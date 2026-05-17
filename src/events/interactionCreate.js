@@ -851,7 +851,8 @@ module.exports = {
             const idade    = (() => { const f = embed.fields.find(f => f.name === 'IDADE');    return f ? parseInt(f.value) || null : null; })();
 
             // Persistir membro aprovado
-            db.query(
+            console.log('[aprovar] Iniciando persistência:', { candidatoId, nome, tipo, registro, cidade, telefone, idade });
+            await db.query(
               `INSERT INTO membros
                 (discord_id, nome, tipo, numero_associado, cidade, telefone, idade, aprovado_por_id, aprovado_por_nome, imagem_prova)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -867,14 +868,16 @@ module.exports = {
                  imagem_prova = EXCLUDED.imagem_prova,
                  criado_em = NOW()`,
               [candidatoId, nome, tipo, registro || null, cidade, telefone, idade, aprovador.id, aprovadorNome, imagemProva],
-            ).catch(err => console.error('[aprovar] Erro ao salvar membro:', err));
+            );
+            console.log('[aprovar] Membro salvo com sucesso');
 
             // Registrar aprovação no ranking
-            db.query(
+            await db.query(
               `INSERT INTO aprovacoes_recrutamento (aprovador_id, aprovador_nome, candidato_id, candidato_nome, tipo)
                VALUES ($1, $2, $3, $4, $5)`,
               [aprovador.id, aprovadorNome, candidatoId, nome, tipo],
-            ).catch(err => console.error('[aprovar] Erro ao salvar aprovação:', err));
+            );
+            console.log('[aprovar] Aprovação registrada com sucesso');
 
             atualizarTopRecrutadores(client).catch(() => {});
           }
