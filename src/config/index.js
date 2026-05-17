@@ -16,6 +16,7 @@ module.exports = {
     logsTicket:         '1505430637941624895',         // Logs e transcritos de tickets — 🛠️・logs-tickets
     logsLoja:           '1505492309595263027',          // Logs e transcritos da loja — 🛠️・logs-loja
     logsItensLoja:      '1505502653306638336',          // Logs de cadastro de itens — 🛠️・logs-itens-loja
+    logsVendas:         '1505510194141069462',          // Logs de vendas confirmadas — 🛠️・logs-vendas
     advertencia:        'ID_CANAL_ADVERTENCIA',       // Botões de advertência de membros
     advRecrutadores:    'ID_CANAL_ADV_RECRUTADORES',  // Botões de advertência de recrutadores
     historicoAdv:       'ID_CANAL_HISTORICO_ADV',     // Histórico de advertências de membros

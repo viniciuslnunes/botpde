@@ -352,6 +352,27 @@ module.exports = {
           const qtd = parseInt(qtdStr) || 1;
           await decrementarEstoque(produtoId, tamanho, qtd).catch(err => console.error('[loja] Erro ao decrementar estoque:', err));
           await db.query(`UPDATE pedidos SET status = 'confirmado' WHERE canal_ticket_id = $1`, [canal.id]).catch(() => {});
+          // Log de venda confirmada
+          try {
+            const prodVenda   = await buscarProduto(produtoId).catch(() => null);
+            const canalVendas = await interaction.client.channels.fetch(config.canais.logsVendas).catch(() => null);
+            if (canalVendas) {
+              const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
+              const pedido    = pedidoRow.rows[0];
+              canalVendas.send({ embeds: [{ color: 0x000000,
+                title: 'VENDA CONFIRMADA',
+                fields: [
+                  { name: 'PRODUTO',      value: prodVenda?.nome ?? `ID ${produtoId}`,               inline: true  },
+                  { name: 'TAMANHO',      value: tamanho === 'UN' ? 'ÚNICO' : tamanho.toUpperCase(), inline: true  },
+                  { name: 'QUANTIDADE',   value: String(qtd),                                        inline: true  },
+                  { name: 'PREÇO UNIT.',  value: prodVenda ? `R$ ${Number(prodVenda.preco).toFixed(2)}` : '—', inline: true },
+                  { name: 'TOTAL',        value: prodVenda ? `R$ ${(Number(prodVenda.preco) * qtd).toFixed(2)}` : '—', inline: true },
+                  { name: 'CLIENTE',      value: pedido ? `<@${pedido.discord_id}>` : canal.name,   inline: true  },
+                  { name: 'CONFIRMADO POR', value: `<@${interaction.user.id}>`,                     inline: false },
+                ],
+              }] });
+            }
+          } catch (e) { console.error('[loja] Erro ao registrar log de venda:', e); }
         }
 
         try {
