@@ -112,4 +112,4 @@ async function atualizarStatusPedido(id, status) {
   await db.query(`UPDATE pedidos SET status = $1 WHERE id = $2`, [status, id]);
 }
 
-module.exports = { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, atualizarStatusPedido, decrementarEstoque, parseEstoquePares, formatarPar, formatarEstoque, tamanhoDisponiveis };
+module.exports = { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, atualizarStatusPedido, decrementarEstoque, formatarEstoque, tamanhoDisponiveis };
