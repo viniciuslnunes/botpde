@@ -20,7 +20,7 @@ const { atualizarMural }      = require('../utils/muralAssociados');
 const { criarCanalTicket, gerarTranscript, CANAL_LOGS, LOGO_PATH, CATEGORIAS } = require('../utils/ticket');
 const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
-const { listarProdutos, buscarProduto, adicionarProduto, removerProduto } = require('../utils/loja');
+const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto } = require('../utils/loja');
 
 const CARGOS_ADV     = config.cargos.adv;
 const CARGOS_ADV_REC = config.cargos.advRec;
@@ -276,6 +276,77 @@ module.exports = {
         } catch {}
         await canal.delete().catch(() => {});
         return;
+      }
+
+      // ── Gerenciamento de loja — botões de ação ────────────────────────────
+
+      if (interaction.isButton() && interaction.customId === 'btn_produto_adicionar') {
+        const modal = new ModalBuilder().setCustomId('modal_produto_add').setTitle('Adicionar Produto');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('nome').setLabel('NOME DO PRODUTO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('tamanhos').setLabel('TAMANHOS (separados por vírgula)').setPlaceholder('P,M,G,GG ou ÚNICO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
+
+      if (interaction.isButton() && interaction.customId === 'btn_produto_remover') {
+        const produtos = await listarProdutos(false).catch(() => []);
+        const ativos   = produtos.filter(p => p.ativo);
+        if (!ativos.length) return interaction.reply({ content: '❌ Nenhum produto ativo no estoque.', flags: 64 });
+        const select = new StringSelectMenuBuilder()
+          .setCustomId('select_remover_produto')
+          .setPlaceholder('Selecione o produto para remover')
+          .addOptions(ativos.slice(0, 25).map(p => ({ label: `${p.nome} — R$ ${Number(p.preco).toFixed(2)}`, value: String(p.id) })));
+        return interaction.reply({ content: '🗑️ Selecione o produto a remover:', components: [new ActionRowBuilder().addComponents(select)], flags: 64 });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'btn_produto_listar') {
+        const todos = await listarProdutos(false).catch(() => []);
+        if (!todos.length) return interaction.reply({ content: 'Nenhum produto cadastrado.', flags: 64 });
+        const linhas = todos.map(p => `**[${p.id}]** ${p.nome} | ${p.tamanhos} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅ ativo' : '❌ inativo'}`);
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '📦 PRODUTOS CADASTRADOS', description: linhas.join('\n') }],
+          flags: 64,
+        });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'btn_produto_editar') {
+        const produtos = await listarProdutos(false).catch(() => []);
+        const ativos   = produtos.filter(p => p.ativo);
+        if (!ativos.length) return interaction.reply({ content: '❌ Nenhum produto ativo no estoque.', flags: 64 });
+        const select = new StringSelectMenuBuilder()
+          .setCustomId('select_editar_produto')
+          .setPlaceholder('Selecione o produto para editar o preço')
+          .addOptions(ativos.slice(0, 25).map(p => ({ label: `${p.nome} — R$ ${Number(p.preco).toFixed(2)}`, value: String(p.id) })));
+        return interaction.reply({ content: '✏️ Selecione o produto:', components: [new ActionRowBuilder().addComponents(select)], flags: 64 });
+      }
+
+      if (interaction.isStringSelectMenu() && interaction.customId === 'select_editar_produto') {
+        const id = interaction.values[0];
+        const modal = new ModalBuilder().setCustomId(`modal_editar_preco:${id}`).setTitle('Editar Preço');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('preco').setLabel('NOVO PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_editar_preco:')) {
+        const id       = interaction.customId.split(':')[1];
+        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco    = parseFloat(precoStr);
+        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ Preço inválido.', flags: 64 });
+        const p = await atualizarProduto(id, { preco }).catch(() => null);
+        if (!p) return interaction.reply({ content: '❌ Erro ao atualizar produto.', flags: 64 });
+        return interaction.reply({ content: `✅ Preço de **${p.nome}** atualizado para **R$ ${Number(p.preco).toFixed(2)}**.`, flags: 64 });
       }
 
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────

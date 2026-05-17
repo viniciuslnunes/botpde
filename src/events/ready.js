@@ -88,8 +88,14 @@ module.exports = {
           const embed = new EmbedBuilder()
             .setColor(0x000000)
             .setTitle('⚙️ GERENCIAMENTO — LOJA')
-            .setDescription('Use os comandos abaixo para gerenciar o estoque:\n\n`/produto adicionar` — Adicionar novo produto\n`/produto remover` — Remover produto\n`/produto listar` — Ver todos os produtos\n`/produto editar_preco` — Alterar preço');
-          await canalGerenc.send({ embeds: [embed] });
+            .setDescription('Use os botões abaixo para gerenciar o estoque da loja.\n\n**ADICIONAR** — Cadastrar novo produto\n**REMOVER** — Retirar produto do estoque\n**LISTAR** — Ver todos os produtos\n**EDITAR PREÇO** — Alterar o preço de um produto');
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('btn_produto_adicionar').setLabel('ADICIONAR').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_produto_remover').setLabel('REMOVER').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_produto_listar').setLabel('LISTAR').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('btn_produto_editar').setLabel('EDITAR PREÇO').setStyle(ButtonStyle.Secondary),
+          );
+          await canalGerenc.send({ embeds: [embed], components: [row] });
         }
       }
     } catch (err) {
