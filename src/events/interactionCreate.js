@@ -81,7 +81,7 @@ module.exports = {
           .addOptions([
             { label: '🤝 PARCERIA',           value: 'parceria',         description: 'Propostas de parceria' },
             { label: '🚨 DENÚNCIA',           value: 'denuncia',         description: 'Denúncias gerais' },
-            { label: '🔒 DENUNCIAR DIRETOR',  value: 'denuncia_diretor', description: 'Privado — diretores não visualizam' },
+            { label: '�️ LOJA',               value: 'loja',             description: 'Dúvidas e pedidos da loja' },
             { label: '📋 RECRUTAMENTO',       value: 'recrutamento',     description: 'Dúvidas sobre recrutamento' },
           ]);
 
@@ -95,9 +95,7 @@ module.exports = {
         await interaction.deferUpdate();
 
         const canal = await criarCanalTicket(interaction.guild, interaction.user, categoria);
-        const avisoPrivado = categoria === 'denuncia_diretor'
-          ? '\n> 🔒 ESTE TICKET É **PRIVADO** — MEMBROS COM CARGO DIRETOR NÃO TÊM ACESSO.'
-          : '';
+        const avisoPrivado = '';
 
         const embed = new EmbedBuilder()
           .setColor(info.cor)

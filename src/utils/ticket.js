@@ -9,7 +9,7 @@ const CARGO_DIRETOR = config.cargos.diretor;
 const CATEGORIAS = {
   parceria:         { label: '🤝 PARCERIA',           emoji: '🤝', cor: 0x000000 },
   denuncia:         { label: '🚨 DENUNCIAR MEMBRO',   emoji: '🚨', cor: 0x000000 },
-  denuncia_diretor: { label: '🔒 DENUNCIAR DIRETOR',  emoji: '🔒', cor: 0x000000 },
+  loja:             { label: '🛍️ LOJA',               emoji: '🛍️', cor: 0x000000 },
   recrutamento:     { label: '📋 RECRUTAMENTO',       emoji: '📋', cor: 0x000000 },
 };
 
