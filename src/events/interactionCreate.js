@@ -851,7 +851,7 @@ module.exports = {
             const idade    = (() => { const f = embed.fields.find(f => f.name === 'IDADE');    return f ? parseInt(f.value) || null : null; })();
 
             // Persistir membro aprovado
-            console.log('[aprovar] Iniciando persistência:', { candidatoId, nome, tipo, registro, cidade, telefone, idade });
+            console.log('[aprovar] Iniciando persistência:', { candidatoId, nome, tipo, registro, cidade, telefone, idade, aprovadorNome });
             await db.query(
               `INSERT INTO membros
                 (discord_id, nome, tipo, numero_associado, cidade, telefone, idade, aprovado_por_id, aprovado_por_nome, imagem_prova)
@@ -882,7 +882,7 @@ module.exports = {
             atualizarTopRecrutadores(client).catch(() => {});
           }
         } catch (err) {
-          console.error('[aprovar] Erro:', err);
+          console.error('[aprovar] Erro DETALHADO:', err.message, err.stack);
         }
 
         return interaction.update({ content: null, embeds: [embedAprovado], components: [] });
