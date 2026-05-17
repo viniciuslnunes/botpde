@@ -403,7 +403,7 @@ module.exports = {
         const linhas = todos.map(p => {
           const est    = formatarEstoque(p.estoque);
           const foto   = p.imagem_url ? ' | 📷 COM FOTO' : '';
-          const status = p.ativo ? 'Produto ativo' : 'Produto sem estoque/Inativo';
+          const status = p.ativo ? 'PRODUTO ATIVO' : 'PRODUTO SEM ESTOQUE/INATIVO';
           return `**[${p.id}]** ${p.nome.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${status}${foto}\n└ ${est}`;
         });
         return interaction.reply({
