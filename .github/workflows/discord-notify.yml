@@ -13,93 +13,56 @@ jobs:
           fetch-depth: 0  # histórico completo para calcular tempo de desenvolvimento
 
       - name: Enviar notificação ao Discord
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          python3 << 'EOF'
-          import subprocess, os, json, urllib.request, datetime
+          HASH_SHORT=$(git log -1 --pretty=%h)
+          HASH_FULL=$(git rev-parse HEAD)
+          MESSAGE=$(git log -1 --pretty=%s)
+          AUTHOR=$(git log -1 --pretty=%an)
+          DATE_STR=$(git log -1 --pretty=%cI)
+          TOTAL=$(git rev-list --count HEAD)
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          REPO="${{ github.repository }}"
 
-          def git(cmd):
-              return subprocess.check_output(['git'] + cmd.split(), text=True).strip()
+          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | head -12 | sed 's/^/\`/' | sed 's/$/\`/' | tr '\n' '\n' || echo "(commit inicial)")
+          COUNT=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | wc -l | tr -d ' ')
+          STATS=$(git diff --shortstat HEAD~1 HEAD 2>/dev/null || echo "")
 
-          # ── Informações do commit ─────────────────────────────────
-          hash_short = git('log -1 --pretty=%h')
-          hash_full  = git('rev-parse HEAD')
-          message    = git('log -1 --pretty=%s')
-          body       = git('log -1 --pretty=%b')
-          author     = git('log -1 --pretty=%an')
-          date_str   = git('log -1 --pretty=%cI')
-          total      = git('rev-list --count HEAD')
-          branch     = git('rev-parse --abbrev-ref HEAD')
-          repo       = '${{ github.repository }}'
+          COMMIT_URL="https://github.com/${REPO}/commit/${HASH_FULL}"
 
-          # ── Arquivos modificados ──────────────────────────────────
-          try:
-              raw = git('diff --name-only HEAD~1 HEAD').split('\n')
-          except Exception:
-              raw = []
-          files = [f for f in raw if f]
-          count = len(files)
-          shown = files[:12]
-          extra = count - len(shown)
-          files_text = '\n'.join(f'`{f}`' for f in shown)
-          if extra > 0:
-              files_text += f'\n*... e mais {extra} arquivo(s)*'
-          if not files_text:
-              files_text = '*(commit inicial)*'
+          FILES_ESCAPED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | head -12 | awk '{print "\`"$0"\`"}' | paste -sd '\n' -)
+          [ -z "$FILES_ESCAPED" ] && FILES_ESCAPED="*(commit inicial)*"
 
-          # ── Estatísticas ──────────────────────────────────────────
-          try:
-              adds_dels = git('diff --shortstat HEAD~1 HEAD')
-          except Exception:
-              adds_dels = ''
-
-          # ── Tempo de desenvolvimento ──────────────────────────────
-          first_iso  = git('log --reverse --pretty=%cI').split('\n')[0]
-          t1 = datetime.datetime.fromisoformat(first_iso).astimezone(datetime.timezone.utc)
-          t2 = datetime.datetime.now(datetime.timezone.utc)
-          delta = t2 - t1
-          days  = delta.days
-          hours = delta.seconds // 3600
-          mins  = (delta.seconds % 3600) // 60
-          dev_time = f'{days}d {hours}h {mins}m'
-
-          # ── Links ─────────────────────────────────────────────────
-          commit_url  = f'https://github.com/{repo}/commit/{hash_full}'
-          compare_url = f'https://github.com/{repo}/commits/{branch}'
-
-          # ── Monta embed ───────────────────────────────────────────
-          desc_parts = [f'>>> **{message}**']
-          if body.strip():
-              desc_parts.append(body.strip())
-          description = '\n'.join(desc_parts)
-
-          fields = [
-              {'name': '👤  AUTOR',                   'value': f'`{author}`',          'inline': True},
-              {'name': '🔀  BRANCH',                  'value': f'`{branch}`',          'inline': True},
-              {'name': '🔢  COMMIT',                  'value': f'[`{hash_short}`]({commit_url})', 'inline': True},
-              {'name': f'📁  ARQUIVOS MODIFICADOS — {count}', 'value': files_text,     'inline': False},
-              {'name': '📊  TOTAL DE COMMITS',        'value': f'`{total}` commits',   'inline': True},
-              {'name': '⏱️  TEMPO DE DESENVOLVIMENTO', 'value': f'`{dev_time}`',        'inline': True},
-          ]
-
-          if adds_dels:
-              fields.append({'name': '±  LINHAS', 'value': f'`{adds_dels.strip()}`', 'inline': False})
-
-          payload = {
-              'embeds': [{
-                  'color': 0x000000,
-                  'title': '🛠️  NOVA ATUALIZAÇÃO — BOT PDE',
-                  'description': description,
-                  'fields': fields,
-                  'footer': {'text': f'BOT PDE • Deploy automático via GitHub Actions'},
-                  'timestamp': date_str,
+          PAYLOAD=$(jq -n \
+            --arg msg "$MESSAGE" \
+            --arg author "$AUTHOR" \
+            --arg branch "$BRANCH" \
+            --arg hash "$HASH_SHORT" \
+            --arg url "$COMMIT_URL" \
+            --arg files "$FILES_ESCAPED" \
+            --arg count "$COUNT" \
+            --arg total "$TOTAL" \
+            --arg stats "$STATS" \
+            --arg date "$DATE_STR" \
+            '{
+              embeds: [{
+                color: 1,
+                title: "🛠️ NOVA ATUALIZAÇÃO — BOT PDE",
+                description: (">>> **" + $msg + "**"),
+                fields: [
+                  {name: "👤 AUTOR",                        value: ("`" + $author + "`"),  inline: true},
+                  {name: "🔀 BRANCH",                       value: ("`" + $branch + "`"),  inline: true},
+                  {name: "🔢 COMMIT",                       value: ("[`" + $hash + "`](" + $url + ")"), inline: true},
+                  {name: ("📁 ARQUIVOS MODIFICADOS — " + $count), value: $files,           inline: false},
+                  {name: "📊 TOTAL DE COMMITS",             value: ("`" + $total + "` commits"), inline: true},
+                  {name: "± LINHAS",                        value: (if $stats == "" then "—" else ("`" + $stats + "`") end), inline: false}
+                ],
+                footer: {text: "BOT PDE • Deploy automático via GitHub Actions"},
+                timestamp: $date
               }]
-          }
+            }')
 
-          webhook = os.environ['DISCORD_WEBHOOK']
-          data    = json.dumps(payload).encode()
-          req     = urllib.request.Request(webhook, data=data, headers={'Content-Type': 'application/json'})
-          urllib.request.urlopen(req)
-          print('✅ Notificação enviada com sucesso!')
-          EOF
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "${{ secrets.DISCORD_WEBHOOK }}"
