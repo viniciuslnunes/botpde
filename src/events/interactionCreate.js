@@ -141,20 +141,27 @@ module.exports = {
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_produto_loja') {
         const produtoId = interaction.values[0];
         const produto   = await buscarProduto(produtoId).catch(() => null);
-        if (!produto) return interaction.update({ content: '❌ Produto não encontrado.', components: [], embeds: [] });
+        if (!produto) return interaction.update({ content: '❌ PRODUTO NÃO ENCONTRADO.', components: [], embeds: [] });
 
         const tamanhos = produto.tamanhos.split(',').map(t => t.trim()).filter(Boolean);
         const select   = new StringSelectMenuBuilder()
           .setCustomId(`select_tamanho_loja:${produtoId}`)
           .setPlaceholder('SELECIONE O TAMANHO')
-          .addOptions(tamanhos.map(t => ({ label: t, value: t })));
+          .addOptions(tamanhos.map(t => ({ label: t.toUpperCase(), value: t })));
+
+        const embedProduto = {
+          color: 0x000000,
+          title: `🛒 ${produto.nome.toUpperCase()}`,
+          fields: [
+            { name: 'PREÇO',    value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
+            { name: 'TAMANHOS', value: produto.tamanhos.toUpperCase(),           inline: true },
+          ],
+          description: 'SELECIONE O TAMANHO ABAIXO:',
+        };
+        if (produto.imagem_url) embedProduto.image = { url: produto.imagem_url };
 
         return interaction.update({
-          embeds: [{
-            color: 0x000000,
-            title: `🛒 ${produto.nome}`,
-            description: `**Preço:** R$ ${Number(produto.preco).toFixed(2)}\nSelecione o tamanho:`,
-          }],
+          embeds: [embedProduto],
           components: [new ActionRowBuilder().addComponents(select)],
         });
       }
@@ -229,22 +236,25 @@ module.exports = {
 
         const PIX_KEY = '11.222.333/0001-44'; // chave simbólica
 
+        const embedPedido = {
+          color: 0xFFFFFF,
+          title: '🛒 NOVO PEDIDO',
+          fields: [
+            { name: 'PRODUTO',     value: produto.nome.toUpperCase(),               inline: true  },
+            { name: 'TAMANHO',     value: tamanho.toUpperCase(),                    inline: true  },
+            { name: 'QUANTIDADE',  value: String(qtd),                              inline: true  },
+            { name: 'PREÇO UNIT.', value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true  },
+            { name: 'TOTAL',       value: `R$ ${total}`,                            inline: true  },
+            ...(obs ? [{ name: 'OBSERVAÇÕES', value: obs, inline: false }] : []),
+            { name: 'SOLICITANTE', value: `<@${user.id}>`,                          inline: false },
+          ],
+          footer: { text: new Date().toLocaleString('pt-BR') },
+        };
+        if (produto.imagem_url) embedPedido.thumbnail = { url: produto.imagem_url };
+
         await canal.send({
           content: `${user}`,
-          embeds: [{
-            color: 0xFFFFFF,
-            title: '🛒 NOVO PEDIDO',
-            fields: [
-              { name: 'PRODUTO',     value: produto.nome,                           inline: true  },
-              { name: 'TAMANHO',     value: tamanho,                                inline: true  },
-              { name: 'QUANTIDADE',  value: String(qtd),                            inline: true  },
-              { name: 'PREÇO UNIT.', value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
-              { name: 'TOTAL',       value: `R$ ${total}`,                          inline: true  },
-              ...(obs ? [{ name: 'OBSERVAÇÕES', value: obs, inline: false }] : []),
-              { name: '📋 SOLICITANTE', value: `<@${user.id}>`,                    inline: false },
-            ],
-            footer: { text: new Date().toLocaleString('pt-BR') },
-          }],
+          embeds: [embedPedido],
           components: [rowFechar],
         });
 
@@ -281,7 +291,7 @@ module.exports = {
       // ── Gerenciamento de loja — botões de ação ────────────────────────────
 
       if (interaction.isButton() && interaction.customId === 'btn_produto_adicionar') {
-        const modal = new ModalBuilder().setCustomId('modal_produto_add').setTitle('Adicionar Produto');
+        const modal = new ModalBuilder().setCustomId('modal_produto_add').setTitle('ADICIONAR PRODUTO');
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('nome').setLabel('NOME DO PRODUTO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
@@ -291,6 +301,9 @@ module.exports = {
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('imagem_url').setLabel('URL DA IMAGEM (OPCIONAL)').setPlaceholder('https://...').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
           ),
         );
         return interaction.showModal(modal);
@@ -309,8 +322,11 @@ module.exports = {
 
       if (interaction.isButton() && interaction.customId === 'btn_produto_listar') {
         const todos = await listarProdutos(false).catch(() => []);
-        if (!todos.length) return interaction.reply({ content: 'Nenhum produto cadastrado.', flags: 64 });
-        const linhas = todos.map(p => `**[${p.id}]** ${p.nome} | ${p.tamanhos} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅ ativo' : '❌ inativo'}`);
+        if (!todos.length) return interaction.reply({ content: 'NENHUM PRODUTO CADASTRADO.', flags: 64 });
+        const linhas = todos.map(p => {
+          const img = p.imagem_url ? ` | [IMAGEM](${p.imagem_url})` : '';
+          return `**[${p.id}]** ${p.nome.toUpperCase()} | ${p.tamanhos.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅ ATIVO' : '❌ INATIVO'}${img}`;
+        });
         return interaction.reply({
           embeds: [{ color: 0x000000, title: '📦 PRODUTOS CADASTRADOS', description: linhas.join('\n') }],
           flags: 64,
@@ -320,53 +336,77 @@ module.exports = {
       if (interaction.isButton() && interaction.customId === 'btn_produto_editar') {
         const produtos = await listarProdutos(false).catch(() => []);
         const ativos   = produtos.filter(p => p.ativo);
-        if (!ativos.length) return interaction.reply({ content: '❌ Nenhum produto ativo no estoque.', flags: 64 });
+        if (!ativos.length) return interaction.reply({ content: '❌ NENHUM PRODUTO ATIVO NO ESTOQUE.', flags: 64 });
         const select = new StringSelectMenuBuilder()
           .setCustomId('select_editar_produto')
-          .setPlaceholder('Selecione o produto para editar o preço')
-          .addOptions(ativos.slice(0, 25).map(p => ({ label: `${p.nome} — R$ ${Number(p.preco).toFixed(2)}`, value: String(p.id) })));
-        return interaction.reply({ content: '✏️ Selecione o produto:', components: [new ActionRowBuilder().addComponents(select)], flags: 64 });
+          .setPlaceholder('SELECIONE O PRODUTO PARA EDITAR')
+          .addOptions(ativos.slice(0, 25).map(p => ({ label: `${p.nome.toUpperCase()} — R$ ${Number(p.preco).toFixed(2)}`, value: String(p.id) })));
+        return interaction.reply({ content: '✏️ SELECIONE O PRODUTO:', components: [new ActionRowBuilder().addComponents(select)], flags: 64 });
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_editar_produto') {
-        const id = interaction.values[0];
-        const modal = new ModalBuilder().setCustomId(`modal_editar_preco:${id}`).setTitle('Editar Preço');
+        const id      = interaction.values[0];
+        const produto = await buscarProduto(id).catch(() => null);
+        if (!produto) return interaction.update({ content: '❌ PRODUTO NÃO ENCONTRADO.', components: [], embeds: [] });
+        const modal = new ModalBuilder().setCustomId(`modal_editar_produto:${id}`).setTitle('EDITAR PRODUTO');
         modal.addComponents(
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('preco').setLabel('NOVO PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            new TextInputBuilder().setCustomId('nome').setLabel('NOME').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80).setValue(produto.nome),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('tamanhos').setLabel('TAMANHOS (separados por vírgula)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue(produto.tamanhos),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('imagem_url').setLabel('URL DA IMAGEM (OPCIONAL)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500).setValue(produto.imagem_url || ''),
           ),
         );
         return interaction.showModal(modal);
       }
 
-      if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_editar_preco:')) {
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_editar_produto:')) {
         const id       = interaction.customId.split(':')[1];
+        const nome     = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const tamanhos = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
         const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
         const preco    = parseFloat(precoStr);
-        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ Preço inválido.', flags: 64 });
-        const p = await atualizarProduto(id, { preco }).catch(() => null);
-        if (!p) return interaction.reply({ content: '❌ Erro ao atualizar produto.', flags: 64 });
-        return interaction.reply({ content: `✅ Preço de **${p.nome}** atualizado para **R$ ${Number(p.preco).toFixed(2)}**.`, flags: 64 });
+        const imgRaw   = interaction.fields.getTextInputValue('imagem_url').trim();
+        const imagem_url = imgRaw || null;
+        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
+        const p = await atualizarProduto(id, { nome, tamanhos, preco, imagem_url }).catch(() => null);
+        if (!p) return interaction.reply({ content: '❌ ERRO AO ATUALIZAR PRODUTO.', flags: 64 });
+        const embed = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
+          { name: 'NOME',     value: p.nome,                                inline: true },
+          { name: 'TAMANHOS', value: p.tamanhos,                            inline: true },
+          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,    inline: true },
+          { name: 'IMAGEM',   value: p.imagem_url ? p.imagem_url : '—',     inline: false },
+        ]};
+        if (p.imagem_url) embed.image = { url: p.imagem_url };
+        return interaction.reply({ embeds: [embed], flags: 64 });
       }
 
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
 
       if (interaction.isModalSubmit() && interaction.customId === 'modal_produto_add') {
-        const nome     = interaction.fields.getTextInputValue('nome');
-        const tamanhos = interaction.fields.getTextInputValue('tamanhos');
-        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco    = parseFloat(precoStr);
-        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ Preço inválido.', flags: 64 });
-        const p = await adicionarProduto(nome, tamanhos, preco).catch(() => null);
-        if (!p) return interaction.reply({ content: '❌ Erro ao salvar produto.', flags: 64 });
-        return interaction.reply({
-          embeds: [{ color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
-            { name: 'NOME',    value: p.nome,                                 inline: true },
-            { name: 'TAMANHOS', value: p.tamanhos,                            inline: true },
-            { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,     inline: true },
-          ]}],
-          flags: 64,
-        });
+        const nome       = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const tamanhos   = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
+        const precoStr   = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco      = parseFloat(precoStr);
+        const imgRaw     = interaction.fields.getTextInputValue('imagem_url').trim();
+        const imagem_url = imgRaw || null;
+        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
+        const p = await adicionarProduto(nome, tamanhos, preco, imagem_url).catch(() => null);
+        if (!p) return interaction.reply({ content: '❌ ERRO AO SALVAR PRODUTO.', flags: 64 });
+        const embed = { color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
+          { name: 'NOME',     value: p.nome,                             inline: true },
+          { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
+          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
+          { name: 'IMAGEM',   value: p.imagem_url ? p.imagem_url : '—',  inline: false },
+        ]};
+        if (p.imagem_url) embed.image = { url: p.imagem_url };
+        return interaction.reply({ embeds: [embed], flags: 64 });
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_remover_produto') {

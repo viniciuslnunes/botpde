@@ -15,10 +15,10 @@ async function buscarProduto(id) {
   return res.rows[0] || null;
 }
 
-async function adicionarProduto(nome, tamanhos, preco) {
+async function adicionarProduto(nome, tamanhos, preco, imagem_url = null) {
   const res = await db.query(
-    `INSERT INTO produtos (nome, tamanhos, preco) VALUES ($1, $2, $3) RETURNING *`,
-    [nome, tamanhos, parseFloat(preco)],
+    `INSERT INTO produtos (nome, tamanhos, preco, imagem_url) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [nome, tamanhos, parseFloat(preco), imagem_url || null],
   );
   return res.rows[0];
 }
