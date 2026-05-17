@@ -24,20 +24,29 @@ const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, remov
 const pendingProdutos = require('../utils/pendingProdutos');
 
 // ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
+// Retorna { embeds, files } — files contém Buffers quando dados são base64
 function carrosselEmbeds(embedBase, imagem_url) {
-  if (!imagem_url) return [embedBase];
-  const urls = imagem_url.split(',').map(u => u.trim()).filter(Boolean).slice(0, 4);
-  if (!urls.length) return [embedBase];
-  if (urls.length === 1) {
-    return [{ ...embedBase, image: { url: urls[0] } }];
+  if (!imagem_url) return { embeds: [embedBase], files: [] };
+  const items = imagem_url.split(',').map(s => s.trim()).filter(Boolean).slice(0, 4);
+  if (!items.length) return { embeds: [embedBase], files: [] };
+
+  const isUrl = items[0].startsWith('http');
+  if (isUrl) {
+    // Compatibilidade com registros antigos que tinham URL (podem estar expirados)
+    if (items.length === 1) return { embeds: [{ ...embedBase, image: { url: items[0] } }], files: [] };
+    const ANCHOR = 'https://discord.com/channels/@me';
+    const embeds = [{ ...embedBase, url: ANCHOR, image: { url: items[0] } }];
+    for (let i = 1; i < items.length; i++) embeds.push({ color: embedBase.color ?? 0, url: ANCHOR, image: { url: items[i] } });
+    return { embeds, files: [] };
   }
-  // Múltiplas imagens: Discord agrupa embeds com mesmo `url` em galeria
+
+  // Dados em base64 — cria Buffers e envia como attachment para nunca expirarem
+  const files = items.map((b64, i) => ({ attachment: Buffer.from(b64, 'base64'), name: `imagem${i + 1}.png` }));
+  if (items.length === 1) return { embeds: [{ ...embedBase, image: { url: 'attachment://imagem1.png' } }], files };
   const ANCHOR = 'https://discord.com/channels/@me';
-  const embeds = [{ ...embedBase, url: ANCHOR, image: { url: urls[0] } }];
-  for (let i = 1; i < urls.length; i++) {
-    embeds.push({ color: embedBase.color ?? 0, url: ANCHOR, image: { url: urls[i] } });
-  }
-  return embeds;
+  const embeds = [{ ...embedBase, url: ANCHOR, image: { url: 'attachment://imagem1.png' } }];
+  for (let i = 1; i < items.length; i++) embeds.push({ color: embedBase.color ?? 0, url: ANCHOR, image: { url: `attachment://imagem${i + 1}.png` } });
+  return { embeds, files };
 }
 
 const CARGOS_ADV     = config.cargos.adv;
@@ -178,7 +187,7 @@ module.exports = {
         };
 
         return interaction.update({
-          embeds: carrosselEmbeds(embedProduto, produto.imagem_url),
+          ...carrosselEmbeds(embedProduto, produto.imagem_url),
           components: [new ActionRowBuilder().addComponents(select)],
         });
       }
@@ -270,7 +279,7 @@ module.exports = {
 
         await canal.send({
           content: `${user}`,
-          embeds: carrosselEmbeds(embedPedido, produto.imagem_url),
+          ...carrosselEmbeds(embedPedido, produto.imagem_url),
           components: [rowFechar],
         });
 
@@ -470,7 +479,7 @@ module.exports = {
           { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
           { name: 'FOTOS',    value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA', inline: false },
         ]};
-        return interaction.update({ embeds: carrosselEmbeds(embedBase, p.imagem_url), components: [] });
+        return interaction.update({ ...carrosselEmbeds(embedBase, p.imagem_url), components: [] });
       }
 
       if (interaction.isButton() && interaction.customId === 'prod_cancelar') {
