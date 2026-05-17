@@ -56,5 +56,44 @@ module.exports = {
     } catch (err) {
       console.error('[ready] Erro ao enviar mensagem de ticket:', err);
     }
+
+    // ── Mensagem fixa de loja ────────────────────────────────
+    try {
+      const canalLoja = await client.channels.fetch(config.canais.loja).catch(() => null);
+      if (canalLoja) {
+        const msgs     = await canalLoja.messages.fetch({ limit: 20 });
+        const jaExiste = msgs.some(m => m.author.id === client.user.id && m.components.length > 0);
+        if (!jaExiste) {
+          const row   = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('abrir_loja').setLabel('🛒 VER PRODUTOS').setStyle(ButtonStyle.Secondary),
+          );
+          const embed = new EmbedBuilder()
+            .setColor(0x000000)
+            .setTitle('🛒 LOJA PDE')
+            .setDescription('Clique no botão abaixo para ver os produtos disponíveis e realizar seu pedido!');
+          await canalLoja.send({ embeds: [embed], components: [row] });
+        }
+      }
+    } catch (err) {
+      console.error('[ready] Erro ao enviar mensagem de loja:', err);
+    }
+
+    // ── Mensagem fixa de gerenciamento da loja ───────────────
+    try {
+      const canalGerenc = await client.channels.fetch(config.canais.gerenciamentoLoja).catch(() => null);
+      if (canalGerenc) {
+        const msgs     = await canalGerenc.messages.fetch({ limit: 20 });
+        const jaExiste = msgs.some(m => m.author.id === client.user.id && m.components.length > 0);
+        if (!jaExiste) {
+          const embed = new EmbedBuilder()
+            .setColor(0x000000)
+            .setTitle('⚙️ GERENCIAMENTO — LOJA')
+            .setDescription('Use os comandos abaixo para gerenciar o estoque:\n\n`/produto adicionar` — Adicionar novo produto\n`/produto remover` — Remover produto\n`/produto listar` — Ver todos os produtos\n`/produto editar_preco` — Alterar preço');
+          await canalGerenc.send({ embeds: [embed] });
+        }
+      }
+    } catch (err) {
+      console.error('[ready] Erro ao enviar mensagem de gerenciamento:', err);
+    }
   },
 };

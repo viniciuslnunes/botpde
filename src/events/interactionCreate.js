@@ -20,6 +20,7 @@ const { atualizarMural }      = require('../utils/muralAssociados');
 const { criarCanalTicket, gerarTranscript, CANAL_LOGS, LOGO_PATH, CATEGORIAS } = require('../utils/ticket');
 const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
+const { listarProdutos, buscarProduto, adicionarProduto, removerProduto } = require('../utils/loja');
 
 const CARGOS_ADV     = config.cargos.adv;
 const CARGOS_ADV_REC = config.cargos.advRec;
@@ -111,6 +112,196 @@ module.exports = {
 
         await canal.delete().catch(() => {});
         return;
+      }
+
+      // ══════════════════════════════════════════════════════
+      //  LOJA
+      // ══════════════════════════════════════════════════════
+
+      if (interaction.isButton() && interaction.customId === 'abrir_loja') {
+        const produtos = await listarProdutos(true).catch(() => []);
+        if (!produtos.length) {
+          return interaction.reply({ content: '🛒 Nenhum produto disponível no momento.', flags: 64 });
+        }
+        const select = new StringSelectMenuBuilder()
+          .setCustomId('select_produto_loja')
+          .setPlaceholder('SELECIONE O PRODUTO')
+          .addOptions(produtos.slice(0, 25).map(p => ({
+            label: p.nome,
+            description: `R$ ${Number(p.preco).toFixed(2)}`,
+            value: String(p.id),
+          })));
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '🛒 LOJA — PRODUTOS DISPONÍVEIS', description: 'Selecione o produto desejado abaixo:' }],
+          components: [new ActionRowBuilder().addComponents(select)],
+          flags: 64,
+        });
+      }
+
+      if (interaction.isStringSelectMenu() && interaction.customId === 'select_produto_loja') {
+        const produtoId = interaction.values[0];
+        const produto   = await buscarProduto(produtoId).catch(() => null);
+        if (!produto) return interaction.update({ content: '❌ Produto não encontrado.', components: [], embeds: [] });
+
+        const tamanhos = produto.tamanhos.split(',').map(t => t.trim()).filter(Boolean);
+        const select   = new StringSelectMenuBuilder()
+          .setCustomId(`select_tamanho_loja:${produtoId}`)
+          .setPlaceholder('SELECIONE O TAMANHO')
+          .addOptions(tamanhos.map(t => ({ label: t, value: t })));
+
+        return interaction.update({
+          embeds: [{
+            color: 0x000000,
+            title: `🛒 ${produto.nome}`,
+            description: `**Preço:** R$ ${Number(produto.preco).toFixed(2)}\nSelecione o tamanho:`,
+          }],
+          components: [new ActionRowBuilder().addComponents(select)],
+        });
+      }
+
+      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_tamanho_loja:')) {
+        const produtoId = interaction.customId.split(':')[1];
+        const tamanho   = interaction.values[0];
+        const produto   = await buscarProduto(produtoId).catch(() => null);
+        if (!produto) return interaction.update({ content: '❌ Produto não encontrado.', components: [], embeds: [] });
+
+        const modal = new ModalBuilder()
+          .setCustomId(`modal_pedido_loja:${produtoId}:${tamanho}`)
+          .setTitle('FINALIZAR PEDIDO');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('quantidade').setLabel('QUANTIDADE').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1').setMaxLength(3),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('obs').setLabel('OBSERVAÇÕES (opcional)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(300),
+          ),
+        );
+        return interaction.showModal(modal);
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_pedido_loja:')) {
+        const [, produtoId, tamanho] = interaction.customId.split(':');
+        const qtdStr   = interaction.fields.getTextInputValue('quantidade');
+        const obs      = interaction.fields.getTextInputValue('obs') || null;
+        const qtd      = parseInt(qtdStr);
+        if (isNaN(qtd) || qtd < 1 || qtd > 100) {
+          return interaction.reply({ content: '❌ Quantidade inválida (mín. 1, máx. 100).', flags: 64 });
+        }
+
+        const produto = await buscarProduto(produtoId).catch(() => null);
+        if (!produto) return interaction.reply({ content: '❌ Produto não encontrado.', flags: 64 });
+
+        await interaction.deferReply({ flags: 64 });
+
+        const total     = (Number(produto.preco) * qtd).toFixed(2);
+        const user      = interaction.user;
+        const nomeCanal = `loja-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 18)}`;
+
+        // Cria canal ticket na categoria da loja
+        const { PermissionFlagsBits } = require('discord.js');
+        const canal = await interaction.guild.channels.create({
+          name: nomeCanal,
+          parent: config.categoriaLoja,
+          permissionOverwrites: [
+            { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+            { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory] },
+          ],
+          topic: `Pedido de ${user.tag} — ${produto.nome}`,
+        });
+
+        // Persiste pedido no banco
+        const { registrarPedido } = require('../utils/loja');
+        registrarPedido({
+          discord_id:      user.id,
+          discord_tag:     user.tag,
+          produto_id:      produto.id,
+          produto_nome:    produto.nome,
+          tamanho,
+          quantidade:      qtd,
+          preco_unit:      produto.preco,
+          canal_ticket_id: canal.id,
+        }).catch(err => console.error('[loja] Erro ao registrar pedido:', err));
+
+        const rowFechar = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('fechar_ticket_loja').setLabel('🔒 FECHAR PEDIDO').setStyle(ButtonStyle.Danger),
+        );
+
+        const PIX_KEY = '11.222.333/0001-44'; // chave simbólica
+
+        await canal.send({
+          content: `${user}`,
+          embeds: [{
+            color: 0xFFFFFF,
+            title: '🛒 NOVO PEDIDO',
+            fields: [
+              { name: 'PRODUTO',     value: produto.nome,                           inline: true  },
+              { name: 'TAMANHO',     value: tamanho,                                inline: true  },
+              { name: 'QUANTIDADE',  value: String(qtd),                            inline: true  },
+              { name: 'PREÇO UNIT.', value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
+              { name: 'TOTAL',       value: `R$ ${total}`,                          inline: true  },
+              ...(obs ? [{ name: 'OBSERVAÇÕES', value: obs, inline: false }] : []),
+              { name: '📋 SOLICITANTE', value: `<@${user.id}>`,                    inline: false },
+            ],
+            footer: { text: new Date().toLocaleString('pt-BR') },
+          }],
+          components: [rowFechar],
+        });
+
+        await canal.send({
+          embeds: [{
+            color: 0x000000,
+            title: '💳 PAGAMENTO VIA PIX',
+            description: `Para finalizar seu pedido, envie o comprovante de pagamento neste canal.\n\n**Chave PIX:** \`${PIX_KEY}\`\n**Valor:** \`R$ ${total}\`\n\nApós o envio do comprovante, nossa equipe irá confirmar e separar seu pedido. ✅`,
+          }],
+        });
+
+        return interaction.editReply({ content: `🛒 Pedido aberto: ${canal}`, components: [] });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'fechar_ticket_loja') {
+        const canal = interaction.channel;
+        await interaction.deferReply({ flags: 64 });
+        await interaction.editReply({ content: '⏳ Gerando transcript e fechando pedido...' });
+        try {
+          const html      = await gerarTranscript(canal);
+          const buffer    = Buffer.from(html, 'utf-8');
+          const canalLogs = await interaction.client.channels.fetch(CANAL_LOGS).catch(() => null);
+          if (canalLogs) {
+            await canalLogs.send({
+              content: `🛒 PEDIDO FECHADO: **${canal.name}** — por ${interaction.user}`,
+              files: [{ attachment: buffer, name: `transcript-${canal.id}.html` }],
+            });
+          }
+        } catch {}
+        await canal.delete().catch(() => {});
+        return;
+      }
+
+      // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
+
+      if (interaction.isModalSubmit() && interaction.customId === 'modal_produto_add') {
+        const nome     = interaction.fields.getTextInputValue('nome');
+        const tamanhos = interaction.fields.getTextInputValue('tamanhos');
+        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco    = parseFloat(precoStr);
+        if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ Preço inválido.', flags: 64 });
+        const p = await adicionarProduto(nome, tamanhos, preco).catch(() => null);
+        if (!p) return interaction.reply({ content: '❌ Erro ao salvar produto.', flags: 64 });
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
+            { name: 'NOME',    value: p.nome,                                 inline: true },
+            { name: 'TAMANHOS', value: p.tamanhos,                            inline: true },
+            { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,     inline: true },
+          ]}],
+          flags: 64,
+        });
+      }
+
+      if (interaction.isStringSelectMenu() && interaction.customId === 'select_remover_produto') {
+        const id = interaction.values[0];
+        await removerProduto(id).catch(() => {});
+        return interaction.update({ content: '✅ Produto removido do estoque.', components: [], embeds: [] });
       }
 
       // ══════════════════════════════════════════════════════

@@ -25,6 +25,8 @@ module.exports = {
     elenco:             'ID_CANAL_ELENCO',            // Embed de elenco
     quadroRecrutadores: 'ID_CANAL_QUADRO_RECRUTADORES', // Quadro de recrutadores
     topRecrutadores:    'ID_CANAL_TOP_RECRUTADORES',  // Ranking de recrutadores
+    loja:               '1493461657433935902',         // 🛒・loja — botão ver produtos
+    gerenciamentoLoja:  '1505465708979421195',         // 🛒・gerenciamento-loja — admin estoque
   },
 
   // ── Cargos ────────────────────────────────────────────────
@@ -60,8 +62,9 @@ module.exports = {
     { id: 'ID_CARGO_RECRUTADOR',   label: 'EQUIPE RECRUTAMENTO' },
   ],
 
-  // ── Categoria de tickets (Discord category ID) ───────────
+  // ── Categorias ────────────────────────────────────────────
   categoriaTickets: '1493453432898457671',  // Categoria ATENDIMENTO
+  categoriaLoja:    '1493453830615076944',  // Categoria 🛒・LOJA
 
   // ── Textos da carteirinha ─────────────────────────────────
   carteirinha: {
