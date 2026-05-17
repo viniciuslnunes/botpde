@@ -244,10 +244,7 @@ module.exports = {
           topic: `Pedido de ${user.tag} — ${produto.nome}`,
         });
 
-        // Persiste pedido no banco
-        // Decrementa estoque do tamanho escolhido
-        await decrementarEstoque(produto.id, tamanho, qtd).catch(err => console.error('[loja] Erro ao decrementar estoque:', err));
-
+        // Persiste pedido no banco (estoque só é decrementado quando admin confirmar a compra)
         registrarPedido({
           discord_id:      user.id,
           discord_tag:     user.tag,
@@ -260,7 +257,8 @@ module.exports = {
         }).catch(err => console.error('[loja] Erro ao registrar pedido:', err));
 
         const rowFechar = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('fechar_ticket_loja').setLabel('🔒 FECHAR PEDIDO').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId('fechar_ticket_loja').setLabel('🔒 FECHAR TICKET').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`confirmar_compra_loja:${produto.id}:${tamanho}:${qtd}`).setLabel('✅ CONFIRMAR COMPRA').setStyle(ButtonStyle.Success),
         );
 
         const PIX_KEY = '11.222.333/0001-44'; // chave simbólica
@@ -297,17 +295,34 @@ module.exports = {
         return interaction.editReply({ content: `🛒 Pedido aberto: ${canal}`, components: [] });
       }
 
-      if (interaction.isButton() && interaction.customId === 'fechar_ticket_loja') {
+      if (interaction.isButton() && (interaction.customId === 'fechar_ticket_loja' || interaction.customId.startsWith('confirmar_compra_loja:'))) {
+        const { PermissionFlagsBits: PFB } = require('discord.js');
+        if (!interaction.member.permissions.has(PFB.ManageChannels)) {
+          return interaction.reply({ content: '❌ APENAS ADMINISTRADORES PODEM USAR ESTE BOTÃO.', flags: 64 });
+        }
+
         const canal = interaction.channel;
+        const confirmar = interaction.customId.startsWith('confirmar_compra_loja:');
+
         await interaction.deferReply({ flags: 64 });
-        await interaction.editReply({ content: '⏳ Gerando transcript e fechando pedido...' });
+        await interaction.editReply({ content: '⏳ Processando...' });
+
+        if (confirmar) {
+          const [, produtoId, tamanho, qtdStr] = interaction.customId.split(':');
+          const qtd = parseInt(qtdStr) || 1;
+          await decrementarEstoque(produtoId, tamanho, qtd).catch(err => console.error('[loja] Erro ao decrementar estoque:', err));
+          await db.query(`UPDATE pedidos SET status = 'confirmado' WHERE canal_ticket_id = $1`, [canal.id]).catch(() => {});
+        }
+
         try {
           const html      = await gerarTranscript(canal);
           const buffer    = Buffer.from(html, 'utf-8');
           const canalLogs = await interaction.client.channels.fetch(CANAL_LOGS).catch(() => null);
           if (canalLogs) {
             await canalLogs.send({
-              content: `🛒 PEDIDO FECHADO: **${canal.name}** — por ${interaction.user}`,
+              content: confirmar
+                ? `✅ COMPRA CONFIRMADA: **${canal.name}** — por ${interaction.user}`
+                : `🔒 TICKET FECHADO SEM CONFIRMAR: **${canal.name}** — por ${interaction.user}`,
               files: [{ attachment: buffer, name: `transcript-${canal.id}.html` }],
             });
           }
