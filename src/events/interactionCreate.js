@@ -20,7 +20,7 @@ const { atualizarMural }      = require('../utils/muralAssociados');
 const { criarCanalTicket, gerarTranscript, CANAL_LOGS, LOGO_PATH, CATEGORIAS } = require('../utils/ticket');
 const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
-const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto } = require('../utils/loja');
+const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, decrementarEstoque, parseEstoque, formatarEstoque, tamanhoDisponiveis } = require('../utils/loja');
 const pendingProdutos = require('../utils/pendingProdutos');
 
 // ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
@@ -170,18 +170,19 @@ module.exports = {
         const produto   = await buscarProduto(produtoId).catch(() => null);
         if (!produto) return interaction.update({ content: '❌ PRODUTO NÃO ENCONTRADO.', components: [], embeds: [] });
 
-        const tamanhos = produto.tamanhos.split(',').map(t => t.trim()).filter(Boolean);
+        const disponiveis = tamanhoDisponiveis(produto.estoque);
+        if (!disponiveis.length) return interaction.update({ content: '❌ PRODUTO SEM ESTOQUE NO MOMENTO.', components: [], embeds: [] });
         const select   = new StringSelectMenuBuilder()
           .setCustomId(`select_tamanho_loja:${produtoId}`)
           .setPlaceholder('SELECIONE O TAMANHO')
-          .addOptions(tamanhos.map(t => ({ label: t.toUpperCase(), value: t })));
+          .addOptions(disponiveis.map(t => ({ label: `${t.toUpperCase()} (${produto.estoque[t]} un.)`, value: t })));
 
         const embedProduto = {
           color: 0x000000,
           title: produto.nome.toUpperCase(),
           fields: [
-            { name: 'PREÇO',    value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
-            { name: 'TAMANHOS', value: produto.tamanhos.toUpperCase(),           inline: true },
+            { name: 'PREÇO',   value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
+            { name: 'ESTOQUE', value: formatarEstoque(produto.estoque),          inline: false },
           ],
           description: 'SELECIONE O TAMANHO ABAIXO:',
         };
@@ -244,7 +245,9 @@ module.exports = {
         });
 
         // Persiste pedido no banco
-        const { registrarPedido } = require('../utils/loja');
+        // Decrementa estoque do tamanho escolhido
+        await decrementarEstoque(produto.id, tamanho, qtd).catch(err => console.error('[loja] Erro ao decrementar estoque:', err));
+
         registrarPedido({
           discord_id:      user.id,
           discord_tag:     user.tag,
@@ -322,7 +325,7 @@ module.exports = {
             new TextInputBuilder().setCustomId('nome').setLabel('NOME DO PRODUTO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('tamanhos').setLabel('TAMANHOS (separados por vírgula)').setPlaceholder('P,M,G,GG ou ÚNICO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
+            new TextInputBuilder().setCustomId('estoque').setLabel('ESTOQUE POR TAMANHO').setPlaceholder('PP:5\nP:10\nM:8\nG:5\nGG:3\nEXG:2').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(200),
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
@@ -346,11 +349,12 @@ module.exports = {
         const todos = await listarProdutos(false).catch(() => []);
         if (!todos.length) return interaction.reply({ content: 'NENHUM PRODUTO CADASTRADO.', flags: 64 });
         const linhas = todos.map(p => {
-          const img = p.imagem_url ? ` | [IMAGEM](${p.imagem_url})` : '';
-          return `**[${p.id}]** ${p.nome.toUpperCase()} | ${p.tamanhos.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅ ATIVO' : '❌ INATIVO'}${img}`;
+          const est  = formatarEstoque(p.estoque);
+          const foto = p.imagem_url ? ' | 📷 COM FOTO' : '';
+          return `**[${p.id}]** ${p.nome.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅' : '❌'}${foto}\n└ ${est}`;
         });
         return interaction.reply({
-          embeds: [{ color: 0x000000, title: '📦 PRODUTOS CADASTRADOS', description: linhas.join('\n') }],
+          embeds: [{ color: 0x000000, title: '📦 PRODUTOS CADASTRADOS', description: linhas.join('\n\n') }],
           flags: 64,
         });
       }
@@ -370,13 +374,16 @@ module.exports = {
         const id      = interaction.values[0];
         const produto = await buscarProduto(id).catch(() => null);
         if (!produto) return interaction.update({ content: '❌ PRODUTO NÃO ENCONTRADO.', components: [], embeds: [] });
+        // Monta valor pré-preenchido do estoque ("PP:5\nP:10")
+        const estoqueAtual = produto.estoque || {};
+        const estoqueValor = Object.entries(estoqueAtual).map(([t, q]) => `${t}:${q}`).join('\n') || 'P:0';
         const modal = new ModalBuilder().setCustomId(`modal_editar_produto:${id}`).setTitle('EDITAR PRODUTO');
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('nome').setLabel('NOME').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80).setValue(produto.nome),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('tamanhos').setLabel('TAMANHOS (separados por vírgula)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue(produto.tamanhos),
+            new TextInputBuilder().setCustomId('estoque').setLabel('ESTOQUE POR TAMANHO').setPlaceholder('PP:5\nP:10\nM:8\nG:5\nGG:3\nEXG:2').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(200).setValue(estoqueValor),
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
@@ -386,15 +393,18 @@ module.exports = {
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_editar_produto:')) {
-        const id       = interaction.customId.split(':')[1];
-        const nome     = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
-        const tamanhos = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
-        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco    = parseFloat(precoStr);
+        const id          = interaction.customId.split(':')[1];
+        const nome        = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const estoqueText = interaction.fields.getTextInputValue('estoque').trim();
+        const precoStr    = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco       = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
+        const estoque  = parseEstoque(estoqueText);
+        const tamanhos = Object.keys(estoque).join(',');
+        if (!tamanhos) return interaction.reply({ content: '❌ ESTOQUE INVÁLIDO. USE O FORMATO: PP:5\nP:10\nM:8', flags: 64 });
 
         // Salva dados pendentes e pede fotos
-        pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, tamanhos, preco, channelId: interaction.channelId });
+        pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, tamanhos, preco, estoque, channelId: interaction.channelId });
         const rowFotos = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('prod_manter_fotos').setLabel('MANTER FOTOS ATUAIS').setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId('prod_sem_foto').setLabel('REMOVER FOTOS').setStyle(ButtonStyle.Secondary),
@@ -416,21 +426,24 @@ module.exports = {
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
 
       if (interaction.isModalSubmit() && interaction.customId === 'modal_produto_add') {
-        const nome     = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
-        const tamanhos = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
-        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco    = parseFloat(precoStr);
+        const nome        = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const estoqueText = interaction.fields.getTextInputValue('estoque').trim();
+        const precoStr    = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco       = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
+        const estoque  = parseEstoque(estoqueText);
+        const tamanhos = Object.keys(estoque).join(',');
+        if (!tamanhos) return interaction.reply({ content: '❌ ESTOQUE INVÁLIDO. USE O FORMATO: PP:5\nP:10\nM:8', flags: 64 });
 
         // Salva dados pendentes e pede fotos
-        pendingProdutos.set(interaction.user.id, { type: 'add', nome, tamanhos, preco, channelId: interaction.channelId });
+        pendingProdutos.set(interaction.user.id, { type: 'add', nome, tamanhos, preco, estoque, channelId: interaction.channelId });
         const rowFotos = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('prod_sem_foto').setLabel('SALVAR SEM FOTO').setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
         );
         return interaction.reply({
           embeds: [{ color: 0x000000, title: '📷 ADICIONAR FOTOS', description:
-            `**PRODUTO:** ${nome}\n**TAMANHOS:** ${tamanhos}\n**PREÇO:** R$ ${preco.toFixed(2)}\n\n`
+            `**PRODUTO:** ${nome}\n**ESTOQUE:** ${formatarEstoque(estoque)}\n**PREÇO:** R$ ${preco.toFixed(2)}\n\n`
             + '---\n\n'
             + '📎 **Envie as fotos agora** diretamente neste canal (até 4 imagens).\n'
             + 'Clique **SALVAR SEM FOTO** para cadastrar sem imagem.\n'
@@ -449,17 +462,17 @@ module.exports = {
         pendingProdutos.delete(interaction.user.id);
         let p;
         if (dados.type === 'add') {
-          p = await adicionarProduto(dados.nome, dados.tamanhos, dados.preco, null).catch(() => null);
+          p = await adicionarProduto(dados.nome, dados.tamanhos, dados.preco, null, dados.estoque || {}).catch(() => null);
         } else {
-          p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, imagem_url: null }).catch(() => null);
+          p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, estoque: dados.estoque || {}, imagem_url: null }).catch(() => null);
         }
         if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
         return interaction.update({
           embeds: [{ color: 0x000000, title: dados.type === 'add' ? '✅ PRODUTO ADICIONADO' : '✅ PRODUTO ATUALIZADO', fields: [
-            { name: 'NOME',     value: p.nome,                             inline: true },
-            { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
-            { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
-            { name: 'FOTOS',    value: 'NENHUMA',                          inline: false },
+            { name: 'NOME',    value: p.nome,                              inline: true },
+            { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true },
+            { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
+            { name: 'FOTOS',   value: 'NENHUMA',                           inline: false },
           ]}],
           components: [],
         });
@@ -470,14 +483,14 @@ module.exports = {
         if (!dados) return interaction.reply({ content: '❌ NENHUMA OPERAÇÃO PENDENTE.', flags: 64 });
         pendingProdutos.delete(interaction.user.id);
         const prodAtual = await buscarProduto(dados.id).catch(() => null);
-        const p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, imagem_url: prodAtual?.imagem_url || null }).catch(() => null);
+        const p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, estoque: dados.estoque || {}, imagem_url: prodAtual?.imagem_url || null }).catch(() => null);
         if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
         const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
         const embedBase = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
-          { name: 'NOME',     value: p.nome,                             inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
-          { name: 'FOTOS',    value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA', inline: false },
+          { name: 'NOME',    value: p.nome,                              inline: true },
+          { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true },
+          { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
+          { name: 'FOTOS',   value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA', inline: false },
         ]};
         return interaction.update({ ...carrosselEmbeds(embedBase, p.imagem_url), components: [] });
       }

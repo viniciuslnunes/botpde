@@ -1,6 +1,6 @@
 const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const pendingProdutos = require('../utils/pendingProdutos');
-const { adicionarProduto, atualizarProduto } = require('../utils/loja');
+const { adicionarProduto, atualizarProduto, formatarEstoque } = require('../utils/loja');
 
 function carrosselEmbeds(embedBase, imagem_url) {
   if (!imagem_url) return { embeds: [embedBase], files: [] };
@@ -51,9 +51,9 @@ module.exports = {
 
       let p;
       if (dados.type === 'add') {
-        p = await adicionarProduto(dados.nome, dados.tamanhos, dados.preco, urls).catch(() => null);
+        p = await adicionarProduto(dados.nome, dados.tamanhos, dados.preco, urls, dados.estoque || {}).catch(() => null);
       } else {
-        p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, imagem_url: urls }).catch(() => null);
+        p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, estoque: dados.estoque || {}, imagem_url: urls }).catch(() => null);
       }
 
       if (!p) {
@@ -67,10 +67,10 @@ module.exports = {
         color: 0x000000,
         title: titulo,
         fields: [
-          { name: 'NOME',     value: p.nome,                             inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
-          { name: 'FOTOS',    value: `${qtdImgs} foto(s) salva(s)`,      inline: false },
+          { name: 'NOME',    value: p.nome,                              inline: true },
+          { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true },
+          { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
+          { name: 'FOTOS',   value: `${qtdImgs} foto(s) salva(s)`,       inline: false },
         ],
       };
 
