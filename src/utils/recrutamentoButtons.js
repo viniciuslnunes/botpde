@@ -4,11 +4,11 @@ module.exports = [
   new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('aprovar_recrutamento')
-      .setLabel('✅ Aprovar')
+      .setLabel('APROVAR')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('reprovar_recrutamento')
-      .setLabel('❌ Reprovar')
+      .setLabel('REPROVAR')
       .setStyle(ButtonStyle.Danger),
   ),
 ];

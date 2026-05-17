@@ -9,10 +9,11 @@ module.exports = {
   canais: {
     recrutamento:       '1491920874805137559',        // Botão de solicitar recrutamento
     validarSetagem:     '1505410676993294448',         // Canal privado de análise (recrutadores)
-    provarManto:        'ID_CANAL_PROVAR_MANTO',      // Candidato envia foto do manto
+    provarAssociacao:   '1505422008605872279',         // Canal provar associação (sócio)
+    provarManto:        '1505433421197873254',          // Canal provar manto (torcedor)
     carteirinha:        'ID_CANAL_CARTEIRINHA',       // Botão de solicitar carteirinha
-    ticket:             'ID_CANAL_TICKET',            // Botão de abrir ticket
-    logsTicket:         'ID_CANAL_LOGS_TICKET',       // Logs e transcritos de tickets
+    ticket:             '1493461731358277672',         // Botão de abrir ticket — 📩・atendimento
+    logsTicket:         '1505430637941624895',         // Logs e transcritos de tickets — 🛠️・logs-tickets
     advertencia:        'ID_CANAL_ADVERTENCIA',       // Botões de advertência de membros
     advRecrutadores:    'ID_CANAL_ADV_RECRUTADORES',  // Botões de advertência de recrutadores
     historicoAdv:       'ID_CANAL_HISTORICO_ADV',     // Histórico de advertências de membros
@@ -28,10 +29,12 @@ module.exports = {
 
   // ── Cargos ────────────────────────────────────────────────
   cargos: {
-    socio:                  'ID_CARGO_SOCIO',
-    provarManto:            'ID_CARGO_PROVAR_MANTO',
-    reprovadoRecrutamento:  'ID_CARGO_REPROVADO_RECRUTAMENTO',
-    visitante:              'ID_CARGO_VISITANTE',
+    socio:                  '1491901374567420114',
+    torcedor:               '1491910592900894730',
+    provarAssociacao:       '1505421478995300544',        // Cargo provar associação (sócio)
+    provarManto:            '1505431888796450967',         // Cargo provar manto (torcedor)
+    reprovadoRecrutamento:  '1505422988453875852',
+    visitante:              '1491907007182278819',
     diretor:                'ID_CARGO_DIRETOR',
     recrutador:             'ID_CARGO_RECRUTADOR',
     elenco:                 'ID_CARGO_ELENCO',
@@ -58,7 +61,7 @@ module.exports = {
   ],
 
   // ── Categoria de tickets (Discord category ID) ───────────
-  categoriaTickets: 'ID_CATEGORIA_TICKETS',
+  categoriaTickets: '1493453432898457671',  // Categoria ATENDIMENTO
 
   // ── Textos da carteirinha ─────────────────────────────────
   carteirinha: {

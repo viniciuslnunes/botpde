@@ -17,15 +17,19 @@ module.exports = {
         const msgs     = await canalRec.messages.fetch({ limit: 20 });
         const jaExiste = msgs.some(m => m.author.id === client.user.id && m.components.length > 0);
         if (!jaExiste) {
+          const fs = require('node:fs');
+          const temLogo = fs.existsSync(LOGO_PATH);
           const row   = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('abrir_recrutamento').setLabel('SOLICITAR RECRUTAMENTO').setStyle(ButtonStyle.Secondary),
           );
           const embed = new EmbedBuilder()
             .setColor(0x000000)
             .setTitle('RECRUTAMENTO')
-            .setDescription('Clique no botão abaixo para solicitar seu recrutamento!')
-            .setThumbnail('attachment://logo.png');
-          await canalRec.send({ embeds: [embed], components: [row], files: [{ attachment: LOGO_PATH, name: 'logo.png' }] });
+            .setDescription('Clique no botão abaixo para solicitar seu recrutamento!');
+          if (temLogo) embed.setThumbnail('attachment://logo.png');
+          const payload = { embeds: [embed], components: [row] };
+          if (temLogo) payload.files = [{ attachment: LOGO_PATH, name: 'logo.png' }];
+          await canalRec.send(payload);
         }
       }
     } catch (err) {

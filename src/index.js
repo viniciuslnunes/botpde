@@ -43,3 +43,15 @@ for (const file of eventFiles) {
 }
 
 client.login(process.env.DISCORD_TOKEN);
+
+// Evita crash por erros internos do discord.js (ex: interações expiradas)
+client.on('error', (err) => {
+  if (err?.code === 10062 || err?.code === 40060) return;
+  console.error('[client error]', err);
+});
+
+// Evita crash por promessas não tratadas
+process.on('unhandledRejection', (err) => {
+  if (err?.code === 10062 || err?.code === 40060) return;
+  console.error('[unhandledRejection]', err);
+});

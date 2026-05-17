@@ -17,11 +17,16 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor(0x000000)
       .setTitle('RECRUTAMENTO')
-      .setDescription('Clique no botão abaixo para solicitar seu recrutamento!')
-      .setThumbnail('attachment://logo.png');
+      .setDescription('Clique no botão abaixo para solicitar seu recrutamento!');
+
+    const fs = require('node:fs');
+    const temLogo = fs.existsSync(LOGO_PATH);
+    if (temLogo) embed.setThumbnail('attachment://logo.png');
 
     const canal = await interaction.client.channels.fetch(config.canais.recrutamento);
-    await canal.send({ embeds: [embed], components: [row], files: [{ attachment: LOGO_PATH, name: 'logo.png' }] });
+    const payload = { embeds: [embed], components: [row] };
+    if (temLogo) payload.files = [{ attachment: LOGO_PATH, name: 'logo.png' }];
+    await canal.send(payload);
     await interaction.reply({ content: 'Botão de recrutamento enviado!', flags: 64 });
   },
 };

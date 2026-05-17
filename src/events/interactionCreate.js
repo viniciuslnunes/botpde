@@ -31,6 +31,9 @@ module.exports = {
   async execute(interaction) {
     const client = interaction.client;
 
+    // Ignora interações já expiradas (pode ocorrer com múltiplas instâncias rodando)
+    if (!interaction.isRepliable?.()) return;
+
     try {
 
       // ══════════════════════════════════════════════════════
@@ -77,12 +80,10 @@ module.exports = {
           new ButtonBuilder().setCustomId('fechar_ticket').setLabel('🔒 FECHAR TICKET').setStyle(ButtonStyle.Danger),
         );
 
-        await canal.send({
-          content: `${interaction.user}`,
-          embeds: [embed],
-          components: [row],
-          files: [{ attachment: LOGO_PATH, name: 'logo.png' }],
-        });
+        const fs = require('node:fs');
+        const payloadTicket = { content: `${interaction.user}`, embeds: [embed], components: [row] };
+        if (fs.existsSync(LOGO_PATH)) payloadTicket.files = [{ attachment: LOGO_PATH, name: 'logo.png' }];
+        await canal.send(payloadTicket);
 
         return interaction.editReply({ content: `🎫 TICKET CRIADO: ${canal}`, components: [] });
       }
@@ -437,8 +438,8 @@ module.exports = {
 
         const numAdv = advAtual + 1;
         const embed  = {
-          color: 0x00FF00,
-          title: `✅ ${numAdv}ª ADVERTÊNCIA REMOVIDA`,
+          color: 0x000000,
+          title: `${numAdv}ª ADVERTÊNCIA REMOVIDA`,
           fields: [
             { name: 'MEMBRO',       value: `<@${membro.id}>`,           inline: true },
             { name: 'ADVERTÊNCIA',  value: `${numAdv}ª`,                inline: true },
@@ -633,8 +634,8 @@ module.exports = {
 
         const numAdv = advAtual + 1;
         const embed  = {
-          color: 0x00FF00,
-          title: `🦅 ADV. RECRUTAMENTO ${numAdv}ª REMOVIDA`,
+          color: 0x000000,
+          title: `ADV. RECRUTAMENTO ${numAdv}ª REMOVIDA`,
           fields: [
             { name: 'RECRUTADOR',       value: `<@${membro.id}>`,           inline: true },
             { name: 'ADVERTÊNCIA',      value: `${numAdv}ª`,                inline: true },
@@ -656,38 +657,58 @@ module.exports = {
       // ══════════════════════════════════════════════════════
 
       if (interaction.isButton() && interaction.customId === 'abrir_recrutamento') {
-        const modal = new ModalBuilder().setCustomId('modal_recrutamento').setTitle('Formulário de Recrutamento');
+        const row = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('select_tipo_recrutamento')
+            .setPlaceholder('SELECIONE O TIPO DE RECRUTAMENTO')
+            .addOptions([
+              { label: '🦅 SÓCIO',    value: 'socio',    description: 'Serei sócio — precisarei provar minha associação' },
+              { label: '🦅 TORCEDOR', value: 'torcedor', description: 'Serei torcedor — precisarei provar foto do manto' },
+            ]),
+        );
+        return interaction.reply({ content: '**📋 RECRUTAMENTO** — SELECIONE O TIPO:', components: [row], flags: 64 });
+      }
+
+      if (interaction.isStringSelectMenu() && interaction.customId === 'select_tipo_recrutamento') {
+        const tipo = interaction.values[0];
+        const modal = new ModalBuilder()
+          .setCustomId(`modal_recrutamento:${tipo}`)
+          .setTitle(tipo === 'socio' ? 'FORMULÁRIO — SÓCIO' : 'FORMULÁRIO — TORCEDOR');
         modal.addComponents(
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('nome').setLabel('Nome').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(2).setMaxLength(16),
+            new TextInputBuilder().setCustomId('nome').setLabel('NOME').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(2).setMaxLength(16),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('idade').setLabel('Idade (apenas números)').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(2),
+            new TextInputBuilder().setCustomId('idade').setLabel('IDADE (apenas números)').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(2),
+          ),
+          ...(tipo === 'socio' ? [new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('registro')
+              .setLabel('Nº DE REGISTRO DE ASSOCIADO')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMinLength(1)
+              .setMaxLength(10),
+          )] : []),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('telefone').setLabel('TELEFONE (ex: 11912345678)').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(10).setMaxLength(11),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('id_fivem').setLabel('ID (apenas números)').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(6),
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('telefone').setLabel('Telefone (apenas números, ex: 11912345678)').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(10).setMaxLength(11),
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('recrutador').setLabel('Recrutador').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(2).setMaxLength(32),
+            new TextInputBuilder().setCustomId('recrutador').setLabel('CIDADE').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(2).setMaxLength(32),
           ),
         );
         return interaction.showModal(modal);
       }
 
-      if (interaction.isModalSubmit() && interaction.customId === 'modal_recrutamento') {
-        const nome      = interaction.fields.getTextInputValue('nome');
-        const idade     = interaction.fields.getTextInputValue('idade');
-        const id_fivem  = interaction.fields.getTextInputValue('id_fivem');
-        const telefone  = interaction.fields.getTextInputValue('telefone');
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_recrutamento:')) {
+        const tipo       = interaction.customId.split(':')[1];
+        const nome       = interaction.fields.getTextInputValue('nome');
+        const idade      = interaction.fields.getTextInputValue('idade');
+        const registro   = tipo === 'socio' ? interaction.fields.getTextInputValue('registro') : null;
+        const telefone   = interaction.fields.getTextInputValue('telefone');
         const recrutador = interaction.fields.getTextInputValue('recrutador');
-        const user      = interaction.user;
+        const user       = interaction.user;
 
-        if (!/^[0-9]+$/.test(id_fivem)) {
-          return interaction.reply({ embeds: [{ color: 0x000000, description: '⚠️ **ERRO:** O CAMPO **ID** DEVE CONTER APENAS NÚMEROS.' }], flags: 64 });
-        }
         if (!/^[0-9]{1,2}$/.test(idade)) {
           return interaction.reply({ embeds: [{ color: 0x000000, description: '⚠️ **ERRO:** O CAMPO **IDADE** DEVE CONTER APENAS NÚMEROS (máx. 2 dígitos).' }], flags: 64 });
         }
@@ -695,17 +716,20 @@ module.exports = {
           return interaction.reply({ embeds: [{ color: 0x000000, description: '⚠️ **ERRO:** O CAMPO **TELEFONE** DEVE CONTER APENAS NÚMEROS, COM 10 OU 11 DÍGITOS.' }], flags: 64 });
         }
 
+        const fields = [
+          { name: 'TIPO',         value: tipo === 'socio' ? '🦅 SÓCIO' : '🦅 TORCEDOR', inline: true },
+          { name: 'NOME',         value: nome,       inline: false },
+          { name: 'IDADE',        value: idade,      inline: false },
+          ...(registro ? [{ name: 'Nº ASSOCIADO', value: registro, inline: false }] : []),
+          { name: 'TELEFONE',     value: telefone,   inline: false },
+          { name: 'CIDADE',       value: recrutador, inline: false },
+          { name: 'ID | DISCORD', value: `${user.id} | <@${user.id}>`, inline: false },
+        ];
+
         const embed = {
           color: 0x000000,
-          title: '📋 NOVA SOLICITAÇÃO DE RECRUTAMENTO',
-          fields: [
-            { name: 'NOME',      value: nome,      inline: false },
-            { name: 'IDADE',     value: idade,      inline: false },
-            { name: 'ID',        value: id_fivem,   inline: false },
-            { name: 'TELEFONE',  value: telefone,   inline: false },
-            { name: 'RECRUTADOR', value: recrutador, inline: false },
-            { name: 'ID | DISCORD', value: `${user.id} | <@${user.id}>`, inline: false },
-          ],
+          title: `SOLICITAÇÃO — ${tipo === 'socio' ? 'SÓCIO' : 'TORCEDOR'}`,
+          fields,
         };
 
         await interaction.reply({ content: 'SUA SOLICITAÇÃO FOI ENVIADA PARA ANÁLISE! AGUARDE AS PRÓXIMAS INSTRUÇÕES.', flags: 64 });
@@ -715,53 +739,60 @@ module.exports = {
           await canalValidar.send({ embeds: [embed], components: recrutamentoButtons });
         }
 
-        // Atribuir cargo provar-manto
+        // Atribuir cargo de verificação e enviar aviso no canal (diferente por tipo)
         try {
-          const guildMember = await interaction.guild.members.fetch(user.id);
-          await guildMember.roles.add(config.cargos.provarManto);
+          const guildMember   = await interaction.guild.members.fetch(user.id);
+          const cargoProvar   = tipo === 'socio' ? config.cargos.provarAssociacao : config.cargos.provarManto;
+          const canalProvarId = tipo === 'socio' ? config.canais.provarAssociacao : config.canais.provarManto;
+          const instrucao     = tipo === 'socio'
+            ? `<@${user.id}>, você tem 10 minutos para enviar sua **carteirinha de associado** aqui! Após esse prazo, o cargo será removido automaticamente.`
+            : `<@${user.id}>, você tem 10 minutos para enviar uma **foto do seu manto** aqui! Após esse prazo, o cargo será removido automaticamente.`;
 
-          const canalProvarManto = interaction.guild.channels.cache.get(config.canais.provarManto);
-          if (canalProvarManto) {
-            const avisoMsg = await canalProvarManto.send({
-              content: `<@${user.id}>, você tem 10 minutos para enviar o manto (imagem) aqui neste canal! Após esse prazo, o cargo será removido automaticamente.`,
-            });
+          await guildMember.roles.add(cargoProvar);
+
+          const canalProvar = interaction.guild.channels.cache.get(canalProvarId);
+          if (canalProvar) {
+            const avisoMsg = await canalProvar.send({ content: instrucao });
             setTimeout(() => { avisoMsg.delete().catch(() => {}); }, 5 * 60 * 1000);
           }
 
           setTimeout(async () => {
             try {
-              await guildMember.roles.remove(config.cargos.provarManto);
+              await guildMember.roles.remove(cargoProvar);
             } catch (err) {
-              console.error('[recrutamento] Erro ao remover cargo provarManto:', err);
+              console.error('[recrutamento] Erro ao remover cargo provar:', err);
             }
           }, 10 * 60 * 1000);
         } catch (err) {
-          console.error('[recrutamento] Erro ao atribuir cargo provarManto:', err);
+          console.error('[recrutamento] Erro ao atribuir cargo provar:', err);
         }
 
         return;
       }
 
       if (interaction.isButton() && interaction.customId === 'aprovar_recrutamento') {
-        const embed    = interaction.message.embeds[0];
-        const idField  = embed.fields.find(f => f.name.startsWith('ID | DISCORD'));
+        const embed       = interaction.message.embeds[0];
+        const idField     = embed.fields.find(f => f.name.startsWith('ID | DISCORD'));
         const candidatoId = idField ? idField.value.split(' ')[0] : null;
         const nomeField   = embed.fields.find(f => f.name === 'NOME');
-        const idFiveMField = embed.fields.find(f => f.name === 'ID');
-        const nome    = nomeField    ? nomeField.value    : '';
-        const id_fivem = idFiveMField ? idFiveMField.value : '';
+        const regField    = embed.fields.find(f => f.name === 'Nº ASSOCIADO' || f.name === 'ID');
+        const tipoField   = embed.fields.find(f => f.name === 'TIPO');
+        const nome        = nomeField ? nomeField.value : '';
+        const registro    = regField  ? regField.value  : '';
+        const isSocio     = tipoField ? tipoField.value.includes('SÓCIO') : false;
+        const tipo        = isSocio ? 'socio' : 'torcedor';
 
-        // Verificar se ID está bloqueado
-        const canalHistorico = interaction.guild.channels.cache.get(config.canais.historicoNaoRec);
+        // Verificar lista de não recrutar (apenas torcedor, que usa ID FiveM)
+        const canalHistoricoNaoRec = interaction.guild.channels.cache.get(config.canais.historicoNaoRec);
         let bloqueado = null;
-        if (canalHistorico && canalHistorico.isTextBased()) {
+        if (!isSocio && canalHistoricoNaoRec && canalHistoricoNaoRec.isTextBased()) {
           try {
-            const msgs = await canalHistorico.messages.fetch({ limit: 100 });
+            const msgs = await canalHistoricoNaoRec.messages.fetch({ limit: 100 });
             msgs.forEach(msg => {
-              if (msg.embeds && msg.embeds.length > 0) {
+              if (msg.embeds?.length > 0) {
                 const e = msg.embeds[0];
                 const idF = e.fields?.find(f => f.name === 'ID');
-                if (idF && idF.value.trim() === id_fivem.trim()) bloqueado = e;
+                if (idF && idF.value.trim() === registro.trim()) bloqueado = e;
               }
             });
           } catch {}
@@ -773,7 +804,7 @@ module.exports = {
             embeds: [{
               color: 0xFF0000,
               title: '🚫 CANDIDATO BLOQUEADO — NÃO RECRUTAR',
-              description: `O ID **${id_fivem}** está na lista de não recrutar. Aprovação cancelada.`,
+              description: `O ID **${registro}** está na lista de não recrutar. Aprovação cancelada.`,
               fields: bloqueado.fields ?? [],
             }],
             components: [],
@@ -781,22 +812,71 @@ module.exports = {
         }
 
         const embedAprovado = {
-          color: 0x00FF00,
-          title: '✅ RECRUTAMENTO APROVADO',
+          color: 0x000000,
+          title: 'RECRUTAMENTO APROVADO',
           fields: embed.fields,
           footer: { text: `Aprovado por ${interaction.user.tag}` },
         };
 
         try {
           if (candidatoId) {
-            const guildMember = await interaction.guild.members.fetch(candidatoId);
-            await guildMember.roles.add(config.cargos.socio);
-            if (config.cargos.provarManto) await guildMember.roles.remove(config.cargos.provarManto).catch(() => {});
-            if (config.cargos.visitante)   await guildMember.roles.remove(config.cargos.visitante).catch(() => {});
-            const novoNick = formatarNick(nome, id_fivem);
+            const guildMember   = await interaction.guild.members.fetch(candidatoId);
+            const aprovador     = interaction.user;
+            const aprovadorNome = interaction.member?.nickname || aprovador.displayName || aprovador.username;
+            const cargoAtribuir = isSocio ? config.cargos.socio : config.cargos.torcedor;
+
+            await guildMember.roles.add(cargoAtribuir);
+            await guildMember.roles.remove(isSocio ? config.cargos.provarAssociacao : config.cargos.provarManto).catch(() => {});
+            await guildMember.roles.remove(config.cargos.visitante).catch(() => {});
+
+            const novoNick = formatarNick(nome, registro || null);
             await guildMember.setNickname(novoNick).catch(() => {});
-            await db.query('INSERT INTO aprovacoes_recrutamento (aprovador_id) VALUES ($1)', [interaction.user.id]);
-            atualizarTopRecrutadores(client).catch(err => console.error('[aprovar]', err));
+
+            // Buscar imagem de prova enviada pelo candidato no canal correspondente
+            let imagemProva = null;
+            try {
+              const canalProvaId = isSocio ? config.canais.provarAssociacao : config.canais.provarManto;
+              const canalProva   = interaction.guild.channels.cache.get(canalProvaId);
+              if (canalProva?.isTextBased()) {
+                const msgs = await canalProva.messages.fetch({ limit: 100 });
+                const msgImagem = msgs.find(m =>
+                  m.author.id === candidatoId && m.attachments.size > 0,
+                );
+                if (msgImagem) imagemProva = msgImagem.attachments.first().url;
+              }
+            } catch {}
+
+            const cidade   = (() => { const f = embed.fields.find(f => f.name === 'CIDADE');   return f ? f.value : null; })();
+            const telefone = (() => { const f = embed.fields.find(f => f.name === 'TELEFONE'); return f ? f.value : null; })();
+            const idade    = (() => { const f = embed.fields.find(f => f.name === 'IDADE');    return f ? parseInt(f.value) || null : null; })();
+
+            // Persistir membro aprovado
+            db.query(
+              `INSERT INTO membros
+                (discord_id, nome, tipo, numero_associado, cidade, telefone, idade, aprovado_por_id, aprovado_por_nome, imagem_prova)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               ON CONFLICT (discord_id) DO UPDATE SET
+                 nome = EXCLUDED.nome,
+                 tipo = EXCLUDED.tipo,
+                 numero_associado = EXCLUDED.numero_associado,
+                 cidade = EXCLUDED.cidade,
+                 telefone = EXCLUDED.telefone,
+                 idade = EXCLUDED.idade,
+                 aprovado_por_id = EXCLUDED.aprovado_por_id,
+                 aprovado_por_nome = EXCLUDED.aprovado_por_nome,
+                 imagem_prova = EXCLUDED.imagem_prova,
+                 criado_em = NOW()`,
+              [candidatoId, nome, tipo, registro || null, cidade, telefone, idade, aprovador.id, aprovadorNome, imagemProva],
+            ).catch(err => console.error('[aprovar] Erro ao salvar membro:', err));
+
+            // Registrar aprovação no ranking
+            db.query(
+              `INSERT INTO aprovacoes_recrutamento (aprovador_id, aprovador_nome, candidato_id, candidato_nome, tipo)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [aprovador.id, aprovadorNome, candidatoId, nome, tipo],
+            ).catch(err => console.error('[aprovar] Erro ao salvar aprovação:', err));
+
+            atualizarTopRecrutadores(client).catch(() => {});
           }
         } catch (err) {
           console.error('[aprovar] Erro:', err);
@@ -815,7 +895,9 @@ module.exports = {
             const guildMember = await interaction.guild.members.fetch(candidatoId).catch(() => null);
             if (guildMember) {
               if (config.cargos.reprovadoRecrutamento) await guildMember.roles.add(config.cargos.reprovadoRecrutamento).catch(() => {});
-              if (config.cargos.provarManto)           await guildMember.roles.remove(config.cargos.provarManto).catch(() => {});
+              await guildMember.roles.remove(config.cargos.provarAssociacao).catch(() => {});
+              await guildMember.roles.remove(config.cargos.provarManto).catch(() => {});
+              await guildMember.roles.remove(config.cargos.visitante).catch(() => {});
             }
           }
         } catch {}

@@ -4,6 +4,11 @@ const config = require('../config');
 const CANAL_TOP = config.canais.topRecrutadores;
 const CONFIG_KEY = 'top_recrutadores_message_id';
 
+// Guard: não executa se o canal ainda não foi configurado
+function canalConfigurado() {
+  return CANAL_TOP && !CANAL_TOP.startsWith('ID_');
+}
+
 async function getTopMessageId() {
   const res = await db.query('SELECT value FROM bot_config WHERE key = $1', [CONFIG_KEY]);
   return res.rows.length > 0 ? res.rows[0].value : null;
@@ -40,6 +45,7 @@ async function construirEmbed() {
 }
 
 async function atualizarTopRecrutadores(client) {
+  if (!canalConfigurado()) return;
   try {
     const canal = await client.channels.fetch(CANAL_TOP);
     if (!canal) return;
