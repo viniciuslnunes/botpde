@@ -80,10 +80,22 @@ module.exports = {
       if (logsItensLojaCh) {
         logsItensLojaCh.send({ ...carrosselEmbeds(embedBase, p.imagem_url) });
       }
-      // Confirmação curta e efêmera-like para o usuário no canal de gerenciamento
-      await message.channel.send({
-        content: `${message.author} ✅ **${dados.type === 'add' ? 'PRODUTO ADICIONADO' : 'PRODUTO ATUALIZADO'}** com sucesso! **${p.nome}** foi ${dados.type === 'add' ? 'cadastrado' : 'atualizado'} na loja.`,
+      // Confirmação com detalhes para o usuário no canal de gerenciamento (apaga em 1 min)
+      const qtdFotos = urls.split(',').filter(Boolean).length;
+      const confirmMsg = await message.channel.send({
+        content: `${message.author}`,
+        embeds: [{ color: 0x000000,
+          title: dados.type === 'add' ? 'PRODUTO ADICIONADO' : 'PRODUTO ATUALIZADO',
+          fields: [
+            { name: 'NOME',    value: p.nome,                              inline: true  },
+            { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true  },
+            { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
+            { name: 'FOTOS',   value: `${qtdFotos} foto(s) salva(s)`,      inline: false },
+          ],
+          footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+        }],
       });
+      setTimeout(() => confirmMsg.delete().catch(() => {}), 60_000);
       return;
     }
 

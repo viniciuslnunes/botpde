@@ -573,24 +573,35 @@ module.exports = {
           p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, estoque: dados.estoque || {}, imagem_url: null }).catch(() => null);
         }
         if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
-        // Log detalhado no canal de logs-itens-loja
-        const logsItensLojaCh = await interaction.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
-        if (logsItensLojaCh) {
-          logsItensLojaCh.send({ embeds: [{ color: 0x000000,
+        const logsItensLojaCh0 = await interaction.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
+        if (logsItensLojaCh0) {
+          logsItensLojaCh0.send({ embeds: [{ color: 0x000000,
             title: dados.type === 'add' ? '📦 PRODUTO ADICIONADO' : '📦 PRODUTO ATUALIZADO',
             fields: [
-              { name: 'NOME',         value: p.nome,                                       inline: true },
-              { name: 'PREÇO',        value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
-              { name: 'ESTOQUE',      value: formatarEstoque(p.estoque),                   inline: false },
-              { name: 'FOTOS',        value: 'NENHUMA',                                    inline: false },
-              { name: 'REGISTRADO POR', value: `<@${interaction.user.id}>`,                inline: false },
+              { name: 'NOME',           value: p.nome,                             inline: true  },
+              { name: 'PREÇO',          value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true  },
+              { name: 'ESTOQUE',        value: formatarEstoque(p.estoque),         inline: false },
+              { name: 'FOTOS',          value: 'NENHUMA',                          inline: false },
+              { name: 'REGISTRADO POR', value: `<@${interaction.user.id}>`,        inline: false },
             ],
           }] });
         }
-        return interaction.update({
-          embeds: [{ color: 0x000000, description: `✅ **${dados.type === 'add' ? 'PRODUTO ADICIONADO' : 'PRODUTO ATUALIZADO'}** com sucesso!\n\n**${p.nome}** foi ${dados.type === 'add' ? 'cadastrado' : 'atualizado'} na loja.` }],
+        await interaction.update({
+          embeds: [{ color: 0x000000,
+            title: dados.type === 'add' ? 'PRODUTO ADICIONADO' : 'PRODUTO ATUALIZADO',
+            fields: [
+              { name: 'NOME',    value: p.nome,                              inline: true  },
+              { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true  },
+              { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
+              { name: 'FOTOS',   value: 'NENHUMA',                           inline: false },
+            ],
+            footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+          }],
           components: [],
         });
+        const msg0 = await interaction.fetchReply().catch(() => null);
+        if (msg0) setTimeout(() => msg0.delete().catch(() => {}), 60_000);
+        return;
       }
 
       if (interaction.isButton() && interaction.customId === 'prod_manter_fotos') {
@@ -601,24 +612,35 @@ module.exports = {
         const p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, estoque: dados.estoque || {}, imagem_url: prodAtual?.imagem_url || null }).catch(() => null);
         if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
         const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
-        // Log detalhado no canal de logs-itens-loja
-        const logsItensLojaCh = await interaction.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
-        if (logsItensLojaCh) {
+        const logsItensLojaCh1 = await interaction.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
+        if (logsItensLojaCh1) {
           const embedLog = { color: 0x000000, title: '📦 PRODUTO ATUALIZADO',
             fields: [
-              { name: 'NOME',           value: p.nome,                                       inline: true },
-              { name: 'PREÇO',          value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
-              { name: 'ESTOQUE',        value: formatarEstoque(p.estoque),                   inline: false },
+              { name: 'NOME',           value: p.nome,                                                 inline: true  },
+              { name: 'PREÇO',          value: `R$ ${Number(p.preco).toFixed(2)}`,                     inline: true  },
+              { name: 'ESTOQUE',        value: formatarEstoque(p.estoque),                             inline: false },
               { name: 'FOTOS',          value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA', inline: false },
-              { name: 'REGISTRADO POR', value: `<@${interaction.user.id}>`,                  inline: false },
+              { name: 'REGISTRADO POR', value: `<@${interaction.user.id}>`,                            inline: false },
             ],
           };
-          logsItensLojaCh.send({ ...carrosselEmbeds(embedLog, p.imagem_url) });
+          logsItensLojaCh1.send({ ...carrosselEmbeds(embedLog, p.imagem_url) });
         }
-        return interaction.update({
-          embeds: [{ color: 0x000000, description: `✅ **PRODUTO ATUALIZADO** com sucesso!\n\n**${p.nome}** foi atualizado na loja.` }],
+        await interaction.update({
+          embeds: [{ color: 0x000000,
+            title: 'PRODUTO ATUALIZADO',
+            fields: [
+              { name: 'NOME',    value: p.nome,                                                        inline: true  },
+              { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,                            inline: true  },
+              { name: 'ESTOQUE', value: formatarEstoque(p.estoque),                                    inline: false },
+              { name: 'FOTOS',   value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA',        inline: false },
+            ],
+            footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+          }],
           components: [],
         });
+        const msg1 = await interaction.fetchReply().catch(() => null);
+        if (msg1) setTimeout(() => msg1.delete().catch(() => {}), 60_000);
+        return;
       }
 
       if (interaction.isButton() && interaction.customId === 'prod_cancelar') {
