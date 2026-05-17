@@ -297,8 +297,11 @@ module.exports = {
 
       if (interaction.isButton() && (interaction.customId === 'fechar_ticket_loja' || interaction.customId.startsWith('confirmar_compra_loja:'))) {
         const { PermissionFlagsBits: PFB } = require('discord.js');
-        if (!interaction.member.permissions.has(PFB.ManageChannels)) {
-          return interaction.reply({ content: '❌ APENAS ADMINISTRADORES PODEM USAR ESTE BOTÃO.', flags: 64 });
+        const temPermissao = interaction.member.permissions.has(PFB.Administrator)
+          || interaction.member.permissions.has(PFB.ManageChannels)
+          || interaction.member.roles.cache.has(config.cargos.responsavelLoja);
+        if (!temPermissao) {
+          return interaction.reply({ content: '❌ APENAS ADMINISTRADORES OU RESPONSÁVEIS PELA LOJA PODEM USAR ESTE BOTÃO.', flags: 64 });
         }
 
         const canal = interaction.channel;

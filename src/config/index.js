@@ -39,6 +39,7 @@ module.exports = {
     reprovadoRecrutamento:  '1505422988453875852',
     visitante:              '1491907007182278819',
     diretor:                'ID_CARGO_DIRETOR',
+    responsavelLoja:        '1505491739614642206',
     recrutador:             'ID_CARGO_RECRUTADOR',
     elenco:                 'ID_CARGO_ELENCO',
     // Cargos de advertência de membros [0] = 1ª adv, [1] = 2ª, [2] = 3ª
