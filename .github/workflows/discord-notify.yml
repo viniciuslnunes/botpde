@@ -17,6 +17,7 @@ jobs:
           HASH_SHORT=$(git log -1 --pretty=%h)
           HASH_FULL=$(git rev-parse HEAD)
           MESSAGE=$(git log -1 --pretty=%s)
+          BODY=$(git log -1 --pretty=%b)
           AUTHOR=$(git log -1 --pretty=%an)
           DATE_STR=$(git log -1 --pretty=%cI)
           TOTAL=$(git rev-list --count HEAD)
@@ -34,6 +35,7 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg msg "$MESSAGE" \
+            --arg body "$BODY" \
             --arg author "$AUTHOR" \
             --arg branch "$BRANCH" \
             --arg hash "$HASH_SHORT" \
@@ -47,7 +49,7 @@ jobs:
               embeds: [{
                 color: 1,
                 title: "🛠️ NOVA ATUALIZAÇÃO — BOT PDE",
-                description: (">>> **" + $msg + "**"),
+                description: (">>> **" + $msg + "**" + (if $body != "" then ("\n\n" + $body) else "" end)),
                 fields: [
                   {name: "👤 AUTOR",                        value: ("`" + $author + "`"),  inline: true},
                   {name: "🔀 BRANCH",                       value: ("`" + $branch + "`"),  inline: true},
