@@ -3,11 +3,35 @@ node_modules/
 
 # Variáveis de ambiente (NUNCA comitar o .env real)
 .env
+.env.local
+.env.*.local
 
 # Logs
 *.log
 npm-debug.log*
+logs/
+*.log.*
+
+# Build / cache
+dist/
+build/
+.cache/
+.tmp/
 
 # Sistema operacional
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Railway / deployment
+.railway/
+
+# Imagens e fontes locais (adicionar manualmente ao servidor)
+img/
+fonts/
