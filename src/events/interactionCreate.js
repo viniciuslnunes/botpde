@@ -21,6 +21,7 @@ const { criarCanalTicket, gerarTranscript, CANAL_LOGS, LOGO_PATH, CATEGORIAS } =
 const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
 const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto } = require('../utils/loja');
+const pendingProdutos = require('../utils/pendingProdutos');
 
 // ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
 function carrosselEmbeds(embedBase, imagem_url) {
@@ -313,9 +314,6 @@ module.exports = {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
           ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('imagem_url').setLabel('IMAGENS (URLs SEPARADAS POR VÍRGULA)').setPlaceholder('https://img1.com,https://img2.com').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000),
-          ),
         );
         return interaction.showModal(modal);
       }
@@ -370,9 +368,6 @@ module.exports = {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
           ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('imagem_url').setLabel('IMAGENS (URLs SEPARADAS POR VÍRGULA)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000).setValue(produto.imagem_url || ''),
-          ),
         );
         return interaction.showModal(modal);
       }
@@ -383,41 +378,100 @@ module.exports = {
         const tamanhos = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
         const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
         const preco    = parseFloat(precoStr);
-        const imgRaw   = interaction.fields.getTextInputValue('imagem_url').trim();
-        const imagem_url = imgRaw || null;
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
-        const p = await atualizarProduto(id, { nome, tamanhos, preco, imagem_url }).catch(() => null);
-        if (!p) return interaction.reply({ content: '❌ ERRO AO ATUALIZAR PRODUTO.', flags: 64 });
-        const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
-        const embedBase = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
-          { name: 'NOME',     value: p.nome,                                         inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                                     inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
-          { name: 'IMAGENS',  value: qtdImgs ? `${qtdImgs} imagem(ns) cadastrada(s)` : '—', inline: false },
-        ]};
-        return interaction.reply({ embeds: carrosselEmbeds(embedBase, p.imagem_url), flags: 64 });
+
+        // Salva dados pendentes e pede fotos
+        pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, tamanhos, preco, channelId: interaction.channelId });
+        const rowFotos = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('prod_manter_fotos').setLabel('MANTER FOTOS ATUAIS').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('prod_sem_foto').setLabel('REMOVER FOTOS').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
+        );
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '📷 FOTOS DO PRODUTO', description:
+            '**DADOS SALVOS!**\n\nAgora escolha uma opção para as fotos:\n\n'
+            + '• **Envie as fotos** diretamente neste canal (até 4 imagens)\n'
+            + '• Clique **MANTER FOTOS ATUAIS** para não alterar\n'
+            + '• Clique **REMOVER FOTOS** para salvar sem imagens\n'
+            + '• Clique **CANCELAR** para descartar as alterações\n\n'
+            + '*Aguardando por 2 minutos...*' }],
+          components: [rowFotos],
+          flags: 64,
+        });
       }
 
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
 
       if (interaction.isModalSubmit() && interaction.customId === 'modal_produto_add') {
-        const nome       = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
-        const tamanhos   = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
-        const precoStr   = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco      = parseFloat(precoStr);
-        const imgRaw     = interaction.fields.getTextInputValue('imagem_url').trim();
-        const imagem_url = imgRaw || null;
+        const nome     = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const tamanhos = interaction.fields.getTextInputValue('tamanhos').toUpperCase().trim();
+        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco    = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
-        const p = await adicionarProduto(nome, tamanhos, preco, imagem_url).catch(() => null);
-        if (!p) return interaction.reply({ content: '❌ ERRO AO SALVAR PRODUTO.', flags: 64 });
+
+        // Salva dados pendentes e pede fotos
+        pendingProdutos.set(interaction.user.id, { type: 'add', nome, tamanhos, preco, channelId: interaction.channelId });
+        const rowFotos = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('prod_sem_foto').setLabel('SALVAR SEM FOTO').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
+        );
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '📷 ADICIONAR FOTOS', description:
+            `**PRODUTO:** ${nome}\n**TAMANHOS:** ${tamanhos}\n**PREÇO:** R$ ${preco.toFixed(2)}\n\n`
+            + '---\n\n'
+            + '📎 **Envie as fotos agora** diretamente neste canal (até 4 imagens).\n'
+            + 'Clique **SALVAR SEM FOTO** para cadastrar sem imagem.\n'
+            + 'Clique **CANCELAR** para descartar.\n\n'
+            + '*Aguardando por 2 minutos...*' }],
+          components: [rowFotos],
+          flags: 64,
+        });
+      }
+
+      // ── Botões de resposta do upload de fotos ────────────────────────────
+
+      if (interaction.isButton() && interaction.customId === 'prod_sem_foto') {
+        const dados = pendingProdutos.get(interaction.user.id);
+        if (!dados) return interaction.reply({ content: '❌ NENHUMA OPERAÇÃO PENDENTE.', flags: 64 });
+        pendingProdutos.delete(interaction.user.id);
+        let p;
+        if (dados.type === 'add') {
+          p = await adicionarProduto(dados.nome, dados.tamanhos, dados.preco, null).catch(() => null);
+        } else {
+          p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, imagem_url: null }).catch(() => null);
+        }
+        if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
+        return interaction.update({
+          embeds: [{ color: 0x000000, title: dados.type === 'add' ? '✅ PRODUTO ADICIONADO' : '✅ PRODUTO ATUALIZADO', fields: [
+            { name: 'NOME',     value: p.nome,                             inline: true },
+            { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
+            { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
+            { name: 'FOTOS',    value: 'NENHUMA',                          inline: false },
+          ]}],
+          components: [],
+        });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'prod_manter_fotos') {
+        const dados = pendingProdutos.get(interaction.user.id);
+        if (!dados) return interaction.reply({ content: '❌ NENHUMA OPERAÇÃO PENDENTE.', flags: 64 });
+        pendingProdutos.delete(interaction.user.id);
+        const prodAtual = await buscarProduto(dados.id).catch(() => null);
+        const p = await atualizarProduto(dados.id, { nome: dados.nome, tamanhos: dados.tamanhos, preco: dados.preco, imagem_url: prodAtual?.imagem_url || null }).catch(() => null);
+        if (!p) return interaction.update({ content: '❌ ERRO AO SALVAR PRODUTO.', components: [], embeds: [] });
         const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
-        const embedBase = { color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
-          { name: 'NOME',     value: p.nome,                                         inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                                     inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
-          { name: 'IMAGENS',  value: qtdImgs ? `${qtdImgs} imagem(ns) cadastrada(s)` : '—', inline: false },
+        const embedBase = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
+          { name: 'NOME',     value: p.nome,                             inline: true },
+          { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
+          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
+          { name: 'FOTOS',    value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA', inline: false },
         ]};
-        return interaction.reply({ embeds: carrosselEmbeds(embedBase, p.imagem_url), flags: 64 });
+        return interaction.update({ embeds: carrosselEmbeds(embedBase, p.imagem_url), components: [] });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'prod_cancelar') {
+        pendingProdutos.delete(interaction.user.id);
+        return interaction.update({ content: '❌ OPERAÇÃO CANCELADA.', components: [], embeds: [] });
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_remover_produto') {

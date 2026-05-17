@@ -90,7 +90,26 @@ module.exports = {
           const embed = new EmbedBuilder()
             .setColor(0x000000)
             .setTitle('GERENCIAMENTO — LOJA')
-            .setDescription('USE OS BOTÕES ABAIXO PARA GERENCIAR O ESTOQUE DA LOJA.\n\n**ADICIONAR** — CADASTRAR NOVO PRODUTO\n**REMOVER** — RETIRAR PRODUTO DO ESTOQUE\n**LISTAR** — VER TODOS OS PRODUTOS\n**EDITAR** — ALTERAR NOME, TAMANHOS, PREÇO OU IMAGEM');
+            .setDescription(
+              '**COMO USAR OS BOTÕES:**\n\n'
+              + '**➕ ADICIONAR**\n'
+              + '1. Clique no botão **ADICIONAR**\n'
+              + '2. Preencha o formulário: nome, tamanhos e preço\n'
+              + '3. Clique em **Enviar**\n'
+              + '4. O bot vai pedir as fotos — envie as imagens **diretamente neste canal** (até 4 fotos)\n'
+              + '5. O bot salva automaticamente ao detectar as imagens\n'
+              + '6. Sem fotos? Clique em **SALVAR SEM FOTO**\n\n'
+              + '**✏️ EDITAR**\n'
+              + '1. Clique no botão **EDITAR**\n'
+              + '2. Selecione o produto na lista\n'
+              + '3. Edite nome, tamanhos e/ou preço no formulário\n'
+              + '4. O bot pergunta sobre as fotos: envie novas, mantenha as atuais ou remova\n\n'
+              + '**🗑️ REMOVER**\n'
+              + '1. Clique no botão **REMOVER**\n'
+              + '2. Selecione o produto — ele será desativado da loja\n\n'
+              + '**📋 LISTAR**\n'
+              + '1. Clique no botão **LISTAR** para ver todos os produtos cadastrados'
+            );
           if (temLogo) embed.setThumbnail('attachment://pdelogo.png');
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('btn_produto_adicionar').setLabel('ADICIONAR').setStyle(ButtonStyle.Secondary),
