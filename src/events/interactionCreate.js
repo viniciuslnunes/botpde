@@ -359,6 +359,8 @@ module.exports = {
             if (canalVendas) {
               const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
               const pedido    = pedidoRow.rows[0];
+              const socioRow  = pedido ? await db.query(`SELECT telefone FROM socios WHERE discord_id = $1`, [pedido.discord_id]).catch(() => ({ rows: [] })) : { rows: [] };
+              const telefone  = socioRow.rows[0]?.telefone ?? null;
               canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
                 fields: [
@@ -367,7 +369,8 @@ module.exports = {
                   { name: 'QUANTIDADE',   value: String(qtd),                                        inline: true  },
                   { name: 'PREÇO UNIT.',  value: prodVenda ? `R$ ${Number(prodVenda.preco).toFixed(2)}` : '—', inline: true },
                   { name: 'TOTAL',        value: prodVenda ? `R$ ${(Number(prodVenda.preco) * qtd).toFixed(2)}` : '—', inline: true },
-                  { name: 'CLIENTE',      value: pedido ? `<@${pedido.discord_id}>` : canal.name,   inline: true  },
+                  { name: 'CLIENTE',      value: pedido ? `<@${pedido.discord_id}>\n${pedido.discord_tag}` : canal.name, inline: true  },
+                  { name: 'TELEFONE',     value: telefone ?? 'NÃO CADASTRADO',                       inline: true  },
                   { name: 'CONFIRMADO POR', value: `<@${interaction.user.id}>`,                     inline: false },
                 ],
               }] });
