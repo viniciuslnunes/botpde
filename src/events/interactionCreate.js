@@ -22,6 +22,7 @@ const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
 const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, decrementarEstoque, formatarEstoque, tamanhoDisponiveis } = require('../utils/loja');
 const pendingProdutos = require('../utils/pendingProdutos');
+const avisoMsgs = new Map(); // userId -> { msg, timeout }
 
 // ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
 // Retorna { embeds, files } — files contém Buffers quando dados são base64
@@ -1343,23 +1344,18 @@ module.exports = {
           const canalProvar = interaction.guild.channels.cache.get(canalProvarId);
           if (canalProvar) {
             const avisoMsg = await canalProvar.send({ content: instrucao });
-            setTimeout(async () => {
+            const t = setTimeout(async () => {
               try {
                 await guildMember.roles.remove(cargoProvar);
                 avisoMsg.delete().catch(() => {});
               } catch (err) {
                 console.error('[recrutamento] Erro ao limpar canal provar:', err);
+              } finally {
+                avisoMsgs.delete(user.id);
               }
             }, 5 * 60 * 1000);
+            avisoMsgs.set(user.id, { msg: avisoMsg, timeout: t });
           }
-
-          setTimeout(async () => {
-            try {
-              await guildMember.roles.remove(cargoProvar);
-            } catch (err) {
-              console.error('[recrutamento] Erro ao remover cargo provar:', err);
-            }
-          }, 5 * 60 * 1000);
         } catch (err) {
           console.error('[recrutamento] Erro ao atribuir cargo provar:', err);
         }
@@ -1425,6 +1421,9 @@ module.exports = {
             await guildMember.roles.add(cargoAtribuir);
             await guildMember.roles.remove(isSocio ? config.cargos.provarAssociacao : config.cargos.provarManto).catch(() => {});
             await guildMember.roles.remove(config.cargos.visitante).catch(() => {});
+            // Cancelar timer e deletar aviso imediatamente
+            const avisoEntry = avisoMsgs.get(candidatoId);
+            if (avisoEntry) { clearTimeout(avisoEntry.timeout); avisoEntry.msg.delete().catch(() => {}); avisoMsgs.delete(candidatoId); }
 
             const novoNick = formatarNick(nome, registro || null);
             await guildMember.setNickname(novoNick).catch(() => {});
