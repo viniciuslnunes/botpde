@@ -173,20 +173,22 @@ module.exports = {
         const disponiveis = tamanhoDisponiveis(produto.estoque);
         if (!disponiveis.length) return interaction.update({ content: '❌ PRODUTO SEM ESTOQUE NO MOMENTO.', components: [], embeds: [] });
 
-        // Produto sem tamanho — pula select e abre modal de pedido direto
+        // Produto sem tamanho — exibe embed com imagem e botão COMPRAR
         if (disponiveis.length === 1 && disponiveis[0] === 'UN') {
-          const modal = new ModalBuilder()
-            .setCustomId(`modal_pedido_loja:${produtoId}:UN`)
-            .setTitle('FINALIZAR PEDIDO');
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('quantidade').setLabel('QUANTIDADE').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1').setMaxLength(3),
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('obs').setLabel('OBSERVAÇÕES (opcional)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(300),
-            ),
-          );
-          return interaction.showModal(modal);
+          const embedProdutoUN = {
+            color: 0x000000,
+            title: produto.nome.toUpperCase(),
+            fields: [
+              { name: 'PREÇO',   value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
+              { name: 'ESTOQUE', value: formatarEstoque(produto.estoque),          inline: true },
+            ],
+          };
+          return interaction.update({
+            ...carrosselEmbeds(embedProdutoUN, produto.imagem_url),
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`comprar_produto_un:${produtoId}`).setLabel('🛒 COMPRAR PRODUTO').setStyle(ButtonStyle.Primary),
+            )],
+          });
         }
 
         const select   = new StringSelectMenuBuilder()
@@ -208,6 +210,24 @@ module.exports = {
           ...carrosselEmbeds(embedProduto, produto.imagem_url),
           components: [new ActionRowBuilder().addComponents(select)],
         });
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('comprar_produto_un:')) {
+        const produtoId = interaction.customId.split(':')[1];
+        const produto   = await buscarProduto(produtoId).catch(() => null);
+        if (!produto) return interaction.reply({ content: '❌ PRODUTO NÃO ENCONTRADO.', flags: 64 });
+        const modal = new ModalBuilder()
+          .setCustomId(`modal_pedido_loja:${produtoId}:UN`)
+          .setTitle('FINALIZAR PEDIDO');
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('quantidade').setLabel('QUANTIDADE').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1').setMaxLength(3),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('obs').setLabel('OBSERVAÇÕES (opcional)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(300),
+          ),
+        );
+        return interaction.showModal(modal);
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_tamanho_loja:')) {
