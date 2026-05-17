@@ -21,13 +21,13 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
     console.log(`Registrando ${commands.length} slash command(s)...`);
 
     // Para registrar globalmente (pode levar até 1 hora para propagar):
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+    // await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
 
     // Para registrar apenas em um servidor (instantâneo — útil em desenvolvimento):
-    // await rest.put(
-    //   Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-    //   { body: commands },
-    // );
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+      { body: commands },
+    );
 
     console.log(`✅ ${commands.length} slash command(s) registrado(s) com sucesso.`);
   } catch (error) {
