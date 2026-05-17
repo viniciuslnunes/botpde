@@ -320,7 +320,7 @@ module.exports = {
         try {
           const html      = await gerarTranscript(canal);
           const buffer    = Buffer.from(html, 'utf-8');
-          const canalLogs = await interaction.client.channels.fetch(CANAL_LOGS).catch(() => null);
+          const canalLogs = await interaction.client.channels.fetch(config.canais.logsLoja).catch(() => null);
           if (canalLogs) {
             await canalLogs.send({
               content: confirmar
