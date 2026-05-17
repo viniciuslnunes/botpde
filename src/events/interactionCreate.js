@@ -258,7 +258,7 @@ module.exports = {
 
         const rowFechar = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('fechar_ticket_loja').setLabel('🔒 FECHAR TICKET').setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`confirmar_compra_loja:${produto.id}:${tamanho}:${qtd}`).setLabel('✅ CONFIRMAR COMPRA').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`confirmar_compra_loja:${produto.id}:${tamanho}:${qtd}`).setLabel('🤝 CONFIRMAR COMPRA').setStyle(ButtonStyle.Primary),
         );
 
         const PIX_KEY = '11.222.333/0001-44'; // chave simbólica
