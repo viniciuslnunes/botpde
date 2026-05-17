@@ -84,9 +84,9 @@ module.exports = {
     try {
       const canalGerenc = await client.channels.fetch(config.canais.gerenciamentoLoja).catch(() => null);
       if (canalGerenc) {
-        const msgs     = await canalGerenc.messages.fetch({ limit: 20 });
-        const jaExiste = msgs.some(m => m.author.id === client.user.id && m.components.length > 0);
-        if (!jaExiste) {
+        const msgs      = await canalGerenc.messages.fetch({ limit: 20 });
+        const msgAntiga = msgs.find(m => m.author.id === client.user.id && m.components.length > 0);
+        if (msgAntiga) await msgAntiga.delete().catch(() => {});
           const embed = new EmbedBuilder()
             .setColor(0x000000)
             .setTitle('GERENCIAMENTO — LOJA')
@@ -118,7 +118,6 @@ module.exports = {
             new ButtonBuilder().setCustomId('btn_produto_editar').setLabel('EDITAR').setStyle(ButtonStyle.Secondary),
           );
           await canalGerenc.send({ embeds: [embed], components: [row], files: logoFile });
-        }
       }
     } catch (err) {
       console.error('[ready] Erro ao enviar mensagem de gerenciamento:', err);
