@@ -1,6 +1,7 @@
 const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const pendingProdutos = require('../utils/pendingProdutos');
 const { adicionarProduto, atualizarProduto, formatarEstoque } = require('../utils/loja');
+const config = require('../config');
 
 function carrosselEmbeds(embedBase, imagem_url) {
   if (!imagem_url) return { embeds: [embedBase], files: [] };
@@ -62,21 +63,26 @@ module.exports = {
       }
 
       const qtdImgs = urls.split(',').filter(Boolean).length;
-      const titulo  = dados.type === 'add' ? '✅ PRODUTO ADICIONADO' : '✅ PRODUTO ATUALIZADO';
+      const titulo  = dados.type === 'add' ? '📦 PRODUTO ADICIONADO' : '📦 PRODUTO ATUALIZADO';
       const embedBase = {
         color: 0x000000,
         title: titulo,
         fields: [
-          { name: 'NOME',    value: p.nome,                              inline: true },
-          { name: 'PREÇO',   value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true },
-          { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
-          { name: 'FOTOS',   value: `${qtdImgs} foto(s) salva(s)`,       inline: false },
+          { name: 'NOME',           value: p.nome,                              inline: true },
+          { name: 'PREÇO',          value: `R$ ${Number(p.preco).toFixed(2)}`,  inline: true },
+          { name: 'ESTOQUE',        value: formatarEstoque(p.estoque),          inline: false },
+          { name: 'FOTOS',          value: `${qtdImgs} foto(s) salva(s)`,       inline: false },
+          { name: 'REGISTRADO POR', value: `<@${message.author.id}>`,           inline: false },
         ],
       };
-
+      // Log detalhado no canal logs-itens-loja
+      const logsItensLojaCh = await message.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
+      if (logsItensLojaCh) {
+        logsItensLojaCh.send({ ...carrosselEmbeds(embedBase, p.imagem_url) });
+      }
+      // Confirmação curta e efêmera-like para o usuário no canal de gerenciamento
       await message.channel.send({
-        content: `${message.author}`,
-        ...carrosselEmbeds(embedBase, p.imagem_url),
+        content: `${message.author} ✅ **${dados.type === 'add' ? 'PRODUTO ADICIONADO' : 'PRODUTO ATUALIZADO'}** com sucesso! **${p.nome}** foi ${dados.type === 'add' ? 'cadastrado' : 'atualizado'} na loja.`,
       });
       return;
     }
