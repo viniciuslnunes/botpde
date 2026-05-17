@@ -367,7 +367,11 @@ module.exports = {
               );
               const clientId = clientOverwrite?.id ?? pedido?.discord_id ?? null;
               console.log('[loja] clientId:', clientId);
-              const socioRow  = clientId ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [clientId]).catch(() => ({ rows: [] })) : { rows: [] };
+              const socioRow  = clientId ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [clientId]).catch(err => { console.error('[loja] Erro query telefone:', err); return { rows: [] }; }) : { rows: [] };
+              console.log('[loja] socioRow rows:', JSON.stringify(socioRow.rows));
+              // fallback: tenta buscar sem filtro para confirmar se há dados
+              const allRows = await db.query(`SELECT discord_id, telefone FROM aprovacoes_recrutamento LIMIT 5`).catch(() => ({ rows: [] }));
+              console.log('[loja] aprovacoes_recrutamento sample:', JSON.stringify(allRows.rows));
               const telefone  = socioRow.rows[0]?.telefone ?? null;
               console.log('[loja] telefone:', telefone);
               await canalVendas.send({ embeds: [{ color: 0x000000,
