@@ -371,7 +371,6 @@ module.exports = {
               const telefone  = socioRow.rows[0]?.telefone ?? null;
               console.log('[loja] telefone:', telefone);
               await canalVendas.send({ embeds: [{ color: 0x000000,
-              await canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
                 fields: [
                   { name: 'PRODUTO',      value: prodVenda?.nome ?? `ID ${produtoId}`,               inline: true  },
