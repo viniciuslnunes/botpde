@@ -1335,15 +1335,22 @@ module.exports = {
           const cargoProvar   = tipo === 'socio' ? config.cargos.provarAssociacao : config.cargos.provarManto;
           const canalProvarId = tipo === 'socio' ? config.canais.provarAssociacao : config.canais.provarManto;
           const instrucao     = tipo === 'socio'
-            ? `<@${user.id}>, você tem 10 minutos para enviar sua **carteirinha de associado** aqui! Após esse prazo, o cargo será removido automaticamente.`
-            : `<@${user.id}>, você tem 10 minutos para enviar uma **foto do seu manto** aqui! Após esse prazo, o cargo será removido automaticamente.`;
+            ? `<@${user.id}>, você tem 5 minutos para enviar sua **carteirinha de associado** aqui! Após esse prazo, o cargo será removido automaticamente.`
+            : `<@${user.id}>, você tem 5 minutos para enviar uma **foto do seu manto** aqui! Após esse prazo, o cargo será removido automaticamente.`;
 
           await guildMember.roles.add(cargoProvar);
 
           const canalProvar = interaction.guild.channels.cache.get(canalProvarId);
           if (canalProvar) {
             const avisoMsg = await canalProvar.send({ content: instrucao });
-            setTimeout(() => { avisoMsg.delete().catch(() => {}); }, 5 * 60 * 1000);
+            setTimeout(async () => {
+              try {
+                await guildMember.roles.remove(cargoProvar);
+                avisoMsg.delete().catch(() => {});
+              } catch (err) {
+                console.error('[recrutamento] Erro ao limpar canal provar:', err);
+              }
+            }, 5 * 60 * 1000);
           }
 
           setTimeout(async () => {
@@ -1352,7 +1359,7 @@ module.exports = {
             } catch (err) {
               console.error('[recrutamento] Erro ao remover cargo provar:', err);
             }
-          }, 10 * 60 * 1000);
+          }, 5 * 60 * 1000);
         } catch (err) {
           console.error('[recrutamento] Erro ao atribuir cargo provar:', err);
         }
