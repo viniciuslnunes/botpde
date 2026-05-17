@@ -355,25 +355,18 @@ module.exports = {
           // Log de venda confirmada
           try {
             const prodVenda   = await buscarProduto(produtoId).catch(() => null);
-            const canalVendas = await interaction.client.channels.fetch(config.canais.logsVendas).catch(err => { console.error('[loja] Erro ao buscar canalVendas:', err); return null; });
-            console.log('[loja] canalVendas:', canalVendas?.id ?? 'NÃO ENCONTRADO');
+            const canalVendas = await interaction.client.channels.fetch(config.canais.logsVendas).catch(() => null);
             if (canalVendas) {
               const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
               const pedido    = pedidoRow.rows[0];
-              console.log('[loja] pedido discord_id:', pedido?.discord_id ?? 'NÃO ENCONTRADO');
               // Pega o discord_id do cliente pelas permissões do canal (mais confiável)
               const clientOverwrite = canal.permissionOverwrites.cache.find(
                 ow => ow.type === 1 && ow.id !== interaction.client.user.id && ow.id !== interaction.guild.roles.everyone.id
               );
               const clientId = clientOverwrite?.id ?? pedido?.discord_id ?? null;
-              console.log('[loja] clientId:', clientId);
-              const socioRow  = clientId ? await db.query(`SELECT telefone FROM membros WHERE discord_id = $1`, [clientId]).catch(err => { console.error('[loja] Erro query telefone:', err); return { rows: [] }; }) : { rows: [] };
-              console.log('[loja] socioRow rows:', JSON.stringify(socioRow.rows));
-              // fallback: tenta buscar sem filtro para confirmar se há dados
-              const allRows = await db.query(`SELECT discord_id, telefone FROM membros LIMIT 5`).catch(() => ({ rows: [] }));
-              console.log('[loja] membros sample:', JSON.stringify(allRows.rows));
+              const socioRow  = clientId ? await db.query(`SELECT telefone FROM membros WHERE discord_id = $1`, [clientId]).catch(() => ({ rows: [] })) : { rows: [] };
               const telefone  = socioRow.rows[0]?.telefone ?? null;
-              console.log('[loja] telefone:', telefone);
+              const agora     = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
               await canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
                 fields: [
@@ -385,6 +378,7 @@ module.exports = {
                   { name: 'CLIENTE',      value: pedido ? `<@${pedido.discord_id}>\n${pedido.discord_tag}` : canal.name, inline: true  },
                   { name: 'TELEFONE',     value: telefone ?? 'NÃO CADASTRADO',                       inline: true  },
                   { name: 'CONFIRMADO POR', value: `<@${interaction.user.id}>`,                     inline: false },
+                  { name: 'DATA/HORA',    value: agora,                                              inline: false },
                 ],
               }] }).catch(err => console.error('[loja] Erro ao enviar log de venda:', err));
             }
