@@ -1,19 +1,25 @@
 const db = require('./db');
 
-// Ordem canônica dos tamanhos para exibição
-const ORDEM_TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'EXG'];
+// Ordem canônica dos tamanhos (sem PP)
+const ORDEM_TAMANHOS = ['P', 'M', 'G', 'GG', 'EXG'];
 
-// Parseia o campo estoque_texto do modal ("PP:5\nP:10\nM:8") para objeto JSON
-function parseEstoque(texto) {
-  const obj = {};
-  for (const linha of texto.split(/[\n,]+/)) {
-    const [tam, qtd] = linha.trim().toUpperCase().split(':');
-    if (tam && qtd !== undefined) {
-      const n = parseInt(qtd);
-      obj[tam] = isNaN(n) ? 0 : n;
-    }
-  }
-  return obj;
+// Parseia os 3 campos pareados do modal para objeto JSON:
+//   campo1 = "P e M"  (ex: "10 e 8")
+//   campo2 = "G e GG" (ex: "5 e 3")
+//   campo3 = "EXG"    (ex: "2")
+// Aceita qualquer separador — extrai apenas os números na ordem
+function parseEstoquePares(pM, gGG, exg) {
+  const nums = str => { const m = (str || '').match(/\d+/g) || []; return [parseInt(m[0]) || 0, parseInt(m[1]) || 0]; };
+  const [p, m]  = nums(pM);
+  const [g, gg] = nums(gGG);
+  const [e]     = nums(exg);
+  return { P: p, M: m, G: g, GG: gg, EXG: e };
+}
+
+// Formata estoque para pré-preenchimento do campo pareado ("10 e 8")
+function formatarPar(estoque, t1, t2) {
+  if (t2 === undefined) return String(estoque?.[t1] ?? 0);
+  return `${estoque?.[t1] ?? 0} e ${estoque?.[t2] ?? 0}`;
 }
 
 // Formata estoque para exibição ("PP: 5 | P: 10 | M: 8")
@@ -106,4 +112,4 @@ async function atualizarStatusPedido(id, status) {
   await db.query(`UPDATE pedidos SET status = $1 WHERE id = $2`, [status, id]);
 }
 
-module.exports = { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, atualizarStatusPedido, decrementarEstoque, parseEstoque, formatarEstoque, tamanhoDisponiveis };
+module.exports = { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, atualizarStatusPedido, decrementarEstoque, parseEstoquePares, formatarPar, formatarEstoque, tamanhoDisponiveis };

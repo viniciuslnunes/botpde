@@ -20,7 +20,7 @@ const { atualizarMural }      = require('../utils/muralAssociados');
 const { criarCanalTicket, gerarTranscript, CANAL_LOGS, LOGO_PATH, CATEGORIAS } = require('../utils/ticket');
 const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
-const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, decrementarEstoque, parseEstoque, formatarEstoque, tamanhoDisponiveis } = require('../utils/loja');
+const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, decrementarEstoque, parseEstoquePares, formatarPar, formatarEstoque, tamanhoDisponiveis } = require('../utils/loja');
 const pendingProdutos = require('../utils/pendingProdutos');
 
 // ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
@@ -343,10 +343,16 @@ module.exports = {
             new TextInputBuilder().setCustomId('nome').setLabel('NOME DO PRODUTO').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('estoque').setLabel('ESTOQUE POR TAMANHO').setPlaceholder('PP:5\nP:10\nM:8\nG:5\nGG:3\nEXG:2').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(200),
+            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            new TextInputBuilder().setCustomId('est_pM').setLabel('QUANTIDADE P e M').setPlaceholder('ex: 10 e 8  →  P=10, M=8').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('est_gGG').setLabel('QUANTIDADE G e GG').setPlaceholder('ex: 5 e 3  →  G=5, GG=3').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('est_exg').setLabel('QUANTIDADE EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
           ),
         );
         return interaction.showModal(modal);
@@ -392,34 +398,40 @@ module.exports = {
         const id      = interaction.values[0];
         const produto = await buscarProduto(id).catch(() => null);
         if (!produto) return interaction.update({ content: '❌ PRODUTO NÃO ENCONTRADO.', components: [], embeds: [] });
-        // Monta valor pré-preenchido do estoque ("PP:5\nP:10")
         const estoqueAtual = produto.estoque || {};
-        const estoqueValor = Object.entries(estoqueAtual).map(([t, q]) => `${t}:${q}`).join('\n') || 'P:0';
         const modal = new ModalBuilder().setCustomId(`modal_editar_produto:${id}`).setTitle('EDITAR PRODUTO');
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('nome').setLabel('NOME').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80).setValue(produto.nome),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('estoque').setLabel('ESTOQUE POR TAMANHO').setPlaceholder('PP:5\nP:10\nM:8\nG:5\nGG:3\nEXG:2').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(200).setValue(estoqueValor),
+            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
+            new TextInputBuilder().setCustomId('est_pM').setLabel('QUANTIDADE P e M').setPlaceholder('ex: 10 e 8').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20).setValue(formatarPar(estoqueAtual, 'P', 'M')),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('est_gGG').setLabel('QUANTIDADE G e GG').setPlaceholder('ex: 5 e 3').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20).setValue(formatarPar(estoqueAtual, 'G', 'GG')),
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('est_exg').setLabel('QUANTIDADE EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(formatarPar(estoqueAtual, 'EXG')),
           ),
         );
         return interaction.showModal(modal);
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_editar_produto:')) {
-        const id          = interaction.customId.split(':')[1];
-        const nome        = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
-        const estoqueText = interaction.fields.getTextInputValue('estoque').trim();
-        const precoStr    = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco       = parseFloat(precoStr);
+        const id      = interaction.customId.split(':')[1];
+        const nome    = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco   = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
-        const estoque  = parseEstoque(estoqueText);
-        const tamanhos = Object.keys(estoque).join(',');
-        if (!tamanhos) return interaction.reply({ content: '❌ ESTOQUE INVÁLIDO. USE O FORMATO: PP:5\nP:10\nM:8', flags: 64 });
+        const estoque  = parseEstoquePares(
+          interaction.fields.getTextInputValue('est_pM'),
+          interaction.fields.getTextInputValue('est_gGG'),
+          interaction.fields.getTextInputValue('est_exg'),
+        );
+        const tamanhos = Object.keys(estoque).filter(t => estoque[t] > 0).join(',') || Object.keys(estoque).join(',');
 
         // Salva dados pendentes e pede fotos
         pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, tamanhos, preco, estoque, channelId: interaction.channelId });
@@ -444,14 +456,16 @@ module.exports = {
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
 
       if (interaction.isModalSubmit() && interaction.customId === 'modal_produto_add') {
-        const nome        = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
-        const estoqueText = interaction.fields.getTextInputValue('estoque').trim();
-        const precoStr    = interaction.fields.getTextInputValue('preco').replace(',', '.');
-        const preco       = parseFloat(precoStr);
+        const nome     = interaction.fields.getTextInputValue('nome').toUpperCase().trim();
+        const precoStr = interaction.fields.getTextInputValue('preco').replace(',', '.');
+        const preco    = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
-        const estoque  = parseEstoque(estoqueText);
-        const tamanhos = Object.keys(estoque).join(',');
-        if (!tamanhos) return interaction.reply({ content: '❌ ESTOQUE INVÁLIDO. USE O FORMATO: PP:5\nP:10\nM:8', flags: 64 });
+        const estoque  = parseEstoquePares(
+          interaction.fields.getTextInputValue('est_pM'),
+          interaction.fields.getTextInputValue('est_gGG'),
+          interaction.fields.getTextInputValue('est_exg'),
+        );
+        const tamanhos = Object.keys(estoque).filter(t => estoque[t] > 0).join(',') || Object.keys(estoque).join(',');
 
         // Salva dados pendentes e pede fotos
         pendingProdutos.set(interaction.user.id, { type: 'add', nome, tamanhos, preco, estoque, channelId: interaction.channelId });
