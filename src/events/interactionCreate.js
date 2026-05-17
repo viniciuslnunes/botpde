@@ -629,7 +629,7 @@ module.exports = {
               { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
               { name: 'FOTOS',   value: 'NENHUMA',                           inline: false },
             ],
-            footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+            footer: { text: 'Clique em "Ignorar mensagem" abaixo para não exibir mais esta notificação.' },
           }],
           components: [],
         });
@@ -668,7 +668,7 @@ module.exports = {
               { name: 'ESTOQUE', value: formatarEstoque(p.estoque),                                    inline: false },
               { name: 'FOTOS',   value: qtdImgs ? `${qtdImgs} foto(s) mantida(s)` : 'NENHUMA',        inline: false },
             ],
-            footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+            footer: { text: 'Clique em "Ignorar mensagem" abaixo para não exibir mais esta notificação.' },
           }],
           components: [],
         });

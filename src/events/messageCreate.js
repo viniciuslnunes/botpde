@@ -92,7 +92,7 @@ module.exports = {
             { name: 'ESTOQUE', value: formatarEstoque(p.estoque),          inline: false },
             { name: 'FOTOS',   value: `${qtdFotos} foto(s) salva(s)`,      inline: false },
           ],
-          footer: { text: 'Esta mensagem será apagada em 1 minuto.' },
+          footer: { text: 'Clique em "Ignorar mensagem" para não exibir mais esta notificação.' },
         }],
       });
       setTimeout(() => confirmMsg.delete().catch(() => {}), 60_000);
