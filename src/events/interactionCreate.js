@@ -359,7 +359,7 @@ module.exports = {
             if (canalVendas) {
               const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
               const pedido    = pedidoRow.rows[0];
-              const socioRow  = pedido ? await db.query(`SELECT telefone FROM socios WHERE discord_id = $1`, [pedido.discord_id]).catch(() => ({ rows: [] })) : { rows: [] };
+              const socioRow  = pedido ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [pedido.discord_id]).catch(() => ({ rows: [] })) : { rows: [] };
               const telefone  = socioRow.rows[0]?.telefone ?? null;
               canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
