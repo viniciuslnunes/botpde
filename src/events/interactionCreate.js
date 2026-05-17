@@ -28,10 +28,14 @@ function carrosselEmbeds(embedBase, imagem_url) {
   if (!imagem_url) return [embedBase];
   const urls = imagem_url.split(',').map(u => u.trim()).filter(Boolean).slice(0, 4);
   if (!urls.length) return [embedBase];
-  const ANCHOR = 'https://discord.com/channels/@me'; // URL âncora igual em todos
+  if (urls.length === 1) {
+    return [{ ...embedBase, image: { url: urls[0] } }];
+  }
+  // Múltiplas imagens: Discord agrupa embeds com mesmo `url` em galeria
+  const ANCHOR = 'https://discord.com/channels/@me';
   const embeds = [{ ...embedBase, url: ANCHOR, image: { url: urls[0] } }];
   for (let i = 1; i < urls.length; i++) {
-    embeds.push({ url: ANCHOR, image: { url: urls[i] } });
+    embeds.push({ color: embedBase.color ?? 0, url: ANCHOR, image: { url: urls[i] } });
   }
   return embeds;
 }

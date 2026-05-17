@@ -23,7 +23,7 @@ module.exports = {
       const urls = [...message.attachments.values()]
         .filter(a => a.contentType?.startsWith('image/'))
         .slice(0, 4)
-        .map(a => a.url)
+        .map(a => a.proxyURL)
         .join(',');
 
       if (!urls) return; // nenhum anexo era imagem, ignora
