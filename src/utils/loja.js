@@ -25,6 +25,7 @@ function formatarPar(estoque, t1, t2) {
 // Formata estoque para exibição ("PP: 5 | P: 10 | M: 8")
 function formatarEstoque(estoque) {
   if (!estoque || !Object.keys(estoque).length) return 'SEM ESTOQUE';
+  if (Object.keys(estoque).length === 1 && estoque.UN != null) return `${estoque.UN} un.`;
   return ORDEM_TAMANHOS
     .filter(t => estoque[t] !== undefined)
     .concat(Object.keys(estoque).filter(t => !ORDEM_TAMANHOS.includes(t)))

@@ -172,6 +172,23 @@ module.exports = {
 
         const disponiveis = tamanhoDisponiveis(produto.estoque);
         if (!disponiveis.length) return interaction.update({ content: '❌ PRODUTO SEM ESTOQUE NO MOMENTO.', components: [], embeds: [] });
+
+        // Produto sem tamanho — pula select e abre modal de pedido direto
+        if (disponiveis.length === 1 && disponiveis[0] === 'UN') {
+          const modal = new ModalBuilder()
+            .setCustomId(`modal_pedido_loja:${produtoId}:UN`)
+            .setTitle('FINALIZAR PEDIDO');
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('quantidade').setLabel('QUANTIDADE').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1').setMaxLength(3),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('obs').setLabel('OBSERVAÇÕES (opcional)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(300),
+            ),
+          );
+          return interaction.showModal(modal);
+        }
+
         const select   = new StringSelectMenuBuilder()
           .setCustomId(`select_tamanho_loja:${produtoId}`)
           .setPlaceholder('SELECIONE O TAMANHO')
@@ -413,9 +430,10 @@ module.exports = {
         const dadosAnt = pendingProdutos.get(interaction.user.id) || {};
         pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, preco, channelId: interaction.channelId, estoqueAtual: dadosAnt.estoqueAtual || {} });
         return interaction.reply({
-          embeds: [{ color: 0x000000, title: 'EDITAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nClique em **PRÓXIMA ETAPA** para definir o estoque por tamanho.` }],
+          embeds: [{ color: 0x000000, title: 'EDITAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nComo é o estoque deste produto?` }],
           components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ PRÓXIMA ETAPA — ESTOQUE').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ COM TAMANHOS (P/M/G/GG/EXG)').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_step2_semtamanho_btn').setLabel('▶ SEM TAMANHO (quantidade única)').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
           )],
           flags: 64,
@@ -431,9 +449,10 @@ module.exports = {
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
         pendingProdutos.set(interaction.user.id, { type: 'add', nome, preco, channelId: interaction.channelId });
         return interaction.reply({
-          embeds: [{ color: 0x000000, title: 'ADICIONAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nClique em **PRÓXIMA ETAPA** para definir o estoque por tamanho.` }],
+          embeds: [{ color: 0x000000, title: 'ADICIONAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nComo é o estoque deste produto?` }],
           components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ PRÓXIMA ETAPA — ESTOQUE').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ COM TAMANHOS (P/M/G/GG/EXG)').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_step2_semtamanho_btn').setLabel('▶ SEM TAMANHO (quantidade única)').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
           )],
           flags: 64,
@@ -453,6 +472,46 @@ module.exports = {
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_exg').setLabel('QUANTIDADE — EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.EXG != null ? String(est.EXG) : '')),
         );
         return interaction.showModal(m2);
+      }
+
+      if (interaction.isButton() && interaction.customId === 'prod_step2_semtamanho_btn') {
+        const dados = pendingProdutos.get(interaction.user.id);
+        if (!dados) return interaction.reply({ content: '❌ SESSÃO EXPIRADA. COMECE NOVAMENTE.', flags: 64 });
+        const qtdAtual = dados.estoqueAtual?.UN != null ? String(dados.estoqueAtual.UN) : '';
+        const mQtd = new ModalBuilder().setCustomId('modal_prod_qtd_unica').setTitle('QUANTIDADE DO PRODUTO');
+        mQtd.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('qtd_un').setLabel('QUANTIDADE TOTAL').setPlaceholder('ex: 50').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(6).setValue(qtdAtual),
+          ),
+        );
+        return interaction.showModal(mQtd);
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId === 'modal_prod_qtd_unica') {
+        const dados = pendingProdutos.get(interaction.user.id);
+        if (!dados) return interaction.reply({ content: '❌ SESSÃO EXPIRADA. COMECE NOVAMENTE.', flags: 64 });
+        const qtd = Math.max(0, parseInt(interaction.fields.getTextInputValue('qtd_un')) || 0);
+        if (qtd <= 0) return interaction.reply({ content: '❌ QUANTIDADE DEVE SER MAIOR QUE 0.', flags: 64 });
+        const estoque  = { UN: qtd };
+        const tamanhos = 'UN';
+        pendingProdutos.set(interaction.user.id, { ...dados, estoque, tamanhos });
+        const isEdit   = dados.type === 'edit';
+        const rowFotos = new ActionRowBuilder().addComponents(
+          ...(isEdit ? [new ButtonBuilder().setCustomId('prod_manter_fotos').setLabel('MANTER FOTOS ATUAIS').setStyle(ButtonStyle.Secondary)] : []),
+          new ButtonBuilder().setCustomId('prod_sem_foto').setLabel(isEdit ? 'REMOVER FOTOS' : 'SALVAR SEM FOTO').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
+        );
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: '📷 FOTOS DO PRODUTO', description:
+            `**PRODUTO:** ${dados.nome}\n**PREÇO:** R$ ${Number(dados.preco).toFixed(2)}\n**ESTOQUE:** ${qtd} un. (sem tamanho)\n\n`
+            + '---\n\n'
+            + '📎 **Envie as fotos agora** diretamente neste canal (até 4 imagens)\n'
+            + `${isEdit ? 'Clique **MANTER FOTOS ATUAIS** para não alterar.\n' : ''}Clique **${isEdit ? 'REMOVER FOTOS' : 'SALVAR SEM FOTO'}** para salvar sem imagem.\n`
+            + 'Clique **CANCELAR** para descartar.\n\n'
+            + '*Aguardando por 2 minutos...*' }],
+          components: [rowFotos],
+          flags: 64,
+        });
       }
 
       if (interaction.isModalSubmit() && interaction.customId === 'modal_prod_step2') {
