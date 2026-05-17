@@ -650,9 +650,23 @@ module.exports = {
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_remover_produto') {
-        const id = interaction.values[0];
+        const id      = interaction.values[0];
+        const produto = await buscarProduto(id).catch(() => null);
         await removerProduto(id).catch(() => {});
-        return interaction.update({ content: '✅ Produto removido do estoque.', components: [], embeds: [] });
+        // Log no canal logs-itens-loja
+        const logsItensLojaCh = await interaction.client.channels.fetch(config.canais.logsItensLoja).catch(() => null);
+        if (logsItensLojaCh && produto) {
+          logsItensLojaCh.send({ embeds: [{ color: 0x000000,
+            title: '🗑️ PRODUTO REMOVIDO',
+            fields: [
+              { name: 'NOME',           value: produto.nome,                                    inline: true  },
+              { name: 'PREÇO',          value: `R$ ${Number(produto.preco).toFixed(2)}`,        inline: true  },
+              { name: 'ESTOQUE',        value: formatarEstoque(produto.estoque),                inline: false },
+              { name: 'REMOVIDO POR',   value: `<@${interaction.user.id}>`,                     inline: false },
+            ],
+          }] });
+        }
+        return interaction.update({ content: 'PRODUTO REMOVIDO DO ESTOQUE.', components: [], embeds: [] });
       }
 
       // ══════════════════════════════════════════════════════
