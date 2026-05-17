@@ -1,0 +1,105 @@
+name: Discord — Notificação de Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # histórico completo para calcular tempo de desenvolvimento
+
+      - name: Enviar notificação ao Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python3 << 'EOF'
+          import subprocess, os, json, urllib.request, datetime
+
+          def git(cmd):
+              return subprocess.check_output(['git'] + cmd.split(), text=True).strip()
+
+          # ── Informações do commit ─────────────────────────────────
+          hash_short = git('log -1 --pretty=%h')
+          hash_full  = git('rev-parse HEAD')
+          message    = git('log -1 --pretty=%s')
+          body       = git('log -1 --pretty=%b')
+          author     = git('log -1 --pretty=%an')
+          date_str   = git('log -1 --pretty=%cI')
+          total      = git('rev-list --count HEAD')
+          branch     = git('rev-parse --abbrev-ref HEAD')
+          repo       = '${{ github.repository }}'
+
+          # ── Arquivos modificados ──────────────────────────────────
+          try:
+              raw = git('diff --name-only HEAD~1 HEAD').split('\n')
+          except Exception:
+              raw = []
+          files = [f for f in raw if f]
+          count = len(files)
+          shown = files[:12]
+          extra = count - len(shown)
+          files_text = '\n'.join(f'`{f}`' for f in shown)
+          if extra > 0:
+              files_text += f'\n*... e mais {extra} arquivo(s)*'
+          if not files_text:
+              files_text = '*(commit inicial)*'
+
+          # ── Estatísticas ──────────────────────────────────────────
+          try:
+              adds_dels = git('diff --shortstat HEAD~1 HEAD')
+          except Exception:
+              adds_dels = ''
+
+          # ── Tempo de desenvolvimento ──────────────────────────────
+          first_iso  = git('log --reverse --pretty=%cI').split('\n')[0]
+          t1 = datetime.datetime.fromisoformat(first_iso).astimezone(datetime.timezone.utc)
+          t2 = datetime.datetime.now(datetime.timezone.utc)
+          delta = t2 - t1
+          days  = delta.days
+          hours = delta.seconds // 3600
+          mins  = (delta.seconds % 3600) // 60
+          dev_time = f'{days}d {hours}h {mins}m'
+
+          # ── Links ─────────────────────────────────────────────────
+          commit_url  = f'https://github.com/{repo}/commit/{hash_full}'
+          compare_url = f'https://github.com/{repo}/commits/{branch}'
+
+          # ── Monta embed ───────────────────────────────────────────
+          desc_parts = [f'>>> **{message}**']
+          if body.strip():
+              desc_parts.append(body.strip())
+          description = '\n'.join(desc_parts)
+
+          fields = [
+              {'name': '👤  AUTOR',                   'value': f'`{author}`',          'inline': True},
+              {'name': '🔀  BRANCH',                  'value': f'`{branch}`',          'inline': True},
+              {'name': '🔢  COMMIT',                  'value': f'[`{hash_short}`]({commit_url})', 'inline': True},
+              {'name': f'📁  ARQUIVOS MODIFICADOS — {count}', 'value': files_text,     'inline': False},
+              {'name': '📊  TOTAL DE COMMITS',        'value': f'`{total}` commits',   'inline': True},
+              {'name': '⏱️  TEMPO DE DESENVOLVIMENTO', 'value': f'`{dev_time}`',        'inline': True},
+          ]
+
+          if adds_dels:
+              fields.append({'name': '±  LINHAS', 'value': f'`{adds_dels.strip()}`', 'inline': False})
+
+          payload = {
+              'embeds': [{
+                  'color': 0x000000,
+                  'title': '🛠️  NOVA ATUALIZAÇÃO — BOT PDE',
+                  'description': description,
+                  'fields': fields,
+                  'footer': {'text': f'BOT PDE • Deploy automático via GitHub Actions'},
+                  'timestamp': date_str,
+              }]
+          }
+
+          webhook = os.environ['DISCORD_WEBHOOK']
+          data    = json.dumps(payload).encode()
+          req     = urllib.request.Request(webhook, data=data, headers={'Content-Type': 'application/json'})
+          urllib.request.urlopen(req)
+          print('✅ Notificação enviada com sucesso!')
+          EOF
