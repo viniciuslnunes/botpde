@@ -355,13 +355,16 @@ module.exports = {
           // Log de venda confirmada
           try {
             const prodVenda   = await buscarProduto(produtoId).catch(() => null);
-            const canalVendas = await interaction.client.channels.fetch(config.canais.logsVendas).catch(() => null);
+            const canalVendas = await interaction.client.channels.fetch(config.canais.logsVendas).catch(err => { console.error('[loja] Erro ao buscar canalVendas:', err); return null; });
+            console.log('[loja] canalVendas:', canalVendas?.id ?? 'NÃO ENCONTRADO');
             if (canalVendas) {
               const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
               const pedido    = pedidoRow.rows[0];
+              console.log('[loja] pedido:', pedido?.discord_id ?? 'NÃO ENCONTRADO');
               const socioRow  = pedido ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [pedido.discord_id]).catch(() => ({ rows: [] })) : { rows: [] };
               const telefone  = socioRow.rows[0]?.telefone ?? null;
-              canalVendas.send({ embeds: [{ color: 0x000000,
+              console.log('[loja] telefone:', telefone);
+              await canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
                 fields: [
                   { name: 'PRODUTO',      value: prodVenda?.nome ?? `ID ${produtoId}`,               inline: true  },
@@ -373,7 +376,7 @@ module.exports = {
                   { name: 'TELEFONE',     value: telefone ?? 'NÃO CADASTRADO',                       inline: true  },
                   { name: 'CONFIRMADO POR', value: `<@${interaction.user.id}>`,                     inline: false },
                 ],
-              }] });
+              }] }).catch(err => console.error('[loja] Erro ao enviar log de venda:', err));
             }
           } catch (e) { console.error('[loja] Erro ao registrar log de venda:', e); }
           // Atualiza embed de resumo de vendas
