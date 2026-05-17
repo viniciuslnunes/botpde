@@ -360,10 +360,17 @@ module.exports = {
             if (canalVendas) {
               const pedidoRow = await db.query(`SELECT * FROM pedidos WHERE canal_ticket_id = $1`, [canal.id]).catch(() => ({ rows: [] }));
               const pedido    = pedidoRow.rows[0];
-              console.log('[loja] pedido:', pedido?.discord_id ?? 'NÃO ENCONTRADO');
-              const socioRow  = pedido ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [pedido.discord_id]).catch(() => ({ rows: [] })) : { rows: [] };
+              console.log('[loja] pedido discord_id:', pedido?.discord_id ?? 'NÃO ENCONTRADO');
+              // Pega o discord_id do cliente pelas permissões do canal (mais confiável)
+              const clientOverwrite = canal.permissionOverwrites.cache.find(
+                ow => ow.type === 1 && ow.id !== interaction.client.user.id && ow.id !== interaction.guild.roles.everyone.id
+              );
+              const clientId = clientOverwrite?.id ?? pedido?.discord_id ?? null;
+              console.log('[loja] clientId:', clientId);
+              const socioRow  = clientId ? await db.query(`SELECT telefone FROM aprovacoes_recrutamento WHERE discord_id = $1`, [clientId]).catch(() => ({ rows: [] })) : { rows: [] };
               const telefone  = socioRow.rows[0]?.telefone ?? null;
               console.log('[loja] telefone:', telefone);
+              await canalVendas.send({ embeds: [{ color: 0x000000,
               await canalVendas.send({ embeds: [{ color: 0x000000,
                 title: 'VENDA CONFIRMADA',
                 fields: [
