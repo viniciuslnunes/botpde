@@ -411,17 +411,15 @@ module.exports = {
         const preco    = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
         const dadosAnt = pendingProdutos.get(interaction.user.id) || {};
-        const est      = dadosAnt.estoqueAtual || {};
-        pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, preco, channelId: interaction.channelId });
-        const m2 = new ModalBuilder().setCustomId('modal_prod_step2').setTitle('ESTOQUE POR TAMANHO — 2/2');
-        m2.addComponents(
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_p').setLabel('QUANTIDADE — P').setPlaceholder('ex: 10').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(String(est.P ?? 0))),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_m').setLabel('QUANTIDADE — M').setPlaceholder('ex: 8').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(String(est.M ?? 0))),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_g').setLabel('QUANTIDADE — G').setPlaceholder('ex: 5').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(String(est.G ?? 0))),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_gg').setLabel('QUANTIDADE — GG').setPlaceholder('ex: 3').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(String(est.GG ?? 0))),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_exg').setLabel('QUANTIDADE — EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(String(est.EXG ?? 0))),
-        );
-        return interaction.showModal(m2);
+        pendingProdutos.set(interaction.user.id, { type: 'edit', id, nome, preco, channelId: interaction.channelId, estoqueAtual: dadosAnt.estoqueAtual || {} });
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: 'EDITAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nClique em **PRÓXIMA ETAPA** para definir o estoque por tamanho.` }],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ PRÓXIMA ETAPA — ESTOQUE').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
+          )],
+          flags: 64,
+        });
       }
 
       // ── Modal 1 de ADICIONAR + Modal 2 comum (add e edit) ───────────────
@@ -432,13 +430,27 @@ module.exports = {
         const preco    = parseFloat(precoStr);
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
         pendingProdutos.set(interaction.user.id, { type: 'add', nome, preco, channelId: interaction.channelId });
-        const m2 = new ModalBuilder().setCustomId('modal_prod_step2').setTitle('ESTOQUE POR TAMANHO — 2/2');
+        return interaction.reply({
+          embeds: [{ color: 0x000000, title: 'ADICIONAR PRODUTO — 2/2', description: `**${nome}** — R$ ${preco.toFixed(2)}\n\nClique em **PRÓXIMA ETAPA** para definir o estoque por tamanho.` }],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('prod_step2_btn').setLabel('▶ PRÓXIMA ETAPA — ESTOQUE').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('prod_cancelar').setLabel('CANCELAR').setStyle(ButtonStyle.Danger),
+          )],
+          flags: 64,
+        });
+      }
+
+      if (interaction.isButton() && interaction.customId === 'prod_step2_btn') {
+        const dados = pendingProdutos.get(interaction.user.id);
+        if (!dados) return interaction.reply({ content: '❌ SESSÃO EXPIRADA. COMECE NOVAMENTE.', flags: 64 });
+        const est = dados.estoqueAtual || {};
+        const m2  = new ModalBuilder().setCustomId('modal_prod_step2').setTitle('ESTOQUE POR TAMANHO — 2/2');
         m2.addComponents(
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_p').setLabel('QUANTIDADE — P').setPlaceholder('ex: 10').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5)),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_m').setLabel('QUANTIDADE — M').setPlaceholder('ex: 8').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5)),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_g').setLabel('QUANTIDADE — G').setPlaceholder('ex: 5').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5)),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_gg').setLabel('QUANTIDADE — GG').setPlaceholder('ex: 3').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5)),
-          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_exg').setLabel('QUANTIDADE — EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5)),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_p').setLabel('QUANTIDADE — P').setPlaceholder('ex: 10').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.P != null ? String(est.P) : '')),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_m').setLabel('QUANTIDADE — M').setPlaceholder('ex: 8').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.M != null ? String(est.M) : '')),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_g').setLabel('QUANTIDADE — G').setPlaceholder('ex: 5').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.G != null ? String(est.G) : '')),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_gg').setLabel('QUANTIDADE — GG').setPlaceholder('ex: 3').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.GG != null ? String(est.GG) : '')),
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('qtd_exg').setLabel('QUANTIDADE — EXG').setPlaceholder('ex: 2').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(5).setValue(est.EXG != null ? String(est.EXG) : '')),
         );
         return interaction.showModal(m2);
       }
