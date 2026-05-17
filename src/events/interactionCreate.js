@@ -22,6 +22,19 @@ const { atualizarTopRecrutadores } = require('../utils/topRecrutadores');
 const { formatarNick }        = require('../utils/formatarNick');
 const { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto } = require('../utils/loja');
 
+// ── Monta array de embeds em carrossel (até 4 imagens) ────────────────────────
+function carrosselEmbeds(embedBase, imagem_url) {
+  if (!imagem_url) return [embedBase];
+  const urls = imagem_url.split(',').map(u => u.trim()).filter(Boolean).slice(0, 4);
+  if (!urls.length) return [embedBase];
+  const ANCHOR = 'https://discord.com/channels/@me'; // URL âncora igual em todos
+  const embeds = [{ ...embedBase, url: ANCHOR, image: { url: urls[0] } }];
+  for (let i = 1; i < urls.length; i++) {
+    embeds.push({ url: ANCHOR, image: { url: urls[i] } });
+  }
+  return embeds;
+}
+
 const CARGOS_ADV     = config.cargos.adv;
 const CARGOS_ADV_REC = config.cargos.advRec;
 const CANAL_HISTORICO     = config.canais.historicoAdv;
@@ -151,17 +164,16 @@ module.exports = {
 
         const embedProduto = {
           color: 0x000000,
-          title: `🛒 ${produto.nome.toUpperCase()}`,
+          title: produto.nome.toUpperCase(),
           fields: [
             { name: 'PREÇO',    value: `R$ ${Number(produto.preco).toFixed(2)}`, inline: true },
             { name: 'TAMANHOS', value: produto.tamanhos.toUpperCase(),           inline: true },
           ],
           description: 'SELECIONE O TAMANHO ABAIXO:',
         };
-        if (produto.imagem_url) embedProduto.image = { url: produto.imagem_url };
 
         return interaction.update({
-          embeds: [embedProduto],
+          embeds: carrosselEmbeds(embedProduto, produto.imagem_url),
           components: [new ActionRowBuilder().addComponents(select)],
         });
       }
@@ -238,7 +250,7 @@ module.exports = {
 
         const embedPedido = {
           color: 0xFFFFFF,
-          title: '🛒 NOVO PEDIDO',
+          title: 'NOVO PEDIDO',
           fields: [
             { name: 'PRODUTO',     value: produto.nome.toUpperCase(),               inline: true  },
             { name: 'TAMANHO',     value: tamanho.toUpperCase(),                    inline: true  },
@@ -250,11 +262,10 @@ module.exports = {
           ],
           footer: { text: new Date().toLocaleString('pt-BR') },
         };
-        if (produto.imagem_url) embedPedido.thumbnail = { url: produto.imagem_url };
 
         await canal.send({
           content: `${user}`,
-          embeds: [embedPedido],
+          embeds: carrosselEmbeds(embedPedido, produto.imagem_url),
           components: [rowFechar],
         });
 
@@ -303,7 +314,7 @@ module.exports = {
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('imagem_url').setLabel('URL DA IMAGEM (OPCIONAL)').setPlaceholder('https://...').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
+            new TextInputBuilder().setCustomId('imagem_url').setLabel('IMAGENS (URLs SEPARADAS POR VÍRGULA)').setPlaceholder('https://img1.com,https://img2.com').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000),
           ),
         );
         return interaction.showModal(modal);
@@ -360,7 +371,7 @@ module.exports = {
             new TextInputBuilder().setCustomId('preco').setLabel('PREÇO (ex: 89.90)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10).setValue(String(produto.preco)),
           ),
           new ActionRowBuilder().addComponents(
-            new TextInputBuilder().setCustomId('imagem_url').setLabel('URL DA IMAGEM (OPCIONAL)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500).setValue(produto.imagem_url || ''),
+            new TextInputBuilder().setCustomId('imagem_url').setLabel('IMAGENS (URLs SEPARADAS POR VÍRGULA)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000).setValue(produto.imagem_url || ''),
           ),
         );
         return interaction.showModal(modal);
@@ -377,14 +388,14 @@ module.exports = {
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
         const p = await atualizarProduto(id, { nome, tamanhos, preco, imagem_url }).catch(() => null);
         if (!p) return interaction.reply({ content: '❌ ERRO AO ATUALIZAR PRODUTO.', flags: 64 });
-        const embed = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
-          { name: 'NOME',     value: p.nome,                                inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                            inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,    inline: true },
-          { name: 'IMAGEM',   value: p.imagem_url ? p.imagem_url : '—',     inline: false },
+        const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
+        const embedBase = { color: 0x000000, title: '✅ PRODUTO ATUALIZADO', fields: [
+          { name: 'NOME',     value: p.nome,                                         inline: true },
+          { name: 'TAMANHOS', value: p.tamanhos,                                     inline: true },
+          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
+          { name: 'IMAGENS',  value: qtdImgs ? `${qtdImgs} imagem(ns) cadastrada(s)` : '—', inline: false },
         ]};
-        if (p.imagem_url) embed.image = { url: p.imagem_url };
-        return interaction.reply({ embeds: [embed], flags: 64 });
+        return interaction.reply({ embeds: carrosselEmbeds(embedBase, p.imagem_url), flags: 64 });
       }
 
       // ── Gerenciamento de loja (modal_produto_add / select_remover) ───────
@@ -399,14 +410,14 @@ module.exports = {
         if (isNaN(preco) || preco <= 0) return interaction.reply({ content: '❌ PREÇO INVÁLIDO.', flags: 64 });
         const p = await adicionarProduto(nome, tamanhos, preco, imagem_url).catch(() => null);
         if (!p) return interaction.reply({ content: '❌ ERRO AO SALVAR PRODUTO.', flags: 64 });
-        const embed = { color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
-          { name: 'NOME',     value: p.nome,                             inline: true },
-          { name: 'TAMANHOS', value: p.tamanhos,                         inline: true },
-          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`, inline: true },
-          { name: 'IMAGEM',   value: p.imagem_url ? p.imagem_url : '—',  inline: false },
+        const qtdImgs = p.imagem_url ? p.imagem_url.split(',').filter(Boolean).length : 0;
+        const embedBase = { color: 0x000000, title: '✅ PRODUTO ADICIONADO', fields: [
+          { name: 'NOME',     value: p.nome,                                         inline: true },
+          { name: 'TAMANHOS', value: p.tamanhos,                                     inline: true },
+          { name: 'PREÇO',    value: `R$ ${Number(p.preco).toFixed(2)}`,             inline: true },
+          { name: 'IMAGENS',  value: qtdImgs ? `${qtdImgs} imagem(ns) cadastrada(s)` : '—', inline: false },
         ]};
-        if (p.imagem_url) embed.image = { url: p.imagem_url };
-        return interaction.reply({ embeds: [embed], flags: 64 });
+        return interaction.reply({ embeds: carrosselEmbeds(embedBase, p.imagem_url), flags: 64 });
       }
 
       if (interaction.isStringSelectMenu() && interaction.customId === 'select_remover_produto') {

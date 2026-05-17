@@ -27,6 +27,7 @@ module.exports = {
     topRecrutadores:    'ID_CANAL_TOP_RECRUTADORES',  // Ranking de recrutadores
     loja:               '1493461657433935902',         // 🛒・loja — botão ver produtos
     gerenciamentoLoja:  '1505465708979421195',         // 🛒・gerenciamento-loja — admin estoque
+    redesSociais:       '1491917296774414417',         // Canal de redes sociais
   },
 
   // ── Cargos ────────────────────────────────────────────────
