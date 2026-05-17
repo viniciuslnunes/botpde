@@ -727,7 +727,7 @@ module.exports = {
         ];
 
         const embed = {
-          color: 0x000000,
+          color: 0xFFFFFF,
           title: `SOLICITAÇÃO — ${tipo === 'socio' ? 'SÓCIO' : 'TORCEDOR'}`,
           fields,
         };
