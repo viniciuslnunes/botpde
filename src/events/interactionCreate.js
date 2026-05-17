@@ -373,6 +373,9 @@ module.exports = {
               }] });
             }
           } catch (e) { console.error('[loja] Erro ao registrar log de venda:', e); }
+          // Atualiza embed de resumo de vendas
+          const { atualizarResumoVendas } = require('../commands/vendas');
+          atualizarResumoVendas(interaction.client).catch(() => {});
         }
 
         try {
@@ -383,7 +386,7 @@ module.exports = {
             await canalLogs.send({
               content: confirmar
                 ? `✅ COMPRA CONFIRMADA: **${canal.name}** — por ${interaction.user}`
-                : `🔒 TICKET FECHADO SEM CONFIRMAR: **${canal.name}** — por ${interaction.user}`,
+                : `VENDA NÃO FINALIZADA: **${canal.name}** — por ${interaction.user}`,
               files: [{ attachment: buffer, name: `transcript-${canal.id}.html` }],
             });
           }
