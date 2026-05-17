@@ -401,9 +401,10 @@ module.exports = {
         const todos = await listarProdutos(false).catch(() => []);
         if (!todos.length) return interaction.reply({ content: 'NENHUM PRODUTO CADASTRADO.', flags: 64 });
         const linhas = todos.map(p => {
-          const est  = formatarEstoque(p.estoque);
-          const foto = p.imagem_url ? ' | 📷 COM FOTO' : '';
-          return `**[${p.id}]** ${p.nome.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${p.ativo ? '✅' : '❌'}${foto}\n└ ${est}`;
+          const est    = formatarEstoque(p.estoque);
+          const foto   = p.imagem_url ? ' | 📷 COM FOTO' : '';
+          const status = p.ativo ? 'Produto ativo' : 'Produto sem estoque/Inativo';
+          return `**[${p.id}]** ${p.nome.toUpperCase()} | R$ ${Number(p.preco).toFixed(2)} | ${status}${foto}\n└ ${est}`;
         });
         return interaction.reply({
           embeds: [{ color: 0x000000, title: '📦 PRODUTOS CADASTRADOS', description: linhas.join('\n\n') }],
