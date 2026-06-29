@@ -25,19 +25,24 @@ function extractSlugFromHost(host: string): string | null {
   // Remove porta (desenvolvimento)
   const hostname = host.split(':')[0]
 
-  // Desenvolvimento: usa variável de ambiente
+  // Localhost → usa sempre TENANT_SLUG
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return process.env.TENANT_SLUG ?? null
   }
 
-  // Produção: extrai subdomínio
-  // ex: pde-gavioes.torcida.app → pde-gavioes
+  // Domínio próprio com subdomínio real: pde.torcida.app → "pde"
+  // Exige ao menos 3 partes E que o domínio-raiz seja o configurado
+  const rootDomain = process.env.ROOT_DOMAIN // ex: torcida.app
   const parts = hostname.split('.')
-  if (parts.length >= 3) {
+
+  if (rootDomain && hostname.endsWith(`.${rootDomain}`)) {
+    // Subdomínio real do nosso domínio
     return parts[0]
   }
 
-  return null
+  // Qualquer outro domínio (Railway, Vercel preview, domínio próprio sem subdomínio)
+  // → usa TENANT_SLUG como override explícito
+  return process.env.TENANT_SLUG ?? null
 }
 
 /**
