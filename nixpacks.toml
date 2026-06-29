@@ -1,19 +1,17 @@
 [phases.setup]
-aptPkgs = [
-  "libcairo2-dev",
-  "libpango1.0-dev",
-  "libjpeg-dev",
-  "libgif-dev",
-  "librsvg2-dev",
-  "libpixman-1-dev",
-  "pkg-config",
-  "python3",
-  "make",
-  "g++"
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm@11.9.0",
+  "pnpm install --ignore-scripts"
 ]
 
 [phases.build]
-cmds = ["npm install"]
+cmds = [
+  "pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma",
+  "pnpm --filter @torcida/web build"
+]
 
 [start]
-cmd = "node src/index.js"
+cmd = "node apps/web/.next/standalone/server.js"
