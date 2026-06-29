@@ -13,8 +13,8 @@ cmds = [
 cmds = [
   "corepack pnpm --filter @torcida/db exec prisma generate",
   "corepack pnpm --filter @torcida/web build",
-  "cp -r apps/web/.next/static apps/web/.next/standalone/.next/static",
-  "cp -r apps/web/public apps/web/.next/standalone/public"
+  "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static",
+  "cp -r apps/web/public apps/web/.next/standalone/apps/web/public"
 ]
 
 [start]
