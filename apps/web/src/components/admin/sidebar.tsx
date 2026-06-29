@@ -9,6 +9,7 @@ import {
   MapPin,
   ShoppingBag,
   Settings,
+  Calendar,
   ChevronRight,
 } from 'lucide-react'
 
@@ -16,6 +17,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/membros', label: 'Membros', icon: Users },
   { href: '/admin/socios', label: 'Sócios', icon: CreditCard },
+  { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
   { href: '/admin/sedes', label: 'Sedes', icon: MapPin },
   { href: '/admin/loja', label: 'Loja', icon: ShoppingBag },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
