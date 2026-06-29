@@ -101,6 +101,10 @@ model Tenant {
   ativo       Boolean  @default(true)
   criadoEm   DateTime @default(now()) @map("criado_em")
 
+  // Banco de dados próprio do tenant (null = usa o banco compartilhado)
+  // Cada torcida pode ter seu banco isolado quando necessário
+  databaseUrl String? @map("database_url")
+
   discordGuildId String? @unique @map("discord_guild_id")
 
   membros         SaasMembro[]
@@ -285,30 +289,40 @@ model Bloqueado {
 // ─── SEDES ────────────────────────────────────────────────────────────────────
 
 model Sede {
-  id       String   @id @default(uuid())
-  tenantId String   @map("tenant_id")
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
 
-  nome       String
-  tipo       TipoSede @default(PONTO_ENCONTRO)
-  endereco   String?
-  cidade     String?
-  estado     String?
-  cep        String?
-  lat        Float?
-  lng        Float?
-  capacidade Int?
+  // tenantId é OPCIONAL — uma subsede ou ponto de encontro pode existir
+  // de forma independente antes da sede principal aderir à plataforma.
+  // Quando a sede principal aderir, basta atribuir o tenantId.
+  tenantId String? @map("tenant_id")
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  nome        String
+  tipo        TipoSede @default(PONTO_ENCONTRO)
+  endereco    String?
+  cidade      String?
+  estado      String?
+  cep         String?
+  lat         Float?
+  lng         Float?
+  capacidade  Int?
   responsavel String?
-  telefone   String?
-  horarios   String?
-  descricao  String?
-  fotoUrl    String?  @map("foto_url")
-  ativa      Boolean  @default(true)
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  telefone    String?
+  horarios    String?
+  descricao   String?
+  fotoUrl     String?  @map("foto_url")
+  ativa       Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em")
 
+  // Hierarquia: subsede aponta para sede pai (também pode ser null)
   sedeId String? @map("sede_id")
   sede   Sede?   @relation("SedeFilhos", fields: [sedeId], references: [id])
   filhos Sede[]  @relation("SedeFilhos")
+
+  // Referência à sede pai que AINDA NÃO É TENANT (pré-adesão)
+  // Ex: PDE aponta para "Gaviões da Fiel" que ainda não aderiu
+  sedeReferenciaNome String? @map("sede_referencia_nome")
+  sedeReferenciaSlug String? @map("sede_referencia_slug")
 
   eventos Evento[]
 
