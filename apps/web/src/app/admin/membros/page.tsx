@@ -197,7 +197,7 @@ export default async function MembrosPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgb(var(--border))]">
-                {membros.map((membro) => {
+                {membros.map((membro: (typeof membros)[number]) => {
                   const badge = STATUS_BADGE[membro.status]
                   return (
                     <tr

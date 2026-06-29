@@ -8,7 +8,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 async function assertAdmin() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
 
-  if (!session?.user || !tenant) {
+  if (!session?.user?.id || !tenant) {
     throw new Error('Não autorizado')
   }
 
