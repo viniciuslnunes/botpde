@@ -12,10 +12,8 @@ cmds = [
 [phases.build]
 cmds = [
   "corepack pnpm --filter @torcida/db exec prisma generate",
-  "corepack pnpm --filter @torcida/web build",
-  "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static",
-  "cp -r apps/web/public apps/web/.next/standalone/apps/web/public"
+  "corepack pnpm --filter @torcida/web build"
 ]
 
 [start]
-cmd = "node apps/web/.next/standalone/server.js"
+cmd = "corepack pnpm --filter @torcida/web start"
