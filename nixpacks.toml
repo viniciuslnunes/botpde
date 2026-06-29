@@ -3,14 +3,16 @@ nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = [
-  "npm install -g pnpm@11.9.0",
-  "pnpm install --ignore-scripts"
+  "npm install -g corepack",
+  "corepack enable",
+  "corepack prepare pnpm@9.15.9 --activate",
+  "corepack pnpm install --prod=false"
 ]
 
 [phases.build]
 cmds = [
-  "pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma",
-  "pnpm --filter @torcida/web build"
+  "corepack pnpm --filter @torcida/db exec prisma generate",
+  "corepack pnpm --filter @torcida/web build"
 ]
 
 [start]
