@@ -12,13 +12,22 @@ import {
   XCircle,
   AlertCircle,
   ArrowRight,
+  PartyPopper,
 } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Meu Portal' }
 
-export default async function PortalPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+export default async function PortalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cadastro?: string }>
+}) {
+  const [session, tenant, params] = await Promise.all([
+    auth(),
+    getTenantFromHost(),
+    searchParams,
+  ])
 
   const userId = session!.user!.id
 
@@ -34,6 +43,8 @@ export default async function PortalPage() {
         })
       : null,
   ])
+
+  const cadastroEnviado = params.cadastro === 'enviado'
 
   const primeiroNome = session?.user?.name?.split(' ')[0] ?? 'Torcedor'
   const avatarUrl = session?.user?.image
@@ -77,6 +88,21 @@ export default async function PortalPage() {
 
   return (
     <div className="space-y-6">
+
+      {/* Banner de cadastro enviado */}
+      {cadastroEnviado && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950">
+          <PartyPopper className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div>
+            <p className="font-semibold text-emerald-800 dark:text-emerald-100">
+              Solicitação enviada!
+            </p>
+            <p className="mt-0.5 text-sm text-emerald-700 dark:text-emerald-300">
+              Seu cadastro está em análise. Os administradores serão notificados e responderão em breve.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Hero — boas-vindas */}
       <div className="relative overflow-hidden rounded-2xl bg-[rgb(var(--surface))] p-6 shadow-sm ring-1 ring-[rgb(var(--border))]">
@@ -153,9 +179,9 @@ export default async function PortalPage() {
         )}
 
         {!membro && (
-          <div className="mt-4 flex items-start gap-3 rounded-xl bg-[rgb(var(--background-subtle))] p-4">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-            <div>
+          <div className="mt-4 flex items-center gap-4 rounded-xl bg-[rgb(var(--background-subtle))] p-4">
+            <AlertCircle className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-[rgb(var(--foreground))]">
                 Ainda não é membro
               </p>
@@ -163,6 +189,33 @@ export default async function PortalPage() {
                 Solicite seu cadastro para ter acesso completo às funcionalidades da torcida.
               </p>
             </div>
+            <Link
+              href="/portal/cadastro"
+              className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: tenant?.corPrimaria ?? '#7c3aed' }}
+            >
+              Cadastrar-se
+            </Link>
+          </div>
+        )}
+
+        {membro?.status === 'REPROVADO' && (
+          <div className="mt-4 flex items-center gap-4 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
+            <XCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                Cadastro reprovado
+              </p>
+              <p className="mt-0.5 text-xs text-red-700 dark:text-red-300">
+                Você pode reenviar sua solicitação com as informações corrigidas.
+              </p>
+            </div>
+            <Link
+              href="/portal/cadastro"
+              className="shrink-0 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Reenviar
+            </Link>
           </div>
         )}
       </div>
