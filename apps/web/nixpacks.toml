@@ -1,0 +1,10 @@
+[phases.build]
+cmds = [
+  "npm install -g pnpm",
+  "pnpm install --ignore-scripts",
+  "pnpm --filter @torcida/db db:generate",
+  "pnpm --filter @torcida/web build"
+]
+
+[start]
+cmd = "node apps/web/.next/standalone/server.js"

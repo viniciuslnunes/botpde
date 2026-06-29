@@ -1,0 +1,26 @@
+{
+  "name": "@torcida/ui",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./services/*": "./src/services/*.tsx"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.10.0",
+    "@torcida/types": "workspace:*",
+    "next-themes": "^0.4.4",
+    "react": "19.2.4",
+    "react-hook-form": "^7.80.0",
+    "sonner": "^1.7.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "typescript": "^5.5.4"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  }
+}

@@ -1,0 +1,479 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELAS EXISTENTES DO BOT (leitura/escrita pelo bot via pg)
+// O Prisma pode ler estas tabelas, mas NÃO altera sua estrutura.
+// ═══════════════════════════════════════════════════════════════
+
+/// Tabela legada do bot — lida pelo SaaS para exibir dados no portal
+model BotMembro {
+  id               Int       @id @default(autoincrement())
+  discordId        String    @unique @map("discord_id")
+  nome             String
+  tipo             String    // 'socio' ou 'torcedor'
+  numeroAssociado  String?   @map("numero_associado")
+  cidade           String?
+  telefone         String?
+  idade            Int?
+  aprovadoPorId    String?   @map("aprovado_por_id")
+  aprovadoPorNome  String?   @map("aprovado_por_nome")
+  criadoEm        DateTime? @default(now()) @map("criado_em")
+  imagemProva      String?   @map("imagem_prova")
+
+  @@map("membros")
+}
+
+/// Tabela legada do bot — produtos da loja
+model BotProduto {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  tamanhos  String
+  preco     Decimal   @db.Decimal(10, 2)
+  imagemUrl String?   @map("imagem_url")
+  ativo     Boolean?  @default(true)
+  criadoEm DateTime? @default(now()) @map("criado_em")
+  estoque   Json?     @default("{}")
+  pedidos   BotPedido[]
+
+  @@map("produtos")
+}
+
+/// Tabela legada do bot — pedidos da loja
+model BotPedido {
+  id            Int       @id @default(autoincrement())
+  discordId     String    @map("discord_id")
+  discordTag    String?   @map("discord_tag")
+  produtoId     Int?      @map("produto_id")
+  produtoNome   String?   @map("produto_nome")
+  tamanho       String?
+  quantidade    Int
+  precoUnit     Decimal?  @db.Decimal(10, 2) @map("preco_unit")
+  total         Decimal?  @db.Decimal(10, 2)
+  status        String?   @default("pendente")
+  canalTicketId String?   @map("canal_ticket_id")
+  criadoEm     DateTime? @default(now()) @map("criado_em")
+  produto       BotProduto? @relation(fields: [produtoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("pedidos")
+}
+
+/// Tabela legada do bot — ranking de recrutadores
+model BotAprovacao {
+  id            Int       @id @default(autoincrement())
+  aprovadorId   String    @map("aprovador_id")
+  aprovadorNome String?   @map("aprovador_nome")
+  candidatoId   String?   @map("candidato_id")
+  candidatoNome String?   @map("candidato_nome")
+  tipo          String?
+  criadoEm     DateTime? @default(now()) @map("criado_em")
+
+  @@map("aprovacoes_recrutamento")
+}
+
+/// Tabela legada do bot — configurações persistidas (IDs de mensagens)
+model BotConfig {
+  key   String  @id
+  value String?
+
+  @@map("bot_config")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELAS DO SAAS — novas, prefixo saas_ para evitar conflitos
+// ═══════════════════════════════════════════════════════════════
+
+// ─── TENANTS ────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  nome        String
+  plano       Plano    @default(FREE)
+  corPrimaria String   @default("#7c3aed") @map("cor_primaria")
+  logoUrl     String?  @map("logo_url")
+  ativo       Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em")
+
+  discordGuildId String? @unique @map("discord_guild_id")
+
+  membros         SaasMembro[]
+  socios          SaasSocio[]
+  produtos        SaasProduto[]
+  pedidos         SaasPedido[]
+  sedes           Sede[]
+  eventos         Evento[]
+  roles           Role[]
+  userRoles       UserRole[]
+  userPermissions UserPermission[]
+  auditLogs       AuditLog[]
+  bloqueados      Bloqueado[]
+  posts           Post[]
+
+  @@map("saas_tenants")
+}
+
+enum Plano {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+// ─── USUÁRIOS ────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String?   @unique
+  nome         String?
+  avatarUrl    String?   @map("avatar_url")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+  discordId    String?   @unique @map("discord_id")
+  googleId     String?   @unique @map("google_id")
+  consentidoEm DateTime? @map("consentido_em")
+
+  userRoles       UserRole[]
+  userPermissions UserPermission[]
+  membros         SaasMembro[]
+  socios          SaasSocio[]
+  pedidos         SaasPedido[]
+  eventosRsvp     EventoRsvp[]
+  posts           Post[]
+  auditLogs       AuditLog[]      @relation("AuditAtor")
+
+  @@map("saas_users")
+}
+
+// ─── CARGOS E PERMISSÕES ─────────────────────────────────────────────────────
+
+model Role {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nome        String
+  cor         String  @default("#6b7280")
+  ordem       Int     @default(0)
+  isSystem    Boolean @default(false) @map("is_system")
+  permissions String[]
+
+  userRoles UserRole[]
+
+  @@unique([tenantId, nome])
+  @@map("saas_roles")
+}
+
+model UserRole {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  tenantId String @map("tenant_id")
+  roleId   String @map("role_id")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, roleId])
+  @@map("saas_user_roles")
+}
+
+model UserPermission {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  tenantId String  @map("tenant_id")
+  permission String
+  granted  Boolean
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, permission])
+  @@map("saas_user_permissions")
+}
+
+// ─── MEMBROS SaaS ─────────────────────────────────────────────────────────────
+
+model SaasMembro {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  tipo            TipoMembro
+  nome            String
+  idade           Int?
+  telefone        String?
+  cidade          String?
+  numeroAssociado String?    @map("numero_associado")
+  imagemProva     String?    @map("imagem_prova")
+  status          StatusMembro @default(PENDENTE)
+
+  aprovadoPorId   String?   @map("aprovado_por_id")
+  aprovadoPorNome String?   @map("aprovado_por_nome")
+  aprovadoEm      DateTime? @map("aprovado_em")
+
+  // Referência ao registro legado do bot (para migração gradual)
+  discordId  String? @map("discord_id")
+  discordTag String? @map("discord_tag")
+
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@map("saas_membros")
+}
+
+enum TipoMembro {
+  SOCIO
+  TORCEDOR
+}
+
+enum StatusMembro {
+  PENDENTE
+  APROVADO
+  REPROVADO
+}
+
+// ─── SÓCIOS / CARTEIRINHAS ───────────────────────────────────────────────────
+
+model SaasSocio {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  numeroSocio Int      @map("numero_socio")
+  nome        String
+  validade    DateTime
+  criadoEm   DateTime @default(now()) @map("criado_em")
+  discordId   String?  @map("discord_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, numeroSocio])
+  @@unique([tenantId, userId])
+  @@map("saas_socios")
+}
+
+// ─── BLOQUEADOS ───────────────────────────────────────────────────────────────
+
+model Bloqueado {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  registro         String
+  nome             String?
+  motivo           String?
+  bloqueadoPorId   String?  @map("bloqueado_por_id")
+  bloqueadoPorNome String?  @map("bloqueado_por_nome")
+  criadoEm        DateTime @default(now()) @map("criado_em")
+
+  @@unique([tenantId, registro])
+  @@map("saas_bloqueados")
+}
+
+// ─── SEDES ────────────────────────────────────────────────────────────────────
+
+model Sede {
+  id       String   @id @default(uuid())
+  tenantId String   @map("tenant_id")
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome       String
+  tipo       TipoSede @default(PONTO_ENCONTRO)
+  endereco   String?
+  cidade     String?
+  estado     String?
+  cep        String?
+  lat        Float?
+  lng        Float?
+  capacidade Int?
+  responsavel String?
+  telefone   String?
+  horarios   String?
+  descricao  String?
+  fotoUrl    String?  @map("foto_url")
+  ativa      Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  sedeId String? @map("sede_id")
+  sede   Sede?   @relation("SedeFilhos", fields: [sedeId], references: [id])
+  filhos Sede[]  @relation("SedeFilhos")
+
+  eventos Evento[]
+
+  @@map("saas_sedes")
+}
+
+enum TipoSede {
+  SEDE
+  SUBSEDE
+  PONTO_ENCONTRO
+}
+
+// ─── EVENTOS ──────────────────────────────────────────────────────────────────
+
+model Evento {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  titulo    String
+  descricao String?
+  data      DateTime
+  local     String?
+  sedeId    String?  @map("sede_id")
+  sede      Sede?    @relation(fields: [sedeId], references: [id])
+  lat       Float?
+  lng       Float?
+
+  criadoPorId      String?  @map("criado_por_id")
+  criadoEm        DateTime @default(now()) @map("criado_em")
+  discordMessageId String?  @map("discord_message_id")
+
+  rsvps EventoRsvp[]
+
+  @@map("saas_eventos")
+}
+
+model EventoRsvp {
+  id       String     @id @default(uuid())
+  eventoId String     @map("evento_id")
+  userId   String     @map("user_id")
+  status   RsvpStatus @default(CONFIRMADO)
+
+  evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([eventoId, userId])
+  @@map("saas_evento_rsvps")
+}
+
+enum RsvpStatus {
+  CONFIRMADO
+  RECUSADO
+}
+
+// ─── LOJA SaaS ────────────────────────────────────────────────────────────────
+
+model SaasProduto {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome      String
+  preco     Decimal  @db.Decimal(10, 2)
+  ativo     Boolean  @default(true)
+  estoque   Json     @default("{}")
+  tamanhos  String[]
+  imagensUrl String[] @map("imagens_url")
+
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  pedidos SaasPedido[]
+
+  @@map("saas_produtos")
+}
+
+model SaasPedido {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String @map("user_id")
+  user     User   @relation(fields: [userId], references: [id])
+
+  produtoId   String     @map("produto_id")
+  produto     SaasProduto @relation(fields: [produtoId], references: [id])
+  produtoNome String     @map("produto_nome")
+  tamanho     String?
+  quantidade  Int
+  precoUnit   Decimal    @db.Decimal(10, 2) @map("preco_unit")
+  total       Decimal    @db.Decimal(10, 2)
+  status      StatusPedido @default(PENDENTE)
+
+  discordId     String?  @map("discord_id")
+  canalTicketId String?  @map("canal_ticket_id")
+
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("saas_pedidos")
+}
+
+enum StatusPedido {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  ENTREGUE
+}
+
+// ─── COMUNIDADE ───────────────────────────────────────────────────────────────
+
+model Post {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId  String  @map("autor_id")
+  autor    User    @relation(fields: [autorId], references: [id])
+
+  titulo    String?
+  conteudo  String
+  imagemUrl String?  @map("imagem_url")
+  fixado    Boolean  @default(false)
+
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("saas_posts")
+}
+
+// ─── ADVERTÊNCIAS ─────────────────────────────────────────────────────────────
+
+model Advertencia {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  membroDiscordId String   @map("membro_discord_id")
+  membroNome      String   @map("membro_nome")
+  motivo          String?
+  tier            Int      @default(1)
+  prazo           DateTime
+
+  emitidoPorId   String?  @map("emitido_por_id")
+  emitidoPorNome String?  @map("emitido_por_nome")
+
+  resolvida Boolean  @default(false)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  @@map("saas_advertencias")
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  atorId   String? @map("ator_id")
+  ator     User?   @relation("AuditAtor", fields: [atorId], references: [id])
+
+  acao       String
+  entidade   String?
+  entidadeId String? @map("entidade_id")
+  detalhes   Json?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@map("saas_audit_logs")
+}

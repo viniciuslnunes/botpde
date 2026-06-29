@@ -1,0 +1,23 @@
+[phases.setup]
+aptPkgs = [
+  "libcairo2-dev",
+  "libpango1.0-dev",
+  "libjpeg-dev",
+  "libgif-dev",
+  "librsvg2-dev",
+  "libpixman-1-dev",
+  "pkg-config",
+  "python3",
+  "make",
+  "g++"
+]
+
+[phases.build]
+cmds = [
+  "npm install -g pnpm",
+  "pnpm install --ignore-scripts",
+  "pnpm --filter @torcida/db db:generate"
+]
+
+[start]
+cmd = "node src/index.js"

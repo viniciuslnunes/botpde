@@ -1,37 +1,42 @@
 # Dependências
 node_modules/
+.pnpm-store/
 
-# Variáveis de ambiente (NUNCA comitar o .env real)
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# Prisma
+packages/db/node_modules/
+*.db
+*.db-shm
+*.db-wal
+
+# Ambiente
 .env
 .env.local
+.env.production
 .env.*.local
 
 # Logs
 *.log
 npm-debug.log*
-logs/
-*.log.*
+pnpm-debug.log*
 
-# Build / cache
-dist/
-build/
-.cache/
-.tmp/
-
-# Sistema operacional
+# OS
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# Editor
-.vscode/
+# IDE
+.vscode/settings.json
 .idea/
-*.swp
-*.swo
 
-# Railway / deployment
-.railway/
+# Turbo
+.turbo/
 
-# Imagens e fontes locais (adicionar manualmente ao servidor)
-img/
-fonts/
+# Assets locais (bot)
+apps/bot/img/
+apps/bot/fonts/
+apps/bot/src/assets/
