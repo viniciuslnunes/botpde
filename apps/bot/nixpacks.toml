@@ -13,11 +13,7 @@ aptPkgs = [
 ]
 
 [phases.build]
-cmds = [
-  "npm install -g pnpm",
-  "pnpm install --ignore-scripts",
-  "pnpm --filter @torcida/db db:generate"
-]
+cmds = ["npm install"]
 
 [start]
 cmd = "node src/index.js"
