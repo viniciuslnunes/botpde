@@ -10,6 +10,7 @@ import {
   Calendar,
   ShoppingBag,
   Users,
+  MapPin,
   Shield,
   LogOut,
   Menu,
@@ -21,6 +22,7 @@ const navLinks = [
   { href: '/portal', label: 'Início', icon: Home, exact: true },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard },
   { href: '/portal/eventos', label: 'Eventos', icon: Calendar },
+  { href: '/portal/sedes', label: 'Sedes', icon: MapPin },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users },
 ]
