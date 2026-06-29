@@ -121,3 +121,58 @@ export async function criarTenantInicial(
 
   redirect(`/super-admin/setup/sucesso?tenant=${tenant.id}&slug=${tenant.slug}`)
 }
+
+export async function atribuirOwner(tenantId: string): Promise<SetupState> {
+  const session = await auth()
+
+  if (!session?.user?.id || !session?.user?.email || !superAdminEmails.includes(session.user.email)) {
+    return { message: 'Acesso negado.' }
+  }
+
+  const tenant = await db.tenant.findUnique({
+    where: { id: tenantId },
+    include: { roles: { where: { nome: 'owner', isSystem: true } } },
+  })
+
+  if (!tenant) return { message: 'Tenant não encontrado.' }
+
+  let ownerRole = tenant.roles[0]
+
+  // Se não existe role owner ainda, cria as 3 roles de sistema
+  if (!ownerRole) {
+    const roles = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const [o] = await Promise.all([
+        tx.role.create({
+          data: { tenantId, nome: 'owner', cor: '#7c3aed', ordem: 0, permissions: ['*'], isSystem: true },
+        }),
+        tx.role.create({
+          data: {
+            tenantId, nome: 'admin', cor: '#2563eb', ordem: 1,
+            permissions: ['membros:ler','membros:aprovar','socios:ler','socios:emitir','socios:renovar','sedes:ler','sedes:editar','eventos:ler','eventos:editar'],
+            isSystem: true,
+          },
+        }),
+        tx.role.create({
+          data: { tenantId, nome: 'member', cor: '#6b7280', ordem: 2, permissions: ['portal:acessar'], isSystem: true },
+        }),
+      ])
+      return { ownerRole: o }
+    })
+    ownerRole = roles.ownerRole
+  }
+
+  // Verifica se já é owner
+  const jaOwner = await db.userRole.findFirst({
+    where: { userId: session.user.id, tenantId, roleId: ownerRole.id },
+  })
+
+  if (jaOwner) {
+    redirect(`/super-admin/setup/sucesso?tenant=${tenantId}&slug=${tenant.slug}`)
+  }
+
+  await db.userRole.create({
+    data: { tenantId, userId: session.user.id, roleId: ownerRole.id },
+  })
+
+  redirect(`/super-admin/setup/sucesso?tenant=${tenantId}&slug=${tenant.slug}`)
+}

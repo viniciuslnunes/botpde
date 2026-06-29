@@ -4,6 +4,7 @@ import type { Tenant } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
 import { redirect } from 'next/navigation'
 import { SetupForm } from './setup-form'
+import { AtribuirOwnerButton } from './setup-form'
 import { Building2 } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -16,10 +17,20 @@ export default async function SetupPage() {
     redirect('/')
   }
 
-  const tenants = await db.tenant.findMany({
-    select: { id: true, slug: true, nome: true, plano: true, ativo: true },
-    orderBy: { criadoEm: 'desc' },
-  })
+  const userId = session.user.id
+
+  const [tenants, minhasRoles] = await Promise.all([
+    db.tenant.findMany({
+      select: { id: true, slug: true, nome: true, plano: true, ativo: true },
+      orderBy: { criadoEm: 'desc' },
+    }),
+    db.userRole.findMany({
+      where: { userId, role: { nome: 'owner', isSystem: true } },
+      select: { tenantId: true },
+    }),
+  ])
+
+  const souOwnerDe = new Set(minhasRoles.map((r: { tenantId: string }) => r.tenantId))
 
   return (
     <div className="space-y-8">
@@ -63,6 +74,13 @@ export default async function SetupPage() {
                   <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
                     {t.plano}
                   </span>
+                  {souOwnerDe.has(t.id) ? (
+                    <span className="rounded-full bg-violet-900 px-2 py-0.5 text-xs font-medium text-violet-300">
+                      owner ✓
+                    </span>
+                  ) : (
+                    <AtribuirOwnerButton tenantId={t.id} />
+                  )}
                 </div>
               </div>
             ))}

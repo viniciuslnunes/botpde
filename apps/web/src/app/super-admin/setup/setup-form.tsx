@@ -1,9 +1,9 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
-import { criarTenantInicial, type SetupState } from './actions'
-import { Loader2 } from 'lucide-react'
+import { criarTenantInicial, atribuirOwner, type SetupState } from './actions'
+import { Loader2, ShieldCheck } from 'lucide-react'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -26,6 +26,21 @@ function FieldError({ errors }: { errors?: string[] }) {
 
 const inputClass =
   'w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all'
+
+export function AtribuirOwnerButton({ tenantId }: { tenantId: string }) {
+  const [pending, startTransition] = useTransition()
+
+  return (
+    <button
+      onClick={() => startTransition(async () => { await atribuirOwner(tenantId) })}
+      disabled={pending}
+      className="flex items-center gap-1.5 rounded-full bg-violet-800 px-3 py-0.5 text-xs font-medium text-violet-100 transition-opacity hover:opacity-80 disabled:opacity-50"
+    >
+      {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+      {pending ? 'Atribuindo...' : 'Tornar-me owner'}
+    </button>
+  )
+}
 
 export function SetupForm() {
   const [state, action] = useActionState<SetupState, FormData>(criarTenantInicial, {})
