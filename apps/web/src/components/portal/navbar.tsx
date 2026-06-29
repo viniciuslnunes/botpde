@@ -12,6 +12,7 @@ import {
   Users,
   MapPin,
   Shield,
+  UserCircle2,
   LogOut,
   Menu,
   X,
@@ -122,6 +123,14 @@ export function PortalNavbar({
                   onClick={() => setUserDropOpen(false)}
                 />
                 <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+                  <Link
+                    href="/portal/perfil"
+                    onClick={() => setUserDropOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  >
+                    <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                    Meu Perfil
+                  </Link>
                   {isAdmin && (
                     <Link
                       href="/admin"
@@ -132,6 +141,7 @@ export function PortalNavbar({
                       Área Admin
                     </Link>
                   )}
+                  <div className="my-1 border-t border-[rgb(var(--border))]" />
                   <button
                     onClick={() => signOut({ callbackUrl: '/entrar' })}
                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
