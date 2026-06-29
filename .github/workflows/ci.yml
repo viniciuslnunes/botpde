@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Typecheck ─────────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Instala dependências sem executar scripts de build para ser mais rápido.
+      # Roda prisma generate manualmente a seguir (não precisa de DATABASE_URL).
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Gerar Prisma Client
+        run: pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
+
+      - name: Typecheck apps/web
+        run: pnpm --filter @torcida/web exec tsc --noEmit
+        env:
+          SKIP_ENV_VALIDATION: true
+
+  # ── Lint ──────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Gerar Prisma Client
+        run: pnpm exec prisma generate --schema=packages/db/prisma/schema.prisma
+
+      - name: Lint apps/web
+        run: pnpm --filter @torcida/web lint
+        env:
+          SKIP_ENV_VALIDATION: true

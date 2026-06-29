@@ -2,12 +2,13 @@ import NextAuth from 'next-auth'
 import Discord from 'next-auth/providers/discord'
 import Google from 'next-auth/providers/google'
 import { db } from '@torcida/db'
+import { env } from '@/lib/env'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Discord({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+      clientId: env.DISCORD_CLIENT_ID,
+      clientSecret: env.DISCORD_CLIENT_SECRET,
       authorization: {
         params: {
           scope: 'identify email guilds',
@@ -15,12 +16,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
           scope: 'openid email profile',
-          // Força a tela de seleção de conta para obter dados precisos
           prompt: 'select_account',
         },
       },

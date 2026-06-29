@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { superAdminEmails } from '@/lib/env'
 
 /**
  * Layout do Super Admin (operador do SaaS).
@@ -16,12 +17,6 @@ export default async function SuperAdminLayout({
   if (!session?.user) {
     redirect('/entrar')
   }
-
-  // Super admin é identificado por e-mail na variável de ambiente
-  // Nunca exposto ao cliente — verificação sempre server-side
-  const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim())
 
   if (!session.user.email || !superAdminEmails.includes(session.user.email)) {
     redirect('/')
