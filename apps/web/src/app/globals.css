@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/*
+  Fontes explícitas para Tailwind v4 em monorepo.
+  Sem @source, o Tailwind v4 não encontra os arquivos quando o build
+  roda com CWD na raiz do monorepo (botpde/) em vez de apps/web/.
+  Caminhos relativos a este arquivo: apps/web/src/app/globals.css
+*/
+@source "../";                          /* apps/web/src/ — pages, components, lib */
+@source "../../../../packages/ui/src";  /* packages/ui — providers compartilhados  */
+
 /* ── Variáveis de tema ─────────────────────────────────────────── */
 :root {
   /* Cor primária — sobrescrita por JavaScript com a cor do tenant */
