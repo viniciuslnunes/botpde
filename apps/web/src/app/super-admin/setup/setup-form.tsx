@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useTransition } from 'react'
+import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
-import { criarTenantInicial, atribuirOwner, type SetupState } from './actions'
+import { useRouter } from 'next/navigation'
+import { criarTenantInicial, atribuirOwnerAction, type SetupState } from './actions'
 import { Loader2, ShieldCheck } from 'lucide-react'
 
 function SubmitButton() {
@@ -28,17 +29,30 @@ const inputClass =
   'w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all'
 
 export function AtribuirOwnerButton({ tenantId }: { tenantId: string }) {
-  const [pending, startTransition] = useTransition()
+  const router = useRouter()
+  const [state, action, pending] = useActionState<SetupState, FormData>(atribuirOwnerAction, {})
+
+  useEffect(() => {
+    if (state.tenantId && state.tenantSlug) {
+      router.push(`/super-admin/setup/sucesso?tenant=${state.tenantId}&slug=${state.tenantSlug}`)
+    }
+  }, [state.tenantId, state.tenantSlug, router])
 
   return (
-    <button
-      onClick={() => startTransition(async () => { await atribuirOwner(tenantId) })}
-      disabled={pending}
-      className="flex items-center gap-1.5 rounded-full bg-violet-800 px-3 py-0.5 text-xs font-medium text-violet-100 transition-opacity hover:opacity-80 disabled:opacity-50"
-    >
-      {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
-      {pending ? 'Atribuindo...' : 'Tornar-me owner'}
-    </button>
+    <form action={action}>
+      <input type="hidden" name="tenantId" value={tenantId} />
+      {state.message && !state.tenantId && (
+        <p className="mb-1 text-xs text-red-400">{state.message}</p>
+      )}
+      <button
+        type="submit"
+        disabled={pending}
+        className="flex items-center gap-1.5 rounded-full bg-violet-800 px-3 py-0.5 text-xs font-medium text-violet-100 transition-opacity hover:opacity-80 disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+        {pending ? 'Atribuindo...' : 'Tornar-me owner'}
+      </button>
+    </form>
   )
 }
 

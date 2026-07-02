@@ -26,6 +26,7 @@ export type SetupState = {
   errors?: Record<string, string[]>
   message?: string
   tenantId?: string
+  tenantSlug?: string
 }
 
 export async function criarTenantInicial(
@@ -114,57 +115,75 @@ export async function criarTenantInicial(
   redirect(`/super-admin/setup/sucesso?tenant=${tenant.id}&slug=${tenant.slug}`)
 }
 
-export async function atribuirOwner(tenantId: string): Promise<SetupState> {
+/**
+ * Server Action compatível com useActionState + <form>.
+ * Recebe tenantId via FormData para evitar problemas com redirect()
+ * quando chamado a partir de onClick/useTransition.
+ */
+export async function atribuirOwnerAction(_prev: SetupState, formData: FormData): Promise<SetupState> {
   const session = await auth()
 
   if (!session?.user?.id || !session?.user?.email || !superAdminEmails.includes(session.user.email)) {
     return { message: 'Acesso negado.' }
   }
 
+  const tenantId = formData.get('tenantId') as string
+  if (!tenantId) return { message: 'Tenant não informado.' }
+
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
-    include: { roles: { where: { nome: 'owner', isSystem: true } } },
+    include: { roles: { where: { isSystem: true } } },
   })
 
   if (!tenant) return { message: 'Tenant não encontrado.' }
 
-  let ownerRole = tenant.roles[0]
+  // Mapeia roles de sistema existentes
+  const roleMap = Object.fromEntries(tenant.roles.map((r: (typeof tenant.roles)[number]) => [r.nome, r]))
+  let ownerRole = roleMap[SYSTEM_ROLES.OWNER]
 
-  // Se não existe role owner ainda, cria as 3 roles de sistema
+  // Cria apenas as roles que ainda não existem
   if (!ownerRole) {
-    const roles = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const [o] = await Promise.all([
-        tx.role.create({
-          data: { tenantId, nome: SYSTEM_ROLES.OWNER, cor: '#7c3aed', ordem: 0, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER], isSystem: true },
-        }),
-        tx.role.create({
-          data: {
-            tenantId, nome: SYSTEM_ROLES.ADMIN, cor: '#2563eb', ordem: 1,
-            permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
-            isSystem: true,
-          },
-        }),
-        tx.role.create({
-          data: { tenantId, nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 2, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER], isSystem: true },
-        }),
-      ])
-      return { ownerRole: o }
+    const toCreate = [
+      { nome: SYSTEM_ROLES.OWNER, cor: '#7c3aed', ordem: 0, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER] },
+      { nome: SYSTEM_ROLES.ADMIN, cor: '#2563eb', ordem: 1, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN] },
+      { nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 2, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER] },
+    ].filter((r) => !roleMap[r.nome])
+
+    const created = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      return Promise.all(
+        toCreate.map((r) =>
+          tx.role.create({ data: { tenantId, ...r, isSystem: true } })
+        )
+      )
     })
-    ownerRole = roles.ownerRole
+
+    const createdOwner = created.find((r: (typeof created)[number]) => r.nome === SYSTEM_ROLES.OWNER)
+    ownerRole = createdOwner ?? roleMap[SYSTEM_ROLES.OWNER]
   }
 
-  // Verifica se já é owner
+  if (!ownerRole) return { message: 'Erro ao criar cargo owner.' }
+
+  // Evita duplicata de userRole
   const jaOwner = await db.userRole.findFirst({
     where: { userId: session.user.id, tenantId, roleId: ownerRole.id },
   })
 
-  if (jaOwner) {
-    redirect(`/super-admin/setup/sucesso?tenant=${tenantId}&slug=${tenant.slug}`)
+  if (!jaOwner) {
+    await db.userRole.create({
+      data: { tenantId, userId: session.user.id, roleId: ownerRole.id },
+    })
   }
 
-  await db.userRole.create({
-    data: { tenantId, userId: session.user.id, roleId: ownerRole.id },
-  })
+  return { tenantId, tenantSlug: tenant.slug }
+}
 
-  redirect(`/super-admin/setup/sucesso?tenant=${tenantId}&slug=${tenant.slug}`)
+/** @deprecated use atribuirOwnerAction */
+export async function atribuirOwner(tenantId: string): Promise<SetupState> {
+  const formData = new FormData()
+  formData.set('tenantId', tenantId)
+  const result = await atribuirOwnerAction({}, formData)
+  if (result.tenantId) {
+    redirect(`/super-admin/setup/sucesso?tenant=${result.tenantId}&slug=${result.tenantSlug}`)
+  }
+  return result
 }
