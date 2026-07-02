@@ -53,11 +53,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
 
-    async jwt({ token, account, profile }) {
-      if (account && profile) {
-        // Persiste o ID do provider no token para lookup futuro
+    async jwt({ token, account }) {
+      // Somente no login inicial (account presente) buscamos o UUID do banco
+      // e sobrescrevemos token.sub para que session.user.id seja sempre o UUID,
+      // nunca o ID numérico do OAuth provider (Discord snowflake / Google ID).
+      if (account) {
         token.provider = account.provider
         token.providerAccountId = account.providerAccountId
+
+        const discordId = account.provider === 'discord' ? account.providerAccountId : undefined
+        const googleId  = account.provider === 'google'  ? account.providerAccountId : undefined
+
+        const dbUser = await db.user.findFirst({
+          where: {
+            OR: [
+              ...(discordId ? [{ discordId }] : []),
+              ...(googleId  ? [{ googleId  }] : []),
+            ],
+          },
+          select: { id: true },
+        })
+
+        if (dbUser) {
+          token.sub = dbUser.id   // UUID do banco — usado em session.user.id
+        }
       }
       return token
     },
