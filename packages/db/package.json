@@ -8,7 +8,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "db:repair-system-roles": "node scripts/repair-system-role-permissions.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"

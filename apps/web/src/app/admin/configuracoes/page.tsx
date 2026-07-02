@@ -2,11 +2,12 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, Palette, MessageSquare, Shield } from 'lucide-react'
+import { Settings, Palette, MessageSquare, Shield, Users2 } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   RolesManager,
+  DepartamentosManager,
 } from '@/components/admin/config-forms'
 import type { Metadata } from 'next'
 
@@ -16,10 +17,26 @@ export default async function ConfiguracoesPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!tenant || !session?.user?.id) redirect('/')
 
-  const [roles, isOwner] = await Promise.all([
+  // Quantos usuários usam cada cargo — controla o botão de excluir na UI
+  interface UsoPorRole {
+    roleId: string
+    _count: { roleId: number }
+  }
+  const usoPorRole: UsoPorRole[] = await db.userRole.groupBy({
+    by: ['roleId'],
+    where: { tenantId: tenant.id },
+    _count: { roleId: true },
+  })
+  const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
+
+  const [rolesRaw, departamentos, isOwner] = await Promise.all([
     db.role.findMany({
       where: { tenantId: tenant.id },
       orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
+    }),
+    db.departamento.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
     }),
     db.userRole.findFirst({
       where: {
@@ -29,6 +46,11 @@ export default async function ConfiguracoesPage() {
       },
     }),
   ])
+
+  const roles = rolesRaw.map((role: (typeof rolesRaw)[number]) => ({
+    ...role,
+    emUso: usoMap.get(role.id) ?? 0,
+  }))
 
   const sections = [
     {
@@ -50,6 +72,13 @@ export default async function ConfiguracoesPage() {
       icon: Shield,
       title: 'Cargos e permissões',
       description: 'Gerencie os cargos disponíveis e as permissões de cada um',
+      ownerOnly: false,
+    },
+    {
+      id: 'departamentos',
+      icon: Users2,
+      title: 'Departamentos',
+      description: 'Agrupamentos organizacionais (Diretoria, Sócio, Torcedor...) — não concedem permissão, servem para organizar e escopar gestão',
       ownerOnly: false,
     },
   ]
@@ -121,6 +150,8 @@ export default async function ConfiguracoesPage() {
                     <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
                   ) : section.id === 'cargos' ? (
                     <RolesManager roles={roles} />
+                  ) : section.id === 'departamentos' ? (
+                    <DepartamentosManager departamentos={departamentos} />
                   ) : null}
                 </div>
               </div>

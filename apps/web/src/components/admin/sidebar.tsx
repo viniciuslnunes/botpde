@@ -10,28 +10,41 @@ import {
   ShoppingBag,
   Settings,
   Calendar,
+  KeyRound,
   ChevronRight,
+  type LucideIcon,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/admin/membros', label: 'Membros', icon: Users },
-  { href: '/admin/socios', label: 'Sócios', icon: CreditCard },
-  { href: '/admin/eventos', label: 'Eventos', icon: Calendar },
-  { href: '/admin/sedes', label: 'Sedes', icon: MapPin },
-  { href: '/admin/loja', label: 'Loja', icon: ShoppingBag },
-  { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
-]
+/** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */
+const ICON_BY_ID: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  membros: Users,
+  socios: CreditCard,
+  eventos: Calendar,
+  sedes: MapPin,
+  loja: ShoppingBag,
+  acessos: KeyRound,
+  configuracoes: Settings,
+}
+
+interface AdminMenuItem {
+  id: string
+  label: string
+  href: string
+  exact?: boolean
+}
 
 interface AdminSidebarProps {
   tenantNome: string
   tenantCor: string
+  /** Itens já filtrados pelas permissões efetivas do usuário (ver ADMIN_MENU/filterMenuByPermissions) */
+  items: AdminMenuItem[]
 }
 
-export function AdminSidebar({ tenantNome, tenantCor }: AdminSidebarProps) {
+export function AdminSidebar({ tenantNome, tenantCor, items }: AdminSidebarProps) {
   const pathname = usePathname()
 
-  function isActive(item: (typeof navItems)[number]) {
+  function isActive(item: AdminMenuItem) {
     if (item.exact) return pathname === item.href
     return pathname.startsWith(item.href)
   }
@@ -55,9 +68,9 @@ export function AdminSidebar({ tenantNome, tenantCor }: AdminSidebarProps) {
       {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const active = isActive(item)
-            const Icon = item.icon
+            const Icon = ICON_BY_ID[item.id] ?? LayoutDashboard
             return (
               <li key={item.href}>
                 <Link

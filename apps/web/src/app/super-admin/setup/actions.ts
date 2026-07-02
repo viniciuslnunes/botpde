@@ -6,6 +6,7 @@ import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '@torcida/types'
 
 const schema = z.object({
   slug: z
@@ -61,45 +62,36 @@ export async function criarTenantInicial(
       data: { slug, nome, corPrimaria },
     })
 
-    // Cria roles de sistema
+    // Cria roles de sistema — permissões vêm de SYSTEM_ROLE_PERMISSIONS (@torcida/types),
+    // fonte única de verdade compartilhada com a UI de cargos e as checagens de acesso.
     const [ownerRole] = await Promise.all([
       tx.role.create({
         data: {
           tenantId: t.id,
-          nome: 'owner',
+          nome: SYSTEM_ROLES.OWNER,
           cor: '#7c3aed',
           ordem: 0,
-          permissions: ['*'],
+          permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER],
           isSystem: true,
         },
       }),
       tx.role.create({
         data: {
           tenantId: t.id,
-          nome: 'admin',
+          nome: SYSTEM_ROLES.ADMIN,
           cor: '#2563eb',
           ordem: 1,
-          permissions: [
-            'membros:ler',
-            'membros:aprovar',
-            'socios:ler',
-            'socios:emitir',
-            'socios:renovar',
-            'sedes:ler',
-            'sedes:editar',
-            'eventos:ler',
-            'eventos:editar',
-          ],
+          permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
           isSystem: true,
         },
       }),
       tx.role.create({
         data: {
           tenantId: t.id,
-          nome: 'member',
+          nome: SYSTEM_ROLES.MEMBER,
           cor: '#6b7280',
           ordem: 2,
-          permissions: ['portal:acessar'],
+          permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER],
           isSystem: true,
         },
       }),
@@ -143,17 +135,17 @@ export async function atribuirOwner(tenantId: string): Promise<SetupState> {
     const roles = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       const [o] = await Promise.all([
         tx.role.create({
-          data: { tenantId, nome: 'owner', cor: '#7c3aed', ordem: 0, permissions: ['*'], isSystem: true },
+          data: { tenantId, nome: SYSTEM_ROLES.OWNER, cor: '#7c3aed', ordem: 0, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER], isSystem: true },
         }),
         tx.role.create({
           data: {
-            tenantId, nome: 'admin', cor: '#2563eb', ordem: 1,
-            permissions: ['membros:ler','membros:aprovar','socios:ler','socios:emitir','socios:renovar','sedes:ler','sedes:editar','eventos:ler','eventos:editar'],
+            tenantId, nome: SYSTEM_ROLES.ADMIN, cor: '#2563eb', ordem: 1,
+            permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
             isSystem: true,
           },
         }),
         tx.role.create({
-          data: { tenantId, nome: 'member', cor: '#6b7280', ordem: 2, permissions: ['portal:acessar'], isSystem: true },
+          data: { tenantId, nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 2, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER], isSystem: true },
         }),
       ])
       return { ownerRole: o }

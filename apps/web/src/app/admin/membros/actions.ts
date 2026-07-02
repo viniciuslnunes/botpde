@@ -1,34 +1,54 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { assertAdmin } from '@/lib/authz'
 
-async function assertAdmin() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+/** Nome do departamento padrão por tipo de membro — criado sob demanda no tenant. */
+const DEPARTAMENTO_PADRAO_POR_TIPO: Record<'SOCIO' | 'TORCEDOR', string> = {
+  SOCIO: 'Sócio',
+  TORCEDOR: 'Torcedor',
+}
 
-  if (!session?.user?.id || !tenant) {
-    throw new Error('Não autorizado')
-  }
-
-  const userRole = await db.userRole.findFirst({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      role: { isSystem: true, nome: { in: ['owner', 'admin'] } },
-    },
+/**
+ * Concede acesso básico ao portal quando um membro é aprovado:
+ * - Role de sistema 'member' (se ainda não tiver)
+ * - Departamento correspondente ao tipo (SOCIO/TORCEDOR), criado sob demanda
+ * Idempotente: seguro chamar mais de uma vez para o mesmo usuário/tenant.
+ */
+async function concederAcessoBasico(tenantId: string, userId: string, tipoMembro: 'SOCIO' | 'TORCEDOR') {
+  const memberRole = await db.role.findFirst({
+    where: { tenantId, nome: 'member', isSystem: true },
   })
 
-  if (!userRole) throw new Error('Sem permissão')
+  if (memberRole) {
+    await db.userRole.upsert({
+      where: { userId_tenantId_roleId: { userId, tenantId, roleId: memberRole.id } },
+      create: { userId, tenantId, roleId: memberRole.id },
+      update: {},
+    })
+  }
 
-  return { session, tenant }
+  const nomeDepartamento = DEPARTAMENTO_PADRAO_POR_TIPO[tipoMembro]
+  const departamento = await db.departamento.upsert({
+    where: { tenantId_nome: { tenantId, nome: nomeDepartamento } },
+    create: { tenantId, nome: nomeDepartamento },
+    update: {},
+  })
+
+  await db.userDepartamento.upsert({
+    where: {
+      userId_tenantId_departamentoId: { userId, tenantId, departamentoId: departamento.id },
+    },
+    create: { userId, tenantId, departamentoId: departamento.id },
+    update: {},
+  })
 }
 
 export async function aprovarMembro(membroId: string) {
   const { session, tenant } = await assertAdmin()
 
-  await db.saasMembro.update({
+  const membro = await db.saasMembro.update({
     where: { id: membroId, tenantId: tenant.id },
     data: {
       status: 'APROVADO',
@@ -37,6 +57,8 @@ export async function aprovarMembro(membroId: string) {
       aprovadoEm: new Date(),
     },
   })
+
+  await concederAcessoBasico(tenant.id, membro.userId, membro.tipo)
 
   await db.auditLog.create({
     data: {

@@ -14,32 +14,32 @@ datasource db {
 
 /// Tabela legada do bot — lida pelo SaaS para exibir dados no portal
 model BotMembro {
-  id               Int       @id @default(autoincrement())
-  discordId        String    @unique @map("discord_id")
-  nome             String
-  tipo             String    // 'socio' ou 'torcedor'
-  numeroAssociado  String?   @map("numero_associado")
-  cidade           String?
-  telefone         String?
-  idade            Int?
-  aprovadoPorId    String?   @map("aprovado_por_id")
-  aprovadoPorNome  String?   @map("aprovado_por_nome")
+  id              Int       @id @default(autoincrement())
+  discordId       String    @unique @map("discord_id")
+  nome            String
+  tipo            String // 'socio' ou 'torcedor'
+  numeroAssociado String?   @map("numero_associado")
+  cidade          String?
+  telefone        String?
+  idade           Int?
+  aprovadoPorId   String?   @map("aprovado_por_id")
+  aprovadoPorNome String?   @map("aprovado_por_nome")
   criadoEm        DateTime? @default(now()) @map("criado_em")
-  imagemProva      String?   @map("imagem_prova")
+  imagemProva     String?   @map("imagem_prova")
 
   @@map("membros")
 }
 
 /// Tabela legada do bot — produtos da loja
 model BotProduto {
-  id        Int       @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   nome      String
   tamanhos  String
-  preco     Decimal   @db.Decimal(10, 2)
-  imagemUrl String?   @map("imagem_url")
-  ativo     Boolean?  @default(true)
-  criadoEm DateTime? @default(now()) @map("criado_em")
-  estoque   Json?     @default("{}")
+  preco     Decimal     @db.Decimal(10, 2)
+  imagemUrl String?     @map("imagem_url")
+  ativo     Boolean?    @default(true)
+  criadoEm  DateTime?   @default(now()) @map("criado_em")
+  estoque   Json?       @default("{}")
   pedidos   BotPedido[]
 
   @@map("produtos")
@@ -47,18 +47,18 @@ model BotProduto {
 
 /// Tabela legada do bot — pedidos da loja
 model BotPedido {
-  id            Int       @id @default(autoincrement())
-  discordId     String    @map("discord_id")
-  discordTag    String?   @map("discord_tag")
-  produtoId     Int?      @map("produto_id")
-  produtoNome   String?   @map("produto_nome")
+  id            Int         @id @default(autoincrement())
+  discordId     String      @map("discord_id")
+  discordTag    String?     @map("discord_tag")
+  produtoId     Int?        @map("produto_id")
+  produtoNome   String?     @map("produto_nome")
   tamanho       String?
   quantidade    Int
-  precoUnit     Decimal?  @db.Decimal(10, 2) @map("preco_unit")
-  total         Decimal?  @db.Decimal(10, 2)
-  status        String?   @default("pendente")
-  canalTicketId String?   @map("canal_ticket_id")
-  criadoEm     DateTime? @default(now()) @map("criado_em")
+  precoUnit     Decimal?    @map("preco_unit") @db.Decimal(10, 2)
+  total         Decimal?    @db.Decimal(10, 2)
+  status        String?     @default("pendente")
+  canalTicketId String?     @map("canal_ticket_id")
+  criadoEm      DateTime?   @default(now()) @map("criado_em")
   produto       BotProduto? @relation(fields: [produtoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("pedidos")
@@ -72,7 +72,7 @@ model BotAprovacao {
   candidatoId   String?   @map("candidato_id")
   candidatoNome String?   @map("candidato_nome")
   tipo          String?
-  criadoEm     DateTime? @default(now()) @map("criado_em")
+  criadoEm      DateTime? @default(now()) @map("criado_em")
 
   @@map("aprovacoes_recrutamento")
 }
@@ -99,7 +99,7 @@ model Tenant {
   corPrimaria String   @default("#7c3aed") @map("cor_primaria")
   logoUrl     String?  @map("logo_url")
   ativo       Boolean  @default(true)
-  criadoEm   DateTime @default(now()) @map("criado_em")
+  criadoEm    DateTime @default(now()) @map("criado_em")
 
   // Banco de dados próprio do tenant (null = usa o banco compartilhado)
   // Cada torcida pode ter seu banco isolado quando necessário
@@ -107,18 +107,21 @@ model Tenant {
 
   discordGuildId String? @unique @map("discord_guild_id")
 
-  membros         SaasMembro[]
-  socios          SaasSocio[]
-  produtos        SaasProduto[]
-  pedidos         SaasPedido[]
-  sedes           Sede[]
-  eventos         Evento[]
-  roles           Role[]
-  userRoles       UserRole[]
-  userPermissions UserPermission[]
-  auditLogs       AuditLog[]
-  bloqueados      Bloqueado[]
-  posts           Post[]
+  membros           SaasMembro[]
+  socios            SaasSocio[]
+  produtos          SaasProduto[]
+  pedidos           SaasPedido[]
+  sedes             Sede[]
+  eventos           Evento[]
+  roles             Role[]
+  userRoles         UserRole[]
+  userPermissions   UserPermission[]
+  departamentos     Departamento[]
+  userDepartamentos UserDepartamento[]
+  auditLogs         AuditLog[]
+  bloqueados        Bloqueado[]
+  posts             Post[]
+  advertencias      Advertencia[]
 
   @@map("saas_tenants")
 }
@@ -136,19 +139,21 @@ model User {
   email        String?   @unique
   nome         String?
   avatarUrl    String?   @map("avatar_url")
-  criadoEm    DateTime  @default(now()) @map("criado_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
   discordId    String?   @unique @map("discord_id")
   googleId     String?   @unique @map("google_id")
   consentidoEm DateTime? @map("consentido_em")
 
-  userRoles       UserRole[]
-  userPermissions UserPermission[]
-  membros         SaasMembro[]
-  socios          SaasSocio[]
-  pedidos         SaasPedido[]
-  eventosRsvp     EventoRsvp[]
-  posts           Post[]
-  auditLogs       AuditLog[]      @relation("AuditAtor")
+  userRoles            UserRole[]
+  userPermissions      UserPermission[]
+  userDepartamentos    UserDepartamento[]
+  departamentosGeridos DepartamentoGestor[]
+  membros              SaasMembro[]
+  socios               SaasSocio[]
+  pedidos              SaasPedido[]
+  eventosRsvp          EventoRsvp[]
+  posts                Post[]
+  auditLogs            AuditLog[]           @relation("AuditAtor")
 
   @@map("saas_users")
 }
@@ -156,13 +161,13 @@ model User {
 // ─── CARGOS E PERMISSÕES ─────────────────────────────────────────────────────
 
 model Role {
-  id          String  @id @default(uuid())
-  tenantId    String  @map("tenant_id")
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nome        String
-  cor         String  @default("#6b7280")
-  ordem       Int     @default(0)
-  isSystem    Boolean @default(false) @map("is_system")
+  cor         String   @default("#6b7280")
+  ordem       Int      @default(0)
+  isSystem    Boolean  @default(false) @map("is_system")
   permissions String[]
 
   userRoles UserRole[]
@@ -184,15 +189,16 @@ model UserRole {
   criadoEm DateTime @default(now()) @map("criado_em")
 
   @@unique([userId, tenantId, roleId])
+  @@index([tenantId])
   @@map("saas_user_roles")
 }
 
 model UserPermission {
-  id       String  @id @default(uuid())
-  userId   String  @map("user_id")
-  tenantId String  @map("tenant_id")
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  tenantId   String  @map("tenant_id")
   permission String
-  granted  Boolean
+  granted    Boolean
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -200,7 +206,68 @@ model UserPermission {
   criadoEm DateTime @default(now()) @map("criado_em")
 
   @@unique([userId, tenantId, permission])
+  @@index([tenantId])
   @@map("saas_user_permissions")
+}
+
+// ─── DEPARTAMENTOS ────────────────────────────────────────────────────────────
+// Agrupamento organizacional (Diretoria, Dpto. Financeiro, Sócio, Torcedor...),
+// independente de Perfil. Departamento NÃO concede permissão — é rótulo/escopo.
+// Lista plana por tenant (sem sub-departamento no MVP).
+
+model Departamento {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome     String
+  cor      String   @default("#6b7280")
+  ordem    Int      @default(0)
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  membros  UserDepartamento[]
+  gestores DepartamentoGestor[]
+
+  @@unique([tenantId, nome])
+  @@map("saas_departamentos")
+}
+
+/// Associação usuário ↔ departamento (multi-departamento, como cargos do Discord)
+model UserDepartamento {
+  id             String @id @default(uuid())
+  userId         String @map("user_id")
+  tenantId       String @map("tenant_id")
+  departamentoId String @map("departamento_id")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, departamentoId])
+  @@index([departamentoId])
+  @@map("saas_user_departamentos")
+}
+
+/// Quem pode gerenciar os membros de um departamento (adicionar/remover membros,
+/// atribuir perfis dentro do escopo do departamento). Owners/admins do tenant
+/// (via Role.isSystem) continuam com acesso total independente desta tabela —
+/// isso serve para delegar gestão de UM departamento específico a alguém que
+/// não é admin geral (ex: liderança de um departamento na subsede/pde).
+model DepartamentoGestor {
+  id             String @id @default(uuid())
+  departamentoId String @map("departamento_id")
+  userId         String @map("user_id")
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([departamentoId, userId])
+  @@index([userId])
+  @@map("saas_departamento_gestores")
 }
 
 // ─── MEMBROS SaaS ─────────────────────────────────────────────────────────────
@@ -215,8 +282,8 @@ model SaasMembro {
   idade           Int?
   telefone        String?
   cidade          String?
-  numeroAssociado String?    @map("numero_associado")
-  imagemProva     String?    @map("imagem_prova")
+  numeroAssociado String?      @map("numero_associado")
+  imagemProva     String?      @map("imagem_prova")
   status          StatusMembro @default(PENDENTE)
 
   aprovadoPorId   String?   @map("aprovado_por_id")
@@ -227,7 +294,7 @@ model SaasMembro {
   discordId  String? @map("discord_id")
   discordTag String? @map("discord_tag")
 
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -257,7 +324,7 @@ model SaasSocio {
   numeroSocio Int      @map("numero_socio")
   nome        String
   validade    DateTime
-  criadoEm   DateTime @default(now()) @map("criado_em")
+  criadoEm    DateTime @default(now()) @map("criado_em")
   discordId   String?  @map("discord_id")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -271,16 +338,16 @@ model SaasSocio {
 // ─── BLOQUEADOS ───────────────────────────────────────────────────────────────
 
 model Bloqueado {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   registro         String
   nome             String?
   motivo           String?
   bloqueadoPorId   String?  @map("bloqueado_por_id")
   bloqueadoPorNome String?  @map("bloqueado_por_nome")
-  criadoEm        DateTime @default(now()) @map("criado_em")
+  criadoEm         DateTime @default(now()) @map("criado_em")
 
   @@unique([tenantId, registro])
   @@map("saas_bloqueados")
@@ -312,7 +379,7 @@ model Sede {
   descricao   String?
   fotoUrl     String?  @map("foto_url")
   ativa       Boolean  @default(true)
-  criadoEm   DateTime @default(now()) @map("criado_em")
+  criadoEm    DateTime @default(now()) @map("criado_em")
 
   // Hierarquia: subsede aponta para sede pai (também pode ser null)
   sedeId String? @map("sede_id")
@@ -326,6 +393,8 @@ model Sede {
 
   eventos Evento[]
 
+  @@index([tenantId])
+  @@index([sedeId])
   @@map("saas_sedes")
 }
 
@@ -338,9 +407,9 @@ enum TipoSede {
 // ─── EVENTOS ──────────────────────────────────────────────────────────────────
 
 model Evento {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   titulo    String
   descricao String?
@@ -352,11 +421,13 @@ model Evento {
   lng       Float?
 
   criadoPorId      String?  @map("criado_por_id")
-  criadoEm        DateTime @default(now()) @map("criado_em")
+  criadoEm         DateTime @default(now()) @map("criado_em")
   discordMessageId String?  @map("discord_message_id")
 
   rsvps EventoRsvp[]
 
+  @@index([tenantId])
+  @@index([sedeId])
   @@map("saas_eventos")
 }
 
@@ -381,9 +452,9 @@ enum RsvpStatus {
 // ─── LOJA SaaS ────────────────────────────────────────────────────────────────
 
 model SaasProduto {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   nome       String
   descricao  String?
@@ -393,11 +464,12 @@ model SaasProduto {
   tamanhos   String[]
   imagensUrl String[] @map("imagens_url")
 
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   pedidos SaasPedido[]
 
+  @@index([tenantId])
   @@map("saas_produtos")
 }
 
@@ -408,21 +480,24 @@ model SaasPedido {
   userId   String @map("user_id")
   user     User   @relation(fields: [userId], references: [id])
 
-  produtoId   String     @map("produto_id")
-  produto     SaasProduto @relation(fields: [produtoId], references: [id])
-  produtoNome String     @map("produto_nome")
+  produtoId   String       @map("produto_id")
+  produto     SaasProduto  @relation(fields: [produtoId], references: [id])
+  produtoNome String       @map("produto_nome")
   tamanho     String?
   quantidade  Int
-  precoUnit   Decimal    @db.Decimal(10, 2) @map("preco_unit")
-  total       Decimal    @db.Decimal(10, 2)
+  precoUnit   Decimal      @map("preco_unit") @db.Decimal(10, 2)
+  total       Decimal      @db.Decimal(10, 2)
   status      StatusPedido @default(PENDENTE)
 
-  discordId     String?  @map("discord_id")
-  canalTicketId String?  @map("canal_ticket_id")
+  discordId     String? @map("discord_id")
+  canalTicketId String? @map("canal_ticket_id")
 
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
+  @@index([tenantId])
+  @@index([userId])
+  @@index([produtoId])
   @@map("saas_pedidos")
 }
 
@@ -436,20 +511,21 @@ enum StatusPedido {
 // ─── COMUNIDADE ───────────────────────────────────────────────────────────────
 
 model Post {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autorId  String  @map("autor_id")
-  autor    User    @relation(fields: [autorId], references: [id])
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId  String @map("autor_id")
+  autor    User   @relation(fields: [autorId], references: [id])
 
   titulo    String?
   conteudo  String
-  imagemUrl String?  @map("imagem_url")
-  fixado    Boolean  @default(false)
+  imagemUrl String? @map("imagem_url")
+  fixado    Boolean @default(false)
 
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
+  @@index([tenantId])
   @@map("saas_posts")
 }
 
@@ -458,6 +534,7 @@ model Post {
 model Advertencia {
   id       String @id @default(uuid())
   tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   membroDiscordId String   @map("membro_discord_id")
   membroNome      String   @map("membro_nome")
@@ -465,12 +542,13 @@ model Advertencia {
   tier            Int      @default(1)
   prazo           DateTime
 
-  emitidoPorId   String?  @map("emitido_por_id")
-  emitidoPorNome String?  @map("emitido_por_nome")
+  emitidoPorId   String? @map("emitido_por_id")
+  emitidoPorNome String? @map("emitido_por_nome")
 
   resolvida Boolean  @default(false)
   criadoEm  DateTime @default(now()) @map("criado_em")
 
+  @@index([tenantId])
   @@map("saas_advertencias")
 }
 
@@ -490,5 +568,6 @@ model AuditLog {
 
   criadoEm DateTime @default(now()) @map("criado_em")
 
+  @@index([tenantId, criadoEm])
   @@map("saas_audit_logs")
 }

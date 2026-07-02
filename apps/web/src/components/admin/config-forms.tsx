@@ -1,51 +1,18 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Loader2, Plus, Pencil, Trash2, X, Check, Shield } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, Eye } from 'lucide-react'
+import { PERMISSION_GROUPS, applyPermissionCascade } from '@torcida/types'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
   criarRole,
   atualizarRole,
   excluirRole,
+  criarDepartamento,
+  atualizarDepartamento,
+  excluirDepartamento,
 } from '@/app/admin/configuracoes/actions'
-
-// ── Permissões disponíveis ────────────────────────────────────────────────────
-
-const PERMISSION_GROUPS = [
-  {
-    label: 'Membros',
-    items: [
-      { key: 'members:view', label: 'Ver membros' },
-      { key: 'members:approve', label: 'Aprovar membros' },
-      { key: 'members:reject', label: 'Reprovar membros' },
-      { key: 'members:warn', label: 'Advertir membros' },
-      { key: 'members:block', label: 'Bloquear membros' },
-    ],
-  },
-  {
-    label: 'Loja',
-    items: [
-      { key: 'store:view_orders', label: 'Ver pedidos' },
-      { key: 'store:manage', label: 'Gerenciar produtos' },
-    ],
-  },
-  {
-    label: 'Eventos',
-    items: [
-      { key: 'events:create', label: 'Criar eventos' },
-      { key: 'events:manage', label: 'Gerenciar eventos' },
-    ],
-  },
-  {
-    label: 'Outros',
-    items: [
-      { key: 'sedes:manage', label: 'Gerenciar sedes' },
-      { key: 'roles:manage', label: 'Gerenciar cargos' },
-      { key: 'reports:view', label: 'Ver relatórios' },
-    ],
-  },
-]
 
 // ── Perfil do Tenant ──────────────────────────────────────────────────────────
 
@@ -214,22 +181,87 @@ interface Role {
   cor: string
   isSystem: boolean
   permissions: string[]
+  /** Quantos usuários têm este cargo atribuído — bloqueia exclusão quando > 0 */
+  emUso?: number
 }
 
 interface RolesManagerProps {
   roles: Role[]
 }
 
+/** Label amigável de uma permissão (fallback pro próprio código). */
+function permissionLabel(key: string): string {
+  for (const group of PERMISSION_GROUPS) {
+    const item = group.items.find((i) => i.key === key)
+    if (item) return item.label
+  }
+  return key
+}
+
 export function RolesManager({ roles }: RolesManagerProps) {
   const [criando, setCriando] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  // Busca por nome do cargo OU por permissão que ele concede (como na referência:
+  // procurar "aprovar" encontra os perfis que têm essa permissão)
+  const needle = busca.trim().toLowerCase()
+  const rolesFiltrados = needle
+    ? roles.filter(
+        (role) =>
+          role.nome.toLowerCase().includes(needle) ||
+          role.permissions.some(
+            (p) =>
+              p.toLowerCase().includes(needle) ||
+              permissionLabel(p).toLowerCase().includes(needle),
+          ),
+      )
+    : roles
+
+  function executar(acao: () => Promise<void>) {
+    setErro(null)
+    startTransition(async () => {
+      try {
+        await acao()
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : 'Erro ao salvar o cargo')
+      }
+    })
+  }
+
+  const editando = criando || editandoId !== null
 
   return (
     <div className="space-y-3">
+      {erro && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {erro}
+        </div>
+      )}
+
+      {/* Busca (oculta durante criação/edição, como na referência) */}
+      {!editando && roles.length > 3 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por cargo ou permissão..."
+            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          />
+        </div>
+      )}
+
       {/* Lista de cargos */}
       <div className="space-y-2">
-        {roles.map((role) =>
+        {rolesFiltrados.length === 0 && !criando && (
+          <p className="py-4 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhum cargo encontrado
+          </p>
+        )}
+        {rolesFiltrados.map((role) =>
           editandoId === role.id ? (
             <RoleForm
               key={role.id}
@@ -239,7 +271,7 @@ export function RolesManager({ roles }: RolesManagerProps) {
               isSystem={role.isSystem}
               onCancel={() => setEditandoId(null)}
               onSubmit={(fd) => {
-                startTransition(async () => {
+                executar(async () => {
                   await atualizarRole(role.id, fd)
                   setEditandoId(null)
                 })
@@ -250,10 +282,14 @@ export function RolesManager({ roles }: RolesManagerProps) {
             <RoleRow
               key={role.id}
               role={role}
-              onEdit={() => setEditandoId(role.id)}
+              disabled={editando}
+              onEdit={() => {
+                setErro(null)
+                setEditandoId(role.id)
+              }}
               onDelete={() => {
                 if (!confirm(`Excluir o cargo "${role.nome}"?`)) return
-                startTransition(() => excluirRole(role.id))
+                executar(() => excluirRole(role.id))
               }}
               pending={pending}
             />
@@ -268,7 +304,7 @@ export function RolesManager({ roles }: RolesManagerProps) {
           <RoleForm
             onCancel={() => setCriando(false)}
             onSubmit={(fd) => {
-              startTransition(async () => {
+              executar(async () => {
                 await criarRole(fd)
                 setCriando(false)
               })
@@ -277,13 +313,18 @@ export function RolesManager({ roles }: RolesManagerProps) {
           />
         </div>
       ) : (
-        <button
-          onClick={() => setCriando(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))] hover:text-[rgb(var(--foreground))]"
-        >
-          <Plus className="h-4 w-4" />
-          Criar novo cargo
-        </button>
+        !editando && (
+          <button
+            onClick={() => {
+              setErro(null)
+              setCriando(true)
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))] hover:text-[rgb(var(--foreground))]"
+          >
+            <Plus className="h-4 w-4" />
+            Criar novo cargo
+          </button>
+        )
       )}
     </div>
   )
@@ -291,21 +332,32 @@ export function RolesManager({ roles }: RolesManagerProps) {
 
 function RoleRow({
   role,
+  disabled,
   onEdit,
   onDelete,
   pending,
 }: {
   role: Role
+  /** Outro cargo está em edição/criação — desabilita interações desta linha */
+  disabled: boolean
   onEdit: () => void
   onDelete: () => void
   pending: boolean
 }) {
+  const emUso = role.emUso ?? 0
+  const podeExcluir = !role.isSystem && emUso === 0
+
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+    <div
+      className={[
+        'flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 transition-opacity',
+        disabled ? 'opacity-50' : '',
+      ].join(' ')}
+    >
       {/* Cor */}
       <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: role.cor }} />
 
-      {/* Nome + badge sistema */}
+      {/* Nome + badges */}
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
         <span className="font-medium text-[rgb(var(--foreground))]">{role.nome}</span>
         {role.isSystem && (
@@ -316,8 +368,15 @@ function RoleRow({
         <span className="text-xs text-[rgb(var(--foreground-muted))]">
           {role.permissions.length === 0
             ? 'Sem permissões'
-            : `${role.permissions.length} permiss${role.permissions.length === 1 ? 'ão' : 'ões'}`}
+            : role.permissions.includes('*')
+              ? 'Todas as permissões'
+              : `${role.permissions.length} permiss${role.permissions.length === 1 ? 'ão' : 'ões'}`}
         </span>
+        {emUso > 0 && (
+          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+            {emUso} usuário{emUso === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
 
       {/* Ações */}
@@ -325,15 +384,16 @@ function RoleRow({
         <div className="flex shrink-0 items-center gap-1">
           <button
             onClick={onEdit}
-            disabled={pending}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+            disabled={pending || disabled}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:pointer-events-none"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onDelete}
-            disabled={pending}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+            disabled={pending || disabled || !podeExcluir}
+            title={podeExcluir ? 'Excluir cargo' : 'Cargo em uso — remova-o dos usuários primeiro'}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-red-950 dark:hover:text-red-400"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -364,22 +424,69 @@ function RoleForm({
   const [cor, setCor] = useState(initialCor)
   const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
 
+  const isEdit = initialNome !== ''
+  const initial = new Set(initialPermissions)
+
+  // Diff em relação ao estado original (só relevante na edição — na criação
+  // tudo é novo por definição, sem destaque, como na referência)
+  const added = isEdit ? [...selected].filter((p) => !initial.has(p)) : []
+  const removed = isEdit ? [...initial].filter((p) => !selected.has(p)) : []
+
   function toggle(key: string) {
     setSelected((prev) => {
+      const prevArr = [...prev]
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      return next
+      // Cascata: marcar não-base puxa a base do grupo; desmarcar a base
+      // derruba as irmãs (mesma regra aplicada no servidor)
+      return new Set(applyPermissionCascade(prevArr, [...next]))
     })
+  }
+
+  /** Contadores de mudança por grupo, para o badge no cabeçalho (edição) */
+  function groupChanges(groupKeys: readonly string[]) {
+    return {
+      added: added.filter((p) => groupKeys.includes(p)).length,
+      removed: removed.filter((p) => groupKeys.includes(p)).length,
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (selected.size === 0) return
+
+    // Confirmação com resumo das mudanças antes de gravar
+    if (isEdit && (added.length > 0 || removed.length > 0)) {
+      const linhas = [
+        ...added.map((p) => `  + ${permissionLabel(p)}`),
+        ...removed.map((p) => `  − ${permissionLabel(p)}`),
+      ]
+      if (!confirm(`Salvar as alterações do cargo "${initialNome}"?\n\n${linhas.join('\n')}`)) return
+    } else if (!isEdit) {
+      if (!confirm('Criar o novo cargo com as permissões selecionadas?')) return
+    }
+
     const fd = new FormData(e.currentTarget)
     // Injeta as permissões selecionadas manualmente (checkboxes podem ser perdidos)
     fd.delete('permissions')
     for (const p of selected) fd.append('permissions', p)
     onSubmit(fd)
+  }
+
+  /** Estilo do item conforme estado: selecionado / adicionado / removido / neutro */
+  function itemClass(key: string): string {
+    const base = 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors'
+    if (isEdit && added.includes(key)) {
+      return `${base} border-green-400 bg-green-50 text-[rgb(var(--foreground))] dark:border-green-700 dark:bg-green-950`
+    }
+    if (isEdit && removed.includes(key)) {
+      return `${base} border-red-300 bg-red-50 text-[rgb(var(--foreground-muted))] dark:border-red-800 dark:bg-red-950`
+    }
+    if (selected.has(key)) {
+      return `${base} border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]`
+    }
+    return `${base} border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]`
   }
 
   return (
@@ -415,48 +522,258 @@ function RoleForm({
         </div>
       </div>
 
+      {/* Aviso: nenhuma permissão selecionada */}
+      {selected.size === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Selecione ao menos uma permissão para o cargo.
+        </div>
+      )}
+
       {/* Permissões */}
       <div>
         <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">Permissões</p>
         <div className="space-y-3">
-          {PERMISSION_GROUPS.map((group) => (
-            <div key={group.label}>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                {group.label}
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                {group.items.map((item) => (
-                  <label
-                    key={item.key}
-                    className={[
-                      'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors',
-                      selected.has(item.key)
-                        ? 'border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
-                        : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
-                    ].join(' ')}
-                  >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={selected.has(item.key)}
-                      onChange={() => toggle(item.key)}
-                    />
-                    <span
-                      className={[
-                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                        selected.has(item.key)
-                          ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                          : 'border-[rgb(var(--border-strong))]',
-                      ].join(' ')}
-                    >
-                      {selected.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+          {PERMISSION_GROUPS.map((group) => {
+            const groupKeys = group.items.map((i) => i.key)
+            const changes = groupChanges(groupKeys)
+            return (
+              <div key={group.label}>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  {group.label}
+                  {changes.added > 0 && (
+                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900 dark:text-green-300">
+                      +{changes.added}
                     </span>
-                    {item.label}
-                  </label>
-                ))}
+                  )}
+                  {changes.removed > 0 && (
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900 dark:text-red-300">
+                      −{changes.removed}
+                    </span>
+                  )}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {group.items.map((item) => {
+                    const isBase = group.base === item.key
+                    return (
+                      <label key={item.key} className={itemClass(item.key)}>
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={selected.has(item.key)}
+                          onChange={() => toggle(item.key)}
+                        />
+                        <span
+                          className={[
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                            selected.has(item.key)
+                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                              : 'border-[rgb(var(--border-strong))]',
+                          ].join(' ')}
+                        >
+                          {selected.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+                        </span>
+                        <span className={isEdit && removed.includes(item.key) ? 'line-through opacity-70' : ''}>
+                          {item.label}
+                        </span>
+                        {isBase && (
+                          <Eye
+                            className="ml-auto h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]"
+                            aria-label="Permissão base do grupo — exigida pelas demais"
+                          />
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          {selected.size} permiss{selected.size === 1 ? 'ão' : 'ões'} selecionada{selected.size === 1 ? '' : 's'}
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={pending || selected.size === 0}
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+          {initialNome ? 'Salvar' : 'Criar cargo'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        >
+          <X className="h-3 w-3" /> Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Departamentos ────────────────────────────────────────────────────────────
+// Agrupamento organizacional (Diretoria, Dpto. Financeiro, Sócio...), sem
+// permissões próprias — quem concede acesso é o Perfil (Role) acima.
+
+interface Departamento {
+  id: string
+  nome: string
+  cor: string
+}
+
+interface DepartamentosManagerProps {
+  departamentos: Departamento[]
+}
+
+export function DepartamentosManager({ departamentos }: DepartamentosManagerProps) {
+  const [criando, setCriando] = useState(false)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        {departamentos.map((departamento) =>
+          editandoId === departamento.id ? (
+            <DepartamentoForm
+              key={departamento.id}
+              initialNome={departamento.nome}
+              initialCor={departamento.cor}
+              onCancel={() => setEditandoId(null)}
+              onSubmit={(fd) => {
+                startTransition(async () => {
+                  await atualizarDepartamento(departamento.id, fd)
+                  setEditandoId(null)
+                })
+              }}
+              pending={pending}
+            />
+          ) : (
+            <DepartamentoRow
+              key={departamento.id}
+              departamento={departamento}
+              onEdit={() => setEditandoId(departamento.id)}
+              onDelete={() => {
+                if (!confirm(`Excluir o departamento "${departamento.nome}"?`)) return
+                startTransition(() => excluirDepartamento(departamento.id))
+              }}
+              pending={pending}
+            />
+          ),
+        )}
+      </div>
+
+      {criando ? (
+        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] p-4">
+          <p className="mb-3 text-sm font-medium text-[rgb(var(--foreground))]">Novo departamento</p>
+          <DepartamentoForm
+            onCancel={() => setCriando(false)}
+            onSubmit={(fd) => {
+              startTransition(async () => {
+                await criarDepartamento(fd)
+                setCriando(false)
+              })
+            }}
+            pending={pending}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => setCriando(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))] hover:text-[rgb(var(--foreground))]"
+        >
+          <Plus className="h-4 w-4" />
+          Criar novo departamento
+        </button>
+      )}
+    </div>
+  )
+}
+
+function DepartamentoRow({
+  departamento,
+  onEdit,
+  onDelete,
+  pending,
+}: {
+  departamento: Departamento
+  onEdit: () => void
+  onDelete: () => void
+  pending: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+      <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: departamento.cor }} />
+      <span className="flex-1 font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          onClick={onEdit}
+          disabled={pending}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={pending}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DepartamentoForm({
+  initialNome = '',
+  initialCor = '#6b7280',
+  onCancel,
+  onSubmit,
+  pending,
+}: {
+  initialNome?: string
+  initialCor?: string
+  onCancel: () => void
+  onSubmit: (fd: FormData) => void
+  pending: boolean
+}) {
+  const [cor, setCor] = useState(initialCor)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    onSubmit(new FormData(e.currentTarget))
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Nome</label>
+          <input
+            name="nome"
+            defaultValue={initialNome}
+            required
+            placeholder="Ex: Diretoria"
+            className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Cor</label>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              type="color"
+              name="corPrimaria"
+              value={cor}
+              onChange={(e) => setCor(e.target.value)}
+              className="h-10 w-10 cursor-pointer rounded-lg border border-[rgb(var(--border))] bg-transparent p-0.5"
+            />
+            <input type="hidden" name="cor" value={cor} />
+          </div>
         </div>
       </div>
 
@@ -467,7 +784,7 @@ function RoleForm({
           className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          {initialNome ? 'Salvar' : 'Criar cargo'}
+          {initialNome ? 'Salvar' : 'Criar departamento'}
         </button>
         <button
           type="button"

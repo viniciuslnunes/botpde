@@ -1,5 +1,25 @@
 {
-  "description": "Impeccable design detector: runs after Edit/Write/MultiEdit on UI files and surfaces findings as system reminders.",
+  "permissions": {
+    "allow": [
+      "Bash(railway --version)",
+      "Bash(railway whoami *)",
+      "mcp__visualize__show_widget",
+      "Bash(npx prisma *)",
+      "Bash(timeout 100 pnpm --filter @torcida/web exec tsc --noEmit)",
+      "Bash(timeout 100 pnpm --filter @torcida/web exec eslint src/app/admin/layout.tsx src/app/admin/membros/actions.ts src/app/super-admin/setup/actions.ts src/components/admin/sidebar.tsx)",
+      "Bash(node scripts/repair-system-role-permissions.js --dry-run)",
+      "Bash(node scripts/repair-system-role-permissions.js)",
+      "Bash(node -e ' *)",
+      "Bash(find node_modules/.pnpm -maxdepth 1 -iname \"@prisma+client*\" 2>/dev/null; echo \"---\"; find / -maxdepth 6 -iname \"index.d.ts\" -path \"*@prisma/client*\" 2>/dev/null | head -5)",
+      "Bash(timeout 100 pnpm --filter @torcida/web exec eslint src/app/admin/acessos src/components/admin/access-manager.tsx src/components/admin/config-forms.tsx src/app/admin/configuracoes src/app/admin/membros/actions.ts src/lib/authz.ts src/app/super-admin/setup/actions.ts)",
+      "Bash(timeout 100 pnpm --filter @torcida/web exec eslint .)",
+      "Bash(timeout 120 pnpm --filter @torcida/web exec tsc --noEmit)",
+      "Bash(timeout 120 pnpm --filter @torcida/web exec eslint src/components/admin/config-forms.tsx src/components/admin/access-manager.tsx src/app/admin/configuracoes src/app/admin/acessos)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(awk -F= '{print $1\"= \\(len:\" length\\(substr\\($0, index\\($0,\"=\"\\)+1\\)\\) \"\\)\"}' apps/web/.env.local)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -14,5 +34,6 @@
         ]
       }
     ]
-  }
+  },
+  "description": "Impeccable design detector: runs after Edit/Write/MultiEdit on UI files and surfaces findings as system reminders."
 }
