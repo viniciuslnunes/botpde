@@ -1,31 +1,9 @@
 'use client'
 
 import { useActionState } from 'react'
-import { useFormStatus } from 'react-dom'
 import { salvarPerfil, type PerfilState } from '@/app/portal/perfil/actions'
-import { Loader2, Save, CheckCircle2 } from 'lucide-react'
-
-const inputClass =
-  'w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-transparent focus:ring-2 focus:ring-[rgb(var(--color-primary))] transition-all'
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors?.length) return null
-  return <p className="mt-1 text-xs text-red-500">{errors[0]}</p>
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-    >
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-      {pending ? 'Salvando...' : 'Salvar alterações'}
-    </button>
-  )
-}
+import { Save, CheckCircle2 } from 'lucide-react'
+import { FieldError, Input, SubmitButton } from '@torcida/ui'
 
 type Props = {
   nome: string
@@ -59,13 +37,13 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
         <label htmlFor="nome" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Nome completo <span className="text-red-500">*</span>
         </label>
-        <input
+        <Input
           id="nome"
           name="nome"
           type="text"
           defaultValue={nome}
           required
-          className={inputClass}
+         
         />
         <FieldError errors={state.errors?.nome} />
       </div>
@@ -76,7 +54,7 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
           <label htmlFor="idade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Idade
           </label>
-          <input
+          <Input
             id="idade"
             name="idade"
             type="number"
@@ -84,7 +62,7 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
             max={120}
             defaultValue={idade ?? ''}
             placeholder="Ex: 25"
-            className={inputClass}
+           
           />
           <FieldError errors={state.errors?.idade} />
         </div>
@@ -94,13 +72,13 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
           <label htmlFor="telefone" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Telefone / WhatsApp
           </label>
-          <input
+          <Input
             id="telefone"
             name="telefone"
             type="tel"
             defaultValue={telefone ?? ''}
             placeholder="(11) 99999-9999"
-            className={inputClass}
+           
           />
           <FieldError errors={state.errors?.telefone} />
         </div>
@@ -111,13 +89,13 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
         <label htmlFor="cidade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Cidade / Estado
         </label>
-        <input
+        <Input
           id="cidade"
           name="cidade"
           type="text"
           defaultValue={cidade ?? ''}
           placeholder="Ex: São Paulo, SP"
-          className={inputClass}
+         
         />
         <FieldError errors={state.errors?.cidade} />
       </div>
@@ -127,13 +105,13 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
         <label htmlFor="discordTag" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Usuário no Discord
         </label>
-        <input
+        <Input
           id="discordTag"
           name="discordTag"
           type="text"
           defaultValue={discordTag ?? ''}
           placeholder="Ex: seuusuario"
-          className={inputClass}
+         
         />
         <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
           Para vincular sua conta ao servidor da torcida no Discord.
@@ -148,7 +126,7 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
         </p>
       )}
 
-      <SubmitButton />
+      <SubmitButton label="Salvar alterações" icon={<Save className="h-4 w-4" />} />
     </form>
   )
 }

@@ -104,9 +104,6 @@ export default async function AdminPage() {
     label: string
     value: number
     icon: React.ElementType
-    cor: string
-    bg: string
-    border: string
     href?: string
     badge?: string
   }
@@ -116,9 +113,6 @@ export default async function AdminPage() {
       label: 'Membros ativos',
       value: totalMembros,
       icon: Users,
-      cor: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-50 dark:bg-emerald-950',
-      border: 'border-emerald-200 dark:border-emerald-900',
       href: '/admin/membros',
       badge: novosUltimos30d > 0 ? `+${novosUltimos30d} este mês` : undefined,
     },
@@ -126,27 +120,18 @@ export default async function AdminPage() {
       label: 'Aguardando aprovação',
       value: pendentes,
       icon: Clock,
-      cor: 'text-yellow-600 dark:text-yellow-400',
-      bg: 'bg-yellow-50 dark:bg-yellow-950',
-      border: 'border-yellow-200 dark:border-yellow-900',
       href: '/admin/membros',
     },
     {
       label: 'Sócios com carteirinha',
       value: totalSocios,
       icon: CreditCard,
-      cor: 'text-violet-600 dark:text-violet-400',
-      bg: 'bg-violet-50 dark:bg-violet-950',
-      border: 'border-violet-200 dark:border-violet-900',
       href: '/admin/socios',
     },
     {
       label: 'Próximos eventos',
       value: proxEventos.length,
       icon: Calendar,
-      cor: 'text-blue-600 dark:text-blue-400',
-      bg: 'bg-blue-50 dark:bg-blue-950',
-      border: 'border-blue-200 dark:border-blue-900',
       href: '/admin/eventos',
     },
   ]
@@ -214,18 +199,18 @@ export default async function AdminPage() {
         </div>
       )}
 
-      {/* KPIs principais */}
+      {/* KPIs principais — neutros por padrão; cor do tenant só no ícone */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => {
           const Icon = k.icon
           const inner = (
-            <div className={`rounded-2xl border ${k.border} ${k.bg} p-5`}>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                     {k.label}
                   </p>
-                  <p className={`mt-2 text-4xl font-bold ${k.cor}`}>{k.value}</p>
+                  <p className="mt-2 text-4xl font-bold text-[rgb(var(--foreground))]">{k.value}</p>
                   {k.badge && (
                     <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                       <TrendingUp className="h-3 w-3" />
@@ -233,14 +218,14 @@ export default async function AdminPage() {
                     </p>
                   )}
                 </div>
-                <div className={`rounded-xl p-2.5 ${k.bg}`}>
-                  <Icon className={`h-5 w-5 ${k.cor}`} />
+                <div className="rounded-xl bg-[rgb(var(--background-subtle))] p-2.5">
+                  <Icon className="h-5 w-5" style={{ color: tenant.corPrimaria }} />
                 </div>
               </div>
             </div>
           )
           return k.href ? (
-            <Link key={k.label} href={k.href} className="block transition-all hover:scale-[1.01] hover:shadow-md">
+            <Link key={k.label} href={k.href} className="block transition-all hover:shadow-md">
               {inner}
             </Link>
           ) : (

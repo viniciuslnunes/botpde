@@ -11,6 +11,8 @@ import {
   Settings,
   Calendar,
   KeyRound,
+  MessagesSquare,
+  Network,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,7 +24,9 @@ const ICON_BY_ID: Record<string, LucideIcon> = {
   socios: CreditCard,
   eventos: Calendar,
   sedes: MapPin,
+  hierarquia: Network,
   loja: ShoppingBag,
+  comunidade: MessagesSquare,
   acessos: KeyRound,
   configuracoes: Settings,
 }

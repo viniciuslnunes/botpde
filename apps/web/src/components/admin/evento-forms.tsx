@@ -1,32 +1,10 @@
 'use client'
 
 import { useActionState, useTransition } from 'react'
-import { useFormStatus } from 'react-dom'
 import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/app/admin/eventos/actions'
 import { Loader2, Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-
-const inputClass =
-  'w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-transparent focus:ring-2 focus:ring-[rgb(var(--color-primary))] transition-all'
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors?.length) return null
-  return <p className="mt-1 text-xs text-red-500">{errors[0]}</p>
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-    >
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
-      {pending ? 'Salvando...' : label}
-    </button>
-  )
-}
+import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
@@ -55,7 +33,7 @@ export function CriarEventoForm() {
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Título <span className="text-red-500">*</span>
         </label>
-        <input name="titulo" type="text" placeholder="Ex: Jogo Corinthians x Santos" required className={inputClass} />
+        <Input name="titulo" type="text" placeholder="Ex: Jogo Corinthians x Santos" required />
         <FieldError errors={state.errors?.titulo} />
       </div>
 
@@ -64,12 +42,11 @@ export function CriarEventoForm() {
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Data e hora <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             name="data"
             type="datetime-local"
             defaultValue={toDatetimeLocal(amanha)}
             required
-            className={inputClass}
           />
           <FieldError errors={state.errors?.data} />
         </div>
@@ -78,7 +55,7 @@ export function CriarEventoForm() {
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Local
           </label>
-          <input name="local" type="text" placeholder="Ex: Neo Química Arena" className={inputClass} />
+          <Input name="local" type="text" placeholder="Ex: Neo Química Arena" />
           <FieldError errors={state.errors?.local} />
         </div>
       </div>
@@ -87,16 +64,16 @@ export function CriarEventoForm() {
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Descrição
         </label>
-        <textarea
+        <Textarea
           name="descricao"
           rows={3}
           placeholder="Detalhes, ponto de encontro, informações adicionais..."
-          className={`${inputClass} resize-none`}
+          className="resize-none"
         />
         <FieldError errors={state.errors?.descricao} />
       </div>
 
-      <SubmitButton label="Criar evento" />
+      <SubmitButton label="Criar evento" icon={<CalendarPlus className="h-4 w-4" />} />
     </form>
   )
 }
@@ -126,7 +103,7 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Título <span className="text-red-500">*</span>
         </label>
-        <input name="titulo" type="text" defaultValue={evento.titulo} required className={inputClass} />
+        <Input name="titulo" type="text" defaultValue={evento.titulo} required />
         <FieldError errors={state.errors?.titulo} />
       </div>
 
@@ -135,12 +112,11 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Data e hora <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             name="data"
             type="datetime-local"
             defaultValue={toDatetimeLocal(new Date(evento.data))}
             required
-            className={inputClass}
           />
           <FieldError errors={state.errors?.data} />
         </div>
@@ -149,7 +125,7 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Local
           </label>
-          <input name="local" type="text" defaultValue={evento.local ?? ''} className={inputClass} />
+          <Input name="local" type="text" defaultValue={evento.local ?? ''} />
           <FieldError errors={state.errors?.local} />
         </div>
       </div>
@@ -158,16 +134,16 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Descrição
         </label>
-        <textarea
+        <Textarea
           name="descricao"
           rows={3}
           defaultValue={evento.descricao ?? ''}
-          className={`${inputClass} resize-none`}
+          className="resize-none"
         />
         <FieldError errors={state.errors?.descricao} />
       </div>
 
-      <SubmitButton label="Salvar alterações" />
+      <SubmitButton label="Salvar alterações" icon={<CalendarPlus className="h-4 w-4" />} />
     </form>
   )
 }

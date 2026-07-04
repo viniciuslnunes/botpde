@@ -30,6 +30,9 @@ export const PERMISSIONS = /** @type {const} */ ({
 
   // Relatórios
   REPORTS_VIEW: 'reports:view',
+
+  // Comunidade (mural de posts)
+  COMMUNITY_MANAGE: 'community:manage',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -68,6 +71,11 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.EVENTS_CREATE, label: 'Criar eventos' },
       { key: PERMISSIONS.EVENTS_MANAGE, label: 'Gerenciar eventos' },
     ],
+  },
+  {
+    label: 'Comunidade',
+    base: null,
+    items: [{ key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' }],
   },
   {
     label: 'Outros',

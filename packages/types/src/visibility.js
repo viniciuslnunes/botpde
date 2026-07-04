@@ -1,0 +1,59 @@
+/**
+ * Classificação de sensibilidade por recurso — ver ARCHITECTURE.md seção 3.2.
+ * "publico": visível para ancestrais E descendentes na árvore de Sede.
+ * "restrito": visível apenas para o próprio tenant e seus ANCESTRAIS
+ * (sede vê tudo da subsede/PDE; subsede/PDE não vê o restrito da sede
+ * nem de outros nós — só o público).
+ */
+export const SENSIBILIDADE = /** @type {const} */ ({
+  PUBLICO: 'publico',
+  RESTRITO: 'restrito',
+})
+
+/** Sensibilidade padrão por recurso do domínio. */
+export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
+  membros: SENSIBILIDADE.RESTRITO,
+  socios: SENSIBILIDADE.RESTRITO,
+  pedidos: SENSIBILIDADE.RESTRITO,
+  financeiro: SENSIBILIDADE.RESTRITO,
+  loja: SENSIBILIDADE.PUBLICO,
+  sedes: SENSIBILIDADE.PUBLICO,
+  eventos: SENSIBILIDADE.PUBLICO,
+  comunidade: SENSIBILIDADE.PUBLICO,
+})
+
+/**
+ * Relação entre dois tenants na árvore de Sede — computada por quem tem
+ * acesso ao banco (ver getTenantRelation em apps/web/src/lib/hierarquia.ts),
+ * consumida aqui de forma pura.
+ * @typedef {'self' | 'ancestor' | 'descendant' | 'unrelated'} TenantRelation
+ */
+
+/**
+ * Decide se um tenant "ator" pode ver um recurso de um tenant "alvo",
+ * dada a relação entre eles na hierarquia e a sensibilidade do recurso.
+ *
+ * Regra: você sempre vê o seu próprio; um ancestral vê tudo dos
+ * descendentes (público + restrito); um descendente só vê o público dos
+ * ancestrais; tenants sem relação de linhagem (irmãos, não relacionados)
+ * não veem nada um do outro nesta versão.
+ *
+ * @param {import('./visibility.js').TenantRelation} relation
+ * @param {string} sensibilidade - um valor de SENSIBILIDADE
+ * @returns {boolean}
+ */
+export function resolveVisibility(relation, sensibilidade) {
+  if (relation === 'self' || relation === 'ancestor') return true
+  if (relation === 'descendant') return sensibilidade === SENSIBILIDADE.PUBLICO
+  return false
+}
+
+/**
+ * Atalho: visibilidade por nome de recurso (usa RECURSO_SENSIBILIDADE).
+ * @param {import('./visibility.js').TenantRelation} relation
+ * @param {keyof typeof RECURSO_SENSIBILIDADE} recurso
+ * @returns {boolean}
+ */
+export function canViewRecurso(relation, recurso) {
+  return resolveVisibility(relation, RECURSO_SENSIBILIDADE[recurso])
+}

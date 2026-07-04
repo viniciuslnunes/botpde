@@ -1,7 +1,6 @@
 'use client'
 
 import { useActionState, useTransition } from 'react'
-import { useFormStatus } from 'react-dom'
 import {
   criarSede,
   editarSede,
@@ -9,30 +8,7 @@ import {
   type SedeState,
 } from '@/app/admin/sedes/actions'
 import { Loader2, MapPin, Power, PowerOff } from 'lucide-react'
-
-const inputClass =
-  'w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-transparent focus:ring-2 focus:ring-[rgb(var(--color-primary))] transition-all'
-
-const selectClass = `${inputClass} cursor-pointer`
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors?.length) return null
-  return <p className="mt-1 text-xs text-red-500">{errors[0]}</p>
-}
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-    >
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {pending ? 'Salvando...' : label}
-    </button>
-  )
-}
+import { FieldError, Input, Select, Textarea, SubmitButton } from '@torcida/ui'
 
 type SedeOption = { id: string; nome: string; tipo: string }
 
@@ -76,11 +52,11 @@ function SedeFormFields({
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Tipo <span className="text-red-500">*</span>
           </label>
-          <select name="tipo" defaultValue={defaults?.tipo ?? 'PONTO_ENCONTRO'} className={selectClass}>
+          <Select name="tipo" defaultValue={defaults?.tipo ?? 'PONTO_ENCONTRO'}>
             <option value="SEDE">Sede</option>
             <option value="SUBSEDE">Subsede</option>
             <option value="PONTO_ENCONTRO">Ponto de Encontro</option>
-          </select>
+          </Select>
           <FieldError errors={state.errors?.tipo} />
         </div>
 
@@ -88,13 +64,12 @@ function SedeFormFields({
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Nome <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             name="nome"
             type="text"
             defaultValue={defaults?.nome ?? ''}
             placeholder="Ex: PDE — Pinheiros"
             required
-            className={inputClass}
           />
           <FieldError errors={state.errors?.nome} />
         </div>
@@ -106,14 +81,14 @@ function SedeFormFields({
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Pertence à sede
           </label>
-          <select name="sedeId" defaultValue={defaults?.sedeId ?? ''} className={selectClass}>
+          <Select name="sedeId" defaultValue={defaults?.sedeId ?? ''}>
             <option value="">— Independente (sede principal) —</option>
             {sedes.map((s) => (
               <option key={s.id} value={s.id}>
                 [{s.tipo === 'SEDE' ? 'Sede' : s.tipo === 'SUBSEDE' ? 'Subsede' : 'PE'}] {s.nome}
               </option>
             ))}
-          </select>
+          </Select>
           <FieldError errors={state.errors?.sedeId} />
         </div>
       )}
@@ -129,12 +104,11 @@ function SedeFormFields({
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Endereço
           </label>
-          <input
+          <Input
             name="endereco"
             type="text"
             defaultValue={defaults?.endereco ?? ''}
             placeholder="Rua, número, complemento"
-            className={inputClass}
           />
         </div>
 
@@ -143,19 +117,19 @@ function SedeFormFields({
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               CEP
             </label>
-            <input name="cep" type="text" defaultValue={defaults?.cep ?? ''} placeholder="00000-000" className={inputClass} />
+            <Input name="cep" type="text" defaultValue={defaults?.cep ?? ''} placeholder="00000-000" />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Cidade
             </label>
-            <input name="cidade" type="text" defaultValue={defaults?.cidade ?? ''} placeholder="São Paulo" className={inputClass} />
+            <Input name="cidade" type="text" defaultValue={defaults?.cidade ?? ''} placeholder="São Paulo" />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Estado
             </label>
-            <input name="estado" type="text" defaultValue={defaults?.estado ?? ''} placeholder="SP" maxLength={2} className={inputClass} />
+            <Input name="estado" type="text" defaultValue={defaults?.estado ?? ''} placeholder="SP" maxLength={2} />
           </div>
         </div>
       </div>
@@ -171,24 +145,22 @@ function SedeFormFields({
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Responsável
             </label>
-            <input
+            <Input
               name="responsavel"
               type="text"
               defaultValue={defaults?.responsavel ?? ''}
               placeholder="Nome do responsável"
-              className={inputClass}
             />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Telefone
             </label>
-            <input
+            <Input
               name="telefone"
               type="tel"
               defaultValue={defaults?.telefone ?? ''}
               placeholder="(11) 99999-9999"
-              className={inputClass}
             />
           </div>
         </div>
@@ -198,25 +170,23 @@ function SedeFormFields({
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Capacidade (pessoas)
             </label>
-            <input
+            <Input
               name="capacidade"
               type="number"
               min={1}
               defaultValue={defaults?.capacidade?.toString() ?? ''}
               placeholder="Ex: 500"
-              className={inputClass}
             />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Horários de funcionamento
             </label>
-            <input
+            <Input
               name="horarios"
               type="text"
               defaultValue={defaults?.horarios ?? ''}
               placeholder="Ex: Seg–Sex 10h–18h"
-              className={inputClass}
             />
           </div>
         </div>
@@ -225,12 +195,12 @@ function SedeFormFields({
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Descrição / Observações
           </label>
-          <textarea
+          <Textarea
             name="descricao"
             rows={3}
             defaultValue={defaults?.descricao ?? ''}
             placeholder="Informações adicionais, regras, como chegar..."
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
         </div>
       </div>

@@ -4,13 +4,9 @@ import { useActionState, useTransition } from 'react'
 import { criarProduto, editarProduto, alterarStatusProduto, atualizarStatusPedido } from '@/app/admin/loja/actions'
 import type { ProdutoState } from '@/app/admin/loja/actions'
 import { useState, useCallback } from 'react'
+import { FieldError } from '@torcida/ui'
 
 const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG']
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors?.length) return null
-  return <p className="mt-1 text-xs text-red-500">{errors[0]}</p>
-}
 
 type Estoque = Record<string, number>
 

@@ -1,37 +1,9 @@
 'use client'
 
 import { useActionState } from 'react'
-import { useFormStatus } from 'react-dom'
 import { solicitarCadastro, type CadastroState } from '@/app/portal/cadastro/actions'
-import { UserCircle2, Phone, MapPin, Tv2, ChevronRight, Loader2 } from 'lucide-react'
-
-function SubmitButton() {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-    >
-      {pending ? (
-        <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Enviando...
-        </>
-      ) : (
-        <>
-          Enviar solicitação
-          <ChevronRight className="h-4 w-4" />
-        </>
-      )}
-    </button>
-  )
-}
-
-function FieldError({ errors }: { errors?: string[] }) {
-  if (!errors?.length) return null
-  return <p className="mt-1 text-xs text-red-500">{errors[0]}</p>
-}
+import { UserCircle2, Phone, MapPin, Tv2, ChevronRight } from 'lucide-react'
+import { FieldError, Input, SubmitButton } from '@torcida/ui'
 
 type Props = {
   nomeInicial?: string
@@ -41,9 +13,6 @@ type Props = {
 
 export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCadastrado }: Props) {
   const [state, action] = useActionState<CadastroState, FormData>(solicitarCadastro, {})
-
-  const inputClass =
-    'w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2.5 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] outline-none focus:border-transparent focus:ring-2 focus:ring-[rgb(var(--color-primary))] transition-all'
 
   return (
     <form action={action} className="space-y-6">
@@ -104,14 +73,14 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
           <label htmlFor="nome" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Nome completo <span className="text-red-500">*</span>
           </label>
-          <input
+          <Input
             id="nome"
             name="nome"
             type="text"
             defaultValue={nomeInicial}
             placeholder="Seu nome completo"
             required
-            className={inputClass}
+           
           />
           <FieldError errors={state.errors?.nome} />
         </div>
@@ -122,14 +91,14 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
             <label htmlFor="idade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Idade
             </label>
-            <input
+            <Input
               id="idade"
               name="idade"
               type="number"
               min={10}
               max={120}
               placeholder="Ex: 25"
-              className={inputClass}
+             
             />
             <FieldError errors={state.errors?.idade} />
           </div>
@@ -142,12 +111,12 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
                 Telefone / WhatsApp
               </span>
             </label>
-            <input
+            <Input
               id="telefone"
               name="telefone"
               type="tel"
               placeholder="(11) 99999-9999"
-              className={inputClass}
+             
             />
             <FieldError errors={state.errors?.telefone} />
           </div>
@@ -161,12 +130,12 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
               Cidade / Estado
             </span>
           </label>
-          <input
+          <Input
             id="cidade"
             name="cidade"
             type="text"
             placeholder="Ex: São Paulo, SP"
-            className={inputClass}
+           
           />
           <FieldError errors={state.errors?.cidade} />
         </div>
@@ -181,12 +150,12 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
         <label htmlFor="discordTag" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Usuário no Discord
         </label>
-        <input
+        <Input
           id="discordTag"
           name="discordTag"
           type="text"
           placeholder="Ex: seuusuario"
-          className={inputClass}
+         
         />
         <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
           Informe seu usuário para vincular sua conta ao servidor da torcida.
@@ -202,7 +171,13 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
       )}
 
       <div className="pt-2" style={{ '--color-primary': corPrimaria } as React.CSSProperties}>
-        <SubmitButton />
+        <SubmitButton
+          label="Enviar solicitação"
+          pendingLabel="Enviando..."
+          icon={<ChevronRight className="h-4 w-4" />}
+          iconPosition="trailing"
+          fullWidth
+        />
       </div>
     </form>
   )

@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { wouldCreateSedeCycle } from '@/lib/hierarquia'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -101,7 +102,7 @@ export async function criarSede(
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: 'SEDE_CRIADA',
       entidade: 'Sede',
       entidadeId: sede.id,
@@ -132,6 +133,12 @@ export async function editarSede(
 
   const { nome, tipo, sedeId: sedePaiId, ...rest } = parsed.data
 
+  if (sedePaiId && (await wouldCreateSedeCycle(sedeId, sedePaiId))) {
+    return {
+      errors: { sedeId: ['Esta sede não pode ser filha de si mesma ou de uma de suas próprias subsedes.'] },
+    }
+  }
+
   await db.sede.update({
     where: { id: sedeId },
     data: { nome, tipo, sedeId: sedePaiId ?? null, ...rest },
@@ -140,7 +147,7 @@ export async function editarSede(
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: 'SEDE_EDITADA',
       entidade: 'Sede',
       entidadeId: sedeId,
@@ -163,7 +170,7 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: ativa ? 'SEDE_ATIVADA' : 'SEDE_DESATIVADA',
       entidade: 'Sede',
       entidadeId: sedeId,

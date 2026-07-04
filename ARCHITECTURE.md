@@ -143,9 +143,20 @@ flowchart LR
     Subsede -.->|só dados públicos| Sede
 ```
 
-Implementação sugerida: uma função central `resolveVisibility(actorTenantId, targetTenantId, field)`
-que percorre a árvore de `Sede` vinculada a cada tenant — em vez de
-espalhar essa lógica em cada query.
+**✅ Implementado (2026-07-03).** Dividido em duas camadas:
+- Regra pura em `packages/types/src/visibility.js` — `RECURSO_SENSIBILIDADE`
+  (mapa recurso → `publico`/`restrito`) e `resolveVisibility(relation, sensibilidade)`
+  / `canViewRecurso(relation, recurso)`, testado isoladamente (self/ancestor
+  sempre veem tudo; descendant só vê público; unrelated não vê nada).
+- Resolução de hierarquia (precisa de banco) em `apps/web/src/lib/hierarquia.ts`
+  — `getTenantRelation(actorTenantId, targetTenantId)` sobe/desce a árvore de
+  `Sede` a partir do `tenantId` de cada nó; `resolveVisibility()` (wrapper
+  assíncrono) combina os dois; `getTenantHierarquia(tenantId)` monta a sede-mãe
+  + lista de descendentes prontos pra exibir.
+- Primeira superfície real: `/admin/hierarquia` — mostra a sede-mãe (só dados
+  públicos) e as subsedes/PDEs (com métricas restritas — membros ativos,
+  sócios — porque olhar descendente é a única direção em que a regra permite
+  ver dado restrito). Gate por `SEDES_MANAGE` via `assertPermission`.
 
 ### 3.2b Controle de acesso — Departamentos, Perfis e Permissões
 
@@ -261,9 +272,12 @@ terceiros que o MVP não precisa.
 
 | # | Item | Ação | Bloqueia o quê |
 |---|------|------|-----------------|
-| 1 | `src/` legado na raiz | Remover (confirmado idêntico a `apps/bot`, produção já usa `apps/bot`) | Nenhum — limpeza segura |
+| 1 | `src/` legado na raiz | ⚠️ Restaurado a pedido (2026-07-02) — havia sido removido (idêntico a `apps/bot/src`, nunca commitado), mas o usuário pediu de volta por precaução. Fica mantido por enquanto; remoção só deve ser refeita com confirmação explícita | Nenhum — decisão do usuário, sem risco técnico dos dois jeitos |
 | 2 | ~~`dbo-bot-pde`~~ | ✅ Confirmado: mesmo banco de `torcida-web`, sem ação necessária | — |
-| 3 | Visibilidade cross-tenant | Implementar `resolveVisibility` usando árvore `Sede` | Feature de hierarquia — **prioridade do MVP**: sede/subsede/PDE trocando dado entre si |
+| 3 | ~~Visibilidade cross-tenant~~ | ✅ Feito (2026-07-03): `resolveVisibility`/`canViewRecurso` (`packages/types`) + `getTenantRelation`/`getTenantHierarquia` (`apps/web/src/lib/hierarquia.ts`) + página `/admin/hierarquia` provando o fluxo real | — |
+| 22 | Aplicar `resolveVisibility` em mais telas | Hoje só `/admin/hierarquia` usa a regra. Próximo: deixar uma subsede ver a loja/comunidade/eventos públicos da sede-mãe diretamente nas telas de loja/comunidade/eventos, não só numa página dedicada | Experiência completa de hierarquia |
+| 23 | ~~Bug crítico: `usuarioId` em vez de `atorId` no AuditLog~~ | ✅ Corrigido (2026-07-03): `admin/eventos/actions.ts`, `admin/sedes/actions.ts` e `portal/cadastro/actions.ts` gravavam `auditLog.create({ data: { usuarioId: ... } })`, mas o campo do schema é `atorId`. Sem `try/catch`, isso quebrava em runtime (Prisma "unknown argument") **depois** do registro principal já ter sido salvo — ou seja, criar/editar evento, criar/editar/ativar sede e enviar cadastro de torcedor todos quebravam com erro 500 mesmo tendo escrito o dado. TypeScript não acusava por causa do mesmo teto de inferência descrito na seção 5.2 (o objeto `data` silenciosamente virava `any`) | — |
+| 24 | ~~Ciclo na árvore de Sede~~ | ✅ Corrigido (2026-07-03): `editarSede` deixava escolher qualquer sede como pai, inclusive uma descendente da própria sede — isso criaria um ciclo que travaria para sempre `getTenantRelation`/`getTenantHierarquia` (recursão infinita). Adicionado `wouldCreateSedeCycle()` em `apps/web/src/lib/hierarquia.ts`, chamado em `editarSede` antes de gravar; `descendantTenantIds` também ganhou um guard de `visitados` como defesa em profundidade | — |
 | 4 | Bot → Prisma | Migrar `apps/bot` de `pg` cru para `@torcida/db` | Unificação de dados, pré-requisito pra API central completa |
 | 5 | Camada de API (tRPC) | Criar `packages/api` (ou rotas tRPC em `apps/web`) focada em uso interno entre hierarquia + mobile | App mobile e troca de dados sede/subsede/PDE |
 | 6 | `apps/mobile` | Scaffold Expo, consumindo a API central | Lançamento mobile |
@@ -277,6 +291,10 @@ terceiros que o MVP não precisa.
 | 14 | ~~Cargos de sistema desalinhados~~ | ✅ Corrigido (2026-07-02): seed de `owner`/`admin`/`member` em `super-admin/setup/actions.ts` usava strings em português (`membros:ler`, `sedes:editar`...) divergentes do vocabulário canônico (`members:view`, `sedes:manage`...) usado pela UI de cargos e por `packages/types`. Agora usa `SYSTEM_ROLES`/`SYSTEM_ROLE_PERMISSIONS` compartilhados | ⚠️ ver nota de migração abaixo |
 | 17 | ~~Gestão de perfis aprimorada~~ | ✅ Feito (2026-07-02), inspirado na tela de Perfis/Permissões de referência: cascata de dependência (`applyPermissionCascade` em `packages/types` — marcar permissão não-base puxa a base do grupo, ex. `members:view`; desmarcar a base derruba as irmãs), aplicada na UI E no servidor (cargos e acessos); diff visual verde/vermelho com contadores por grupo na edição; busca por nome/permissão; confirmação com resumo das mudanças; exclusão bloqueada para cargo em uso (contagem exibida); validação de ≥1 permissão | — |
 | 15 | ~~Reparo de dados em produção~~ | ✅ Rodado (2026-07-02) via `packages/db/scripts/repair-system-role-permissions.js`: 0 correções necessárias — o único tenant existente (`pde-gavioes-fiel`) já tinha as 3 roles de sistema com permissões canônicas (foi criado via `prisma/seed.js`, que nunca teve o bug — só o wizard `super-admin/setup` tinha). Script fica registrado (`pnpm --filter @torcida/db db:repair-system-roles`) como rede de segurança idempotente para o futuro | — |
+| 18 | ~~Sistema de comunidade~~ | ✅ Feito (2026-07-02): `/admin/comunidade` (CRUD de posts, fixar/desafixar, gate por `COMMUNITY_MANAGE`) + `/portal/comunidade` (feed somente-leitura, fixados primeiro). Usa o model `Post` que já existia no schema (nunca tinha UI). Nova permissão `community:manage` exigiu rodar `repair-system-role-permissions.js` de novo — owner/admin em produção ganharam a permissão retroativamente | — |
+| 19 | Sistema de comunidade — sem interação | Hoje é só mural de avisos (admin publica, membro lê). Sem comentários/reações — schema `Post` não tem essas tabelas. Adicionar se virar demanda real | Engajamento social (futuro) |
+| 20 | ~~`packages/ui` — design system real~~ | ✅ Feito (2026-07-02): extraídos `FieldError`, `Input`/`Select`/`Textarea`, `SubmitButton`, `Badge`, `PageHeader`, `Card` — eram copiados byte-a-byte em 6+ arquivos (`evento-forms`, `post-forms`, `sede-forms`, `cadastro-form`, `perfil-form`, parcialmente `produto-forms`). Build real com `tsup` (`dist/` com `.js`/`.mjs`/`.d.ts`), sem alterar como `apps/web` consome o pacote hoje (`exports` continua apontando pro `src`, o build é uso externo/futuro). Motivação: preparar pra sincronizar com claude.ai/design (`/design-sync`) depois — hoje não havia nada buildável pra sincronizar | — |
+| 21 | Migrar admin/loja para os componentes do design system | `produto-forms.tsx` tem estilo de input divergente (sem focus ring, padding menor) — não migrado agora pra não arriscar regressão visual sem visualizar. Unificar quando alguém revisar a tela da loja | Consistência visual completa |
 
 ## 5. Decisões fechadas nesta revisão
 

@@ -18,6 +18,22 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Meu Portal' }
 
+// Tipos explícitos — o schema tem relações suficientes para o TypeScript
+// desistir de inferir o retorno do Prisma silenciosamente (vira implicit any).
+interface EventoProximo {
+  id: string
+  titulo: string
+  data: Date
+  local: string | null
+}
+interface PostRecente {
+  id: string
+  titulo: string | null
+  conteudo: string
+  fixado: boolean
+  criadoEm: Date
+}
+
 export default async function PortalPage({
   searchParams,
 }: {
@@ -31,7 +47,7 @@ export default async function PortalPage({
 
   const userId = session!.user!.id
 
-  const [membro, socio] = await Promise.all([
+  const [membro, socio, proximosEventos, postsRecentes] = await Promise.all([
     tenant
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
@@ -42,6 +58,22 @@ export default async function PortalPage({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
         })
       : null,
+    tenant
+      ? (db.evento.findMany({
+          where: { tenantId: tenant.id, data: { gte: new Date() } },
+          orderBy: { data: 'asc' },
+          take: 3,
+          select: { id: true, titulo: true, data: true, local: true },
+        }) as Promise<EventoProximo[]>)
+      : ([] as EventoProximo[]),
+    tenant
+      ? (db.post.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
+          take: 2,
+          select: { id: true, titulo: true, conteudo: true, fixado: true, criadoEm: true },
+        }) as Promise<PostRecente[]>)
+      : ([] as PostRecente[]),
   ])
 
   const cadastroEnviado = params.cadastro === 'enviado'
@@ -57,34 +89,32 @@ export default async function PortalPage({
       icon: CreditCard,
       label: 'Carteirinha',
       description: socio ? `Sócio Nº ${socio.numeroSocio}` : 'Digital e sempre à mão',
-      color: 'text-violet-600 dark:text-violet-400',
-      bg: 'bg-violet-50 dark:bg-violet-950',
     },
     {
       href: '/portal/eventos',
       icon: Calendar,
       label: 'Eventos',
       description: 'Partidas, caravanas e mais',
-      color: 'text-blue-600 dark:text-blue-400',
-      bg: 'bg-blue-50 dark:bg-blue-950',
     },
     {
       href: '/portal/loja',
       icon: ShoppingBag,
       label: 'Loja',
       description: 'Camisas, produtos oficiais',
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-50 dark:bg-emerald-950',
     },
     {
       href: '/portal/comunidade',
       icon: Users,
       label: 'Comunidade',
       description: 'Feed da torcida',
-      color: 'text-orange-600 dark:text-orange-400',
-      bg: 'bg-orange-50 dark:bg-orange-950',
     },
   ]
+
+  function formatarDataEvento(data: Date) {
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(
+      new Date(data),
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -234,8 +264,10 @@ export default async function PortalPage({
                 href={item.href}
                 className="group flex items-center gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-all hover:shadow-md hover:ring-1 hover:ring-[rgb(var(--border-strong))]"
               >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.bg}`}>
-                  <Icon className={`h-5 w-5 ${item.color}`} />
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))]"
+                >
+                  <Icon className="h-5 w-5" style={{ color: tenant?.corPrimaria ?? '#7c3aed' }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-[rgb(var(--foreground))]">{item.label}</p>
@@ -261,10 +293,31 @@ export default async function PortalPage({
               Ver todos →
             </Link>
           </div>
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <Calendar className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhum evento próximo</p>
-          </div>
+          {proximosEventos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Calendar className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhum evento próximo</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {proximosEventos.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/portal/eventos/${e.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-[rgb(var(--border))] px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-[rgb(var(--foreground))]">{e.titulo}</p>
+                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                      {formatarDataEvento(e.data)}
+                      {e.local ? ` · ${e.local}` : ''}
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Novidades da comunidade */}
@@ -278,10 +331,21 @@ export default async function PortalPage({
               Ver feed →
             </Link>
           </div>
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <Users className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhuma publicação recente</p>
-          </div>
+          {postsRecentes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Users className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhuma publicação recente</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {postsRecentes.map((p) => (
+                <div key={p.id} className="rounded-lg border border-[rgb(var(--border))] px-3 py-2.5 text-sm">
+                  {p.titulo && <p className="font-medium text-[rgb(var(--foreground))]">{p.titulo}</p>}
+                  <p className="line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">{p.conteudo}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
