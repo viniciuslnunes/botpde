@@ -106,7 +106,7 @@ export async function solicitarCadastro(
     await db.auditLog.create({
       data: {
         tenantId: tenant.id,
-        usuarioId: session.user.id,
+        atorId: session.user.id,
         acao: 'RECADASTRO_SOLICITADO',
         entidade: 'SaasMembro',
         entidadeId: existing.id,
@@ -130,7 +130,7 @@ export async function solicitarCadastro(
     await db.auditLog.create({
       data: {
         tenantId: tenant.id,
-        usuarioId: session.user.id,
+        atorId: session.user.id,
         acao: 'CADASTRO_SOLICITADO',
         entidade: 'SaasMembro',
         entidadeId: novo.id,

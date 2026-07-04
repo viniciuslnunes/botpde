@@ -69,7 +69,7 @@ export async function criarEvento(
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: 'EVENTO_CRIADO',
       entidade: 'Evento',
       entidadeId: evento.id,
@@ -119,7 +119,7 @@ export async function editarEvento(
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: 'EVENTO_EDITADO',
       entidade: 'Evento',
       entidadeId: eventoId,
@@ -148,7 +148,7 @@ export async function excluirEvento(eventoId: string) {
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
-      usuarioId: session.user.id,
+      atorId: session.user.id,
       acao: 'EVENTO_EXCLUIDO',
       entidade: 'Evento',
       entidadeId: eventoId,
