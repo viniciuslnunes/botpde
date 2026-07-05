@@ -147,3 +147,154 @@ export async function excluirPost(postId: string) {
   revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
 }
+
+/* ── Comunicados oficiais ──────────────────────────────────────────────────
+ * Distintos de Post: gated por ANNOUNCEMENTS_PUBLISH, não por
+ * COMMUNITY_MANAGE — nem todo post comunitário é comunicado oficial, e só
+ * perfis autorizados a publicar conteúdo institucional passam neste gate. */
+
+const comunicadoSchema = z.object({
+  titulo: z.string().min(1, 'Título é obrigatório').max(150),
+  corpo: z.string().min(1, 'Conteúdo é obrigatório').max(4000),
+  prioridade: z.enum(['NORMAL', 'IMPORTANTE', 'URGENTE']),
+})
+
+export type ComunicadoState = {
+  errors?: Record<string, string[]>
+  message?: string
+}
+
+export async function criarComunicado(
+  _prev: ComunicadoState,
+  formData: FormData,
+): Promise<ComunicadoState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const raw = {
+    titulo: formData.get('titulo') as string,
+    corpo: formData.get('corpo') as string,
+    prioridade: formData.get('prioridade') as string,
+  }
+
+  const parsed = comunicadoSchema.safeParse(raw)
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  const { titulo, corpo, prioridade } = parsed.data
+
+  const comunicado = await db.announcement.create({
+    data: { tenantId: tenant.id, autorId: session.user.id, titulo, corpo, prioridade },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'COMUNICADO_CRIADO',
+      entidade: 'Announcement',
+      entidadeId: comunicado.id,
+    },
+  })
+
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+  return {}
+}
+
+export async function atualizarComunicado(
+  comunicadoId: string,
+  _prev: ComunicadoState,
+  formData: FormData,
+): Promise<ComunicadoState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const comunicado = await db.announcement.findFirst({
+    where: { id: comunicadoId, tenantId: tenant.id },
+  })
+  if (!comunicado) return { message: 'Comunicado não encontrado' }
+
+  const raw = {
+    titulo: formData.get('titulo') as string,
+    corpo: formData.get('corpo') as string,
+    prioridade: formData.get('prioridade') as string,
+  }
+
+  const parsed = comunicadoSchema.safeParse(raw)
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  const { titulo, corpo, prioridade } = parsed.data
+
+  await db.announcement.update({
+    where: { id: comunicadoId },
+    data: { titulo, corpo, prioridade },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'COMUNICADO_ATUALIZADO',
+      entidade: 'Announcement',
+      entidadeId: comunicadoId,
+    },
+  })
+
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+  return {}
+}
+
+export async function alternarFixadoComunicado(comunicadoId: string) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const comunicado = await db.announcement.findFirst({
+    where: { id: comunicadoId, tenantId: tenant.id },
+  })
+  if (!comunicado) throw new Error('Comunicado não encontrado')
+
+  await db.announcement.update({ where: { id: comunicadoId }, data: { fixado: !comunicado.fixado } })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: comunicado.fixado ? 'COMUNICADO_DESAFIXADO' : 'COMUNICADO_FIXADO',
+      entidade: 'Announcement',
+      entidadeId: comunicadoId,
+    },
+  })
+
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+}
+
+export async function excluirComunicado(comunicadoId: string) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const comunicado = await db.announcement.findFirst({
+    where: { id: comunicadoId, tenantId: tenant.id },
+  })
+  if (!comunicado) throw new Error('Comunicado não encontrado')
+
+  await db.announcement.delete({ where: { id: comunicadoId } })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'COMUNICADO_EXCLUIDO',
+      entidade: 'Announcement',
+      entidadeId: comunicadoId,
+    },
+  })
+
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+}

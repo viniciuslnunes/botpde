@@ -31,8 +31,13 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Relatórios
   REPORTS_VIEW: 'reports:view',
 
-  // Comunidade (mural de posts)
+  // Comunidade (mural de posts locais/não-oficiais)
   COMMUNITY_MANAGE: 'community:manage',
+
+  // Comunicados oficiais — separado de COMMUNITY_MANAGE: nem todo post
+  // comunitário é comunicado oficial, e publicar conteúdo institucional
+  // exige um perfil autorizado à parte.
+  ANNOUNCEMENTS_PUBLISH: 'announcements:publish',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -75,7 +80,10 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
   {
     label: 'Comunidade',
     base: null,
-    items: [{ key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' }],
+    items: [
+      { key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' },
+      { key: PERMISSIONS.ANNOUNCEMENTS_PUBLISH, label: 'Publicar comunicados oficiais' },
+    ],
   },
   {
     label: 'Outros',

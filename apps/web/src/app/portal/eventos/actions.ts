@@ -3,12 +3,18 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertMembroAtivo } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
 
 export async function responderRsvp(eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
+
+  // Carteirinha e status de associação influenciam ações restritas — membro
+  // pendente/reprovado ou sócio com carteirinha vencida não confirma
+  // presença em evento oficial.
+  await assertMembroAtivo(tenant.id, session.user.id)
 
   const evento = await db.evento.findUnique({
     where: { id: eventoId },

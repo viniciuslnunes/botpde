@@ -131,6 +131,44 @@ export async function editarEvento(
   redirect('/admin/eventos')
 }
 
+/**
+ * Check-in real — independente do RSVP. Confirmar presença (EventoRsvp.status)
+ * não equivale a check-in real: alguém pode confirmar e faltar, ou aparecer
+ * sem ter confirmado antes e ser check-in manualmente. Faz upsert porque o
+ * usuário pode não ter nenhum EventoRsvp prévio.
+ */
+export async function registrarCheckIn(eventoId: string, userId: string) {
+  const { session, tenant } = await assertAdmin()
+
+  const evento = await db.evento.findUnique({ where: { id: eventoId }, select: { tenantId: true } })
+  if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado.')
+
+  await db.eventoRsvp.upsert({
+    where: { eventoId_userId: { eventoId, userId } },
+    update: { checkedInAt: new Date(), checkedInPorId: session.user.id },
+    create: {
+      eventoId,
+      userId,
+      status: 'CONFIRMADO',
+      checkedInAt: new Date(),
+      checkedInPorId: session.user.id,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_CHECKIN',
+      entidade: 'EventoRsvp',
+      entidadeId: eventoId,
+      detalhes: { userId },
+    },
+  })
+
+  revalidatePath(`/admin/eventos/${eventoId}`)
+}
+
 export async function excluirEvento(eventoId: string) {
   const { session, tenant } = await assertAdmin()
 

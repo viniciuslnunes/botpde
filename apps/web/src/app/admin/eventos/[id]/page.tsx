@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
+import { CheckInButton } from './checkin-button'
 import Link from 'next/link'
 import { ArrowLeft, Users, UserCheck, UserX } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -22,7 +23,7 @@ export default async function EditarEventoPage({
     where: { id },
     include: {
       rsvps: {
-        include: { user: { select: { name: true, image: true, email: true } } },
+        include: { user: { select: { id: true, name: true, image: true, email: true } } },
         orderBy: { status: 'asc' },
       },
     },
@@ -71,14 +72,17 @@ export default async function EditarEventoPage({
                 </p>
                 <div className="space-y-1.5">
                   {confirmados.map((r: Rsvp) => (
-                    <div key={r.id} className="flex items-center gap-2 text-sm text-[rgb(var(--foreground))]">
-                      {r.user.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.user.image} alt="" className="h-6 w-6 rounded-full" />
-                      ) : (
-                        <div className="h-6 w-6 rounded-full bg-[rgb(var(--border))]" />
-                      )}
-                      {r.user.name ?? r.user.email}
+                    <div key={r.id} className="flex items-center justify-between gap-2 text-sm text-[rgb(var(--foreground))]">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {r.user.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={r.user.image} alt="" className="h-6 w-6 shrink-0 rounded-full" />
+                        ) : (
+                          <div className="h-6 w-6 shrink-0 rounded-full bg-[rgb(var(--border))]" />
+                        )}
+                        <span className="truncate">{r.user.name ?? r.user.email}</span>
+                      </div>
+                      <CheckInButton eventoId={evento.id} userId={r.user.id} checkedInAt={r.checkedInAt} />
                     </div>
                   ))}
                 </div>
@@ -93,14 +97,17 @@ export default async function EditarEventoPage({
                 </p>
                 <div className="space-y-1.5">
                   {recusados.map((r: Rsvp) => (
-                    <div key={r.id} className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
-                      {r.user.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.user.image} alt="" className="h-6 w-6 rounded-full opacity-50" />
-                      ) : (
-                        <div className="h-6 w-6 rounded-full bg-[rgb(var(--border))]" />
-                      )}
-                      {r.user.name ?? r.user.email}
+                    <div key={r.id} className="flex items-center justify-between gap-2 text-sm text-[rgb(var(--foreground-muted))]">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {r.user.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={r.user.image} alt="" className="h-6 w-6 shrink-0 rounded-full opacity-50" />
+                        ) : (
+                          <div className="h-6 w-6 shrink-0 rounded-full bg-[rgb(var(--border))]" />
+                        )}
+                        <span className="truncate">{r.user.name ?? r.user.email}</span>
+                      </div>
+                      <CheckInButton eventoId={evento.id} userId={r.user.id} checkedInAt={r.checkedInAt} />
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import Link from 'next/link'
 import { Calendar, MapPin, Clock, Users, CalendarX, ChevronRight } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -20,26 +21,46 @@ function diasParaEvento(data: Date) {
   return `Em ${diff} dias`
 }
 
+interface EventoListItem {
+  id: string
+  titulo: string
+  data: Date
+  local: string | null
+  tenantId: string
+  tenant: { nome: string }
+  _count: { rsvps: number }
+}
+
 export default async function EventosPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   const agora = new Date()
 
+  const escopoVisivel = tenant
+    ? await getEscopoEventosVisiveis(tenant.id, session?.user?.id)
+    : null
+
   const [proximos, passados, meuRsvp] = await Promise.all([
-    tenant
-      ? db.evento.findMany({
-          where: { tenantId: tenant.id, data: { gte: agora } },
-          include: { _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } } },
+    tenant && escopoVisivel
+      ? (db.evento.findMany({
+          where: { ...escopoVisivel, data: { gte: agora } },
+          include: {
+            _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+            tenant: { select: { nome: true } },
+          },
           orderBy: { data: 'asc' },
-        })
-      : [],
-    tenant
-      ? db.evento.findMany({
-          where: { tenantId: tenant.id, data: { lt: agora } },
-          include: { _count: { select: { rsvps: true } } },
+        }) as Promise<EventoListItem[]>)
+      : ([] as EventoListItem[]),
+    tenant && escopoVisivel
+      ? (db.evento.findMany({
+          where: { ...escopoVisivel, data: { lt: agora } },
+          include: {
+            _count: { select: { rsvps: true } },
+            tenant: { select: { nome: true } },
+          },
           orderBy: { data: 'desc' },
           take: 5,
-        })
-      : [],
+        }) as Promise<EventoListItem[]>)
+      : ([] as EventoListItem[]),
     session?.user?.id && tenant
       ? db.eventoRsvp.findMany({
           where: { userId: session.user.id, evento: { tenantId: tenant.id } },
@@ -51,8 +72,6 @@ export default async function EventosPage() {
   const rsvpMap = new Map(
     (meuRsvp as { eventoId: string; status: string }[]).map((r) => [r.eventoId, r.status]),
   )
-
-  type Evento = (typeof proximos)[number]
 
   function badgeRsvp(eventoId: string) {
     const s = rsvpMap.get(eventoId)
@@ -71,9 +90,10 @@ export default async function EventosPage() {
     return null
   }
 
-  function EventoCard({ evento, passado = false }: { evento: Evento; passado?: boolean }) {
+  function EventoCard({ evento, passado = false }: { evento: EventoListItem; passado?: boolean }) {
     const dias = !passado ? diasParaEvento(new Date(evento.data)) : null
     const rsvpBadge = !passado ? badgeRsvp(evento.id) : null
+    const herdado = tenant ? evento.tenantId !== tenant.id : false
 
     return (
       <Link
@@ -99,6 +119,11 @@ export default async function EventosPage() {
                   ].join(' ')}
                 >
                   {dias}
+                </span>
+              )}
+              {herdado && (
+                <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                  {evento.tenant.nome}
                 </span>
               )}
               {rsvpBadge}
@@ -154,7 +179,7 @@ export default async function EventosPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {proximos.map((e: Evento) => (
+            {proximos.map((e) => (
               <EventoCard key={e.id} evento={e} />
             ))}
           </div>
@@ -168,7 +193,7 @@ export default async function EventosPage() {
             Histórico
           </h2>
           <div className="space-y-3">
-            {passados.map((e: Evento) => (
+            {passados.map((e) => (
               <EventoCard key={e.id} evento={e} passado />
             ))}
           </div>

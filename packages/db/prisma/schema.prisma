@@ -122,6 +122,7 @@ model Tenant {
   bloqueados        Bloqueado[]
   posts             Post[]
   advertencias      Advertencia[]
+  announcements     Announcement[]
 
   @@map("saas_tenants")
 }
@@ -154,6 +155,8 @@ model User {
   eventosRsvp          EventoRsvp[]
   posts                Post[]
   auditLogs            AuditLog[]           @relation("AuditAtor")
+  announcements        Announcement[]
+  announcementReads    AnnouncementRead[]
 
   @@map("saas_users")
 }
@@ -294,6 +297,13 @@ model SaasMembro {
   discordId  String? @map("discord_id")
   discordTag String? @map("discord_tag")
 
+  // Vínculo territorial principal — a qual Sede/Subsede/PDE específica do
+  // tenant este associado pertence (um tenant pode ter várias linhas de
+  // Sede, ex: vários pontos de encontro). Nullable para não quebrar
+  // cadastros existentes e tenants com uma única Sede.
+  sedeId String? @map("sede_id")
+  sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
@@ -301,6 +311,7 @@ model SaasMembro {
   user   User   @relation(fields: [userId], references: [id])
 
   @@unique([tenantId, userId])
+  @@index([sedeId])
   @@map("saas_membros")
 }
 
@@ -392,6 +403,7 @@ model Sede {
   sedeReferenciaSlug String? @map("sede_referencia_slug")
 
   eventos Evento[]
+  membros SaasMembro[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -436,6 +448,12 @@ model EventoRsvp {
   eventoId String     @map("evento_id")
   userId   String     @map("user_id")
   status   RsvpStatus @default(CONFIRMADO)
+
+  // Check-in real — independente do status de RSVP. Confirmar presença
+  // (status) não equivale a comparecer de fato (checkedInAt): alguém pode
+  // confirmar e faltar, ou aparecer e ser check-in sem ter confirmado antes.
+  checkedInAt    DateTime? @map("checked_in_at")
+  checkedInPorId String?   @map("checked_in_por_id")
 
   evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id])
@@ -506,6 +524,56 @@ enum StatusPedido {
   CONFIRMADO
   CANCELADO
   ENTREGUE
+}
+
+// ─── COMUNICADOS OFICIAIS ──────────────────────────────────────────────────
+// Distintos de Post (mural/comunidade): nem todo post comunitário é
+// comunicado oficial. Publicação gated por ANNOUNCEMENTS_PUBLISH (não por
+// COMMUNITY_MANAGE, que segue governando só posts locais).
+
+model Announcement {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId  String @map("autor_id")
+  autor    User   @relation(fields: [autorId], references: [id])
+
+  titulo     String
+  corpo      String
+  prioridade PrioridadeComunicado @default(NORMAL)
+  fixado     Boolean              @default(false)
+
+  publicadoEm  DateTime @default(now()) @map("publicado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  leituras AnnouncementRead[]
+
+  @@index([tenantId])
+  @@map("saas_announcements")
+}
+
+enum PrioridadeComunicado {
+  NORMAL
+  IMPORTANTE
+  URGENTE
+}
+
+/// Rastreio de leitura por associado — usado para saber quem já viu um
+/// comunicado oficial (não se aplica a Post/mural local).
+model AnnouncementRead {
+  id             String @id @default(uuid())
+  announcementId String @map("announcement_id")
+  userId         String @map("user_id")
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lidoEm DateTime @default(now()) @map("lido_em")
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("saas_announcement_reads")
 }
 
 // ─── COMUNIDADE ───────────────────────────────────────────────────────────────

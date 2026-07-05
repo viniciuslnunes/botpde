@@ -36,6 +36,10 @@ const schema = z.object({
     .max(50)
     .optional()
     .transform((v) => v || undefined),
+  sedeId: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
 })
 
 export type CadastroState = {
@@ -64,6 +68,7 @@ export async function solicitarCadastro(
     telefone: formData.get('telefone') as string | undefined,
     cidade: formData.get('cidade') as string | undefined,
     discordTag: formData.get('discordTag') as string | undefined,
+    sedeId: formData.get('sedeId') as string | undefined,
   }
 
   const parsed = schema.safeParse(raw)
@@ -72,6 +77,23 @@ export async function solicitarCadastro(
   }
 
   const data = parsed.data
+
+  // Vínculo territorial principal: se a torcida tem só uma unidade, usa ela
+  // direto; se tem várias, exige que o associado tenha escolhido uma válida.
+  const sedesDoTenant: { id: string }[] = await db.sede.findMany({
+    where: { tenantId: tenant.id, ativa: true },
+    select: { id: true },
+  })
+
+  let sedeId: string | undefined
+  if (sedesDoTenant.length === 1) {
+    sedeId = sedesDoTenant[0].id
+  } else if (sedesDoTenant.length > 1) {
+    if (!data.sedeId || !sedesDoTenant.some((s: { id: string }) => s.id === data.sedeId)) {
+      return { errors: { sedeId: ['Selecione sua unidade'] } }
+    }
+    sedeId = data.sedeId
+  }
 
   // Verifica se já existe um cadastro
   const existing = await db.saasMembro.findUnique({
@@ -96,6 +118,7 @@ export async function solicitarCadastro(
         telefone: data.telefone,
         cidade: data.cidade,
         discordTag: data.discordTag,
+        sedeId,
         status: 'PENDENTE',
         aprovadoPorId: null,
         aprovadoPorNome: null,
@@ -123,6 +146,7 @@ export async function solicitarCadastro(
         telefone: data.telefone,
         cidade: data.cidade,
         discordTag: data.discordTag,
+        sedeId,
         status: 'PENDENTE',
       },
     })

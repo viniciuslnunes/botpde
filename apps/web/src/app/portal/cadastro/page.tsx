@@ -14,12 +14,21 @@ export default async function CadastroPage() {
 
   if (!session?.user?.id) redirect('/entrar')
 
-  const membro = tenant
-    ? await db.saasMembro.findUnique({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-        select: { id: true, status: true, nome: true, tipo: true },
-      })
-    : null
+  const [membro, sedes] = await Promise.all([
+    tenant
+      ? db.saasMembro.findUnique({
+          where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+          select: { id: true, status: true, nome: true, tipo: true },
+        })
+      : null,
+    tenant
+      ? db.sede.findMany({
+          where: { tenantId: tenant.id, ativa: true },
+          select: { id: true, nome: true, tipo: true },
+          orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+        })
+      : [],
+  ])
 
   // Cadastro aprovado → redireciona para o portal
   if (membro?.status === 'APROVADO') redirect('/portal')
@@ -123,6 +132,7 @@ export default async function CadastroPage() {
           nomeInicial={nomeInicial}
           corPrimaria={tenant?.corPrimaria ?? '#7c3aed'}
           jaCadastrado={jaCadastrado}
+          sedes={sedes}
         />
       </div>
     </div>

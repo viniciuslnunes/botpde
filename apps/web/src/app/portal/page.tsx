@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getFeedComunidade } from '@/lib/comunidade'
+import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import Link from 'next/link'
 import {
   CreditCard,
@@ -26,12 +28,12 @@ interface EventoProximo {
   data: Date
   local: string | null
 }
-interface PostRecente {
+interface ItemComunidade {
   id: string
   titulo: string | null
-  conteudo: string
+  texto: string
   fixado: boolean
-  criadoEm: Date
+  oficial: boolean
 }
 
 export default async function PortalPage({
@@ -47,7 +49,9 @@ export default async function PortalPage({
 
   const userId = session!.user!.id
 
-  const [membro, socio, proximosEventos, postsRecentes] = await Promise.all([
+  const escopoEventos = tenant ? await getEscopoEventosVisiveis(tenant.id, userId) : null
+
+  const [membro, socio, proximosEventos, feedComunidade] = await Promise.all([
     tenant
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
@@ -58,23 +62,38 @@ export default async function PortalPage({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
         })
       : null,
-    tenant
+    tenant && escopoEventos
       ? (db.evento.findMany({
-          where: { tenantId: tenant.id, data: { gte: new Date() } },
+          where: { ...escopoEventos, data: { gte: new Date() } },
           orderBy: { data: 'asc' },
           take: 3,
           select: { id: true, titulo: true, data: true, local: true },
         }) as Promise<EventoProximo[]>)
       : ([] as EventoProximo[]),
     tenant
-      ? (db.post.findMany({
-          where: { tenantId: tenant.id },
-          orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
-          take: 2,
-          select: { id: true, titulo: true, conteudo: true, fixado: true, criadoEm: true },
-        }) as Promise<PostRecente[]>)
-      : ([] as PostRecente[]),
+      ? getFeedComunidade(tenant.id, { takePosts: 2 })
+      : Promise.resolve({ announcements: [], posts: [] }),
   ])
+
+  // Comunicados institucionais sempre aparecem primeiro no widget — mesma
+  // regra do feed completo: conteúdo institucional sobrescreve a
+  // prioridade do feed local.
+  const itensComunidade: ItemComunidade[] = [
+    ...feedComunidade.announcements.map((a) => ({
+      id: a.id,
+      titulo: a.titulo as string | null,
+      texto: a.corpo,
+      fixado: a.fixado,
+      oficial: true,
+    })),
+    ...feedComunidade.posts.map((p) => ({
+      id: p.id,
+      titulo: p.titulo,
+      texto: p.conteudo,
+      fixado: p.fixado,
+      oficial: false,
+    })),
+  ].slice(0, 2)
 
   const cadastroEnviado = params.cadastro === 'enviado'
 
@@ -331,17 +350,24 @@ export default async function PortalPage({
               Ver feed →
             </Link>
           </div>
-          {postsRecentes.length === 0 ? (
+          {itensComunidade.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <Users className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
               <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhuma publicação recente</p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {postsRecentes.map((p) => (
-                <div key={p.id} className="rounded-lg border border-[rgb(var(--border))] px-3 py-2.5 text-sm">
-                  {p.titulo && <p className="font-medium text-[rgb(var(--foreground))]">{p.titulo}</p>}
-                  <p className="line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">{p.conteudo}</p>
+              {itensComunidade.map((item) => (
+                <div key={item.id} className="rounded-lg border border-[rgb(var(--border))] px-3 py-2.5 text-sm">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {item.oficial && (
+                      <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+                        Oficial
+                      </span>
+                    )}
+                    {item.titulo && <p className="font-medium text-[rgb(var(--foreground))]">{item.titulo}</p>}
+                  </div>
+                  <p className="line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">{item.texto}</p>
                 </div>
               ))}
             </div>

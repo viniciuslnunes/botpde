@@ -2,16 +2,28 @@
 
 import { useActionState } from 'react'
 import { solicitarCadastro, type CadastroState } from '@/app/portal/cadastro/actions'
-import { UserCircle2, Phone, MapPin, Tv2, ChevronRight } from 'lucide-react'
-import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { UserCircle2, Phone, MapPin, Tv2, ChevronRight, Building2 } from 'lucide-react'
+import { FieldError, Input, Select, SubmitButton } from '@torcida/ui'
+
+const TIPO_SEDE_LABEL: Record<string, string> = {
+  SEDE: 'Sede',
+  SUBSEDE: 'Subsede',
+  PONTO_ENCONTRO: 'Ponto de Encontro',
+}
 
 type Props = {
   nomeInicial?: string
   corPrimaria?: string
   jaCadastrado?: boolean
+  sedes?: { id: string; nome: string; tipo: string }[]
 }
 
-export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCadastrado }: Props) {
+export function CadastroForm({
+  nomeInicial = '',
+  corPrimaria = '#7c3aed',
+  jaCadastrado,
+  sedes = [],
+}: Props) {
   const [state, action] = useActionState<CadastroState, FormData>(solicitarCadastro, {})
 
   return (
@@ -139,6 +151,29 @@ export function CadastroForm({ nomeInicial = '', corPrimaria = '#7c3aed', jaCada
           />
           <FieldError errors={state.errors?.cidade} />
         </div>
+
+        {/* Unidade — só aparece quando a torcida tem mais de uma sede/subsede/PDE */}
+        {sedes.length > 1 && (
+          <div>
+            <label htmlFor="sedeId" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              <span className="flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                Sua unidade <span className="text-red-500">*</span>
+              </span>
+            </label>
+            <Select id="sedeId" name="sedeId" required defaultValue="">
+              <option value="" disabled>
+                Selecione sua sede, subsede ou ponto de encontro
+              </option>
+              {sedes.map((sede) => (
+                <option key={sede.id} value={sede.id}>
+                  {TIPO_SEDE_LABEL[sede.tipo] ?? sede.tipo} — {sede.nome}
+                </option>
+              ))}
+            </Select>
+            <FieldError errors={state.errors?.sedeId} />
+          </div>
+        )}
       </div>
 
       {/* Discord */}

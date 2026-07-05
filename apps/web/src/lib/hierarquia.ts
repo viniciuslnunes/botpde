@@ -80,6 +80,24 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
 }
 
 /**
+ * Cadeia completa de tenants ancestrais de um tenant, do mais próximo ao
+ * mais distante (ex: PDE → [Subsede, Sede]). Ao contrário de
+ * `getTenantHierarquia` (que só expõe o ancestral mais próximo, para a tela
+ * `/admin/hierarquia`), esta função devolve a árvore inteira — necessária
+ * para cascatear conteúdo institucional (comunicados/eventos) através de 2+
+ * níveis de hierarquia.
+ */
+export async function getAncestorTenantIds(tenantId: string): Promise<string[]> {
+  const sede: SedeNode | null = await db.sede.findFirst({
+    where: { tenantId },
+    select: { id: true, tenantId: true, sedeId: true },
+  })
+  if (!sede) return []
+
+  return ancestorTenantIds(sede)
+}
+
+/**
  * Determina a relação entre dois tenants na árvore de Sede: o próprio, um
  * ancestral (sede-mãe), um descendente (subsede/PDE), ou sem relação.
  * Retorna "unrelated" também quando algum dos dois tenants não está

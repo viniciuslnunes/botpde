@@ -63,3 +63,31 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 
   return { session, tenant }
 }
+
+/**
+ * Garante que o usuário tem um vínculo de associado ativo no tenant antes de
+ * uma ação restrita (ex: confirmar presença em evento oficial). Carteirinha
+ * e status de associação influenciam acesso: membro pendente/reprovado, ou
+ * sócio com carteirinha vencida, não pode executar a ação.
+ */
+export async function assertMembroAtivo(tenantId: string, userId: string): Promise<void> {
+  const membro = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true, tipo: true },
+  })
+
+  if (!membro) throw new Error('Você precisa ser associado desta torcida para essa ação.')
+  if (membro.status !== 'APROVADO') {
+    throw new Error('Seu cadastro de associado ainda não foi aprovado.')
+  }
+
+  if (membro.tipo === 'SOCIO') {
+    const socio = await db.saasSocio.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { validade: true },
+    })
+    if (socio && socio.validade < new Date()) {
+      throw new Error('Sua carteirinha está vencida. Regularize para continuar.')
+    }
+  }
+}
