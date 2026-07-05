@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -22,13 +23,20 @@ export default async function PortalLojaPage() {
   if (!tenant) redirect('/')
   if (!session?.user?.id) redirect('/entrar')
 
+  // Loja é recurso PUBLICO na hierarquia — produtos da sede-mãe cascadeiam
+  // pras telas de subsedes/PDEs, na mesma direção já aplicada em
+  // comunidade/eventos (institucional/centralizado desce, local não sobe).
+  const ancestrais = await getAncestorTenantIds(tenant.id)
+  const tenantIds = [tenant.id, ...ancestrais]
+
   const [produtos, meusPedidos] = await Promise.all([
     db.saasProduto.findMany({
-      where: { tenantId: tenant.id, ativo: true },
+      where: { tenantId: { in: tenantIds }, ativo: true },
       orderBy: { criadoEm: 'desc' },
+      include: { tenant: { select: { nome: true } } },
     }),
     db.saasPedido.count({
-      where: { tenantId: tenant.id, userId: session.user.id, status: { in: ['PENDENTE', 'CONFIRMADO'] } },
+      where: { tenantId: { in: tenantIds }, userId: session.user.id, status: { in: ['PENDENTE', 'CONFIRMADO'] } },
     }),
   ])
 
@@ -82,6 +90,11 @@ export default async function PortalLojaPage() {
                   </div>
                 )}
                 <div className="p-4 space-y-2">
+                  {p.tenantId !== tenant.id && (
+                    <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                      {p.tenant.nome}
+                    </span>
+                  )}
                   <h3 className="font-semibold text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--primary))] transition-colors line-clamp-1">
                     {p.nome}
                   </h3>

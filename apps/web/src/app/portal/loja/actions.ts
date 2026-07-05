@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { resolveVisibility } from '@/lib/hierarquia'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 
@@ -30,12 +31,27 @@ export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): 
 
   const { produtoId, tamanho, quantidade } = parsed.data
 
+  // Produto pode pertencer a um tenant ancestral (loja da sede-mãe cascadeia
+  // pra subsedes/PDEs) — valida visibilidade antes de tentar comprar.
+  const produtoBase = await db.saasProduto.findFirst({
+    where: { id: produtoId, ativo: true },
+    select: { tenantId: true },
+  })
+  if (!produtoBase) return { error: 'Produto não encontrado ou inativo.' }
+  if (produtoBase.tenantId !== tenant.id) {
+    const visivel = await resolveVisibility(tenant.id, produtoBase.tenantId, 'loja')
+    if (!visivel) return { error: 'Produto não encontrado ou inativo.' }
+  }
+  const produtoTenantId = produtoBase.tenantId
+
   try {
     let pedidoId: string | undefined
 
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      // O pedido é gravado no tenant DONO do produto (não no tenant do
+      // comprador) — é quem tem o estoque e vai gerenciar/entregar o pedido.
       const produto = await tx.saasProduto.findFirst({
-        where: { id: produtoId, tenantId: tenant.id, ativo: true },
+        where: { id: produtoId, tenantId: produtoTenantId, ativo: true },
       })
       if (!produto) throw new Error('Produto não encontrado ou inativo.')
 
@@ -66,7 +82,7 @@ export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): 
 
       const pedido = await tx.saasPedido.create({
         data: {
-          tenantId: tenant.id,
+          tenantId: produtoTenantId,
           userId: session.user!.id,
           produtoId,
           produtoNome: produto.nome,
@@ -81,7 +97,7 @@ export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): 
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PEDIDO_CRIADO', entidade: 'SaasPedido', entidadeId: pedidoId },
+      data: { tenantId: produtoTenantId, atorId: session.user.id, acao: 'PEDIDO_CRIADO', entidade: 'SaasPedido', entidadeId: pedidoId },
     })
 
     revalidatePath('/portal/loja')

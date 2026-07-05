@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -42,8 +43,13 @@ export default async function MeusPedidosPage() {
   if (!tenant) redirect('/')
   if (!session?.user?.id) redirect('/entrar')
 
+  // Pedido é gravado no tenant dono do produto (ver portal/loja/actions.ts)
+  // — se o produto era de um tenant ancestral, o pedido também está lá.
+  // É histórico pessoal do próprio usuário, sempre visível independente da
+  // classificação de sensibilidade do recurso.
+  const ancestrais = await getAncestorTenantIds(tenant.id)
   const pedidos = await db.saasPedido.findMany({
-    where: { tenantId: tenant.id, userId: session.user.id },
+    where: { tenantId: { in: [tenant.id, ...ancestrais] }, userId: session.user.id },
     orderBy: { criadoEm: 'desc' },
     include: { produto: { select: { imagensUrl: true, ativo: true } } },
   })

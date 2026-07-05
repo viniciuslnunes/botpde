@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { resolveVisibility } from '@/lib/hierarquia'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -19,11 +20,18 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
   if (!tenant) redirect('/')
   if (!session?.user?.id) redirect('/entrar')
 
+  // Produto pode pertencer a um tenant ancestral (loja da sede-mãe cascadeia
+  // pra subsedes/PDEs) — busca sem restringir por tenant, valida depois.
   const produto = await db.saasProduto.findFirst({
-    where: { id, tenantId: tenant.id, ativo: true },
+    where: { id, ativo: true },
+    include: { tenant: { select: { nome: true } } },
   })
 
   if (!produto) notFound()
+  if (produto.tenantId !== tenant.id) {
+    const visivel = await resolveVisibility(tenant.id, produto.tenantId, 'loja')
+    if (!visivel) notFound()
+  }
 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
 
@@ -53,6 +61,11 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
         {/* Info + Compra */}
         <div className="space-y-6">
           <div>
+            {produto.tenantId !== tenant.id && (
+              <span className="mb-2 inline-flex rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                {produto.tenant.nome}
+              </span>
+            )}
             <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{produto.nome}</h1>
             {produto.descricao && (
               <p className="mt-2 text-[rgb(var(--foreground-muted))]">{produto.descricao}</p>
