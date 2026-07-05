@@ -10,7 +10,8 @@
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
     "db:repair-system-roles": "node scripts/repair-system-role-permissions.js",
-    "db:seed-test-data": "node scripts/seed-dados-teste.js"
+    "db:seed-test-data": "node scripts/seed-dados-teste.js",
+    "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"

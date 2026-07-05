@@ -1,5 +1,6 @@
 import { signIn } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
+import { EntrarSenhaForm } from './entrar-senha-form'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Entrar' }
@@ -99,6 +100,16 @@ export default async function EntrarPage() {
                   Continuar com Google
                 </button>
               </form>
+
+              {/* Divisor */}
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+                <span className="text-xs text-[rgb(var(--foreground-muted))]">ou</span>
+                <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+              </div>
+
+              {/* E-mail e senha */}
+              <EntrarSenhaForm corPrimaria={cor} />
             </div>
           </div>
 

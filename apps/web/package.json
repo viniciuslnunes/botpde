@@ -13,6 +13,7 @@
     "@torcida/db": "workspace:*",
     "@torcida/types": "workspace:*",
     "@torcida/ui": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "lucide-react": "^1.22.0",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.29",

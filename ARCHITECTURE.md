@@ -296,6 +296,10 @@ terceiros que o MVP não precisa.
 | 19 | Sistema de comunidade — sem interação | Hoje é só mural de avisos (admin publica, membro lê). Sem comentários/reações — schema `Post` não tem essas tabelas. Adicionar se virar demanda real | Engajamento social (futuro) |
 | 20 | ~~`packages/ui` — design system real~~ | ✅ Feito (2026-07-02): extraídos `FieldError`, `Input`/`Select`/`Textarea`, `SubmitButton`, `Badge`, `PageHeader`, `Card` — eram copiados byte-a-byte em 6+ arquivos (`evento-forms`, `post-forms`, `sede-forms`, `cadastro-form`, `perfil-form`, parcialmente `produto-forms`). Build real com `tsup` (`dist/` com `.js`/`.mjs`/`.d.ts`), sem alterar como `apps/web` consome o pacote hoje (`exports` continua apontando pro `src`, o build é uso externo/futuro). Motivação: preparar pra sincronizar com claude.ai/design (`/design-sync`) depois — hoje não havia nada buildável pra sincronizar | — |
 | 21 | Migrar admin/loja para os componentes do design system | `produto-forms.tsx` tem estilo de input divergente (sem focus ring, padding menor) — não migrado agora pra não arriscar regressão visual sem visualizar. Unificar quando alguém revisar a tela da loja | Consistência visual completa |
+| 26 | ~~Roteamento por subdomínio real~~ | ✅ Preparado (2026-07-05): `ROOT_DOMAIN` validada em `apps/web/src/lib/env.ts`, `tenant.ts` já usava a lógica certa (só faltava a env var validada). Testável agora **sem domínio próprio** via `ROOT_DOMAIN=lvh.me` (`*.lvh.me` resolve pra `127.0.0.1`, sem DNS). `auth.ts` ganhou cookie de sessão compartilhado entre subdomínios (`cookies.sessionToken.domain = .${ROOT_DOMAIN}`) — sem isso, logar em `sede.lvh.me` não mantinha sessão em `subsede.lvh.me`. Script `promover-subsede-para-tenant.js` promove uma `Sede` de teste a `Tenant` de verdade, reaproveitando o mesmo usuário owner | Só falta domínio real — ver nota de produção abaixo |
+| 27 | ~~Segundo método de login (e-mail/senha)~~ | ✅ Feito (2026-07-05): `User.senhaHash` (nullable, só contas com senha têm), provider `Credentials` em `auth.ts` (bcrypt.compare, erro genérico — não diferencia e-mail inexistente de senha errada), `/entrar/criar-conta` (cadastro) e formulário de senha em `/entrar`. Callback `jwt` ganhou ramo específico pra `account.provider === 'credentials'` (usa `user.id` direto, os ramos de discordId/googleId não se aplicam). **Decisão deliberada**: conta com senha NÃO mescla com conta OAuth existente do mesmo e-mail (evita takeover) | Reset de senha (item 28) |
+| 28 | "Esqueci minha senha" | Fora de escopo por decisão do usuário — exige provedor de e-mail transacional (nenhum configurado no projeto ainda, ex: Resend). Enquanto não existir, reset é manual (direto no banco) | Fluxo de recuperação completo |
+| 29 | Rate-limit de login | Não implementado — sem Redis/Upstash no projeto. Aceitável no estágio atual (baixo tráfego), registrar como necessário antes de abrir cadastro público | Proteção contra força bruta |
 
 ## 5. Decisões fechadas nesta revisão
 
@@ -367,3 +371,19 @@ o padrão (`RoleLite`, `DepartamentoLite` etc.).
   não bloqueante agora.
 - Próximo passo natural de feature: detalhar `resolveVisibility` (item 3) —
   visibilidade cross-tenant na hierarquia sede/subsede/PDE.
+- **Item 26 — checklist pra quando houver domínio próprio de produção**
+  (usuário ainda não comprou um):
+  1. Definir `ROOT_DOMAIN=seudominio.com` nas env vars do serviço
+     `torcida-web` no Railway.
+  2. Configurar DNS wildcard (`*.seudominio.com` → apontar pro Railway,
+     conforme instrução exibida ao adicionar Custom Domain na aba do
+     serviço).
+  3. Adicionar o domínio wildcard nas configurações de Custom Domain do
+     Railway (o certificado SSL costuma ser provisionado automaticamente,
+     confirmar na hora — pode exigir plano pago dependendo do momento).
+  4. Registrar as novas redirect URIs de produção (`https://<qualquer
+     subdomínio>.seudominio.com/api/auth/callback/discord` e `.../google`)
+     nos consoles de desenvolvedor do Discord e do Google — OAuth exige URI
+     exata, não aceita wildcard; se o login sempre passar pelo domínio raiz
+     antes de redirecionar (cookie compartilhado já cobre isso), só a URI do
+     domínio raiz precisa estar cadastrada.

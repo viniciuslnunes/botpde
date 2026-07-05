@@ -143,6 +143,9 @@ model User {
   criadoEm     DateTime  @default(now()) @map("criado_em")
   discordId    String?   @unique @map("discord_id")
   googleId     String?   @unique @map("google_id")
+  // Hash bcrypt — só usuários que se cadastraram por e-mail/senha têm valor.
+  // Nunca preenchido para contas só-OAuth (Discord/Google).
+  senhaHash    String?   @map("senha_hash")
   consentidoEm DateTime? @map("consentido_em")
 
   userRoles            UserRole[]

@@ -28,6 +28,10 @@ const serverSchema = z.object({
 
   // Multi-tenancy
   TENANT_SLUG: z.string().optional(),
+  // Domínio raiz pra roteamento por subdomínio real (ex: torcida.app, ou
+  // lvh.me em dev — resolve *.lvh.me pra 127.0.0.1 sem precisar de DNS).
+  // Ausente = modo single-tenant via TENANT_SLUG (comportamento atual).
+  ROOT_DOMAIN: z.string().optional(),
 
   // Super admins (e-mails separados por vírgula)
   SUPER_ADMIN_EMAILS: z.string().optional(),
@@ -59,6 +63,7 @@ function validateEnv() {
       GOOGLE_CLIENT_ID: '',
       GOOGLE_CLIENT_SECRET: '',
       TENANT_SLUG: undefined,
+      ROOT_DOMAIN: undefined,
       SUPER_ADMIN_EMAILS: undefined,
       NODE_ENV: 'development' as const,
       PORT: 3000,

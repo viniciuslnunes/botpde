@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
+import { env } from '@/lib/env'
 
 /**
  * Resolve o tenant a partir do hostname da requisição.
@@ -27,12 +28,13 @@ function extractSlugFromHost(host: string): string | null {
 
   // Localhost → usa sempre TENANT_SLUG
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return process.env.TENANT_SLUG ?? null
+    return env.TENANT_SLUG ?? null
   }
 
   // Domínio próprio com subdomínio real: pde.torcida.app → "pde"
-  // Exige ao menos 3 partes E que o domínio-raiz seja o configurado
-  const rootDomain = process.env.ROOT_DOMAIN // ex: torcida.app
+  // (ROOT_DOMAIN também pode ser lvh.me em dev, que resolve *.lvh.me pra
+  // 127.0.0.1 sem precisar de DNS — permite testar subdomínio sem domínio próprio)
+  const rootDomain = env.ROOT_DOMAIN
   const parts = hostname.split('.')
 
   if (rootDomain && hostname.endsWith(`.${rootDomain}`)) {
@@ -42,7 +44,7 @@ function extractSlugFromHost(host: string): string | null {
 
   // Qualquer outro domínio (Railway, Vercel preview, domínio próprio sem subdomínio)
   // → usa TENANT_SLUG como override explícito
-  return process.env.TENANT_SLUG ?? null
+  return env.TENANT_SLUG ?? null
 }
 
 /**

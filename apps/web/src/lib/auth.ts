@@ -1,8 +1,16 @@
 import NextAuth from 'next-auth'
 import Discord from 'next-auth/providers/discord'
 import Google from 'next-auth/providers/google'
+import Credentials from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
 import { db } from '@torcida/db'
-import { env } from '@/lib/env'
+import { env, isProd } from '@/lib/env'
+
+// Domínio do cookie de sessão — só sobrescrito quando ROOT_DOMAIN está
+// configurado (subdomínio real ou lvh.me em dev), pra sessão ser
+// compartilhada entre sede/subsede/PDE. Sem ROOT_DOMAIN, comportamento
+// padrão do NextAuth (cookie escopado ao host atual) não muda.
+const cookieDomain = env.ROOT_DOMAIN ? `.${env.ROOT_DOMAIN}` : undefined
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -25,7 +33,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       },
     }),
+    Credentials({
+      credentials: { email: {}, password: {} },
+      async authorize(credentials) {
+        const email = credentials?.email as string | undefined
+        const password = credentials?.password as string | undefined
+        if (!email || !password) return null
+
+        const user = await db.user.findUnique({ where: { email } })
+        // Erro genérico (usuário inexistente ou sem senha cadastrada) —
+        // não diferenciar do caso de senha errada, evita enumeração de contas.
+        if (!user?.senhaHash) return null
+
+        const senhaValida = await bcrypt.compare(password, user.senhaHash)
+        if (!senhaValida) return null
+
+        return { id: user.id, email: user.email, name: user.nome, image: user.avatarUrl }
+      },
+    }),
   ],
+
+  ...(cookieDomain
+    ? {
+        cookies: {
+          sessionToken: {
+            name: `${isProd ? '__Secure-' : ''}authjs.session-token`,
+            options: {
+              httpOnly: true,
+              sameSite: 'lax',
+              path: '/',
+              secure: isProd,
+              domain: cookieDomain,
+            },
+          },
+        },
+      }
+    : {}),
 
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -53,13 +96,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
 
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       // Somente no login inicial (account presente) buscamos o UUID do banco
       // e sobrescrevemos token.sub para que session.user.id seja sempre o UUID,
       // nunca o ID numérico do OAuth provider (Discord snowflake / Google ID).
       if (account) {
         token.provider = account.provider
         token.providerAccountId = account.providerAccountId
+
+        // Credentials (e-mail/senha): authorize() já devolve o UUID do banco
+        // como user.id — não há discordId/googleId pra buscar, então usa direto.
+        if (account.provider === 'credentials') {
+          if (user?.id) token.sub = user.id
+          return token
+        }
 
         const discordId = account.provider === 'discord' ? account.providerAccountId : undefined
         const googleId  = account.provider === 'google'  ? account.providerAccountId : undefined
