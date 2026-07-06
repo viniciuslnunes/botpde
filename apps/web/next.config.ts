@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
   images: {
@@ -9,4 +10,19 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: 'devinicius',
+  project: 'torcida-web',
+
+  // Upload de sourcemaps só roda se SENTRY_AUTH_TOKEN estiver definido
+  // (não está no CI hoje) — sem o token, essa etapa é pulada silenciosamente.
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+
+  webpack: {
+    // Deploy é Railway, não Vercel — desliga integração automática de cron
+    // monitors específica da Vercel.
+    automaticVercelMonitors: false,
+    treeshake: { removeDebugLogging: true },
+  },
+})

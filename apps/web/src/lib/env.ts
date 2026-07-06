@@ -47,6 +47,9 @@ const serverSchema = z.object({
 
 const clientSchema = z.object({
   NEXT_PUBLIC_API_URL: z.string().url().optional(),
+  // DSN do Sentry — não é segredo (só permite enviar eventos, não lê-los).
+  // Ausente = SDK inicializa em no-op, sem lançar erro.
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 })
 
 // ── Validação ─────────────────────────────────────────────────────────────────
@@ -69,6 +72,7 @@ function validateEnv() {
       PORT: 3000,
       HOSTNAME: '0.0.0.0',
       NEXT_PUBLIC_API_URL: undefined,
+      NEXT_PUBLIC_SENTRY_DSN: undefined,
     }
   }
 
@@ -89,6 +93,7 @@ function validateEnv() {
 
   const clientParsed = clientSchema.safeParse({
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   })
 
   return {

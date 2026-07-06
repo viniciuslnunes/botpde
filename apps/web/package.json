@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@sentry/nextjs": "^10",
     "@torcida/db": "workspace:*",
     "@torcida/types": "workspace:*",
     "@torcida/ui": "workspace:*",
