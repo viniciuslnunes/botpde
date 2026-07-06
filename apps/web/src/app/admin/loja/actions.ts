@@ -1,19 +1,12 @@
 'use server'
 
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 
 const TAMANHOS_VALIDOS = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'UN'] as const
-
-async function assertAdmin() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
-  return { userId: session.user.id, tenant }
-}
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +60,7 @@ function parseEstoque(estoqueJson: string | undefined, tamanhos: string[]): Reco
 
 export async function criarProduto(_prev: ProdutoState, formData: FormData): Promise<ProdutoState> {
   try {
-    const { userId, tenant } = await assertAdmin()
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
     const raw = Object.fromEntries(formData)
     const parsed = ProdutoSchema.safeParse(raw)
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
@@ -82,7 +75,7 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: userId, acao: 'PRODUTO_CRIADO', entidade: 'SaasProduto' },
+      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PRODUTO_CRIADO', entidade: 'SaasProduto' },
     })
 
     revalidatePath('/admin/loja')
@@ -94,7 +87,7 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
 
 export async function editarProduto(id: string, _prev: ProdutoState, formData: FormData): Promise<ProdutoState> {
   try {
-    const { userId, tenant } = await assertAdmin()
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
     const raw = Object.fromEntries(formData)
     const parsed = ProdutoSchema.safeParse(raw)
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
@@ -110,7 +103,7 @@ export async function editarProduto(id: string, _prev: ProdutoState, formData: F
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: userId, acao: 'PRODUTO_EDITADO', entidade: 'SaasProduto', entidadeId: id },
+      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PRODUTO_EDITADO', entidade: 'SaasProduto', entidadeId: id },
     })
 
     revalidatePath('/admin/loja')
@@ -122,10 +115,10 @@ export async function editarProduto(id: string, _prev: ProdutoState, formData: F
 }
 
 export async function alterarStatusProduto(id: string, ativo: boolean) {
-  const { userId, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
   await db.saasProduto.update({ where: { id, tenantId: tenant.id }, data: { ativo } })
   await db.auditLog.create({
-    data: { tenantId: tenant.id, atorId: userId, acao: ativo ? 'PRODUTO_ATIVADO' : 'PRODUTO_DESATIVADO', entidade: 'SaasProduto', entidadeId: id },
+    data: { tenantId: tenant.id, atorId: session.user.id, acao: ativo ? 'PRODUTO_ATIVADO' : 'PRODUTO_DESATIVADO', entidade: 'SaasProduto', entidadeId: id },
   })
   revalidatePath('/admin/loja')
 }
@@ -134,7 +127,7 @@ export async function alterarStatusProduto(id: string, ativo: boolean) {
 
 export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState, formData: FormData): Promise<PedidoStatusState> {
   try {
-    const { userId, tenant } = await assertAdmin()
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
     const status = formData.get('status') as string
     const validos = ['PENDENTE', 'CONFIRMADO', 'CANCELADO', 'ENTREGUE']
     if (!validos.includes(status)) return { error: 'Status inválido' }
@@ -146,7 +139,7 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: userId, acao: 'PEDIDO_STATUS_ATUALIZADO', entidade: 'SaasPedido', entidadeId: id, detalhes: { status } },
+      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PEDIDO_STATUS_ATUALIZADO', entidade: 'SaasPedido', entidadeId: id, detalhes: { status } },
     })
 
     revalidatePath('/admin/loja/pedidos')

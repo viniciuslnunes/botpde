@@ -1,28 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 
-async function assertAdmin() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
-
-  const role = await db.userRole.findFirst({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      role: { isSystem: true, nome: { in: ['owner', 'admin'] } },
-    },
-  })
-  if (!role) throw new Error('Sem permissão')
-
-  return { session, tenant }
-}
+// Carteirinha/sócio reaproveita MEMBERS_APPROVE — não existe permissão
+// dedicada para "gerenciar sócios" ainda; emitir/renovar/revogar carteirinha
+// é parte do mesmo fluxo de aprovação de associado.
 
 export async function emitirCarteirinha(formData: FormData) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   const userId = String(formData.get('userId') ?? '').trim()
   const nome = String(formData.get('nome') ?? '').trim()
@@ -74,7 +62,7 @@ export async function emitirCarteirinha(formData: FormData) {
 }
 
 export async function renovarCarteirinha(socioId: string, novaValidade: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   const validade = new Date(novaValidade)
   if (isNaN(validade.getTime())) throw new Error('Data de validade inválida')
@@ -99,7 +87,7 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
 }
 
 export async function revogarCarteirinha(socioId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   const socio = await db.saasSocio.findFirst({
     where: { id: socioId, tenantId: tenant.id },

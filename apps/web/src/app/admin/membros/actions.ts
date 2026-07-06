@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
-import { assertAdmin } from '@/lib/authz'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 
 /** Nome do departamento padrão por tipo de membro — criado sob demanda no tenant. */
 const DEPARTAMENTO_PADRAO_POR_TIPO: Record<'SOCIO' | 'TORCEDOR', string> = {
@@ -46,7 +47,7 @@ async function concederAcessoBasico(tenantId: string, userId: string, tipoMembro
 }
 
 export async function aprovarMembro(membroId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   const membro = await db.saasMembro.update({
     where: { id: membroId, tenantId: tenant.id },
@@ -75,7 +76,7 @@ export async function aprovarMembro(membroId: string) {
 }
 
 export async function reprovarMembro(membroId: string, motivo?: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
 
   await db.saasMembro.update({
     where: { id: membroId, tenantId: tenant.id },
@@ -103,7 +104,10 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
 }
 
 export async function reverterMembro(membroId: string) {
-  const { session, tenant } = await assertAdmin()
+  // Reverte aprovação/reprovação para pendente — reaproveita MEMBERS_APPROVE
+  // (não existe permissão dedicada para "reverter"; é a mesma decisão de
+  // aprovação sendo desfeita).
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   await db.saasMembro.update({
     where: { id: membroId, tenantId: tenant.id },

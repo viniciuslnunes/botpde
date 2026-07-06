@@ -1,28 +1,12 @@
 'use server'
 
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { wouldCreateSedeCycle } from '@/lib/hierarquia'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-
-async function assertAdmin() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
-
-  const role = await db.userRole.findFirst({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      role: { isSystem: true, nome: { in: ['owner', 'admin'] } },
-    },
-  })
-  if (!role) throw new Error('Sem permissão')
-  return { session, tenant }
-}
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 
 const sedeSchema = z.object({
   nome: z.string().min(3, 'Nome muito curto').max(100),
@@ -72,7 +56,7 @@ export async function criarSede(
   _prev: SedeState,
   formData: FormData,
 ): Promise<SedeState> {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
 
   const parsed = sedeSchema.safeParse(parseSedeForm(formData))
   if (!parsed.success) {
@@ -119,7 +103,7 @@ export async function editarSede(
   _prev: SedeState,
   formData: FormData,
 ): Promise<SedeState> {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
 
   const parsed = sedeSchema.safeParse(parseSedeForm(formData))
   if (!parsed.success) {
@@ -160,7 +144,7 @@ export async function editarSede(
 }
 
 export async function alterarStatusSede(sedeId: string, ativa: boolean) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
 
   const existing = await db.sede.findUnique({ where: { id: sedeId }, select: { tenantId: true } })
   if (!existing || existing.tenantId !== tenant.id) throw new Error('Sede não encontrada')

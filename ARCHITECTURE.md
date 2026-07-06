@@ -1,7 +1,7 @@
 # Arquitetura — Torcida SaaS
 
 > Documento vivo. Atualizar sempre que uma decisão estrutural mudar.
-> Última revisão: 2026-07-02
+> Última revisão: 2026-07-06
 
 ## 1. Visão geral do produto
 
@@ -328,11 +328,10 @@ terceiros que o MVP não precisa.
   e só grava overrides em `UserPermission` quando o efetivo desejado diverge
   do que o(s) perfil(is) já dariam — implementa exatamente a semântica de
   `calculateEffectivePermissions` (perfil ∪ overrides) de trás pra frente.
-- Gate de acesso por **permissão granular** (`ROLES_MANAGE`) via novo helper
+- Gate de acesso por **permissão granular** (`ROLES_MANAGE`) via helper
   `assertPermission()` em `apps/web/src/lib/authz.ts` — não por nome de
-  cargo, ao contrário do `assertAdmin`/`assertOwner` usados no resto do
-  admin (essa inconsistência entre helpers é conhecida e documentada, não
-  foi resolvida globalmente nesta revisão — ver item 16).
+  cargo. **Atualização (2026-07-06, item 16): esse critério agora é o único
+  em todo o admin** — ver seção 5.3.
 - Também extraído: `assertAdmin`/`assertOwner` estavam duplicados em 2
   arquivos (`membros/actions.ts`, `configuracoes/actions.ts`) — agora vivem
   só em `apps/web/src/lib/authz.ts`. `PERMISSION_GROUPS` (labels de UI por
@@ -359,16 +358,43 @@ assinalabilidade (mais raso) em vez de re-inferir o tipo completo (mais
 profundo). Ver `apps/web/src/app/admin/acessos/actions.ts` e `page.tsx` para
 o padrão (`RoleLite`, `DepartamentoLite` etc.).
 
+### 5.3 Item 16 resolvido — assertPermission é o único critério de autorização do admin
+
+`assertAdmin`/`assertOwner` (nome de cargo de sistema `owner`/`admin`) foram
+removidos de `apps/web/src/lib/authz.ts` — não têm mais nenhum caller.
+Substituídos por `assertPermission(PERMISSION)` em todo `apps/web/src/app/admin/**`:
+
+- `sedes/actions.ts` → `SEDES_MANAGE`
+- `loja/actions.ts` → `STORE_MANAGE` (produtos e status de pedido)
+- `eventos/actions.ts` → `EVENTS_CREATE` (criar) / `EVENTS_MANAGE` (editar,
+  check-in, excluir)
+- `membros/actions.ts` → `MEMBERS_APPROVE` (aprovar/reverter) /
+  `MEMBERS_REJECT` (reprovar)
+- `socios/actions.ts` → `MEMBERS_APPROVE` (emitir/renovar/revogar
+  carteirinha — não existe permissão dedicada a "sócio"; reaproveita a mais
+  próxima do fluxo de aprovação de associado, decisão a revisitar se virar
+  demanda)
+- `configuracoes/actions.ts` → `SETTINGS_MANAGE` (perfil do tenant, Discord
+  guild — únicas ações que eram `assertOwner`, e `SETTINGS_MANAGE` já é
+  exclusiva do owner via `SYSTEM_ROLE_PERMISSIONS`) / `ROLES_MANAGE` (cargos
+  e departamentos, mesmo critério já usado em `/admin/acessos`)
+
+Sem regressão para `owner`/`admin` (ambos já têm todas as permissões
+granulares via `SYSTEM_ROLE_PERMISSIONS`); um perfil customizado com a
+permissão certa passa a acessar a ação equivalente sem precisar do cargo de
+sistema. `AuthzResult` (tipo de retorno de `assertPermission`) parou de
+derivar de `assertAdmin` (removido) e passou a usar o tipo `Session` de
+`next-auth` diretamente — `ReturnType<typeof auth>` não funciona aqui porque
+o `auth` do NextAuth v5 é uma função com múltiplos overloads (middleware e
+sessão) e a utility type resolve para a assinatura errada.
+
+Testes: `pnpm --filter @torcida/web test` (suíte da VIN-6) continuam verdes,
+já que não tocam em `packages/types`. Nenhum teste cobre `assertPermission`
+em si (depende de sessão/banco) — cobertura por typecheck + smoke manual.
+
 ## 6. Itens em aberto (aguardando decisão)
 
-- **Item 16**: `assertAdmin`/`assertOwner` (nome de cargo) e `assertPermission`
-  (permissão granular) coexistem em `apps/web/src/lib/authz.ts` com critérios
-  diferentes. Um perfil customizado com a permissão certa passa em
-  `assertPermission` mas não em `assertAdmin` — hoje só `/admin/acessos` usa
-  o critério granular; o resto do admin (membros, sedes, eventos, loja,
-  configurações) ainda exige cargo de sistema `owner`/`admin` literal. Migrar
-  o resto do admin pra `assertPermission` é trabalho de uma rodada futura,
-  não bloqueante agora.
+- ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
 - Próximo passo natural de feature: detalhar `resolveVisibility` (item 3) —
   visibilidade cross-tenant na hierarquia sede/subsede/PDE.
 - **Item 26 — checklist pra quando houver domínio próprio de produção**

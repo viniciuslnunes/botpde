@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
-import { assertAdmin, assertOwner } from '@/lib/authz'
-import { ALL_PERMISSIONS, applyPermissionCascade } from '@torcida/types'
+import { assertPermission } from '@/lib/authz'
+import { ALL_PERMISSIONS, applyPermissionCascade, PERMISSIONS } from '@torcida/types'
 
 /**
  * Sanitiza a lista de permissões vinda do formulário de cargo:
@@ -21,7 +21,7 @@ function sanitizeRolePermissions(permissionsRaw: string[]): string[] {
 // ── Perfil do tenant ──────────────────────────────────────────────────────────
 
 export async function salvarPerfilTenant(formData: FormData) {
-  const { session, tenant } = await assertOwner()
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
   const nome = String(formData.get('nome') ?? '').trim()
   const corPrimaria = String(formData.get('corPrimaria') ?? '').trim()
@@ -48,7 +48,7 @@ export async function salvarPerfilTenant(formData: FormData) {
 }
 
 export async function salvarDiscordGuildId(formData: FormData) {
-  const { session, tenant } = await assertOwner()
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
   const discordGuildId = String(formData.get('discordGuildId') ?? '').trim() || null
 
@@ -72,7 +72,7 @@ export async function salvarDiscordGuildId(formData: FormData) {
 // ── Cargos ────────────────────────────────────────────────────────────────────
 
 export async function criarRole(formData: FormData) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
@@ -110,7 +110,7 @@ export async function criarRole(formData: FormData) {
 }
 
 export async function atualizarRole(roleId: string, formData: FormData) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const role = await db.role.findFirst({
     where: { id: roleId, tenantId: tenant.id },
@@ -156,7 +156,7 @@ export async function atualizarRole(roleId: string, formData: FormData) {
 }
 
 export async function excluirRole(roleId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const role = await db.role.findFirst({
     where: { id: roleId, tenantId: tenant.id },
@@ -191,7 +191,7 @@ export async function excluirRole(roleId: string) {
 // de cargo/perfil — ver ARCHITECTURE.md seção 3.2b.
 
 export async function criarDepartamento(formData: FormData) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
@@ -221,7 +221,7 @@ export async function criarDepartamento(formData: FormData) {
 }
 
 export async function atualizarDepartamento(departamentoId: string, formData: FormData) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const departamento = await db.departamento.findFirst({
     where: { id: departamentoId, tenantId: tenant.id },
@@ -254,7 +254,7 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
 }
 
 export async function excluirDepartamento(departamentoId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const departamento = await db.departamento.findFirst({
     where: { id: departamentoId, tenantId: tenant.id },

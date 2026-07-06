@@ -1,27 +1,11 @@
 'use server'
 
-import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-
-async function assertAdmin() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
-
-  const role = await db.userRole.findFirst({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      role: { isSystem: true, nome: { in: ['owner', 'admin'] } },
-    },
-  })
-  if (!role) throw new Error('Sem permissão')
-  return { session, tenant }
-}
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 
 const eventoSchema = z.object({
   titulo: z.string().min(3, 'Título muito curto').max(100),
@@ -39,7 +23,7 @@ export async function criarEvento(
   _prev: EventoState,
   formData: FormData,
 ): Promise<EventoState> {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_CREATE)
 
   const raw = {
     titulo: formData.get('titulo') as string,
@@ -86,7 +70,7 @@ export async function editarEvento(
   _prev: EventoState,
   formData: FormData,
 ): Promise<EventoState> {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
   const raw = {
     titulo: formData.get('titulo') as string,
@@ -138,7 +122,7 @@ export async function editarEvento(
  * usuário pode não ter nenhum EventoRsvp prévio.
  */
 export async function registrarCheckIn(eventoId: string, userId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
   const evento = await db.evento.findUnique({ where: { id: eventoId }, select: { tenantId: true } })
   if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado.')
@@ -170,7 +154,7 @@ export async function registrarCheckIn(eventoId: string, userId: string) {
 }
 
 export async function excluirEvento(eventoId: string) {
-  const { session, tenant } = await assertAdmin()
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
   const existing = await db.evento.findUnique({
     where: { id: eventoId },
