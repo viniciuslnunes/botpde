@@ -23,6 +23,9 @@ importers:
       '@napi-rs/canvas':
         specifier: ^0.1.57
         version: 0.1.100
+      '@torcida/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       discord.js:
         specifier: ^14.15.3
         version: 14.26.4
