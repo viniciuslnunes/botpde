@@ -1,4 +1,5 @@
 const db   = require('./db');
+const { getBotConfig, setBotConfig } = require('./botConfig');
 const config = require('../config');
 
 const CANAL_TOP = config.canais.topRecrutadores;
@@ -10,15 +11,11 @@ function canalConfigurado() {
 }
 
 async function getTopMessageId() {
-  const res = await db.query('SELECT value FROM bot_config WHERE key = $1', [CONFIG_KEY]);
-  return res.rows.length > 0 ? res.rows[0].value : null;
+  return getBotConfig(CONFIG_KEY);
 }
 
 async function setTopMessageId(id) {
-  await db.query(
-    'INSERT INTO bot_config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-    [CONFIG_KEY, id],
-  );
+  await setBotConfig(CONFIG_KEY, id);
 }
 
 async function construirEmbed() {
