@@ -22,16 +22,6 @@ module.exports = {
     const guild  = interaction.guild;
     let enviados = 0;
 
-    // Canal de carteirinha
-    const canalCarteirinha = guild.channels.cache.get(config.canais.carteirinha);
-    if (canalCarteirinha && !await jaTemBotao(canalCarteirinha, client)) {
-      await canalCarteirinha.send({
-        embeds: [new EmbedBuilder().setColor(0x000000).setTitle('🪪 CARTEIRINHA DE SÓCIO').setDescription('Clique no botão abaixo para emitir ou consultar sua carteirinha.')],
-        components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('solicitar_carteirinha').setLabel('🪪 SOLICITAR CARTEIRINHA').setStyle(ButtonStyle.Secondary))],
-      });
-      enviados++;
-    }
-
     // Canal de ticket
     const canalTicket = guild.channels.cache.get(config.canais.ticket);
     if (canalTicket && !await jaTemBotao(canalTicket, client)) {

@@ -2,9 +2,9 @@ const { getDb } = require('./prisma')
 
 /**
  * Helper único de leitura/escrita da tabela bot_config (key/value), via
- * Prisma. Substitui o padrão idêntico que estava duplicado em 5 arquivos
- * (elenco, hierarquiaEmbed, muralAssociados, quadroRecrutadores,
- * topRecrutadores) — ver ARCHITECTURE.md, Fase 1 de unificação de dados.
+ * Prisma. Substitui o padrão idêntico que estava duplicado em vários
+ * arquivos (elenco, hierarquiaEmbed, quadroRecrutadores, topRecrutadores)
+ * — ver ARCHITECTURE.md, Fase 1 de unificação de dados.
  */
 
 async function getBotConfig(key) {

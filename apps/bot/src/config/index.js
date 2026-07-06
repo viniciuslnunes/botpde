@@ -11,7 +11,6 @@ module.exports = {
     validarSetagem:     '1505410676993294448',         // Canal privado de análise (recrutadores)
     provarAssociacao:   '1505422008605872279',         // Canal provar associação (sócio)
     provarManto:        '1505433421197873254',          // Canal provar manto (torcedor)
-    carteirinha:        'ID_CANAL_CARTEIRINHA',       // Botão de solicitar carteirinha
     ticket:             '1493461731358277672',         // Botão de abrir ticket — 📩・atendimento
     logsTicket:         '1505430637941624895',         // Logs e transcritos de tickets — 🛠️・logs-tickets
     logsLoja:           '1505492309595263027',          // Logs e transcritos da loja — 🛠️・logs-loja
@@ -24,7 +23,6 @@ module.exports = {
     historicoAdvRec:    'ID_CANAL_HISTORICO_ADV_REC', // Histórico de advertências de recrutadores
     naoRecrutar:        'ID_CANAL_NAO_RECRUTAR',      // Canal ❌・nao-recrutar (uso de /bloquearid)
     historicoNaoRec:    'ID_CANAL_HISTORICO_NAO_REC', // Canal de histórico de IDs bloqueados
-    mural:              'ID_CANAL_MURAL',             // Mural de associados
     hierarquia:         'ID_CANAL_HIERARQUIA',        // Embed de hierarquia
     elenco:             'ID_CANAL_ELENCO',            // Embed de elenco
     quadroRecrutadores: 'ID_CANAL_QUADRO_RECRUTADORES', // Quadro de recrutadores
@@ -71,12 +69,4 @@ module.exports = {
   // ── Categorias ────────────────────────────────────────────
   categoriaTickets: '1493453432898457671',  // Categoria ATENDIMENTO
   categoriaLoja:    '1493453830615076944',  // Categoria 🛒・LOJA
-
-  // ── Textos da carteirinha ─────────────────────────────────
-  carteirinha: {
-    titulo:        'SEU SERVIDOR',
-    subtitulo:     'NOME DA TORCIDA / GRUPO',
-    presidente:    'NOME DO PRESIDENTE',
-    fundacao:      'DD/MM/AAAA',
-  },
 };
