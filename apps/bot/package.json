@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.57",
-    "@torcida/db": "workspace:*",
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
     "pg": "^8.12.0"
