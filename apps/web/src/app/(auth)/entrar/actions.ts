@@ -3,7 +3,7 @@
 import { db } from '@torcida/db'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
-import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
+import { excedeuLimite } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -16,23 +16,23 @@ export async function entrarComSenha(
   const email = formData.get('email') as string
   const senha = formData.get('senha') as string
 
+  // Checagem rápida (evita round-trip completo do signIn) — o registro da
+  // tentativa falha (registrarTentativaFalha) e a aplicação real do limite
+  // acontecem em authorize() (lib/auth.ts), o único ponto por onde toda
+  // tentativa de login passa de fato.
   if (email && excedeuLimite(email)) {
     return { message: 'Muitas tentativas com este e-mail. Tente novamente em alguns minutos.' }
   }
 
   try {
     // Em caso de sucesso, signIn() lança um redirect (NEXT_REDIRECT) que sai
-    // desta função pelo `throw error` abaixo — não há linha "depois do
-    // sucesso" pra limpar o contador aqui. O contador expira sozinho na
-    // janela de tempo (ver rate-limit.ts), então algumas tentativas erradas
-    // seguidas de acerto só custam ao usuário legítimo um pouco de margem
-    // pelos minutos seguintes — sem impacto de segurança real.
+    // desta função pelo `throw error` abaixo.
     await signIn('credentials', { email, password: senha, redirectTo: '/portal' })
   } catch (error) {
-    // AuthError = falha de autenticação real (e-mail/senha inválidos).
+    // AuthError = falha de autenticação real (e-mail/senha inválidos, ou
+    // rate-limit excedido — authorize() retorna null nos dois casos).
     // Qualquer outro erro (inclusive o redirect de sucesso) deve propagar.
     if (error instanceof AuthError) {
-      if (email) registrarTentativaFalha(email)
       return { message: 'E-mail ou senha inválidos.' }
     }
     throw error

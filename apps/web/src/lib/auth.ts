@@ -5,6 +5,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from '@torcida/db'
 import { env, isProd } from '@/lib/env'
+import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
 
 // Domínio do cookie de sessão — só sobrescrito quando ROOT_DOMAIN está
 // configurado (subdomínio real ou lvh.me em dev), pra sessão ser
@@ -40,13 +41,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = credentials?.password as string | undefined
         if (!email || !password) return null
 
+        // Aplicado aqui (não só na Server Action de /entrar) porque este é o
+        // único ponto por onde toda tentativa de login realmente passa —
+        // uma chamada direta a /api/auth/callback/credentials, pulando a UI,
+        // teria burlado o limite se ele só existisse na Server Action.
+        if (excedeuLimite(email)) return null
+
         const user = await db.user.findUnique({ where: { email } })
         // Erro genérico (usuário inexistente ou sem senha cadastrada) —
         // não diferenciar do caso de senha errada, evita enumeração de contas.
-        if (!user?.senhaHash) return null
+        if (!user?.senhaHash) {
+          registrarTentativaFalha(email)
+          return null
+        }
 
         const senhaValida = await bcrypt.compare(password, user.senhaHash)
-        if (!senhaValida) return null
+        if (!senhaValida) {
+          registrarTentativaFalha(email)
+          return null
+        }
 
         return { id: user.id, email: user.email, name: user.nome, image: user.avatarUrl }
       },
