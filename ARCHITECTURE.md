@@ -32,14 +32,10 @@ botpde/ (monorepo pnpm + turborepo)
 ├── apps/
 │   ├── bot/          Discord bot — JS puro, discord.js, pg direto (sem Prisma)
 │   └── web/           Next.js 16 + React 19 — portal, admin, super-admin
-├── packages/
-│   ├── db/            Prisma schema único, compartilhado por quem o importar
-│   ├── types/          Schemas Zod + permissões compartilhadas
-│   └── ui/             Componentes React + services (form, dialog, toast...)
-└── src/                ⚠️ LEGADO — código do bot pré-monorepo, idêntico
-                         a apps/bot/src (confirmado via git diff). Não é usado
-                         em produção (Railway aponta pra apps/bot). Candidato
-                         a remoção.
+└── packages/
+    ├── db/            Prisma schema único, compartilhado por quem o importar
+    ├── types/          Schemas Zod + permissões compartilhadas
+    └── ui/             Componentes React + services (form, dialog, toast...)
 ```
 
 ### 2.2 Dados
@@ -272,7 +268,7 @@ terceiros que o MVP não precisa.
 
 | # | Item | Ação | Bloqueia o quê |
 |---|------|------|-----------------|
-| 1 | `src/` legado na raiz | ⚠️ Restaurado a pedido (2026-07-02) — havia sido removido (idêntico a `apps/bot/src`, nunca commitado), mas o usuário pediu de volta por precaução. Fica mantido por enquanto; remoção só deve ser refeita com confirmação explícita | Nenhum — decisão do usuário, sem risco técnico dos dois jeitos |
+| 1 | ~~`src/` legado na raiz~~ | ✅ Removido em definitivo (2026-07-06, VIN-9), decisão conjunta após análise: confirmado idêntico a `apps/bot/src` (diff vazio), zero configs de build/deploy referenciando o `src/` da raiz (Railway do `bot-pde` roda com Root Directory `apps/bot`), nenhum dos dois tocado desde a migração pro monorepo. Remover não apaga histórico do Git (`git log --all -- src/` continua funcionando). Achado colateral corrigido junto: `apps/bot/src/assets/` estava no `.gitignore`, deixando `pdelogo.png` (usado em runtime por `apps/bot/src/events/ready.js`) sem nenhuma cópia versionada — corrigido antes da remoção (git detectou como rename, preservando o blob) | — |
 | 2 | ~~`dbo-bot-pde`~~ | ✅ Confirmado: mesmo banco de `torcida-web`, sem ação necessária | — |
 | 3 | ~~Visibilidade cross-tenant~~ | ✅ Feito (2026-07-03): `resolveVisibility`/`canViewRecurso` (`packages/types`) + `getTenantRelation`/`getTenantHierarquia` (`apps/web/src/lib/hierarquia.ts`) + página `/admin/hierarquia` provando o fluxo real | — |
 | 22 | ~~Aplicar `resolveVisibility` em mais telas~~ | ✅ Feito (2026-07-05) para comunidade e eventos: `getAncestorTenantIds()` (novo, em `hierarquia.ts`) + `getFeedComunidade()`/`getEscopoEventosVisiveis()` (novos, `apps/web/src/lib/comunidade.ts` e `eventos.ts`) fazem `/portal/comunidade`, `/portal/eventos` e os widgets da Home herdarem conteúdo público de tenants ancestrais. Loja segue pendente | Loja ainda falta |
