@@ -1,4 +1,4 @@
-const db = require('./db');
+const { getDb } = require('./prisma');
 
 // Ordem canônica dos tamanhos (sem PP)
 const ORDEM_TAMANHOS = ['P', 'M', 'G', 'GG', 'EXG'];
@@ -42,44 +42,80 @@ function tamanhoDisponiveis(estoque) {
   return todos;
 }
 
+// ── Tradução Prisma (camelCase) → formato snake_case que os call-sites
+// existentes esperam (produto.imagem_url, pedido.discord_id etc). Mantém o
+// contrato externo idêntico ao do pg cru — call-sites em commands/produto.js,
+// events/interactionCreate.js e events/messageCreate.js não precisam mudar.
+
+function produtoParaLinha(p) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    nome: p.nome,
+    tamanhos: p.tamanhos,
+    preco: Number(p.preco),
+    imagem_url: p.imagemUrl,
+    ativo: p.ativo,
+    criado_em: p.criadoEm,
+    estoque: p.estoque,
+  };
+}
+
+function pedidoParaLinha(ped) {
+  if (!ped) return null;
+  return {
+    id: ped.id,
+    discord_id: ped.discordId,
+    discord_tag: ped.discordTag,
+    produto_id: ped.produtoId,
+    produto_nome: ped.produtoNome,
+    tamanho: ped.tamanho,
+    quantidade: ped.quantidade,
+    preco_unit: ped.precoUnit != null ? Number(ped.precoUnit) : null,
+    total: ped.total != null ? Number(ped.total) : null,
+    status: ped.status,
+    canal_ticket_id: ped.canalTicketId,
+    criado_em: ped.criadoEm,
+  };
+}
+
 // ── Produtos ─────────────────────────────────────────────────────────────────
 
 async function listarProdutos(apenasAtivos = true) {
-  const q = apenasAtivos
-    ? `SELECT * FROM produtos WHERE ativo = TRUE ORDER BY nome`
-    : `SELECT * FROM produtos ORDER BY ativo DESC, nome`;
-  const res = await db.query(q);
-  return res.rows;
+  const db = await getDb();
+  const rows = await db.botProduto.findMany({
+    where: apenasAtivos ? { ativo: true } : undefined,
+    orderBy: apenasAtivos ? { nome: 'asc' } : [{ ativo: 'desc' }, { nome: 'asc' }],
+  });
+  return rows.map(produtoParaLinha);
 }
 
 async function buscarProduto(id) {
-  const res = await db.query('SELECT * FROM produtos WHERE id = $1', [id]);
-  return res.rows[0] || null;
+  const db = await getDb();
+  const p = await db.botProduto.findUnique({ where: { id: Number(id) } });
+  return produtoParaLinha(p);
 }
 
 async function adicionarProduto(nome, tamanhos, preco, imagem_url = null, estoque = {}) {
-  const res = await db.query(
-    `INSERT INTO produtos (nome, tamanhos, preco, imagem_url, estoque) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [nome, tamanhos, parseFloat(preco), imagem_url || null, JSON.stringify(estoque)],
-  );
-  return res.rows[0];
+  const db = await getDb();
+  const p = await db.botProduto.create({
+    data: { nome, tamanhos, preco: parseFloat(preco), imagemUrl: imagem_url || null, estoque },
+  });
+  return produtoParaLinha(p);
 }
 
+// campos vem em snake_case (mesmo formato que os call-sites já usam) — só
+// imagem_url precisa de tradução de nome pro campo do Prisma; o resto
+// (nome, tamanhos, preco, ativo, estoque) tem o mesmo nome nos dois lados.
 async function atualizarProduto(id, campos) {
-  const sets  = [];
-  const vals  = [];
-  let   idx   = 1;
+  const db = await getDb();
+  const data = {};
   for (const [k, v] of Object.entries(campos)) {
-    sets.push(`${k} = $${idx++}`);
-    // estoque precisa ser serializado
-    vals.push(k === 'estoque' ? JSON.stringify(v) : v);
+    if (k === 'imagem_url') data.imagemUrl = v;
+    else data[k] = v;
   }
-  vals.push(id);
-  const res = await db.query(
-    `UPDATE produtos SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
-    vals,
-  );
-  return res.rows[0];
+  const p = await db.botProduto.update({ where: { id: Number(id) }, data });
+  return produtoParaLinha(p);
 }
 
 // Decrementa qtd unidades do tamanho no estoque; retorna produto atualizado ou null se sem estoque
@@ -94,23 +130,34 @@ async function decrementarEstoque(id, tamanho, qtd = 1) {
 }
 
 async function removerProduto(id) {
-  await db.query(`UPDATE produtos SET ativo = FALSE WHERE id = $1`, [id]);
+  const db = await getDb();
+  await db.botProduto.update({ where: { id: Number(id) }, data: { ativo: false } });
 }
 
 // ── Pedidos ───────────────────────────────────────────────────────────────────
 
 async function registrarPedido({ discord_id, discord_tag, produto_id, produto_nome, tamanho, quantidade, preco_unit, canal_ticket_id }) {
+  const db = await getDb();
   const total = parseFloat(preco_unit) * parseInt(quantidade);
-  const res = await db.query(
-    `INSERT INTO pedidos (discord_id, discord_tag, produto_id, produto_nome, tamanho, quantidade, preco_unit, total, canal_ticket_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [discord_id, discord_tag, produto_id, produto_nome, tamanho, quantidade, preco_unit, total, canal_ticket_id],
-  );
-  return res.rows[0];
+  const ped = await db.botPedido.create({
+    data: {
+      discordId: discord_id,
+      discordTag: discord_tag,
+      produtoId: produto_id,
+      produtoNome: produto_nome,
+      tamanho,
+      quantidade,
+      precoUnit: preco_unit,
+      total,
+      canalTicketId: canal_ticket_id,
+    },
+  });
+  return pedidoParaLinha(ped);
 }
 
 async function atualizarStatusPedido(id, status) {
-  await db.query(`UPDATE pedidos SET status = $1 WHERE id = $2`, [status, id]);
+  const db = await getDb();
+  await db.botPedido.update({ where: { id: Number(id) }, data: { status } });
 }
 
 module.exports = { listarProdutos, buscarProduto, adicionarProduto, atualizarProduto, removerProduto, registrarPedido, atualizarStatusPedido, decrementarEstoque, formatarEstoque, tamanhoDisponiveis };

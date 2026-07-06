@@ -1,25 +1,27 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const db     = require('../utils/db');
+const { getDb } = require('../utils/prisma');
 const config = require('../config');
 
 async function gerarEmbedVendas() {
-  const res = await db.query(`
-    SELECT
-      produto_nome,
-      tamanho,
-      SUM(quantidade)  AS total_qtd,
-      SUM(total)       AS total_valor
-    FROM pedidos
-    WHERE status = 'confirmado'
-    GROUP BY produto_nome, tamanho
-    ORDER BY produto_nome, tamanho
-  `);
+  const db = await getDb();
 
-  const totalGeral = await db.query(`SELECT COALESCE(SUM(total),0) AS montante, COUNT(*) AS qtd_vendas FROM pedidos WHERE status = 'confirmado'`);
-  const { montante, qtd_vendas } = totalGeral.rows[0];
+  const grupos = await db.botPedido.groupBy({
+    by: ['produtoNome', 'tamanho'],
+    where: { status: 'confirmado' },
+    _sum: { quantidade: true, total: true },
+    orderBy: [{ produtoNome: 'asc' }, { tamanho: 'asc' }],
+  });
 
-  const linhas = res.rows.map(r =>
-    `**${r.produto_nome.toUpperCase()}** — ${r.tamanho === 'UN' ? 'ÚNICO' : r.tamanho.toUpperCase()}: ${r.total_qtd} un. — R$ ${Number(r.total_valor).toFixed(2)}`,
+  const totalGeral = await db.botPedido.aggregate({
+    where: { status: 'confirmado' },
+    _sum: { total: true },
+    _count: true,
+  });
+  const montante   = totalGeral._sum.total ?? 0;
+  const qtd_vendas = totalGeral._count;
+
+  const linhas = grupos.map(r =>
+    `**${r.produtoNome.toUpperCase()}** — ${r.tamanho === 'UN' ? 'ÚNICO' : r.tamanho.toUpperCase()}: ${r._sum.quantidade} un. — R$ ${Number(r._sum.total).toFixed(2)}`,
   );
 
   return {
