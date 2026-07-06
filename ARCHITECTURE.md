@@ -84,7 +84,11 @@ botpde/ (monorepo pnpm + turborepo)
 
 - Railway, 4 serviços/projetos:
   - `torcida-web` — Next.js standalone (Nixpacks).
-  - `bot-pde` — bot atual (`apps/bot`), Root Directory configurado corretamente.
+  - `bot-pde` (nome do serviço no Railway: `botpde`) — bot atual (`apps/bot`),
+    Root Directory = `apps/bot`, build via `npm install` isolado (não vê o
+    resto do monorepo). Funciona bem para o `pg` cru que o bot usa hoje —
+    mas **não suporta dependências `workspace:*`** (ver item 4: tentativa de
+    usar `@torcida/db` quebrou o deploy, revertida em 2026-07-06).
   - `dbo-bot-pde` — Postgres addon. **Confirmado (2026-07-01) que é o
     mesmo banco usado por `torcida-web`**: `dbo-bot-pde` expõe o host
     interno (`postgres.railway.internal`), `torcida-web` usa o proxy
@@ -208,6 +212,20 @@ referência, incluindo fluxo de concessão/revogação em lote).
   para as equivalentes `saas_*`, com script de migração de dados —
   até então seguem lidas em paralelo (como hoje).
 
+**⚠️ Bloqueada por infraestrutura de deploy (2026-07-06)**: implementação
+tentada (VIN-11/13/14) e **revertida** — o serviço `botpde` no Railway
+builda com Root Directory=`apps/bot` e `npm install` isolado, sem acesso ao
+resto do monorepo. `@torcida/db` (`workspace:*`) não resolve nesse contexto
+(`npm error Unsupported URL Type "workspace:"`), quebrando 3 deploys
+seguidos antes de ser identificado. Retomar só depois de decidir entre:
+(a) mudar o Root Directory do `botpde` pra raiz do repo + `pnpm` (igual
+`torcida-web` já faz — a correção "de verdade", mas exige mudança no
+painel do Railway, possivelmente com "Config-as-code" apontando pro
+`apps/bot/nixpacks.toml`/`railway.toml` específico, não testado ainda); ou
+(b) vendorizar uma cópia do schema Prisma só pro bot (evita mexer no
+Railway, mas reintroduz duplicação de schema — mesma classe de problema
+que a remoção do `src/` legado, item 1, resolveu).
+
 ### 3.4 Camada de API para mobile
 
 **Prioridade nº 1 é interna, não externa**: a API central existe primeiro
@@ -275,7 +293,7 @@ terceiros que o MVP não precisa.
 | 25 | ~~PRD "torcida organizada" — 8 regras de negócio~~ | ✅ Feito (2026-07-05), sem reescrever a arquitetura (decisão de escopo do usuário): (1) `SaasMembro.sedeId` — vínculo territorial explícito, escolhido no cadastro quando o tenant tem mais de uma `Sede`; (2)+(3)+(4) `Announcement`/`AnnouncementRead` (novo, distinto de `Post`) — comunicado oficial com prioridade/pin, gated por nova permissão `announcements:publish` (separada de `community:manage`), sempre ordenado acima do mural local em `getFeedComunidade()`; (5) moderação segue restrita ao próprio tenant (mesmo padrão de `tenantId` nas queries; itens herdados de ancestrais renderizam sem controles de edição); (6) eventos globais vs. restritos a uma unidade via `Evento.sedeId` + `SaasMembro.sedeId`; (7) `EventoRsvp.checkedInAt/checkedInPorId` — check-in real independente do status de RSVP, com botão dedicado em `/admin/eventos/[id]`; (8) `assertMembroAtivo()` (novo, `authz.ts`) bloqueia RSVP de membro pendente/reprovado ou sócio com carteirinha vencida. ⚠️ Nova permissão exige rodar `repair-system-role-permissions.js` depois do `db push` (mesmo padrão do item 18) | — |
 | 23 | ~~Bug crítico: `usuarioId` em vez de `atorId` no AuditLog~~ | ✅ Corrigido (2026-07-03): `admin/eventos/actions.ts`, `admin/sedes/actions.ts` e `portal/cadastro/actions.ts` gravavam `auditLog.create({ data: { usuarioId: ... } })`, mas o campo do schema é `atorId`. Sem `try/catch`, isso quebrava em runtime (Prisma "unknown argument") **depois** do registro principal já ter sido salvo — ou seja, criar/editar evento, criar/editar/ativar sede e enviar cadastro de torcedor todos quebravam com erro 500 mesmo tendo escrito o dado. TypeScript não acusava por causa do mesmo teto de inferência descrito na seção 5.2 (o objeto `data` silenciosamente virava `any`) | — |
 | 24 | ~~Ciclo na árvore de Sede~~ | ✅ Corrigido (2026-07-03): `editarSede` deixava escolher qualquer sede como pai, inclusive uma descendente da própria sede — isso criaria um ciclo que travaria para sempre `getTenantRelation`/`getTenantHierarquia` (recursão infinita). Adicionado `wouldCreateSedeCycle()` em `apps/web/src/lib/hierarquia.ts`, chamado em `editarSede` antes de gravar; `descendantTenantIds` também ganhou um guard de `visitados` como defesa em profundidade | — |
-| 4 | Bot → Prisma | Migrar `apps/bot` de `pg` cru para `@torcida/db` | Unificação de dados, pré-requisito pra API central completa |
+| 4 | Bot → Prisma | ⚠️ Tentado e **revertido** (2026-07-06): `@torcida/db` (`workspace:*`) quebra o build do serviço `botpde` no Railway (Root Directory=`apps/bot`, `npm install` isolado não resolve o protocolo `workspace:`). Revertido pra `pg` cru (ver seção 3.3). Bloqueado até decidir entre mudar Root Directory pra raiz + `pnpm`, ou vendorizar o schema | Unificação de dados, pré-requisito pra API central completa |
 | 5 | Camada de API (tRPC) | Criar `packages/api` (ou rotas tRPC em `apps/web`) focada em uso interno entre hierarquia + mobile | App mobile e troca de dados sede/subsede/PDE |
 | 6 | `apps/mobile` | Scaffold Expo, consumindo a API central | Lançamento mobile |
 | 7 | API REST pública | **Fora de escopo do MVP** — só entra no roadmap quando houver demanda real de integração com terceiros | Integrações externas (futuro) |
