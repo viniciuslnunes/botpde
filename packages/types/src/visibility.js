@@ -57,3 +57,21 @@ export function resolveVisibility(relation, sensibilidade) {
 export function canViewRecurso(relation, recurso) {
   return resolveVisibility(relation, RECURSO_SENSIBILIDADE[recurso])
 }
+
+/**
+ * Converte a posição do ALVO na linhagem do ator para a TenantRelation no
+ * contrato de resolveVisibility — que descreve o papel do ATOR em relação ao
+ * alvo. Sutil e fácil de inverter: se o alvo é ancestral do ator, o ator é
+ * DESCENDENTE dele (vê só o público); se o alvo é descendente do ator, o
+ * ator é ANCESTRAL dele (vê tudo). Função pura, coberta por teste — quem
+ * percorre a árvore (getTenantRelation em apps/web) delega a decisão aqui.
+ *
+ * @param {boolean} targetIsAncestorOfActor - alvo está entre os ancestrais do ator
+ * @param {boolean} targetIsDescendantOfActor - alvo está entre os descendentes do ator
+ * @returns {import('./visibility.js').TenantRelation}
+ */
+export function relationFromLineage(targetIsAncestorOfActor, targetIsDescendantOfActor) {
+  if (targetIsAncestorOfActor) return 'descendant'
+  if (targetIsDescendantOfActor) return 'ancestor'
+  return 'unrelated'
+}
