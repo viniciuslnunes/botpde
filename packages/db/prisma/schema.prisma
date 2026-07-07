@@ -123,6 +123,7 @@ model Tenant {
   posts             Post[]
   advertencias      Advertencia[]
   announcements     Announcement[]
+  importacoes       ImportacaoMembros[]
 
   @@map("saas_tenants")
 }
@@ -307,6 +308,12 @@ model SaasMembro {
   sedeId String? @map("sede_id")
   sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
 
+  // Rastro de origem: qual importação criou este membro (null = cadastro
+  // orgânico). Permite auditar e desfazer importações (ex: dados MOCK de
+  // demonstração) sem tocar em membros reais.
+  importacaoId String?            @map("importacao_id")
+  importacao   ImportacaoMembros? @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
@@ -315,6 +322,7 @@ model SaasMembro {
 
   @@unique([tenantId, userId])
   @@index([sedeId])
+  @@index([importacaoId])
   @@map("saas_membros")
 }
 
@@ -327,6 +335,44 @@ enum StatusMembro {
   PENDENTE
   APROVADO
   REPROVADO
+}
+
+// ─── IMPORTAÇÃO DE MEMBROS ───────────────────────────────────────────────────
+// Staging + auditoria de cada execução de importação da base de associados.
+// Ver docs/data/spec-importacao-membros.md. Origem MOCK = dados de demonstração,
+// rastreáveis via SaasMembro.importacaoId e reversíveis (desfazerImportacao).
+
+model ImportacaoMembros {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  origem      OrigemImportacao
+  status      StatusImportacao @default(PENDENTE)
+  totalLinhas Int              @default(0) @map("total_linhas")
+  importados  Int              @default(0)
+  duplicados  Int              @default(0)
+  erros       Json?
+  criadoPorId String?          @map("criado_por_id")
+  criadoEm    DateTime         @default(now()) @map("criado_em")
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membros SaasMembro[]
+
+  @@index([tenantId, criadoEm])
+  @@map("saas_importacoes_membros")
+}
+
+enum OrigemImportacao {
+  CSV
+  BOT
+  DISCORD
+  MOCK
+}
+
+enum StatusImportacao {
+  PENDENTE
+  PROCESSANDO
+  CONCLUIDA
+  ERRO
 }
 
 // ─── SÓCIOS / CARTEIRINHAS ───────────────────────────────────────────────────

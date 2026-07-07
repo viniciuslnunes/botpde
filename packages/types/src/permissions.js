@@ -10,6 +10,7 @@ export const PERMISSIONS = /** @type {const} */ ({
   MEMBERS_REJECT: 'members:reject',
   MEMBERS_WARN: 'members:warn',
   MEMBERS_BLOCK: 'members:block',
+  MEMBERS_IMPORT: 'members:import',
 
   // Loja
   STORE_VIEW_ORDERS: 'store:view_orders',
@@ -59,6 +60,7 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.MEMBERS_REJECT, label: 'Reprovar membros' },
       { key: PERMISSIONS.MEMBERS_WARN, label: 'Advertir membros' },
       { key: PERMISSIONS.MEMBERS_BLOCK, label: 'Bloquear membros' },
+      { key: PERMISSIONS.MEMBERS_IMPORT, label: 'Importar base de associados' },
     ],
   },
   {
