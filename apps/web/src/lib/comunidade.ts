@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { getAncestorTenantIds } from './hierarquia'
+import { getVisibleTenantIds } from './hierarquia'
 
 export interface ComunicadoFeedItem {
   id: string
@@ -41,8 +41,8 @@ export async function getFeedComunidade(
   tenantId: string,
   opts: { takePosts?: number } = {},
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
-  const ancestrais = await getAncestorTenantIds(tenantId)
-  const tenantIds = [tenantId, ...ancestrais]
+  // comunidade é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
+  const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
 
   const [announcements, posts] = await Promise.all([
     db.announcement.findMany({

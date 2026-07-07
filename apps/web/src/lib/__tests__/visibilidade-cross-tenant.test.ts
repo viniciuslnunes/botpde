@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canViewRecurso, resolveVisibility, SENSIBILIDADE } from '@torcida/types'
+import { canViewRecurso, relationFromLineage, resolveVisibility, SENSIBILIDADE } from '@torcida/types'
 
 describe('resolveVisibility', () => {
   it('self sempre vê, mesmo recurso restrito', () => {
@@ -37,5 +37,37 @@ describe('canViewRecurso', () => {
   it('subsede (descendant) não vê membros restritos da sede, mas vê eventos públicos', () => {
     expect(canViewRecurso('descendant', 'membros')).toBe(false)
     expect(canViewRecurso('descendant', 'eventos')).toBe(true)
+  })
+})
+
+describe('relationFromLineage (VIN-18 — direção da relação)', () => {
+  it('alvo é ancestral do ator → ator é descendant (PDE olhando a sede)', () => {
+    expect(relationFromLineage(true, false)).toBe('descendant')
+  })
+
+  it('alvo é descendente do ator → ator é ancestor (sede olhando o PDE)', () => {
+    expect(relationFromLineage(false, true)).toBe('ancestor')
+  })
+
+  it('sem parentesco → unrelated', () => {
+    expect(relationFromLineage(false, false)).toBe('unrelated')
+  })
+
+  it('regressão da inversão: PDE nunca ganha acesso a restrito da sede via linhagem', () => {
+    // Antes do VIN-18, o alvo-ancestral virava relation 'ancestor' e liberava
+    // RESTRITO indevidamente. A combinação correta nega:
+    const relation = relationFromLineage(true, false)
+    expect(canViewRecurso(relation, 'membros')).toBe(false)
+    expect(canViewRecurso(relation, 'socios')).toBe(false)
+    expect(canViewRecurso(relation, 'financeiro')).toBe(false)
+    // ...e mantém o público visível (comportamento existente preservado):
+    expect(canViewRecurso(relation, 'loja')).toBe(true)
+    expect(canViewRecurso(relation, 'comunidade')).toBe(true)
+  })
+
+  it('sede mantém acesso total aos descendentes (público + restrito)', () => {
+    const relation = relationFromLineage(false, true)
+    expect(canViewRecurso(relation, 'membros')).toBe(true)
+    expect(canViewRecurso(relation, 'eventos')).toBe(true)
   })
 })

@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { canViewRecurso, type RECURSO_SENSIBILIDADE } from '@torcida/types'
+import { canViewRecurso, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
 
 export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated'
 
@@ -98,10 +98,17 @@ export async function getAncestorTenantIds(tenantId: string): Promise<string[]> 
 }
 
 /**
- * Determina a relação entre dois tenants na árvore de Sede: o próprio, um
- * ancestral (sede-mãe), um descendente (subsede/PDE), ou sem relação.
- * Retorna "unrelated" também quando algum dos dois tenants não está
- * vinculado a nenhuma Sede (ex: tenant criado sem hierarquia).
+ * Determina o papel do tenant ATOR em relação ao tenant alvo na árvore de
+ * Sede — no contrato de resolveVisibility/canViewRecurso: 'ancestor' = o
+ * ator é ancestral do alvo (vê tudo dele); 'descendant' = o ator é
+ * descendente do alvo (vê só o público). Retorna "unrelated" também quando
+ * algum dos dois tenants não está vinculado a nenhuma Sede.
+ *
+ * Nota (VIN-18): a versão anterior devolvia a posição do ALVO ('ancestor'
+ * quando o alvo era ancestral do ator), o contrário do que a função pura
+ * espera — sem efeito visível até então porque só era usada com recurso
+ * público ('loja'), visível nas duas direções da linhagem. A conversão
+ * agora é delegada à função pura relationFromLineage (testada).
  */
 export async function getTenantRelation(
   actorTenantId: string,
@@ -120,9 +127,30 @@ export async function getTenantRelation(
     descendantTenantIds(actorSede.id),
   ])
 
-  if (ancestrais.includes(targetTenantId)) return 'ancestor'
-  if (descendentes.includes(targetTenantId)) return 'descendant'
-  return 'unrelated'
+  return relationFromLineage(
+    ancestrais.includes(targetTenantId),
+    descendentes.includes(targetTenantId),
+  )
+}
+
+/**
+ * IDs de tenant cujo conteúdo do recurso indicado é visível para o tenant
+ * ator: sempre o próprio, mais os ancestrais quando o recurso é PÚBLICO
+ * (o ator é descendente deles — só enxerga o público). Centraliza a regra
+ * que antes estava implícita e duplicada em eventos, comunidade e loja.
+ *
+ * Gancho futuro (Fase 2 — Alianças): quando `Alianca` existir, adicionar
+ * aqui os tenants de alianças ATIVAS para recursos públicos, via relação
+ * 'allied' em resolveVisibility — este é o único ponto a estender.
+ */
+export async function getVisibleTenantIds(
+  tenantId: string,
+  recurso: keyof typeof RECURSO_SENSIBILIDADE,
+): Promise<string[]> {
+  if (!canViewRecurso('descendant', recurso)) return [tenantId]
+
+  const ancestrais = await getAncestorTenantIds(tenantId)
+  return [tenantId, ...ancestrais]
 }
 
 /**

@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getAncestorTenantIds } from '@/lib/hierarquia'
+import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
@@ -26,8 +26,7 @@ export default async function PortalLojaPage() {
   // Loja é recurso PUBLICO na hierarquia — produtos da sede-mãe cascadeiam
   // pras telas de subsedes/PDEs, na mesma direção já aplicada em
   // comunidade/eventos (institucional/centralizado desce, local não sobe).
-  const ancestrais = await getAncestorTenantIds(tenant.id)
-  const tenantIds = [tenant.id, ...ancestrais]
+  const tenantIds = await getVisibleTenantIds(tenant.id, 'loja')
 
   const [produtos, meusPedidos] = await Promise.all([
     db.saasProduto.findMany({

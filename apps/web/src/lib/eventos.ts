@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { getAncestorTenantIds } from './hierarquia'
+import { getVisibleTenantIds } from './hierarquia'
 
 /**
  * Cláusula `where` do Prisma que decide quais eventos um associado enxerga:
@@ -11,15 +11,17 @@ import { getAncestorTenantIds } from './hierarquia'
  * respeito a uma subsede/PDE diferente.
  */
 export async function getEscopoEventosVisiveis(tenantId: string, userId: string | undefined) {
-  const [membro, ancestrais] = await Promise.all([
+  const [membro, tenantsVisiveis] = await Promise.all([
     userId
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId, userId } },
           select: { sedeId: true },
         })
       : null,
-    getAncestorTenantIds(tenantId),
+    // eventos é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
+    getVisibleTenantIds(tenantId, 'eventos'),
   ])
+  const ancestrais = tenantsVisiveis.filter((id) => id !== tenantId)
 
   return {
     OR: [
