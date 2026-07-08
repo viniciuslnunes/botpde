@@ -19,6 +19,11 @@ describe('resolveVisibility', () => {
     expect(resolveVisibility('unrelated', SENSIBILIDADE.PUBLICO)).toBe(false)
     expect(resolveVisibility('unrelated', SENSIBILIDADE.RESTRITO)).toBe(false)
   })
+
+  it('allied vê apenas recurso público, nunca restrito', () => {
+    expect(resolveVisibility('allied', SENSIBILIDADE.PUBLICO)).toBe(true)
+    expect(resolveVisibility('allied', SENSIBILIDADE.RESTRITO)).toBe(false)
+  })
 })
 
 describe('canViewRecurso', () => {
@@ -37,6 +42,13 @@ describe('canViewRecurso', () => {
   it('subsede (descendant) não vê membros restritos da sede, mas vê eventos públicos', () => {
     expect(canViewRecurso('descendant', 'membros')).toBe(false)
     expect(canViewRecurso('descendant', 'eventos')).toBe(true)
+  })
+
+  it('tenant aliado vê recursos públicos, mas não vê dados restritos', () => {
+    expect(canViewRecurso('allied', 'eventos')).toBe(true)
+    expect(canViewRecurso('allied', 'loja')).toBe(true)
+    expect(canViewRecurso('allied', 'membros')).toBe(false)
+    expect(canViewRecurso('allied', 'socios')).toBe(false)
   })
 })
 

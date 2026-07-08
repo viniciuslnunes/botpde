@@ -39,6 +39,19 @@ export const PERMISSIONS = /** @type {const} */ ({
   // comunitário é comunicado oficial, e publicar conteúdo institucional
   // exige um perfil autorizado à parte.
   ANNOUNCEMENTS_PUBLISH: 'announcements:publish',
+
+  // Alianças entre torcidas (Presidente)
+  ALLIANCES_MANAGE: 'alliances:manage',
+
+  // Comunidade social
+  COMMUNITY_POST: 'community:post',
+  COMMUNITY_MODERATE: 'community:moderate',
+
+  // Notícias curadas
+  NEWS_CURATE: 'news:curate',
+
+  // Salas de vídeo Meet
+  MEETINGS_HOST: 'meetings:host',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -85,7 +98,16 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' },
       { key: PERMISSIONS.ANNOUNCEMENTS_PUBLISH, label: 'Publicar comunicados oficiais' },
+      { key: PERMISSIONS.COMMUNITY_POST, label: 'Publicar no feed como membro' },
+      { key: PERMISSIONS.COMMUNITY_MODERATE, label: 'Moderar publicações e denúncias' },
+      { key: PERMISSIONS.NEWS_CURATE, label: 'Curar notícias do time' },
+      { key: PERMISSIONS.MEETINGS_HOST, label: 'Criar salas de vídeo' },
     ],
+  },
+  {
+    label: 'Alianças',
+    base: null,
+    items: [{ key: PERMISSIONS.ALLIANCES_MANAGE, label: 'Gerenciar alianças entre torcidas' }],
   },
   {
     label: 'Outros',
@@ -153,7 +175,7 @@ export const SYSTEM_ROLE_PERMISSIONS = {
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
     (p) => p !== PERMISSIONS.SETTINGS_MANAGE,
   ),
-  [SYSTEM_ROLES.MEMBER]: [],
+  [SYSTEM_ROLES.MEMBER]: [PERMISSIONS.COMMUNITY_POST],
 }
 
 /**

@@ -26,7 +26,7 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
  * Relação entre dois tenants na árvore de Sede — computada por quem tem
  * acesso ao banco (ver getTenantRelation em apps/web/src/lib/hierarquia.ts),
  * consumida aqui de forma pura.
- * @typedef {'self' | 'ancestor' | 'descendant' | 'unrelated'} TenantRelation
+ * @typedef {'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied'} TenantRelation
  */
 
 /**
@@ -35,8 +35,7 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
  *
  * Regra: você sempre vê o seu próprio; um ancestral vê tudo dos
  * descendentes (público + restrito); um descendente só vê o público dos
- * ancestrais; tenants sem relação de linhagem (irmãos, não relacionados)
- * não veem nada um do outro nesta versão.
+ * ancestrais; aliado vê só o público; tenants sem relação não veem nada.
  *
  * @param {import('./visibility.js').TenantRelation} relation
  * @param {string} sensibilidade - um valor de SENSIBILIDADE
@@ -44,7 +43,9 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
  */
 export function resolveVisibility(relation, sensibilidade) {
   if (relation === 'self' || relation === 'ancestor') return true
-  if (relation === 'descendant') return sensibilidade === SENSIBILIDADE.PUBLICO
+  if (relation === 'descendant' || relation === 'allied') {
+    return sensibilidade === SENSIBILIDADE.PUBLICO
+  }
   return false
 }
 

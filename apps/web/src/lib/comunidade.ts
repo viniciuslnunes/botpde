@@ -17,11 +17,15 @@ export interface ComunicadoFeedItem {
 
 export interface PostFeedItem {
   id: string
+  tenantId: string
   titulo: string | null
   conteudo: string
   imagemUrl: string | null
+  tipo: 'INSTITUCIONAL' | 'MEMBRO'
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
   fixado: boolean
   criadoEm: Date
+  tenant: { nome: string }
   autor: { nome: string | null; avatarUrl: string | null }
 }
 
@@ -34,10 +38,10 @@ const PESO_PRIORIDADE: Record<ComunicadoFeedItem['prioridade'], number> = {
 /**
  * Feed de comunidade de um tenant: comunicados oficiais (próprios + herdados
  * de ancestrais, já que comunidade é um recurso PUBLICO na hierarquia) e
- * posts locais (só do próprio tenant — post comunitário não cascateia,
- * apenas comunicado institucional). Comunicados sempre vêm ordenados acima
- * de posts locais no consumo desta função — implementa a regra "conteúdo
- * institucional sempre pode sobrescrever a prioridade do feed local".
+ * posts da rede visível (próprio tenant + aliados/ancestrais), respeitando
+ * visibilidade pública para tenants externos. Comunicados sempre vêm
+ * ordenados acima de posts no consumo desta função — implementa a regra
+ * "conteúdo institucional sempre pode sobrescrever a prioridade do feed".
  */
 export async function getFeedComunidade(
   tenantId: string,
@@ -45,6 +49,7 @@ export async function getFeedComunidade(
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
   // comunidade é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
   const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const tenantsExternos = tenantIds.filter((id) => id !== tenantId)
 
   const [announcements, posts] = await Promise.all([
     db.announcement.findMany({
@@ -55,10 +60,19 @@ export async function getFeedComunidade(
       },
     }) as Promise<ComunicadoFeedItem[]>,
     db.post.findMany({
-      where: { tenantId },
+      where: {
+        oculto: false,
+        OR: [
+          { tenantId },
+          { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' },
+        ],
+      },
       orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
       take: opts.takePosts,
-      include: { autor: { select: { nome: true, avatarUrl: true } } },
+      include: {
+        tenant: { select: { nome: true } },
+        autor: { select: { nome: true, avatarUrl: true } },
+      },
     }) as Promise<PostFeedItem[]>,
   ])
 

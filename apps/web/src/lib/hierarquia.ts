@@ -1,7 +1,7 @@
 import { db } from '@torcida/db'
 import { canViewRecurso, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
 
-export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated'
+export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied'
 
 interface SedeNode {
   id: string
@@ -98,17 +98,41 @@ export async function getAncestorTenantIds(tenantId: string): Promise<string[]> 
 }
 
 /**
- * Determina o papel do tenant ATOR em relação ao tenant alvo na árvore de
- * Sede — no contrato de resolveVisibility/canViewRecurso: 'ancestor' = o
- * ator é ancestral do alvo (vê tudo dele); 'descendant' = o ator é
- * descendente do alvo (vê só o público). Retorna "unrelated" também quando
- * algum dos dois tenants não está vinculado a nenhuma Sede.
- *
- * Nota (VIN-18): a versão anterior devolvia a posição do ALVO ('ancestor'
- * quando o alvo era ancestral do ator), o contrário do que a função pura
- * espera — sem efeito visível até então porque só era usada com recurso
- * público ('loja'), visível nas duas direções da linhagem. A conversão
- * agora é delegada à função pura relationFromLineage (testada).
+ * IDs de tenants com aliança ATIVA em relação ao tenant indicado.
+ */
+export async function getAlliedTenantIds(tenantId: string): Promise<string[]> {
+  const aliancas: { tenantOrigemId: string; tenantAliadoId: string }[] =
+    await db.alianca.findMany({
+      where: {
+        status: 'ATIVA',
+        OR: [{ tenantOrigemId: tenantId }, { tenantAliadoId: tenantId }],
+      },
+      select: { tenantOrigemId: true, tenantAliadoId: true },
+    })
+
+  return aliancas.map((a) => (a.tenantOrigemId === tenantId ? a.tenantAliadoId : a.tenantOrigemId))
+}
+
+/**
+ * Verifica se dois tenants têm aliança ATIVA (simétrico).
+ */
+export async function tenantsAreAllied(tenantAId: string, tenantBId: string): Promise<boolean> {
+  if (tenantAId === tenantBId) return true
+  const count = await db.alianca.count({
+    where: {
+      status: 'ATIVA',
+      OR: [
+        { tenantOrigemId: tenantAId, tenantAliadoId: tenantBId },
+        { tenantOrigemId: tenantBId, tenantAliadoId: tenantAId },
+      ],
+    },
+  })
+  return count > 0
+}
+
+/**
+ * Determina o papel do tenant ATOR em relação ao tenant alvo — hierarquia
+ * de Sede ou aliança ATIVA entre torcidas.
  */
 export async function getTenantRelation(
   actorTenantId: string,
@@ -120,17 +144,23 @@ export async function getTenantRelation(
     where: { tenantId: actorTenantId },
     select: { id: true, tenantId: true, sedeId: true },
   })
-  if (!actorSede) return 'unrelated'
 
-  const [ancestrais, descendentes] = await Promise.all([
-    ancestorTenantIds(actorSede),
-    descendantTenantIds(actorSede.id),
-  ])
+  if (actorSede) {
+    const [ancestrais, descendentes] = await Promise.all([
+      ancestorTenantIds(actorSede),
+      descendantTenantIds(actorSede.id),
+    ])
 
-  return relationFromLineage(
-    ancestrais.includes(targetTenantId),
-    descendentes.includes(targetTenantId),
-  )
+    const lineageRelation = relationFromLineage(
+      ancestrais.includes(targetTenantId),
+      descendentes.includes(targetTenantId),
+    )
+    if (lineageRelation !== 'unrelated') return lineageRelation
+  }
+
+  if (await tenantsAreAllied(actorTenantId, targetTenantId)) return 'allied'
+
+  return 'unrelated'
 }
 
 /**
@@ -149,8 +179,13 @@ export async function getVisibleTenantIds(
 ): Promise<string[]> {
   if (!canViewRecurso('descendant', recurso)) return [tenantId]
 
-  const ancestrais = await getAncestorTenantIds(tenantId)
-  return [tenantId, ...ancestrais]
+  const [ancestrais, aliados] = await Promise.all([
+    getAncestorTenantIds(tenantId),
+    getAlliedTenantIds(tenantId),
+  ])
+
+  const ids = new Set([tenantId, ...ancestrais, ...aliados])
+  return Array.from(ids)
 }
 
 /**

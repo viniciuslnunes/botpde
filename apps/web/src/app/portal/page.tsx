@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getFeedComunidade } from '@/lib/comunidade'
+import { getFeedPersonalizado } from '@/lib/feed'
 import { escolherComunicadoDestaque } from '@/lib/comunicado-destaque'
 import { resolverProximaAcao } from '@/lib/proxima-acao'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
@@ -40,6 +40,7 @@ interface ItemComunidade {
   fixado: boolean
   oficial: boolean
   novo: boolean
+  noticia: boolean
 }
 
 export default async function PortalPage({
@@ -57,7 +58,7 @@ export default async function PortalPage({
 
   const escopoEventos = tenant ? await getEscopoEventosVisiveis(tenant.id, userId) : null
 
-  const [membro, socio, proximosEventos, feedComunidade] = await Promise.all([
+  const [membro, socio, proximosEventos, feed] = await Promise.all([
     tenant
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
@@ -79,12 +80,21 @@ export default async function PortalPage({
         }) as Promise<EventoProximo[]>)
       : ([] as EventoProximo[]),
     tenant
-      ? getFeedComunidade(tenant.id, { takePosts: 2, userId })
-      : Promise.resolve({ announcements: [], posts: [] }),
+      ? getFeedPersonalizado(tenant.id, userId, {
+          take: 5,
+          afiliacaoId: tenant.afiliacaoId,
+        })
+      : Promise.resolve({
+          announcements: [],
+          postsSeguindo: [],
+          postsSugeridos: [],
+          noticias: [],
+          pageInfo: { nextCursor: null, hasMore: false },
+        }),
   ])
 
   // Comunicado prioritário não lido → banner na primeira dobra (VIN-19)
-  const destaque = escolherComunicadoDestaque(feedComunidade.announcements)
+  const destaque = escolherComunicadoDestaque(feed.announcements)
 
   // Próxima ação do associado (VIN-20): primeiro evento futuro sem RSVP.
   // Depende dos eventos já buscados — query sequencial de propósito.
@@ -110,7 +120,7 @@ export default async function PortalPage({
   // prioridade do feed local.
   // O comunicado já destacado no banner não se repete no widget (VIN-20)
   const itensComunidade: ItemComunidade[] = [
-    ...feedComunidade.announcements
+    ...feed.announcements
       .filter((a) => a.id !== destaque?.id)
       .map((a) => ({
       id: a.id,
@@ -119,14 +129,25 @@ export default async function PortalPage({
       fixado: a.fixado,
       oficial: true,
       novo: a.lido === false,
+      noticia: false,
     })),
-    ...feedComunidade.posts.map((p) => ({
+    ...[...feed.postsSeguindo, ...feed.postsSugeridos].map((p) => ({
       id: p.id,
       titulo: p.titulo,
       texto: p.conteudo,
-      fixado: p.fixado,
+      fixado: false,
       oficial: false,
       novo: false,
+      noticia: false,
+    })),
+    ...feed.noticias.map((n) => ({
+      id: `noticia-${n.id}`,
+      titulo: n.titulo,
+      texto: n.resumo ?? `Fonte: ${n.fonte}`,
+      fixado: false,
+      oficial: false,
+      novo: false,
+      noticia: true,
     })),
   ].slice(0, 2)
 
@@ -486,6 +507,11 @@ export default async function PortalPage({
                     {item.oficial && (
                       <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
                         Oficial
+                      </span>
+                    )}
+                    {item.noticia && (
+                      <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                        Notícia
                       </span>
                     )}
                     {item.titulo && <p className="font-medium text-[rgb(var(--foreground))]">{item.titulo}</p>}

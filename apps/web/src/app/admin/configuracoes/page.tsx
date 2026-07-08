@@ -2,10 +2,11 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, Palette, MessageSquare, Shield, Users2 } from 'lucide-react'
+import { Settings, Palette, MessageSquare, Shield, Users2, Flag } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
+  AfiliacaoForm,
   RolesManager,
   DepartamentosManager,
 } from '@/components/admin/config-forms'
@@ -29,7 +30,17 @@ export default async function ConfiguracoesPage() {
   })
   const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
 
-  const [rolesRaw, departamentos, isOwner] = await Promise.all([
+  interface AfiliacaoOption {
+    id: string
+    nome: string
+  }
+
+  const [rolesRaw, departamentos, isOwner, afiliacoes]: [
+    Awaited<ReturnType<typeof db.role.findMany>>,
+    Awaited<ReturnType<typeof db.departamento.findMany>>,
+    Awaited<ReturnType<typeof db.userRole.findFirst>>,
+    AfiliacaoOption[],
+  ] = await Promise.all([
     db.role.findMany({
       where: { tenantId: tenant.id },
       orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
@@ -44,6 +55,10 @@ export default async function ConfiguracoesPage() {
         tenantId: tenant.id,
         role: { isSystem: true, nome: 'owner' },
       },
+    }),
+    db.afiliacao.findMany({
+      orderBy: { nome: 'asc' },
+      select: { id: true, nome: true },
     }),
   ])
 
@@ -65,6 +80,13 @@ export default async function ConfiguracoesPage() {
       icon: MessageSquare,
       title: 'Integração Discord',
       description: 'Vincule o servidor Discord para sincronizar membros e comandos do bot',
+      ownerOnly: true,
+    },
+    {
+      id: 'afiliacao',
+      icon: Flag,
+      title: 'Afiliação',
+      description: 'Defina qual time a torcida apoia para contexto global de notícias',
       ownerOnly: true,
     },
     {
@@ -148,6 +170,8 @@ export default async function ConfiguracoesPage() {
                     />
                   ) : section.id === 'discord' ? (
                     <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
+                  ) : section.id === 'afiliacao' ? (
+                    <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
                   ) : section.id === 'cargos' ? (
                     <RolesManager roles={roles} />
                   ) : section.id === 'departamentos' ? (

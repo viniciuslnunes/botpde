@@ -36,6 +36,17 @@ const serverSchema = z.object({
   // Super admins (e-mails separados por vírgula)
   SUPER_ADMIN_EMAILS: z.string().optional(),
 
+  // LiveKit (Meet)
+  LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY é obrigatória'),
+  LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET é obrigatória'),
+  LIVEKIT_URL: z
+    .string()
+    .min(1, 'LIVEKIT_URL é obrigatória')
+    .refine((v) => v.startsWith('wss://') || v.startsWith('ws://'), {
+      message: 'LIVEKIT_URL deve usar ws:// ou wss://',
+    }),
+  NOTICIAS_INGEST_KEY: z.string().optional(),
+
   // Runtime
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -68,6 +79,10 @@ function validateEnv() {
       TENANT_SLUG: undefined,
       ROOT_DOMAIN: undefined,
       SUPER_ADMIN_EMAILS: undefined,
+      LIVEKIT_API_KEY: '',
+      LIVEKIT_API_SECRET: '',
+      LIVEKIT_URL: '',
+      NOTICIAS_INGEST_KEY: undefined,
       NODE_ENV: 'development' as const,
       PORT: 3000,
       HOSTNAME: '0.0.0.0',

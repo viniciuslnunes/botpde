@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { ALL_PERMISSIONS, applyPermissionCascade, PERMISSIONS } from '@torcida/types'
+import { z } from 'zod'
 
 /**
  * Sanitiza a lista de permissões vinda do formulário de cargo:
@@ -16,6 +17,18 @@ function sanitizeRolePermissions(permissionsRaw: string[]): string[] {
   const cascaded: string[] = applyPermissionCascade([], valid)
   if (cascaded.length === 0) throw new Error('Selecione ao menos uma permissão para o cargo')
   return cascaded
+}
+
+async function assertTenantOwner(userId: string, tenantId: string): Promise<void> {
+  const ownerRole = await db.userRole.findFirst({
+    where: {
+      userId,
+      tenantId,
+      role: { isSystem: true, nome: 'owner' },
+    },
+    select: { id: true },
+  })
+  if (!ownerRole) throw new Error('Apenas o owner pode alterar esta configuração')
 }
 
 // ── Perfil do tenant ──────────────────────────────────────────────────────────
@@ -67,6 +80,57 @@ export async function salvarDiscordGuildId(formData: FormData) {
   })
 
   revalidatePath('/admin/configuracoes')
+}
+
+const afiliacaoSchema = z.object({
+  afiliacaoId: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.trim() ? value.trim() : null))
+    .refine((value) => value === null || z.string().uuid().safeParse(value).success, {
+      message: 'Afiliação inválida',
+    }),
+})
+
+interface AfiliacaoLite {
+  id: string
+  nome: string
+}
+
+export async function salvarAfiliacao(formData: FormData): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const parsed = afiliacaoSchema.safeParse({
+    afiliacaoId: String(formData.get('afiliacaoId') ?? ''),
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const afiliacaoId = parsed.data.afiliacaoId
+  if (afiliacaoId) {
+    const afiliacao: AfiliacaoLite | null = await db.afiliacao.findUnique({
+      where: { id: afiliacaoId },
+      select: { id: true, nome: true },
+    })
+    if (!afiliacao) throw new Error('Afiliação não encontrada')
+  }
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { afiliacaoId },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_AFILIACAO_ATUALIZADA',
+      detalhes: { afiliacaoId },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal')
 }
 
 // ── Cargos ────────────────────────────────────────────────────────────────────

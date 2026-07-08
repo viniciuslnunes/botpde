@@ -6,6 +6,7 @@ import { PERMISSION_GROUPS, applyPermissionCascade } from '@torcida/types'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
+  salvarAfiliacao,
   criarRole,
   atualizarRole,
   excluirRole,
@@ -162,6 +163,74 @@ export function DiscordForm({ discordGuildId }: DiscordFormProps) {
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar Guild ID
+        </button>
+        {success && (
+          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
+            <Check className="h-4 w-4" /> Salvo com sucesso
+          </span>
+        )}
+      </div>
+    </form>
+  )
+}
+
+// ── Afiliação (owner) ─────────────────────────────────────────────────────────
+
+interface AfiliacaoOption {
+  id: string
+  nome: string
+}
+
+interface AfiliacaoFormProps {
+  afiliacaoId: string | null
+  afiliacoes: AfiliacaoOption[]
+}
+
+export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [success, setSuccess] = useState(false)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    startTransition(async () => {
+      await salvarAfiliacao(fd)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+          Time apoiado (Afiliação)
+        </label>
+        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          Define qual clube esta torcida apoia para notícias e identidade compartilhada.
+        </p>
+        <select
+          name="afiliacaoId"
+          defaultValue={afiliacaoId ?? ''}
+          className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+        >
+          <option value="">Sem afiliação</option>
+          {afiliacoes.map((afiliacao) => (
+            <option key={afiliacao.id} value={afiliacao.id}>
+              {afiliacao.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Salvar afiliação
         </button>
         {success && (
           <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">

@@ -43,7 +43,14 @@ export async function criarPost(_prev: PostState, formData: FormData): Promise<P
   const { titulo, conteudo, imagemUrl } = parsed.data
 
   const post = await db.post.create({
-    data: { tenantId: tenant.id, autorId: session.user.id, titulo, conteudo, imagemUrl },
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      titulo,
+      conteudo,
+      imagemUrl,
+      tipo: 'INSTITUCIONAL',
+    },
   })
 
   await db.auditLog.create({

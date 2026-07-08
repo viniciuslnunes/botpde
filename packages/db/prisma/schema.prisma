@@ -107,6 +107,9 @@ model Tenant {
 
   discordGuildId String? @unique @map("discord_guild_id")
 
+  afiliacaoId String?     @map("afiliacao_id")
+  afiliacao   Afiliacao?  @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+
   membros           SaasMembro[]
   socios            SaasSocio[]
   produtos          SaasProduto[]
@@ -124,6 +127,13 @@ model Tenant {
   advertencias      Advertencia[]
   announcements     Announcement[]
   importacoes       ImportacaoMembros[]
+  aliancasOrigem    Alianca[]             @relation("AliancaOrigem")
+  aliancasAliado    Alianca[]             @relation("AliancaAliado")
+  recomendacoes     RecomendacaoAlianca[]
+  perfisMembro      PerfilMembro[]
+  seguimentosCtx    Seguimento[]          @relation("SeguimentoContexto")
+  salasReuniao      SalaReuniao[]
+  denuncias         Denuncia[]
 
   @@map("saas_tenants")
 }
@@ -161,6 +171,20 @@ model User {
   auditLogs            AuditLog[]           @relation("AuditAtor")
   announcements        Announcement[]
   announcementReads    AnnouncementRead[]
+  perfisMembro         PerfilMembro[]
+  seguindo             Seguimento[]         @relation("SeguimentoSeguidor")
+  seguidores           Seguimento[]         @relation("SeguimentoSeguido")
+  comentarios          Comentario[]
+  reacoes              Reacao[]
+  denuncias            Denuncia[]
+  denunciasResolvidas  Denuncia[]           @relation("DenunciaResolvidoPor")
+  notificacoes         Notificacao[]
+  noticiasCuradas      Noticia[]
+  aliancasPropostas    Alianca[]            @relation("AliancaPropostaPor")
+  aliancasConfirmadas  Alianca[]            @relation("AliancaConfirmadaPor")
+  salasHospedadas      SalaReuniao[]
+  participacoesReuniao ParticipanteReuniao[]
+  mensagensReuniao     MensagemReuniao[]
 
   @@map("saas_users")
 }
@@ -486,6 +510,7 @@ model Evento {
   discordMessageId String?  @map("discord_message_id")
 
   rsvps EventoRsvp[]
+  salas SalaReuniao[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -625,6 +650,75 @@ model AnnouncementRead {
   @@map("saas_announcement_reads")
 }
 
+// ─── AFILIAÇÃO GLOBAL (time apoiado) ─────────────────────────────────────────
+
+model Afiliacao {
+  id             String   @id @default(uuid())
+  nome           String
+  apelido        String?
+  escudoUrl      String?  @map("escudo_url")
+  cidade         String?
+  estado         String?
+  apiExternalId  String?  @map("api_external_id")
+  criadoEm       DateTime @default(now()) @map("criado_em")
+
+  tenants  Tenant[]
+  noticias Noticia[]
+
+  @@map("saas_afiliacoes")
+}
+
+// ─── ALIANÇAS ENTRE TORCIDAS ─────────────────────────────────────────────────
+
+model Alianca {
+  id               String        @id @default(uuid())
+  tenantOrigemId   String        @map("tenant_origem_id")
+  tenantAliadoId   String        @map("tenant_aliado_id")
+  status           StatusAlianca @default(PENDENTE)
+  propostaPorId    String        @map("proposta_por_id")
+  confirmadaPorId  String?       @map("confirmada_por_id")
+  confirmadaEm     DateTime?     @map("confirmada_em")
+  criadoEm         DateTime      @default(now()) @map("criado_em")
+
+  tenantOrigem  Tenant @relation("AliancaOrigem", fields: [tenantOrigemId], references: [id], onDelete: Cascade)
+  tenantAliado  Tenant @relation("AliancaAliado", fields: [tenantAliadoId], references: [id], onDelete: Cascade)
+  propostaPor   User   @relation("AliancaPropostaPor", fields: [propostaPorId], references: [id])
+  confirmadaPor User?  @relation("AliancaConfirmadaPor", fields: [confirmadaPorId], references: [id])
+
+  @@unique([tenantOrigemId, tenantAliadoId])
+  @@index([tenantAliadoId])
+  @@map("saas_aliancas")
+}
+
+enum StatusAlianca {
+  SUGERIDA
+  PENDENTE
+  ATIVA
+  ENCERRADA
+}
+
+model RecomendacaoAlianca {
+  id                String                  @id @default(uuid())
+  tenantId          String                  @map("tenant_id")
+  tenantSugeridoId  String?                 @map("tenant_sugerido_id")
+  nomeSugerido      String                  @map("nome_sugerido")
+  confianca         ConfiancaRecomendacao
+  fonte             String
+  observacao        String?
+  criadoEm          DateTime                @default(now()) @map("criado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("saas_recomendacoes_alianca")
+}
+
+enum ConfiancaRecomendacao {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
 // ─── COMUNIDADE ───────────────────────────────────────────────────────────────
 
 model Post {
@@ -634,16 +728,260 @@ model Post {
   autorId  String @map("autor_id")
   autor    User   @relation(fields: [autorId], references: [id])
 
-  titulo    String?
-  conteudo  String
-  imagemUrl String? @map("imagem_url")
-  fixado    Boolean @default(false)
+  titulo      String?
+  conteudo    String
+  imagemUrl   String?          @map("imagem_url")
+  midiaUrls   String[]         @default([]) @map("midia_urls")
+  tipo        TipoPost         @default(INSTITUCIONAL)
+  visibilidade VisibilidadePost @default(PUBLICO)
+  fixado      Boolean          @default(false)
+  oculto      Boolean          @default(false)
 
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  @@index([tenantId])
+  comentarios Comentario[]
+  reacoes     Reacao[]
+  denuncias   Denuncia[]
+
+  @@index([tenantId, criadoEm])
+  @@index([tenantId, oculto])
   @@map("saas_posts")
+}
+
+enum TipoPost {
+  INSTITUCIONAL
+  MEMBRO
+}
+
+enum VisibilidadePost {
+  PUBLICO
+  TENANT
+  PRIVADO
+}
+
+model PerfilMembro {
+  id            String  @id @default(uuid())
+  userId        String  @map("user_id")
+  tenantId      String  @map("tenant_id")
+  bio           String?
+  perfilPrivado Boolean @default(true) @map("perfil_privado")
+  avatarUrl     String? @map("avatar_url")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@unique([userId, tenantId])
+  @@map("saas_perfis_membro")
+}
+
+model Seguimento {
+  id               String            @id @default(uuid())
+  seguidorId       String            @map("seguidor_id")
+  seguidoId        String            @map("seguido_id")
+  tenantContextoId String            @map("tenant_contexto_id")
+  status           StatusSeguimento  @default(PENDENTE)
+  criadoEm         DateTime          @default(now()) @map("criado_em")
+  atualizadoEm     DateTime          @updatedAt @map("atualizado_em")
+
+  seguidor       User   @relation("SeguimentoSeguidor", fields: [seguidorId], references: [id], onDelete: Cascade)
+  seguido        User   @relation("SeguimentoSeguido", fields: [seguidoId], references: [id], onDelete: Cascade)
+  tenantContexto Tenant @relation("SeguimentoContexto", fields: [tenantContextoId], references: [id], onDelete: Cascade)
+
+  @@unique([seguidorId, seguidoId])
+  @@index([seguidoId, status])
+  @@map("saas_seguimentos")
+}
+
+enum StatusSeguimento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  BLOQUEADO
+}
+
+model Comentario {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  autorId   String   @map("autor_id")
+  conteudo  String
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, criadoEm])
+  @@map("saas_comentarios")
+}
+
+model Reacao {
+  id       String     @id @default(uuid())
+  postId   String     @map("post_id")
+  userId   String     @map("user_id")
+  tipo     TipoReacao @default(CURTIR)
+  criadoEm DateTime   @default(now()) @map("criado_em")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("saas_reacoes")
+}
+
+enum TipoReacao {
+  CURTIR
+  FORCA
+}
+
+model Denuncia {
+  id             String         @id @default(uuid())
+  tenantId       String         @map("tenant_id")
+  postId         String         @map("post_id")
+  denuncianteId  String         @map("denunciante_id")
+  motivo         String
+  status         StatusDenuncia @default(PENDENTE)
+  resolvidoPorId String?        @map("resolvido_por_id")
+  resolvidoEm    DateTime?      @map("resolvido_em")
+  criadoEm       DateTime       @default(now()) @map("criado_em")
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post          Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  denunciante   User   @relation(fields: [denuncianteId], references: [id], onDelete: Cascade)
+  resolvidoPor  User?  @relation("DenunciaResolvidoPor", fields: [resolvidoPorId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("saas_denuncias")
+}
+
+enum StatusDenuncia {
+  PENDENTE
+  RESOLVIDA
+  DESCARTADA
+}
+
+model Notificacao {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  tenantId  String           @map("tenant_id")
+  tipo      TipoNotificacao
+  titulo    String
+  corpo     String?
+  link      String?
+  lida      Boolean          @default(false)
+  criadoEm  DateTime         @default(now()) @map("criado_em")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lida, criadoEm])
+  @@map("saas_notificacoes")
+}
+
+enum TipoNotificacao {
+  SEGUIMENTO_PENDENTE
+  SEGUIMENTO_APROVADO
+  NOVO_COMENTARIO
+  NOVA_REACAO
+  COMUNICADO_URGENTE
+  DENUNCIA_NOVA
+}
+
+// ─── NOTÍCIAS CURADAS (global por afiliação) ─────────────────────────────────
+
+model Noticia {
+  id              String        @id @default(uuid())
+  afiliacaoId     String        @map("afiliacao_id")
+  titulo          String
+  resumo          String?
+  url             String
+  fonte           String
+  embedHtml       String?       @map("embed_html")
+  embedThumbnail  String?       @map("embed_thumbnail")
+  status          StatusNoticia @default(RASCUNHO)
+  publicadoEm     DateTime?     @map("publicado_em")
+  curadoPorId     String?       @map("curado_por_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+
+  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+  curadoPor User?     @relation(fields: [curadoPorId], references: [id])
+
+  @@unique([afiliacaoId, url])
+  @@index([afiliacaoId, status, publicadoEm])
+  @@map("saas_noticias")
+}
+
+enum StatusNoticia {
+  RASCUNHO
+  APROVADA
+  REJEITADA
+}
+
+// ─── SALAS MEET (WebRTC) ─────────────────────────────────────────────────────
+
+model SalaReuniao {
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  hostId          String        @map("host_id")
+  titulo          String
+  tipo            TipoSalaReuniao @default(ABERTA)
+  livekitRoomName String        @unique @map("livekit_room_name")
+  linkConvite     String        @unique @map("link_convite")
+  agendadaPara    DateTime?     @map("agendada_para")
+  encerradaEm     DateTime?     @map("encerrada_em")
+  eventoId        String?       @map("evento_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  host          User                  @relation(fields: [hostId], references: [id])
+  evento        Evento?               @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  participantes ParticipanteReuniao[]
+  mensagens     MensagemReuniao[]
+
+  @@index([tenantId, encerradaEm])
+  @@map("saas_salas_reuniao")
+}
+
+enum TipoSalaReuniao {
+  EVENTO
+  ABERTA
+  DM_GRUPO
+}
+
+model ParticipanteReuniao {
+  id       String              @id @default(uuid())
+  salaId   String              @map("sala_id")
+  userId   String              @map("user_id")
+  papel    PapelParticipanteReuniao @default(PARTICIPANTE)
+  entrouEm DateTime            @default(now()) @map("entrou_em")
+  saiuEm   DateTime?           @map("saiu_em")
+
+  sala SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([salaId, userId])
+  @@map("saas_participantes_reuniao")
+}
+
+enum PapelParticipanteReuniao {
+  HOST
+  MODERADOR
+  PARTICIPANTE
+}
+
+model MensagemReuniao {
+  id       String   @id @default(uuid())
+  salaId   String   @map("sala_id")
+  autorId  String   @map("autor_id")
+  conteudo String
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  sala  SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  autor User        @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([salaId, criadoEm])
+  @@map("saas_mensagens_reuniao")
 }
 
 // ─── ADVERTÊNCIAS ─────────────────────────────────────────────────────────────

@@ -15,6 +15,9 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'hierarquia', label: 'Hierarquia', href: '/admin/hierarquia', permissao: PERMISSIONS.SEDES_MANAGE },
   { id: 'loja', label: 'Loja', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
   { id: 'comunidade', label: 'Comunidade', href: '/admin/comunidade', permissao: PERMISSIONS.COMMUNITY_MANAGE },
+  { id: 'comunidade-moderacao', label: 'Moderação', href: '/admin/comunidade/moderacao', permissao: PERMISSIONS.COMMUNITY_MODERATE },
+  { id: 'noticias', label: 'Notícias', href: '/admin/comunidade/noticias', permissao: PERMISSIONS.NEWS_CURATE },
+  { id: 'aliancas', label: 'Alianças', href: '/admin/aliancas', permissao: PERMISSIONS.ALLIANCES_MANAGE },
   { id: 'acessos', label: 'Controle de acesso', href: '/admin/acessos', permissao: PERMISSIONS.ROLES_MANAGE },
   { id: 'configuracoes', label: 'Configurações', href: '/admin/configuracoes', permissao: PERMISSIONS.SETTINGS_MANAGE },
 ])

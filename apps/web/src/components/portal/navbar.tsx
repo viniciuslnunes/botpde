@@ -10,6 +10,7 @@ import {
   Calendar,
   ShoppingBag,
   Users,
+  Video,
   MapPin,
   Shield,
   UserCircle2,
@@ -18,6 +19,7 @@ import {
   X,
   ChevronDown,
 } from 'lucide-react'
+import { NotificationBell, type NotificationItem } from '@/components/portal/notification-bell'
 
 const navLinks = [
   { href: '/portal', label: 'Início', icon: Home, exact: true },
@@ -26,6 +28,7 @@ const navLinks = [
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users },
+  { href: '/portal/comunidade/salas', label: 'Salas', icon: Video },
 ]
 
 interface PortalNavbarProps {
@@ -34,6 +37,7 @@ interface PortalNavbarProps {
   tenantNome: string
   tenantCor: string
   isAdmin: boolean
+  notifications: NotificationItem[]
 }
 
 export function PortalNavbar({
@@ -42,6 +46,7 @@ export function PortalNavbar({
   tenantNome,
   tenantCor,
   isAdmin,
+  notifications,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -95,6 +100,8 @@ export function PortalNavbar({
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <NotificationBell initialItems={notifications} />
+
           {/* User dropdown — desktop */}
           <div className="relative hidden md:block">
             <button

@@ -1,19 +1,20 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { RsvpButtons } from './rsvp-buttons'
+import { criarSala } from '@/app/portal/comunidade/salas/actions'
 import {
   ArrowLeft,
   Calendar,
   MapPin,
   Clock,
   UserCheck,
-  UserX,
   AlertCircle,
 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 
 export const metadata: Metadata = { title: 'Evento' }
 
@@ -55,6 +56,12 @@ export default async function EventoDetailPage({
         select: { status: true },
       })
     : null
+  let podeCriarSala = false
+  if (session?.user?.id && tenant) {
+    const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
+    const effective = calculateEffectivePermissions(rolePermissions, overrides)
+    podeCriarSala = hasPermission(effective, PERMISSIONS.MEETINGS_HOST)
+  }
 
   const passado = new Date(evento.data) < new Date()
 
@@ -126,6 +133,16 @@ export default async function EventoDetailPage({
             Você vai?
           </h2>
           <RsvpButtons eventoId={id} statusAtual={meuRsvp?.status ?? null} />
+
+          {podeCriarSala && (
+            <form action={criarSala} className="mt-4">
+              <input type="hidden" name="titulo" value={`Sala: ${evento.titulo}`} />
+              <input type="hidden" name="eventoId" value={evento.id} />
+              <button className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--surface-raised))]">
+                Criar sala de vídeo deste evento
+              </button>
+            </form>
+          )}
         </div>
       )}
 
