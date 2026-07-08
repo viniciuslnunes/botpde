@@ -79,6 +79,15 @@ botpde/ (monorepo pnpm + turborepo)
 - **Consequência prática:** hoje não há nada reutilizável para o mobile.
   Qualquer app RN vai precisar de uma API nova, independente do formato
   escolhido (REST, tRPC, etc).
+- **Catálogo da superfície de escrita** (as-is) mapeado em
+  `docs/api/server-actions.html` — doc navegável (estilo Scalar) de cada
+  Server Action: gate de permissão, validação Zod, escritas no banco e
+  `AuditLog`. Regenerar quando novas actions forem criadas.
+- **Achado de auditoria (2026-07-07):** o catálogo expôs que
+  `criarTenantInicial` e `atribuirOwnerAction` (super-admin,
+  `app/super-admin/setup/actions.ts`) **não gravam `AuditLog`**, violando a
+  convenção "toda mutação administrativa grava AuditLog". Tratado como lacuna
+  de segurança — ver item em aberto no §6.
 
 ### 2.5 Deploy / custo
 
@@ -360,7 +369,7 @@ Ao escrever `/admin/acessos`, `db.role.findMany(...).map(...)` (e padrões
 equivalentes) passaram a falhar com `implicit any`/`unknown` no `tsc`, **sem
 nenhum erro no arquivo que gerou o dado** — só nos usos seguintes. Isolado e
 confirmado: é um teto de profundidade de inferência do TypeScript contra os
-tipos condicionais gerados pelo Prisma para este schema (24 models bem
+tipos condicionais gerados pelo Prisma para este schema (27 models bem
 relacionados) — a inferência automática do retorno de `findMany`/`findUnique`
 simplesmente para de funcionar de forma **silenciosa** a partir de um certo
 ponto, sem "excessively deep" explícito.
@@ -406,9 +415,48 @@ Testes: `pnpm --filter @torcida/web test` (suíte da VIN-6) continuam verdes,
 já que não tocam em `packages/types`. Nenhum teste cobre `assertPermission`
 em si (depende de sessão/banco) — cobertura por typecheck + smoke manual.
 
+### 5.4 Provedor de banco — Railway mantido; Prisma Postgres NÃO adotado (2026-07-07)
+
+Decisão de arquitetura de infra, avaliada com prioridade em custo baixo/zero,
+simplicidade e baixo risco. **Banco ativo continua o Railway Postgres**
+(`dbo-bot-pde`, ver §2.5). O **Prisma Postgres** que aparece no console
+`console.prisma.io` **existe mas NÃO é o banco da aplicação** — é uma instância
+separada e vazia (mostra "connect your database to start seeing usage").
+Prisma é usado apenas como **ORM**, apontando para o Railway via `DATABASE_URL`
+(`packages/db/.env`). Não confundir os dois.
+
+Por que manter Railway (sem migrar):
+- Já está em produção, funcionando, e co-hospeda `web` + `bot` + Postgres no
+  mesmo provedor — menos superfície operacional.
+- Custo já baixo (~$2.45/mês dentro do Hobby de $5) — a economia do free tier
+  do Prisma Postgres seria marginal e só sobre o DB (o resto segue no Railway).
+- **Fator decisivo:** o `bot` acessa o banco com `pg` cru, não Prisma. Prisma
+  Postgres é pensado para acesso via Accelerate (pooler/proxy). Migrar exigiria
+  retrabalhar o acesso do bot — custo/risco reais por ganho pequeno.
+- Conexão TCP direta combina com a arquitetura atual (Next server + bot
+  long-running), não serverless.
+
+Quando Prisma Postgres faria sentido no futuro (só neste combo, não antes):
+mover o deploy para **serverless/edge** (ex.: Vercel) **e** aposentar o acesso
+`pg` cru do bot, indo 100% Prisma — aí o pooling do Accelerate resolve
+esgotamento de conexão em serverless e o free tier passa a valer. `Tenant.databaseUrl`
+(§3.1) segue reservado para isolamento físico pontual, independente do provedor.
+
+Melhorias ortogonais ao provedor (não são migração): confirmar backups
+automáticos do Railway ligados; considerar migrations versionadas para produção
+quando o schema estabilizar (hoje o fluxo é `db push`, sem migrations).
+
 ## 6. Itens em aberto (aguardando decisão)
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
+- **Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)** —
+  `criarTenantInicial` e `atribuirOwnerAction` não gravam `AuditLog`. Correção
+  de escopo mínimo (sem mudança de schema): em `criarTenantInicial`, gravar
+  `TENANT_CRIADO` (entidade `Tenant`, `entidadeId: t.id`) e `OWNER_ATRIBUIDO`
+  dentro da transação; em `atribuirOwnerAction`, gravar `OWNER_ATRIBUIDO`
+  apenas quando o owner é de fato atribuído (dentro do `if (!jaOwner)`), para
+  não poluir chamadas idempotentes. Nomes seguem o padrão existente
+  (`TENANT_PERFIL_ATUALIZADO`, `ROLE_CRIADO`).
 - Próximo passo natural de feature: detalhar `resolveVisibility` (item 3) —
   visibilidade cross-tenant na hierarquia sede/subsede/PDE.
 - **Item 26 — checklist pra quando houver domínio próprio de produção**
