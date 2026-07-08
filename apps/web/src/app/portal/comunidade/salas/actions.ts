@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
+import { isLiveKitConfigured } from '@/lib/env'
 import { createSala, encerrarSala as encerrarSalaNoBanco } from '@/lib/salas'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
@@ -26,6 +27,12 @@ const encerrarSalaSchema = z.object({
 
 export async function criarSala(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEETINGS_HOST)
+
+  if (!isLiveKitConfigured()) {
+    throw new Error(
+      'Salas de vídeo indisponíveis: configure LIVEKIT_API_KEY, LIVEKIT_API_SECRET e LIVEKIT_URL.',
+    )
+  }
 
   const parsed = criarSalaSchema.safeParse({
     titulo: formData.get('titulo'),

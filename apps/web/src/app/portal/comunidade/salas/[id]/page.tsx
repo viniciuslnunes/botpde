@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, MessageSquare, Power, Send, Users } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
-import { env } from '@/lib/env'
+import { isLiveKitConfigured, requireLiveKitConfig } from '@/lib/env'
 import { createRoomToken } from '@/lib/livekit'
 import { getSalaById } from '@/lib/salas'
 import { getTenantFromHost } from '@/lib/tenant'
@@ -34,12 +34,16 @@ export default async function SalaDetailPage({
   if (!sala) notFound()
 
   const isHost = session.user.id === sala.hostId
-  const token = await createRoomToken(
-    sala.livekitRoomName,
-    session.user.id,
-    session.user.name ?? 'Torcedor',
-    isHost,
-  )
+  const livekitOk = isLiveKitConfigured()
+  const token = livekitOk
+    ? await createRoomToken(
+        sala.livekitRoomName,
+        session.user.id,
+        session.user.name ?? 'Torcedor',
+        isHost,
+      )
+    : null
+  const livekitUrl = livekitOk ? requireLiveKitConfig().url : null
 
   const enviarMensagemBound = enviarMensagemSala
   const encerrarSalaBound = encerrarSala.bind(null, sala.id)
@@ -83,8 +87,17 @@ export default async function SalaDetailPage({
             Esta sala foi encerrada em {formatarData(new Date(sala.encerradaEm))}
           </p>
         </div>
+      ) : !livekitOk ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-center dark:border-amber-800 dark:bg-amber-950">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+            Vídeo indisponível — LiveKit não configurado neste ambiente.
+          </p>
+          <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+            O chat da sala abaixo continua funcionando.
+          </p>
+        </div>
       ) : (
-        <MeetRoom token={token} serverUrl={env.LIVEKIT_URL} />
+        <MeetRoom token={token!} serverUrl={livekitUrl!} />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">

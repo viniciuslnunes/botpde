@@ -36,13 +36,13 @@ const serverSchema = z.object({
   // Super admins (e-mails separados por vírgula)
   SUPER_ADMIN_EMAILS: z.string().optional(),
 
-  // LiveKit (Meet)
-  LIVEKIT_API_KEY: z.string().min(1, 'LIVEKIT_API_KEY é obrigatória'),
-  LIVEKIT_API_SECRET: z.string().min(1, 'LIVEKIT_API_SECRET é obrigatória'),
+  // LiveKit (Meet) — opcional; salas de vídeo exigem em runtime
+  LIVEKIT_API_KEY: z.string().min(1).optional(),
+  LIVEKIT_API_SECRET: z.string().min(1).optional(),
   LIVEKIT_URL: z
     .string()
-    .min(1, 'LIVEKIT_URL é obrigatória')
-    .refine((v) => v.startsWith('wss://') || v.startsWith('ws://'), {
+    .optional()
+    .refine((v) => !v || v.startsWith('wss://') || v.startsWith('ws://'), {
       message: 'LIVEKIT_URL deve usar ws:// ou wss://',
     }),
   NOTICIAS_INGEST_KEY: z.string().optional(),
@@ -79,9 +79,9 @@ function validateEnv() {
       TENANT_SLUG: undefined,
       ROOT_DOMAIN: undefined,
       SUPER_ADMIN_EMAILS: undefined,
-      LIVEKIT_API_KEY: '',
-      LIVEKIT_API_SECRET: '',
-      LIVEKIT_URL: '',
+      LIVEKIT_API_KEY: undefined,
+      LIVEKIT_API_SECRET: undefined,
+      LIVEKIT_URL: undefined,
       NOTICIAS_INGEST_KEY: undefined,
       NODE_ENV: 'development' as const,
       PORT: 3000,
@@ -127,3 +127,24 @@ export const superAdminEmails: string[] = env.SUPER_ADMIN_EMAILS
 
 export const isDev = env.NODE_ENV === 'development'
 export const isProd = env.NODE_ENV === 'production'
+
+export function isLiveKitConfigured(): boolean {
+  return Boolean(env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET && env.LIVEKIT_URL)
+}
+
+export function requireLiveKitConfig(): {
+  apiKey: string
+  apiSecret: string
+  url: string
+} {
+  if (!isLiveKitConfigured()) {
+    throw new Error(
+      'LiveKit não configurado. Defina LIVEKIT_API_KEY, LIVEKIT_API_SECRET e LIVEKIT_URL no ambiente.',
+    )
+  }
+  return {
+    apiKey: env.LIVEKIT_API_KEY!,
+    apiSecret: env.LIVEKIT_API_SECRET!,
+    url: env.LIVEKIT_URL!,
+  }
+}
