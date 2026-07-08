@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getFeedComunidade } from '@/lib/comunidade'
+import { escolherComunicadoDestaque } from '@/lib/comunicado-destaque'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import Link from 'next/link'
 import {
@@ -15,6 +16,7 @@ import {
   AlertCircle,
   ArrowRight,
   PartyPopper,
+  Megaphone,
 } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -34,6 +36,7 @@ interface ItemComunidade {
   texto: string
   fixado: boolean
   oficial: boolean
+  novo: boolean
 }
 
 export default async function PortalPage({
@@ -71,9 +74,12 @@ export default async function PortalPage({
         }) as Promise<EventoProximo[]>)
       : ([] as EventoProximo[]),
     tenant
-      ? getFeedComunidade(tenant.id, { takePosts: 2 })
+      ? getFeedComunidade(tenant.id, { takePosts: 2, userId })
       : Promise.resolve({ announcements: [], posts: [] }),
   ])
+
+  // Comunicado prioritário não lido → banner na primeira dobra (VIN-19)
+  const destaque = escolherComunicadoDestaque(feedComunidade.announcements)
 
   // Comunicados institucionais sempre aparecem primeiro no widget — mesma
   // regra do feed completo: conteúdo institucional sobrescreve a
@@ -85,6 +91,7 @@ export default async function PortalPage({
       texto: a.corpo,
       fixado: a.fixado,
       oficial: true,
+      novo: a.lido === false,
     })),
     ...feedComunidade.posts.map((p) => ({
       id: p.id,
@@ -92,6 +99,7 @@ export default async function PortalPage({
       texto: p.conteudo,
       fixado: p.fixado,
       oficial: false,
+      novo: false,
     })),
   ].slice(0, 2)
 
@@ -151,6 +159,48 @@ export default async function PortalPage({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Comunicado prioritário não lido — primeira dobra (VIN-19). Some
+          depois que o associado visita o feed (leitura marcada lá). */}
+      {destaque && (
+        <Link
+          href="/portal/comunidade"
+          className={[
+            'group flex items-start gap-3 rounded-xl border p-4 transition-colors',
+            destaque.prioridade === 'URGENTE'
+              ? 'border-red-300 bg-red-50 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:hover:bg-red-900'
+              : 'border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.06)] hover:bg-[rgb(var(--primary)_/_0.1)]',
+          ].join(' ')}
+        >
+          <Megaphone
+            className={[
+              'mt-0.5 h-5 w-5 shrink-0',
+              destaque.prioridade === 'URGENTE'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-[rgb(var(--primary))]',
+            ].join(' ')}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={[
+                  'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                  destaque.prioridade === 'URGENTE'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-[rgb(var(--primary))] text-white',
+                ].join(' ')}
+              >
+                {destaque.prioridade === 'URGENTE' ? 'Urgente' : 'Comunicado'}
+              </span>
+              <p className="font-semibold text-[rgb(var(--foreground))]">{destaque.titulo}</p>
+            </div>
+            <p className="mt-1 line-clamp-2 text-sm text-[rgb(var(--foreground-muted))]">
+              {destaque.corpo}
+            </p>
+          </div>
+          <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-hover:translate-x-0.5" />
+        </Link>
       )}
 
       {/* Hero — boas-vindas */}
@@ -360,6 +410,11 @@ export default async function PortalPage({
               {itensComunidade.map((item) => (
                 <div key={item.id} className="rounded-lg border border-[rgb(var(--border))] px-3 py-2.5 text-sm">
                   <div className="flex flex-wrap items-center gap-1.5">
+                    {item.novo && (
+                      <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        Novo
+                      </span>
+                    )}
                     {item.oficial && (
                       <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
                         Oficial
