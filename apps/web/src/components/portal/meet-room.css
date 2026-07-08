@@ -1,0 +1,116 @@
+/* LiveKit theme alinhado ao portal escuro */
+.meet-room-root[data-lk-theme='default'] {
+  --lk-bg: rgb(9 9 11);
+  --lk-bg2: rgb(24 24 27);
+  --lk-bg3: rgb(39 39 42);
+  --lk-bg4: rgb(63 63 70);
+  --lk-bg5: rgb(82 82 91);
+  --lk-fg: rgb(250 250 250);
+  --lk-fg2: rgb(161 161 170);
+  --lk-fg3: rgb(113 113 122);
+  --lk-fg4: rgb(82 82 91);
+  --lk-fg5: rgb(63 63 70);
+  --lk-accent-bg: rgb(var(--color-primary));
+  --lk-accent-fg: rgb(255 255 255);
+  --lk-accent2: rgb(var(--color-primary));
+  --lk-accent3: rgb(var(--color-primary));
+  --lk-accent4: rgb(var(--color-primary));
+  --lk-danger: rgb(239 68 68);
+  --lk-danger-fg: rgb(255 255 255);
+  --lk-border-color: rgb(39 39 42);
+  --lk-control-bar-height: 4.25rem;
+  --lk-grid-gap: 0.75rem;
+  --lk-border-radius: 0.75rem;
+  --lk-drop-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  --lk-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.meet-room-root {
+  display: flex;
+  flex-direction: column;
+  min-height: min(72vh, 760px);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgb(var(--surface));
+}
+
+.meet-room-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.meet-room-stage {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  padding: 0.75rem;
+  background: rgb(9 9 11);
+}
+
+.meet-room-grid {
+  height: 100%;
+}
+
+.meet-room-grid .lk-participant-tile {
+  border-radius: 0.875rem;
+  overflow: hidden;
+  border: 1px solid rgb(39 39 42);
+  background: rgb(24 24 27);
+}
+
+.meet-room-grid .lk-participant-metadata {
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.72), transparent);
+}
+
+.meet-room-empty {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+  color: rgb(161 161 170);
+}
+
+.meet-room-empty svg {
+  opacity: 0.7;
+}
+
+.meet-room-empty p {
+  max-width: 28rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.meet-room-controls.lk-control-bar {
+  border-top: 1px solid rgb(39 39 42);
+  background: rgb(24 24 27);
+  padding: 0.75rem 1rem;
+}
+
+.meet-room-controls .lk-button {
+  border-radius: 9999px;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.meet-room-controls .lk-button[data-lk-source='screen_share'] {
+  min-width: auto;
+  padding-inline: 1rem;
+}
+
+.meet-room-alert {
+  margin: 0.75rem 0.75rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(251 191 36 / 0.35);
+  background: rgb(69 26 3 / 0.45);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgb(254 243 199);
+}

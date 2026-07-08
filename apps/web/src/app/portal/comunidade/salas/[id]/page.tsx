@@ -97,7 +97,9 @@ export default async function SalaDetailPage({
           </p>
         </div>
       ) : (
-        <MeetRoom token={token!} serverUrl={livekitUrl!} />
+        <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
+          <MeetRoom token={token!} serverUrl={livekitUrl!} />
+        </section>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">

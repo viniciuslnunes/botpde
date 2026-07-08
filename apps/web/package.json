@@ -10,13 +10,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@livekit/components-react": "^2.9.16",
     "@hookform/resolvers": "^3.9.1",
+    "@livekit/components-react": "^2.9.16",
+    "@livekit/components-styles": "^1.2.0",
     "@sentry/nextjs": "^10",
     "@torcida/db": "workspace:*",
     "@torcida/types": "workspace:*",
     "@torcida/ui": "workspace:*",
     "bcryptjs": "^3.0.3",
+    "livekit-client": "^2.15.7",
+    "livekit-server-sdk": "^2.13.0",
     "lucide-react": "^1.22.0",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.29",
@@ -25,8 +28,6 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.54.2",
-    "livekit-client": "^2.15.7",
-    "livekit-server-sdk": "^2.13.0",
     "sonner": "^1.7.4",
     "zod": "^3.23.8"
   },
