@@ -30,7 +30,11 @@ export default async function ComunidadePage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!tenant) redirect('/')
 
-  const { announcements, posts } = await getFeedComunidade(tenant.id)
+  // Estado de leitura vem calculado ANTES da marcação abaixo — assim esta
+  // visita ainda exibe "Novo" no que acabou de chegar; na próxima, não.
+  const { announcements, posts } = await getFeedComunidade(tenant.id, {
+    userId: session?.user?.id,
+  })
 
   if (session?.user?.id && announcements.length > 0) {
     await marcarComunicadosLidos(
@@ -71,6 +75,11 @@ export default async function ComunidadePage() {
                 ].join(' ')}
               >
                 <div className="flex flex-wrap items-center gap-2">
+                  {a.lido === false && (
+                    <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                      Novo
+                    </span>
+                  )}
                   {a.fixado && (
                     <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
                       <Pin className="h-3 w-3" /> Fixado

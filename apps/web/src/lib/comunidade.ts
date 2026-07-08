@@ -11,6 +11,8 @@ export interface ComunicadoFeedItem {
   publicadoEm: Date
   tenant: { nome: string }
   autor: { nome: string | null; avatarUrl: string | null }
+  /** Presente quando o feed foi buscado com userId — estado de leitura do usuário. */
+  lido?: boolean
 }
 
 export interface PostFeedItem {
@@ -39,7 +41,7 @@ const PESO_PRIORIDADE: Record<ComunicadoFeedItem['prioridade'], number> = {
  */
 export async function getFeedComunidade(
   tenantId: string,
-  opts: { takePosts?: number } = {},
+  opts: { takePosts?: number; userId?: string } = {},
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
   // comunidade é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
   const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
@@ -59,6 +61,17 @@ export async function getFeedComunidade(
       include: { autor: { select: { nome: true, avatarUrl: true } } },
     }) as Promise<PostFeedItem[]>,
   ])
+
+  // Estado de leitura por usuário — calculado ANTES de qualquer marcação,
+  // para a UI conseguir exibir "Novo" na visita que introduz o comunicado.
+  if (opts.userId && announcements.length > 0) {
+    const lidos: { announcementId: string }[] = await db.announcementRead.findMany({
+      where: { userId: opts.userId, announcementId: { in: announcements.map((a) => a.id) } },
+      select: { announcementId: true },
+    })
+    const lidosSet = new Set(lidos.map((l) => l.announcementId))
+    for (const a of announcements) a.lido = lidosSet.has(a.id)
+  }
 
   announcements.sort((a, b) => {
     const pesoA = PESO_PRIORIDADE[a.prioridade]
