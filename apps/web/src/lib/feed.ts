@@ -156,55 +156,52 @@ export async function getFeedPersonalizado(
     select: { seguidoId: true },
   })
   const seguindoIds = seguindo.map((s) => s.seguidoId)
-  const seguindoSet = new Set(seguindoIds)
+  // A rede pessoal do feed é VOCÊ + quem você segue. Incluir o próprio usuário
+  // garante que suas publicações apareçam no feed (não só no perfil).
+  const redeIds = [userId, ...seguindoIds]
+  const redeSet = new Set(redeIds)
 
-  const suggestedShare = seguindoIds.length > 0 ? Math.max(1, Math.floor(take * 0.2)) : take
-  const takeSeguindo = Math.max(0, take - suggestedShare)
-  const takeSugeridos = suggestedShare
-
-  const [postsSeguindoRaw, postsSugeridosRaw] = await Promise.all([
-    takeSeguindo > 0
-      ? (db.post.findMany({
-          where: {
-            tenantId: { in: visibleTenantIds },
-            tipo: 'MEMBRO',
-            oculto: false,
-            autorId: { in: seguindoIds.length > 0 ? seguindoIds : [''] },
-            ...cursorWhere,
-          },
-          orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-          take: takeSeguindo + 1,
-          include: postInclude(userId),
-        }) as Promise<PostRaw[]>)
-      : Promise.resolve([] as PostRaw[]),
+  const [pessoalRaw, descobertaRaw] = await Promise.all([
+    db.post.findMany({
+      where: {
+        tenantId: { in: visibleTenantIds },
+        tipo: 'MEMBRO',
+        oculto: false,
+        autorId: { in: redeIds },
+        ...cursorWhere,
+      },
+      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      include: postInclude(userId),
+    }) as Promise<PostRaw[]>,
     db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
         visibilidade: 'PUBLICO',
         oculto: false,
-        autorId: { notIn: [...seguindoIds, userId] },
+        autorId: { notIn: redeIds },
         ...cursorWhere,
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-      take: takeSugeridos + 1,
+      take: take + 1,
       include: postInclude(userId),
     }) as Promise<PostRaw[]>,
   ])
 
-  const postsSeguindoTyped: PostSocialItem[] = postsSeguindoRaw.map(projetarPost)
-  const postsSugeridosTyped: PostSocialItem[] = postsSugeridosRaw.map(projetarPost)
+  // União por recência, dedupe, e uma única página de `take` posts.
+  const dedup = new Map<string, PostSocialItem>()
+  for (const post of [...pessoalRaw, ...descobertaRaw].map(projetarPost)) {
+    if (!dedup.has(post.id)) dedup.set(post.id, post)
+  }
+  const ordenados = [...dedup.values()].sort(sortPostsDesc)
+  const hasMore = ordenados.length > take
+  const pagina = ordenados.slice(0, take)
+  const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
 
-  const hasMoreSeguindo = postsSeguindoTyped.length > takeSeguindo
-  const hasMoreSugeridos = postsSugeridosTyped.length > takeSugeridos
-  const postsSeguindo = postsSeguindoTyped.slice(0, takeSeguindo)
-  const postsSugeridos = postsSugeridosTyped
-    .slice(0, takeSugeridos)
-    .filter((post: PostSocialItem) => !seguindoSet.has(post.autorId))
-
-  const merged = [...postsSeguindo, ...postsSugeridos].sort(sortPostsDesc).slice(0, take)
-  const hasMore = hasMoreSeguindo || hasMoreSugeridos
-  const nextCursor = hasMore && merged.length > 0 ? encodeCursor(merged[merged.length - 1]) : null
+  // Mantém o contrato de dois baldes; os consumidores concatenam ambos.
+  const postsSeguindo = pagina.filter((post) => redeSet.has(post.autorId))
+  const postsSugeridos = pagina.filter((post) => !redeSet.has(post.autorId))
 
   return {
     announcements,
