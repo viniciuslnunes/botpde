@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getFeedComunidade } from '@/lib/comunidade'
 import { escolherComunicadoDestaque } from '@/lib/comunicado-destaque'
+import { resolverProximaAcao } from '@/lib/proxima-acao'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import Link from 'next/link'
 import {
@@ -17,6 +18,8 @@ import {
   ArrowRight,
   PartyPopper,
   Megaphone,
+  MapPin,
+  CalendarCheck,
 } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -58,6 +61,8 @@ export default async function PortalPage({
     tenant
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId } },
+          // Núcleo local do associado (VIN-20) — a unidade a que ele pertence
+          include: { sede: { select: { id: true, nome: true, tipo: true, cidade: true } } },
         })
       : null,
     tenant
@@ -81,11 +86,33 @@ export default async function PortalPage({
   // Comunicado prioritário não lido → banner na primeira dobra (VIN-19)
   const destaque = escolherComunicadoDestaque(feedComunidade.announcements)
 
+  // Próxima ação do associado (VIN-20): primeiro evento futuro sem RSVP.
+  // Depende dos eventos já buscados — query sequencial de propósito.
+  interface RsvpLite {
+    eventoId: string
+    status: 'CONFIRMADO' | 'RECUSADO'
+  }
+  const rsvps: RsvpLite[] =
+    membro?.status === 'APROVADO' && proximosEventos.length > 0
+      ? await db.eventoRsvp.findMany({
+          where: { userId, eventoId: { in: proximosEventos.map((e) => e.id) } },
+          select: { eventoId: true, status: true },
+        })
+      : []
+  const proximaAcao = resolverProximaAcao(
+    proximosEventos,
+    new Map(rsvps.map((r) => [r.eventoId, r.status])),
+    membro?.status === 'APROVADO',
+  )
+
   // Comunicados institucionais sempre aparecem primeiro no widget — mesma
   // regra do feed completo: conteúdo institucional sobrescreve a
   // prioridade do feed local.
+  // O comunicado já destacado no banner não se repete no widget (VIN-20)
   const itensComunidade: ItemComunidade[] = [
-    ...feedComunidade.announcements.map((a) => ({
+    ...feedComunidade.announcements
+      .filter((a) => a.id !== destaque?.id)
+      .map((a) => ({
       id: a.id,
       titulo: a.titulo as string | null,
       texto: a.corpo,
@@ -258,9 +285,50 @@ export default async function PortalPage({
                   Sócio Nº {socio.numeroSocio}
                 </span>
               )}
+
+              {/* Núcleo local — vínculo territorial do associado (VIN-20) */}
+              {membro?.sede && (
+                <Link
+                  href={`/portal/sedes/${membro.sede.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--background-subtle))] px-3 py-1 text-xs font-semibold text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  {membro.sede.nome}
+                  {membro.sede.cidade ? ` · ${membro.sede.cidade}` : ''}
+                </Link>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Próxima ação do associado (VIN-20) — só para membro aprovado */}
+        {proximaAcao?.tipo === 'CONFIRMAR_PRESENCA' && (
+          <Link
+            href={`/portal/eventos/${proximaAcao.evento.id}`}
+            className="group mt-4 flex items-center gap-3 rounded-xl border border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.06)] p-4 transition-colors hover:bg-[rgb(var(--primary)_/_0.1)]"
+          >
+            <CalendarCheck className="h-5 w-5 shrink-0 text-[rgb(var(--primary))]" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                Confirme sua presença: {proximaAcao.evento.titulo}
+              </p>
+              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                {formatarDataEvento(proximaAcao.evento.data)} — responda para a liderança organizar a mobilização.
+              </p>
+            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        )}
+
+        {proximaAcao?.tipo === 'PRESENCA_CONFIRMADA' && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl bg-green-50 p-4 dark:bg-green-950">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+            <p className="text-sm text-green-800 dark:text-green-200">
+              Presença confirmada em <span className="font-semibold">{proximaAcao.evento.titulo}</span>{' '}
+              ({formatarDataEvento(proximaAcao.evento.data)}). Nos vemos lá!
+            </p>
+          </div>
+        )}
 
         {/* Aviso de pendência */}
         {membro?.status === 'PENDENTE' && (
