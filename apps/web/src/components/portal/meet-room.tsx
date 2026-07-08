@@ -14,6 +14,7 @@ import {
 import { toast } from '@torcida/ui'
 import { playSalaModerationAlert } from '@/lib/sala-alert-sound'
 import {
+  ConnectionState,
   MediaDeviceFailure,
   RoomEvent,
   Track,
@@ -364,46 +365,37 @@ function MeetConference({
   userName: string
   onLeaveCall?: () => void
 }) {
-  const {
-    GridLayout,
-    ParticipantTile,
-    RoomAudioRenderer,
-    useTracks,
-    useParticipants,
-    ParticipantLoop,
-    useLocalParticipant,
-  } = lk
+  const { GridLayout, ParticipantTile, RoomAudioRenderer, useTracks, useLocalParticipant, useRoomContext } =
+    lk
 
-  const participants = useParticipants()
+  const room = useRoomContext()
   const { localParticipant } = useLocalParticipant()
-  const screenTracks = useTracks([{ source: Track.Source.ScreenShare, withPlaceholder: false }])
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  )
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
+  const conectado = room.state === ConnectionState.Connected
 
   return (
     <div className="meet-room-layout">
       <div className="meet-room-stage">
-        {participants.length === 0 ? (
+        {!conectado ? (
           <div className="meet-room-connecting">
             <Loader2 className="h-6 w-6 animate-spin" />
             <span>Conectando à sala…</span>
           </div>
         ) : (
-          <>
-            {screenTracks.length > 0 && (
-              <div className="meet-room-screenshare-row">
-                <GridLayout tracks={screenTracks} className="meet-room-grid meet-room-grid--focus">
-                  <ParticipantTile />
-                </GridLayout>
-              </div>
-            )}
-            <ParticipantLoop participants={participants} className="meet-room-participant-grid">
-              <ParticipantTile />
-            </ParticipantLoop>
-          </>
+          <GridLayout tracks={tracks} className="meet-room-grid">
+            <ParticipantTile />
+          </GridLayout>
         )}
 
-        {!isHost && !canSpeak && !canScreen && (
+        {conectado && !isHost && !canSpeak && !canScreen && (
           <div className="meet-room-local-status">
             Sem permissão de voz, câmera ou tela — use os botões abaixo para solicitar ao anfitrião.
           </div>

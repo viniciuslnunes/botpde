@@ -63,13 +63,10 @@ declare module '@livekit/components-react' {
     className?: string
     children?: ReactNode
   }): ReactNode
-  export function useTracks(sources: unknown[]): unknown[]
-  export function useParticipants(): unknown[]
-  export function ParticipantLoop(props: {
-    participants: unknown[]
-    className?: string
-    children?: ReactNode
-  }): ReactNode
+  export function useTracks(
+    sources: unknown[],
+    options?: { onlySubscribed?: boolean },
+  ): unknown[]
   export function useTrackToggle(props: { source: unknown }): {
     buttonProps: Record<string, unknown>
     enabled: boolean
