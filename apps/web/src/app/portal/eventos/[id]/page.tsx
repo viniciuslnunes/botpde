@@ -35,7 +35,10 @@ export default async function EventoDetailPage({
     where: { id },
     include: {
       rsvps: {
-        include: { user: { select: { id: true, name: true, image: true } } },
+        // Campos reais do model User são `nome`/`avatarUrl` (não name/image).
+        // O select errado quebrava a página inteira em runtime e o tsc não
+        // acusava — a inferência do Prisma degrada para any (ARCHITECTURE §5.2).
+        include: { user: { select: { id: true, nome: true, avatarUrl: true } } },
         where: { status: 'CONFIRMADO' },
         orderBy: { id: 'asc' },
         take: 50,
@@ -145,17 +148,17 @@ export default async function EventoDetailPage({
           <div className="flex flex-wrap gap-3">
             {evento.rsvps.map((r: (typeof evento.rsvps)[number]) => (
               <div key={r.id} className="flex items-center gap-2 text-sm text-[rgb(var(--foreground))]">
-                {r.user.image ? (
+                {r.user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={r.user.image}
-                    alt={r.user.name ?? ''}
+                    src={r.user.avatarUrl}
+                    alt={r.user.nome ?? ''}
                     className="h-7 w-7 rounded-full ring-1 ring-[rgb(var(--border))]"
                   />
                 ) : (
                   <div className="h-7 w-7 rounded-full bg-[rgb(var(--border))]" />
                 )}
-                <span className="text-xs">{r.user.name ?? 'Membro'}</span>
+                <span className="text-xs">{r.user.nome ?? 'Membro'}</span>
               </div>
             ))}
           </div>
