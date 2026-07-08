@@ -12,8 +12,11 @@ import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 
 const criarSalaSchema = z.object({
-  titulo: z.string().min(3, 'Título muito curto').max(120),
-  eventoId: z.string().uuid().optional().or(z.literal('')),
+  titulo: z.string().trim().min(3, 'Título muito curto').max(120),
+  eventoId: z
+    .union([z.string().uuid(), z.literal('')])
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
 })
 
 const enviarMensagemSchema = z.object({
@@ -25,52 +28,83 @@ const encerrarSalaSchema = z.object({
   salaId: z.string().uuid('Sala inválida'),
 })
 
-export async function criarSala(formData: FormData) {
-  const { session, tenant } = await assertPermission(PERMISSIONS.MEETINGS_HOST)
+export type CriarSalaState = { message?: string }
 
-  if (!isLiveKitConfigured()) {
-    throw new Error(
-      'Salas de vídeo indisponíveis: configure LIVEKIT_API_KEY, LIVEKIT_API_SECRET e LIVEKIT_URL.',
-    )
-  }
+function isNextRedirect(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    String((error as { digest?: string }).digest).startsWith('NEXT_REDIRECT')
+  )
+}
 
-  const parsed = criarSalaSchema.safeParse({
-    titulo: formData.get('titulo'),
-    eventoId: formData.get('eventoId'),
-  })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+export async function criarSala(
+  _prev: CriarSalaState,
+  formData: FormData,
+): Promise<CriarSalaState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.MEETINGS_HOST)
 
-  const eventoId = parsed.data.eventoId || undefined
-  if (eventoId) {
-    const evento = await db.evento.findFirst({
-      where: { id: eventoId, tenantId: tenant.id },
-      select: { id: true },
+    if (!isLiveKitConfigured()) {
+      return {
+        message:
+          'Salas de vídeo indisponíveis: confirme LIVEKIT_API_KEY, LIVEKIT_API_SECRET e LIVEKIT_URL no Railway e faça redeploy.',
+      }
+    }
+
+    const parsed = criarSalaSchema.safeParse({
+      titulo: formData.get('titulo'),
+      eventoId: formData.get('eventoId') ?? '',
     })
-    if (!evento) throw new Error('Evento não encontrado para este tenant.')
+    if (!parsed.success) {
+      return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+    }
+
+    const eventoId = parsed.data.eventoId
+    if (eventoId) {
+      const evento = await db.evento.findFirst({
+        where: { id: eventoId, tenantId: tenant.id },
+        select: { id: true },
+      })
+      if (!evento) return { message: 'Evento não encontrado para este tenant.' }
+    }
+
+    const sala = await createSala({
+      tenantId: tenant.id,
+      hostId: session.user.id,
+      titulo: parsed.data.titulo,
+      tipo: eventoId ? 'EVENTO' : 'ABERTA',
+      eventoId,
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'SALA_REUNIAO_CRIADA',
+        entidade: 'SalaReuniao',
+        entidadeId: sala.id,
+        detalhes: { tipo: sala.tipo, eventoId: sala.eventoId },
+      },
+    })
+
+    revalidatePath('/portal/comunidade/salas')
+    revalidatePath('/portal/eventos')
+    redirect(`/portal/comunidade/salas/${sala.id}`)
+  } catch (error) {
+    if (isNextRedirect(error)) throw error
+    const message = error instanceof Error ? error.message : 'Erro ao criar sala'
+    return { message }
   }
 
-  const sala = await createSala({
-    tenantId: tenant.id,
-    hostId: session.user.id,
-    titulo: parsed.data.titulo,
-    tipo: eventoId ? 'EVENTO' : 'ABERTA',
-    eventoId,
-  })
+  return {}
+}
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'SALA_REUNIAO_CRIADA',
-      entidade: 'SalaReuniao',
-      entidadeId: sala.id,
-      detalhes: { tipo: sala.tipo, eventoId: sala.eventoId },
-    },
-  })
-
-  revalidatePath('/portal/comunidade/salas')
-  revalidatePath('/portal/eventos')
-  redirect(`/portal/comunidade/salas/${sala.id}`)
+/** Form action sem useActionState (ex.: botão em página de evento). */
+export async function criarSalaDeEvento(formData: FormData): Promise<void> {
+  const result = await criarSala({}, formData)
+  if (result.message) throw new Error(result.message)
 }
 
 export async function encerrarSala(salaId: string) {

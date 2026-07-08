@@ -1,7 +1,7 @@
 import 'server-only'
 import { db } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
-import { generateInviteSlug } from '@/lib/livekit'
+import { generateInviteSlug } from '@/lib/invite-slug'
 
 export type SalaAtivaListItem = {
   id: string
@@ -54,7 +54,7 @@ export async function listSalasAtivas(tenantId: string): Promise<SalaAtivaListIt
     include: {
       host: { select: { id: true, nome: true, avatarUrl: true } },
       evento: { select: { id: true, titulo: true, data: true } },
-      _count: { select: { participantes: { where: { saiuEm: null } } } },
+      _count: { select: { participantes: true } },
     },
     orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
   }) as Promise<SalaAtivaListItem[]>)
@@ -73,7 +73,7 @@ export async function getSalaById(tenantId: string, salaId: string): Promise<Sal
         orderBy: { criadoEm: 'desc' },
         take: 50,
       },
-      _count: { select: { participantes: { where: { saiuEm: null } } } },
+      _count: { select: { participantes: true } },
     },
   }) as Promise<SalaDetalhe | null>)
 
@@ -109,7 +109,7 @@ export async function createSala(input: CreateSalaInput): Promise<SalaAtivaListI
     include: {
       host: { select: { id: true, nome: true, avatarUrl: true } },
       evento: { select: { id: true, titulo: true, data: true } },
-      _count: { select: { participantes: { where: { saiuEm: null } } } },
+      _count: { select: { participantes: true } },
     },
   }) as Promise<SalaAtivaListItem>)
 

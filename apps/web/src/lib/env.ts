@@ -129,7 +129,10 @@ export const isDev = env.NODE_ENV === 'development'
 export const isProd = env.NODE_ENV === 'production'
 
 export function isLiveKitConfigured(): boolean {
-  return Boolean(env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET && env.LIVEKIT_URL)
+  const key = env.LIVEKIT_API_KEY?.trim()
+  const secret = env.LIVEKIT_API_SECRET?.trim()
+  const url = env.LIVEKIT_URL?.trim()
+  return Boolean(key && secret && url)
 }
 
 export function requireLiveKitConfig(): {

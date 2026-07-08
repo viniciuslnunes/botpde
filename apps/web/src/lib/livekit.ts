@@ -1,6 +1,4 @@
 import 'server-only'
-import { randomBytes } from 'node:crypto'
-import { AccessToken } from 'livekit-server-sdk'
 import { requireLiveKitConfig } from '@/lib/env'
 
 export async function createRoomToken(
@@ -10,6 +8,7 @@ export async function createRoomToken(
   isHost: boolean,
 ): Promise<string> {
   const { apiKey, apiSecret } = requireLiveKitConfig()
+  const { AccessToken } = await import('livekit-server-sdk')
   const token = new AccessToken(apiKey, apiSecret, {
     identity: userId,
     name: userName,
@@ -25,8 +24,4 @@ export async function createRoomToken(
   })
 
   return token.toJwt()
-}
-
-export function generateInviteSlug(): string {
-  return randomBytes(6).toString('base64url')
 }

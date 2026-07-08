@@ -5,7 +5,7 @@ import { MessagesSquare, Users, Video } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { listSalasAtivas } from '@/lib/salas'
-import { criarSala } from './actions'
+import { CriarSalaForm } from '@/components/portal/criar-sala-form'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { db } from '@torcida/db'
 
@@ -43,38 +43,7 @@ export default async function SalasPage() {
         </p>
       </div>
 
-      {canHost && (
-        <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            Criar nova sala
-          </h2>
-          <form action={criarSala} className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
-            <input
-              name="titulo"
-              required
-              minLength={3}
-              maxLength={120}
-              placeholder="Ex: Pré-jogo da rodada"
-              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-            />
-            <select
-              name="eventoId"
-              defaultValue=""
-              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-            >
-              <option value="">Sem evento vinculado</option>
-              {eventos.map((evento) => (
-                <option key={evento.id} value={evento.id}>
-                  {evento.titulo}
-                </option>
-              ))}
-            </select>
-            <button className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white">
-              Criar sala
-            </button>
-          </form>
-        </section>
-      )}
+      {canHost && <CriarSalaForm eventos={eventos} />}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

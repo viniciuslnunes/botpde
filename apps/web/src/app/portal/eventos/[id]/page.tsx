@@ -4,7 +4,7 @@ import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { RsvpButtons } from './rsvp-buttons'
-import { criarSala } from '@/app/portal/comunidade/salas/actions'
+import { criarSalaDeEvento } from '@/app/portal/comunidade/salas/actions'
 import {
   ArrowLeft,
   Calendar,
@@ -135,7 +135,7 @@ export default async function EventoDetailPage({
           <RsvpButtons eventoId={id} statusAtual={meuRsvp?.status ?? null} />
 
           {podeCriarSala && (
-            <form action={criarSala} className="mt-4">
+            <form action={criarSalaDeEvento} className="mt-4">
               <input type="hidden" name="titulo" value={`Sala: ${evento.titulo}`} />
               <input type="hidden" name="eventoId" value={evento.id} />
               <button className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--surface-raised))]">
