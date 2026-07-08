@@ -9,6 +9,7 @@ import { listParticipantesAtivos } from '@/lib/salas-presenca'
 import { getTenantFromHost } from '@/lib/tenant'
 import { encerrarSala } from '../actions'
 import { SalaAtivaClient } from '@/components/portal/sala-ativa-client'
+import { formatDateTimeShort } from '@/lib/format-datetime'
 
 export const metadata: Metadata = { title: 'Sala de vídeo' }
 export const dynamic = 'force-dynamic'
@@ -51,7 +52,11 @@ export default async function SalaDetailPage({
         linkConvite: sala.linkConvite,
         tipo: sala.tipo,
         criadoEm: sala.criadoEm.toISOString(),
+        criadoEmFormatado: formatDateTimeShort(sala.criadoEm),
         encerradaEm: sala.encerradaEm?.toISOString() ?? null,
+        encerradaEmFormatado: sala.encerradaEm
+          ? formatDateTimeShort(sala.encerradaEm)
+          : null,
         host: sala.host,
         evento: sala.evento ? { titulo: sala.evento.titulo } : null,
       }}
@@ -72,6 +77,7 @@ export default async function SalaDetailPage({
         id: m.id,
         conteudo: m.conteudo,
         criadoEm: m.criadoEm.toISOString(),
+        criadoEmFormatado: formatDateTimeShort(m.criadoEm),
         editadaEm: m.editadaEm?.toISOString() ?? null,
         destacada: m.destacada,
         autor: m.autor,

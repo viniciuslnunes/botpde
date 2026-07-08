@@ -32,7 +32,7 @@ interface SalaEnqueteProps {
 }
 
 function InicialAvatar({ nome }: { nome: string | null }) {
-  return (nome?.trim()?.[0] ?? '?').toUpperCase()
+  return <>{(nome?.trim()?.[0] ?? '?').toUpperCase()}</>
 }
 
 export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
