@@ -72,6 +72,8 @@ export default async function SalaDetailPage({
         id: m.id,
         conteudo: m.conteudo,
         criadoEm: m.criadoEm.toISOString(),
+        editadaEm: m.editadaEm?.toISOString() ?? null,
+        destacada: m.destacada,
         autor: m.autor,
       }))}
       encerrarSalaAction={encerrarSalaBound}

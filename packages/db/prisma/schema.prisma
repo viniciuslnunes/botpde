@@ -185,6 +185,8 @@ model User {
   salasHospedadas      SalaReuniao[]
   participacoesReuniao ParticipanteReuniao[]
   mensagensReuniao     MensagemReuniao[]
+  enquetesReuniao      EnqueteReuniao[]
+  votosEnqueteReuniao  VotoEnqueteReuniao[]
 
   @@map("saas_users")
 }
@@ -938,6 +940,7 @@ model SalaReuniao {
   evento        Evento?               @relation(fields: [eventoId], references: [id], onDelete: SetNull)
   participantes ParticipanteReuniao[]
   mensagens     MensagemReuniao[]
+  enquetes      EnqueteReuniao[]
 
   @@index([tenantId, encerradaEm])
   @@map("saas_salas_reuniao")
@@ -971,17 +974,66 @@ enum PapelParticipanteReuniao {
 }
 
 model MensagemReuniao {
-  id       String   @id @default(uuid())
-  salaId   String   @map("sala_id")
-  autorId  String   @map("autor_id")
-  conteudo String
-  criadoEm DateTime @default(now()) @map("criado_em")
+  id         String    @id @default(uuid())
+  salaId     String    @map("sala_id")
+  autorId    String    @map("autor_id")
+  conteudo   String
+  destacada  Boolean   @default(false)
+  editadaEm  DateTime? @map("editada_em")
+  excluidaEm DateTime? @map("excluida_em")
+  criadoEm   DateTime  @default(now()) @map("criado_em")
 
   sala  SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
   autor User        @relation(fields: [autorId], references: [id], onDelete: Cascade)
 
   @@index([salaId, criadoEm])
+  @@index([salaId, destacada])
   @@map("saas_mensagens_reuniao")
+}
+
+model EnqueteReuniao {
+  id          String    @id @default(uuid())
+  salaId      String    @map("sala_id")
+  criadorId   String    @map("criador_id")
+  pergunta    String
+  encerradaEm DateTime? @map("encerrada_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  sala    SalaReuniao           @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  criador User                  @relation(fields: [criadorId], references: [id], onDelete: Cascade)
+  opcoes  OpcaoEnqueteReuniao[]
+  votos   VotoEnqueteReuniao[]
+
+  @@index([salaId, encerradaEm])
+  @@map("saas_enquetes_reuniao")
+}
+
+model OpcaoEnqueteReuniao {
+  id        String @id @default(uuid())
+  enqueteId String @map("enquete_id")
+  texto     String
+  ordem     Int    @default(0)
+
+  enquete EnqueteReuniao       @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  votos   VotoEnqueteReuniao[]
+
+  @@index([enqueteId, ordem])
+  @@map("saas_opcoes_enquete_reuniao")
+}
+
+model VotoEnqueteReuniao {
+  id        String   @id @default(uuid())
+  enqueteId String   @map("enquete_id")
+  opcaoId   String   @map("opcao_id")
+  userId    String   @map("user_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  enquete EnqueteReuniao      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  opcao   OpcaoEnqueteReuniao @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enqueteId, userId])
+  @@map("saas_votos_enquete_reuniao")
 }
 
 // ─── ADVERTÊNCIAS ─────────────────────────────────────────────────────────────

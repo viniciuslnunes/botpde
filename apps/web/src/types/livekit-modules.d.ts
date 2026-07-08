@@ -64,6 +64,16 @@ declare module '@livekit/components-react' {
     children?: ReactNode
   }): ReactNode
   export function useTracks(sources: unknown[]): unknown[]
+  export function useParticipants(): unknown[]
+  export function ParticipantLoop(props: {
+    participants: unknown[]
+    className?: string
+    children?: ReactNode
+  }): ReactNode
+  export function useTrackToggle(props: { source: unknown }): {
+    buttonProps: Record<string, unknown>
+    enabled: boolean
+  }
   export function useLocalParticipant(): { localParticipant: import('livekit-client').LocalParticipant }
   export function useRoomContext(): import('livekit-client').Room
 }

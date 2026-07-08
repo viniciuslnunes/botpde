@@ -2,9 +2,10 @@
 
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, MessageSquare, Power, Users } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Phone, Power, Users, Video } from 'lucide-react'
 import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
+import { SalaEnquete } from '@/components/portal/sala-enquete'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
 
 type SalaAtivaClientProps = {
@@ -48,9 +49,20 @@ export function SalaAtivaClient({
   encerrarSalaAction,
 }: SalaAtivaClientProps) {
   const [onlineCount, setOnlineCount] = useState(initialParticipantes.length)
+  const [inCall, setInCall] = useState(true)
+  const [callKey, setCallKey] = useState(0)
 
   const handleCountChange = useCallback((count: number) => {
     setOnlineCount(count)
+  }, [])
+
+  const handleLeaveCall = useCallback(() => {
+    setInCall(false)
+  }, [])
+
+  const handleRejoinCall = useCallback(() => {
+    setCallKey((k) => k + 1)
+    setInCall(true)
   }, [])
 
   return (
@@ -101,60 +113,104 @@ export function SalaAtivaClient({
             O chat da sala abaixo continua funcionando.
           </p>
         </div>
+      ) : inCall && token && livekitUrl ? (
+        <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
+          <MeetRoom
+            key={callKey}
+            salaId={sala.id}
+            token={token}
+            serverUrl={livekitUrl}
+            isHost={isHost}
+            userId={userId}
+            userName={userName}
+            onOnlineCountChange={handleCountChange}
+            onLeaveCall={handleLeaveCall}
+          />
+        </section>
       ) : (
-        token &&
-        livekitUrl && (
-          <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
-            <MeetRoom
-              salaId={sala.id}
-              token={token}
-              serverUrl={livekitUrl}
-              isHost={isHost}
-              userId={userId}
-              userName={userName}
-              onOnlineCountChange={handleCountChange}
-            />
-          </section>
-        )
+        <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8">
+          <div className="mx-auto max-w-lg text-center">
+            <Phone className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
+            <h2 className="text-lg font-semibold text-[rgb(var(--foreground))]">
+              Você saiu da chamada
+            </h2>
+            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+              Ainda pode acompanhar o chat, enquetes e quem está online na sala.
+            </p>
+            <button
+              type="button"
+              onClick={handleRejoinCall}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-white"
+            >
+              <Video className="h-4 w-4" />
+              Entrar na chamada novamente
+            </button>
+          </div>
+        </section>
       )}
 
       {!sala.encerradaEm && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              <MessageSquare className="h-4 w-4" />
-              Chat da sala
-            </h2>
-            <SalaChat salaId={sala.id} currentUserId={userId} initialMensagens={initialMensagens} />
-          </section>
+        <>
+          {!inCall && (
+            <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                <Users className="h-4 w-4" />
+                Participantes na sala
+              </h2>
+              <SalaParticipantes
+                salaId={sala.id}
+                initialParticipantes={initialParticipantes}
+                onCountChange={handleCountChange}
+              />
+            </section>
+          )}
 
-          <aside className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              <Users className="h-4 w-4" />
-              Participantes online
-            </h2>
-            <SalaParticipantes
-              salaId={sala.id}
-              initialParticipantes={initialParticipantes}
-              onCountChange={handleCountChange}
-            />
+          <SalaEnquete salaId={sala.id} isHost={isHost} />
 
-            <dl className="mt-6 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm">
-              <div>
-                <dt className="text-[rgb(var(--foreground-muted))]">Convite</dt>
-                <dd className="font-mono text-[rgb(var(--foreground))]">{sala.linkConvite}</dd>
-              </div>
-              <div>
-                <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
-                <dd className="text-[rgb(var(--foreground))]">{formatarData(sala.criadoEm)}</dd>
-              </div>
-              <div>
-                <dt className="text-[rgb(var(--foreground-muted))]">Tipo</dt>
-                <dd className="text-[rgb(var(--foreground))]">{sala.tipo}</dd>
-              </div>
-            </dl>
-          </aside>
-        </div>
+          <div className={`grid gap-4 ${inCall ? 'lg:grid-cols-[1fr_320px]' : 'lg:grid-cols-2'}`}>
+            <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                <MessageSquare className="h-4 w-4" />
+                Chat da sala
+              </h2>
+              <SalaChat
+                salaId={sala.id}
+                currentUserId={userId}
+                isHost={isHost}
+                initialMensagens={initialMensagens}
+              />
+            </section>
+
+            {inCall && (
+              <aside className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  <Users className="h-4 w-4" />
+                  Participantes online
+                </h2>
+                <SalaParticipantes
+                  salaId={sala.id}
+                  initialParticipantes={initialParticipantes}
+                  onCountChange={handleCountChange}
+                />
+
+                <dl className="mt-6 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm">
+                  <div>
+                    <dt className="text-[rgb(var(--foreground-muted))]">Convite</dt>
+                    <dd className="font-mono text-[rgb(var(--foreground))]">{sala.linkConvite}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
+                    <dd className="text-[rgb(var(--foreground))]">{formatarData(sala.criadoEm)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[rgb(var(--foreground-muted))]">Tipo</dt>
+                    <dd className="text-[rgb(var(--foreground))]">{sala.tipo}</dd>
+                  </div>
+                </dl>
+              </aside>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

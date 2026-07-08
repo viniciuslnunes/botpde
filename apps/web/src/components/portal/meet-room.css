@@ -47,10 +47,69 @@
   min-height: 420px;
   padding: 0.75rem;
   background: rgb(9 9 11);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.meet-room-grid {
-  height: 100%;
+.meet-room-connecting {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: rgb(161 161 170);
+  font-size: 0.875rem;
+}
+
+.meet-room-screenshare-row {
+  flex: 0 0 auto;
+  min-height: 200px;
+  max-height: 45%;
+}
+
+.meet-room-participant-grid {
+  flex: 1;
+  min-height: 200px;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.meet-room-participant-grid .lk-participant-tile {
+  aspect-ratio: 16 / 10;
+  min-height: 160px;
+}
+
+.meet-room-local-status {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(63 63 70);
+  background: rgb(24 24 27 / 0.92);
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgb(161 161 170);
+}
+
+.meet-room-toggle.lk-button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+}
+
+.meet-room-toggle.lk-button .lk-button-group {
+  display: flex;
+}
+
+/* Esconde ícones duplicados do TrackToggle */
+.meet-room-toggle.lk-button svg + svg {
+  display: none;
 }
 
 .meet-room-grid .lk-participant-tile {

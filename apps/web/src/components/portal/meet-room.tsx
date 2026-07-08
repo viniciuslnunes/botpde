@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
   Bell,
@@ -10,10 +9,6 @@ import {
   Loader2,
   LogOut,
   MonitorUp,
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -45,6 +40,7 @@ type MeetRoomProps = {
   userId: string
   userName: string
   onOnlineCountChange?: (count: number) => void
+  onLeaveCall?: () => void
 }
 
 type LiveKitModule = typeof import('@livekit/components-react')
@@ -115,20 +111,37 @@ async function registrarPresenca(salaId: string, method: 'POST' | 'DELETE'): Pro
   }
 }
 
+function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
+  const { useTrackToggle } = lk
+  const { buttonProps, enabled } = useTrackToggle({ source: Track.Source.ScreenShare })
+
+  return (
+    <button
+      type="button"
+      {...buttonProps}
+      className="meet-room-action-wide"
+    >
+      <MonitorUp className="h-4 w-4" />
+      {enabled ? 'Parar tela' : 'Compartilhar tela'}
+    </button>
+  )
+}
+
 function MeetControls({
   lk,
   salaId,
   isHost,
   userId,
   userName,
+  onLeaveCall,
 }: {
   lk: LiveKitModule
   salaId: string
   isHost: boolean
   userId: string
   userName: string
+  onLeaveCall?: () => void
 }) {
-  const router = useRouter()
   const { useLocalParticipant, useRoomContext, TrackToggle } = lk
   const { localParticipant } = useLocalParticipant()
   const room = useRoomContext()
@@ -239,7 +252,7 @@ function MeetControls({
     setSaindo(true)
     await registrarPresenca(salaId, 'DELETE')
     room.disconnect()
-    router.push('/portal/comunidade/salas')
+    onLeaveCall?.()
   }
 
   return (
@@ -293,14 +306,8 @@ function MeetControls({
       <div className="meet-room-toolbar">
         {isHost || canSpeak ? (
           <>
-            <TrackToggle source={Track.Source.Microphone} className="meet-room-toggle">
-              <Mic className="h-5 w-5" />
-              <MicOff className="h-5 w-5" />
-            </TrackToggle>
-            <TrackToggle source={Track.Source.Camera} className="meet-room-toggle">
-              <Video className="h-5 w-5" />
-              <VideoOff className="h-5 w-5" />
-            </TrackToggle>
+            <TrackToggle source={Track.Source.Microphone} className="meet-room-toggle" />
+            <TrackToggle source={Track.Source.Camera} className="meet-room-toggle" />
           </>
         ) : (
           <button
@@ -315,10 +322,7 @@ function MeetControls({
         )}
 
         {isHost || canScreen ? (
-          <TrackToggle source={Track.Source.ScreenShare} className="meet-room-action-wide">
-            <MonitorUp className="h-4 w-4" />
-            Compartilhar tela
-          </TrackToggle>
+          <ScreenShareButton lk={lk} />
         ) : (
           <button
             type="button"
@@ -351,29 +355,69 @@ function MeetConference({
   isHost,
   userId,
   userName,
+  onLeaveCall,
 }: {
   lk: LiveKitModule
   salaId: string
   isHost: boolean
   userId: string
   userName: string
+  onLeaveCall?: () => void
 }) {
-  const { GridLayout, ParticipantTile, RoomAudioRenderer, useTracks } = lk
+  const {
+    GridLayout,
+    ParticipantTile,
+    RoomAudioRenderer,
+    useTracks,
+    useParticipants,
+    ParticipantLoop,
+    useLocalParticipant,
+  } = lk
 
-  const tracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: true },
-    { source: Track.Source.ScreenShare, withPlaceholder: false },
-  ])
+  const participants = useParticipants()
+  const { localParticipant } = useLocalParticipant()
+  const screenTracks = useTracks([{ source: Track.Source.ScreenShare, withPlaceholder: false }])
+  const canSpeak = canUseSpeak(localParticipant, isHost)
+  const canScreen = canUseScreenShare(localParticipant, isHost)
 
   return (
     <div className="meet-room-layout">
       <div className="meet-room-stage">
-        <GridLayout tracks={tracks} className="meet-room-grid">
-          <ParticipantTile />
-        </GridLayout>
+        {participants.length === 0 ? (
+          <div className="meet-room-connecting">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Conectando à sala…</span>
+          </div>
+        ) : (
+          <>
+            {screenTracks.length > 0 && (
+              <div className="meet-room-screenshare-row">
+                <GridLayout tracks={screenTracks} className="meet-room-grid meet-room-grid--focus">
+                  <ParticipantTile />
+                </GridLayout>
+              </div>
+            )}
+            <ParticipantLoop participants={participants} className="meet-room-participant-grid">
+              <ParticipantTile />
+            </ParticipantLoop>
+          </>
+        )}
+
+        {!isHost && !canSpeak && !canScreen && (
+          <div className="meet-room-local-status">
+            Sem permissão de voz, câmera ou tela — use os botões abaixo para solicitar ao anfitrião.
+          </div>
+        )}
       </div>
 
-      <MeetControls lk={lk} salaId={salaId} isHost={isHost} userId={userId} userName={userName} />
+      <MeetControls
+        lk={lk}
+        salaId={salaId}
+        isHost={isHost}
+        userId={userId}
+        userName={userName}
+        onLeaveCall={onLeaveCall}
+      />
       <RoomAudioRenderer />
     </div>
   )
@@ -387,6 +431,7 @@ export function MeetRoom({
   userId,
   userName,
   onOnlineCountChange,
+  onLeaveCall,
 }: MeetRoomProps) {
   const [lk, setLk] = useState<LiveKitModule | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -429,8 +474,8 @@ export function MeetRoom({
   }, [salaId])
 
   const conferenceProps = useMemo(
-    () => ({ lk: lk!, salaId, isHost, userId, userName }),
-    [lk, salaId, isHost, userId, userName],
+    () => ({ lk: lk!, salaId, isHost, userId, userName, onLeaveCall }),
+    [lk, salaId, isHost, userId, userName, onLeaveCall],
   )
 
   if (loadError) {

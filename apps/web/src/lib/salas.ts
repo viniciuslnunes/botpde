@@ -34,6 +34,8 @@ export type SalaDetalhe = {
     id: string
     conteudo: string
     criadoEm: Date
+    editadaEm: Date | null
+    destacada: boolean
     autorId: string
     autor: { id: string; nome: string | null; avatarUrl: string | null }
   }[]
@@ -69,8 +71,9 @@ export async function getSalaById(tenantId: string, salaId: string): Promise<Sal
       host: { select: { id: true, nome: true, avatarUrl: true } },
       evento: { select: { id: true, titulo: true, data: true } },
       mensagens: {
+        where: { excluidaEm: null },
         include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
-        orderBy: { criadoEm: 'desc' },
+        orderBy: [{ destacada: 'desc' }, { criadoEm: 'desc' }],
         take: 50,
       },
       _count: { select: { participantes: true } },
