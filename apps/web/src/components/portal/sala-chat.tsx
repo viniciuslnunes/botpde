@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Pin, Send, Trash2, Pencil } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatDateTimeShort } from '@/lib/format-datetime'
+import { FormattedDateTime } from '@/components/ui/formatted-datetime'
 
 export type SalaMensagem = {
   id: string
   conteudo: string
   criadoEm: string
+  criadoEmFormatado?: string
   editadaEm: string | null
   destacada: boolean
   autor: { id: string; nome: string | null; avatarUrl: string | null }
@@ -18,12 +21,6 @@ interface SalaChatProps {
   currentUserId: string
   isHost: boolean
   initialMensagens: SalaMensagem[]
-}
-
-function formatarHora(iso: string): string {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(iso),
-  )
 }
 
 function isMensagemTemporaria(id: string): boolean {
@@ -89,9 +86,18 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
           const merged = after
             ? ordenarMensagens([
                 ...prev.filter((m) => !data.mensagens!.some((n) => n.id === m.id)),
-                ...data.mensagens!,
+                ...data.mensagens!.map((m) => ({
+                  ...m,
+                  criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+                })),
               ])
-            : mesclarComServidor(prev, data.mensagens!)
+            : mesclarComServidor(
+                prev,
+                data.mensagens!.map((m) => ({
+                  ...m,
+                  criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+                })),
+              )
           const last = ultimaMensagemServidor(merged)
           if (last) lastCriadoEmRef.current = last
           return merged
@@ -109,7 +115,13 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
         if (!data.mensagens) return
 
         setMensagens((prev) => {
-          const merged = mesclarComServidor(prev, data.mensagens!)
+          const merged = mesclarComServidor(
+            prev,
+            data.mensagens!.map((m) => ({
+              ...m,
+              criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+            })),
+          )
           const last = ultimaMensagemServidor(merged)
           if (last) lastCriadoEmRef.current = last
           return merged
@@ -162,7 +174,10 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
 
       setMensagens((prev) => {
         const next = ordenarMensagens(
-          prev.filter((m) => m.id !== tempId).concat(data.mensagem!),
+          prev.filter((m) => m.id !== tempId).concat({
+            ...data.mensagem!,
+            criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
+          }),
         )
         const last = ultimaMensagemServidor(next)
         if (last) lastCriadoEmRef.current = last
@@ -207,7 +222,16 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
     }
 
     setMensagens((prev) =>
-      ordenarMensagens(prev.map((m) => (m.id === mensagemId ? data.mensagem! : m))),
+      ordenarMensagens(
+        prev.map((m) =>
+          m.id === mensagemId
+            ? {
+                ...data.mensagem!,
+                criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
+              }
+            : m,
+        ),
+      ),
     )
     setEditandoId(null)
     toast.success(body.destacada !== undefined ? 'Destaque atualizado.' : 'Mensagem editada.')
@@ -259,7 +283,10 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs text-[rgb(var(--foreground-muted))]">
                     {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
-                    {formatarHora(mensagem.criadoEm)}
+                    <FormattedDateTime
+                      iso={mensagem.criadoEm}
+                      formatted={mensagem.criadoEmFormatado}
+                    />
                     {temporaria && ' · enviando…'}
                     {mensagem.editadaEm && ' · editada'}
                     {mensagem.destacada && ' · destacada'}

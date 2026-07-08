@@ -7,6 +7,7 @@ import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
+import { FormattedDateTime } from '@/components/ui/formatted-datetime'
 
 type SalaAtivaClientProps = {
   sala: {
@@ -15,7 +16,9 @@ type SalaAtivaClientProps = {
     linkConvite: string
     tipo: string
     criadoEm: string
+    criadoEmFormatado: string
     encerradaEm: string | null
+    encerradaEmFormatado: string | null
     host: { id: string; nome: string | null }
     evento: { titulo: string } | null
   }
@@ -28,12 +31,6 @@ type SalaAtivaClientProps = {
   initialParticipantes: ParticipanteSala[]
   initialMensagens: SalaMensagem[]
   encerrarSalaAction: () => void
-}
-
-function formatarData(iso: string): string {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(iso),
-  )
 }
 
 export function SalaAtivaClient({
@@ -101,7 +98,11 @@ export function SalaAtivaClient({
       {sala.encerradaEm ? (
         <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center">
           <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-            Esta sala foi encerrada em {formatarData(sala.encerradaEm)}
+            Esta sala foi encerrada em{' '}
+            <FormattedDateTime
+              iso={sala.encerradaEm}
+              formatted={sala.encerradaEmFormatado ?? undefined}
+            />
           </p>
         </div>
       ) : !livekitOk ? (
@@ -200,7 +201,9 @@ export function SalaAtivaClient({
                   </div>
                   <div>
                     <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
-                    <dd className="text-[rgb(var(--foreground))]">{formatarData(sala.criadoEm)}</dd>
+                    <dd className="text-[rgb(var(--foreground))]">
+                      <FormattedDateTime iso={sala.criadoEm} formatted={sala.criadoEmFormatado} />
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-[rgb(var(--foreground-muted))]">Tipo</dt>
