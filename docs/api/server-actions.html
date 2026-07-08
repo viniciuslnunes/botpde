@@ -377,10 +377,10 @@ const GROUPS = [
     path:"app/super-admin/setup/actions.ts", actions:[
     { v:"create", n:"criarTenantInicial", a:"(prev, formData)", gate:"Super-admin", open:true,
       desc:"Cria o tenant + 3 roles de sistema (OWNER/ADMIN/MEMBER) e atribui OWNER ao usuário logado. Tudo em transação.",
-      input:"slug(a-z0-9-), nome, corPrimaria?", writes:"Tenant, Role×3, UserRole", audit:"—", ret:"redirect" },
+      input:"slug(a-z0-9-), nome, corPrimaria?", writes:"Tenant, Role×3, UserRole, AuditLog×2", audit:"TENANT_CRIADO, OWNER_ATRIBUIDO", ret:"redirect" },
     { v:"edit", n:"atribuirOwnerAction", a:"(prev, formData)", gate:"Super-admin", open:true,
       desc:"Garante roles de sistema num tenant existente e atribui OWNER ao usuário logado (sem duplicar).",
-      input:"tenantId", writes:"Role, UserRole", audit:"—", ret:"{ tenantId?, tenantSlug? | message? }" },
+      input:"tenantId", writes:"Role, UserRole, AuditLog", audit:"OWNER_ATRIBUIDO (só quando o owner é de fato atribuído)", ret:"{ tenantId?, tenantSlug? | message? }" },
     { v:"edit", n:"atribuirOwner", a:"(tenantId)", gate:"Super-admin", open:true,
       desc:"@deprecated — wrapper legado sobre atribuirOwnerAction com redirect.",
       input:"tenantId", writes:"(via atribuirOwnerAction)", audit:"—", ret:"redirect | SetupState" },

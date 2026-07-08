@@ -83,11 +83,11 @@ botpde/ (monorepo pnpm + turborepo)
   `docs/api/server-actions.html` — doc navegável (estilo Scalar) de cada
   Server Action: gate de permissão, validação Zod, escritas no banco e
   `AuditLog`. Regenerar quando novas actions forem criadas.
-- **Achado de auditoria (2026-07-07):** o catálogo expôs que
+- **Achado de auditoria (2026-07-07, resolvido):** o catálogo expôs que
   `criarTenantInicial` e `atribuirOwnerAction` (super-admin,
-  `app/super-admin/setup/actions.ts`) **não gravam `AuditLog`**, violando a
-  convenção "toda mutação administrativa grava AuditLog". Tratado como lacuna
-  de segurança — ver item em aberto no §6.
+  `app/super-admin/setup/actions.ts`) **não gravavam `AuditLog`**, violando a
+  convenção "toda mutação administrativa grava AuditLog". Corrigido no mesmo dia
+  (`TENANT_CRIADO` / `OWNER_ATRIBUIDO`) — ver §6.
 
 ### 2.5 Deploy / custo
 
@@ -449,13 +449,15 @@ quando o schema estabilizar (hoje o fluxo é `db push`, sem migrations).
 ## 6. Itens em aberto (aguardando decisão)
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
-- **Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)** —
-  `criarTenantInicial` e `atribuirOwnerAction` não gravam `AuditLog`. Correção
-  de escopo mínimo (sem mudança de schema): em `criarTenantInicial`, gravar
-  `TENANT_CRIADO` (entidade `Tenant`, `entidadeId: t.id`) e `OWNER_ATRIBUIDO`
-  dentro da transação; em `atribuirOwnerAction`, gravar `OWNER_ATRIBUIDO`
-  apenas quando o owner é de fato atribuído (dentro do `if (!jaOwner)`), para
-  não poluir chamadas idempotentes. Nomes seguem o padrão existente
+- ~~**Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)**~~
+  — ✅ Feito (2026-07-07): `criarTenantInicial` e `atribuirOwnerAction` agora
+  gravam `AuditLog` (sem mudança de schema). Em `criarTenantInicial`, dentro da
+  transação (client `tx`): `TENANT_CRIADO` (entidade `Tenant`, `entidadeId:
+  t.id`, `detalhes: { slug, nome }`) e `OWNER_ATRIBUIDO` (entidade `User`,
+  `entidadeId: session.user.id`). Em `atribuirOwnerAction`, `OWNER_ATRIBUIDO`
+  gravado apenas quando o owner é de fato atribuído (dentro do `if (!jaOwner)`),
+  para não poluir chamadas idempotentes; `detalhes` inclui `rolesCriadas` quando
+  houve criação de cargos de sistema. Nomes seguem o padrão existente
   (`TENANT_PERFIL_ATUALIZADO`, `ROLE_CRIADO`).
 - Próximo passo natural de feature: detalhar `resolveVisibility` (item 3) —
   visibilidade cross-tenant na hierarquia sede/subsede/PDE.

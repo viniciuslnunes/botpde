@@ -98,6 +98,17 @@ export async function criarTenantInicial(
       }),
     ])
 
+    await tx.auditLog.create({
+      data: {
+        tenantId: t.id,
+        atorId: session.user.id,
+        acao: 'TENANT_CRIADO',
+        entidade: 'Tenant',
+        entidadeId: t.id,
+        detalhes: { slug, nome },
+      },
+    })
+
     // Atribui owner ao usuário logado
     if (session.user.id) {
       await tx.userRole.create({
@@ -105,6 +116,17 @@ export async function criarTenantInicial(
           tenantId: t.id,
           userId: session.user.id,
           roleId: ownerRole.id,
+        },
+      })
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: t.id,
+          atorId: session.user.id,
+          acao: 'OWNER_ATRIBUIDO',
+          entidade: 'User',
+          entidadeId: session.user.id,
+          detalhes: { roleId: ownerRole.id },
         },
       })
     }
@@ -140,6 +162,7 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
   // Mapeia roles de sistema existentes
   const roleMap = Object.fromEntries(tenant.roles.map((r: (typeof tenant.roles)[number]) => [r.nome, r]))
   let ownerRole = roleMap[SYSTEM_ROLES.OWNER]
+  let rolesCriadas: string[] = []
 
   // Cria apenas as roles que ainda não existem
   if (!ownerRole) {
@@ -159,6 +182,7 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
 
     const createdOwner = created.find((r: (typeof created)[number]) => r.nome === SYSTEM_ROLES.OWNER)
     ownerRole = createdOwner ?? roleMap[SYSTEM_ROLES.OWNER]
+    rolesCriadas = created.map((r: (typeof created)[number]) => r.nome)
   }
 
   if (!ownerRole) return { message: 'Erro ao criar cargo owner.' }
@@ -171,6 +195,17 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
   if (!jaOwner) {
     await db.userRole.create({
       data: { tenantId, userId: session.user.id, roleId: ownerRole.id },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId,
+        atorId: session.user.id,
+        acao: 'OWNER_ATRIBUIDO',
+        entidade: 'User',
+        entidadeId: session.user.id,
+        detalhes: { roleId: ownerRole.id, rolesCriadas },
+      },
     })
   }
 
