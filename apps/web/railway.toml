@@ -1,5 +1,6 @@
 [build]
 builder = "NIXPACKS"
+# watch paths do Railway incluem apps/web — alterações na raiz (.npmrc) não disparam deploy
 
 [deploy]
 startCommand = "pnpm --filter @torcida/web start"
