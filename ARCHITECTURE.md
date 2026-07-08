@@ -477,3 +477,30 @@ quando o schema estabilizar (hoje o fluxo é `db push`, sem migrations).
      exata, não aceita wildcard; se o login sempre passar pelo domínio raiz
      antes de redirecionar (cookie compartilhado já cobre isso), só a URI do
      domínio raiz precisa estar cadastrada.
+- ~~**Comunidade — redesenho UI/UX (rede social)**~~ — ✅ Feito (2026-07-08):
+  `/portal/comunidade` reconstruída como hub social de 3 zonas (trilha de
+  identidade+navegação, feed central, trilha de notícias+sugestões), com "Ao vivo
+  agora" trazendo as salas ativas ao topo, composer convidativo, comunicados
+  integrados ao fluxo e cards de post no padrão rede social. Engajamento deixou de
+  usar `window.prompt/alert`: `PostEngagement` agora tem contadores reais, reação
+  otimista e comentário inline. `feed.ts` passou a projetar `totalReacoes`,
+  `totalComentarios` e `minhaReacao` (helpers `postInclude`/`projetarPost`
+  exportados; sem mudança de schema). Novos: `components/portal/avatar.tsx`,
+  `formatRelative` em `lib/format-datetime.ts`. Salas/Perfil/Solicitações
+  alinhados ao mesmo visual. `marcarComunicadosLidos` no feed virou best-effort
+  (try/catch) para não derrubar a página.
+- **Item 27 — Mensageria da comunidade (fase seguinte, decidido 2026-07-08).**
+  Visão do usuário para "conversar/criar comunidades", que o redesenho acima
+  ainda NÃO cobre (é feature de backend, não UI). Escopo a especificar antes de
+  implementar:
+  1. **Conversas diretas (DM 1×1)** entre membros — respeitando visibilidade
+     cross-tenant (`canViewRecurso`/aliança) para quem pode iniciar conversa.
+  2. **Grupos** criados por membros (chat de texto próprio, lista de membros).
+  3. **Comunidades** — canais temáticos criados por administradores (em
+     destaque) ou por membros; entram como novo conceito no schema (novos models
+     tipo `Conversa`/`CanalMensagem`/`MembroConversa` + `MensagemDireta`), RBAC
+     (permissões de criar/moderar comunidade) e moderação. O chat ao vivo das
+     salas de vídeo (`SalaChat`) permanece dentro da sala — é efêmero e separado
+     desta mensageria persistente.
+  Decisão pendente: modelo de dados (reusar `Post`/`Comentario`? novo domínio de
+  mensagens?), limites de rate, e visibilidade de comunidades entre tenants.

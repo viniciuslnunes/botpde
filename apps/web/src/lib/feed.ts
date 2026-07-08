@@ -10,7 +10,7 @@ interface FeedOpts {
   afiliacaoId?: string | null
 }
 
-interface PostSocialItem {
+export interface PostSocialItem {
   id: string
   tenantId: string
   titulo: string | null
@@ -22,6 +22,36 @@ interface PostSocialItem {
   autorId: string
   tenant: { nome: string }
   autor: { id: string; nome: string | null; avatarUrl: string | null }
+  totalReacoes: number
+  totalComentarios: number
+  minhaReacao: 'CURTIR' | 'FORCA' | null
+}
+
+/** Shape cru do Prisma antes de projetar em PostSocialItem. */
+export type PostRaw = Omit<PostSocialItem, 'totalReacoes' | 'totalComentarios' | 'minhaReacao'> & {
+  _count: { reacoes: number; comentarios: number }
+  reacoes: { tipo: 'CURTIR' | 'FORCA' }[]
+}
+
+export function projetarPost(post: PostRaw): PostSocialItem {
+  const { _count, reacoes, ...rest } = post
+  return {
+    ...rest,
+    totalReacoes: _count.reacoes,
+    totalComentarios: _count.comentarios,
+    minhaReacao: reacoes[0]?.tipo ?? null,
+  }
+}
+
+export function postInclude(userId?: string) {
+  return {
+    tenant: { select: { nome: true } },
+    autor: { select: { id: true, nome: true, avatarUrl: true } },
+    _count: { select: { reacoes: true, comentarios: true } },
+    reacoes: userId
+      ? { where: { userId }, select: { tipo: true }, take: 1 }
+      : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
+  } as const
 }
 
 interface FeedCursor {
@@ -93,7 +123,7 @@ export async function getFeedPersonalizado(
   const { announcements } = await getFeedComunidade(tenantId, { userId, takePosts: 0 })
 
   if (!userId) {
-    const sugeridos: PostSocialItem[] = await db.post.findMany({
+    const sugeridosRaw = (await db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
@@ -103,11 +133,9 @@ export async function getFeedPersonalizado(
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
       take: take + 1,
-      include: {
-        tenant: { select: { nome: true } },
-        autor: { select: { id: true, nome: true, avatarUrl: true } },
-      },
-    })
+      include: postInclude(),
+    })) as PostRaw[]
+    const sugeridos: PostSocialItem[] = sugeridosRaw.map(projetarPost)
 
     const slice = sugeridos.slice(0, take)
     const hasMore = sugeridos.length > take
@@ -136,7 +164,7 @@ export async function getFeedPersonalizado(
 
   const [postsSeguindoRaw, postsSugeridosRaw] = await Promise.all([
     takeSeguindo > 0
-      ? db.post.findMany({
+      ? (db.post.findMany({
           where: {
             tenantId: { in: visibleTenantIds },
             tipo: 'MEMBRO',
@@ -146,12 +174,9 @@ export async function getFeedPersonalizado(
           },
           orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
           take: takeSeguindo + 1,
-          include: {
-            tenant: { select: { nome: true } },
-            autor: { select: { id: true, nome: true, avatarUrl: true } },
-          },
-        })
-      : Promise.resolve([] as PostSocialItem[]),
+          include: postInclude(userId),
+        }) as Promise<PostRaw[]>)
+      : Promise.resolve([] as PostRaw[]),
     db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
@@ -163,15 +188,12 @@ export async function getFeedPersonalizado(
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
       take: takeSugeridos + 1,
-      include: {
-        tenant: { select: { nome: true } },
-        autor: { select: { id: true, nome: true, avatarUrl: true } },
-      },
-    }),
+      include: postInclude(userId),
+    }) as Promise<PostRaw[]>,
   ])
 
-  const postsSeguindoTyped: PostSocialItem[] = postsSeguindoRaw
-  const postsSugeridosTyped: PostSocialItem[] = postsSugeridosRaw
+  const postsSeguindoTyped: PostSocialItem[] = postsSeguindoRaw.map(projetarPost)
+  const postsSugeridosTyped: PostSocialItem[] = postsSugeridosRaw.map(projetarPost)
 
   const hasMoreSeguindo = postsSeguindoTyped.length > takeSeguindo
   const hasMoreSugeridos = postsSugeridosTyped.length > takeSugeridos

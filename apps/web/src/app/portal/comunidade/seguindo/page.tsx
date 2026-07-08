@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { Avatar } from '@/components/portal/avatar'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Solicitações de Seguimento' }
@@ -75,18 +76,23 @@ export default async function SeguindoPage() {
           {pendentes.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
             >
-              <div>
-                <Link
-                  href={`/portal/comunidade/perfil/${item.seguidor.id}`}
-                  className="text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
-                >
-                  {item.seguidor.nome ?? 'Membro'}
+              <div className="flex min-w-0 items-center gap-3">
+                <Link href={`/portal/comunidade/perfil/${item.seguidor.id}`}>
+                  <Avatar nome={item.seguidor.nome} avatarUrl={item.seguidor.avatarUrl} size="md" />
                 </Link>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                  solicitou em {formatarData(item.criadoEm)}
-                </p>
+                <div className="min-w-0">
+                  <Link
+                    href={`/portal/comunidade/perfil/${item.seguidor.id}`}
+                    className="truncate text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
+                  >
+                    {item.seguidor.nome ?? 'Membro'}
+                  </Link>
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    solicitou em {formatarData(item.criadoEm)}
+                  </p>
+                </div>
               </div>
               <SeguimentoButtons mode="review" seguimentoId={item.id} />
             </div>

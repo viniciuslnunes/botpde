@@ -1,60 +1,128 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
-import { MessageSquarePlus } from 'lucide-react'
-import { FieldError, Input, SubmitButton, Textarea } from '@torcida/ui'
+import { useActionState, useEffect, useRef, useState } from 'react'
+import { ImagePlus, Send, X } from 'lucide-react'
+import { FieldError } from '@torcida/ui'
 import { publicarPost, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import { Avatar } from './avatar'
 
 const INITIAL_STATE: PublicarPostState = {}
 
-export function FeedComposer() {
-  const [state, action] = useActionState<PublicarPostState, FormData>(publicarPost, INITIAL_STATE)
-  const formRef = useRef<HTMLFormElement>(null)
+interface FeedComposerProps {
+  userName: string | null
+  userAvatar: string | null
+}
 
+export function FeedComposer({ userName, userAvatar }: FeedComposerProps) {
+  const [state, action, pending] = useActionState<PublicarPostState, FormData>(
+    publicarPost,
+    INITIAL_STATE,
+  )
+  const [expanded, setExpanded] = useState(false)
+  const [comImagem, setComImagem] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const firstName = userName?.split(' ')[0] ?? 'torcedor'
+
+  // Após publicar, limpa os campos do formulário (o composer segue aberto para o
+  // próximo post). Apenas manipulação de DOM — sem setState dentro do efeito.
   useEffect(() => {
     if (state.success) formRef.current?.reset()
   }, [state.success])
 
   return (
-    <form ref={formRef} action={action} className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-        Compartilhar no feed
-      </h2>
+    <form
+      ref={formRef}
+      action={action}
+      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
+    >
+      <div className="flex items-start gap-3">
+        <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
+        <div className="min-w-0 flex-1">
+          {!expanded ? (
+            <button
+              type="button"
+              onClick={() => {
+                setExpanded(true)
+                requestAnimationFrame(() => textareaRef.current?.focus())
+              }}
+              className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
+            >
+              No que você tá pensando, {firstName}?
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <textarea
+                ref={textareaRef}
+                name="conteudo"
+                required
+                maxLength={3000}
+                rows={3}
+                placeholder={`No que você tá pensando, ${firstName}?`}
+                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+              />
+              <FieldError errors={state.errors?.conteudo} />
+
+              {comImagem && (
+                <div>
+                  <input
+                    name="imagemUrl"
+                    type="url"
+                    autoFocus
+                    placeholder="Cole a URL de uma imagem"
+                    maxLength={500}
+                    className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                  />
+                  <FieldError errors={state.errors?.imagemUrl} />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {state.message && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
           {state.message}
-        </div>
+        </p>
       )}
 
-      {state.success && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
-          Post publicado com sucesso.
+      {expanded && (
+        <div className="mt-3 flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
+          <button
+            type="button"
+            onClick={() => setComImagem((v) => !v)}
+            className={[
+              'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors',
+              comImagem
+                ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+            ].join(' ')}
+          >
+            {comImagem ? <X className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
+            {comImagem ? 'Remover imagem' : 'Imagem'}
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" />
+              {pending ? 'Publicando…' : 'Publicar'}
+            </button>
+          </div>
         </div>
       )}
-
-      <div>
-        <Textarea
-          name="conteudo"
-          required
-          maxLength={3000}
-          rows={3}
-          placeholder="No que você está pensando para a torcida?"
-        />
-        <FieldError errors={state.errors?.conteudo} />
-      </div>
-
-      <div>
-        <Input
-          name="imagemUrl"
-          type="url"
-          placeholder="URL da imagem (opcional)"
-          maxLength={500}
-        />
-        <FieldError errors={state.errors?.imagemUrl} />
-      </div>
-
-      <SubmitButton label="Publicar" icon={<MessageSquarePlus className="h-4 w-4" />} />
     </form>
   )
 }

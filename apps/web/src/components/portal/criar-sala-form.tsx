@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import { Video } from 'lucide-react'
 import { criarSala, type CriarSalaState } from '@/app/portal/comunidade/salas/actions'
 
 interface EventoOption {
@@ -19,8 +20,9 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
 
   return (
     <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-        Criar nova sala
+      <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+        <Video className="h-4 w-4 text-[rgb(var(--primary))]" />
+        Abrir uma sala
       </h2>
 
       {state.message && (
