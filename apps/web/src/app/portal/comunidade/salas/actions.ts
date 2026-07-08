@@ -13,11 +13,22 @@ import { PERMISSIONS } from '@torcida/types'
 
 const criarSalaSchema = z.object({
   titulo: z.string().trim().min(3, 'Título muito curto').max(120),
-  eventoId: z
-    .union([z.string().uuid(), z.literal('')])
-    .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
 })
+
+function readFormString(formData: FormData, name: string): string {
+  const value = formData.get(name)
+  return typeof value === 'string' ? value : ''
+}
+
+function parseEventoIdOpcional(formData: FormData): { eventoId?: string; error?: string } {
+  const raw = readFormString(formData, 'eventoId').trim()
+  if (!raw) return {}
+  const parsed = z.string().uuid().safeParse(raw)
+  if (!parsed.success) {
+    return { error: 'Selecione um evento válido ou deixe "Sem evento vinculado".' }
+  }
+  return { eventoId: parsed.data }
+}
 
 const enviarMensagemSchema = z.object({
   salaId: z.string().uuid('Sala inválida'),
@@ -54,14 +65,15 @@ export async function criarSala(
     }
 
     const parsed = criarSalaSchema.safeParse({
-      titulo: formData.get('titulo'),
-      eventoId: formData.get('eventoId') ?? '',
+      titulo: readFormString(formData, 'titulo'),
     })
     if (!parsed.success) {
       return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
     }
 
-    const eventoId = parsed.data.eventoId
+    const eventoParsed = parseEventoIdOpcional(formData)
+    if (eventoParsed.error) return { message: eventoParsed.error }
+    const eventoId = eventoParsed.eventoId
     if (eventoId) {
       const evento = await db.evento.findFirst({
         where: { id: eventoId, tenantId: tenant.id },
