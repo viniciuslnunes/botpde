@@ -6,22 +6,12 @@ import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/l
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { atualizarPerfil } from '@/app/portal/comunidade/actions'
+import { postInclude, projetarPost, type PostRaw, type PostSocialItem } from '@/lib/feed'
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Perfil da Comunidade' }
-
-interface PostPerfil {
-  id: string
-  tenantId: string
-  titulo: string | null
-  conteudo: string
-  imagemUrl: string | null
-  criadoEm: Date
-  tenant: { nome: string }
-  autor: { id: string; nome: string | null; avatarUrl: string | null }
-}
 
 export default async function PerfilComunidadePage({
   params,
@@ -61,7 +51,7 @@ export default async function PerfilComunidadePage({
     isSelf || perfilAtual.perfilPrivado === false || statusSeguimento === 'APROVADO'
 
   const visibleTenantIds = await getVisibleTenantIds(tenant.id, 'comunidade')
-  const posts: PostPerfil[] = podeVerPosts
+  const posts: PostSocialItem[] = podeVerPosts
     ? ((await db.post.findMany({
         where: {
           autorId: userId,
@@ -71,12 +61,15 @@ export default async function PerfilComunidadePage({
         },
         orderBy: [{ criadoEm: 'desc' }],
         take: 20,
-        include: {
-          tenant: { select: { nome: true } },
-          autor: { select: { id: true, nome: true, avatarUrl: true } },
-        },
-      })) as PostPerfil[])
+        include: postInclude(session.user.id),
+      })) as PostRaw[]).map(projetarPost)
     : []
+
+  const currentUser = {
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl: session.user.image ?? null,
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -160,7 +153,12 @@ export default async function PerfilComunidadePage({
         ) : (
           <div className="space-y-4">
             {posts.map((post) => (
-              <FeedPostCard key={post.id} post={post} showTenantBadge={post.tenantId !== tenant.id} />
+              <FeedPostCard
+                key={post.id}
+                post={post}
+                showTenantBadge={post.tenantId !== tenant.id}
+                currentUser={currentUser}
+              />
             ))}
           </div>
         )}

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { MessagesSquare, Users, Video } from 'lucide-react'
+import { ArrowLeft, Users, Video } from 'lucide-react'
+import { Avatar } from '@/components/portal/avatar'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { listSalasAtivas } from '@/lib/salas'
@@ -10,10 +11,6 @@ import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torc
 import { db } from '@torcida/db'
 
 export const metadata: Metadata = { title: 'Salas de vídeo' }
-
-function formatarData(data: Date): string {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data)
-}
 
 export default async function SalasPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
@@ -35,55 +32,75 @@ export default async function SalasPage() {
   const canHost = hasPermission(effectivePermissions, PERMISSIONS.MEETINGS_HOST)
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Salas de vídeo</h1>
+        <Link
+          href="/portal/comunidade"
+          className="mb-3 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        >
+          <ArrowLeft className="h-4 w-4" /> Voltar à comunidade
+        </Link>
+        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Salas ao vivo</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Encontros em tempo real da comunidade usando áudio, vídeo e compartilhamento de tela
+          Encontros em tempo real com áudio, vídeo, chat e compartilhamento de tela
         </p>
       </div>
 
       {canHost && <CriarSalaForm eventos={eventos} />}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Salas ativas
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+          {salas.length > 0 && (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+            </span>
+          )}
+          {salas.length > 0 ? `${salas.length} sala${salas.length === 1 ? '' : 's'} abertas` : 'Salas ativas'}
         </h2>
 
         {salas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] py-12 text-center">
-            <MessagesSquare className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-              Não há salas abertas no momento
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)]">
+              <Video className="h-6 w-6 text-[rgb(var(--primary))]" />
+            </div>
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Nenhuma sala aberta agora
             </p>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              {canHost ? 'Crie a primeira sala para iniciar um encontro.' : 'Aguarde um anfitrião abrir uma sala.'}
+            <p className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
+              {canHost
+                ? 'Abra a primeira sala e chame a torcida para um encontro ao vivo.'
+                : 'Assim que um anfitrião abrir uma sala, ela aparece aqui.'}
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {salas.map((sala) => (
               <Link
                 key={sala.id}
                 href={`/portal/comunidade/salas/${sala.id}`}
-                className="flex flex-col gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 transition-shadow hover:shadow-md"
+                className="flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Video className="h-4 w-4 text-[rgb(var(--primary))]" />
-                  <h3 className="font-semibold text-[rgb(var(--foreground))]">{sala.titulo}</h3>
-                  {sala.evento && (
-                    <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-                      Evento: {sala.evento.titulo}
-                    </span>
-                  )}
+                <div className="flex items-start gap-2">
+                  <Video className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold text-[rgb(var(--foreground))]">{sala.titulo}</h3>
+                    {sala.evento && (
+                      <span className="mt-1 inline-block rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--primary))]">
+                        {sala.evento.titulo}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-4 text-xs text-[rgb(var(--foreground-muted))]">
-                  <span>Anfitrião: {sala.host.nome ?? 'Membro'}</span>
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {sala._count.participantes} online
+                <div className="mt-auto flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
+                  <span className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                    <Avatar nome={sala.host.nome} avatarUrl={sala.host.avatarUrl} size="xs" />
+                    {sala.host.nome ?? 'Membro'}
                   </span>
-                  <span>Criada em {formatarData(new Date(sala.criadoEm))}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+                    <Users className="h-3.5 w-3.5" />
+                    {sala._count.participantes}
+                  </span>
                 </div>
               </Link>
             ))}
