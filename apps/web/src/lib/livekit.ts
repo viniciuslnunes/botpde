@@ -17,7 +17,7 @@ export async function createRoomToken(
   token.addGrant({
     roomJoin: true,
     room: roomName,
-    canPublish: true,
+    canPublish: isHost,
     canSubscribe: true,
     canPublishData: true,
     roomAdmin: isHost,

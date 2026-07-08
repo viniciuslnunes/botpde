@@ -114,3 +114,92 @@
   line-height: 1.45;
   color: rgb(254 243 199);
 }
+
+.meet-room-hint {
+  margin: 0.75rem 0.75rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(39 39 42);
+  background: rgb(24 24 27);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.8125rem;
+  color: rgb(161 161 170);
+}
+
+.meet-room-footer {
+  border-top: 1px solid rgb(39 39 42);
+  background: rgb(24 24 27);
+}
+
+.meet-room-requests {
+  border-bottom: 1px solid rgb(39 39 42);
+  padding: 0.75rem 1rem;
+}
+
+.meet-room-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.meet-room-toggle.lk-button,
+.meet-room-action,
+.meet-room-action-wide.lk-button,
+.meet-room-leave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(63 63 70);
+  background: rgb(39 39 42);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(250 250 250);
+  transition: background 0.15s ease;
+}
+
+.meet-room-toggle.lk-button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+}
+
+.meet-room-toggle.lk-button[data-lk-enabled='true'],
+.meet-room-action-wide.lk-button[data-lk-enabled='true'] {
+  background: rgb(var(--color-primary));
+  border-color: transparent;
+}
+
+.meet-room-action:hover:not(:disabled),
+.meet-room-leave:hover:not(:disabled),
+.meet-room-toggle.lk-button:hover:not(:disabled),
+.meet-room-action-wide.lk-button:hover:not(:disabled) {
+  background: rgb(63 63 70);
+}
+
+.meet-room-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.meet-room-leave {
+  margin-left: auto;
+  border-color: rgb(127 29 29);
+  background: rgb(69 10 10);
+  color: rgb(254 202 202);
+}
+
+.meet-room-leave:hover:not(:disabled) {
+  background: rgb(127 29 29);
+}
+
+@media (max-width: 640px) {
+  .meet-room-leave {
+    margin-left: 0;
+    width: 100%;
+  }
+}

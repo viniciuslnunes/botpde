@@ -1,33 +1,322 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, Info, Loader2 } from 'lucide-react'
-import { MediaDeviceFailure, Track } from 'livekit-client'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  AlertCircle,
+  Hand,
+  Info,
+  Loader2,
+  LogOut,
+  MonitorUp,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  X,
+} from 'lucide-react'
+import {
+  MediaDeviceFailure,
+  RoomEvent,
+  Track,
+  type LocalParticipant,
+  type RemoteParticipant,
+} from 'livekit-client'
 import '@livekit/components-styles'
+import {
+  decodeSalaModeracaoMessage,
+  encodeSalaModeracaoMessage,
+  permissionAllowsScreen,
+  permissionAllowsSpeak,
+  SALA_MOD_TOPIC,
+  type MidiaSalaKind,
+  type SalaModeracaoMessage,
+} from '@/lib/sala-moderacao'
 import './meet-room.css'
 
 type MeetRoomProps = {
+  salaId: string
   token: string
   serverUrl: string
+  isHost: boolean
+  userId: string
+  userName: string
+  onOnlineCountChange?: (count: number) => void
 }
 
 type LiveKitModule = typeof import('@livekit/components-react')
 
+type MediaRequest = {
+  requestId: string
+  userId: string
+  userName: string
+  kind: MidiaSalaKind
+}
+
 function mediaFailureMessage(failure: MediaDeviceFailure): string {
   switch (failure) {
     case MediaDeviceFailure.PermissionDenied:
-      return 'Permita câmera e microfone nas configurações do navegador para falar ou aparecer em vídeo.'
+      return 'Permita câmera e microfone nas configurações do navegador.'
     case MediaDeviceFailure.NotFound:
-      return 'Nenhuma câmera ou microfone detectado. Você ainda pode usar o chat da sala e compartilhar tela, se disponível.'
+      return 'Nenhuma câmera ou microfone detectado. Você ainda pode usar o chat e solicitar compartilhar tela.'
     case MediaDeviceFailure.DeviceInUse:
-      return 'Câmera ou microfone em uso por outro aplicativo. Feche o outro app e tente novamente.'
+      return 'Câmera ou microfone em uso por outro aplicativo.'
     default:
-      return 'Não foi possível acessar câmera ou microfone. Use os botões abaixo para tentar novamente.'
+      return 'Não foi possível acessar câmera ou microfone.'
   }
 }
 
-function MeetConference({ lk }: { lk: LiveKitModule }) {
-  const { GridLayout, ParticipantTile, ControlBar, RoomAudioRenderer, useTracks } = lk
+function canUseSpeak(participant: LocalParticipant, isHost: boolean): boolean {
+  if (isHost) return true
+  const permissions = participant.permissions
+  if (!permissions?.canPublish) return false
+  return permissionAllowsSpeak(permissions.canPublishSources)
+}
+
+function canUseScreenShare(participant: LocalParticipant, isHost: boolean): boolean {
+  if (isHost) return true
+  const permissions = participant.permissions
+  if (!permissions?.canPublish) return false
+  return permissionAllowsScreen(permissions.canPublishSources)
+}
+
+async function registrarPresenca(salaId: string, method: 'POST' | 'DELETE'): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/salas/${salaId}/participantes`, { method, cache: 'no-store' })
+    if (!res.ok) return null
+    const data = (await res.json()) as { total?: number }
+    return typeof data.total === 'number' ? data.total : null
+  } catch {
+    return null
+  }
+}
+
+function MeetControls({
+  lk,
+  salaId,
+  isHost,
+  userId,
+  userName,
+}: {
+  lk: LiveKitModule
+  salaId: string
+  isHost: boolean
+  userId: string
+  userName: string
+}) {
+  const router = useRouter()
+  const { useLocalParticipant, useRoomContext, TrackToggle } = lk
+  const { localParticipant } = useLocalParticipant()
+  const room = useRoomContext()
+
+  const [requests, setRequests] = useState<MediaRequest[]>([])
+  const [pendingKind, setPendingKind] = useState<MidiaSalaKind | null>(null)
+  const [saindo, setSaindo] = useState(false)
+
+  const canSpeak = canUseSpeak(localParticipant, isHost)
+  const canScreen = canUseScreenShare(localParticipant, isHost)
+
+  const syncPermissions = useCallback(() => {
+    if (isHost) return
+    if (canUseSpeak(localParticipant, false) || canUseScreenShare(localParticipant, false)) {
+      setPendingKind(null)
+    }
+  }, [isHost, localParticipant])
+
+  useEffect(() => {
+    syncPermissions()
+    localParticipant.on('participantPermissionsChanged', syncPermissions)
+    return () => {
+      localParticipant.off('participantPermissionsChanged', syncPermissions)
+    }
+  }, [localParticipant, syncPermissions])
+
+  useEffect(() => {
+    function onData(payload: Uint8Array, participant?: RemoteParticipant) {
+      const message = decodeSalaModeracaoMessage(payload)
+      if (!message) return
+
+      if (message.type === 'media_request' && isHost) {
+        setRequests((prev) => {
+          if (prev.some((r) => r.requestId === message.requestId)) return prev
+          return [...prev, message]
+        })
+        return
+      }
+
+      if (message.type === 'media_response' && message.userId === userId) {
+        if (message.approved) syncPermissions()
+        setPendingKind(null)
+      }
+
+      if (message.type === 'media_request' && !isHost && participant) {
+        // eco ignorado
+      }
+    }
+
+    room.on(RoomEvent.DataReceived, onData)
+    return () => {
+      room.off(RoomEvent.DataReceived, onData)
+    }
+  }, [room, isHost, userId, syncPermissions])
+
+  async function enviarSolicitacao(kind: MidiaSalaKind) {
+    if (pendingKind) return
+    const requestId = crypto.randomUUID()
+    const message: SalaModeracaoMessage = {
+      type: 'media_request',
+      requestId,
+      userId,
+      userName,
+      kind,
+    }
+    setPendingKind(kind)
+    await room.localParticipant.publishData(encodeSalaModeracaoMessage(message), {
+      reliable: true,
+      topic: SALA_MOD_TOPIC,
+    })
+  }
+
+  async function responderSolicitacao(request: MediaRequest, approved: boolean) {
+    if (approved) {
+      const res = await fetch(`/api/salas/${salaId}/midia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: request.userId, kind: request.kind }),
+      })
+      if (!res.ok) return
+    }
+
+    const response: SalaModeracaoMessage = {
+      type: 'media_response',
+      requestId: request.requestId,
+      userId: request.userId,
+      approved,
+      kind: request.kind,
+    }
+    await room.localParticipant.publishData(encodeSalaModeracaoMessage(response), {
+      reliable: true,
+      topic: SALA_MOD_TOPIC,
+    })
+    setRequests((prev) => prev.filter((r) => r.requestId !== request.requestId))
+  }
+
+  async function sairDaChamada() {
+    if (saindo) return
+    setSaindo(true)
+    await registrarPresenca(salaId, 'DELETE')
+    room.disconnect()
+    router.push('/portal/comunidade/salas')
+  }
+
+  return (
+    <div className="meet-room-footer">
+      {isHost && requests.length > 0 && (
+        <div className="meet-room-requests">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Solicitações pendentes
+          </p>
+          <ul className="space-y-2">
+            {requests.map((request) => (
+              <li
+                key={request.requestId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 py-2"
+              >
+                <span className="text-sm text-zinc-100">
+                  <strong>{request.userName}</strong>{' '}
+                  {request.kind === 'speak' ? 'quer falar' : 'quer compartilhar tela'}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void responderSolicitacao(request, true)}
+                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                  >
+                    Permitir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void responderSolicitacao(request, false)}
+                    className="rounded-lg border border-zinc-600 px-3 py-1 text-xs font-semibold text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Negar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="meet-room-toolbar">
+        {isHost || canSpeak ? (
+          <>
+            <TrackToggle source={Track.Source.Microphone} className="meet-room-toggle">
+              <Mic className="h-5 w-5" />
+              <MicOff className="h-5 w-5" />
+            </TrackToggle>
+            <TrackToggle source={Track.Source.Camera} className="meet-room-toggle">
+              <Video className="h-5 w-5" />
+              <VideoOff className="h-5 w-5" />
+            </TrackToggle>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={pendingKind === 'speak'}
+            onClick={() => void enviarSolicitacao('speak')}
+            className="meet-room-action"
+          >
+            <Hand className="h-4 w-4" />
+            {pendingKind === 'speak' ? 'Aguardando…' : 'Solicitar falar'}
+          </button>
+        )}
+
+        {isHost || canScreen ? (
+          <TrackToggle source={Track.Source.ScreenShare} className="meet-room-action-wide">
+            <MonitorUp className="h-4 w-4" />
+            Compartilhar tela
+          </TrackToggle>
+        ) : (
+          <button
+            type="button"
+            disabled={pendingKind === 'screen'}
+            onClick={() => void enviarSolicitacao('screen')}
+            className="meet-room-action"
+          >
+            <MonitorUp className="h-4 w-4" />
+            {pendingKind === 'screen' ? 'Aguardando…' : 'Solicitar tela'}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void sairDaChamada()}
+          disabled={saindo}
+          className="meet-room-leave"
+        >
+          {saindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          Sair da chamada
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MeetConference({
+  lk,
+  salaId,
+  isHost,
+  userId,
+  userName,
+}: {
+  lk: LiveKitModule
+  salaId: string
+  isHost: boolean
+  userId: string
+  userName: string
+}) {
+  const { GridLayout, ParticipantTile, RoomAudioRenderer, useTracks } = lk
 
   const tracks = useTracks([
     { source: Track.Source.Camera, withPlaceholder: true },
@@ -42,22 +331,21 @@ function MeetConference({ lk }: { lk: LiveKitModule }) {
         </GridLayout>
       </div>
 
-      <ControlBar
-        className="meet-room-controls"
-        controls={{
-          microphone: true,
-          camera: true,
-          screenShare: true,
-          chat: false,
-          leave: false,
-        }}
-      />
+      <MeetControls lk={lk} salaId={salaId} isHost={isHost} userId={userId} userName={userName} />
       <RoomAudioRenderer />
     </div>
   )
 }
 
-export function MeetRoom({ token, serverUrl }: MeetRoomProps) {
+export function MeetRoom({
+  salaId,
+  token,
+  serverUrl,
+  isHost,
+  userId,
+  userName,
+  onOnlineCountChange,
+}: MeetRoomProps) {
   const [lk, setLk] = useState<LiveKitModule | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [mediaHint, setMediaHint] = useState<string | null>(null)
@@ -70,9 +358,7 @@ export function MeetRoom({ token, serverUrl }: MeetRoomProps) {
       })
       .catch(() => {
         if (active) {
-          setLoadError(
-            'SDK LiveKit indisponível. Verifique as dependências e a configuração LIVEKIT_URL.',
-          )
+          setLoadError('SDK LiveKit indisponível neste ambiente.')
         }
       })
     return () => {
@@ -80,9 +366,30 @@ export function MeetRoom({ token, serverUrl }: MeetRoomProps) {
     }
   }, [])
 
+  const handleConnected = useCallback(async () => {
+    const total = await registrarPresenca(salaId, 'POST')
+    if (typeof total === 'number') onOnlineCountChange?.(total)
+  }, [salaId, onOnlineCountChange])
+
+  const handleDisconnected = useCallback(async () => {
+    const total = await registrarPresenca(salaId, 'DELETE')
+    if (typeof total === 'number') onOnlineCountChange?.(total)
+  }, [salaId, onOnlineCountChange])
+
   const handleMediaDeviceFailure = useCallback((failure: MediaDeviceFailure) => {
     setMediaHint(mediaFailureMessage(failure))
   }, [])
+
+  useEffect(() => {
+    return () => {
+      void registrarPresenca(salaId, 'DELETE')
+    }
+  }, [salaId])
+
+  const conferenceProps = useMemo(
+    () => ({ lk: lk!, salaId, isHost, userId, userName }),
+    [lk, salaId, isHost, userId, userName],
+  )
 
   if (loadError) {
     return (
@@ -110,8 +417,22 @@ export function MeetRoom({ token, serverUrl }: MeetRoomProps) {
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{mediaHint}</span>
+            <button
+              type="button"
+              onClick={() => setMediaHint(null)}
+              className="ml-auto text-amber-200/80 hover:text-amber-100"
+              aria-label="Fechar aviso"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
+      )}
+
+      {!isHost && (
+        <p className="meet-room-hint">
+          Microfone, câmera e tela exigem aprovação do anfitrião. Use os botões abaixo para solicitar.
+        </p>
       )}
 
       <LiveKitRoom
@@ -122,12 +443,14 @@ export function MeetRoom({ token, serverUrl }: MeetRoomProps) {
         video={false}
         data-lk-theme="default"
         className="flex min-h-0 flex-1 flex-col"
+        onConnected={() => void handleConnected()}
+        onDisconnected={() => void handleDisconnected()}
         onMediaDeviceFailure={handleMediaDeviceFailure}
         onError={(error) => {
           console.error('[MeetRoom]', error)
         }}
       >
-        <MeetConference lk={lk} />
+        <MeetConference {...conferenceProps} />
       </LiveKitRoom>
     </div>
   )

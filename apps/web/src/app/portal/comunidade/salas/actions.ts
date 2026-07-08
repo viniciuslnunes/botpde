@@ -174,6 +174,4 @@ export async function enviarMensagemSala(formData: FormData) {
       conteudo: parsed.data.conteudo,
     },
   })
-
-  revalidatePath(`/portal/comunidade/salas/${sala.id}`)
 }

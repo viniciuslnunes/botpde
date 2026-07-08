@@ -5,6 +5,25 @@ declare module 'livekit-server-sdk' {
     addGrant(grant: Record<string, unknown>): void
     toJwt(): Promise<string>
   }
+
+  export enum TrackSource {
+    UNKNOWN = 0,
+    CAMERA = 1,
+    MICROPHONE = 2,
+    SCREEN_SHARE = 3,
+    SCREEN_SHARE_AUDIO = 4,
+  }
+
+  export class RoomServiceClient {
+    constructor(host: string, apiKey: string, apiSecret: string)
+    listParticipants(room: string): Promise<Array<{ identity: string; permission?: { canPublishSources?: number[] } }>>
+    updateParticipant(
+      room: string,
+      identity: string,
+      metadata?: string,
+      permission?: Record<string, unknown>,
+    ): Promise<unknown>
+  }
 }
 
 declare module '@livekit/components-styles'
@@ -21,6 +40,8 @@ declare module '@livekit/components-react' {
     audio?: boolean
     className?: string
     children?: ReactNode
+    onConnected?: () => void
+    onDisconnected?: () => void
     onMediaDeviceFailure?: (failure: MediaDeviceFailure) => void
     onError?: (error: Error) => void
   }): ReactNode
@@ -35,29 +56,14 @@ declare module '@livekit/components-react' {
   export function ParticipantTile(): ReactNode
   export function ControlBar(props: {
     className?: string
-    controls?: {
-      microphone?: boolean
-      camera?: boolean
-      screenShare?: boolean
-      chat?: boolean
-      leave?: boolean
-    }
+    controls?: Record<string, boolean>
+  }): ReactNode
+  export function TrackToggle(props: {
+    source: unknown
+    className?: string
+    children?: ReactNode
   }): ReactNode
   export function useTracks(sources: unknown[]): unknown[]
-}
-
-declare module 'livekit-client' {
-  export enum MediaDeviceFailure {
-    PermissionDenied = 'PermissionDenied',
-    NotFound = 'NotFound',
-    DeviceInUse = 'DeviceInUse',
-  }
-
-  export namespace Track {
-    enum Source {
-      Camera = 'camera',
-      Microphone = 'microphone',
-      ScreenShare = 'screen_share',
-    }
-  }
+  export function useLocalParticipant(): { localParticipant: import('livekit-client').LocalParticipant }
+  export function useRoomContext(): import('livekit-client').Room
 }
