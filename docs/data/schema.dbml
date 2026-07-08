@@ -1,0 +1,436 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Torcida SaaS — Modelo de dados (DBML para https://dbdiagram.io/d)
+// Fonte da verdade: packages/db/prisma/schema.prisma
+// Gerado a partir do schema em 2026-07-07. Regenerar quando o schema mudar.
+//
+// Como usar: abra https://dbdiagram.io/d, cole este arquivo inteiro no editor.
+// Nomes de tabela/coluna = nomes REAIS no Postgres (@map do Prisma).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────
+// LEGADO DO BOT (Discord.js) — tabelas sem prefixo, acessadas via `pg` cru
+// ─────────────────────────────────────────────────────────────────────────
+
+Table membros {
+  id integer [pk, increment]
+  discord_id varchar [unique, not null]
+  nome varchar [not null]
+  tipo varchar [note: "'socio' ou 'torcedor'"]
+  numero_associado varchar
+  cidade varchar
+  telefone varchar
+  idade integer
+  aprovado_por_id varchar
+  aprovado_por_nome varchar
+  criado_em timestamp
+  imagem_prova varchar
+  Note: 'Base legada de membros do bot Discord'
+}
+
+Table produtos {
+  id integer [pk, increment]
+  nome varchar [not null]
+  tamanhos varchar [not null]
+  preco decimal
+  imagem_url varchar
+  ativo boolean
+  criado_em timestamp
+  estoque json
+}
+
+Table pedidos {
+  id integer [pk, increment]
+  discord_id varchar [not null]
+  discord_tag varchar
+  produto_id integer
+  produto_nome varchar
+  tamanho varchar
+  quantidade integer [not null]
+  preco_unit decimal
+  total decimal
+  status varchar
+  canal_ticket_id varchar
+  criado_em timestamp
+}
+
+Table aprovacoes_recrutamento {
+  id integer [pk, increment]
+  aprovador_id varchar [not null]
+  aprovador_nome varchar
+  candidato_id varchar
+  candidato_nome varchar
+  tipo varchar
+  criado_em timestamp
+}
+
+Table bot_config {
+  key varchar [pk]
+  value varchar
+}
+
+Ref: pedidos.produto_id > produtos.id
+
+// ─────────────────────────────────────────────────────────────────────────
+// SAAS — TENANTS (raiz multi-tenant)
+// ─────────────────────────────────────────────────────────────────────────
+
+Table saas_tenants {
+  id uuid [pk]
+  slug varchar [unique, not null]
+  nome varchar [not null]
+  plano varchar [note: 'FREE | BASIC | PREMIUM']
+  cor_primaria varchar
+  logo_url varchar
+  ativo boolean
+  criado_em timestamp
+  database_url varchar [note: 'null = banco compartilhado']
+  discord_guild_id varchar [unique]
+  Note: 'Torcida/organização. Raiz de quase todo dado SaaS (tenantId).'
+}
+
+Table saas_users {
+  id uuid [pk]
+  email varchar [unique]
+  nome varchar
+  avatar_url varchar
+  discord_id varchar [unique]
+  google_id varchar [unique]
+  senha_hash varchar [note: 'só contas e-mail/senha']
+  consentido_em timestamp
+  criado_em timestamp
+  Note: 'Usuário global (cross-tenant via UserRole)'
+}
+
+// ─── CARGOS E PERMISSÕES ──────────────────────────────────────────────────
+
+Table saas_roles {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  nome varchar [not null]
+  cor varchar
+  ordem integer
+  is_system boolean
+  permissions "varchar[]" [note: 'lista de permissões (RBAC)']
+  Indexes { (tenant_id, nome) [unique] }
+}
+
+Table saas_user_roles {
+  id uuid [pk]
+  user_id uuid [not null]
+  tenant_id uuid [not null]
+  role_id uuid [not null]
+  criado_em timestamp
+  Indexes { (user_id, tenant_id, role_id) [unique] }
+}
+
+Table saas_user_permissions {
+  id uuid [pk]
+  user_id uuid [not null]
+  tenant_id uuid [not null]
+  permission varchar [not null]
+  granted boolean [note: 'override: concede/revoga permissão pontual']
+  criado_em timestamp
+  Indexes { (user_id, tenant_id, permission) [unique] }
+}
+
+// ─── DEPARTAMENTOS ────────────────────────────────────────────────────────
+
+Table saas_departamentos {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  nome varchar [not null]
+  cor varchar
+  ordem integer
+  criado_em timestamp
+  Indexes { (tenant_id, nome) [unique] }
+}
+
+Table saas_user_departamentos {
+  id uuid [pk]
+  user_id uuid [not null]
+  tenant_id uuid [not null]
+  departamento_id uuid [not null]
+  criado_em timestamp
+  Indexes { (user_id, tenant_id, departamento_id) [unique] }
+}
+
+Table saas_departamento_gestores {
+  id uuid [pk]
+  departamento_id uuid [not null]
+  user_id uuid [not null]
+  criado_em timestamp
+  Indexes { (departamento_id, user_id) [unique] }
+}
+
+// ─── MEMBROS / SÓCIOS ─────────────────────────────────────────────────────
+
+Table saas_membros {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  user_id uuid [not null]
+  tipo varchar [note: 'SOCIO | TORCEDOR']
+  nome varchar [not null]
+  idade integer
+  telefone varchar
+  cidade varchar
+  numero_associado varchar
+  imagem_prova varchar
+  status varchar [note: 'PENDENTE | APROVADO | REPROVADO']
+  aprovado_por_id varchar
+  aprovado_por_nome varchar
+  aprovado_em timestamp
+  discord_id varchar
+  discord_tag varchar
+  sede_id uuid [note: 'vínculo territorial (SetNull)']
+  importacao_id uuid [note: 'origem da importação (SetNull)']
+  criado_em timestamp
+  atualizado_em timestamp
+  Indexes { (tenant_id, user_id) [unique] }
+}
+
+Table saas_importacoes_membros {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  origem varchar [note: 'CSV | BOT | DISCORD | MOCK']
+  status varchar [note: 'PENDENTE | PROCESSANDO | CONCLUIDA | ERRO']
+  total_linhas integer
+  importados integer
+  duplicados integer
+  erros json
+  criado_por_id varchar
+  criado_em timestamp
+}
+
+Table saas_socios {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  user_id uuid [not null]
+  numero_socio integer [not null]
+  nome varchar [not null]
+  validade timestamp [not null]
+  discord_id varchar
+  criado_em timestamp
+  Indexes {
+    (tenant_id, numero_socio) [unique]
+    (tenant_id, user_id) [unique]
+  }
+}
+
+Table saas_bloqueados {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  registro varchar [not null]
+  nome varchar
+  motivo varchar
+  bloqueado_por_id varchar
+  bloqueado_por_nome varchar
+  criado_em timestamp
+  Indexes { (tenant_id, registro) [unique] }
+}
+
+// ─── SEDES (hierarquia Sede → Subsede → PDE) ──────────────────────────────
+
+Table saas_sedes {
+  id uuid [pk]
+  tenant_id uuid [note: 'OPCIONAL — pré-adesão possível (SetNull)']
+  nome varchar [not null]
+  tipo varchar [note: 'SEDE | SUBSEDE | PONTO_ENCONTRO']
+  endereco varchar
+  cidade varchar
+  estado varchar
+  cep varchar
+  lat float
+  lng float
+  capacidade integer
+  responsavel varchar
+  telefone varchar
+  horarios varchar
+  descricao varchar
+  foto_url varchar
+  ativa boolean
+  sede_id uuid [note: 'auto-referência: sede pai']
+  sede_referencia_nome varchar [note: 'pai que ainda não é tenant']
+  sede_referencia_slug varchar
+  criado_em timestamp
+}
+
+// ─── EVENTOS ──────────────────────────────────────────────────────────────
+
+Table saas_eventos {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  titulo varchar [not null]
+  descricao varchar
+  data timestamp [not null]
+  local varchar
+  sede_id uuid
+  lat float
+  lng float
+  criado_por_id varchar
+  discord_message_id varchar
+  criado_em timestamp
+}
+
+Table saas_evento_rsvps {
+  id uuid [pk]
+  evento_id uuid [not null]
+  user_id uuid [not null]
+  status varchar [note: 'CONFIRMADO | RECUSADO']
+  checked_in_at timestamp [note: 'check-in real (≠ RSVP)']
+  checked_in_por_id varchar
+  Indexes { (evento_id, user_id) [unique] }
+}
+
+// ─── LOJA ─────────────────────────────────────────────────────────────────
+
+Table saas_produtos {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  nome varchar [not null]
+  descricao varchar
+  preco decimal [not null]
+  ativo boolean
+  estoque json
+  tamanhos "varchar[]"
+  imagens_url "varchar[]"
+  criado_em timestamp
+  atualizado_em timestamp
+}
+
+Table saas_pedidos {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  user_id uuid [not null]
+  produto_id uuid [not null]
+  produto_nome varchar [not null]
+  tamanho varchar
+  quantidade integer [not null]
+  preco_unit decimal [not null]
+  total decimal [not null]
+  status varchar [note: 'PENDENTE | CONFIRMADO | CANCELADO | ENTREGUE']
+  discord_id varchar
+  canal_ticket_id varchar
+  criado_em timestamp
+  atualizado_em timestamp
+}
+
+// ─── COMUNICADOS OFICIAIS ─────────────────────────────────────────────────
+
+Table saas_announcements {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  autor_id uuid [not null]
+  titulo varchar [not null]
+  corpo varchar [not null]
+  prioridade varchar [note: 'NORMAL | IMPORTANTE | URGENTE']
+  fixado boolean
+  publicado_em timestamp
+  criado_em timestamp
+  atualizado_em timestamp
+}
+
+Table saas_announcement_reads {
+  id uuid [pk]
+  announcement_id uuid [not null]
+  user_id uuid [not null]
+  lido_em timestamp
+  Indexes { (announcement_id, user_id) [unique] }
+}
+
+// ─── COMUNIDADE / MODERAÇÃO / AUDITORIA ───────────────────────────────────
+
+Table saas_posts {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  autor_id uuid [not null]
+  titulo varchar
+  conteudo varchar [not null]
+  imagem_url varchar
+  fixado boolean
+  criado_em timestamp
+  atualizado_em timestamp
+}
+
+Table saas_advertencias {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  membro_discord_id varchar [not null]
+  membro_nome varchar [not null]
+  motivo varchar
+  tier integer
+  prazo timestamp [not null]
+  emitido_por_id varchar
+  emitido_por_nome varchar
+  resolvida boolean
+  criado_em timestamp
+}
+
+Table saas_audit_logs {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  ator_id uuid
+  acao varchar [not null]
+  entidade varchar
+  entidade_id varchar
+  detalhes json
+  criado_em timestamp
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RELACIONAMENTOS (Refs)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Cargos & permissões
+Ref: saas_roles.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_user_roles.user_id > saas_users.id [delete: cascade]
+Ref: saas_user_roles.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_user_roles.role_id > saas_roles.id [delete: cascade]
+Ref: saas_user_permissions.user_id > saas_users.id [delete: cascade]
+Ref: saas_user_permissions.tenant_id > saas_tenants.id [delete: cascade]
+
+// Departamentos
+Ref: saas_departamentos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_user_departamentos.user_id > saas_users.id [delete: cascade]
+Ref: saas_user_departamentos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_user_departamentos.departamento_id > saas_departamentos.id [delete: cascade]
+Ref: saas_departamento_gestores.departamento_id > saas_departamentos.id [delete: cascade]
+Ref: saas_departamento_gestores.user_id > saas_users.id [delete: cascade]
+
+// Membros / sócios
+Ref: saas_membros.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_membros.user_id > saas_users.id
+Ref: saas_membros.sede_id > saas_sedes.id [delete: set null]
+Ref: saas_membros.importacao_id > saas_importacoes_membros.id [delete: set null]
+Ref: saas_importacoes_membros.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_socios.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_socios.user_id > saas_users.id
+Ref: saas_bloqueados.tenant_id > saas_tenants.id [delete: cascade]
+
+// Sedes (auto-referência + tenant opcional)
+Ref: saas_sedes.tenant_id > saas_tenants.id [delete: set null]
+Ref: saas_sedes.sede_id > saas_sedes.id
+
+// Eventos
+Ref: saas_eventos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_eventos.sede_id > saas_sedes.id
+Ref: saas_evento_rsvps.evento_id > saas_eventos.id [delete: cascade]
+Ref: saas_evento_rsvps.user_id > saas_users.id
+
+// Loja
+Ref: saas_produtos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_pedidos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_pedidos.user_id > saas_users.id
+Ref: saas_pedidos.produto_id > saas_produtos.id
+
+// Comunicados
+Ref: saas_announcements.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_announcements.autor_id > saas_users.id
+Ref: saas_announcement_reads.announcement_id > saas_announcements.id [delete: cascade]
+Ref: saas_announcement_reads.user_id > saas_users.id [delete: cascade]
+
+// Comunidade / moderação / auditoria
+Ref: saas_posts.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_posts.autor_id > saas_users.id
+Ref: saas_advertencias.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_audit_logs.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_audit_logs.ator_id > saas_users.id

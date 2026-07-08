@@ -1,0 +1,467 @@
+<style>
+  :root {
+    --accent: #7c3aed;
+    --accent-soft: #7c3aed1a;
+    --bg: #fbfaff;
+    --surface: #ffffff;
+    --surface-2: #f4f2fb;
+    --border: #e7e3f3;
+    --border-strong: #d8d2ec;
+    --text: #1c1830;
+    --text-2: #5b5470;
+    --text-3: #8b84a0;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --c-create: #0f9d6b;   --c-create-bg: #0f9d6b1a;
+    --c-edit:   #c2820a;   --c-edit-bg:   #c2820a1a;
+    --c-delete: #d64560;   --c-delete-bg: #d645601a;
+    --c-auth:   #6d5ae0;   --c-auth-bg:   #6d5ae01a;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #100e18; --surface: #17141f; --surface-2: #1d1a29;
+      --border: #2a2540; --border-strong: #3a3356;
+      --text: #ece9f6; --text-2: #a49dbd; --text-3: #756d90;
+      --accent: #a78bfa; --accent-soft: #a78bfa22;
+      --c-create:#34d399; --c-create-bg:#34d39920;
+      --c-edit:#fbbf24; --c-edit-bg:#fbbf2420;
+      --c-delete:#fb7185; --c-delete-bg:#fb718520;
+      --c-auth:#c4b5fd; --c-auth-bg:#c4b5fd20;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #100e18; --surface: #17141f; --surface-2: #1d1a29;
+    --border: #2a2540; --border-strong: #3a3356;
+    --text: #ece9f6; --text-2: #a49dbd; --text-3: #756d90;
+    --accent: #a78bfa; --accent-soft: #a78bfa22;
+    --c-create:#34d399; --c-create-bg:#34d39920;
+    --c-edit:#fbbf24; --c-edit-bg:#fbbf2420;
+    --c-delete:#fb7185; --c-delete-bg:#fb718520;
+    --c-auth:#c4b5fd; --c-auth-bg:#c4b5fd20;
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaff; --surface: #ffffff; --surface-2: #f4f2fb;
+    --border: #e7e3f3; --border-strong: #d8d2ec;
+    --text: #1c1830; --text-2: #5b5470; --text-3: #8b84a0;
+    --accent: #7c3aed; --accent-soft: #7c3aed1a;
+    --c-create:#0f9d6b; --c-create-bg:#0f9d6b1a;
+    --c-edit:#c2820a; --c-edit-bg:#c2820a1a;
+    --c-delete:#d64560; --c-delete-bg:#d645601a;
+    --c-auth:#6d5ae0; --c-auth-bg:#6d5ae01a;
+  }
+
+  * { box-sizing: border-box; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  body, .wrap { margin: 0; }
+  .wrap {
+    background: var(--bg); color: var(--text);
+    font-family: var(--sans); line-height: 1.55;
+    display: grid; grid-template-columns: 264px minmax(0,1fr);
+    min-height: 100vh;
+  }
+  a { color: inherit; }
+
+  /* Sidebar */
+  aside {
+    position: sticky; top: 0; align-self: start; height: 100vh;
+    border-right: 1px solid var(--border);
+    padding: 22px 16px; overflow-y: auto;
+    background: var(--surface);
+  }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom: 4px; }
+  .brand .dot { width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(140deg, var(--accent), var(--c-auth));
+    flex: none; box-shadow: 0 2px 8px var(--accent-soft); }
+  .brand h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  .brand p { margin: 0; font-size: 11px; color: var(--text-3); }
+  .search { margin: 16px 0 8px; }
+  .search input {
+    width: 100%; padding: 8px 11px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg);
+    color: var(--text); font-size: 13px; font-family: var(--sans);
+  }
+  .search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  nav a {
+    display: flex; justify-content: space-between; align-items:center;
+    text-decoration: none; padding: 6px 9px; border-radius: 8px;
+    font-size: 13px; color: var(--text-2); font-weight: 500;
+  }
+  nav a:hover { background: var(--surface-2); color: var(--text); }
+  nav a .n { font-family: var(--mono); font-size: 11px; color: var(--text-3);
+    background: var(--surface-2); padding: 1px 7px; border-radius: 20px; }
+  nav a:hover .n { background: var(--accent-soft); color: var(--accent); }
+
+  /* Main */
+  main { padding: 40px clamp(20px, 5vw, 56px) 80px; max-width: 1080px; }
+  header.page h2 { font-size: clamp(24px, 3.4vw, 34px); margin: 0 0 6px;
+    letter-spacing: -.02em; text-wrap: balance; }
+  header.page .lead { color: var(--text-2); max-width: 62ch; margin: 0 0 22px; }
+  .note {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 15px; font-size: 13.5px; color: var(--text-2);
+    margin-bottom: 26px;
+  }
+  .note b { color: var(--text); }
+  code { font-family: var(--mono); font-size: .88em;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; }
+  .stat { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; min-width: 96px; }
+  .stat .v { font-size: 22px; font-weight: 680; font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em; }
+  .stat .l { font-size: 11px; color: var(--text-3); text-transform: uppercase;
+    letter-spacing: .06em; }
+
+  section.group { margin-top: 38px; scroll-margin-top: 20px; }
+  section.group > h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--accent); margin: 0 0 3px; font-weight: 640;
+  }
+  section.group > .gdesc { color: var(--text-3); font-size: 13px; margin: 0 0 16px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .card:hover { border-color: var(--border-strong);
+    box-shadow: 0 4px 20px -12px var(--accent); }
+  .card .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .verb {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; padding: 3px 9px; border-radius: 6px; flex: none;
+  }
+  .verb.create { color: var(--c-create); background: var(--c-create-bg); }
+  .verb.edit   { color: var(--c-edit);   background: var(--c-edit-bg); }
+  .verb.delete { color: var(--c-delete); background: var(--c-delete-bg); }
+  .verb.auth   { color: var(--c-auth);   background: var(--c-auth-bg); }
+  .card .sig { font-family: var(--mono); font-size: 14px; font-weight: 600;
+    color: var(--text); word-break: break-word; }
+  .card .sig .args { color: var(--text-3); font-weight: 400; }
+  .gate {
+    margin-left: auto; font-family: var(--mono); font-size: 11px;
+    padding: 3px 9px; border-radius: 20px; white-space: nowrap;
+    border: 1px solid var(--border-strong); color: var(--text-2);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .gate::before { content:""; width:6px; height:6px; border-radius:50%;
+    background: var(--accent); flex:none; }
+  .gate.open::before { background: var(--text-3); }
+  .card .desc { color: var(--text-2); font-size: 13.5px; margin: 10px 0 0; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+    gap: 10px 22px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); }
+  .meta div { font-size: 12.5px; }
+  .meta .k { color: var(--text-3); text-transform: uppercase; letter-spacing: .05em;
+    font-size: 10.5px; margin-bottom: 3px; }
+  .meta .val { color: var(--text-2); font-family: var(--mono); font-size: 12px;
+    line-height: 1.5; }
+  .meta .val .pill { display:inline-block; background: var(--surface-2);
+    border:1px solid var(--border); border-radius: 5px; padding: 1px 6px;
+    margin: 0 3px 3px 0; color: var(--text); }
+  .path { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+  .empty { display:none; color: var(--text-3); font-size: 14px; padding: 40px 0; text-align:center; }
+  .empty.show { display: block; }
+
+  .themed { position: fixed; top: 14px; right: 16px; z-index: 5; }
+  .themed button { font: inherit; font-size: 12px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    color: var(--text-2); border-radius: 8px; padding: 6px 11px; }
+
+  @media (max-width: 820px) {
+    .wrap { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: none;
+      border-bottom: 1px solid var(--border); }
+    aside nav { display: none; }
+  }
+</style>
+
+<h2 class="sr-only">Catálogo de Server Actions do Torcida SaaS — mutações, permissões e efeitos no banco</h2>
+
+<div class="themed"><button id="tt" aria-label="Alternar tema">◐ tema</button></div>
+
+<div class="wrap">
+  <aside>
+    <div class="brand">
+      <div class="dot" aria-hidden="true"></div>
+      <div>
+        <h1>Torcida SaaS</h1>
+        <p>API interna · Server Actions</p>
+      </div>
+    </div>
+    <div class="search">
+      <input id="q" type="search" placeholder="Filtrar ação, permissão…" aria-label="Filtrar" />
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <main>
+    <header class="page">
+      <h2>Catálogo de Server Actions</h2>
+      <p class="lead">A camada de escrita do Torcida SaaS não é REST — são Server Actions do Next.js
+      (<code>"use server"</code>). Cada card abaixo é uma ação de mutação: o gate de permissão que a
+      protege, a validação de entrada, o que grava no banco e o rastro de auditoria.</p>
+      <div class="note">
+        <b>Como ler o gate.</b> <code>assertPermission(X)</code> é o único critério do admin (servidor,
+        nunca no cliente). Ações do portal exigem só <b>Sessão</b> (usuário logado) e, quando restritas,
+        <code>assertMembroAtivo</code>. <b>Super-admin</b> = e-mail na allowlist de ambiente.
+      </div>
+      <div class="stats" id="stats"></div>
+    </header>
+    <div id="content"></div>
+    <div class="empty" id="empty">Nenhuma ação corresponde ao filtro.</div>
+  </main>
+</div>
+
+<script>
+const GROUPS = [
+  { id:"auth", t:"Autenticação & Conta", d:"Público — entrada e criação de conta (fora do escopo de tenant).",
+    path:"app/(auth)/entrar/actions.ts", actions:[
+    { v:"auth", n:"entrarComSenha", a:"(prev, formData)", gate:"Público", open:true,
+      desc:"Login por e-mail/senha. Checa rate-limit por e-mail antes do signIn; o limite real é aplicado em authorize().",
+      input:"email, senha", writes:"—", audit:"—", ret:"{ message? }" },
+    { v:"create", n:"criarContaComSenha", a:"(prev, formData)", gate:"Público", open:true,
+      desc:"Cria conta local. Não mescla com conta OAuth de mesmo e-mail. Faz signIn ao final.",
+      input:"nome≥3, email, senha≥8, confirmarSenha", writes:"User", audit:"—", ret:"{ errors? | message? }" },
+  ]},
+  { id:"cadastro", t:"Cadastro & Perfil (portal)", d:"Usuário logado gerenciando o próprio vínculo.",
+    path:"app/portal/{cadastro,perfil}/actions.ts", actions:[
+    { v:"create", n:"solicitarCadastro", a:"(prev, formData)", gate:"Sessão", open:true,
+      desc:"Solicita associação à torcida atual. Resolve a Sede (unidade única → automática; várias → obrigatória). Recadastra se estava REPROVADO.",
+      input:"nome, tipo(SOCIO|TORCEDOR), idade?, telefone?, cidade?, discordTag?, sedeId?",
+      writes:"SaasMembro (PENDENTE)", audit:"CADASTRO_SOLICITADO / RECADASTRO_SOLICITADO", ret:"{ errors? | message? }" },
+    { v:"edit", n:"salvarPerfil", a:"(prev, formData)", gate:"Sessão", open:true,
+      desc:"Atualiza o nome no User e os dados do SaasMembro no tenant atual (se existir).",
+      input:"nome, idade?, telefone?, cidade?, discordTag?", writes:"User, SaasMembro", audit:"—", ret:"{ success? | errors? }" },
+  ]},
+  { id:"loja-portal", t:"Loja (portal)", d:"Compra do associado, com visibilidade cross-tenant.",
+    path:"app/portal/loja/actions.ts", actions:[
+    { v:"create", n:"fazerPedido", a:"(prev, formData)", gate:"Sessão", open:true,
+      desc:"Cria pedido no tenant DONO do produto (cascata da loja da sede-mãe). Valida visibilidade, checa/decrementa estoque em transação.",
+      input:"produtoId(uuid), tamanho?, quantidade(1–10)", writes:"SaasPedido, SaasProduto(estoque)", audit:"PEDIDO_CRIADO", ret:"{ success?, pedidoId? | error? }" },
+  ]},
+  { id:"eventos-portal", t:"Eventos (portal)", d:"Confirmação de presença do associado.",
+    path:"app/portal/eventos/actions.ts", actions:[
+    { v:"edit", n:"responderRsvp", a:"(eventoId, status)", gate:"Sessão + membro ativo", open:false,
+      desc:"Confirma/recusa presença. Exige assertMembroAtivo (bloqueia pendente/reprovado ou carteirinha vencida) e evento não encerrado.",
+      input:"status: CONFIRMADO | RECUSADO", writes:"EventoRsvp (upsert)", audit:"—", ret:"void" },
+  ]},
+  { id:"membros", t:"Membros (admin)", d:"Moderação da base de associados.",
+    path:"app/admin/membros/actions.ts", actions:[
+    { v:"edit", n:"aprovarMembro", a:"(membroId)", gate:"MEMBERS_APPROVE",
+      desc:"Aprova o membro e concede acesso básico (role 'member' + departamento por tipo, idempotente).",
+      input:"membroId", writes:"SaasMembro, UserRole, Departamento, UserDepartamento", audit:"MEMBRO_APROVADO", ret:"void" },
+    { v:"edit", n:"reprovarMembro", a:"(membroId, motivo?)", gate:"MEMBERS_REJECT",
+      desc:"Marca o cadastro como REPROVADO, registrando o revisor.",
+      input:"membroId, motivo?", writes:"SaasMembro", audit:"MEMBRO_REPROVADO", ret:"void" },
+    { v:"edit", n:"reverterMembro", a:"(membroId)", gate:"MEMBERS_APPROVE",
+      desc:"Desfaz aprovação/reprovação, voltando o membro para PENDENTE (reaproveita MEMBERS_APPROVE).",
+      input:"membroId", writes:"SaasMembro", audit:"MEMBRO_REVERTIDO_PENDENTE", ret:"void" },
+  ]},
+  { id:"importacao", t:"Importação de membros (admin)", d:"Staging reversível da base — ver spec-importacao-membros.md.",
+    path:"app/admin/membros/importar/actions.ts", actions:[
+    { v:"create", n:"importarMock", a:"(formData)", gate:"MEMBERS_IMPORT",
+      desc:"Importa N membros MOCK (demonstração). Idempotente: dedup por User existente + unique(tenantId,userId). Membros entram APROVADOS.",
+      input:"quantidade(1–500)", writes:"ImportacaoMembros, User, SaasMembro", audit:"MEMBROS_IMPORTADOS", ret:"{ success, importados, duplicados, erros }" },
+    { v:"delete", n:"desfazerImportacao", a:"(importacaoId)", gate:"MEMBERS_IMPORT",
+      desc:"Reverte uma importação MOCK: remove os SaasMembro e os Users mock órfãos (sem outro vínculo). Só MOCK.",
+      input:"importacaoId", writes:"SaasMembro(del), User(del), ImportacaoMembros(del)", audit:"IMPORTACAO_DESFEITA", ret:"{ success, importados }" },
+  ]},
+  { id:"socios", t:"Sócios & carteirinhas (admin)", d:"Emissão de carteirinha (reaproveita MEMBERS_APPROVE).",
+    path:"app/admin/socios/actions.ts", actions:[
+    { v:"create", n:"emitirCarteirinha", a:"(formData)", gate:"MEMBERS_APPROVE",
+      desc:"Emite carteirinha para membro SOCIO aprovado. Gera o próximo número de sócio sequencial.",
+      input:"userId, nome, validade", writes:"SaasSocio", audit:"SOCIO_CARTEIRINHA_EMITIDA", ret:"void" },
+    { v:"edit", n:"renovarCarteirinha", a:"(socioId, novaValidade)", gate:"MEMBERS_APPROVE",
+      desc:"Atualiza a data de validade de uma carteirinha existente.",
+      input:"socioId, novaValidade", writes:"SaasSocio", audit:"SOCIO_CARTEIRINHA_RENOVADA", ret:"void" },
+    { v:"delete", n:"revogarCarteirinha", a:"(socioId)", gate:"MEMBERS_APPROVE",
+      desc:"Revoga (exclui) a carteirinha do sócio.",
+      input:"socioId", writes:"SaasSocio (del)", audit:"SOCIO_CARTEIRINHA_REVOGADA", ret:"void" },
+  ]},
+  { id:"loja-admin", t:"Loja (admin)", d:"Gestão de catálogo e pedidos.",
+    path:"app/admin/loja/actions.ts", actions:[
+    { v:"create", n:"criarProduto", a:"(prev, formData)", gate:"STORE_MANAGE",
+      desc:"Cria produto. Parseia tamanhos (CSV) e estoque (JSON por tamanho).",
+      input:"nome≥2, preco>0, descricao?, imagemUrl?, tamanhos?, estoqueJson?", writes:"SaasProduto", audit:"PRODUTO_CRIADO", ret:"{ success? | fieldErrors? }" },
+    { v:"edit", n:"editarProduto", a:"(id, prev, formData)", gate:"STORE_MANAGE",
+      desc:"Atualiza os dados do produto (mesmo schema de criação).",
+      input:"ProdutoSchema", writes:"SaasProduto", audit:"PRODUTO_EDITADO", ret:"{ success? | fieldErrors? }" },
+    { v:"edit", n:"alterarStatusProduto", a:"(id, ativo)", gate:"STORE_MANAGE",
+      desc:"Ativa/desativa a exibição do produto na loja.",
+      input:"id, ativo(bool)", writes:"SaasProduto", audit:"PRODUTO_ATIVADO / _DESATIVADO", ret:"void" },
+    { v:"edit", n:"atualizarStatusPedido", a:"(id, prev, formData)", gate:"STORE_MANAGE",
+      desc:"Muda o status de um pedido dentro dos valores válidos.",
+      input:"status: PENDENTE|CONFIRMADO|CANCELADO|ENTREGUE", writes:"SaasPedido", audit:"PEDIDO_STATUS_ATUALIZADO", ret:"{ success? | error? }" },
+  ]},
+  { id:"sedes", t:"Sedes (admin)", d:"Hierarquia territorial Sede → Subsede → PDE.",
+    path:"app/admin/sedes/actions.ts", actions:[
+    { v:"create", n:"criarSede", a:"(prev, formData)", gate:"SEDES_MANAGE",
+      desc:"Cria sede/subsede/PDE. Valida que a sede pai pertence ao mesmo tenant.",
+      input:"nome, tipo, sedeId?, endereco?, cidade?, estado?, cep?, capacidade?, …", writes:"Sede", audit:"SEDE_CRIADA", ret:"{ errors? }" },
+    { v:"edit", n:"editarSede", a:"(sedeId, prev, formData)", gate:"SEDES_MANAGE",
+      desc:"Edita a sede. Bloqueia ciclos na hierarquia (wouldCreateSedeCycle).",
+      input:"sedeSchema", writes:"Sede", audit:"SEDE_EDITADA", ret:"{ errors? | message? }" },
+    { v:"edit", n:"alterarStatusSede", a:"(sedeId, ativa)", gate:"SEDES_MANAGE",
+      desc:"Ativa/desativa a sede.",
+      input:"sedeId, ativa(bool)", writes:"Sede", audit:"SEDE_ATIVADA / _DESATIVADA", ret:"void" },
+  ]},
+  { id:"eventos", t:"Eventos (admin)", d:"Criação, edição e check-in.",
+    path:"app/admin/eventos/actions.ts", actions:[
+    { v:"create", n:"criarEvento", a:"(prev, formData)", gate:"EVENTS_CREATE",
+      desc:"Cria evento no tenant, registrando o autor.",
+      input:"titulo≥3, data, descricao?, local?", writes:"Evento", audit:"EVENTO_CRIADO", ret:"{ errors? }" },
+    { v:"edit", n:"editarEvento", a:"(eventoId, prev, formData)", gate:"EVENTS_MANAGE",
+      desc:"Edita evento existente do tenant.",
+      input:"eventoSchema", writes:"Evento", audit:"EVENTO_EDITADO", ret:"{ errors? | message? }" },
+    { v:"edit", n:"registrarCheckIn", a:"(eventoId, userId)", gate:"EVENTS_MANAGE",
+      desc:"Check-in real (≠ RSVP). Upsert porque o usuário pode não ter RSVP prévio.",
+      input:"eventoId, userId", writes:"EventoRsvp (upsert)", audit:"EVENTO_CHECKIN", ret:"void" },
+    { v:"delete", n:"excluirEvento", a:"(eventoId)", gate:"EVENTS_MANAGE",
+      desc:"Exclui o evento do tenant.",
+      input:"eventoId", writes:"Evento (del)", audit:"EVENTO_EXCLUIDO", ret:"void" },
+  ]},
+  { id:"comunidade", t:"Comunidade & comunicados (admin)", d:"Posts do mural (COMMUNITY_MANAGE) e comunicados oficiais (ANNOUNCEMENTS_PUBLISH).",
+    path:"app/admin/comunidade/actions.ts", actions:[
+    { v:"create", n:"criarPost", a:"(prev, formData)", gate:"COMMUNITY_MANAGE",
+      desc:"Cria post no mural da comunidade.",
+      input:"titulo?, conteudo(1–4000), imagemUrl?", writes:"Post", audit:"POST_CRIADO", ret:"{ errors? }" },
+    { v:"edit", n:"atualizarPost", a:"(postId, prev, formData)", gate:"COMMUNITY_MANAGE",
+      desc:"Edita post existente do tenant.", input:"postSchema", writes:"Post", audit:"POST_ATUALIZADO", ret:"{ errors? | message? }" },
+    { v:"edit", n:"alternarFixado", a:"(postId)", gate:"COMMUNITY_MANAGE",
+      desc:"Fixa/desafixa o post no topo do mural.", input:"postId", writes:"Post", audit:"POST_FIXADO / _DESAFIXADO", ret:"void" },
+    { v:"delete", n:"excluirPost", a:"(postId)", gate:"COMMUNITY_MANAGE",
+      desc:"Exclui o post.", input:"postId", writes:"Post (del)", audit:"POST_EXCLUIDO", ret:"void" },
+    { v:"create", n:"criarComunicado", a:"(prev, formData)", gate:"ANNOUNCEMENTS_PUBLISH",
+      desc:"Publica comunicado oficial (distinto de post; gate próprio).",
+      input:"titulo, corpo(1–4000), prioridade(NORMAL|IMPORTANTE|URGENTE)", writes:"Announcement", audit:"COMUNICADO_CRIADO", ret:"{ errors? }" },
+    { v:"edit", n:"atualizarComunicado", a:"(comunicadoId, prev, formData)", gate:"ANNOUNCEMENTS_PUBLISH",
+      desc:"Edita comunicado existente.", input:"comunicadoSchema", writes:"Announcement", audit:"COMUNICADO_ATUALIZADO", ret:"{ errors? | message? }" },
+    { v:"edit", n:"alternarFixadoComunicado", a:"(comunicadoId)", gate:"ANNOUNCEMENTS_PUBLISH",
+      desc:"Fixa/desafixa o comunicado.", input:"comunicadoId", writes:"Announcement", audit:"COMUNICADO_FIXADO / _DESAFIXADO", ret:"void" },
+    { v:"delete", n:"excluirComunicado", a:"(comunicadoId)", gate:"ANNOUNCEMENTS_PUBLISH",
+      desc:"Exclui o comunicado.", input:"comunicadoId", writes:"Announcement (del)", audit:"COMUNICADO_EXCLUIDO", ret:"void" },
+  ]},
+  { id:"config", t:"Configurações: cargos & departamentos (admin)", d:"Perfil do tenant, RBAC e departamentos.",
+    path:"app/admin/configuracoes/actions.ts", actions:[
+    { v:"edit", n:"salvarPerfilTenant", a:"(formData)", gate:"SETTINGS_MANAGE",
+      desc:"Atualiza nome e cor primária da torcida.", input:"nome, corPrimaria(#hex)", writes:"Tenant", audit:"TENANT_PERFIL_ATUALIZADO", ret:"void" },
+    { v:"edit", n:"salvarDiscordGuildId", a:"(formData)", gate:"SETTINGS_MANAGE",
+      desc:"Vincula/desvincula o servidor Discord (guild) ao tenant.", input:"discordGuildId?", writes:"Tenant", audit:"TENANT_DISCORD_ATUALIZADO", ret:"void" },
+    { v:"create", n:"criarRole", a:"(formData)", gate:"ROLES_MANAGE",
+      desc:"Cria cargo custom. Sanitiza permissões (vocabulário canônico + cascata), exige ≥1.",
+      input:"nome, cor?, permissions[]", writes:"Role", audit:"ROLE_CRIADO", ret:"void" },
+    { v:"edit", n:"atualizarRole", a:"(roleId, formData)", gate:"ROLES_MANAGE",
+      desc:"Edita cargo. Bloqueia cargos isSystem. Audita o diff de permissões.",
+      input:"nome, cor?, permissions[]", writes:"Role", audit:"ROLE_ATUALIZADO", ret:"void" },
+    { v:"delete", n:"excluirRole", a:"(roleId)", gate:"ROLES_MANAGE",
+      desc:"Exclui cargo. Bloqueia isSystem e cargos em uso por algum usuário.",
+      input:"roleId", writes:"Role (del)", audit:"ROLE_EXCLUIDO", ret:"void" },
+    { v:"create", n:"criarDepartamento", a:"(formData)", gate:"ROLES_MANAGE",
+      desc:"Cria departamento (agrupamento organizacional, não concede permissão).", input:"nome, cor?", writes:"Departamento", audit:"DEPARTAMENTO_CRIADO", ret:"void" },
+    { v:"edit", n:"atualizarDepartamento", a:"(departamentoId, formData)", gate:"ROLES_MANAGE",
+      desc:"Edita nome/cor do departamento.", input:"nome, cor?", writes:"Departamento", audit:"DEPARTAMENTO_ATUALIZADO", ret:"void" },
+    { v:"delete", n:"excluirDepartamento", a:"(departamentoId)", gate:"ROLES_MANAGE",
+      desc:"Exclui o departamento.", input:"departamentoId", writes:"Departamento (del)", audit:"DEPARTAMENTO_EXCLUIDO", ret:"void" },
+  ]},
+  { id:"acessos", t:"Controle de acesso (admin)", d:"Atribuição de perfis, departamentos e permissões por usuário.",
+    path:"app/admin/acessos/actions.ts", actions:[
+    { v:"edit", n:"salvarAcessoUsuario", a:"(userId, formData)", gate:"ROLES_MANAGE",
+      desc:"Salva o acesso efetivo do usuário calculando o diff mínimo: perfis, departamentos (com gestor) e overrides de permissão. Tudo em transação.",
+      input:"perfilIds[], departamentoIds[], gestorDepartamentoIds[], permissoes[]",
+      writes:"UserRole, UserDepartamento, DepartamentoGestor, UserPermission", audit:"ACESSO_USUARIO_ATUALIZADO", ret:"void" },
+  ]},
+  { id:"super-admin", t:"Super-admin: setup", d:"Provisionamento de tenant (allowlist de e-mail em ambiente).",
+    path:"app/super-admin/setup/actions.ts", actions:[
+    { v:"create", n:"criarTenantInicial", a:"(prev, formData)", gate:"Super-admin", open:true,
+      desc:"Cria o tenant + 3 roles de sistema (OWNER/ADMIN/MEMBER) e atribui OWNER ao usuário logado. Tudo em transação.",
+      input:"slug(a-z0-9-), nome, corPrimaria?", writes:"Tenant, Role×3, UserRole", audit:"—", ret:"redirect" },
+    { v:"edit", n:"atribuirOwnerAction", a:"(prev, formData)", gate:"Super-admin", open:true,
+      desc:"Garante roles de sistema num tenant existente e atribui OWNER ao usuário logado (sem duplicar).",
+      input:"tenantId", writes:"Role, UserRole", audit:"—", ret:"{ tenantId?, tenantSlug? | message? }" },
+    { v:"edit", n:"atribuirOwner", a:"(tenantId)", gate:"Super-admin", open:true,
+      desc:"@deprecated — wrapper legado sobre atribuirOwnerAction com redirect.",
+      input:"tenantId", writes:"(via atribuirOwnerAction)", audit:"—", ret:"redirect | SetupState" },
+  ]},
+];
+
+const VERB_LABEL = { create:"Criar", edit:"Editar", delete:"Excluir", auth:"Auth" };
+
+const nav = document.getElementById("nav");
+const content = document.getElementById("content");
+let total = 0, gated = 0;
+const gates = new Set();
+
+GROUPS.forEach(g => {
+  const a = document.createElement("a");
+  a.href = "#" + g.id;
+  a.innerHTML = `<span>${g.t.replace(/ \(.*/,"")}</span><span class="n">${g.actions.length}</span>`;
+  nav.appendChild(a);
+
+  const sec = document.createElement("section");
+  sec.className = "group"; sec.id = g.id;
+  sec.innerHTML = `<h3>${g.t}</h3><p class="gdesc">${g.d} · <span class="path">${g.path}</span></p>`;
+  g.actions.forEach(ac => {
+    total++;
+    if (!ac.open) { gated++; gates.add(ac.gate); }
+    const card = document.createElement("article");
+    card.className = "card";
+    card.dataset.search = (ac.n + " " + ac.gate + " " + ac.desc + " " + ac.writes + " " + g.t).toLowerCase();
+    card.innerHTML = `
+      <div class="top">
+        <span class="verb ${ac.v}">${VERB_LABEL[ac.v]}</span>
+        <span class="sig">${ac.n}<span class="args">${ac.a}</span></span>
+        <span class="gate ${ac.open ? "open":""}">${ac.gate}</span>
+      </div>
+      <p class="desc">${ac.desc}</p>
+      <div class="meta">
+        <div><div class="k">Entrada (Zod / args)</div><div class="val">${ac.input}</div></div>
+        <div><div class="k">Grava no banco</div><div class="val">${pills(ac.writes)}</div></div>
+        <div><div class="k">AuditLog</div><div class="val">${ac.audit === "—" ? '<span style="opacity:.5">— sem auditoria</span>' : ac.audit}</div></div>
+        <div><div class="k">Retorno</div><div class="val">${ac.ret}</div></div>
+      </div>`;
+    sec.appendChild(card);
+  });
+  content.appendChild(sec);
+});
+
+function pills(w){
+  if (w === "—") return '<span style="opacity:.5">—</span>';
+  return w.split(",").map(s => `<span class="pill">${s.trim()}</span>`).join("");
+}
+
+const stats = document.getElementById("stats");
+[["Server Actions", total], ["Módulos", GROUPS.length], ["Permissões", gates.size], ["Só sessão/público", total-gated]]
+  .forEach(([l,v])=>{
+    const d=document.createElement("div"); d.className="stat";
+    d.innerHTML=`<div class="v">${v}</div><div class="l">${l}</div>`; stats.appendChild(d);
+  });
+
+// filtro
+const q = document.getElementById("q");
+const empty = document.getElementById("empty");
+q.addEventListener("input", () => {
+  const term = q.value.trim().toLowerCase();
+  let anyVisible = false;
+  document.querySelectorAll("section.group").forEach(sec => {
+    let secVisible = false;
+    sec.querySelectorAll(".card").forEach(c => {
+      const match = !term || c.dataset.search.includes(term);
+      c.style.display = match ? "" : "none";
+      if (match) { secVisible = true; anyVisible = true; }
+    });
+    sec.style.display = secVisible ? "" : "none";
+  });
+  empty.classList.toggle("show", !anyVisible);
+});
+
+// tema
+const tt = document.getElementById("tt");
+tt.addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const isDark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", isDark ? "light" : "dark");
+});
+</script>
