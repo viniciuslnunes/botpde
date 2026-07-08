@@ -1,8 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, Loader2, Plus, X } from 'lucide-react'
+import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
+
+type VotanteEnquete = {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+}
 
 export type EnqueteSala = {
   id: string
@@ -11,12 +17,22 @@ export type EnqueteSala = {
   criadoEm: string
   meuVotoOpcaoId: string | null
   totalVotos: number
-  opcoes: { id: string; texto: string; votos: number; percentual: number }[]
+  opcoes: {
+    id: string
+    texto: string
+    votos: number
+    percentual: number
+    votantes: VotanteEnquete[]
+  }[]
 }
 
 interface SalaEnqueteProps {
   salaId: string
   isHost: boolean
+}
+
+function InicialAvatar({ nome }: { nome: string | null }) {
+  return (nome?.trim()?.[0] ?? '?').toUpperCase()
 }
 
 export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
@@ -41,7 +57,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
 
   useEffect(() => {
     void carregar()
-    const id = window.setInterval(() => void carregar(), 4000)
+    const id = window.setInterval(() => void carregar(), 3000)
     return () => window.clearInterval(id)
   }, [carregar])
 
@@ -121,7 +137,10 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
       </div>
 
       {isHost && mostrarForm && (
-        <form onSubmit={criarEnquete} className="mb-4 space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
+        <form
+          onSubmit={criarEnquete}
+          className="mb-4 space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3"
+        >
           <input
             value={pergunta}
             onChange={(e) => setPergunta(e.target.value)}
@@ -171,14 +190,14 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
       ) : enquetes.length === 0 ? (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhuma enquete ativa.</p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-4">
           {enquetes.map((enquete) => (
             <li
               key={enquete.id}
-              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3"
+              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4"
             >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{enquete.pergunta}</p>
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <p className="text-base font-semibold text-[rgb(var(--foreground))]">{enquete.pergunta}</p>
                 {isHost && (
                   <button
                     type="button"
@@ -189,40 +208,88 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                   </button>
                 )}
               </div>
+
               <ul className="space-y-2">
                 {enquete.opcoes.map((opcao) => {
                   const selecionada = enquete.meuVotoOpcaoId === opcao.id
+                  const lider = enquete.totalVotos > 0 && opcao.votos === Math.max(...enquete.opcoes.map((o) => o.votos))
                   return (
                     <li key={opcao.id}>
                       <button
                         type="button"
                         disabled={votando === opcao.id}
                         onClick={() => void votar(enquete.id, opcao.id)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        className={`relative w-full overflow-hidden rounded-xl border text-left transition ${
                           selecionada
-                            ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/10'
-                            : 'border-[rgb(var(--border))] hover:bg-[rgb(var(--surface))]'
+                            ? 'border-[rgb(var(--color-primary))] ring-1 ring-[rgb(var(--color-primary))]/40'
+                            : 'border-[rgb(var(--border))] hover:border-[rgb(var(--foreground-muted))]'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{opcao.texto}</span>
-                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                            {opcao.percentual}% ({opcao.votos})
-                          </span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border))]">
-                          <div
-                            className="h-full rounded-full bg-[rgb(var(--color-primary))]"
-                            style={{ width: `${opcao.percentual}%` }}
-                          />
+                        <div
+                          className="absolute inset-y-0 left-0 transition-all duration-500"
+                          style={{
+                            width: `${Math.max(opcao.percentual, opcao.votos > 0 ? 6 : 0)}%`,
+                            backgroundColor: 'rgb(var(--color-primary) / 0.35)',
+                          }}
+                        />
+                        <div className="relative px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              {selecionada && (
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                              )}
+                              <span className="text-sm font-medium text-[rgb(var(--foreground))]">
+                                {opcao.texto}
+                                {lider && enquete.totalVotos > 1 && (
+                                  <span className="ml-2 text-xs font-semibold text-emerald-400">Líder</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold tabular-nums text-[rgb(var(--foreground))]">
+                                {opcao.percentual}%
+                              </div>
+                              <div className="text-xs text-[rgb(var(--foreground-muted))]">
+                                {opcao.votos} voto{opcao.votos === 1 ? '' : 's'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isHost && opcao.votantes.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5 border-t border-[rgb(var(--border))]/60 pt-2">
+                              <p className="w-full text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                                Votantes
+                              </p>
+                              {opcao.votantes.map((v) => (
+                                <span
+                                  key={v.userId}
+                                  className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--surface))] px-2 py-0.5 text-xs text-[rgb(var(--foreground))]"
+                                >
+                                  {v.avatarUrl ? (
+                                    <img
+                                      src={v.avatarUrl}
+                                      alt=""
+                                      className="h-4 w-4 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-bold">
+                                      <InicialAvatar nome={v.nome} />
+                                    </span>
+                                  )}
+                                  {v.nome ?? 'Membro'}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </button>
                     </li>
                   )
                 })}
               </ul>
-              <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-                {enquete.totalVotos} voto(s)
+
+              <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                {enquete.totalVotos} voto(s) no total · toque em uma opção para votar ou alterar
               </p>
             </li>
           ))}

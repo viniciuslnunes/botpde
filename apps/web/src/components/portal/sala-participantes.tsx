@@ -78,7 +78,7 @@ export function SalaParticipantes({
     }
 
     void poll()
-    const id = window.setInterval(poll, 4000)
+    const id = window.setInterval(poll, 5000)
     return () => {
       active = false
       window.clearInterval(id)
