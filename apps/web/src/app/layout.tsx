@@ -1,13 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import dynamic from 'next/dynamic'
 import { ThemeProvider } from '@torcida/ui'
 import { DialogProvider } from '@torcida/ui'
-
-const ToastProvider = dynamic(
-  () => import('@torcida/ui').then((mod) => mod.ToastProvider),
-  { ssr: false },
-)
+import { ClientToastProvider } from '@/components/providers/client-toast-provider'
 
 export const metadata: Metadata = {
   title: {
@@ -28,7 +23,7 @@ export default function RootLayout({
         <ThemeProvider>
           <DialogProvider>
             {children}
-            <ToastProvider />
+            <ClientToastProvider />
           </DialogProvider>
         </ThemeProvider>
       </body>
