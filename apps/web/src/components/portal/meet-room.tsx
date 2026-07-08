@@ -113,17 +113,33 @@ async function registrarPresenca(salaId: string, method: 'POST' | 'DELETE'): Pro
 }
 
 function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
-  const { useTrackToggle } = lk
-  const { buttonProps, enabled } = useTrackToggle({ source: Track.Source.ScreenShare })
+  const { useLocalParticipant } = lk
+  const { localParticipant } = useLocalParticipant()
+  const [pending, setPending] = useState(false)
+  const enabled = localParticipant.isScreenShareEnabled
+
+  async function alternarTela() {
+    if (pending) return
+    setPending(true)
+    try {
+      await localParticipant.setScreenShareEnabled(!enabled, { audio: true })
+    } catch {
+      toast.error('Não foi possível compartilhar a tela. Verifique a permissão do navegador.')
+    } finally {
+      setPending(false)
+    }
+  }
 
   return (
     <button
       type="button"
-      {...buttonProps}
+      onClick={() => void alternarTela()}
+      disabled={pending}
+      data-active={enabled ? 'true' : 'false'}
       className="meet-room-action-wide"
     >
-      <MonitorUp className="h-4 w-4" />
-      {enabled ? 'Parar tela' : 'Compartilhar tela'}
+      <MonitorUp className="h-4 w-4 shrink-0" />
+      <span>{pending ? 'Aguarde…' : enabled ? 'Parar tela' : 'Compartilhar tela'}</span>
     </button>
   )
 }

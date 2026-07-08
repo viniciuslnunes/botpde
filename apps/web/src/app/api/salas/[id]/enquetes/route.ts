@@ -8,6 +8,11 @@ const criarEnqueteSchema = z.object({
   opcoes: z.array(z.string().trim().min(1).max(120)).min(2).max(6),
 })
 
+type VotoComAutor = {
+  opcaoId: string
+  user: { id: string; nome: string | null; avatarUrl: string | null }
+}
+
 function serializeEnquete(
   enquete: {
     id: string
@@ -17,6 +22,8 @@ function serializeEnquete(
     opcoes: { id: string; texto: string; ordem: number; _count?: { votos: number } }[]
   },
   meuVotoOpcaoId: string | null,
+  votos: VotoComAutor[],
+  incluirVotantes: boolean,
 ) {
   const totalVotos = enquete.opcoes.reduce((acc, o) => acc + (o._count?.votos ?? 0), 0)
   return {
@@ -31,6 +38,15 @@ function serializeEnquete(
       texto: o.texto,
       votos: o._count?.votos ?? 0,
       percentual: totalVotos > 0 ? Math.round(((o._count?.votos ?? 0) / totalVotos) * 100) : 0,
+      votantes: incluirVotantes
+        ? votos
+            .filter((v) => v.opcaoId === o.id)
+            .map((v) => ({
+              userId: v.user.id,
+              nome: v.user.nome,
+              avatarUrl: v.user.avatarUrl,
+            }))
+        : [],
     })),
   }
 }
@@ -41,7 +57,7 @@ export async function GET(
 ) {
   try {
     const { id: salaId } = await context.params
-    const { session } = await assertSalaMembro(salaId)
+    const { session, isHost } = await assertSalaMembro(salaId)
 
     const enquetes = await db.enqueteReuniao.findMany({
       where: { salaId, encerradaEm: null },
@@ -50,16 +66,34 @@ export async function GET(
           orderBy: { ordem: 'asc' },
           include: { _count: { select: { votos: true } } },
         },
-        votos: { where: { userId: session.user.id }, select: { opcaoId: true } },
+        votos: isHost
+          ? {
+              include: {
+                user: { select: { id: true, nome: true, avatarUrl: true } },
+              },
+            }
+          : {
+              where: { userId: session.user.id },
+              select: { opcaoId: true },
+            },
       },
       orderBy: { criadoEm: 'desc' },
       take: 5,
     })
 
     return NextResponse.json({
-      enquetes: enquetes.map((e: (typeof enquetes)[number]) =>
-        serializeEnquete(e, e.votos[0]?.opcaoId ?? null),
-      ),
+      enquetes: enquetes.map((e: (typeof enquetes)[number]) => {
+        const meuVotoOpcaoId = isHost
+          ? (e.votos as VotoComAutor[]).find((v) => v.user.id === session.user.id)?.opcaoId ?? null
+          : (e.votos as { opcaoId: string }[])[0]?.opcaoId ?? null
+
+        return serializeEnquete(
+          e,
+          meuVotoOpcaoId,
+          isHost ? (e.votos as VotoComAutor[]) : [],
+          isHost,
+        )
+      }),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao carregar enquetes.'
@@ -98,6 +132,11 @@ export async function POST(
           orderBy: { ordem: 'asc' },
           include: { _count: { select: { votos: true } } },
         },
+        votos: {
+          include: {
+            user: { select: { id: true, nome: true, avatarUrl: true } },
+          },
+        },
       },
     })
 
@@ -112,7 +151,9 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({ enquete: serializeEnquete(enquete, null) })
+    return NextResponse.json({
+      enquete: serializeEnquete(enquete, null, enquete.votos, true),
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao criar enquete.'
     return NextResponse.json({ error: message }, { status: 400 })

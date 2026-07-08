@@ -215,9 +215,10 @@
 
 .meet-room-toggle.lk-button,
 .meet-room-action,
-.meet-room-action-wide.lk-button,
+.meet-room-action-wide,
 .meet-room-leave {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
@@ -229,6 +230,12 @@
   font-weight: 600;
   color: rgb(250 250 250);
   transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.meet-room-action-wide[data-active='true'] {
+  background: rgb(var(--color-primary));
+  border-color: transparent;
 }
 
 .meet-room-toggle.lk-button {
@@ -237,17 +244,21 @@
   padding: 0;
 }
 
-.meet-room-toggle.lk-button[data-lk-enabled='true'],
-.meet-room-action-wide.lk-button[data-lk-enabled='true'] {
+.meet-room-toggle.lk-button[data-lk-enabled='true'] {
   background: rgb(var(--color-primary));
   border-color: transparent;
 }
 
 .meet-room-action:hover:not(:disabled),
 .meet-room-leave:hover:not(:disabled),
-.meet-room-toggle.lk-button:hover:not(:disabled),
-.meet-room-action-wide.lk-button:hover:not(:disabled) {
+.meet-room-action-wide:hover:not(:disabled),
+.meet-room-toggle.lk-button:hover:not(:disabled) {
   background: rgb(63 63 70);
+}
+
+.meet-room-action-wide[data-active='true']:hover:not(:disabled) {
+  background: rgb(var(--color-primary));
+  filter: brightness(1.08);
 }
 
 .meet-room-action:disabled {
