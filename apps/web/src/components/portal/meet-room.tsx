@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
+  Bell,
   Hand,
   Info,
   Loader2,
@@ -15,6 +16,8 @@ import {
   VideoOff,
   X,
 } from 'lucide-react'
+import { toast } from '@torcida/ui'
+import { playSalaModerationAlert } from '@/lib/sala-alert-sound'
 import {
   MediaDeviceFailure,
   RoomEvent,
@@ -51,6 +54,27 @@ type MediaRequest = {
   userId: string
   userName: string
   kind: MidiaSalaKind
+}
+
+function requestKindLabel(kind: MidiaSalaKind): string {
+  return kind === 'speak' ? 'falar' : 'compartilhar tela'
+}
+
+function notifyHostNewRequest(request: MediaRequest) {
+  playSalaModerationAlert()
+  toast.warning(`${request.userName} quer ${requestKindLabel(request.kind)}`, 'Responda na barra abaixo do vídeo.')
+}
+
+function notifyGuestResponse(kind: MidiaSalaKind, approved: boolean) {
+  if (approved) {
+    toast.success(
+      kind === 'speak'
+        ? 'Anfitrião liberou microfone e câmera.'
+        : 'Anfitrião liberou compartilhamento de tela.',
+    )
+    return
+  }
+  toast.info('Solicitação negada pelo anfitrião.')
 }
 
 function mediaFailureMessage(failure: MediaDeviceFailure): string {
@@ -112,6 +136,8 @@ function MeetControls({
   const [requests, setRequests] = useState<MediaRequest[]>([])
   const [pendingKind, setPendingKind] = useState<MidiaSalaKind | null>(null)
   const [saindo, setSaindo] = useState(false)
+  const [pulseRequests, setPulseRequests] = useState(false)
+  const knownRequestIdsRef = useRef<Set<string>>(new Set())
 
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
@@ -139,12 +165,19 @@ function MeetControls({
       if (message.type === 'media_request' && isHost) {
         setRequests((prev) => {
           if (prev.some((r) => r.requestId === message.requestId)) return prev
+          if (!knownRequestIdsRef.current.has(message.requestId)) {
+            knownRequestIdsRef.current.add(message.requestId)
+            notifyHostNewRequest(message)
+            setPulseRequests(true)
+            window.setTimeout(() => setPulseRequests(false), 5000)
+          }
           return [...prev, message]
         })
         return
       }
 
       if (message.type === 'media_response' && message.userId === userId) {
+        notifyGuestResponse(message.kind, message.approved)
         if (message.approved) syncPermissions()
         setPendingKind(null)
       }
@@ -212,9 +245,18 @@ function MeetControls({
   return (
     <div className="meet-room-footer">
       {isHost && requests.length > 0 && (
-        <div className="meet-room-requests">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        <div
+          className={`meet-room-requests${pulseRequests ? ' meet-room-requests--pulse' : ''}`}
+          role="region"
+          aria-live="polite"
+          aria-label="Solicitações pendentes de mídia"
+        >
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <Bell className={`h-4 w-4${pulseRequests ? ' text-amber-400 animate-pulse' : ''}`} />
             Solicitações pendentes
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-zinc-950">
+              {requests.length}
+            </span>
           </p>
           <ul className="space-y-2">
             {requests.map((request) => (
