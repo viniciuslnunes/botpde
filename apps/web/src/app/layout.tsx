@@ -1,8 +1,13 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import dynamic from 'next/dynamic'
 import { ThemeProvider } from '@torcida/ui'
-import { ToastProvider } from '@torcida/ui'
 import { DialogProvider } from '@torcida/ui'
+
+const ToastProvider = dynamic(
+  () => import('@torcida/ui').then((mod) => mod.ToastProvider),
+  { ssr: false },
+)
 
 export const metadata: Metadata = {
   title: {

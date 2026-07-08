@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import nextDynamic from 'next/dynamic'
 import { notFound, redirect } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { isLiveKitConfigured, requireLiveKitConfig } from '@/lib/env'
@@ -8,8 +10,20 @@ import { getSalaById } from '@/lib/salas'
 import { listParticipantesAtivos } from '@/lib/salas-presenca'
 import { getTenantFromHost } from '@/lib/tenant'
 import { encerrarSala } from '../actions'
-import { SalaAtivaClient } from '@/components/portal/sala-ativa-client'
 import { formatDateTimeShort } from '@/lib/format-datetime'
+
+const SalaAtivaClient = nextDynamic(
+  () => import('@/components/portal/sala-ativa-client').then((mod) => mod.SalaAtivaClient),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+        <Loader2 className="h-8 w-8 animate-spin text-[rgb(var(--foreground-muted))]" />
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">Carregando sala…</p>
+      </div>
+    ),
+  },
+)
 
 export const metadata: Metadata = { title: 'Sala de vídeo' }
 export const dynamic = 'force-dynamic'

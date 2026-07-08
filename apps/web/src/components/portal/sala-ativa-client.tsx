@@ -7,7 +7,6 @@ import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
-import { FormattedDateTime } from '@/components/ui/formatted-datetime'
 
 type SalaAtivaClientProps = {
   sala: {
@@ -99,10 +98,7 @@ export function SalaAtivaClient({
         <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center">
           <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
             Esta sala foi encerrada em{' '}
-            <FormattedDateTime
-              iso={sala.encerradaEm}
-              formatted={sala.encerradaEmFormatado ?? undefined}
-            />
+            <span suppressHydrationWarning>{sala.encerradaEmFormatado}</span>
           </p>
         </div>
       ) : !livekitOk ? (
@@ -201,8 +197,8 @@ export function SalaAtivaClient({
                   </div>
                   <div>
                     <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
-                    <dd className="text-[rgb(var(--foreground))]">
-                      <FormattedDateTime iso={sala.criadoEm} formatted={sala.criadoEmFormatado} />
+                    <dd className="text-[rgb(var(--foreground))]" suppressHydrationWarning>
+                      {sala.criadoEmFormatado}
                     </dd>
                   </div>
                   <div>

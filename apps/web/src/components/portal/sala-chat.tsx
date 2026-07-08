@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Pin, Send, Trash2, Pencil } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatDateTimeShort } from '@/lib/format-datetime'
-import { FormattedDateTime } from '@/components/ui/formatted-datetime'
 
 export type SalaMensagem = {
   id: string
@@ -151,6 +150,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
       id: tempId,
       conteudo: texto,
       criadoEm: new Date().toISOString(),
+      criadoEmFormatado: formatDateTimeShort(new Date()),
       editadaEm: null,
       destacada: false,
       autor: { id: currentUserId, nome: 'Você', avatarUrl: null },
@@ -281,12 +281,9 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
                 } ${temporaria ? 'opacity-80' : ''}`}
               >
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-[rgb(var(--foreground-muted))]">
+                  <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
                     {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
-                    <FormattedDateTime
-                      iso={mensagem.criadoEm}
-                      formatted={mensagem.criadoEmFormatado}
-                    />
+                    {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
                     {temporaria && ' · enviando…'}
                     {mensagem.editadaEm && ' · editada'}
                     {mensagem.destacada && ' · destacada'}
