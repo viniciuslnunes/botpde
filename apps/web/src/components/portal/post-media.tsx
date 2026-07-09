@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import {
   classifyMedia,
+  cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
   youTubeId,
   type EmbedProvider,
+  type MediaAttachment,
 } from '@/lib/social-embed'
 
 const SCRIPTS: Partial<Record<EmbedProvider, string>> = {
@@ -43,12 +45,22 @@ interface PostMediaProps {
 }
 
 export function PostMedia({ urls }: PostMediaProps) {
-  const { images, embeds } = classifyMedia(urls)
-  if (images.length === 0 && embeds.length === 0) return null
+  const { media, embeds } = classifyMedia(urls)
+  const slides = media.filter((m) => m.type !== 'sticker')
+  const stickers = media.filter((m) => m.type === 'sticker')
+  if (media.length === 0 && embeds.length === 0) return null
 
   return (
     <div className="mt-3 space-y-3">
-      {images.length > 0 && <ImageCarousel images={images} />}
+      {slides.length > 0 && <MediaCarousel slides={slides} />}
+      {stickers.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {stickers.map((s) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={s.url} src={s.url} alt="Sticker" className="h-28 w-28 object-contain" />
+          ))}
+        </div>
+      )}
       {embeds.map((url) => (
         <SocialEmbed key={url} url={url} />
       ))}
@@ -56,17 +68,32 @@ export function PostMedia({ urls }: PostMediaProps) {
   )
 }
 
-function ImageCarousel({ images }: { images: string[] }) {
+function Slide({ item, className }: { item: MediaAttachment; className: string }) {
+  if (item.type === 'video') {
+    return (
+      <video
+        src={item.url}
+        poster={cloudinaryVideoPoster(item.url)}
+        controls
+        playsInline
+        preload="metadata"
+        className={className}
+      />
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={item.url} alt="" className={className} />
+}
+
+function MediaCarousel({ slides }: { slides: MediaAttachment[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
 
-  if (images.length === 1) {
+  if (slides.length === 1) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={images[0]}
-        alt=""
-        className="max-h-[32rem] w-full rounded-xl border border-[rgb(var(--border))] object-cover"
+      <Slide
+        item={slides[0]}
+        className="max-h-[32rem] w-full rounded-xl border border-[rgb(var(--border))] object-contain"
       />
     )
   }
@@ -74,7 +101,7 @@ function ImageCarousel({ images }: { images: string[] }) {
   function scrollTo(i: number) {
     const track = trackRef.current
     if (!track) return
-    const clamped = Math.max(0, Math.min(images.length - 1, i))
+    const clamped = Math.max(0, Math.min(slides.length - 1, i))
     track.scrollTo({ left: clamped * track.clientWidth, behavior: 'smooth' })
     setIndex(clamped)
   }
@@ -92,13 +119,11 @@ function ImageCarousel({ images }: { images: string[] }) {
         onScroll={onScroll}
         className="flex snap-x snap-mandatory overflow-x-auto rounded-xl border border-[rgb(var(--border))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {images.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+        {slides.map((item, i) => (
+          <Slide
             key={i}
-            src={src}
-            alt=""
-            className="h-[22rem] w-full shrink-0 snap-center object-cover sm:h-[28rem]"
+            item={item}
+            className="h-[22rem] w-full shrink-0 snap-center bg-black object-contain sm:h-[28rem]"
           />
         ))}
       </div>
@@ -113,7 +138,7 @@ function ImageCarousel({ images }: { images: string[] }) {
           <ChevronLeft className="h-5 w-5" />
         </button>
       )}
-      {index < images.length - 1 && (
+      {index < slides.length - 1 && (
         <button
           type="button"
           onClick={() => scrollTo(index + 1)}
@@ -125,11 +150,11 @@ function ImageCarousel({ images }: { images: string[] }) {
       )}
 
       <div className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
-        {index + 1}/{images.length}
+        {index + 1}/{slides.length}
       </div>
 
       <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
-        {images.map((_, i) => (
+        {slides.map((_, i) => (
           <button
             key={i}
             type="button"

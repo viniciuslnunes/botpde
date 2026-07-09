@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <circle cx="60" cy="60" r="50" fill="#16a34a"/>
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#ffffff" stroke-width="4" stroke-dasharray="6 7" opacity="0.8"/>
+  <text x="60" y="72" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900" fill="#ffffff">GOL!</text>
+</svg>

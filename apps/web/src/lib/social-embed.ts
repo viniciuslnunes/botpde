@@ -6,8 +6,14 @@
  */
 
 export type EmbedProvider = 'youtube' | 'twitter' | 'instagram' | 'tiktok'
+export type MediaKind = 'image' | 'video' | 'sticker'
+export interface MediaAttachment {
+  type: MediaKind
+  url: string
+}
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|avif|svg)(\?.*)?$/i
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i
 
 export const EMBED_HOSTS: Record<EmbedProvider, string> = {
   youtube: 'YouTube',
@@ -41,6 +47,20 @@ export function isImageUrl(url: string): boolean {
   return isCloudinaryUrl(url) || IMAGE_EXT.test(url)
 }
 
+export function isCloudinaryVideo(url: string): boolean {
+  return isCloudinaryUrl(url) && (/\/video\/upload\//.test(url) || VIDEO_EXT.test(url))
+}
+
+/** Sticker embutido no app (servido de /public/stickers). Caminho relativo. */
+export function isStickerPath(url: string): boolean {
+  return /^\/stickers\/[\w-]+\.svg$/.test(url)
+}
+
+/** Poster (primeiro frame) de um vídeo do Cloudinary, via transformação de URL. */
+export function cloudinaryVideoPoster(url: string): string {
+  return url.replace('/video/upload/', '/video/upload/so_0/').replace(VIDEO_EXT, '.jpg')
+}
+
 export function youTubeId(url: string): string | null {
   try {
     const u = new URL(url)
@@ -55,15 +75,21 @@ export function youTubeId(url: string): string | null {
   }
 }
 
-/** Separa os anexos em imagens e embeds sociais, preservando a ordem. */
-export function classifyMedia(urls: string[]): { images: string[]; embeds: string[] } {
-  const images: string[] = []
+/**
+ * Separa os anexos em mídia (imagem/vídeo/sticker) e embeds sociais,
+ * preservando a ordem.
+ */
+export function classifyMedia(urls: string[]): { media: MediaAttachment[]; embeds: string[] } {
+  const media: MediaAttachment[] = []
   const embeds: string[] = []
   for (const url of urls) {
+    if (!url) continue
     if (isSocialUrl(url)) embeds.push(url)
-    else if (url) images.push(url)
+    else if (isCloudinaryVideo(url)) media.push({ type: 'video', url })
+    else if (isStickerPath(url)) media.push({ type: 'sticker', url })
+    else media.push({ type: 'image', url })
   }
-  return { images, embeds }
+  return { media, embeds }
 }
 
 /** Primeira URL de rede social encontrada num texto — usada pelo composer. */

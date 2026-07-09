@@ -35,10 +35,12 @@ async function compress(file: File): Promise<Blob> {
   }
 }
 
-export async function uploadImageToCloudinary(
+export async function uploadMediaToCloudinary(
   file: File,
   onProgress?: (pct: number) => void,
 ): Promise<string> {
+  const isVideo = file.type.startsWith('video/')
+
   const signRes = await fetch('/api/upload/sign', { method: 'POST' })
   if (signRes.status === 501) {
     throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')
@@ -49,7 +51,8 @@ export async function uploadImageToCloudinary(
   }
   const sign = (await signRes.json()) as SignResponse
 
-  const blob = await compress(file)
+  // Vídeo sobe sem compressão no cliente; imagem é redimensionada antes.
+  const blob = isVideo ? file : await compress(file)
   const form = new FormData()
   form.append('file', blob, file.name)
   form.append('api_key', sign.apiKey)
@@ -57,7 +60,8 @@ export async function uploadImageToCloudinary(
   form.append('folder', sign.folder)
   form.append('signature', sign.signature)
 
-  const endpoint = `https://api.cloudinary.com/v1_1/${sign.cloudName}/image/upload`
+  const resourceType = isVideo ? 'video' : 'image'
+  const endpoint = `https://api.cloudinary.com/v1_1/${sign.cloudName}/${resourceType}/upload`
 
   return new Promise<string>((resolve, reject) => {
     const xhr = new XMLHttpRequest()

@@ -10,16 +10,19 @@ import { PERMISSIONS } from '@torcida/types'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
-import { isCloudinaryUrl, isSocialUrl } from '@/lib/social-embed'
+import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const MAX_MIDIAS = 10
 
-// Cada anexo deve ser uma imagem do nosso Cloudinary ou um link de rede social
-// (embed) — bloqueia URLs arbitrárias de terceiros.
+// Cada anexo deve ser mídia do nosso Cloudinary (imagem/vídeo), um link de rede
+// social (embed) ou um sticker do app — bloqueia URLs arbitrárias de terceiros.
 const midiaUrlSchema = z
   .string()
-  .url('Anexo inválido')
-  .refine((url) => isCloudinaryUrl(url) || isSocialUrl(url), 'Tipo de anexo não permitido')
+  .max(500)
+  .refine(
+    (url) => isCloudinaryUrl(url) || isSocialUrl(url) || isStickerPath(url),
+    'Tipo de anexo não permitido',
+  )
 
 const postSchema = z.object({
   conteudo: z.string().trim().min(1, 'Conteúdo é obrigatório').max(3000),

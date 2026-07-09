@@ -1,17 +1,19 @@
 'use client'
 
 import { useActionState, useRef, useState } from 'react'
-import { ImagePlus, Smile, Send, X, Loader2, Link2 } from 'lucide-react'
+import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, type PublicarPostState } from '@/app/portal/comunidade/actions'
-import { uploadImageToCloudinary } from '@/lib/cloudinary-upload'
+import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
+import { StickerPicker } from './sticker-picker'
 
 const INITIAL_STATE: PublicarPostState = {}
-const MAX_IMAGENS = 10
-const MAX_MB = 10
+const MAX_ANEXOS = 10
+const MAX_IMG_MB = 10
+const MAX_VIDEO_MB = 100
 
 interface FeedComposerProps {
   userName: string | null
@@ -41,8 +43,11 @@ export function FeedComposer({ userName, userAvatar }: FeedComposerProps) {
   )
 }
 
+type MediaKind = 'image' | 'video' | 'sticker'
+
 interface MediaItem {
   id: string
+  kind: MediaKind
   localUrl: string
   url: string | null
   progress: number
@@ -64,6 +69,7 @@ function ComposerBody({
   const [texto, setTexto] = useState('')
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [stickerOpen, setStickerOpen] = useState(false)
   const [embedDispensado, setEmbedDispensado] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -101,25 +107,38 @@ function ComposerBody({
   }
 
   function addFiles(files: FileList | File[]) {
-    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const arr = Array.from(files).filter(
+      (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+    )
     if (arr.length === 0) return
-    const espaco = MAX_IMAGENS - medias.length
+    const espaco = MAX_ANEXOS - medias.length
     if (espaco <= 0) {
-      toast.error(`Máximo de ${MAX_IMAGENS} imagens por publicação.`)
+      toast.error(`Máximo de ${MAX_ANEXOS} anexos por publicação.`)
       return
     }
     for (const file of arr.slice(0, espaco)) {
-      if (file.size > MAX_MB * 1024 * 1024) {
-        toast.error(`"${file.name}" passa de ${MAX_MB}MB.`)
+      const isVideo = file.type.startsWith('video/')
+      const limiteMB = isVideo ? MAX_VIDEO_MB : MAX_IMG_MB
+      if (file.size > limiteMB * 1024 * 1024) {
+        toast.error(`"${file.name}" passa de ${limiteMB}MB.`)
         continue
       }
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const item: MediaItem = { id, localUrl: URL.createObjectURL(file), url: null, progress: 0, error: null }
+      const item: MediaItem = {
+        id,
+        kind: isVideo ? 'video' : 'image',
+        localUrl: URL.createObjectURL(file),
+        url: null,
+        progress: 0,
+        error: null,
+      }
       setMedias((prev) => [...prev, item])
-      void uploadImageToCloudinary(file, (pct) =>
+      void uploadMediaToCloudinary(file, (pct) =>
         setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, progress: pct } : m))),
       )
-        .then((url) => setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, url, progress: 100 } : m))))
+        .then((url) =>
+          setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, url, progress: 100 } : m))),
+        )
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : 'Falha no upload'
           setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, error: msg } : m)))
@@ -128,10 +147,23 @@ function ComposerBody({
     }
   }
 
+  function addSticker(url: string) {
+    setStickerOpen(false)
+    if (medias.length >= MAX_ANEXOS) {
+      toast.error(`Máximo de ${MAX_ANEXOS} anexos por publicação.`)
+      return
+    }
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    setMedias((prev) => [
+      ...prev,
+      { id, kind: 'sticker', localUrl: url, url, progress: 100, error: null },
+    ])
+  }
+
   function removeMedia(id: string) {
     setMedias((prev) => {
       const alvo = prev.find((m) => m.id === id)
-      if (alvo) URL.revokeObjectURL(alvo.localUrl)
+      if (alvo && alvo.kind !== 'sticker') URL.revokeObjectURL(alvo.localUrl)
       return prev.filter((m) => m.id !== id)
     })
   }
@@ -174,10 +206,12 @@ function ComposerBody({
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               onPaste={(e) => {
-                const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
-                if (imgs.length) {
+                const files = Array.from(e.clipboardData.files).filter(
+                  (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+                )
+                if (files.length) {
                   e.preventDefault()
-                  addFiles(imgs)
+                  addFiles(files)
                 }
               }}
               placeholder={`No que você tá pensando, ${firstName}?`}
@@ -189,16 +223,29 @@ function ComposerBody({
 
       {expanded && (
         <>
-          {/* Prévia das imagens */}
+          {/* Prévia dos anexos */}
           {medias.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 pl-[52px]">
               {medias.map((m) => (
                 <div
                   key={m.id}
-                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-[rgb(var(--border))]"
+                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.localUrl} alt="" className="h-full w-full object-cover" />
+                  {m.kind === 'video' ? (
+                    <>
+                      <video src={m.localUrl} muted playsInline className="h-full w-full object-cover" />
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <Play className="h-6 w-6 fill-white text-white drop-shadow" />
+                      </div>
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.localUrl}
+                      alt=""
+                      className={m.kind === 'sticker' ? 'h-full w-full object-contain p-1.5' : 'h-full w-full object-cover'}
+                    />
+                  )}
                   {m.url === null && !m.error && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                       <Loader2 className="h-5 w-5 animate-spin text-white" />
@@ -212,7 +259,7 @@ function ComposerBody({
                   <button
                     type="button"
                     onClick={() => removeMedia(m.id)}
-                    aria-label="Remover imagem"
+                    aria-label="Remover anexo"
                     className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                   >
                     <X className="h-3 w-3" />
@@ -250,33 +297,52 @@ function ComposerBody({
           )}
 
           <div className="mt-3 flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
-            <div className="relative flex items-center gap-1">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                aria-label="Adicionar imagens"
+                aria-label="Adicionar foto ou vídeo"
+                title="Foto ou vídeo"
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
               >
                 <ImagePlus className="h-5 w-5" />
               </button>
-              <button
-                type="button"
-                onClick={() => setEmojiOpen((v) => !v)}
-                aria-label="Emojis"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-              >
-                <Smile className="h-5 w-5" />
-              </button>
-              {emojiOpen && (
-                <EmojiPicker
-                  onSelect={(e) => insertEmoji(e)}
-                  onClose={() => setEmojiOpen(false)}
-                />
-              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmojiOpen((v) => !v)
+                    setStickerOpen(false)
+                  }}
+                  aria-label="Emojis"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+                >
+                  <Smile className="h-5 w-5" />
+                </button>
+                {emojiOpen && (
+                  <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
+                )}
+              </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStickerOpen((v) => !v)
+                    setEmojiOpen(false)
+                  }}
+                  aria-label="Stickers"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+                >
+                  <StickerIcon className="h-5 w-5" />
+                </button>
+                {stickerOpen && (
+                  <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
+                )}
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 multiple
                 className="hidden"
                 onChange={(e) => {
