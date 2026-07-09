@@ -51,6 +51,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Visibilidade**: use `resolveVisibility`/`canViewRecurso` de `packages/types/src/visibility.js`.
   `self`/`ancestor` = tudo; `descendant` e `allied` = só PÚBLICO; `unrelated` = nada.
 - **UX**: cubra estados de vazio, erro e loading.
+- **Dependência externa opcional**: quando uma feature depende de um serviço externo não
+  obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
+  e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.
 
 ## Fluxo de trabalho
 
@@ -67,4 +70,6 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - `packages/types/src/visibility.js` — sensibilidade e visibilidade cross-tenant.
 - `apps/web/src/lib/authz.ts` — `assertPermission`.
 - `apps/web/src/lib/hierarquia.ts` — relação entre tenants na árvore de Sede.
+- `apps/web/src/lib/salas.ts`, `salas-api.ts`, `livekit.ts` — núcleo do módulo Salas (Meet);
+  ver `docs/data/modulo-salas.md`.
 - `ARCHITECTURE.md` — decisões fechadas (§5) e itens em aberto (§6).

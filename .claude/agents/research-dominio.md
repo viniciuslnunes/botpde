@@ -19,6 +19,8 @@ Leia `ARCHITECTURE.md` e `docs/product/dominio.md` antes de opinar. O produto é
 SaaS operacional multi-tenant (hierarquia Sede → Subsede → PDE) evoluindo para incluir
 comunidade com aliados, informação confiável do nicho e importação da base real de
 associados. Foco: utilidade real para a torcida, governança, precisão de informação.
+Reuniões ao vivo (Salas/Meet) já existem como alavanca de engajamento síncrono —
+relevante ao pensar mobilização e comunidade.
 
 ## Como trabalhar
 1. Enquadre a pergunta em termos do domínio (operação, mobilização, comunidade,

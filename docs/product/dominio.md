@@ -16,7 +16,7 @@ Não é rede social genérica — cada recurso resolve uma dor real da torcida.
 |---|---|---|
 | Operação | membros, sócios, carteirinha, sedes/subsedes/PDE, departamentos, RBAC, auditoria | Existe |
 | Mobilização | eventos, RSVP, check-in, presença | Existe |
-| Comunidade | comunicados oficiais, mural/posts por unidade | Existe (intra-tenant) |
+| Comunidade | comunicados oficiais, mural/posts por unidade, salas de vídeo ao vivo (Meet) | Existe (intra-tenant) |
 | Alianças 🆕 | relação curada torcida↔torcida; visibilidade pública cross-tenant | Novo |
 | Informação do nicho 🆕 | afiliação (time), jogos/calendário/resultados, notícias, dados institucionais | Novo |
 
@@ -48,6 +48,8 @@ A hierarquia Sede → Subsede → PDE é **afiliação territorial** (subsedes/P
    → aliados passam a ver o conteúdo público.
 4. **Onboarding de dados**: importar base de associados existente → métricas reais →
    refino das regras de negócio.
+5. **Reunião ao vivo**: membro com `meetings:host` cria sala (opcionalmente ligada a um
+   evento) → associados entram, conversam e votam em enquetes → host modera e encerra.
 
 ## Regras de visibilidade (resumo)
 

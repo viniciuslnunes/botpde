@@ -30,6 +30,15 @@ Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de ac
 - Visibilidade: `self`/`ancestor` veem tudo; `descendant` vê só PÚBLICO; `unrelated` não
   vê nada. **Alianças** adicionam `'allied'` → só PÚBLICO, jamais restrito.
 
+## Exemplo de referência: módulo Salas (Meet)
+Uma única permissão, `MEETINGS_HOST` (`meetings:host`, grupo Comunidade), autoriza criar/
+encerrar sala e toda moderação (editar/destacar/excluir mensagem, criar/encerrar enquete,
+aprovar pedido de mídia). Entrar/conversar/votar exige só membro ativo — não é uma
+permissão administrativa. Salas **não** está em `visibility.js`: escopo é só
+`tenantId` + membro ativo, sem sensibilidade PÚBLICO/RESTRITO cross-tenant. A única
+privacidade do módulo é de dado, não de permissão: votantes de enquete só são expostos ao
+host (`apps/web/src/app/api/salas/[id]/enquetes/route.ts`). Ver `docs/data/modulo-salas.md`.
+
 ## Como trabalhar
 1. Nova permissão → adicionar em `PERMISSIONS` + `PERMISSION_GROUPS`, definir a base do
    grupo (cascata) e o cargo que a recebe por padrão.

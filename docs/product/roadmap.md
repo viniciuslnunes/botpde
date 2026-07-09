@@ -13,6 +13,9 @@ Sprints de 2 semanas. Cada item precisa de critério de aceite (ver DoR/DoD no
    habilita métricas reais.
 5. Decidir permissão dedicada de "sócio" (hoje reusa `MEMBERS_APPROVE`).
 
+**Entregue fora de ordem:** Salas de vídeo (Meet) — reuniões ao vivo com chat, presença e
+enquetes via LiveKit/WebRTC (permissão `MEETINGS_HOST`). Ver `docs/data/modulo-salas.md`.
+
 **Resultado:** base estável, acesso consistente e dados reais para métrica.
 
 ## Fase 2 — Alianças + fundação de informação
@@ -43,4 +46,4 @@ Sprints de 2 semanas. Cada item precisa de critério de aceite (ver DoR/DoD no
 A. Fundamentos de autorização · B. Territorialidade · C. Comunicados oficiais ·
 D. Eventos e mobilização · E. Experiência do associado · F. API compartilhada (tRPC) ·
 G. Convergência bot ↔ web · **H. Alianças** 🆕 · **I. Informação do nicho** 🆕 ·
-**J. Importação de base** 🆕.
+**J. Importação de base** 🆕 · **K. Salas de vídeo (Meet)** ✅ entregue.

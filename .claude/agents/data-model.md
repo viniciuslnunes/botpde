@@ -13,9 +13,11 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 íntegro e escalável.
 
 ## Fontes de verdade
-- Schema: `packages/db/prisma/schema.prisma` (26 models, prefixo `saas_`; tabelas
+- Schema: `packages/db/prisma/schema.prisma` (43 models, prefixo `saas_`; tabelas
   legadas do bot sem prefixo).
-- Docs: `ARCHITECTURE.md` §2.2 e `docs/data/entidades-novas.md`.
+- Docs: `ARCHITECTURE.md` §2.2, `docs/data/entidades-novas.md` e `docs/data/modulo-salas.md`
+  (módulo Salas/Meet).
+- Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).
 - O projeto usa **`db push`** (não há pasta de migrations). Mudança de schema é
   sincronizada, não versionada em migration files.
 
@@ -28,6 +30,15 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 - Únicos compostos por tenant quando o identificador é local (ex.:
   `(tenantId, numeroSocio)`).
 - Índices em colunas de filtro/ordenação frequentes (ex.: `(tenantId, criadoEm)`).
+
+## Exemplo de referência: módulo Salas (Meet)
+6 models (`SalaReuniao`, `ParticipanteReuniao`, `MensagemReuniao`, `EnqueteReuniao`,
+`OpcaoEnqueteReuniao`, `VotoEnqueteReuniao`) mostram o padrão de "raiz + filhos com soft
+delete + votação": `@@unique([salaId, userId])` para upsert de presença,
+`@@unique([enqueteId, userId])` para 1-voto-por-pessoa (também via upsert), `encerradaEm`/
+`excluidaEm` como soft delete em vez de exclusão física. Dois valores de enum
+(`TipoSalaReuniao.DM_GRUPO`, `PapelParticipanteReuniao.MODERADOR`) existem no schema mas
+nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/data/modulo-salas.md`.
 
 ## Como trabalhar
 1. Leia o schema atual e as relações vizinhas antes de propor.

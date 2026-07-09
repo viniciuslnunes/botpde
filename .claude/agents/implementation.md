@@ -43,3 +43,11 @@ ou abstrações novas sem necessidade clara.
 - Não altere schema, permissões ou visibilidade sem que isso esteja no plano aprovado.
 - Se descobrir que o plano está errado ou incompleto, pare e reporte — não improvise
   arquitetura.
+
+## Padrão de referência: módulo Salas (Meet)
+Operações **dentro** de uma sala ativa (mensagens, enquetes, participantes, mídia) usam
+**route handlers** (`api/salas/[id]/*`), não Server Actions — porque o client faz polling/
+updates frequentes. Use `assertSalaMembro(salaId)` / `assertSalaAnfitriao(salaId)`
+(`apps/web/src/lib/salas-api.ts`) para autorização, não `assertPermission` direto. Para
+dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` de
+`apps/web/src/lib/livekit.ts` — degrade, não quebre. Ver `docs/data/modulo-salas.md`.

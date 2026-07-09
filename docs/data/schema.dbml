@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Torcida SaaS — Modelo de dados (DBML para https://dbdiagram.io/d)
 // Fonte da verdade: packages/db/prisma/schema.prisma
-// Gerado a partir do schema em 2026-07-07. Regenerar quando o schema mudar.
+// Gerado a partir do schema em 2026-07-08. Regenerar quando o schema mudar.
 //
 // Como usar: abra https://dbdiagram.io/d, cole este arquivo inteiro no editor.
 // Nomes de tabela/coluna = nomes REAIS no Postgres (@map do Prisma).
@@ -376,6 +376,79 @@ Table saas_audit_logs {
   criado_em timestamp
 }
 
+// ─── SALAS MEET (WebRTC / LiveKit) ────────────────────────────────────────
+
+Table saas_salas_reuniao {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  host_id uuid [not null]
+  titulo varchar [not null]
+  tipo varchar [note: 'EVENTO | ABERTA | DM_GRUPO (DM_GRUPO nunca gravado hoje)']
+  livekit_room_name varchar [unique, not null, note: 'formato "${tenantId}:${slug}"']
+  link_convite varchar [unique, not null]
+  agendada_para timestamp
+  encerrada_em timestamp [note: 'preenchido = sala encerrada (soft delete)']
+  evento_id uuid [note: 'vínculo opcional a um Evento (SetNull)']
+  criado_em timestamp
+  Indexes { (tenant_id, encerrada_em) }
+  Note: 'Sala de videoconferência (LiveKit). LiveKit é opcional — sem config, funciona como chat/enquetes/presença.'
+}
+
+Table saas_participantes_reuniao {
+  id uuid [pk]
+  sala_id uuid [not null]
+  user_id uuid [not null]
+  papel varchar [note: 'HOST | MODERADOR | PARTICIPANTE (MODERADOR nunca atribuído hoje)']
+  entrou_em timestamp
+  saiu_em timestamp
+  Indexes { (sala_id, user_id) [unique] }
+  Note: 'Registro de presença (upsert por entrada/saída)'
+}
+
+Table saas_mensagens_reuniao {
+  id uuid [pk]
+  sala_id uuid [not null]
+  autor_id uuid [not null]
+  conteudo varchar [not null]
+  destacada boolean [note: 'mensagem fixada pelo host']
+  editada_em timestamp
+  excluida_em timestamp [note: 'soft delete']
+  criado_em timestamp
+  Indexes {
+    (sala_id, criado_em)
+    (sala_id, destacada)
+  }
+  Note: 'Chat da sala (polling)'
+}
+
+Table saas_enquetes_reuniao {
+  id uuid [pk]
+  sala_id uuid [not null]
+  criador_id uuid [not null]
+  pergunta varchar [not null]
+  encerrada_em timestamp
+  criado_em timestamp
+  Indexes { (sala_id, encerrada_em) }
+  Note: 'Enquete ao vivo. Votantes (quem votou em quê) só são expostos ao host.'
+}
+
+Table saas_opcoes_enquete_reuniao {
+  id uuid [pk]
+  enquete_id uuid [not null]
+  texto varchar [not null]
+  ordem integer
+  Indexes { (enquete_id, ordem) }
+}
+
+Table saas_votos_enquete_reuniao {
+  id uuid [pk]
+  enquete_id uuid [not null]
+  opcao_id uuid [not null]
+  user_id uuid [not null]
+  criado_em timestamp
+  Indexes { (enquete_id, user_id) [unique, note: '1 voto por pessoa por enquete; upsert permite trocar de voto'] }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // RELACIONAMENTOS (Refs)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -434,3 +507,18 @@ Ref: saas_posts.autor_id > saas_users.id
 Ref: saas_advertencias.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_audit_logs.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_audit_logs.ator_id > saas_users.id
+
+// Salas Meet (WebRTC / LiveKit)
+Ref: saas_salas_reuniao.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_salas_reuniao.host_id > saas_users.id
+Ref: saas_salas_reuniao.evento_id > saas_eventos.id [delete: set null]
+Ref: saas_participantes_reuniao.sala_id > saas_salas_reuniao.id [delete: cascade]
+Ref: saas_participantes_reuniao.user_id > saas_users.id [delete: cascade]
+Ref: saas_mensagens_reuniao.sala_id > saas_salas_reuniao.id [delete: cascade]
+Ref: saas_mensagens_reuniao.autor_id > saas_users.id [delete: cascade]
+Ref: saas_enquetes_reuniao.sala_id > saas_salas_reuniao.id [delete: cascade]
+Ref: saas_enquetes_reuniao.criador_id > saas_users.id [delete: cascade]
+Ref: saas_opcoes_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: cascade]
+Ref: saas_votos_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: cascade]
+Ref: saas_votos_enquete_reuniao.opcao_id > saas_opcoes_enquete_reuniao.id [delete: cascade]
+Ref: saas_votos_enquete_reuniao.user_id > saas_users.id [delete: cascade]

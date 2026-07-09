@@ -61,6 +61,13 @@ botpde/ (monorepo pnpm + turborepo)
   referência à sede-mãe ainda não cadastrada).
 - Não existe hoje nenhuma regra de **visibilidade cross-tenant** (o que uma
   subsede pode ver da sede, e vice-versa). Cada tenant é uma ilha.
+- **Módulo Salas (Meet)**: videoconferência em tempo real dentro de Comunidade,
+  via LiveKit/WebRTC — **opcional** (`isLiveKitConfigured()`; sem config, a sala
+  ainda funciona como chat/enquetes/presença). Presença e chat/enquetes usam
+  polling, não websocket próprio; só áudio/vídeo e o gesto de "levantar a mão"
+  usam o data channel do LiveKit. Autorização de host é uma única permissão
+  (`meetings:host`); votantes de enquete só são visíveis ao host (privacidade).
+  Ver `docs/data/modulo-salas.md`.
 
 ### 2.3 Autenticação e autorização
 
@@ -369,8 +376,8 @@ Ao escrever `/admin/acessos`, `db.role.findMany(...).map(...)` (e padrões
 equivalentes) passaram a falhar com `implicit any`/`unknown` no `tsc`, **sem
 nenhum erro no arquivo que gerou o dado** — só nos usos seguintes. Isolado e
 confirmado: é um teto de profundidade de inferência do TypeScript contra os
-tipos condicionais gerados pelo Prisma para este schema (27 models bem
-relacionados) — a inferência automática do retorno de `findMany`/`findUnique`
+tipos condicionais gerados pelo Prisma para este schema (43 models bem
+relacionados, contagem em 2026-07-08) — a inferência automática do retorno de `findMany`/`findUnique`
 simplesmente para de funcionar de forma **silenciosa** a partir de um certo
 ponto, sem "excessively deep" explícito.
 
@@ -445,6 +452,28 @@ esgotamento de conexão em serverless e o free tier passa a valer. `Tenant.datab
 Melhorias ortogonais ao provedor (não são migração): confirmar backups
 automáticos do Railway ligados; considerar migrations versionadas para produção
 quando o schema estabilizar (hoje o fluxo é `db push`, sem migrations).
+
+### 5.5 Captura visual de fluxo para revisão de UI/UX — Playwright, sem MCP dedicado (2026-07-08)
+
+Adicionado `apps/web/e2e/` (Playwright) para navegar os fluxos principais e
+salvar PNGs em `apps/web/e2e/screenshots/<fluxo>/` (não commitado — artefato
+local). Objetivo: alimentar o agente `ux-review` (que aciona o skill
+`impeccable`) com evidência real de tela em vez de inferência por JSX. Ver
+`apps/web/e2e/README.md`.
+
+Por que Playwright (test suite) e não um MCP de browser dedicado:
+- O pedido é **repetível e versionável** ("rodar e salvar imagem de cada
+  fluxo"), não exploração ad-hoc de uma sessão — isso pede uma suíte de teste,
+  não uma ferramenta MCP conversacional.
+- O repo já usa Vitest como padrão de teste; Playwright é o par natural para
+  e2e/visual, sem introduzir um novo protocolo de integração.
+- Login é OAuth (Discord/Google) + e-mail/senha — sem credencial de teste
+  seedada. Em vez de automatizar OAuth em CI (frágil), a suíte reusa uma
+  `storageState` capturada uma vez manualmente (`test:e2e:login`), padrão
+  recomendado do próprio Playwright para apps com OAuth.
+- Continua valendo usar `claude-in-chrome`/preview tools para exploração pontual
+  interativa; a suíte Playwright é para captura em lote, comparável entre
+  execuções.
 
 ## 6. Itens em aberto (aguardando decisão)
 

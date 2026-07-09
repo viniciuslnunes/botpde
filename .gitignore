@@ -36,6 +36,13 @@ Thumbs.db
 # Turbo
 .turbo/
 
+# Playwright (captura visual de fluxos — artefato local, ver apps/web/e2e/README.md)
+apps/web/e2e/.auth/
+apps/web/e2e/screenshots/
+apps/web/e2e/.test-results/
+apps/web/playwright-report/
+apps/web/test-results/
+
 # Assets locais (bot)
 apps/bot/img/
 apps/bot/fonts/

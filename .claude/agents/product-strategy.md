@@ -22,6 +22,11 @@ operacional** antes de expandir para comunidade/informação.
 - Priorize governança, precisão de informação, segurança e escalabilidade.
 - Reutilize o que já existe; evite reescrita ampla.
 
+## Domínio Comunidade — já entregue
+Salas de vídeo ao vivo (Meet: chat, presença, enquetes, LiveKit/WebRTC opcional) já foram
+construídas e são um recurso de engajamento entregue, não um item de roadmap. Ver
+`docs/data/modulo-salas.md` e `docs/product/roadmap.md` (épico K).
+
 ## Como trabalhar
 1. Enquadre o problema por domínio (Operação, Mobilização, Comunidade, Alianças,
    Informação).

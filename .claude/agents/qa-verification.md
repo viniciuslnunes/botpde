@@ -33,6 +33,11 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - Autorização: uma mudança de gate não pode ampliar acesso silenciosamente.
 - Visibilidade: aliados/descendentes nunca enxergam recurso RESTRITO.
 - Multi-tenant: nenhuma query cruza tenants sem regra explícita.
+- Salas (Meet): gate de host confirmado em cada **route handler** de `api/salas/[id]/*`
+  (não só nas Server Actions — o módulo usa route handlers para as operações dentro da
+  sala); votantes de enquete expostos só a `isHost`; caminho sem LiveKit configurado não
+  quebra a página; ações `SALA_REUNIAO_CRIADA/ENCERRADA`, `SALA_ENQUETE_CRIADA/VOTO/
+  ENCERRADA` gravadas em `AuditLog`.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

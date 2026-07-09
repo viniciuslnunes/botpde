@@ -13,9 +13,10 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 | `product-strategy` | Decidir o quê construir e em que ordem | opus |
 | `data-model` | Propor/validar entidades Prisma e integridade | opus |
 | `rbac` | Permissões, autorização e visibilidade cross-tenant | opus |
-| `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual) | opus |
+| `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual; captura PNGs reais via Playwright, ver `apps/web/e2e/README.md`) | opus |
 | `qa-verification` | Verificar antes de dar como pronto; rodar Vitest | opus |
 | `implementation` | Codificar o combinado, com escopo mínimo | **fable** |
+| `news-curator` | Curar fila de notícias externas: aprovar/rejeitar com justificativa | opus |
 
 ## Fluxo recomendado por feature
 
