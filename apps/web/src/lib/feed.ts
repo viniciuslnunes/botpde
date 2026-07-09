@@ -16,6 +16,7 @@ export interface PostSocialItem {
   titulo: string | null
   conteudo: string
   imagemUrl: string | null
+  midiaUrls: string[]
   tipo: 'INSTITUCIONAL' | 'MEMBRO'
   visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
   criadoEm: Date

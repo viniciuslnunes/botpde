@@ -10,16 +10,30 @@ import { PERMISSIONS } from '@torcida/types'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import { isCloudinaryUrl, isSocialUrl } from '@/lib/social-embed'
+
+const MAX_MIDIAS = 10
+
+// Cada anexo deve ser uma imagem do nosso Cloudinary ou um link de rede social
+// (embed) — bloqueia URLs arbitrárias de terceiros.
+const midiaUrlSchema = z
+  .string()
+  .url('Anexo inválido')
+  .refine((url) => isCloudinaryUrl(url) || isSocialUrl(url), 'Tipo de anexo não permitido')
 
 const postSchema = z.object({
-  conteudo: z.string().min(1, 'Conteúdo é obrigatório').max(3000),
-  imagemUrl: z
-    .string()
-    .url('URL de imagem inválida')
-    .optional()
-    .or(z.literal(''))
-    .transform((value) => value || undefined),
+  conteudo: z.string().trim().min(1, 'Conteúdo é obrigatório').max(3000),
+  midias: z.array(midiaUrlSchema).max(MAX_MIDIAS, 'Máximo de 10 anexos').default([]),
 })
+
+function parseMidias(raw: FormDataEntryValue | null): unknown {
+  if (typeof raw !== 'string' || raw.trim() === '') return []
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return []
+  }
+}
 
 const perfilSchema = z.object({
   bio: z.string().max(280, 'Bio deve ter no máximo 280 caracteres').optional(),
@@ -45,6 +59,8 @@ export interface PublicarPostState {
   errors?: Record<string, string[]>
   message?: string
   success?: boolean
+  /** Muda a cada publicação — usado no cliente para remontar/limpar o composer. */
+  token?: string
 }
 
 export async function publicarPost(
@@ -56,14 +72,14 @@ export async function publicarPost(
 
   const parsed = postSchema.safeParse({
     conteudo: formData.get('conteudo'),
-    imagemUrl: formData.get('imagemUrl'),
+    midias: parseMidias(formData.get('midias')),
   })
 
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { conteudo, imagemUrl } = parsed.data
+  const { conteudo, midias } = parsed.data
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
   const post = await db.post.create({
@@ -71,7 +87,7 @@ export async function publicarPost(
       tenantId: tenant.id,
       autorId: session.user.id,
       conteudo,
-      imagemUrl,
+      midiaUrls: midias,
       tipo: 'MEMBRO',
       visibilidade: 'PUBLICO',
     },
@@ -89,7 +105,7 @@ export async function publicarPost(
   })
 
   revalidatePath('/portal/comunidade')
-  return { success: true }
+  return { success: true, token: post.id }
 }
 
 export async function solicitarSeguir(userId: string): Promise<void> {

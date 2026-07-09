@@ -1,12 +1,17 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
-import { ImagePlus, Send, X } from 'lucide-react'
-import { FieldError } from '@torcida/ui'
+import { useActionState, useRef, useState } from 'react'
+import { ImagePlus, Smile, Send, X, Loader2, Link2 } from 'lucide-react'
+import { toast } from '@torcida/ui'
 import { publicarPost, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import { uploadImageToCloudinary } from '@/lib/cloudinary-upload'
+import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
 import { Avatar } from './avatar'
+import { EmojiPicker } from './emoji-picker'
 
 const INITIAL_STATE: PublicarPostState = {}
+const MAX_IMAGENS = 10
+const MAX_MB = 10
 
 interface FeedComposerProps {
   userName: string | null
@@ -18,111 +23,289 @@ export function FeedComposer({ userName, userAvatar }: FeedComposerProps) {
     publicarPost,
     INITIAL_STATE,
   )
-  const [expanded, setExpanded] = useState(false)
-  const [comImagem, setComImagem] = useState(false)
-  const formRef = useRef<HTMLFormElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const firstName = userName?.split(' ')[0] ?? 'torcedor'
-
-  // Após publicar, limpa os campos do formulário (o composer segue aberto para o
-  // próximo post). Apenas manipulação de DOM — sem setState dentro do efeito.
-  useEffect(() => {
-    if (state.success) formRef.current?.reset()
-  }, [state.success])
 
   return (
     <form
-      ref={formRef}
       action={action}
       className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
     >
+      {/* Remonta (limpa) a cada publicação bem-sucedida via token */}
+      <ComposerBody
+        key={state.token ?? 'novo'}
+        userName={userName}
+        userAvatar={userAvatar}
+        pending={pending}
+        serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0]}
+      />
+    </form>
+  )
+}
+
+interface MediaItem {
+  id: string
+  localUrl: string
+  url: string | null
+  progress: number
+  error: string | null
+}
+
+function ComposerBody({
+  userName,
+  userAvatar,
+  pending,
+  serverError,
+}: {
+  userName: string | null
+  userAvatar: string | null
+  pending: boolean
+  serverError?: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [texto, setTexto] = useState('')
+  const [medias, setMedias] = useState<MediaItem[]>([])
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [embedDispensado, setEmbedDispensado] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const firstName = userName?.split(' ')[0] ?? 'torcedor'
+  const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
+  const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
+  const enviando = medias.some((m) => m.url === null && !m.error)
+  const finalMidias = [
+    ...medias.filter((m) => m.url).map((m) => m.url as string),
+    ...(embedUrl ? [embedUrl] : []),
+  ]
+  const podePublicar = texto.trim().length > 0 && !enviando && !pending
+
+  function open() {
+    setExpanded(true)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current
+    if (!el) {
+      setTexto((t) => t + emoji)
+      return
+    }
+    const start = el.selectionStart ?? texto.length
+    const end = el.selectionEnd ?? texto.length
+    const next = texto.slice(0, start) + emoji + texto.slice(end)
+    setTexto(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.selectionStart = el.selectionEnd = start + emoji.length
+    })
+  }
+
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    if (arr.length === 0) return
+    const espaco = MAX_IMAGENS - medias.length
+    if (espaco <= 0) {
+      toast.error(`Máximo de ${MAX_IMAGENS} imagens por publicação.`)
+      return
+    }
+    for (const file of arr.slice(0, espaco)) {
+      if (file.size > MAX_MB * 1024 * 1024) {
+        toast.error(`"${file.name}" passa de ${MAX_MB}MB.`)
+        continue
+      }
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const item: MediaItem = { id, localUrl: URL.createObjectURL(file), url: null, progress: 0, error: null }
+      setMedias((prev) => [...prev, item])
+      void uploadImageToCloudinary(file, (pct) =>
+        setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, progress: pct } : m))),
+      )
+        .then((url) => setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, url, progress: 100 } : m))))
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : 'Falha no upload'
+          setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, error: msg } : m)))
+          toast.error(msg)
+        })
+    }
+  }
+
+  function removeMedia(id: string) {
+    setMedias((prev) => {
+      const alvo = prev.find((m) => m.id === id)
+      if (alvo) URL.revokeObjectURL(alvo.localUrl)
+      return prev.filter((m) => m.id !== id)
+    })
+  }
+
+  return (
+    <div
+      onDragOver={(e) => {
+        if (!expanded) return
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragOver(false)
+        if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files)
+      }}
+      className={dragOver ? 'rounded-xl outline-2 outline-dashed outline-[rgb(var(--primary))]' : ''}
+    >
+      <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
+
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
         <div className="min-w-0 flex-1">
           {!expanded ? (
             <button
               type="button"
-              onClick={() => {
-                setExpanded(true)
-                requestAnimationFrame(() => textareaRef.current?.focus())
-              }}
+              onClick={open}
               className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
             >
               No que você tá pensando, {firstName}?
             </button>
           ) : (
-            <div className="space-y-2">
-              <textarea
-                ref={textareaRef}
-                name="conteudo"
-                required
-                maxLength={3000}
-                rows={3}
-                placeholder={`No que você tá pensando, ${firstName}?`}
-                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
-              />
-              <FieldError errors={state.errors?.conteudo} />
-
-              {comImagem && (
-                <div>
-                  <input
-                    name="imagemUrl"
-                    type="url"
-                    autoFocus
-                    placeholder="Cole a URL de uma imagem"
-                    maxLength={500}
-                    className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-                  />
-                  <FieldError errors={state.errors?.imagemUrl} />
-                </div>
-              )}
-            </div>
+            <textarea
+              ref={textareaRef}
+              name="conteudo"
+              required
+              maxLength={3000}
+              rows={3}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onPaste={(e) => {
+                const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+                if (imgs.length) {
+                  e.preventDefault()
+                  addFiles(imgs)
+                }
+              }}
+              placeholder={`No que você tá pensando, ${firstName}?`}
+              className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+            />
           )}
         </div>
       </div>
 
-      {state.message && (
-        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {state.message}
-        </p>
-      )}
-
       {expanded && (
-        <div className="mt-3 flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
-          <button
-            type="button"
-            onClick={() => setComImagem((v) => !v)}
-            className={[
-              'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors',
-              comImagem
-                ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
-                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-            ].join(' ')}
-          >
-            {comImagem ? <X className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
-            {comImagem ? 'Remover imagem' : 'Imagem'}
-          </button>
+        <>
+          {/* Prévia das imagens */}
+          {medias.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2 pl-[52px]">
+              {medias.map((m) => (
+                <div
+                  key={m.id}
+                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-[rgb(var(--border))]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.localUrl} alt="" className="h-full w-full object-cover" />
+                  {m.url === null && !m.error && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <Loader2 className="h-5 w-5 animate-spin text-white" />
+                    </div>
+                  )}
+                  {m.error && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-red-600/70 px-1 text-center text-[10px] font-medium text-white">
+                      Falhou
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(m.id)}
+                    aria-label="Remover imagem"
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              <Send className="h-4 w-4" />
-              {pending ? 'Publicando…' : 'Publicar'}
-            </button>
+          {/* Prévia do embed detectado */}
+          {embedUrl && embedProvider && (
+            <div className="mt-3 ml-[52px] flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2">
+              <Link2 className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-[rgb(var(--foreground))]">
+                  Publicação do {EMBED_HOSTS[embedProvider]}
+                </p>
+                <p className="truncate text-[11px] text-[rgb(var(--foreground-muted))]">{embedUrl}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEmbedDispensado(true)}
+                aria-label="Não embutir este link"
+                className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {serverError && (
+            <p className="mt-2 ml-[52px] rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              {serverError}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
+            <div className="relative flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Adicionar imagens"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              >
+                <ImagePlus className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmojiOpen((v) => !v)}
+                aria-label="Emojis"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+              {emojiOpen && (
+                <EmojiPicker
+                  onSelect={(e) => insertEmoji(e)}
+                  onClose={() => setEmojiOpen(false)}
+                />
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) addFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={!podePublicar}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {enviando ? 'Enviando…' : pending ? 'Publicando…' : 'Publicar'}
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
-    </form>
+    </div>
   )
 }
