@@ -52,6 +52,7 @@ export function SalaParticipantes({
     let active = true
 
     async function poll() {
+      if (document.visibilityState !== 'visible') return
       setCarregando(true)
       try {
         const res = await fetch(`/api/salas/${salaId}/participantes`, { cache: 'no-store' })

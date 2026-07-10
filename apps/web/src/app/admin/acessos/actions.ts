@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { invalidatePermissionsCache } from '@/lib/tenant'
 import { ALL_PERMISSIONS, PERMISSIONS, applyPermissionCascade } from '@torcida/types'
 
 const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
@@ -173,4 +174,5 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   })
 
   revalidatePath('/admin/acessos')
+  invalidatePermissionsCache(userId, tenant.id)
 }

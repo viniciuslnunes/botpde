@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { invalidateTenantCache } from '@/lib/tenant'
 import { ALL_PERMISSIONS, applyPermissionCascade, PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 
@@ -58,6 +59,8 @@ export async function salvarPerfilTenant(formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin')
+  revalidatePath('/portal')
+  invalidateTenantCache(tenant.slug)
 }
 
 export async function salvarDiscordGuildId(formData: FormData) {
@@ -80,6 +83,7 @@ export async function salvarDiscordGuildId(formData: FormData) {
   })
 
   revalidatePath('/admin/configuracoes')
+  invalidateTenantCache(tenant.slug)
 }
 
 const afiliacaoSchema = z.object({
@@ -131,6 +135,7 @@ export async function salvarAfiliacao(formData: FormData): Promise<void> {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/portal')
+  invalidateTenantCache(tenant.slug)
 }
 
 // ── Cargos ────────────────────────────────────────────────────────────────────

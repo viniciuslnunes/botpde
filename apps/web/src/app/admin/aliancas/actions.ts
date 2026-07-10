@@ -6,6 +6,7 @@ import type { Alianca, StatusAlianca } from '@torcida/db'
 import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { normalizeTenantPair } from '@/lib/aliancas'
+import { invalidateHierarchyCache } from '@/lib/hierarquia'
 import { PERMISSIONS } from '@torcida/types'
 
 const uuidSchema = z.string().uuid('ID inválido')
@@ -14,6 +15,11 @@ interface TenantLite {
   id: string
   nome: string
   slug: string
+}
+
+function invalidateAliancaHierarchy(origemId: string, aliadoId: string): void {
+  invalidateHierarchyCache(origemId)
+  invalidateHierarchyCache(aliadoId)
 }
 
 async function loadAliancaInTenant(aliancaId: string, tenantId: string): Promise<Alianca | null> {
@@ -100,6 +106,7 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
+  invalidateAliancaHierarchy(tenantOrigemId, tenantDestinoId)
 }
 
 export async function aceitarAlianca(aliancaId: string): Promise<void> {
@@ -139,6 +146,7 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
+  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
 export async function rejeitarAlianca(aliancaId: string): Promise<void> {
@@ -178,6 +186,7 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
+  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
 export async function encerrarAlianca(aliancaId: string): Promise<void> {
@@ -213,4 +222,5 @@ export async function encerrarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
+  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }

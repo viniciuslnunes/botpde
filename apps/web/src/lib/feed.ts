@@ -121,7 +121,11 @@ export async function getFeedPersonalizado(
       ? await getNoticiasAprovadas(opts.afiliacaoId)
       : []
 
-  const { announcements } = await getFeedComunidade(tenantId, { userId, takePosts: 0 })
+  const { announcements } = await getFeedComunidade(tenantId, {
+    userId,
+    takePosts: 0,
+    visibleTenantIds,
+  })
 
   if (!userId) {
     const sugeridosRaw = (await db.post.findMany({

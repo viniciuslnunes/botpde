@@ -9,6 +9,7 @@ import {
   type InboxItemDto,
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { Avatar } from './avatar'
 import { MensagemThread } from './mensagem-thread'
 
@@ -45,10 +46,7 @@ export function MensagensShell({
     }
   }, [])
 
-  useEffect(() => {
-    const id = window.setInterval(() => void atualizarInbox(), 10000)
-    return () => window.clearInterval(id)
-  }, [atualizarInbox])
+  useVisibleInterval(() => void atualizarInbox(), 15000)
 
   function zerarNaoLidas(conversaId: string) {
     setConversas((prev) =>

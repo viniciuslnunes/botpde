@@ -45,6 +45,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
   const [votando, setVotando] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return
     try {
       const res = await fetch(`/api/salas/${salaId}/enquetes`, { cache: 'no-store' })
       if (!res.ok) return

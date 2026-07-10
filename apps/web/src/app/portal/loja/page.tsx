@@ -21,9 +21,9 @@ import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/type
 
 import type { Metadata } from 'next'
 
-import type { Prisma } from '@torcida/db'
+import { Prisma } from '@torcida/db'
 
-
+const PAGE_SIZE = 48
 
 export const metadata: Metadata = { title: 'Loja' }
 
@@ -50,6 +50,8 @@ type SearchParams = {
   precoMin?: string
 
   precoMax?: string
+
+  page?: string
 
 }
 
@@ -131,7 +133,13 @@ export default async function PortalLojaPage({
 
 
 
-  const [produtos, categorias, meusPedidos, sacolaCount, destaques, tamanhosRows, faixaPrecoAgg] = await Promise.all([
+  const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1)
+
+  const skip = (page - 1) * PAGE_SIZE
+
+
+
+  const [produtos, totalProdutos, categorias, meusPedidos, sacolaCount, destaques, tamanhoRows, faixaPrecoAgg] = await Promise.all([
 
     db.saasProduto.findMany({
 
@@ -139,9 +147,15 @@ export default async function PortalLojaPage({
 
       orderBy,
 
+      skip,
+
+      take: PAGE_SIZE,
+
       include: { tenant: { select: { nome: true } }, categoria: { select: { nome: true, slug: true } } },
 
     }),
+
+    db.saasProduto.count({ where }),
 
     db.saasCategoria.findMany({
 
@@ -171,13 +185,14 @@ export default async function PortalLojaPage({
 
     }),
 
-    db.saasProduto.findMany({
-
-      where: { tenantId: { in: tenantIds }, ativo: true },
-
-      select: { tamanhos: true },
-
-    }),
+    tenantIds.length > 0
+      ? db.$queryRaw<{ tamanho: string }[]>`
+          SELECT DISTINCT unnest(tamanhos) AS tamanho
+          FROM saas_produtos
+          WHERE tenant_id IN (${Prisma.join(tenantIds)})
+            AND ativo = true
+        `
+      : Promise.resolve([]),
 
     db.saasProduto.aggregate({
 
@@ -193,11 +208,9 @@ export default async function PortalLojaPage({
 
 
 
-  const tamanhosDisponiveis = ordenarTamanhos(
+  const tamanhosDisponiveis = ordenarTamanhos(tamanhoRows.map((r: { tamanho: string }) => r.tamanho))
 
-    tamanhosRows.flatMap((r: (typeof tamanhosRows)[number]) => r.tamanhos),
-
-  )
+  const totalPages = Math.max(1, Math.ceil(totalProdutos / PAGE_SIZE))
 
   const faixaPreco = {
 
@@ -239,7 +252,7 @@ export default async function PortalLojaPage({
 
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
 
-          {produtos.length} produto{produtos.length !== 1 ? 's' : ''}
+          {totalProdutos} produto{totalProdutos !== 1 ? 's' : ''}
 
         </p>
 
@@ -422,11 +435,48 @@ export default async function PortalLojaPage({
 
         )}
 
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-4">
+            {page > 1 && (
+              <Link
+                href={buildLojaPageUrl(sp, page - 1)}
+                className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+              >
+                Anterior
+              </Link>
+            )}
+            <span className="text-sm text-[rgb(var(--foreground-muted))]">
+              Página {page} de {totalPages}
+            </span>
+            {page < totalPages && (
+              <Link
+                href={buildLojaPageUrl(sp, page + 1)}
+                className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+              >
+                Próxima
+              </Link>
+            )}
+          </div>
+        )}
+
       </div>
 
     </div>
 
   )
 
+}
+
+function buildLojaPageUrl(sp: SearchParams, page: number): string {
+  const params = new URLSearchParams()
+  if (sp.q?.trim()) params.set('q', sp.q.trim())
+  if (sp.categoria?.trim()) params.set('categoria', sp.categoria.trim())
+  if (sp.tamanho?.trim()) params.set('tamanho', sp.tamanho.trim())
+  if (sp.ordenar?.trim()) params.set('ordenar', sp.ordenar.trim())
+  if (sp.precoMin?.trim()) params.set('precoMin', sp.precoMin.trim())
+  if (sp.precoMax?.trim()) params.set('precoMax', sp.precoMax.trim())
+  if (page > 1) params.set('page', String(page))
+  const qs = params.toString()
+  return qs ? `/portal/loja?${qs}` : '/portal/loja'
 }
 

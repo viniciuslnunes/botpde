@@ -1,30 +1,38 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
+import { resetPrismaQueryCount } from '@torcida/db'
 
 const PUBLIC_PATHS = ['/entrar', '/api/auth', '/_next', '/favicon.ico']
 
-export default auth((req) => {
+export const proxy = auth((req) => {
+  if (process.env.NODE_ENV === 'development') {
+    resetPrismaQueryCount()
+  }
+
   const { pathname } = req.nextUrl
   const session = req.auth
 
-  // Permite rotas públicas sem verificação
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next()
   }
 
-  // Redireciona não autenticados para login
   if (!session) {
     const loginUrl = new URL('/entrar', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Usuário autenticado tentando acessar /entrar → redireciona para portal
   if (pathname === '/entrar') {
     return NextResponse.redirect(new URL('/portal/comunidade', req.url))
   }
 
-  return NextResponse.next()
+  const requestHeaders = new Headers(req.headers)
+  if (process.env.NODE_ENV === 'development') {
+    requestHeaders.set('x-pathname', pathname)
+    requestHeaders.set('x-method', req.method)
+  }
+
+  return NextResponse.next({ request: { headers: requestHeaders } })
 })
 
 export const config = {

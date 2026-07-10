@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
@@ -41,14 +41,35 @@ function setStoredExpanded(value: boolean) {
 }
 
 interface ComunidadeChatPanelProps {
-  initialConversas: InboxItemDto[]
   currentUserId: string
 }
 
-export function ComunidadeChatPanel({ initialConversas, currentUserId }: ComunidadeChatPanelProps) {
+export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const [conversas, setConversas] = useState<InboxItemDto[]>([])
+  const [carregando, setCarregando] = useState(true)
 
-  const naoLidas = initialConversas.reduce((acc, c) => acc + c.naoLidas, 0)
+  useEffect(() => {
+    let active = true
+    async function carregar() {
+      try {
+        const res = await fetch('/api/conversas', { cache: 'no-store' })
+        if (!res.ok || !active) return
+        const data = (await res.json()) as { conversas?: InboxItemDto[] }
+        if (data.conversas) setConversas(data.conversas)
+      } catch {
+        // silencioso
+      } finally {
+        if (active) setCarregando(false)
+      }
+    }
+    void carregar()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const naoLidas = conversas.reduce((acc, c) => acc + c.naoLidas, 0)
 
   const toggleExpanded = useCallback(() => {
     setStoredExpanded(!getSnapshot())
@@ -79,6 +100,7 @@ export function ComunidadeChatPanel({ initialConversas, currentUserId }: Comunid
         </button>
         <Link
           href="/portal/mensagens"
+          prefetch={false}
           title="Abrir em tela cheia"
           aria-label="Abrir mensagens em tela cheia"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
@@ -89,12 +111,16 @@ export function ComunidadeChatPanel({ initialConversas, currentUserId }: Comunid
 
       {expanded && (
         <div className="p-2">
-          <MensagensShell
-            variant="embedded"
-            initialConversas={initialConversas}
-            initialSelecionadaId={null}
-            currentUserId={currentUserId}
-          />
+          {carregando ? (
+            <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
+          ) : (
+            <MensagensShell
+              variant="embedded"
+              initialConversas={conversas}
+              initialSelecionadaId={null}
+              currentUserId={currentUserId}
+            />
+          )}
         </div>
       )}
     </div>

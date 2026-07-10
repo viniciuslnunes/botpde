@@ -110,6 +110,7 @@ export function MensagemThread({
     lastCriadoEmRef.current = null
 
     async function carregar(full: boolean) {
+      if (document.visibilityState !== 'visible') return
       const after = lastCriadoEmRef.current
       const url =
         !full && after
@@ -145,7 +146,7 @@ export function MensagemThread({
 
     void carregar(true)
     marcarLida()
-    const pollId = window.setInterval(() => void carregar(false), 2500)
+    const pollId = window.setInterval(() => void carregar(false), 4000)
     const fullId = window.setInterval(() => void carregar(true), 20000)
     return () => {
       active = false

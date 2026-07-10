@@ -1,10 +1,19 @@
 import type { Metadata } from 'next'
+import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { listConversas, type ConversaInboxItem } from '@/lib/mensageria'
-import { MensagensShell } from '@/components/portal/mensagens-shell'
 import type { InboxItemDto } from '@/lib/mensageria-client'
+
+const MensagensShell = dynamic(
+  () => import('@/components/portal/mensagens-shell').then((mod) => mod.MensagensShell),
+  {
+    loading: () => (
+      <div className="h-[calc(100vh-8.5rem)] min-h-[24rem] animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+    ),
+  },
+)
 
 export const metadata: Metadata = { title: 'Mensagens' }
 

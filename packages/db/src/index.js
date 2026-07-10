@@ -1,13 +1,37 @@
 import { PrismaClient } from '@prisma/client'
+import {
+  incrementPrismaQueryCount,
+  resetPrismaQueryCount,
+  getAndResetPrismaQueryCount,
+} from './query-metrics.js'
+
+export { resetPrismaQueryCount, getAndResetPrismaQueryCount }
 
 // ── Cliente compartilhado (banco principal da plataforma) ─────────────────────
 const globalForPrisma = globalThis
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient() {
+  const base = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
+
+  if (process.env.NODE_ENV !== 'development') {
+    return base
+  }
+
+  return base.$extends({
+    query: {
+      async $allOperations({ args, query }) {
+        incrementPrismaQueryCount()
+        return query(args)
+      },
+    },
+  })
+}
+
+export const db =
+  globalForPrisma.prisma ??
+  createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 

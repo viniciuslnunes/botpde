@@ -3,6 +3,7 @@ import './globals.css'
 import { ThemeProvider } from '@torcida/ui'
 import { DialogProvider } from '@torcida/ui'
 import { ClientToastProvider } from '@/components/providers/client-toast-provider'
+import { PrismaQueryLogger } from '@/components/dev/prisma-query-logger'
 
 export const metadata: Metadata = {
   title: {
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <DialogProvider>
+            <PrismaQueryLogger />
             {children}
             <ClientToastProvider />
           </DialogProvider>

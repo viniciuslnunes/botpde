@@ -1,5 +1,19 @@
+import { cache } from 'react'
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
 import { canViewRecurso, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
+
+export const HIERARCHY_CACHE_TAG = 'tenant-hierarchy'
+
+export function hierarchyCacheTag(tenantId: string): string {
+  return `hierarchy-${tenantId}`
+}
+
+/** Invalida cache de hierarquia após mudanças em sede ou aliança. */
+export function invalidateHierarchyCache(tenantId?: string): void {
+  revalidateTag(HIERARCHY_CACHE_TAG, 'max')
+  if (tenantId) revalidateTag(hierarchyCacheTag(tenantId), 'max')
+}
 
 export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied'
 
@@ -87,7 +101,7 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
  * para cascatear conteúdo institucional (comunicados/eventos) através de 2+
  * níveis de hierarquia.
  */
-export async function getAncestorTenantIds(tenantId: string): Promise<string[]> {
+async function getAncestorTenantIdsImpl(tenantId: string): Promise<string[]> {
   const sede: SedeNode | null = await db.sede.findFirst({
     where: { tenantId },
     select: { id: true, tenantId: true, sedeId: true },
@@ -97,10 +111,18 @@ export async function getAncestorTenantIds(tenantId: string): Promise<string[]> 
   return ancestorTenantIds(sede)
 }
 
+export const getAncestorTenantIds = cache(async (tenantId: string): Promise<string[]> => {
+  return unstable_cache(
+    () => getAncestorTenantIdsImpl(tenantId),
+    ['ancestor-tenants', tenantId],
+    { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+  )()
+})
+
 /**
  * IDs de tenants com aliança ATIVA em relação ao tenant indicado.
  */
-export async function getAlliedTenantIds(tenantId: string): Promise<string[]> {
+async function getAlliedTenantIdsImpl(tenantId: string): Promise<string[]> {
   const aliancas: { tenantOrigemId: string; tenantAliadoId: string }[] =
     await db.alianca.findMany({
       where: {
@@ -112,6 +134,14 @@ export async function getAlliedTenantIds(tenantId: string): Promise<string[]> {
 
   return aliancas.map((a) => (a.tenantOrigemId === tenantId ? a.tenantAliadoId : a.tenantOrigemId))
 }
+
+export const getAlliedTenantIds = cache(async (tenantId: string): Promise<string[]> => {
+  return unstable_cache(
+    () => getAlliedTenantIdsImpl(tenantId),
+    ['allied-tenants', tenantId],
+    { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+  )()
+})
 
 /**
  * Verifica se dois tenants têm aliança ATIVA (simétrico).
@@ -134,7 +164,7 @@ export async function tenantsAreAllied(tenantAId: string, tenantBId: string): Pr
  * Determina o papel do tenant ATOR em relação ao tenant alvo — hierarquia
  * de Sede ou aliança ATIVA entre torcidas.
  */
-export async function getTenantRelation(
+async function getTenantRelationImpl(
   actorTenantId: string,
   targetTenantId: string,
 ): Promise<TenantRelation> {
@@ -163,6 +193,24 @@ export async function getTenantRelation(
   return 'unrelated'
 }
 
+export const getTenantRelation = cache(
+  async (actorTenantId: string, targetTenantId: string): Promise<TenantRelation> => {
+    const pairKey = [actorTenantId, targetTenantId].sort().join(':')
+    return unstable_cache(
+      () => getTenantRelationImpl(actorTenantId, targetTenantId),
+      ['tenant-relation', pairKey],
+      {
+        revalidate: 300,
+        tags: [
+          HIERARCHY_CACHE_TAG,
+          hierarchyCacheTag(actorTenantId),
+          hierarchyCacheTag(targetTenantId),
+        ],
+      },
+    )()
+  },
+)
+
 /**
  * IDs de tenant cujo conteúdo do recurso indicado é visível para o tenant
  * ator: sempre o próprio, mais os ancestrais quando o recurso é PÚBLICO
@@ -173,7 +221,7 @@ export async function getTenantRelation(
  * aqui os tenants de alianças ATIVAS para recursos públicos, via relação
  * 'allied' em resolveVisibility — este é o único ponto a estender.
  */
-export async function getVisibleTenantIds(
+async function getVisibleTenantIdsImpl(
   tenantId: string,
   recurso: keyof typeof RECURSO_SENSIBILIDADE,
 ): Promise<string[]> {
@@ -187,6 +235,19 @@ export async function getVisibleTenantIds(
   const ids = new Set([tenantId, ...ancestrais, ...aliados])
   return Array.from(ids)
 }
+
+export const getVisibleTenantIds = cache(
+  async (
+    tenantId: string,
+    recurso: keyof typeof RECURSO_SENSIBILIDADE,
+  ): Promise<string[]> => {
+    return unstable_cache(
+      () => getVisibleTenantIdsImpl(tenantId, recurso),
+      ['visible-tenants', tenantId, recurso],
+      { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+    )()
+  },
+)
 
 /**
  * Atalho: `actorTenantId` pode ver o recurso `recurso` de `targetTenantId`?

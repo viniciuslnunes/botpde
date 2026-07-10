@@ -1,3 +1,4 @@
+import { Prisma } from '@torcida/db'
 import { db } from '@torcida/db'
 import { canFollowUser } from './social'
 
@@ -94,6 +95,44 @@ const MENSAGEM_SELECT = {
   criadoEm: true,
   autor: { select: { id: true, nome: true, avatarUrl: true } },
 } as const
+
+interface UnreadCountRow {
+  conversaId: string
+  count: number
+}
+
+/** Contagens de não-lidas por conversa em uma única query (evita N+1). */
+async function contarNaoLidasPorConversa(
+  userId: string,
+  opts: { excludeSilenciadas?: boolean; conversaIds?: string[] } = {},
+): Promise<Map<string, number>> {
+  const { excludeSilenciadas = false, conversaIds } = opts
+  if (conversaIds && conversaIds.length === 0) return new Map()
+
+  const silenciadaClause = excludeSilenciadas
+    ? Prisma.sql`AND mc.silenciada = false`
+    : Prisma.empty
+  const conversaClause =
+    conversaIds && conversaIds.length > 0
+      ? Prisma.sql`AND m.conversa_id IN (${Prisma.join(conversaIds)})`
+      : Prisma.empty
+
+  const rows: UnreadCountRow[] = await db.$queryRaw`
+    SELECT m.conversa_id AS "conversaId", COUNT(*)::int AS count
+    FROM saas_mensagens_diretas m
+    INNER JOIN saas_membros_conversa mc ON mc.conversa_id = m.conversa_id
+    WHERE mc.user_id = ${userId}
+      AND mc.saiu_em IS NULL
+      ${silenciadaClause}
+      AND m.autor_id != ${userId}
+      AND m.removida_em IS NULL
+      AND (mc.ultima_leitura_em IS NULL OR m.criado_em > mc.ultima_leitura_em)
+      ${conversaClause}
+    GROUP BY m.conversa_id
+  `
+
+  return new Map(rows.map((r) => [r.conversaId, r.count]))
+}
 
 /**
  * Pode `remetenteId` conversar com `destinatarioId` neste contexto?
@@ -266,20 +305,11 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
     take: 50,
   })
 
-  const naoLidasPorConversa = await Promise.all(
-    rows.map((row) =>
-      db.mensagemDireta.count({
-        where: {
-          conversaId: row.conversa.id,
-          autorId: { not: userId },
-          removidaEm: null,
-          ...(row.ultimaLeituraEm ? { criadoEm: { gt: row.ultimaLeituraEm } } : {}),
-        },
-      }),
-    ),
-  )
+  const naoLidasMap = await contarNaoLidasPorConversa(userId, {
+    conversaIds: rows.map((row) => row.conversa.id),
+  })
 
-  return rows.map((row, i) => {
+  return rows.map((row) => {
     const ativos = row.conversa.membros.filter((m) => m.saiuEm === null)
     const outro = row.conversa.tipo === 'DIRETA'
       ? (ativos.find((m) => m.userId !== userId)?.user ?? null)
@@ -303,7 +333,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
             removida: ultima.removidaEm !== null,
           }
         : null,
-      naoLidas: naoLidasPorConversa[i],
+      naoLidas: naoLidasMap.get(row.conversa.id) ?? 0,
     }
   })
 }
@@ -362,29 +392,10 @@ export async function marcarConversaLida(conversaId: string, userId: string): Pr
 
 /** Total de mensagens não lidas do usuário (badge da navbar). */
 export async function contarMensagensNaoLidas(userId: string): Promise<number> {
-  interface LeituraRow {
-    ultimaLeituraEm: Date | null
-    conversaId: string
-  }
-  const membros: LeituraRow[] = await db.membroConversa.findMany({
-    where: { userId, saiuEm: null, silenciada: false },
-    select: { conversaId: true, ultimaLeituraEm: true },
-  })
-  if (membros.length === 0) return 0
-
-  const counts = await Promise.all(
-    membros.map((m) =>
-      db.mensagemDireta.count({
-        where: {
-          conversaId: m.conversaId,
-          autorId: { not: userId },
-          removidaEm: null,
-          ...(m.ultimaLeituraEm ? { criadoEm: { gt: m.ultimaLeituraEm } } : {}),
-        },
-      }),
-    ),
-  )
-  return counts.reduce((acc, n) => acc + n, 0)
+  const naoLidasMap = await contarNaoLidasPorConversa(userId, { excludeSilenciadas: true })
+  let total = 0
+  for (const count of naoLidasMap.values()) total += count
+  return total
 }
 
 /** Membros ativos da conversa (painel do grupo). */

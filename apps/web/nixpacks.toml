@@ -1,10 +1,12 @@
 [phases.build]
 cmds = [
-  "npm install -g pnpm",
-  "pnpm install --ignore-scripts",
-  "pnpm --filter @torcida/db db:generate",
-  "pnpm --filter @torcida/web build"
+  "npm install -g corepack",
+  "corepack enable",
+  "corepack prepare pnpm@9.15.9 --activate",
+  "corepack pnpm install --ignore-scripts",
+  "corepack pnpm --filter @torcida/db db:generate",
+  "corepack pnpm --filter @torcida/web build"
 ]
 
 [start]
-cmd = "node apps/web/.next/standalone/server.js"
+cmd = "corepack pnpm --filter @torcida/web start"

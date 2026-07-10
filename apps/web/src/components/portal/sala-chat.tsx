@@ -70,6 +70,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
     let active = true
 
     async function sincronizar() {
+      if (document.visibilityState !== 'visible') return
       const after = lastCriadoEmRef.current
       const url = after
         ? `/api/salas/${salaId}/mensagens?after=${encodeURIComponent(after)}`
@@ -107,6 +108,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
     }
 
     async function sincronizarCompleto() {
+      if (document.visibilityState !== 'visible') return
       try {
         const res = await fetch(`/api/salas/${salaId}/mensagens?full=1`, { cache: 'no-store' })
         if (!res.ok || !active) return
@@ -131,7 +133,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
     }
 
     void sincronizar()
-    const novasId = window.setInterval(sincronizar, 1500)
+    const novasId = window.setInterval(sincronizar, 3000)
     const fullId = window.setInterval(sincronizarCompleto, 15000)
     return () => {
       active = false

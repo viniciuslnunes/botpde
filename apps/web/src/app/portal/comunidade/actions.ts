@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
+import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
@@ -406,4 +407,15 @@ export async function marcarNotificacaoLida(notificacaoId: string): Promise<void
 
   revalidatePath('/portal')
   revalidatePath('/portal/comunidade')
+}
+
+/** Marca comunicados como lidos após a UI renderizar (evita write-on-read no SSR). */
+export async function marcarComunicadosLidosAction(announcementIds: string[]): Promise<void> {
+  const session = await auth()
+  if (!session?.user?.id || announcementIds.length === 0) return
+  try {
+    await marcarComunicadosLidos(announcementIds, session.user.id)
+  } catch {
+    // silencioso — não bloqueia a experiência do feed
+  }
 }

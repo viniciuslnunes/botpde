@@ -45,15 +45,18 @@ const PESO_PRIORIDADE: Record<ComunicadoFeedItem['prioridade'], number> = {
  */
 export async function getFeedComunidade(
   tenantId: string,
-  opts: { takePosts?: number; userId?: string } = {},
+  opts: { takePosts?: number; userId?: string; visibleTenantIds?: string[] } = {},
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
   // comunidade é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
-  const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const tenantIds =
+    opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
   const tenantsExternos = tenantIds.filter((id) => id !== tenantId)
 
   const [announcements, posts] = await Promise.all([
     db.announcement.findMany({
       where: { tenantId: { in: tenantIds } },
+      orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
+      take: 30,
       include: {
         tenant: { select: { nome: true } },
         autor: { select: { nome: true, avatarUrl: true } },

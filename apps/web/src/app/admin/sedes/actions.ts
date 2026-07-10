@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@torcida/db'
-import { wouldCreateSedeCycle } from '@/lib/hierarquia'
+import { wouldCreateSedeCycle, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -95,6 +95,7 @@ export async function criarSede(
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
+  invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
 }
 
@@ -140,6 +141,7 @@ export async function editarSede(
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
+  invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
 }
 
@@ -163,4 +165,5 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
+  invalidateHierarchyCache(tenant.id)
 }

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Megaphone, Pin } from 'lucide-react'
 import { Badge } from '@torcida/ui'
+import { marcarComunicadosLidosAction } from '@/app/portal/comunidade/actions'
 
 export interface ComunicadoSectionItem {
   id: string
@@ -63,6 +64,15 @@ export function ComunicadosSection({
   defaultExpanded,
 }: ComunicadosSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const marcouLidosRef = useRef(false)
+
+  useEffect(() => {
+    if (marcouLidosRef.current) return
+    const naoLidos = announcements.filter((a) => a.lido === false).map((a) => a.id)
+    if (naoLidos.length === 0) return
+    marcouLidosRef.current = true
+    void marcarComunicadosLidosAction(naoLidos)
+  }, [announcements])
 
   if (announcements.length === 0) return null
 

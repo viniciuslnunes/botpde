@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { resolveVisibility } from '@/lib/hierarquia'
+import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 import {
@@ -31,15 +31,22 @@ async function assertAuth() {
   return { session, tenant, userId: session.user.id }
 }
 
-async function assertProdutoVisivel(produtoId: string, tenantId: string) {
+async function assertProdutoVisivel(
+  produtoId: string,
+  tenantId: string,
+  visibleTenantIds?: Set<string>,
+) {
   const produto = await db.saasProduto.findFirst({
     where: { id: produtoId, ativo: true },
     select: { tenantId: true },
   })
   if (!produto) throw new Error('Produto não encontrado ou inativo.')
-  if (produto.tenantId !== tenantId) {
-    const visivel = await resolveVisibility(tenantId, produto.tenantId, 'loja')
-    if (!visivel) throw new Error('Produto não encontrado ou inativo.')
+  if (produto.tenantId === tenantId) return produto.tenantId
+
+  const visible =
+    visibleTenantIds ?? new Set(await getVisibleTenantIds(tenantId, 'loja'))
+  if (!visible.has(produto.tenantId)) {
+    throw new Error('Produto não encontrado ou inativo.')
   }
   return produto.tenantId
 }
@@ -180,9 +187,13 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
 
     if (itensCarrinho.length === 0) return { error: 'Sua sacola está vazia.' }
 
+    const visibleLojaIds = new Set(await getVisibleTenantIds(tenant.id, 'loja'))
+
     for (const item of itensCarrinho) {
       if (!item.produto.ativo) return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
-      await assertProdutoVisivel(item.produtoId, tenant.id)
+      if (item.produto.tenantId !== tenant.id && !visibleLojaIds.has(item.produto.tenantId)) {
+        return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
+      }
     }
 
     const porTenant = new Map<string, typeof itensCarrinho>()

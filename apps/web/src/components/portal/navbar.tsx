@@ -19,23 +19,21 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { NotificationBell, type NotificationItem } from '@/components/portal/notification-bell'
+import { useNavbarContext } from '@/lib/use-navbar-context'
 
 const navLinks = [
-  { href: '/portal/comunidade', label: 'Comunidade', icon: Users },
-  { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard },
-  { href: '/portal/eventos', label: 'Eventos', icon: Calendar },
-  { href: '/portal/sedes', label: 'Sedes', icon: MapPin },
-  { href: '/portal/loja', label: 'Loja', icon: ShoppingBag },
-]
+  { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: false },
+  { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: false },
+  { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: true },
+  { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: true },
+  { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: false },
+] as const
 
 interface PortalNavbarProps {
   userName: string | null
   userAvatar: string | null
   tenantNome: string
   tenantCor: string
-  isAdmin: boolean
-  notifications: NotificationItem[]
-  unreadMessages: number
 }
 
 export function PortalNavbar({
@@ -43,11 +41,9 @@ export function PortalNavbar({
   userAvatar,
   tenantNome,
   tenantCor,
-  isAdmin,
-  notifications,
-  unreadMessages,
 }: PortalNavbarProps) {
   const pathname = usePathname()
+  const { unreadMessages, isAdmin, notifications } = useNavbarContext()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
 
@@ -83,6 +79,7 @@ export function PortalNavbar({
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={link.prefetch}
                 className={[
                   'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
                   active
@@ -100,6 +97,7 @@ export function PortalNavbar({
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/portal/mensagens"
+            prefetch={false}
             aria-label={
               unreadMessages > 0
                 ? `Mensagens (${unreadMessages} não lidas)`
@@ -160,6 +158,7 @@ export function PortalNavbar({
                   {isAdmin && (
                     <Link
                       href="/admin"
+                      prefetch={false}
                       onClick={() => setUserDropOpen(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
@@ -233,6 +232,7 @@ export function PortalNavbar({
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={link.prefetch}
                   onClick={() => setMenuOpen(false)}
                   className={[
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -249,6 +249,7 @@ export function PortalNavbar({
             {isAdmin && (
               <Link
                 href="/admin"
+                prefetch={false}
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--primary)_/_0.1)]"
               >
