@@ -48,6 +48,79 @@ export async function resolverDenuncia(denunciaId: string): Promise<void> {
   revalidatePath('/portal/comunidade')
 }
 
+export async function resolverDenunciaMensagem(denunciaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_MODERATE)
+  const parsed = denunciaIdSchema.safeParse({ denunciaId })
+  if (!parsed.success) throw new Error('Denúncia inválida')
+
+  const denuncia = await db.denunciaMensagem.findFirst({
+    where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
+    select: { id: true, mensagemId: true },
+  })
+  if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await db.$transaction([
+    db.denunciaMensagem.update({
+      where: { id: denuncia.id },
+      data: {
+        status: 'RESOLVIDA',
+        resolvidoPorId: session.user.id,
+        resolvidoEm: new Date(),
+      },
+    }),
+    db.mensagemDireta.update({
+      where: { id: denuncia.mensagemId },
+      data: { removidaEm: new Date() },
+    }),
+    db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DENUNCIA_MENSAGEM_RESOLVIDA',
+        entidade: 'DenunciaMensagem',
+        entidadeId: denuncia.id,
+        detalhes: { mensagemRemovida: true },
+      },
+    }),
+  ])
+
+  revalidatePath('/admin/comunidade/moderacao')
+}
+
+export async function descartarDenunciaMensagem(denunciaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_MODERATE)
+  const parsed = denunciaIdSchema.safeParse({ denunciaId })
+  if (!parsed.success) throw new Error('Denúncia inválida')
+
+  const denuncia = await db.denunciaMensagem.findFirst({
+    where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
+    select: { id: true },
+  })
+  if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await db.$transaction([
+    db.denunciaMensagem.update({
+      where: { id: denuncia.id },
+      data: {
+        status: 'DESCARTADA',
+        resolvidoPorId: session.user.id,
+        resolvidoEm: new Date(),
+      },
+    }),
+    db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DENUNCIA_MENSAGEM_DESCARTADA',
+        entidade: 'DenunciaMensagem',
+        entidadeId: denuncia.id,
+      },
+    }),
+  ])
+
+  revalidatePath('/admin/comunidade/moderacao')
+}
+
 export async function descartarDenuncia(denunciaId: string): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_MODERATE)
   const parsed = denunciaIdSchema.safeParse({ denunciaId })

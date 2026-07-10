@@ -134,6 +134,8 @@ model Tenant {
   seguimentosCtx    Seguimento[]          @relation("SeguimentoContexto")
   salasReuniao      SalaReuniao[]
   denuncias         Denuncia[]
+  conversas         Conversa[]
+  denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
 
   @@map("saas_tenants")
 }
@@ -187,6 +189,14 @@ model User {
   mensagensReuniao     MensagemReuniao[]
   enquetesReuniao      EnqueteReuniao[]
   votosEnqueteReuniao  VotoEnqueteReuniao[]
+
+  conversasCriadas            Conversa[]         @relation("ConversaCriadaPor")
+  membroConversas             MembroConversa[]
+  mensagensDiretas            MensagemDireta[]   @relation("MensagemDiretaAutor")
+  bloqueiosFeitos             BloqueioUsuario[]  @relation("BloqueioBloqueador")
+  bloqueiosRecebidos          BloqueioUsuario[]  @relation("BloqueioBloqueado")
+  denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
+  denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
 
   @@map("saas_users")
 }
@@ -888,6 +898,125 @@ enum TipoNotificacao {
   NOVA_REACAO
   COMUNICADO_URGENTE
   DENUNCIA_NOVA
+  NOVA_MENSAGEM
+}
+
+// ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
+
+model Conversa {
+  id   String       @id @default(uuid())
+  tipo TipoConversa
+
+  // Tenant onde a conversa foi iniciada — contexto/auditoria. A LEITURA é
+  // chaveada por participação (MembroConversa), não por tenant: é o que
+  // permite DM entre membros de torcidas aliadas.
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Só para GRUPO — DM não tem nome/descrição/avatar próprios
+  nome      String?
+  descricao String?
+  avatarUrl String? @map("avatar_url")
+
+  criadoPorId String @map("criado_por_id")
+  criadoPor   User   @relation("ConversaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  // Bumpado a cada mensagem — ordena a inbox por atividade recente
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  membros   MembroConversa[]
+  mensagens MensagemDireta[]
+
+  @@index([tenantId, atualizadoEm])
+  @@map("saas_conversas")
+}
+
+enum TipoConversa {
+  DIRETA
+  GRUPO
+}
+
+model MembroConversa {
+  id              String        @id @default(uuid())
+  conversaId      String        @map("conversa_id")
+  userId          String        @map("user_id")
+  papel           PapelConversa @default(MEMBRO)
+  entrouEm        DateTime      @default(now()) @map("entrou_em")
+  ultimaLeituraEm DateTime?     @map("ultima_leitura_em")
+  silenciada      Boolean       @default(false)
+  saiuEm          DateTime?     @map("saiu_em")
+
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversaId, userId])
+  @@index([userId, saiuEm])
+  @@map("saas_membros_conversa")
+}
+
+enum PapelConversa {
+  ADMIN
+  MEMBRO
+}
+
+model MensagemDireta {
+  id          String    @id @default(uuid())
+  conversaId  String    @map("conversa_id")
+  autorId     String    @map("autor_id")
+  conteudo    String
+  midiaUrls   String[]  @default([]) @map("midia_urls")
+  respostaAId String?   @map("resposta_a_id")
+  editadaEm   DateTime? @map("editada_em")
+  // Soft delete — mantém a posição na thread ("mensagem removida")
+  removidaEm  DateTime? @map("removida_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  conversa  Conversa           @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  autor     User               @relation("MensagemDiretaAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  respostaA MensagemDireta?    @relation("MensagemResposta", fields: [respostaAId], references: [id], onDelete: SetNull)
+  respostas MensagemDireta[]   @relation("MensagemResposta")
+  denuncias DenunciaMensagem[]
+
+  @@index([conversaId, criadoEm])
+  @@map("saas_mensagens_diretas")
+}
+
+// Bloqueio usuário→usuário (mensageria). Distinto de `Bloqueado`, que é a
+// blocklist de registros por tenant.
+model BloqueioUsuario {
+  id           String   @id @default(uuid())
+  bloqueadorId String   @map("bloqueador_id")
+  bloqueadoId  String   @map("bloqueado_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  bloqueador User @relation("BloqueioBloqueador", fields: [bloqueadorId], references: [id], onDelete: Cascade)
+  bloqueado  User @relation("BloqueioBloqueado", fields: [bloqueadoId], references: [id], onDelete: Cascade)
+
+  @@unique([bloqueadorId, bloqueadoId])
+  @@index([bloqueadoId])
+  @@map("saas_bloqueios_usuario")
+}
+
+// `Denuncia` existente é acoplada a Post — mensagens precisam da própria tabela.
+model DenunciaMensagem {
+  id             String         @id @default(uuid())
+  tenantId       String         @map("tenant_id")
+  mensagemId     String         @map("mensagem_id")
+  denuncianteId  String         @map("denunciante_id")
+  motivo         String
+  status         StatusDenuncia @default(PENDENTE)
+  resolvidoPorId String?        @map("resolvido_por_id")
+  resolvidoEm    DateTime?      @map("resolvido_em")
+  criadoEm       DateTime       @default(now()) @map("criado_em")
+
+  tenant       Tenant         @relation("DenunciaMensagemTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  mensagem     MensagemDireta @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
+  denunciante  User           @relation("DenunciaMensagemDenunciante", fields: [denuncianteId], references: [id], onDelete: Cascade)
+  resolvidoPor User?          @relation("DenunciaMensagemResolvidoPor", fields: [resolvidoPorId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("saas_denuncias_mensagem")
 }
 
 // ─── NOTÍCIAS CURADAS (global por afiliação) ─────────────────────────────────

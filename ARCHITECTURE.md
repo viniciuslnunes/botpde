@@ -518,18 +518,30 @@ Por que Playwright (test suite) e não um MCP de browser dedicado:
   `formatRelative` em `lib/format-datetime.ts`. Salas/Perfil/Solicitações
   alinhados ao mesmo visual. `marcarComunicadosLidos` no feed virou best-effort
   (try/catch) para não derrubar a página.
-- **Item 27 — Mensageria da comunidade (fase seguinte, decidido 2026-07-08).**
+- **Item 27 — Mensageria da comunidade (plano fechado 2026-07-08, M1 em implementação).**
   Visão do usuário para "conversar/criar comunidades", que o redesenho acima
-  ainda NÃO cobre (é feature de backend, não UI). Escopo a especificar antes de
-  implementar:
-  1. **Conversas diretas (DM 1×1)** entre membros — respeitando visibilidade
-     cross-tenant (`canViewRecurso`/aliança) para quem pode iniciar conversa.
-  2. **Grupos** criados por membros (chat de texto próprio, lista de membros).
-  3. **Comunidades** — canais temáticos criados por administradores (em
-     destaque) ou por membros; entram como novo conceito no schema (novos models
-     tipo `Conversa`/`CanalMensagem`/`MembroConversa` + `MensagemDireta`), RBAC
-     (permissões de criar/moderar comunidade) e moderação. O chat ao vivo das
-     salas de vídeo (`SalaChat`) permanece dentro da sala — é efêmero e separado
-     desta mensageria persistente.
-  Decisão pendente: modelo de dados (reusar `Post`/`Comentario`? novo domínio de
-  mensagens?), limites de rate, e visibilidade de comunidades entre tenants.
+  ainda NÃO cobre. Decisões fechadas com o usuário (2026-07-08):
+  - **Tempo-real: polling** (~2s, mesmo padrão do `SalaChat` das salas de
+    vídeo) — zero infra nova; evoluir p/ SSE/serviço só com demanda real.
+  - **Alcance de DM: mesmo tenant + aliados** (`self/ancestor/descendant/allied`
+    via `canFollowUser`/visibilidade; `unrelated` bloqueado).
+  - **Recorte M1: DM 1×1 + Grupos juntos**; Comunidades temáticas ficam p/ M3.
+  Modelo de dados (novo domínio, aditivo — NÃO reusa `Post`/`Comentario`):
+  `Conversa` (tipo `DIRETA|GRUPO`, tenantId de contexto, nome/descricao/avatar
+  p/ grupo, `atualizadoEm` bumpado a cada mensagem p/ ordenar inbox),
+  `MembroConversa` (papel `ADMIN|MEMBRO`, `ultimaLeituraEm` p/ não-lidas,
+  silenciada, saiuEm), `MensagemDireta` (conteudo, `midiaUrls[]` reusando o
+  pipeline Cloudinary/embeds/stickers, respostaA, editadaEm, removidaEm),
+  `Bloqueio` (bloqueador/bloqueado) e `DenunciaMensagem` (a `Denuncia`
+  existente é acoplada a Post). **Leitura chaveada por participação**
+  (`MembroConversa`), não por tenantId — é o que permite DM cross-tenant com
+  aliado; `tenantId` na Conversa é contexto/auditoria.
+  Permissões novas: `MESSAGES_SEND` + `GROUPS_CREATE` (cargo `member`),
+  `MESSAGES_MODERATE` (moderação) — exige rodar
+  `repair-system-role-permissions` em produção (mesmo caso do
+  `community:manage`, item 18). O chat ao vivo das salas (`SalaChat`/
+  `MensagemReuniao`) permanece separado — efêmero, dentro da sala.
+  Superfícies M1: `/portal/mensagens` (inbox + thread, composer rico
+  reusado), badge de não-lidas na navbar, botão "Mensagem" no perfil.
+  M2/M3 (fases seguintes): transferência de admin de grupo, Comunidades
+  temáticas (canais de admin, visibilidade pública/aliada) e busca.

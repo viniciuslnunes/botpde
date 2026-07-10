@@ -5,6 +5,7 @@ import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { PerfilMensagemActions } from '@/components/portal/perfil-mensagem-actions'
 import { atualizarPerfil } from '@/app/portal/comunidade/actions'
 import { postInclude, projetarPost, type PostRaw, type PostSocialItem } from '@/lib/feed'
 import { db } from '@torcida/db'
@@ -47,6 +48,27 @@ export default async function PerfilComunidadePage({
         getSeguimentoStatus(session.user.id, userId),
       ])
 
+  // Best-effort: tabela de bloqueio pode não existir antes da migração da
+  // mensageria — nesse caso o perfil abre sem os botões de conversa.
+  let bloqueadoPorMim = false
+  let mensageriaDisponivel = true
+  if (!isSelf) {
+    try {
+      const bloqueio: { id: string } | null = await db.bloqueioUsuario.findUnique({
+        where: {
+          bloqueadorId_bloqueadoId: {
+            bloqueadorId: session.user.id,
+            bloqueadoId: userId,
+          },
+        },
+        select: { id: true },
+      })
+      bloqueadoPorMim = bloqueio !== null
+    } catch {
+      mensageriaDisponivel = false
+    }
+  }
+
   const podeVerPosts =
     isSelf || perfilAtual.perfilPrivado === false || statusSeguimento === 'APROVADO'
 
@@ -88,8 +110,19 @@ export default async function PerfilComunidadePage({
               {perfilAtual.perfilPrivado ? 'Perfil privado' : 'Perfil público'}
             </p>
           </div>
-          {!isSelf && podeSeguir && (
-            <SeguimentoButtons mode="follow" userId={userId} status={statusSeguimento} />
+          {!isSelf && (
+            <div className="flex flex-col items-end gap-2">
+              {podeSeguir && (
+                <SeguimentoButtons mode="follow" userId={userId} status={statusSeguimento} />
+              )}
+              {mensageriaDisponivel && (
+                <PerfilMensagemActions
+                  userId={userId}
+                  podeConversar={podeSeguir}
+                  bloqueadoPorMim={bloqueadoPorMim}
+                />
+              )}
+            </div>
           )}
         </div>
         {perfilAtual.bio && (

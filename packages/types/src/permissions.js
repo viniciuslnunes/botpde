@@ -52,6 +52,11 @@ export const PERMISSIONS = /** @type {const} */ ({
 
   // Salas de vídeo Meet
   MEETINGS_HOST: 'meetings:host',
+
+  // Mensageria (DM 1×1 e grupos — ARCHITECTURE.md §6 item 27)
+  MESSAGES_SEND: 'messages:send',
+  GROUPS_CREATE: 'groups:create',
+  MESSAGES_MODERATE: 'messages:moderate',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -102,6 +107,15 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.COMMUNITY_MODERATE, label: 'Moderar publicações e denúncias' },
       { key: PERMISSIONS.NEWS_CURATE, label: 'Curar notícias do time' },
       { key: PERMISSIONS.MEETINGS_HOST, label: 'Criar salas de vídeo' },
+    ],
+  },
+  {
+    label: 'Mensagens',
+    base: null,
+    items: [
+      { key: PERMISSIONS.MESSAGES_SEND, label: 'Enviar mensagens diretas' },
+      { key: PERMISSIONS.GROUPS_CREATE, label: 'Criar grupos de conversa' },
+      { key: PERMISSIONS.MESSAGES_MODERATE, label: 'Moderar mensagens denunciadas' },
     ],
   },
   {
@@ -175,7 +189,11 @@ export const SYSTEM_ROLE_PERMISSIONS = {
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
     (p) => p !== PERMISSIONS.SETTINGS_MANAGE,
   ),
-  [SYSTEM_ROLES.MEMBER]: [PERMISSIONS.COMMUNITY_POST],
+  [SYSTEM_ROLES.MEMBER]: [
+    PERMISSIONS.COMMUNITY_POST,
+    PERMISSIONS.MESSAGES_SEND,
+    PERMISSIONS.GROUPS_CREATE,
+  ],
 }
 
 /**
