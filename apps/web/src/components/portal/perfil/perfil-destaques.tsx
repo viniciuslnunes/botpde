@@ -1,27 +1,36 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { criarDestaquePerfil } from '@/app/portal/comunidade/actions'
-import type { DestaquePerfilItem } from '@/lib/feed'
-import type { PostSocialItem } from '@/lib/feed'
+import { DestaqueViewer } from './destaque-viewer'
+import type { DestaquePerfilItem, PostSocialItem } from '@/lib/feed'
 
 interface PerfilDestaquesProps {
   destaques: DestaquePerfilItem[]
   posts: PostSocialItem[]
   isSelf: boolean
   userId: string
+  autorNome: string | null
 }
 
-export function PerfilDestaques({ destaques, posts, isSelf, userId }: PerfilDestaquesProps) {
+export function PerfilDestaques({
+  destaques,
+  posts,
+  isSelf,
+  userId,
+  autorNome,
+}: PerfilDestaquesProps) {
   const [criando, setCriando] = useState(false)
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null)
   const [titulo, setTitulo] = useState('')
   const [selecionados, setSelecionados] = useState<string[]>([])
   const [pending, startTransition] = useTransition()
 
-  if (destaques.length === 0 && !isSelf) return null
+  const visiveis = destaques.filter((d) => d.posts.length > 0)
+
+  if (visiveis.length === 0 && !isSelf) return null
 
   function togglePost(id: string) {
     setSelecionados((prev) =>
@@ -48,13 +57,14 @@ export function PerfilDestaques({ destaques, posts, isSelf, userId }: PerfilDest
   return (
     <section className="space-y-3">
       <div className="flex gap-3 overflow-x-auto pb-1">
-        {destaques.map((d) => (
-          <Link
+        {visiveis.map((d, idx) => (
+          <button
             key={d.id}
-            href={`/portal/comunidade/perfil/${userId}?aba=publicacoes`}
+            type="button"
+            onClick={() => setViewerIdx(idx)}
             className="flex shrink-0 flex-col items-center gap-1"
           >
-            <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[rgb(var(--primary))] p-0.5">
+            <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[rgb(var(--primary))] p-0.5 transition-transform hover:scale-105">
               {d.capaUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={d.capaUrl} alt="" className="h-full w-full rounded-full object-cover" />
@@ -67,7 +77,7 @@ export function PerfilDestaques({ destaques, posts, isSelf, userId }: PerfilDest
             <span className="max-w-[4.5rem] truncate text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
               {d.titulo}
             </span>
-          </Link>
+          </button>
         ))}
         {isSelf && (
           <button
@@ -83,10 +93,20 @@ export function PerfilDestaques({ destaques, posts, isSelf, userId }: PerfilDest
         )}
       </div>
 
+      {viewerIdx !== null && visiveis[viewerIdx] && (
+        <DestaqueViewer
+          destaques={visiveis}
+          userId={userId}
+          autorNome={autorNome}
+          initialDestaqueIndex={viewerIdx}
+          onClose={() => setViewerIdx(null)}
+        />
+      )}
+
       {criando && isSelf && (
         <form
           onSubmit={salvarDestaque}
-          className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 space-y-3"
+          className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
         >
           <input
             value={titulo}
@@ -98,7 +118,10 @@ export function PerfilDestaques({ destaques, posts, isSelf, userId }: PerfilDest
           <p className="text-xs text-[rgb(var(--foreground-muted))]">Selecione até 5 publicações:</p>
           <div className="max-h-40 space-y-1 overflow-y-auto">
             {posts.slice(0, 15).map((p) => (
-              <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[rgb(var(--background-subtle))]">
+              <label
+                key={p.id}
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[rgb(var(--background-subtle))]"
+              >
                 <input
                   type="checkbox"
                   checked={selecionados.includes(p.id)}

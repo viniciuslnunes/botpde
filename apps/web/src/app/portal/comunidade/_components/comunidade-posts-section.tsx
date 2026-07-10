@@ -26,17 +26,25 @@ export async function ComunidadePostsSection({
     { cursor, take: 20 },
   )
 
-  const stream: PostSocialItem[] = [...postsSeguindo, ...postsSugeridos].sort(
-    (a, b) => b.criadoEm.getTime() - a.criadoEm.getTime(),
-  )
+  const stream: PostSocialItem[] =
+    postsSugeridos.length > 0
+      ? [...postsSugeridos].sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime())
+      : [...postsSeguindo].sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime())
 
   return (
     <>
       <section className="space-y-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
           <MessagesSquare className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          Feed da comunidade
+          Descobrir na comunidade
         </h2>
+        {postsSugeridos.length > 0 && postsSeguindo.length > 0 && (
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            <Link href="/portal/comunidade/rede" className="font-medium text-[rgb(var(--primary))] hover:underline">
+              Ver só quem você segue →
+            </Link>
+          </p>
+        )}
         {stream.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
             <MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />

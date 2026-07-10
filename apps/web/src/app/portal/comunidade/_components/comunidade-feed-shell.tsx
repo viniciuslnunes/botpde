@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video, Search, Users } from 'lucide-react'
+import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -56,6 +56,7 @@ function AsideWidgetsFallback() {
 export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado = true }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true },
+    { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false },
     { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false },
     { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false },
@@ -138,6 +139,12 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado
             className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
           >
             <Video className="h-4 w-4" /> Salas
+          </Link>
+          <Link
+            href="/portal/comunidade/rede"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
+          >
+            <Heart className="h-4 w-4" /> Minha rede
           </Link>
           <Link
             href="/portal/comunidade/videos"

@@ -2,7 +2,8 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getVisibleTenantIds } from './hierarquia'
-import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial } from './perfil-social'
+import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
+import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
@@ -396,6 +397,140 @@ export interface DestaquePerfilItem {
   titulo: string
   capaUrl: string | null
   postIds: string[]
+  posts: PostSocialItem[]
+}
+
+export interface HashtagEmAlta {
+  tag: string
+  total: number
+}
+
+/** Verifica se o viewer pode abrir o post (perfil + visibilidade do post). */
+export async function podeVerPost(
+  viewerId: string,
+  post: {
+    autorId: string
+    tenantId: string
+    visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+    oculto: boolean
+  },
+): Promise<boolean> {
+  if (post.oculto) return false
+  if (!(await podeVerConteudoSocial(viewerId, post.autorId, post.tenantId))) return false
+  if (viewerId === post.autorId) return true
+  if (post.visibilidade === 'PUBLICO') return true
+  if (post.visibilidade === 'TENANT') {
+    const membro: { status: string } | null = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: post.tenantId, userId: viewerId } },
+      select: { status: true },
+    })
+    return membro?.status === 'ATIVO'
+  }
+  const status = await getSeguimentoStatus(viewerId, post.autorId)
+  return status === 'APROVADO'
+}
+
+export async function getPostPorId(
+  postId: string,
+  tenantId: string,
+  viewerId: string,
+): Promise<PostSocialItem | null> {
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const raw: PostRaw | null = (await db.post.findFirst({
+    where: {
+      id: postId,
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+    },
+    include: postInclude(viewerId),
+  })) as PostRaw | null
+  if (!raw) return null
+  const post = projetarPost(raw)
+  const ok = await podeVerPost(viewerId, {
+    autorId: post.autorId,
+    tenantId: post.tenantId,
+    visibilidade: post.visibilidade,
+    oculto: false,
+  })
+  return ok ? post : null
+}
+
+export const getPostsDaRede = cache(async function getPostsDaRede(
+  tenantId: string,
+  userId: string,
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+
+  const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
+    getVisibleTenantIds(tenantId, 'comunidade'),
+    db.seguimento.findMany({
+      where: { seguidorId: userId, status: 'APROVADO' },
+      select: { seguidoId: true },
+    }),
+  ])
+
+  const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+      autorId: { in: redeIds },
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = posts.slice(0, take)
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+})
+
+export async function getHashtagsEmAlta(
+  tenantId: string,
+  limite = 5,
+): Promise<HashtagEmAlta[]> {
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const links: Array<{ hashtag: { tag: string } }> = await db.postHashtag.findMany({
+    where: {
+      post: {
+        criadoEm: { gte: since },
+        oculto: false,
+        visibilidade: 'PUBLICO',
+        tenantId: { in: visibleTenantIds },
+      },
+    },
+    select: { hashtag: { select: { tag: true } } },
+    take: 800,
+  })
+
+  const counts = new Map<string, number>()
+  for (const link of links) {
+    const tag = link.hashtag.tag
+    counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limite)
+    .map(([tag, total]) => ({ tag, total }))
 }
 
 export async function getPostsPorHashtag(
@@ -510,6 +645,7 @@ export async function getGruposPublicos(
 export async function getDestaquesPerfil(
   userId: string,
   tenantId: string,
+  viewerId?: string,
 ): Promise<DestaquePerfilItem[]> {
   const rows: Array<{
     id: string
@@ -533,6 +669,33 @@ export async function getDestaquesPerfil(
     },
   })
 
+  const postIds = [...new Set(rows.flatMap((d) => d.itens.map((i) => i.postId)))]
+  let postsMap = new Map<string, PostSocialItem>()
+
+  if (viewerId && postIds.length > 0) {
+    const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+    const postsRaw = (await db.post.findMany({
+      where: {
+        id: { in: postIds },
+        tenantId: { in: visibleTenantIds },
+        oculto: false,
+      },
+      include: postInclude(viewerId),
+    })) as PostRaw[]
+
+    for (const raw of postsRaw) {
+      const post = projetarPost(raw)
+      if (await podeVerPost(viewerId, {
+        autorId: post.autorId,
+        tenantId: post.tenantId,
+        visibilidade: post.visibilidade,
+        oculto: false,
+      })) {
+        postsMap.set(post.id, post)
+      }
+    }
+  }
+
   return rows.map((d) => ({
     id: d.id,
     titulo: d.titulo,
@@ -542,6 +705,9 @@ export async function getDestaquesPerfil(
       d.itens[0]?.post.imagemUrl ??
       null,
     postIds: d.itens.map((i) => i.postId),
+    posts: d.itens
+      .map((i) => postsMap.get(i.postId))
+      .filter((p): p is PostSocialItem => p != null),
   }))
 }
 

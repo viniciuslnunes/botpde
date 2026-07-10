@@ -1,37 +1,49 @@
 # Módulo Comunidade — perfil social e feed
 
 Hub social multi-tenant em `/portal/comunidade`: feed de posts de membros,
-comunicados oficiais, perfis unificados, seguimento com aprovação e busca de
-membros.
+comunicados oficiais, perfis unificados, seguimento com aprovação, busca de
+membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 
 ## Modelo de dados
 
 | Entidade | Tabela | Papel |
 |---|---|---|
-| `Post` | `saas_posts` | Publicações (`MEMBRO` ou `INSTITUCIONAL`); `visibilidade`: `PUBLICO`, `TENANT`, `PRIVADO` |
+| `Post` | `saas_posts` | Publicações (`MEMBRO` ou `INSTITUCIONAL`); `visibilidade`: `PUBLICO`, `TENANT`, `PRIVADO`; `postOrigemId` para repost |
 | `PerfilMembro` | `saas_perfis_membro` | Bio, banner, avatar social, privacidade, toggles de exibição (por tenant) |
+| `PerfilDestaque` / `PerfilDestaqueItem` | — | Destaques estilo stories no perfil |
 | `Seguimento` | `saas_seguimentos` | Grafo social; status `PENDENTE` / `APROVADO` / `REJEITADO` |
-| `Comentario` / `Reacao` | — | Engajamento nos posts |
+| `Comentario` / `Reacao` | — | Engajamento (`CURTIR`, `FORCA`, `VAMOS`, `PRESENTE`) |
+| `EnquetePost` / `OpcaoEnquetePost` / `VotoEnquetePost` | — | Enquetes embutidas em posts |
+| `Hashtag` / `PostHashtag` | — | Hashtags por tenant |
+| `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
 
 ## Privacidade
 
 Função central: `podeVerConteudoSocial` em `apps/web/src/lib/perfil-social.ts`.
+Permalink de posts usa também `podeVerPost` em `apps/web/src/lib/feed.ts` (perfil +
+visibilidade do post).
 
 - **Perfil público** (`perfilPrivado: false`): posts públicos visíveis no feed e perfil.
 - **Perfil privado** (default): só o próprio usuário e seguidores com status `APROVADO` veem publicações, fotos e atividade.
-- O feed (`getPostsParaFeed`) filtra autores privados fora da rede via `getAutoresSemAcesso`.
+- O feed principal (`/portal/comunidade`) prioriza **descoberta** (posts públicos de fora da rede).
+- **Minha rede** (`/portal/comunidade/rede`) mostra só posts de quem você segue + os seus.
 
 ## Rotas portal
 
 | Rota | Descrição |
 |---|---|
-| `/portal/comunidade` | Feed + composer + aside |
-| `/portal/comunidade/perfil/[userId]` | Perfil unificado (abas Sobre, Publicações, Fotos, Atividade) |
+| `/portal/comunidade` | Feed descoberta + composer + aside |
+| `/portal/comunidade/rede` | Feed só da sua rede (quem você segue) |
+| `/portal/comunidade/post/[id]` | Permalink de uma publicação |
+| `/portal/comunidade/perfil/[userId]` | Perfil unificado (abas + destaques) |
 | `/portal/comunidade/perfil/[userId]/seguidores` | Lista de seguidores |
 | `/portal/comunidade/perfil/[userId]/seguindo` | Lista de quem segue |
 | `/portal/comunidade/busca` | Busca de membros |
 | `/portal/comunidade/seguindo` | Solicitações pendentes recebidas |
+| `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
+| `/portal/comunidade/grupos` | Grupos públicos (criar/entrar) |
+| `/portal/comunidade/videos` | Posts com vídeo |
 | `/portal/perfil` | Redireciona para o perfil social do usuário logado |
 
 ## API
@@ -43,13 +55,19 @@ Função central: `podeVerConteudoSocial` em `apps/web/src/lib/perfil-social.ts`
 
 ## Server Actions (`comunidade/actions.ts`)
 
-- `publicarPost`, `editarPost`, `excluirPost`
+- `publicarPost`, `publicarEnquete`, `editarPost`, `excluirPost`, `repostarPost`
 - `solicitarSeguir`, `deixarDeSeguir`, `aprovarSeguimento`, `rejeitarSeguimento`
-- `atualizarPerfilSocial` (bio, banner, avatar, privacidade, toggles)
-- `comentarPost`, `reagirPost`, `listarComentariosPost`, `denunciarPost`
+- `atualizarPerfilSocial`, `criarDestaquePerfil`
+- `comentarPost`, `reagirPost`, `votarEnquetePost`, `listarComentariosPost`, `denunciarPost`
+- `criarGrupoPublico`, `entrarGrupoPublico`
 
-Toda mutação administrativa grava `AuditLog`; engajamento usa rate limit em
-`engagement-rate-limit.ts`.
+Notificações de menção, comentário, reação e repost apontam para
+`/portal/comunidade/post/[id]` via `linkPostComunidade()`.
+
+## Formato de menções e hashtags
+
+- Menção: `@[Nome](user:uuid)` — parser em `packages/types/src/comunidade-social.js`
+- Hashtag: `#tag` (2–40 caracteres) — normalizada sem acentos
 
 ## Visibilidade cross-tenant
 

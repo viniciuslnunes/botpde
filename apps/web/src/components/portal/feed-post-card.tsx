@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Repeat2 } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
+import { linkPostComunidade } from '@/lib/comunidade-social'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
@@ -40,7 +41,12 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
               </span>
             )}
           </div>
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">{formatRelative(post.criadoEm)}</p>
+          <Link
+            href={linkPostComunidade(post.id)}
+            className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
+          >
+            {formatRelative(post.criadoEm)}
+          </Link>
         </div>
         {(isAuthor || author) && <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} />}
       </header>

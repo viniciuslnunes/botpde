@@ -152,7 +152,7 @@ export default async function PerfilComunidadePage({
     ? await Promise.all([
         getFotosDoAutor(userId, tenant.id, visibleTenantIds),
         getAtividadeDoAutor(userId, visibleTenantIds),
-        getDestaquesPerfil(userId, tenant.id),
+        getDestaquesPerfil(userId, tenant.id, session.user.id),
       ])
     : [[], [], []]
 
@@ -209,6 +209,7 @@ export default async function PerfilComunidadePage({
           posts={posts}
           isSelf={isSelf}
           userId={userId}
+          autorNome={user.nome}
         />
       )}
 

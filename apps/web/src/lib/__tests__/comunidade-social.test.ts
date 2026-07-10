@@ -5,6 +5,7 @@ import {
   normalizarHashtag,
   formatarMencao,
   isVideoUrl,
+  linkPostComunidade,
 } from '../comunidade-social'
 
 describe('comunidade-social', () => {
@@ -31,5 +32,9 @@ describe('comunidade-social', () => {
   it('detecta URLs de vídeo', () => {
     expect(isVideoUrl('https://res.cloudinary.com/x/video/upload/v1/a.mp4')).toBe(true)
     expect(isVideoUrl('https://res.cloudinary.com/x/image/upload/v1/a.jpg')).toBe(false)
+  })
+
+  it('gera permalink de post', () => {
+    expect(linkPostComunidade('abc-123')).toBe('/portal/comunidade/post/abc-123')
   })
 })

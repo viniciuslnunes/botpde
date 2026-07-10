@@ -1,0 +1,93 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { Users } from 'lucide-react'
+import { auth } from '@/lib/auth'
+import { getTenantFromHost } from '@/lib/tenant'
+import { getPostsDaRede } from '@/lib/feed'
+import { FeedPostCard } from '@/components/portal/feed-post-card'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = { title: 'Minha rede — Comunidade' }
+
+export default async function RedeComunidadePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cursor?: string }>
+}) {
+  const [params, session, tenant] = await Promise.all([
+    searchParams,
+    auth(),
+    getTenantFromHost(),
+  ])
+  if (!session?.user?.id) redirect('/entrar')
+  if (!tenant) redirect('/portal')
+
+  const { posts, pageInfo } = await getPostsDaRede(tenant.id, session.user.id, {
+    cursor: params.cursor,
+    take: 20,
+  })
+
+  const currentUser = {
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl: session.user.image ?? null,
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-4">
+      <Link
+        href="/portal/comunidade"
+        className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+      >
+        ← Voltar ao feed
+      </Link>
+
+      <header>
+        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Minha rede</h1>
+        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+          Publicações de quem você segue e as suas
+        </p>
+      </header>
+
+      {posts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
+          <Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />
+          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            Sua rede ainda está vazia
+          </p>
+          <p className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
+            Siga outros membros ou publique algo para ver atividade aqui.
+          </p>
+          <Link
+            href="/portal/comunidade/busca"
+            className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Buscar membros
+          </Link>
+        </div>
+      ) : (
+        <section className="space-y-4">
+          {posts.map((post) => (
+            <FeedPostCard
+              key={post.id}
+              post={post}
+              showTenantBadge={post.tenantId !== tenant.id}
+              currentUser={currentUser}
+            />
+          ))}
+        </section>
+      )}
+
+      {pageInfo.hasMore && pageInfo.nextCursor && (
+        <div className="flex justify-center pt-2">
+          <Link
+            href={`/portal/comunidade/rede?cursor=${encodeURIComponent(pageInfo.nextCursor)}`}
+            className="rounded-full border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Carregar mais
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}

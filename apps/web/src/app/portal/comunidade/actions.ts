@@ -9,6 +9,7 @@ import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
 import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, criarGrupoPublicoSchema, criarDestaqueSchema } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
+import { linkPostComunidade } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
@@ -120,7 +121,7 @@ export async function publicarPost(
       autorNome: session.user.name ?? null,
       tenantId: tenant.id,
       postId: post.id,
-      link: '/portal/comunidade',
+      link: linkPostComunidade(post.id),
     }),
   ])
 
@@ -480,7 +481,7 @@ export async function comentarPost(
       tipo: 'NOVO_COMENTARIO',
       titulo: 'Novo comentário no seu post',
       corpo: parsed.data.conteudo.slice(0, 140),
-      link: '/portal/comunidade',
+      link: linkPostComunidade(post.id),
     })
   }
 
@@ -501,11 +502,11 @@ export async function comentarPost(
     autorNome: session.user.name ?? null,
     tenantId: tenant.id,
     postId: post.id,
-    link: '/portal/comunidade',
+    link: linkPostComunidade(post.id),
   })
 
   revalidatePath('/portal/comunidade')
-  revalidatePath('/portal')
+  revalidatePath(`/portal/comunidade/post/${post.id}`)
 
   return {
     id: comentario.id,
@@ -565,7 +566,7 @@ export async function publicarEnquete(
       autorNome: session.user.name ?? null,
       tenantId: tenant.id,
       postId: post.id,
-      link: '/portal/comunidade',
+      link: linkPostComunidade(post.id),
     }),
   ])
 
@@ -645,7 +646,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
       tipo: 'REPOST',
       titulo: 'Sua publicação foi compartilhada',
       corpo: `${session.user.name ?? 'Um membro'} compartilhou seu post.`,
-      link: '/portal/comunidade',
+      link: linkPostComunidade(original.id),
     })
   }
 
@@ -805,7 +806,7 @@ export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAM
             : parsed.data.tipo === 'PRESENTE'
               ? 'Marcou presença no seu post.'
               : 'Recebeu uma curtida.',
-      link: '/portal/comunidade',
+      link: linkPostComunidade(post.id),
     })
   }
 

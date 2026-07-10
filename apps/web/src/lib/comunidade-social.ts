@@ -71,3 +71,8 @@ export function isVideoUrl(url: string): boolean {
     url.endsWith('.mov')
   )
 }
+
+/** Permalink estável de um post no portal. */
+export function linkPostComunidade(postId: string): string {
+  return `/portal/comunidade/post/${postId}`
+}
