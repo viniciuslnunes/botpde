@@ -31,6 +31,15 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
   §5.6 (cache, Suspense, `useVisibleInterval`, prefetch on-hover).
 
+## Compliance de domínio (`docs/knowledge/contexto-legal.md`)
+Em mudanças que tocam membros/cadastro, verifique também:
+- Campos do cadastro legal (LGE 14.597/2023) não removidos/quebrados na ficha.
+- Desligamento/exclusão de membro preserva histórico e grava `AuditLog` com
+  data (valor jurídico — responsabilidade objetiva da torcida).
+- Dados de membros nunca expostos cross-tenant (nem para `allied`) — LGPD.
+- Em comunidade: fluxo de denúncia/moderação não regredido (risco de
+  banimento coletivo por conteúdo de incitação).
+
 ## Foco em regressão
 - Autorização: uma mudança de gate não pode ampliar acesso silenciosamente.
 - Visibilidade: aliados/descendentes nunca enxergam recurso RESTRITO.

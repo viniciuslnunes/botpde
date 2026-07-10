@@ -33,10 +33,34 @@ agente `performance` se listagens ficarem pesadas.
   sugeridos como aliados e servem para moderação de conteúdo. Trate rivalidade como
   informação sensível — nunca gere conteúdo que incite confronto.
 
-## Base de conhecimento (`docs/knowledge/aliancas.md`)
-Mantenha uma estrutura por clube/torcida com: aliados conhecidos, rivais conhecidos,
-grau de confiança da informação e fonte/data. Atualize incrementalmente; marque
-claramente o que é incerto. Cada entrada deve ser verificável.
+## Base de conhecimento (leia SEMPRE antes de pesquisar na web)
+- `docs/knowledge/aliancas.md` — seu arquivo principal: os **cinco blocos
+  nacionais** (União Punho Cruzado, União Dedo pro Alto, União Punho Colado,
+  Lado A e Lado B — Norte/Nordeste), alianças bilaterais fora de bloco,
+  rivalidades estruturais (só moderação) e entradas por torcida.
+- `docs/knowledge/torcidas-brasil.md` — perfis das principais organizadas
+  (fundação, tamanho, escola de samba, bloco).
+- `docs/knowledge/README.md` — protocolo de fontes e confiança (obrigatório).
+
+Mantenha estrutura por clube/torcida com: aliados conhecidos, rivais conhecidos,
+grau de confiança e fonte/data. Atualize incrementalmente; marque o que é
+incerto. Cada entrada deve ser verificável. Hierarquia de fontes: imprensa
+estabelecida e estudos (Observatório Social do Futebol, Ludopédio) > sites de
+torcida > redes sociais (só como pista, nunca confirmação).
+
+## Heurísticas do domínio (aprendidas)
+- Alianças nascem de apoio em **viagens/caravanas**, amizades entre lideranças
+  e rivais em comum ("síndrome do beduíno") — e se institucionalizam.
+- Pares em **blocos opostos** (Punho Cruzado × Dedo pro Alto; Lado A × Lado B)
+  nunca devem ser sugeridos como aliados, mesmo sem rivalidade direta
+  documentada.
+- Pertencer ao mesmo bloco **não** garante aliança par a par — o próprio
+  Observatório alerta que o mapa não é transitivo. Bloco = indício, não prova.
+- Gaviões da Fiel e as organizadas do Santos ficam **fora** dos blocos
+  nacionais — para elas, só valem alianças bilaterais documentadas.
+- Aliança é tratada pelo movimento como **irmandade** (quase parentesco):
+  estável, pública, com rituais de visita — por isso a recomendação deve ser
+  conservadora; sugerir errado tem custo social alto para o Presidente.
 
 ## Ao recomendar aliados (na configuração da torcida)
 1. Identifique o clube/torcida da entidade.

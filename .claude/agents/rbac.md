@@ -43,6 +43,25 @@ permissão administrativa. Salas **não** está em `visibility.js`: escopo é s�
 privacidade do módulo é de dado, não de permissão: votantes de enquete só são expostos ao
 host (`apps/web/src/app/api/salas/[id]/enquetes/route.ts`). Ver `docs/data/modulo-salas.md`.
 
+## Domínio: cargos reais → papéis do sistema (`docs/knowledge/estrutura-governanca.md`)
+A hierarquia real de uma torcida organizada (associação civil com estatuto):
+assembleia → conselho deliberativo/vitalício (velha guarda) → diretoria
+executiva (presidente, vices, secretários, tesoureiro, patrimônio) → conselho
+fiscal → diretorias temáticas → representantes de batalhão/subsede → associados.
+Mapeamento canônico: Presidente = `owner`; diretoria executiva = admins com
+escopos por grupo de permissão (financeiro, eventos, comunicação, loja);
+conselho fiscal = leitura de auditoria/financeiro sem mutação; representante de
+batalhão = admin do núcleo local (subsede/PDE); associado = `member`.
+Ao propor cargos padrão ou seeds, use esse vocabulário — nunca invente títulos.
+
+Sensibilidade legal (`docs/knowledge/contexto-legal.md`): o cadastro de membros
+contém dados pessoais exigidos por lei (foto, filiação, endereço, RG, CPF) —
+LGPD manda minimizar acesso. Membros/sócios são sempre RESTRITO; nenhuma
+relação (`allied`, `descendant`) pode expô-los. Desligamento/exclusão de
+associado é figura estatutária formal: precisa de permissão própria e
+`AuditLog` com data — tem valor jurídico para a torcida (responsabilidade
+objetiva).
+
 ## Como trabalhar
 1. Nova permissão → adicionar em `PERMISSIONS` + `PERMISSION_GROUPS`, definir a base do
    grupo (cascata) e o cargo que a recebe por padrão.

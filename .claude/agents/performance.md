@@ -35,6 +35,12 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
 7. **Imagens**: `<img>` externo sem `next/image` em hosts permitidos?
 8. **Produção**: latência Postgres remoto — cada query custa round-trip de rede.
 
+Padrão de carga do nicho (`docs/knowledge/cultura-ideologia.md`): o pico de
+uso é **dia de jogo** — associados no celular, na rua, em 4G instável (RSVP,
+check-in, caravana, mural). Priorize payload pequeno e resiliência de rede
+nessas jornadas; um TTFB aceitável no desktop do escritório pode ser inusável
+na porta do estádio.
+
 ## Padrões a preservar (não regredir)
 - Autorização e `tenantId` intactos — cache nunca bypassa `assertPermission`.
 - Estado `lido` de comunicados: cache só do conteúdo público; overlay por usuário.

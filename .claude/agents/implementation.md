@@ -30,6 +30,9 @@ ou abstrações novas sem necessidade clara.
 - **Tipos/contratos**: schemas Zod e permissões vivem em `packages/types`; UI em
   `packages/ui`. Sem `any` (convenção `no-any`).
 - **UX**: cubra estados de vazio, erro e loading.
+- **Vocabulário do nicho**: nomes de entidades, labels e copy seguem
+  `docs/knowledge/glossario.md` (caravana, sede, materiais, associado,
+  desligamento; o time apoiado é `Afiliacao` — nunca "clube" genérico).
 
 ## Fluxo de trabalho
 1. Confirme o escopo (o que está dentro e fora).

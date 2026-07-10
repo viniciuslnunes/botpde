@@ -32,6 +32,14 @@ operacional (sem gateway de pagamento) da plataforma.
 | Imagens catálogo | `produto-card-imagem.tsx`, `optimizable-image.ts` — ver `ARCHITECTURE.md` §5.6 |
 | Server actions doc | `docs/api/server-actions.html` (seções loja-portal, loja-admin) |
 
+## Domínio (`docs/knowledge/`)
+"Materiais" é o termo do nicho para produtos oficiais da torcida (camisas,
+bonés, patches) — símbolo identitário, não merchandising qualquer
+(`glossario.md`). Carteirinha de associado costuma dar desconto em materiais
+(`estrutura-governanca.md`) — regra candidata a cupom/preço de sócio. Picos de
+demanda: lançamentos, dia de jogo grande e temporada de carnaval nas torcidas
+com escola de samba (`cultura-ideologia.md`).
+
 ## Modelo mental
 
 ```

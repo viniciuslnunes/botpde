@@ -42,6 +42,23 @@ delete + votação": `@@unique([salaId, userId])` para upsert de presença,
 (`TipoSalaReuniao.DM_GRUPO`, `PapelParticipanteReuniao.MODERADOR`) existem no schema mas
 nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/data/modulo-salas.md`.
 
+## Domínio: entidades reais do nicho (`docs/knowledge/`)
+- `estrutura-governanca.md` — departamentos reais para seeds/sugestões:
+  batucada, caravanas, social/eventos, materiais/loja, patrimônio, financeiro,
+  comunicação, feminino, carnaval (quando a torcida tem escola de samba).
+  "Batalhões"/subsedes por cidade confirmam a hierarquia Sede → Subsede → PDE.
+- `contexto-legal.md` — a ficha de membro deve comportar os campos do cadastro
+  legal obrigatório (LGE 14.597/2023): nome completo, foto, filiação, endereço,
+  escolaridade, profissão, data de nascimento, RG, CPF. Desligamento/exclusão
+  com data e trilha de auditoria tem valor jurídico (responsabilidade objetiva)
+  — soft delete/histórico, nunca exclusão física do vínculo.
+- `torcidas-brasil.md` — nem todo tenant é associação com mensalidade (barra
+  brava = livre adesão): campos de cadastro/mensalidade devem ser opcionais no
+  modelo, não invariantes.
+- `aliancas.md` — aliança é relação curada torcida↔torcida (tenant raiz ↔
+  tenant raiz), opt-in, simétrica na leitura; rivalidade NÃO vira entidade de
+  produto — no máximo lista de supressão para recomendações.
+
 ## Como trabalhar
 1. Leia o schema atual e as relações vizinhas antes de propor.
 2. Proponha em bloco Prisma comentado, com cardinalidade, `onDelete` e índices.

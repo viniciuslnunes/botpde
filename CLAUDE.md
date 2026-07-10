@@ -1,7 +1,8 @@
 # CLAUDE.md — Torcida SaaS
 
 Guia curto para trabalhar neste repositório. Detalhe arquitetural em `ARCHITECTURE.md`;
-produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`).
+produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`);
+conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
 Performance web: `ARCHITECTURE.md` §5.6; agente `performance` para auditorias novas.
 
 ## O que é

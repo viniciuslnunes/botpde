@@ -22,6 +22,21 @@ Stack: Next.js 16 (App Router, Server Components/Actions), Tailwind v4, `@torcid
 (componentes com CSS variables), next-themes (dark/light), next-intl (pt-BR). Web
 responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
 
+## Domínio: tom de voz e público (`docs/knowledge/`)
+- `glossario.md` é a referência de copy: o portal fala com o **associado**
+  ("sua torcida", "sua sede", "próxima caravana", "materiais"); o admin fala
+  com a **diretoria** (vocabulário estatutário: assembleia, conselho,
+  desligamento). Nunca "fã", "fã-clube" ou "clube" genérico — o time apoiado é
+  a **Afiliação**.
+- `cultura-ideologia.md` — presença é status: histórico de check-ins/caravanas
+  merece destaque visual de orgulho. Símbolos (cores, escudo da torcida) têm
+  valor emocional alto — personalização do tenant importa. Base popular,
+  aparelhos modestos, uso em dia de jogo (rua, 4G): mobile-first de verdade e
+  peso de página contido.
+- Conteúdo sensível: zoeira com rival é cultura; incitação é risco legal
+  (banimento coletivo — `contexto-legal.md`). Telas de comunidade devem tratar
+  denúncia/moderação como fluxo de primeira classe, sem tom policialesco.
+
 ## O que você verifica
 - Jornada: a tela deixa claro **status, próxima ação e contexto local**?
 - Carga cognitiva: redundância de cards, excesso de opções, hierarquia fraca.

@@ -2,6 +2,9 @@
 
 > Documento de produto. A verdade técnica (as-is/to-be, RBAC, deploy) está em
 > `ARCHITECTURE.md`. Aqui descrevemos o **domínio** e as **jornadas**.
+> O conhecimento profundo do nicho (torcidas reais, blocos de alianças,
+> governança interna, contexto legal, glossário) vive em **`docs/knowledge/`**
+> — índice em `docs/knowledge/README.md`.
 
 ## Visão
 

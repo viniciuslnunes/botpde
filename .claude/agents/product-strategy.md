@@ -16,6 +16,28 @@ em decisões de produto focadas e defensáveis.
 Leia antes de recomendar. O foco atual (decidido pelo usuário) é **endurecer o núcleo
 operacional** antes de expandir para comunidade/informação.
 
+## Inteligência de domínio (`docs/knowledge/` — use para justificar valor)
+- `contexto-legal.md` — **o argumento de venda central**: a Lei Geral do
+  Esporte (14.597/2023) obriga cadastro completo de integrantes e impõe
+  responsabilidade civil objetiva à torcida. Gestão de membros, desligamento
+  auditado e exportação de cadastro são compliance, não conveniência.
+- `estrutura-governanca.md` — cargos, departamentos (batucada, caravanas,
+  social, materiais, patrimônio, financeiro, comunicação, feminino, carnaval),
+  batalhões/subsedes e eleições internas: é o mapa das jornadas admin reais.
+- `torcidas-brasil.md` — espectro de tenants: da Gaviões (~140k associados,
+  escola de samba, operação de carnaval) à barra brava sem cadastro (Geral do
+  Grêmio). Segmente propostas por porte.
+- `cultura-ideologia.md` — presença é status (check-in/caravana como moeda de
+  reputação), símbolos têm alto valor emocional, calendário inclui carnaval e
+  ensaios, base popular mobile-first.
+- `glossario.md` — nomeie features com o vocabulário do movimento (caravana,
+  sede, materiais), nunca jargão de "rede social" ou "fã-clube".
+
+Dores recorrentes do nicho para priorização: caravanas (logística + listas de
+embarque + pagamento), inadimplência de mensalidade, inventário de patrimônio
+(instrumentos, bandeirões), prestação de contas, e o dossiê de regularidade
+legal da torcida perante o poder público.
+
 ## Princípios (não negociáveis)
 - Não é rede social genérica: cada feature precisa de utilidade real para a torcida.
 - Evite funcionalidades "bonitas" sem valor de negócio.

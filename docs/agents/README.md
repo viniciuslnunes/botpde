@@ -4,6 +4,18 @@ Modelo de trabalho assistido por IA: **Opus planeja, Fable implementa.** Os agen
 vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 `/agents`). Este README explica quando usar cada um.
 
+## Memória de domínio compartilhada
+
+Todos os agentes se apoiam na base de conhecimento em **`docs/knowledge/`**
+(ver o índice em `docs/knowledge/README.md`): alianças e rivalidades,
+perfis das torcidas do Brasil, estrutura/governança interna, cultura e
+ideologia, contexto legal (Lei Geral do Esporte) e glossário do nicho.
+Regras: cada fato tem fonte + data + grau de confiança; rivalidades existem
+só para moderação; quem escreve lá são `aliancas-torcidas` e
+`research-dominio` — os demais só leem. A cada decisão nova de produto ou
+arquitetura, registre nos docs que os agentes leem (este é o protocolo de
+"alimentar o time").
+
 ## Papéis
 
 | Agente | Quando usar | Model |
