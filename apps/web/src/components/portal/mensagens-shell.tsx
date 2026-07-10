@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
@@ -11,7 +12,17 @@ import {
 import { formatRelative } from '@/lib/format-datetime'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { Avatar } from './avatar'
-import { MensagemThread } from './mensagem-thread'
+
+const MensagemThread = dynamic(
+  () => import('./mensagem-thread').then((mod) => mod.MensagemThread),
+  {
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-[rgb(var(--background-subtle))]" />
+      </div>
+    ),
+  },
+)
 
 interface MensagensShellProps {
   initialConversas: InboxItemDto[]

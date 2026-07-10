@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { listConversas, serializeConversasInbox } from '@/lib/mensageria'
 import { getTenantFromHost } from '@/lib/tenant'
 import { MensagensShell } from '@/components/portal/mensagens-shell'
 
@@ -19,6 +20,8 @@ export default async function MensagensPage({
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
+  const conversas = serializeConversasInbox(await listConversas(session.user.id))
+
   return (
     <div className="space-y-4">
       <div>
@@ -29,7 +32,7 @@ export default async function MensagensPage({
       </div>
 
       <MensagensShell
-        initialConversas={[]}
+        initialConversas={conversas}
         initialSelecionadaId={params.c ?? null}
         currentUserId={session.user.id}
       />

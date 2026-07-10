@@ -26,11 +26,11 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 const navLinks = [
-  { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: true },
-  { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: true },
-  { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: true },
-  { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: true },
-  { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: true },
+  { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
+  { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
+  { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: 'hover' as const },
+  { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: 'hover' as const },
+  { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
 
 interface PortalNavbarProps {
@@ -113,7 +113,7 @@ export function PortalNavbar({
           <div className="ml-auto flex items-center gap-2">
             <PortalNavLink
               href="/portal/mensagens"
-              prefetch={true}
+              prefetch="hover"
               aria-label={
                 unreadMessages > 0
                   ? `Mensagens (${unreadMessages} não lidas)`
@@ -243,7 +243,7 @@ export function PortalNavbar({
             <nav className="space-y-1">
               <PortalNavLink
                 href="/portal/mensagens"
-                prefetch={true}
+                prefetch="hover"
                 onClick={() => setMenuOpen(false)}
                 className={mobileLinkClass(pathname.startsWith('/portal/mensagens'))}
               >

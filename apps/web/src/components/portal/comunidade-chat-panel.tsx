@@ -50,6 +50,7 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
+    if (!expanded) return
     let active = true
     async function carregar() {
       try {
@@ -63,11 +64,12 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
         if (active) setCarregando(false)
       }
     }
+    setCarregando(true)
     void carregar()
     return () => {
       active = false
     }
-  }, [])
+  }, [expanded])
 
   const naoLidas = conversas.reduce((acc, c) => acc + c.naoLidas, 0)
 

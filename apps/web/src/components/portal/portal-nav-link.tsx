@@ -2,12 +2,16 @@
 
 import Link from 'next/link'
 import { useLinkStatus } from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { NavLinkStatusReporter } from './nav-pending-context'
 
+export type PrefetchMode = boolean | 'hover'
+
 interface PortalNavLinkProps {
   href: string
-  prefetch?: boolean
+  prefetch?: PrefetchMode
   onClick?: () => void
   className: string
   children: React.ReactNode
@@ -28,8 +32,26 @@ export function PortalNavLink({
   children,
   showSpinner = true,
 }: PortalNavLinkProps) {
+  const router = useRouter()
+  const prefetched = useRef(false)
+
+  const prefetchOnIntent = useCallback(() => {
+    if (prefetch !== 'hover' || prefetched.current) return
+    prefetched.current = true
+    void router.prefetch(href)
+  }, [href, prefetch, router])
+
+  const linkPrefetch = prefetch === 'hover' ? false : prefetch
+
   return (
-    <Link href={href} prefetch={prefetch} onClick={onClick} className={className}>
+    <Link
+      href={href}
+      prefetch={linkPrefetch}
+      onClick={onClick}
+      onMouseEnter={prefetch === 'hover' ? prefetchOnIntent : undefined}
+      onFocus={prefetch === 'hover' ? prefetchOnIntent : undefined}
+      className={className}
+    >
       <NavLinkStatusReporter />
       <span className="flex items-center gap-1.5">
         {showSpinner && <LinkPendingSpinner />}

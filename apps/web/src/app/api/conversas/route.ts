@@ -8,6 +8,7 @@ import {
   getOrCreateDmConversa,
   listConversas,
   MAX_MEMBROS_GRUPO,
+  serializeConversasInbox,
 } from '@/lib/mensageria'
 import { assertPodeEnviarMensagens, assertUsuarioMensageria } from '@/lib/mensageria-api'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
@@ -32,15 +33,7 @@ export async function GET() {
   try {
     const { userId } = await assertUsuarioMensageria()
     const conversas = await listConversas(userId)
-    return NextResponse.json({
-      conversas: conversas.map((c) => ({
-        ...c,
-        atualizadoEm: c.atualizadoEm.toISOString(),
-        ultimaMensagem: c.ultimaMensagem
-          ? { ...c.ultimaMensagem, criadoEm: c.ultimaMensagem.criadoEm.toISOString() }
-          : null,
-      })),
-    })
+    return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao carregar conversas.'
     return NextResponse.json({ error: message }, { status: 400 })

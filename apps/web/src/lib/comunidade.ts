@@ -1,5 +1,18 @@
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
+
+export const COMUNICADOS_CACHE_TAG = 'comunicados-feed'
+
+export function comunicadosCacheTag(tenantId: string): string {
+  return `comunicados-${tenantId}`
+}
+
+/** Invalida cache de comunicados após publicação/edição no admin. */
+export function invalidateComunicadosCache(tenantId?: string): void {
+  revalidateTag(COMUNICADOS_CACHE_TAG, 'max')
+  if (tenantId) revalidateTag(comunicadosCacheTag(tenantId), 'max')
+}
 
 export interface ComunicadoFeedItem {
   id: string
@@ -35,6 +48,37 @@ const PESO_PRIORIDADE: Record<ComunicadoFeedItem['prioridade'], number> = {
   NORMAL: 0,
 }
 
+function sortComunicados(announcements: ComunicadoFeedItem[]): void {
+  announcements.sort((a, b) => {
+    const pesoA = PESO_PRIORIDADE[a.prioridade]
+    const pesoB = PESO_PRIORIDADE[b.prioridade]
+    if (pesoA !== pesoB) return pesoB - pesoA
+    if (a.fixado !== b.fixado) return a.fixado ? -1 : 1
+    return b.publicadoEm.getTime() - a.publicadoEm.getTime()
+  })
+}
+
+async function fetchComunicadosBase(tenantId: string): Promise<ComunicadoFeedItem[]> {
+  return unstable_cache(
+    async () => {
+      const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+      const announcements = (await db.announcement.findMany({
+        where: { tenantId: { in: tenantIds } },
+        orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
+        take: 30,
+        include: {
+          tenant: { select: { nome: true } },
+          autor: { select: { nome: true, avatarUrl: true } },
+        },
+      })) as ComunicadoFeedItem[]
+      sortComunicados(announcements)
+      return announcements
+    },
+    ['comunicados-feed', tenantId],
+    { revalidate: 120, tags: [COMUNICADOS_CACHE_TAG, comunicadosCacheTag(tenantId)] },
+  )()
+}
+
 /**
  * Feed de comunidade de um tenant: comunicados oficiais (próprios + herdados
  * de ancestrais, já que comunidade é um recurso PUBLICO na hierarquia) e
@@ -47,36 +91,30 @@ export async function getFeedComunidade(
   tenantId: string,
   opts: { takePosts?: number; userId?: string; visibleTenantIds?: string[] } = {},
 ): Promise<{ announcements: ComunicadoFeedItem[]; posts: PostFeedItem[] }> {
-  // comunidade é recurso PÚBLICO → inclui ancestrais (ver getVisibleTenantIds)
+  const wantPosts = opts.takePosts != null && opts.takePosts > 0
   const tenantIds =
     opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
   const tenantsExternos = tenantIds.filter((id) => id !== tenantId)
 
   const [announcements, posts] = await Promise.all([
-    db.announcement.findMany({
-      where: { tenantId: { in: tenantIds } },
-      orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
-      take: 30,
-      include: {
-        tenant: { select: { nome: true } },
-        autor: { select: { nome: true, avatarUrl: true } },
-      },
-    }) as Promise<ComunicadoFeedItem[]>,
-    db.post.findMany({
-      where: {
-        oculto: false,
-        OR: [
-          { tenantId },
-          { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' },
-        ],
-      },
-      orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
-      take: opts.takePosts,
-      include: {
-        tenant: { select: { nome: true } },
-        autor: { select: { nome: true, avatarUrl: true } },
-      },
-    }) as Promise<PostFeedItem[]>,
+    fetchComunicadosBase(tenantId),
+    wantPosts
+      ? (db.post.findMany({
+          where: {
+            oculto: false,
+            OR: [
+              { tenantId },
+              { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' },
+            ],
+          },
+          orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
+          take: opts.takePosts,
+          include: {
+            tenant: { select: { nome: true } },
+            autor: { select: { nome: true, avatarUrl: true } },
+          },
+        }) as Promise<PostFeedItem[]>)
+      : Promise.resolve([] as PostFeedItem[]),
   ])
 
   // Estado de leitura por usuário — calculado ANTES de qualquer marcação,
@@ -89,14 +127,6 @@ export async function getFeedComunidade(
     const lidosSet = new Set(lidos.map((l) => l.announcementId))
     for (const a of announcements) a.lido = lidosSet.has(a.id)
   }
-
-  announcements.sort((a, b) => {
-    const pesoA = PESO_PRIORIDADE[a.prioridade]
-    const pesoB = PESO_PRIORIDADE[b.prioridade]
-    if (pesoA !== pesoB) return pesoB - pesoA
-    if (a.fixado !== b.fixado) return a.fixado ? -1 : 1
-    return b.publicadoEm.getTime() - a.publicadoEm.getTime()
-  })
 
   return { announcements, posts }
 }

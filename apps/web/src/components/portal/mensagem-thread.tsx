@@ -25,6 +25,7 @@ import {
   type MensagemDto,
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -103,13 +104,8 @@ export function MensagemThread({
     )
   }, [conversaId, onLida])
 
-  // O shell monta este componente com key={conversa.id}, então cada conversa
-  // remonta o thread do zero — o estado inicial dos useState já cobre o reset.
-  useEffect(() => {
-    let active = true
-    lastCriadoEmRef.current = null
-
-    async function carregar(full: boolean) {
+  const carregar = useCallback(
+    async (full: boolean) => {
       if (document.visibilityState !== 'visible') return
       const after = lastCriadoEmRef.current
       const url =
@@ -118,7 +114,6 @@ export function MensagemThread({
           : `/api/conversas/${conversaId}/mensagens?full=1`
       try {
         const res = await fetch(url, { cache: 'no-store' })
-        if (!active) return
         if (!res.ok) {
           if (full) setErro('Não foi possível carregar a conversa.')
           return
@@ -140,20 +135,24 @@ export function MensagemThread({
       } catch {
         // polling silencioso
       } finally {
-        if (active && full) setCarregando(false)
+        if (full) setCarregando(false)
       }
-    }
+    },
+    [conversaId, marcarLida],
+  )
 
+  // O shell monta este componente com key={conversa.id}, então cada conversa
+  // remonta o thread do zero — o estado inicial dos useState já cobre o reset.
+  useEffect(() => {
+    setCarregando(true)
+    setErro(null)
+    lastCriadoEmRef.current = null
     void carregar(true)
     marcarLida()
-    const pollId = window.setInterval(() => void carregar(false), 4000)
-    const fullId = window.setInterval(() => void carregar(true), 20000)
-    return () => {
-      active = false
-      window.clearInterval(pollId)
-      window.clearInterval(fullId)
-    }
-  }, [conversaId, marcarLida])
+  }, [conversaId, carregar, marcarLida])
+
+  useVisibleInterval(() => void carregar(false), 4000)
+  useVisibleInterval(() => void carregar(true), 20000)
 
   function insertEmoji(emoji: string) {
     const el = inputRef.current

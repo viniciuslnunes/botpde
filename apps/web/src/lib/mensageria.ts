@@ -1,5 +1,6 @@
 import { Prisma } from '@torcida/db'
 import { db } from '@torcida/db'
+import type { InboxItemDto } from './mensageria-client'
 import { canFollowUser } from './social'
 
 /**
@@ -67,6 +68,17 @@ interface MembroAtivoRow {
     avatarUrl: string | null
     atualizadoEm: Date
   }
+}
+
+/** Formato JSON do inbox nas APIs e hidratação SSR do shell de mensagens. */
+export function serializeConversasInbox(conversas: ConversaInboxItem[]): InboxItemDto[] {
+  return conversas.map((c) => ({
+    ...c,
+    atualizadoEm: c.atualizadoEm.toISOString(),
+    ultimaMensagem: c.ultimaMensagem
+      ? { ...c.ultimaMensagem, criadoEm: c.ultimaMensagem.criadoEm.toISOString() }
+      : null,
+  }))
 }
 
 /** Formato JSON da mensagem nas APIs (datas ISO, conteúdo removido zerado). */
@@ -344,20 +356,23 @@ export async function listMensagens(
   opts: { after?: Date; take?: number } = {},
 ): Promise<MensagemItem[]> {
   const take = Math.min(opts.take ?? 100, 200)
-  const mensagens: MensagemItem[] = await db.mensagemDireta.findMany({
-    where: {
-      conversaId,
-      ...(opts.after ? { criadoEm: { gt: opts.after } } : {}),
-    },
-    orderBy: { criadoEm: 'asc' },
-    // Sem `after`, queremos as ÚLTIMAS `take`: busca desc e reverte
-    ...(opts.after ? { take } : {}),
+
+  if (opts.after) {
+    return db.mensagemDireta.findMany({
+      where: { conversaId, criadoEm: { gt: opts.after } },
+      orderBy: { criadoEm: 'asc' },
+      take,
+      select: MENSAGEM_SELECT,
+    })
+  }
+
+  const recentes: MensagemItem[] = await db.mensagemDireta.findMany({
+    where: { conversaId },
+    orderBy: { criadoEm: 'desc' },
+    take,
     select: MENSAGEM_SELECT,
   })
-  if (!opts.after && mensagens.length > take) {
-    return mensagens.slice(mensagens.length - take)
-  }
-  return mensagens
+  return recentes.reverse()
 }
 
 /** Cria mensagem e bumpa `atualizadoEm` da conversa (ordena a inbox). */

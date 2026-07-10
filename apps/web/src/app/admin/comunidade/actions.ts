@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { invalidateComunicadosCache } from '@/lib/comunidade'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 
@@ -204,6 +205,7 @@ export async function criarComunicado(
     },
   })
 
+  invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
@@ -250,6 +252,7 @@ export async function atualizarComunicado(
     },
   })
 
+  invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
@@ -276,6 +279,7 @@ export async function alternarFixadoComunicado(comunicadoId: string) {
     },
   })
 
+  invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
@@ -301,6 +305,7 @@ export async function excluirComunicado(comunicadoId: string) {
     },
   })
 
+  invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')

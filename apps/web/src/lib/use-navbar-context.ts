@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { NotificationItem } from '@/components/portal/notification-bell'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 
 interface NavbarContext {
   unreadMessages: number
@@ -48,6 +50,9 @@ function loadNavbarContext(force = false): Promise<NavbarContext> {
 }
 
 export function useNavbarContext() {
+  const pathname = usePathname()
+  const onMensagensPage = pathname.startsWith('/portal/mensagens')
+
   const [ctx, setCtx] = useState<NavbarContext>({
     unreadMessages: cached?.unreadMessages ?? 0,
     isAdmin: cached?.isAdmin ?? false,
@@ -60,9 +65,12 @@ export function useNavbarContext() {
 
   useEffect(() => {
     refresh()
-    const id = window.setInterval(() => refresh(), CACHE_MS)
-    return () => window.clearInterval(id)
   }, [refresh])
+
+  useVisibleInterval(() => {
+    if (onMensagensPage) return
+    refresh()
+  }, CACHE_MS)
 
   return { ...ctx, refresh }
 }
