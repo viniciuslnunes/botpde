@@ -45,6 +45,13 @@ export function MensagensShell({
   const [modal, setModal] = useState<Modal>('nenhum')
   const [carregando, setCarregando] = useState(initialConversas.length === 0)
 
+  useEffect(() => {
+    if (initialConversas.length > 0) {
+      setConversas(initialConversas)
+      setCarregando(false)
+    }
+  }, [initialConversas])
+
   const selecionada = conversas.find((c) => c.id === selecionadaId) ?? null
 
   const atualizarInbox = useCallback(async () => {

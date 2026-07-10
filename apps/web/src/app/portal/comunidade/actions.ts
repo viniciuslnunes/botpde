@@ -11,6 +11,7 @@ import { PERMISSIONS } from '@torcida/types'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const MAX_MIDIAS = 10
@@ -238,7 +239,48 @@ async function listarModeradoresIds(tenantId: string): Promise<string[]> {
   return [...new Set(rows.map((row) => row.userId))]
 }
 
-export async function comentarPost(postId: string, conteudo: string): Promise<void> {
+export interface ComentarioPostItem {
+  id: string
+  conteudo: string
+  criadoEm: string
+  autor: { id: string; nome: string | null; avatarUrl: string | null }
+}
+
+export async function listarComentariosPost(postId: string): Promise<ComentarioPostItem[]> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const post: { id: string } | null = await db.post.findFirst({
+    where: { id: postId, tenantId: { in: visibleIds }, oculto: false },
+    select: { id: true },
+  })
+  if (!post) throw new Error('Post não encontrado')
+
+  const rows: Array<{
+    id: string
+    conteudo: string
+    criadoEm: Date
+    autor: { id: string; nome: string | null; avatarUrl: string | null }
+  }> = await db.comentario.findMany({
+    where: { postId },
+    orderBy: { criadoEm: 'asc' },
+    take: 100,
+    include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
+  })
+
+  return rows.map((c) => ({
+    id: c.id,
+    conteudo: c.conteudo,
+    criadoEm: c.criadoEm.toISOString(),
+    autor: c.autor,
+  }))
+}
+
+export async function comentarPost(
+  postId: string,
+  conteudo: string,
+): Promise<ComentarioPostItem> {
   const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
   await assertMembroAtivo(tenant.id, session.user.id)
 
@@ -251,14 +293,16 @@ export async function comentarPost(postId: string, conteudo: string): Promise<vo
   }
   registrarAcaoEngajamento(limiterKey)
 
+  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
   const post = await db.post.findFirst({
-    where: { id: parsed.data.postId, tenantId: tenant.id, oculto: false },
-    select: { id: true, autorId: true, titulo: true },
+    where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
+    select: { id: true, autorId: true, titulo: true, tenantId: true },
   })
   if (!post) throw new Error('Post não encontrado')
 
   const comentario = await db.comentario.create({
     data: { postId: post.id, autorId: session.user.id, conteudo: parsed.data.conteudo },
+    include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
   })
 
   if (post.autorId !== session.user.id) {
@@ -285,6 +329,13 @@ export async function comentarPost(postId: string, conteudo: string): Promise<vo
 
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
+
+  return {
+    id: comentario.id,
+    conteudo: comentario.conteudo,
+    criadoEm: comentario.criadoEm.toISOString(),
+    autor: comentario.autor,
+  }
 }
 
 export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA'): Promise<void> {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
@@ -47,35 +47,42 @@ interface ComunidadeChatPanelProps {
 export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
-  const [carregando, setCarregando] = useState(true)
+  const [carregando, setCarregando] = useState(false)
+  const carregouRef = useRef(false)
 
+  const carregar = useCallback(async (mostrarSkeleton: boolean) => {
+    if (mostrarSkeleton) setCarregando(true)
+    try {
+      const res = await fetch('/api/conversas', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as { conversas?: InboxItemDto[] }
+      if (data.conversas) setConversas(data.conversas)
+    } catch {
+      // silencioso
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+
+  // Badge + dados iniciais sem esperar expandir
   useEffect(() => {
-    if (!expanded) return
-    let active = true
-    async function carregar() {
-      try {
-        const res = await fetch('/api/conversas', { cache: 'no-store' })
-        if (!res.ok || !active) return
-        const data = (await res.json()) as { conversas?: InboxItemDto[] }
-        if (data.conversas) setConversas(data.conversas)
-      } catch {
-        // silencioso
-      } finally {
-        if (active) setCarregando(false)
-      }
-    }
-    setCarregando(true)
-    void carregar()
-    return () => {
-      active = false
-    }
-  }, [expanded])
+    void carregar(!carregouRef.current)
+    carregouRef.current = true
+  }, [carregar])
+
+  // Ao reexpandir, atualiza em background sem desmontar o shell
+  useEffect(() => {
+    if (!expanded || !carregouRef.current) return
+    void carregar(false)
+  }, [expanded, carregar])
 
   const naoLidas = conversas.reduce((acc, c) => acc + c.naoLidas, 0)
 
   const toggleExpanded = useCallback(() => {
     setStoredExpanded(!getSnapshot())
   }, [])
+
+  const shellPronto = conversas.length > 0 || !carregando
 
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
@@ -111,20 +118,19 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
         </Link>
       </div>
 
-      {expanded && (
-        <div className="p-2">
-          {carregando ? (
-            <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
-          ) : (
-            <MensagensShell
-              variant="embedded"
-              initialConversas={conversas}
-              initialSelecionadaId={null}
-              currentUserId={currentUserId}
-            />
-          )}
-        </div>
-      )}
+      {/* Mantém o shell montado — evita perder estado e refetch lento ao colapsar/expandir */}
+      <div className={expanded ? 'p-2' : 'hidden'} aria-hidden={!expanded}>
+        {!shellPronto ? (
+          <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
+        ) : (
+          <MensagensShell
+            variant="embedded"
+            initialConversas={conversas}
+            initialSelecionadaId={null}
+            currentUserId={currentUserId}
+          />
+        )}
+      </div>
     </div>
   )
 }
