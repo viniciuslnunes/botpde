@@ -4,7 +4,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
-import { ComunidadeFeedSection } from './_components/comunidade-feed-section'
+import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 
 const ComunidadeChatPanel = dynamic(
@@ -18,25 +18,6 @@ const ComunidadeChatPanel = dynamic(
 )
 
 export const metadata: Metadata = { title: 'Comunidade' }
-
-function FeedFallback() {
-  return (
-    <>
-      <aside className="hidden lg:block">
-        <div className="sticky top-20 space-y-4">
-          <div className="h-20 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-          <div className="h-32 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-        </div>
-      </aside>
-      <main className="min-w-0 space-y-4">
-        <div className="h-24 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-36 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-        ))}
-      </main>
-    </>
-  )
-}
 
 function SalasFallback() {
   return <div className="h-40 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
@@ -59,13 +40,11 @@ export default async function ComunidadePage({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
-      <Suspense fallback={<FeedFallback />}>
-        <ComunidadeFeedSection
-          tenant={{ id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId }}
-          currentUser={currentUser}
-          cursor={params.cursor}
-        />
-      </Suspense>
+      <ComunidadeFeedShell
+        tenant={{ id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId }}
+        currentUser={currentUser}
+        cursor={params.cursor}
+      />
 
       <aside className="hidden xl:block">
         <div className="sticky top-20 space-y-4">

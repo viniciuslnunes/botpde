@@ -32,6 +32,7 @@ export function MensagensShell({
   const [conversas, setConversas] = useState<InboxItemDto[]>(initialConversas)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(initialSelecionadaId)
   const [modal, setModal] = useState<Modal>('nenhum')
+  const [carregando, setCarregando] = useState(initialConversas.length === 0)
 
   const selecionada = conversas.find((c) => c.id === selecionadaId) ?? null
 
@@ -40,11 +41,24 @@ export function MensagensShell({
       const res = await fetch('/api/conversas', { cache: 'no-store' })
       if (!res.ok) return
       const data = (await res.json()) as { conversas?: InboxItemDto[] }
-      if (data.conversas) setConversas(data.conversas)
+      if (data.conversas) {
+        setConversas(data.conversas)
+        if (initialSelecionadaId && data.conversas.some((c) => c.id === initialSelecionadaId)) {
+          setSelecionadaId(initialSelecionadaId)
+        }
+      }
     } catch {
       // polling silencioso
+    } finally {
+      setCarregando(false)
     }
-  }, [])
+  }, [initialSelecionadaId])
+
+  useEffect(() => {
+    if (initialConversas.length === 0) {
+      void atualizarInbox()
+    }
+  }, [initialConversas.length, atualizarInbox])
 
   useVisibleInterval(() => void atualizarInbox(), 15000)
 
@@ -113,7 +127,19 @@ export function MensagensShell({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {conversas.length === 0 ? (
+          {carregando ? (
+            <div className="animate-pulse space-y-3 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-[rgb(var(--border))]" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 rounded bg-[rgb(var(--border))]" />
+                    <div className="h-2 w-full rounded bg-[rgb(var(--border))]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : conversas.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
               <MessagesSquare className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
               <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">

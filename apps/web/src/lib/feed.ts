@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getVisibleTenantIds } from './hierarquia'
@@ -106,26 +107,15 @@ function sortPostsDesc(a: { criadoEm: Date }, b: { criadoEm: Date }): number {
   return b.criadoEm.getTime() - a.criadoEm.getTime()
 }
 
-export async function getFeedPersonalizado(
+export const getPostsParaFeed = cache(async function getPostsParaFeed(
   tenantId: string,
-  userId?: string,
+  userId: string | undefined,
   opts: FeedOpts = {},
-): Promise<FeedPersonalizadoResult> {
+): Promise<Pick<FeedPersonalizadoResult, 'postsSeguindo' | 'postsSugeridos' | 'pageInfo'>> {
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
-
-  const noticias =
-    opts.afiliacaoId != null && opts.afiliacaoId !== ''
-      ? await getNoticiasAprovadas(opts.afiliacaoId)
-      : []
-
-  const { announcements } = await getFeedComunidade(tenantId, {
-    userId,
-    takePosts: 0,
-    visibleTenantIds,
-  })
 
   if (!userId) {
     const sugeridosRaw = (await db.post.findMany({
@@ -141,14 +131,11 @@ export async function getFeedPersonalizado(
       include: postInclude(),
     })) as PostRaw[]
     const sugeridos: PostSocialItem[] = sugeridosRaw.map(projetarPost)
-
     const slice = sugeridos.slice(0, take)
     const hasMore = sugeridos.length > take
     return {
-      announcements,
       postsSeguindo: [],
       postsSugeridos: slice,
-      noticias,
       pageInfo: {
         hasMore,
         nextCursor: hasMore && slice.length > 0 ? encodeCursor(slice[slice.length - 1]) : null,
@@ -160,10 +147,7 @@ export async function getFeedPersonalizado(
     where: { seguidorId: userId, status: 'APROVADO' },
     select: { seguidoId: true },
   })
-  const seguindoIds = seguindo.map((s) => s.seguidoId)
-  // A rede pessoal do feed é VOCÊ + quem você segue. Incluir o próprio usuário
-  // garante que suas publicações apareçam no feed (não só no perfil).
-  const redeIds = [userId, ...seguindoIds]
+  const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
   const redeSet = new Set(redeIds)
 
   const [pessoalRaw, descobertaRaw] = await Promise.all([
@@ -194,7 +178,6 @@ export async function getFeedPersonalizado(
     }) as Promise<PostRaw[]>,
   ])
 
-  // União por recência, dedupe, e uma única página de `take` posts.
   const dedup = new Map<string, PostSocialItem>()
   for (const post of [...pessoalRaw, ...descobertaRaw].map(projetarPost)) {
     if (!dedup.has(post.id)) dedup.set(post.id, post)
@@ -204,15 +187,41 @@ export async function getFeedPersonalizado(
   const pagina = ordenados.slice(0, take)
   const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
 
-  // Mantém o contrato de dois baldes; os consumidores concatenam ambos.
-  const postsSeguindo = pagina.filter((post) => redeSet.has(post.autorId))
-  const postsSugeridos = pagina.filter((post) => !redeSet.has(post.autorId))
+  return {
+    postsSeguindo: pagina.filter((post) => redeSet.has(post.autorId)),
+    postsSugeridos: pagina.filter((post) => !redeSet.has(post.autorId)),
+    pageInfo: { nextCursor, hasMore },
+  }
+})
+
+export const getComunicadosParaFeed = cache(async function getComunicadosParaFeed(tenantId: string, userId?: string) {
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const { announcements } = await getFeedComunidade(tenantId, {
+    userId,
+    takePosts: 0,
+    visibleTenantIds,
+  })
+  return announcements
+})
+
+export async function getFeedPersonalizado(
+  tenantId: string,
+  userId?: string,
+  opts: FeedOpts = {},
+): Promise<FeedPersonalizadoResult> {
+  const [noticias, announcements, posts] = await Promise.all([
+    opts.afiliacaoId != null && opts.afiliacaoId !== ''
+      ? getNoticiasAprovadas(opts.afiliacaoId)
+      : Promise.resolve([] as NoticiaAprovadaItem[]),
+    getComunicadosParaFeed(tenantId, userId),
+    getPostsParaFeed(tenantId, userId, opts),
+  ])
 
   return {
     announcements,
-    postsSeguindo,
-    postsSugeridos,
+    postsSeguindo: posts.postsSeguindo,
+    postsSugeridos: posts.postsSugeridos,
     noticias,
-    pageInfo: { nextCursor, hasMore },
+    pageInfo: posts.pageInfo,
   }
 }
