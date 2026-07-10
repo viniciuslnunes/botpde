@@ -31,7 +31,7 @@ export default async function CadastroPage() {
   ])
 
   // Cadastro aprovado → redireciona para o portal
-  if (membro?.status === 'APROVADO') redirect('/portal')
+  if (membro?.status === 'APROVADO') redirect('/portal/comunidade')
 
   // Cadastro pendente → mostra aviso, não o formulário
   if (membro?.status === 'PENDENTE') {

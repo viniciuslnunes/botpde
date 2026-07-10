@@ -5,12 +5,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
-  Home,
   CreditCard,
   Calendar,
   ShoppingBag,
   Users,
-  Video,
   MapPin,
   MessageCircle,
   Shield,
@@ -23,13 +21,11 @@ import {
 import { NotificationBell, type NotificationItem } from '@/components/portal/notification-bell'
 
 const navLinks = [
-  { href: '/portal', label: 'Início', icon: Home, exact: true },
+  { href: '/portal/comunidade', label: 'Comunidade', icon: Users },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard },
   { href: '/portal/eventos', label: 'Eventos', icon: Calendar },
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag },
-  { href: '/portal/comunidade', label: 'Comunidade', icon: Users },
-  { href: '/portal/comunidade/salas', label: 'Salas', icon: Video },
 ]
 
 interface PortalNavbarProps {
@@ -58,7 +54,6 @@ export function PortalNavbar({
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
 
   function isActive(link: (typeof navLinks)[number]) {
-    if (link.exact) return pathname === link.href
     return pathname.startsWith(link.href)
   }
 
@@ -67,7 +62,7 @@ export function PortalNavbar({
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
 
         {/* Logo / Tenant */}
-        <Link href="/portal" className="flex shrink-0 items-center gap-2">
+        <Link href="/portal/comunidade" className="flex shrink-0 items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
             style={{ backgroundColor: tenantCor }}

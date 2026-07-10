@@ -21,7 +21,7 @@ export default auth((req) => {
 
   // Usuário autenticado tentando acessar /entrar → redireciona para portal
   if (pathname === '/entrar') {
-    return NextResponse.redirect(new URL('/portal', req.url))
+    return NextResponse.redirect(new URL('/portal/comunidade', req.url))
   }
 
   return NextResponse.next()

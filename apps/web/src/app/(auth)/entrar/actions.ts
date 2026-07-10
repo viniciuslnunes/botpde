@@ -27,7 +27,7 @@ export async function entrarComSenha(
   try {
     // Em caso de sucesso, signIn() lança um redirect (NEXT_REDIRECT) que sai
     // desta função pelo `throw error` abaixo.
-    await signIn('credentials', { email, password: senha, redirectTo: '/portal' })
+    await signIn('credentials', { email, password: senha, redirectTo: '/portal/comunidade' })
   } catch (error) {
     // AuthError = falha de autenticação real (e-mail/senha inválidos, ou
     // rate-limit excedido — authorize() retorna null nos dois casos).
@@ -86,6 +86,6 @@ export async function criarContaComSenha(
   const senhaHash = await bcrypt.hash(senha, 10)
   await db.user.create({ data: { nome, email, senhaHash } })
 
-  await signIn('credentials', { email, password: senha, redirectTo: '/portal' })
+  await signIn('credentials', { email, password: senha, redirectTo: '/portal/comunidade' })
   return {}
 }

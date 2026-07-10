@@ -16,6 +16,7 @@ interface MensagensShellProps {
   initialConversas: InboxItemDto[]
   initialSelecionadaId: string | null
   currentUserId: string
+  variant?: 'full' | 'embedded'
 }
 
 type Modal = 'nenhum' | 'dm' | 'grupo'
@@ -24,7 +25,9 @@ export function MensagensShell({
   initialConversas,
   initialSelecionadaId,
   currentUserId,
+  variant = 'full',
 }: MensagensShellProps) {
+  const embedded = variant === 'embedded'
   const [conversas, setConversas] = useState<InboxItemDto[]>(initialConversas)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(initialSelecionadaId)
   const [modal, setModal] = useState<Modal>('nenhum')
@@ -70,12 +73,21 @@ export function MensagensShell({
   }
 
   return (
-    <div className="flex h-[calc(100vh-8.5rem)] min-h-[24rem] overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+    <div
+      className={[
+        'flex overflow-hidden bg-[rgb(var(--surface))]',
+        embedded
+          ? 'h-[min(28rem,calc(100vh-12rem))] min-h-[16rem] rounded-xl border border-[rgb(var(--border))]'
+          : 'h-[calc(100vh-8.5rem)] min-h-[24rem] rounded-2xl border border-[rgb(var(--border))]',
+      ].join(' ')}
+    >
       {/* Coluna: inbox */}
       <div
         className={[
-          'w-full flex-col border-r border-[rgb(var(--border))] md:flex md:w-80 md:shrink-0',
-          selecionada ? 'hidden' : 'flex',
+          embedded ? 'w-full' : 'w-full md:w-80 md:shrink-0',
+          'flex-col border-r border-[rgb(var(--border))]',
+          embedded ? 'flex' : 'md:flex',
+          selecionada ? (embedded ? 'hidden' : 'hidden md:flex') : 'flex',
         ].join(' ')}
       >
         <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
@@ -174,7 +186,13 @@ export function MensagensShell({
       </div>
 
       {/* Coluna: thread */}
-      <div className={['min-w-0 flex-1 flex-col md:flex', selecionada ? 'flex' : 'hidden'].join(' ')}>
+      <div
+        className={[
+          'min-w-0 flex-1 flex-col',
+          embedded ? 'flex' : 'md:flex',
+          selecionada ? 'flex' : embedded ? 'hidden' : 'hidden md:flex',
+        ].join(' ')}
+      >
         {selecionada ? (
           <MensagemThread
             key={selecionada.id}
@@ -185,15 +203,17 @@ export function MensagensShell({
             onSaiu={removerDaLista}
           />
         ) : (
-          <div className="hidden h-full flex-col items-center justify-center px-6 text-center md:flex">
-            <MessagesSquare className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-              Selecione uma conversa
-            </p>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Ou comece uma nova com um membro da torcida.
-            </p>
-          </div>
+          !embedded && (
+            <div className="hidden h-full flex-col items-center justify-center px-6 text-center md:flex">
+              <MessagesSquare className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
+              <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
+                Selecione uma conversa
+              </p>
+              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                Ou comece uma nova com um membro da torcida.
+              </p>
+            </div>
+          )
         )}
       </div>
 
