@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { solicitarCadastro, type CadastroState } from '@/app/portal/cadastro/actions'
 import { UserCircle2, Phone, MapPin, Tv2, ChevronRight, Building2 } from 'lucide-react'
-import { FieldError, Input, Select, SubmitButton } from '@torcida/ui'
+import { FieldError, Input, Select, SubmitButton, hexToRgb } from '@torcida/ui'
 
 const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
@@ -205,7 +205,7 @@ export function CadastroForm({
         </div>
       )}
 
-      <div className="pt-2" style={{ '--color-primary': corPrimaria } as React.CSSProperties}>
+      <div className="pt-2" style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>
         <SubmitButton
           label="Enviar solicitação"
           pendingLabel="Enviando..."

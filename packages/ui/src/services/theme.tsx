@@ -24,10 +24,10 @@ export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
   useEffect(() => {
-    // Injeta a cor do tenant como CSS custom property no :root
-    document.documentElement.style.setProperty('--color-primary', cor)
-    // Gera variações de luminosidade para hover/active states
-    document.documentElement.style.setProperty('--color-primary-raw', hexToRgb(cor))
+    // --color-primary é consumida como `rgb(var(--color-primary))` em todo o
+    // app (ver globals.css) — precisa ser canais RGB, não o hex puro.
+    document.documentElement.style.setProperty('--color-primary', hexToRgb(cor))
+    document.documentElement.style.setProperty('--color-primary-raw', cor)
   }, [cor])
 
   return (
@@ -48,7 +48,7 @@ export function useTenantTheme() {
   return useContext(TenantThemeContext)
 }
 
-function hexToRgb(hex: string): string {
+export function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)

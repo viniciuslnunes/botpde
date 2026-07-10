@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { criarContaComSenha, type ContaState } from '../actions'
 import { UserCircle2, Mail, Lock, ChevronRight } from 'lucide-react'
-import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { FieldError, Input, SubmitButton, hexToRgb } from '@torcida/ui'
 
 export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
   const [state, action] = useActionState<ContaState, FormData>(criarContaComSenha, {})
@@ -57,7 +57,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
         <FieldError errors={state.errors?.confirmarSenha} />
       </div>
 
-      <div className="pt-2" style={{ '--color-primary': corPrimaria } as React.CSSProperties}>
+      <div className="pt-2" style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>
         <SubmitButton
           label="Criar conta"
           pendingLabel="Criando..."

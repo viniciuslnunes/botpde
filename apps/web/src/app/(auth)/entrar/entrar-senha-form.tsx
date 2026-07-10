@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { entrarComSenha, type LoginSenhaState } from './actions'
 import { Mail, Lock, ChevronRight } from 'lucide-react'
-import { Input, SubmitButton } from '@torcida/ui'
+import { Input, SubmitButton, hexToRgb } from '@torcida/ui'
 import Link from 'next/link'
 
 export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
@@ -34,7 +34,7 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
           <Input id="senha" name="senha" type="password" placeholder="Sua senha" required />
         </div>
 
-        <div style={{ '--color-primary': corPrimaria } as React.CSSProperties}>
+        <div style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>
           <SubmitButton
             label="Entrar com e-mail"
             pendingLabel="Entrando..."

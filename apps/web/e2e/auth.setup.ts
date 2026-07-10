@@ -8,6 +8,10 @@ const AUTH_FILE = path.join(__dirname, '.auth/user.json')
  * (Google bloqueia login em browser controlado por automação; Discord exige
  * autorização manual a cada sessão). Credenciais só em E2E_TEST_EMAIL/
  * E2E_TEST_PASSWORD (apps/web/.env.local, nunca commitado).
+ *
+ * Requer ROOT_DOMAIN comentado em .env.local (modo single-tenant) — com
+ * ROOT_DOMAIN=lvh.me setado, o cookie de sessão usa Domain=.lvh.me, que o
+ * navegador rejeita em localhost:3000 e a sessão nunca é persistida.
  */
 setup('autenticar usuário de teste', async ({ page }) => {
   const email = process.env.E2E_TEST_EMAIL
@@ -23,6 +27,14 @@ setup('autenticar usuário de teste', async ({ page }) => {
   await page.locator('#senha').fill(senha)
   await page.getByRole('button', { name: /entrar com e-mail/i }).click()
   await page.waitForURL('**/portal')
+
+  const cookies = await page.context().cookies()
+  if (!cookies.some((c) => c.name.includes('session-token'))) {
+    throw new Error(
+      'Login concluiu mas a sessão não persistiu — confirme que ROOT_DOMAIN está comentado ' +
+        'em apps/web/.env.local (ver apps/web/e2e/README.md).',
+    )
+  }
 
   await page.context().storageState({ path: AUTH_FILE })
 })

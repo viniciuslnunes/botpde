@@ -5,8 +5,8 @@ test('feed da comunidade + composer', async ({ page }) => {
   await page.goto('/portal/comunidade')
   await snapshot(page, 'comunidade', '01-feed')
 
-  const composer = page.getByRole('textbox').first()
-  await composer.click()
+  const composerTrigger = page.getByRole('button', { name: /No que você tá pensando/i })
+  await composerTrigger.click()
   await snapshot(page, 'comunidade', '02-composer-expandido')
 })
 
