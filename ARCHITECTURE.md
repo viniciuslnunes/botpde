@@ -468,12 +468,46 @@ Por que Playwright (test suite) e não um MCP de browser dedicado:
 - O repo já usa Vitest como padrão de teste; Playwright é o par natural para
   e2e/visual, sem introduzir um novo protocolo de integração.
 - Login é OAuth (Discord/Google) + e-mail/senha — sem credencial de teste
-  seedada. Em vez de automatizar OAuth em CI (frágil), a suíte reusa uma
-  `storageState` capturada uma vez manualmente (`test:e2e:login`), padrão
-  recomendado do próprio Playwright para apps com OAuth.
+  seedada em produção, mas a suíte usa um usuário de teste real via Credentials
+  (e-mail/senha em `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`, `apps/web/.env.local`,
+  nunca commitado). Login 100% automático via projeto `setup`
+  (`apps/web/e2e/auth.setup.ts`) a cada `test:e2e` — não depende de captura
+  manual. Google bloqueia login em browser controlado por automação; Discord
+  exigiria reautorizar a cada sessão — por isso Credentials, não OAuth, na
+  captura automática (login social continua igual para usuários reais).
 - Continua valendo usar `claude-in-chrome`/preview tools para exploração pontual
   interativa; a suíte Playwright é para captura em lote, comparável entre
   execuções.
+
+### 5.6 Dois bugs achados via a captura visual (2026-07-10)
+
+**Bug 1 — CTA invisível em `/entrar` e `/entrar/criar-conta` (corrigido).**
+Causa raiz: `ThemeProvider` (`packages/ui/src/services/theme.tsx`) gravava
+`--color-primary` com o hex puro do tenant em vez de canais RGB — quebrando
+**todo** consumidor de `rgb(var(--color-primary))` no app assim que o JS do
+cliente rodava (não só o botão do login: badges, inputs, `sala-enquete`,
+`sala-chat`, `meet-room.css` etc. usam o mesmo padrão). Corrigido na origem
+(usa o `hexToRgb` já existente, agora exportado por `@torcida/ui`) + nos 3
+pontos que reinjetavam `--color-primary` localmente com hex puro
+(`entrar-senha-form.tsx`, `criar-conta-form.tsx`, `cadastro-form.tsx`).
+Achado, não resolvido aqui: `ThemeProvider` nunca recebe a prop `tenant` em
+`app/layout.tsx` — a cor por tenant hoje só existe via cálculo manual
+duplicado em páginas individuais (`/entrar` computa `cor` direto do
+tenant fetchado), não via este mecanismo central. Não corrigido nesta
+rodada (fora do escopo dos 2 bugs reportados).
+
+**Bug 2 — sessão de e-mail/senha "não persistia" (não era bug de app).**
+Investigação longa (Turbopack vs. webpack, matcher do middleware, `redirect:
+false` + hard navigation) até achar a causa real via `response.headersArray()`
+do Playwright: `ROOT_DOMAIN=lvh.me` estava ativo em `apps/web/.env.local`
+enquanto se testava em `localhost:3000` — o cookie de sessão saía com
+`Domain=.lvh.me`, que o navegador descarta silenciosamente fora desse domínio
+(mesma causa-raiz de uma sessão anterior de debug, reintroduzida ao reiniciar
+o servidor manualmente). **Não é bug de código** — `ROOT_DOMAIN` e
+`localhost:3000` são incompatíveis por design (cookie de sessão cross-subdomínio
+exige o domínio real). `.env.local` agora documenta isso inline. Se voltar a
+acontecer: suspeitar primeiro de `ROOT_DOMAIN` antes de investigar
+NextAuth/Next.js.
 
 ## 6. Itens em aberto (aguardando decisão)
 
@@ -518,9 +552,12 @@ Por que Playwright (test suite) e não um MCP de browser dedicado:
   `formatRelative` em `lib/format-datetime.ts`. Salas/Perfil/Solicitações
   alinhados ao mesmo visual. `marcarComunicadosLidos` no feed virou best-effort
   (try/catch) para não derrubar a página.
-- **Item 27 — Mensageria da comunidade (plano fechado 2026-07-08, M1 em implementação).**
-  Visão do usuário para "conversar/criar comunidades", que o redesenho acima
-  ainda NÃO cobre. Decisões fechadas com o usuário (2026-07-08):
+- **Item 27 — Mensageria da comunidade (plano fechado 2026-07-08; ✅ M1 entregue 2026-07-10).**
+  M1 (DM 1×1 + Grupos) em produção: schema aplicado via `db:push`,
+  `repair-system-role-permissions` rodado (6 cargos corrigidos), verificação
+  E2E 15/15 contra o servidor real (login, DM, grupo, polling, não-lidas,
+  bloqueio, proteção de último admin, rejeição de anexo hostil).
+  Decisões fechadas com o usuário (2026-07-08):
   - **Tempo-real: polling** (~2s, mesmo padrão do `SalaChat` das salas de
     vídeo) — zero infra nova; evoluir p/ SSE/serviço só com demanda real.
   - **Alcance de DM: mesmo tenant + aliados** (`self/ancestor/descendant/allied`
