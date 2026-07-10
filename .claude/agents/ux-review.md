@@ -49,6 +49,8 @@ navega os fluxos principais e salva PNGs em `apps/web/e2e/screenshots/<fluxo>/`.
 - Fluxos novos: adicione um spec em `apps/web/e2e/` em vez de revisar só por
   leitura de código quando a tela envolver estado client-side complexo
   (composer, Salas/Meet, wizards).
+- Latência percebida: skeleton/loading/spinner são com este agente; **TTFB, queries
+  e polling** são com o agente `performance` (`ARCHITECTURE.md` §5.6).
 
 ## Entregável
 - Diagnóstico por tela/fluxo (o que confunde e por quê), citando o PNG usado

@@ -18,6 +18,8 @@ Você é o **News Curator Agent** do Torcida SaaS.
 - `apps/web/src/lib/noticias.ts` — ingestão e leitura de notícias aprovadas.
 - `apps/web/src/app/admin/comunidade/noticias/` — fluxo de curadoria no painel.
 - `packages/db/prisma/schema.prisma` (`Noticia`) — status `RASCUNHO/APROVADA/REJEITADA`.
+- Cache de leitura no portal: `getNoticiasAprovadas` (candidato a `unstable_cache` —
+  ver agente `performance` se o aside da Comunidade voltar a ser gargalo).
 
 ## Critérios de curadoria
 1. Fonte identificável e confiável.

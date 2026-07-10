@@ -29,6 +29,7 @@ operacional (sem gateway de pagamento) da plataforma.
 | Hierarquia | `apps/web/src/lib/hierarquia.ts` (`getVisibleTenantIds`, `resolveVisibility`) |
 | Seed demo | `packages/db/scripts/seed-loja-gavioes.js` |
 | Testes | `apps/web/src/lib/__tests__/loja.test.ts` |
+| Imagens catálogo | `produto-card-imagem.tsx`, `optimizable-image.ts` — ver `ARCHITECTURE.md` §5.6 |
 | Server actions doc | `docs/api/server-actions.html` (seções loja-portal, loja-admin) |
 
 ## Modelo mental

@@ -14,6 +14,7 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 | `data-model` | Propor/validar entidades Prisma e integridade | opus |
 | `rbac` | Permissões, autorização e visibilidade cross-tenant | opus |
 | `loja` | Catálogo, sacola, checkout, cupons, pedidos e estoque | opus |
+| `performance` | Auditar latência, queries, cache, bundle e polling; planejar otimizações zero-custo | opus |
 | `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual; captura PNGs reais via Playwright, ver `apps/web/e2e/README.md`) | opus |
 | `qa-verification` | Verificar antes de dar como pronto; rodar Vitest | opus |
 | `implementation` | Codificar o combinado, com escopo mínimo | **fable** |
@@ -25,9 +26,20 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 2. **Recortar** → `product-strategy` decide escopo e fase.
 3. **Modelar** → `data-model` (dados) + `rbac` (acesso/visibilidade); para loja, também `loja`.
 4. **Desenhar** → `ux-review` valida jornada e estados.
-5. **Fechar plano** (Opus) → aprovação humana.
-6. **Implementar** → `implementation` (Fable) segue `CLAUDE.md`.
-7. **Verificar** → `qa-verification` confere DoD e roda testes.
+5. **Performance** (quando relevante) → `performance` audita impacto em TTFB/queries antes de fechar plano em páginas pesadas, feeds ou polling novo.
+6. **Fechar plano** (Opus) → aprovação humana.
+7. **Implementar** → `implementation` (Fable) segue `CLAUDE.md`.
+8. **Verificar** → `qa-verification` confere DoD e roda testes.
+
+## Performance (plano concluído — manutenção contínua)
+
+As Fases 1–5 de otimização web estão documentadas em `ARCHITECTURE.md` §5.6
+(commits `99443a7` → `82ae6f3`). Use o agente `performance` para:
+- validar que uma feature nova não reintroduz N+1 ou prefetch agressivo;
+- propor recortes quando navegação ou demo voltarem a degradar;
+- decidir se o próximo passo é código ou infra (pooler, CDN, etc.).
+
+Não há “Fase 6 grátis” planejada — ganhos adicionais exigem mudança arquitetural.
 
 ## Princípios
 
@@ -35,3 +47,4 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 - Escopo mínimo e seguro; reutilizar o que já existe.
 - Autorização sempre no servidor; auditar toda mutação.
 - Cada feature justificada pelo domínio — nada de recurso "bonito" sem valor.
+- Performance: medir antes de otimizar; preservar cache, Suspense e `useVisibleInterval`.

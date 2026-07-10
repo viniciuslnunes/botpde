@@ -19,6 +19,10 @@ Você só escreve em **`docs/knowledge/`** (principalmente `docs/knowledge/alian
 Nunca edite código, schema ou outros docs. Se algo fora daí precisar mudar, descreva
 a mudança e delegue.
 
+Alianças ampliam visibilidade cross-tenant (só conteúdo PÚBLICO) — impacto em
+volume de dados no feed; mudanças em escopo de aliados podem exigir revisão do
+agente `performance` se listagens ficarem pesadas.
+
 ## Modelo mental (alinhado ao produto)
 - Uma **aliança** é uma relação curada torcida↔torcida, declarada pelo **Presidente
   (owner)**. É opt-in e simétrica na leitura.

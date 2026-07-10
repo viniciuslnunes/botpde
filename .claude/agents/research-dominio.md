@@ -20,7 +20,8 @@ SaaS operacional multi-tenant (hierarquia Sede → Subsede → PDE) evoluindo pa
 comunidade com aliados, informação confiável do nicho e importação da base real de
 associados. Foco: utilidade real para a torcida, governança, precisão de informação.
 Reuniões ao vivo (Salas/Meet) já existem como alavanca de engajamento síncrono —
-relevante ao pensar mobilização e comunidade.
+relevante ao pensar mobilização e comunidade. Performance web do portal está
+documentada em `ARCHITECTURE.md` §5.6 (plano concluído).
 
 ## Como trabalhar
 1. Enquadre a pergunta em termos do domínio (operação, mobilização, comunidade,

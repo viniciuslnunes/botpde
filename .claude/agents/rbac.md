@@ -31,6 +31,8 @@ Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de ac
 - `owner` = wildcard `*`; `admin` = tudo menos `SETTINGS_MANAGE`.
 - Visibilidade: `self`/`ancestor` veem tudo; `descendant` vê só PÚBLICO; `unrelated` não
   vê nada. **Alianças** adicionam `'allied'` → só PÚBLICO, jamais restrito.
+- Cache de dados (`unstable_cache`) **não substitui** checagem de permissão no request
+  de mutação — só acelera leituras já públicas ou pós-gate.
 
 ## Exemplo de referência: módulo Salas (Meet)
 Uma única permissão, `MEETINGS_HOST` (`meetings:host`, grupo Comunidade), autoriza criar/

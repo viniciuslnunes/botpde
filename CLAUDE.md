@@ -2,6 +2,7 @@
 
 Guia curto para trabalhar neste repositório. Detalhe arquitetural em `ARCHITECTURE.md`;
 produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`).
+Performance web: `ARCHITECTURE.md` §5.6; agente `performance` para auditorias novas.
 
 ## O que é
 
@@ -52,6 +53,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Visibilidade**: use `resolveVisibility`/`canViewRecurso` de `packages/types/src/visibility.js`.
   `self`/`ancestor` = tudo; `descendant` e `allied` = só PÚBLICO; `unrelated` = nada.
 - **UX**: cubra estados de vazio, erro e loading.
+- **Performance** (páginas com muitas queries, feed ou polling): siga `ARCHITECTURE.md`
+  §5.6 — `React.cache`/`unstable_cache`, Suspense, prefetch on-hover, `useVisibleInterval`,
+  `next/image` quando aplicável. Dúvida de diagnóstico → agente `performance` antes de codar.
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.

@@ -1,7 +1,7 @@
 # Arquitetura — Torcida SaaS
 
 > Documento vivo. Atualizar sempre que uma decisão estrutural mudar.
-> Última revisão: 2026-07-06
+> Última revisão: 2026-07-10
 
 ## 1. Visão geral do produto
 
@@ -481,8 +481,55 @@ Por que Playwright (test suite) e não um MCP de browser dedicado:
 - Continua valendo usar `claude-in-chrome`/preview tools para exploração pontual
   interativa; a suíte Playwright é para captura em lote, comparável entre
   execuções.
+- Benchmark de latência de navegação: `apps/web/e2e/nav-latency.portal.spec.ts`
+  (mede skeleton, TTFB percebido entre rotas do menu).
 
-### 5.6 Dois bugs achados via a captura visual (2026-07-10)
+### 5.6 Otimização de performance web — plano em 5 fases concluído (2026-07-10)
+
+Diagnóstico inicial: navegação lenta por **dezenas de round-trips ao Postgres
+remoto** (Railway) por página, ausência de feedback visual, e polling HTTP
+competindo com navegação. O plano zero-custo (sem trocar stack) foi executado
+em cinco fases; commits de referência na `main`:
+
+| Fase | Commit | Foco |
+|------|--------|------|
+| 1–3 | `99443a7` | `React.cache`/`unstable_cache`, N+1 mensagens, skeletons, navbar lazy, Suspense Comunidade, índices DB, `proxy.ts`, `staleTimes` |
+| Navegação instantânea | `79ae24b` | Barra de progresso + spinner, prefetch menu, streaming granular (Comunidade/Loja/Eventos), inbox client em Mensagens |
+| 4 | `6f4db5f` | `next/image`, feed agregado (1 query), `connection_limit=5` automático em `@torcida/db` |
+| 5 | `82ae6f3` | Inbox SSR em Mensagens, prefetch on-hover, `unstable_cache` de comunicados, polling com `useVisibleInterval`, `listMensagens` com LIMIT SQL, `dynamic()` no thread |
+
+**Padrões adotados (manter em features novas):**
+- Cache por request: `React.cache` em `tenant.ts`, `hierarquia.ts`, `feed.ts`.
+- Cache cross-request: `unstable_cache` + `revalidateTag` (tenant, hierarquia,
+  permissões, comunicados — ver `comunicadosCacheTag` em `comunidade.ts`).
+- Feedback de navegação: `PortalNavLink` + `NavPendingProvider`; `loading.tsx`
+  nas rotas do menu.
+- Streaming: Suspense por seção em páginas pesadas; não bloquear shell no SSR.
+- Prefetch: `prefetch="hover"` na navbar — evitar prefetch agressivo em todas
+  as rotas.
+- Imagens: `next/image` via `canOptimizeImageUrl()` (`optimizable-image.ts`).
+- Polling: `useVisibleInterval`; pausar badges redundantes quando a rota já
+  carrega os mesmos dados (ex.: navbar em `/portal/mensagens`).
+- Dev: contador de queries Prisma (`query-metrics.js`, badge em dev).
+
+**Teto estrutural (não some com mais React):**
+- Latência TCP Postgres Railway (~50–150 ms por query).
+- Páginas autenticadas 100% dinâmicas (`auth()`/`headers()` impedem cache de
+  página inteira).
+- Mensageria em polling HTTP (item 27 — SSE/WebSocket só com demanda de escala).
+
+**Fora do escopo do plano concluído** (evolução arquitetural, não “Fase 6
+grátis”): PgBouncer/Accelerate, Redis, WebSocket, SWR/React Query global,
+migração Vercel+Neon, virtualização de listas longas. Ver §5.4 para critérios
+de quando pooler faria sentido.
+
+**Passo manual opcional (infra, zero código):** Cloudflare Free na frente do
+domínio — cache de `/_next/static` e Brotli; documentado em `apps/web/src/lib/env.ts`.
+
+Agente responsável por auditorias e novos recortes: `performance` (ver
+`docs/agents/README.md`).
+
+### 5.7 Dois bugs achados via a captura visual (2026-07-10)
 
 **Bug 1 — CTA invisível em `/entrar` e `/entrar/criar-conta` (corrigido).**
 Causa raiz: `ThemeProvider` (`packages/ui/src/services/theme.tsx`) gravava

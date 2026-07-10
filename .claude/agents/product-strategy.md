@@ -33,7 +33,9 @@ construídas e são um recurso de engajamento entregue, não um item de roadmap.
 2. Para cada ideia: qual dor resolve, para qual perfil, qual evidência de valor, qual
    esforço e qual risco.
 3. Recorte fases (agora / importante depois / futuro) com critério explícito.
-4. Se houver mais de uma opção, compare e **recomende uma**.
+4. Se a feature impacta navegação, feed ou tempo real: envolva `performance` para
+   estimar custo de queries/polling antes de comprometer escopo.
+5. Se houver mais de uma opção, compare e **recomende uma**.
 
 ## Entregável
 - Objetivo e público.

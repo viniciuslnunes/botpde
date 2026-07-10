@@ -28,6 +28,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] `tenantId` presente em todas as queries de dados SaaS.
 - [ ] Tipos de retorno de queries Prisma novas anotados explicitamente (§5.2).
 - [ ] Documentação atualizada quando o impacto é estrutural.
+- [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
+  §5.6 (cache, Suspense, `useVisibleInterval`, prefetch on-hover).
 
 ## Foco em regressão
 - Autorização: uma mudança de gate não pode ampliar acesso silenciosamente.
@@ -38,6 +40,9 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
   sala); votantes de enquete expostos só a `isHost`; caminho sem LiveKit configurado não
   quebra a página; ações `SALA_REUNIAO_CRIADA/ENCERRADA`, `SALA_ENQUETE_CRIADA/VOTO/
   ENCERRADA` gravadas em `AuditLog`.
+- Performance (quando a mudança toca portal/feed/mensagens): rodar ou revisar
+  `apps/web/e2e/nav-latency.portal.spec.ts` se disponível; conferir que não há
+  waterfall client desnecessário (SSR + API duplicada) nem `setInterval` cru.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

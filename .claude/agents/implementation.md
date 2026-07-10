@@ -52,3 +52,5 @@ updates frequentes. Use `assertSalaMembro(salaId)` / `assertSalaAnfitriao(salaId
 dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` de
 `apps/web/src/lib/livekit.ts` — degrade, não quebre. Ver `docs/data/modulo-salas.md`.
 Loja: sacola/checkout/cupom — ver `docs/data/modulo-loja.md`; agente `loja` para escopo amplo.
+Performance: ver `ARCHITECTURE.md` §5.6; não reintroduza fetch-on-mount onde já há SSR ou
+prefetch agressivo na navbar.

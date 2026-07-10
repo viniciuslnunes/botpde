@@ -30,6 +30,8 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 - Únicos compostos por tenant quando o identificador é local (ex.:
   `(tenantId, numeroSocio)`).
 - Índices em colunas de filtro/ordenação frequentes (ex.: `(tenantId, criadoEm)`).
+- Para páginas de listagem/feed novas: coordene com `performance` se a query
+  precisar de índice composto ou `take` — não proponha schema só por estética.
 
 ## Exemplo de referência: módulo Salas (Meet)
 6 models (`SalaReuniao`, `ParticipanteReuniao`, `MensagemReuniao`, `EnqueteReuniao`,
