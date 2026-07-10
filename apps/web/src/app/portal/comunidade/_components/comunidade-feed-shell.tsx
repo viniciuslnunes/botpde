@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark, Bell } from 'lucide-react'
+import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark, Bell, Radio } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -71,6 +71,7 @@ export function ComunidadeFeedShell({
     { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false, badge: 0 },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false, badge: 0 },
     { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false, badge: 0 },
+    { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio, active: false, badge: 0 },
     {
       href: '/portal/comunidade/notificacoes',
       label: 'Notificações',
@@ -176,6 +177,12 @@ export function ComunidadeFeedShell({
             className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
           >
             <Video className="h-4 w-4" /> Vídeos
+          </Link>
+          <Link
+            href="/portal/comunidade/canais"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
+          >
+            <Radio className="h-4 w-4" /> Canais
           </Link>
           <Link
             href="/portal/comunidade/grupos"

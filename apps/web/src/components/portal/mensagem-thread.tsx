@@ -30,6 +30,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { PostMedia } from './post-media'
+import { isConversaGrupoLike } from '@/lib/canais'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -295,13 +296,13 @@ export function MensagemThread({
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</p>
-          {conversa.tipo === 'GRUPO' && (
+          {isConversaGrupoLike(conversa.tipo) && (
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               {conversa.totalMembros} participantes
             </p>
           )}
         </div>
-        {conversa.tipo === 'GRUPO' && (
+        {isConversaGrupoLike(conversa.tipo) && (
           <button
             type="button"
             onClick={() => setPainelMembros((v) => !v)}
@@ -318,7 +319,7 @@ export function MensagemThread({
         )}
       </div>
 
-      {painelMembros && conversa.tipo === 'GRUPO' && (
+      {painelMembros && isConversaGrupoLike(conversa.tipo) && (
         <PainelMembros
           conversaId={conversaId}
           currentUserId={currentUserId}
@@ -354,7 +355,7 @@ export function MensagemThread({
                         : 'rounded-bl-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
                     ].join(' ')}
                   >
-                    {conversa.tipo === 'GRUPO' && !minha && (
+                    {isConversaGrupoLike(conversa.tipo) && !minha && (
                       <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--primary))]">
                         {m.autor.nome ?? 'Membro'}
                       </p>

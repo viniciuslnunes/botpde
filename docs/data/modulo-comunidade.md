@@ -18,6 +18,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
 | `MomentoStory` | `saas_momentos_story` | Momentos efêmeros (24h) no feed |
 | `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos; posts do mural via `Post.conversaId` |
+| `Conversa` (`tipo: CANAL`) | `saas_conversas` | Canais institucionais e comunidades temáticas (M3); mural só-admin opcional |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
 
 ## Privacidade
@@ -47,6 +48,9 @@ visibilidade do post).
 | `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
 | `/portal/comunidade/grupos` | Grupos públicos (criar/entrar) |
 | `/portal/comunidade/grupos/[id]` | Página do grupo (mural + link ao chat) |
+| `/portal/comunidade/canais` | Canais oficiais e comunidades temáticas |
+| `/portal/comunidade/canais/[id]` | Detalhe do canal (mural + chat) |
+| `/portal/comunidade/unidade/[tenantId]` | Perfil institucional da unidade (sede/subsede/PDE) |
 | `/portal/comunidade/notificacoes` | Central de notificações sociais |
 | `/portal/comunidade/videos` | Reels e posts com vídeo (grade ou vertical) |
 | `/portal/perfil` | Redireciona para o perfil social do usuário logado |
@@ -69,6 +73,7 @@ visibilidade do post).
 - `fixarPostPerfil`, `salvarPost`, `removerPostSalvo`
 - `marcarNotificacaoLida`, `marcarTodasNotificacoesLidas`
 - `criarGrupoPublico`, `entrarGrupoPublico`, `publicarPostGrupo`, `publicarMomentoStory`
+- `criarCanalTematico`, `entrarCanal`, `publicarPostCanal`
 
 Notificações de menção, comentário, reação e repost apontam para
 `/portal/comunidade/post/[id]` via `linkPostComunidade()`.
@@ -94,6 +99,14 @@ Notificações de menção, comentário, reação e repost apontam para
 - **Mural do grupo** — posts com `conversaId` ficam só no mural (`/portal/comunidade/grupos/[id]`); não entram no feed principal.
 - **Momentos 24h** — `MomentoStory` com `expiraEm`; anéis no topo do feed; viewer fullscreen.
 - **Reels** — `/portal/comunidade/videos` com modo vertical (snap scroll + autoplay) e grade.
+
+## Canais institucionais (M3 mensageria)
+
+- **Perfil oficial por unidade** — `/portal/comunidade/unidade/[tenantId]` agrega comunicados, mural institucional, eventos e canal oficial auto-provisionado.
+- **Canal oficial** — um `Conversa` `tipo: CANAL` com `canalOficial: true` por tenant; publicação restrita a admins (`CHANNELS_MANAGE`, `COMMUNITY_MANAGE` ou `ANNOUNCEMENTS_PUBLISH`).
+- **Comunidades temáticas** — admins criam canais com visibilidade `TENANT` / `HIERARQUIA` / `ALIADOS` / `PUBLICO`.
+- **Busca** — `/api/comunidade/busca` inclui canais e unidades da hierarquia visível.
+- **Permissão** — `channels:manage` (owner/admin por padrão; rodar `repair-system-role-permissions` em produção).
 
 ## Formato de menções e hashtags
 

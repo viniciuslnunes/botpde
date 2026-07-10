@@ -57,6 +57,9 @@ export const PERMISSIONS = /** @type {const} */ ({
   MESSAGES_SEND: 'messages:send',
   GROUPS_CREATE: 'groups:create',
   MESSAGES_MODERATE: 'messages:moderate',
+
+  // Canais institucionais e comunidades temáticas (M3 mensageria)
+  CHANNELS_MANAGE: 'channels:manage',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -115,6 +118,7 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.MESSAGES_SEND, label: 'Enviar mensagens diretas' },
       { key: PERMISSIONS.GROUPS_CREATE, label: 'Criar grupos de conversa' },
+      { key: PERMISSIONS.CHANNELS_MANAGE, label: 'Gerenciar canais e comunidades' },
       { key: PERMISSIONS.MESSAGES_MODERATE, label: 'Moderar mensagens denunciadas' },
     ],
   },

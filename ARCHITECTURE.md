@@ -632,3 +632,8 @@ NextAuth/Next.js.
   reusado), badge de não-lidas na navbar, botão "Mensagem" no perfil.
   M2/M3 (fases seguintes): transferência de admin de grupo, Comunidades
   temáticas (canais de admin, visibilidade pública/aliada) e busca.
+  **✅ M2 entregue 2026-07-10** (transferência de admin). **✅ M3 entregue
+  2026-07-10**: `TipoConversa.CANAL`, perfil institucional por tenant
+  (`/portal/comunidade/unidade/[tenantId]`), canal oficial auto-provisionado,
+  comunidades temáticas com visibilidade hierárquica/aliados, busca de canais
+  e unidades, permissão `channels:manage`.

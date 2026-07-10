@@ -4,10 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, MAX_MENCOES_POR_CONTEUDO } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -18,6 +18,13 @@ import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId } from '@/lib/feed'
 import { calcularExpiraStory } from '@/lib/stories'
+import {
+  getCanalPorId,
+  inscreverCanal,
+  podePublicarNoCanal,
+  linkCanalComunidade,
+  linkUnidadeComunidade,
+} from '@/lib/canais'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
@@ -1055,6 +1062,150 @@ export async function publicarMomentoStory(
   })
 
   revalidatePath('/portal/comunidade')
+  return { success: true }
+}
+
+async function permissoesEfetivas(userId: string, tenantId: string): Promise<string[]> {
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
+  return calculateEffectivePermissions(rolePermissions, overrides)
+}
+
+export async function entrarCanal(conversaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const canal = await getCanalPorId(conversaId, tenant.id, session.user.id)
+  if (!canal) throw new Error('Canal não encontrado ou indisponível.')
+  if (!canal.publica) throw new Error('Este canal não aceita novos inscritos.')
+
+  await inscreverCanal(conversaId, session.user.id)
+
+  revalidatePath('/portal/comunidade/canais')
+  revalidatePath(linkCanalComunidade(conversaId))
+  revalidatePath('/portal/mensagens')
+}
+
+export async function criarCanalTematico(
+  nome: string,
+  descricao?: string,
+  visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO' = 'HIERARQUIA',
+): Promise<{ id: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const efetivas = await permissoesEfetivas(session.user.id, tenant.id)
+  if (
+    !hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) &&
+    !hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
+  ) {
+    throw new Error('Sem permissão para criar canais.')
+  }
+
+  const parsed = criarCanalTematicoSchema.safeParse({ nome, descricao, visibilidadeCanal })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  const canal: { id: string } = await db.conversa.create({
+    data: {
+      tipo: 'CANAL',
+      tenantId: tenant.id,
+      nome: parsed.data.nome,
+      descricao: parsed.data.descricao?.trim() || null,
+      institucional: true,
+      canalOficial: false,
+      visibilidadeCanal: parsed.data.visibilidadeCanal,
+      somenteAdminPublica: true,
+      publica: true,
+      criadoPorId: session.user.id,
+      membros: {
+        create: { userId: session.user.id, papel: 'ADMIN' },
+      },
+    },
+    select: { id: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'CANAL_TEMATICO_CRIADO',
+      entidade: 'Conversa',
+      entidadeId: canal.id,
+      detalhes: { visibilidadeCanal: parsed.data.visibilidadeCanal },
+    },
+  })
+
+  revalidatePath('/portal/comunidade/canais')
+  return canal
+}
+
+export async function publicarPostCanal(
+  conversaId: string,
+  conteudo: string,
+): Promise<{ success: boolean; message?: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = publicarPostCanalSchema.safeParse({ conversaId, conteudo })
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  }
+
+  const efetivas = await permissoesEfetivas(session.user.id, tenant.id)
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) return { success: false, message: 'Canal não encontrado.' }
+
+  if (!canal.souMembro) {
+    await inscreverCanal(parsed.data.conversaId, session.user.id)
+  }
+
+  const podePublicar = await podePublicarNoCanal(canal, tenant.id, efetivas)
+  if (canal.somenteAdminPublica && !podePublicar) {
+    return { success: false, message: 'Somente administradores podem publicar neste canal.' }
+  }
+
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) return { success: false, message: erroMencoes }
+
+  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+  const post = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: parsed.data.conteudo,
+      tipo: canal.institucional ? 'INSTITUCIONAL' : 'MEMBRO',
+      visibilidade: 'TENANT',
+      conversaId: parsed.data.conversaId,
+    },
+  })
+
+  await Promise.all([
+    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
+    notificarMencoesDoPost({
+      conteudo: parsed.data.conteudo,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      tenantId: tenant.id,
+      postId: post.id,
+      link: linkCanalComunidade(parsed.data.conversaId),
+    }),
+  ])
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_CANAL_PUBLICADO',
+      entidade: 'Post',
+      entidadeId: post.id,
+      detalhes: { conversaId: parsed.data.conversaId, canalOficial: canal.canalOficial },
+    },
+  })
+
+  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+  if (canal.canalOficial) {
+    revalidatePath(linkUnidadeComunidade(tenant.id))
+  }
   return { success: true }
 }
 

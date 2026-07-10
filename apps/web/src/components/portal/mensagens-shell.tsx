@@ -209,7 +209,7 @@ export function MensagensShell({
                           ? c.ultimaMensagem.removida
                             ? 'Mensagem removida'
                             : c.ultimaMensagem.conteudo || '📎 Anexo'
-                          : c.tipo === 'GRUPO'
+                          : c.tipo === 'GRUPO' || c.tipo === 'CANAL'
                             ? `${c.totalMembros} participantes`
                             : 'Conversa iniciada'}
                       </p>

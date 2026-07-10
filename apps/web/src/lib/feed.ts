@@ -295,7 +295,7 @@ function sortPostsDesc(a: { criadoEm: Date }, b: { criadoEm: Date }): number {
   return b.criadoEm.getTime() - a.criadoEm.getTime()
 }
 
-async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
+export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
   return enriquecerPostsComBadges(posts)
 }
 

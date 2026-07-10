@@ -2,24 +2,34 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Search, Loader2, Hash, FileText } from 'lucide-react'
+import { Search, Loader2, Hash, FileText, Radio, Building2 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import type { MembroBuscaItem } from '@/lib/comunidade-busca'
+import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais'
+import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface BuscaResponse {
   membros: MembroBuscaItem[]
   hashtags: Array<{ tag: string; total: number }>
   posts: PostSocialItem[]
+  canais: CanalItem[]
+  unidades: UnidadeBuscaItem[]
 }
 
 export function BuscaMembrosClient() {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
-  const [resultado, setResultado] = useState<BuscaResponse>({ membros: [], hashtags: [], posts: [] })
+  const [resultado, setResultado] = useState<BuscaResponse>({
+    membros: [],
+    hashtags: [],
+    posts: [],
+    canais: [],
+    unidades: [],
+  })
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -31,7 +41,7 @@ export function BuscaMembrosClient() {
 
   const buscar = useCallback(async (termo: string) => {
     if (termo.length < 2) {
-      setResultado({ membros: [], hashtags: [], posts: [] })
+      setResultado({ membros: [], hashtags: [], posts: [], canais: [], unidades: [] })
       return
     }
     setCarregando(true)
@@ -46,7 +56,7 @@ export function BuscaMembrosClient() {
       setResultado(data)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro na busca')
-      setResultado({ membros: [], hashtags: [], posts: [] })
+      setResultado({ membros: [], hashtags: [], posts: [], canais: [], unidades: [] })
     } finally {
       setCarregando(false)
     }
@@ -62,7 +72,9 @@ export function BuscaMembrosClient() {
     !erro &&
     resultado.membros.length === 0 &&
     resultado.hashtags.length === 0 &&
-    resultado.posts.length === 0
+    resultado.posts.length === 0 &&
+    resultado.canais.length === 0 &&
+    resultado.unidades.length === 0
 
   return (
     <div className="space-y-6">
@@ -72,7 +84,7 @@ export function BuscaMembrosClient() {
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar membros, hashtags ou posts…"
+          placeholder="Buscar membros, canais, unidades, hashtags ou posts…"
           className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pl-10 pr-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
           autoFocus
         />
@@ -101,6 +113,54 @@ export function BuscaMembrosClient() {
         <p className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
           Digite ao menos 2 caracteres para buscar.
         </p>
+      )}
+
+      {resultado.unidades.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <Building2 className="h-4 w-4" />
+            Unidades
+          </h2>
+          <div className="space-y-2">
+            {resultado.unidades.map((u) => (
+              <Link
+                key={u.tenantId}
+                href={linkUnidadeComunidade(u.tenantId)}
+                className="block rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <p className="font-semibold text-[rgb(var(--foreground))]">{u.nome}</p>
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                  {labelTipoUnidade(u.tipo)}
+                  {u.cidade ? ` · ${u.cidade}` : ''}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {resultado.canais.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <Radio className="h-4 w-4" />
+            Canais
+          </h2>
+          <div className="space-y-2">
+            {resultado.canais.map((c) => (
+              <Link
+                key={c.id}
+                href={c.canalOficial ? linkUnidadeComunidade(c.tenantId) : linkCanalComunidade(c.id)}
+                className="block rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <p className="font-semibold text-[rgb(var(--foreground))]">{c.nome ?? 'Canal'}</p>
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                  {c.tenantNome}
+                  {c.canalOficial ? ' · Oficial' : ' · Temático'}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {resultado.hashtags.length > 0 && (

@@ -14,7 +14,7 @@ import { canFollowUser } from './social'
 export const MAX_MEMBROS_GRUPO = 50
 export const MAX_CONTEUDO_MENSAGEM = 2000
 
-export type TipoConversa = 'DIRETA' | 'GRUPO'
+export type TipoConversa = 'DIRETA' | 'GRUPO' | 'CANAL'
 export type PapelConversa = 'ADMIN' | 'MEMBRO'
 
 export interface AutorLite {

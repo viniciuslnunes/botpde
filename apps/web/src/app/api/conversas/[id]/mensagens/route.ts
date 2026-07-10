@@ -127,9 +127,9 @@ export async function POST(
           tenantId: conversa.tenantId,
           tipo: 'NOVA_MENSAGEM',
           titulo:
-            conversa.tipo === 'GRUPO'
-              ? `Nova mensagem em ${conversa.nome ?? 'grupo'}`
-              : 'Nova mensagem direta',
+            conversa.tipo === 'DIRETA'
+              ? 'Nova mensagem direta'
+              : `Nova mensagem em ${conversa.nome ?? (conversa.tipo === 'CANAL' ? 'canal' : 'grupo')}`,
           corpo: parsed.data.conteudo.slice(0, 140),
           link: `/portal/mensagens?c=${conversaId}`,
         })

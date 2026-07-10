@@ -55,6 +55,18 @@ export default async function AdminComunidadePage() {
 
       <div className="flex-1 overflow-auto px-8 py-6">
         <div className="mx-auto max-w-3xl space-y-8">
+          {podeGerenciarPosts && (
+            <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                Gerencie canais oficiais e comunidades temáticas em{' '}
+                <a href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--primary))] hover:underline">
+                  Portal → Comunidade → Canais
+                </a>
+                .
+              </p>
+            </section>
+          )}
+
           {podePublicarComunicado && (
             <section className="space-y-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

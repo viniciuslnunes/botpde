@@ -20,7 +20,7 @@ export interface MensagemDto {
 
 export interface InboxItemDto {
   id: string
-  tipo: 'DIRETA' | 'GRUPO'
+  tipo: 'DIRETA' | 'GRUPO' | 'CANAL'
   nome: string | null
   avatarUrl: string | null
   atualizadoEm: string
@@ -53,6 +53,6 @@ export interface MembroConversaDto {
 
 /** Título exibível de uma conversa (DM usa o outro participante). */
 export function tituloConversa(item: InboxItemDto): string {
-  if (item.tipo === 'GRUPO') return item.nome ?? 'Grupo'
+  if (item.tipo === 'GRUPO' || item.tipo === 'CANAL') return item.nome ?? (item.tipo === 'CANAL' ? 'Canal' : 'Grupo')
   return item.outroMembro?.nome ?? 'Conversa'
 }

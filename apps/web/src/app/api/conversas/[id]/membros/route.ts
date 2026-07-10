@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { canMessageUser, listMembrosConversa, MAX_MEMBROS_GRUPO } from '@/lib/mensageria'
+import { isConversaGrupoLike } from '@/lib/canais'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 
 const adicionarSchema = z.object({
@@ -40,7 +41,7 @@ export async function POST(
     const { id: conversaId } = await context.params
     const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
 
-    if (conversa.tipo !== 'GRUPO') {
+    if (!isConversaGrupoLike(conversa.tipo)) {
       return NextResponse.json({ error: 'DMs não aceitam novos participantes.' }, { status: 400 })
     }
     if (membro.papel !== 'ADMIN') {
@@ -107,8 +108,8 @@ export async function PATCH(
     const { id: conversaId } = await context.params
     const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
 
-    if (conversa.tipo !== 'GRUPO') {
-      return NextResponse.json({ error: 'Somente grupos aceitam transferência de admin.' }, { status: 400 })
+    if (!isConversaGrupoLike(conversa.tipo)) {
+      return NextResponse.json({ error: 'Somente grupos e canais aceitam transferência de admin.' }, { status: 400 })
     }
     if (membro.papel !== 'ADMIN') {
       return NextResponse.json({ error: 'Somente o admin atual pode transferir.' }, { status: 403 })
@@ -173,7 +174,7 @@ export async function DELETE(
     const parsed = removerSchema.safeParse(body)
     const alvoId = parsed.success && parsed.data.userId ? parsed.data.userId : userId
 
-    if (conversa.tipo !== 'GRUPO') {
+    if (!isConversaGrupoLike(conversa.tipo)) {
       return NextResponse.json({ error: 'Não é possível sair de uma DM.' }, { status: 400 })
     }
 

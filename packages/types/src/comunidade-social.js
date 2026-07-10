@@ -51,6 +51,17 @@ export const publicarMomentoStorySchema = z.object({
   conteudo: z.string().trim().max(280).optional(),
 })
 
+export const criarCanalTematicoSchema = z.object({
+  nome: z.string().trim().min(3).max(80),
+  descricao: z.string().trim().max(280).optional(),
+  visibilidadeCanal: z.enum(['TENANT', 'HIERARQUIA', 'ALIADOS', 'PUBLICO']).default('HIERARQUIA'),
+})
+
+export const publicarPostCanalSchema = z.object({
+  conversaId: z.string().min(1),
+  conteudo: z.string().trim().min(1).max(3000),
+})
+
 export const criarGrupoPublicoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),

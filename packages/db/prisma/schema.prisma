@@ -1197,6 +1197,13 @@ model Conversa {
   // Grupos públicos da comunidade — qualquer membro ativo do tenant pode entrar
   publica   Boolean @default(false)
 
+  // CANAL — comunidade temática ou perfil oficial da unidade (M3 mensageria)
+  institucional       Boolean           @default(false) @map("institucional")
+  canalOficial        Boolean           @default(false) @map("canal_oficial")
+  visibilidadeCanal   VisibilidadeCanal @default(HIERARQUIA) @map("visibilidade_canal")
+  /// Mural do canal: quando true, só admins publicam posts
+  somenteAdminPublica Boolean           @default(true) @map("somente_admin_publica")
+
   criadoPorId String @map("criado_por_id")
   criadoPor   User   @relation("ConversaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Cascade)
 
@@ -1209,12 +1216,21 @@ model Conversa {
   posts     Post[]
 
   @@index([tenantId, atualizadoEm])
+  @@index([tenantId, tipo, canalOficial])
   @@map("saas_conversas")
 }
 
 enum TipoConversa {
   DIRETA
   GRUPO
+  CANAL
+}
+
+enum VisibilidadeCanal {
+  TENANT
+  HIERARQUIA
+  ALIADOS
+  PUBLICO
 }
 
 model MembroConversa {

@@ -5,6 +5,7 @@ import { getContagensSeguimento, getAutoresSemAcesso, resolverAvatarSocial } fro
 import { normalizarHashtag } from './comunidade-social'
 import { postInclude, projetarPost, podeVerPost, type PostSocialItem, type PostRaw } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
+import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
 
 export interface MembroBuscaItem {
   id: string
@@ -21,6 +22,8 @@ export interface BuscaComunidadeResult {
   membros: MembroBuscaItem[]
   hashtags: Array<{ tag: string; total: number }>
   posts: PostSocialItem[]
+  canais: CanalItem[]
+  unidades: UnidadeBuscaItem[]
 }
 
 export async function buscarMembrosComunidade(
@@ -116,16 +119,17 @@ export async function buscarComunidade(
 ): Promise<BuscaComunidadeResult> {
   const termo = q.trim()
   if (termo.length < 2) {
-    return { membros: [], hashtags: [], posts: [] }
+    return { membros: [], hashtags: [], posts: [], canais: [], unidades: [] }
   }
 
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
   const normalizedTag = normalizarHashtag(termo.replace(/^#/, ''))
 
-  const [membros, hashtagRows, postsRaw]: [
+  const [membros, hashtagRows, postsRaw, canaisUnidades]: [
     MembroBuscaItem[],
     Array<{ tag: string; _count: { posts: number } }>,
     PostRaw[],
+    { canais: CanalItem[]; unidades: UnidadeBuscaItem[] },
   ] = await Promise.all([
     buscarMembrosComunidade(tenantId, userId, termo),
     db.hashtag.findMany({
@@ -142,12 +146,14 @@ export async function buscarComunidade(
         tipo: 'MEMBRO',
         oculto: false,
         visibilidade: 'PUBLICO',
+        conversaId: null,
         conteudo: { contains: termo, mode: 'insensitive' },
       },
       orderBy: { criadoEm: 'desc' },
       take: 15,
       include: postInclude(userId),
     }) as Promise<PostRaw[]>,
+    buscarCanaisEUnidades(tenantId, userId, termo),
   ])
 
   let posts = postsRaw.map(projetarPost)
@@ -176,5 +182,7 @@ export async function buscarComunidade(
       .slice(0, 10)
       .map((h) => ({ tag: h.tag, total: h._count.posts })),
     posts: postsComBadges,
+    canais: canaisUnidades.canais,
+    unidades: canaisUnidades.unidades,
   }
 }
