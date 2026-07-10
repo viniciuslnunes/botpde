@@ -92,6 +92,16 @@ export function NotificationBell({ initialItems }: { initialItems: NotificationI
               </div>
             )}
 
+            <div className="border-t border-[rgb(var(--border))] px-2 py-2">
+              <Link
+                href="/portal/comunidade/notificacoes"
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-2 py-2 text-center text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))]"
+              >
+                Ver todas as notificações
+              </Link>
+            </div>
+
             {pending && (
               <p className="px-2 pb-1 pt-2 text-right text-[10px] text-[rgb(var(--foreground-muted))]">
                 Atualizando...

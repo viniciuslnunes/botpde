@@ -3,9 +3,11 @@ import { Newspaper, Users, Hash, Calendar } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getProximoEvento } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
+import { listSalasAtivas } from '@/lib/salas'
 import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { ComunidadeSalasLiveWidget } from '@/components/portal/comunidade-salas-live-widget'
 
 interface ComunidadeAsideWidgetsProps {
   tenantId: string
@@ -18,17 +20,19 @@ export async function ComunidadeAsideWidgets({
   afiliacaoId,
   currentUserId,
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, sugestoes, hashtags, proximoEvento] = await Promise.all([
+  const [noticias, sugestoes, hashtags, proximoEvento, salasAoVivo] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
       : Promise.resolve([] as SugestaoAutorAside[]),
     getHashtagsEmAlta(tenantId, 5),
     getProximoEvento(tenantId, currentUserId),
+    listSalasAtivas(tenantId),
   ])
 
   return (
     <>
+      <ComunidadeSalasLiveWidget salas={salasAoVivo} />
       {proximoEvento && (
         <Link
           href={`/portal/eventos/${proximoEvento.id}`}

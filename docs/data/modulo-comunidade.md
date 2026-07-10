@@ -45,6 +45,7 @@ visibilidade do post).
 | `/portal/comunidade/salvos` | Publicações salvas pelo usuário |
 | `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
 | `/portal/comunidade/grupos` | Grupos públicos (criar/entrar) |
+| `/portal/comunidade/notificacoes` | Central de notificações sociais |
 | `/portal/comunidade/videos` | Posts com vídeo |
 | `/portal/perfil` | Redireciona para o perfil social do usuário logado |
 
@@ -54,6 +55,7 @@ visibilidade do post).
 |---|---|
 | `GET /api/comunidade/membros?q=` | Busca membros aprovados em tenants visíveis |
 | `GET /api/comunidade/busca?q=` | Busca unificada (membros + hashtags + posts) |
+| `GET /api/comunidade/notificacoes?filtro=` | Lista notificações sociais com filtro |
 | `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar) |
 
 ## Server Actions (`comunidade/actions.ts`)
@@ -63,6 +65,7 @@ visibilidade do post).
 - `atualizarPerfilSocial`, `criarDestaquePerfil`
 - `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
 - `fixarPostPerfil`, `salvarPost`, `removerPostSalvo`
+- `marcarNotificacaoLida`, `marcarTodasNotificacoesLidas`
 - `criarGrupoPublico`, `entrarGrupoPublico`
 
 Notificações de menção, comentário, reação e repost apontam para
@@ -74,6 +77,14 @@ Notificações de menção, comentário, reação e repost apontam para
 - **Post sobre evento**: composer com modo evento; card com RSVP embutido (`PostEventoEmbed`).
 - **Badges no feed**: sede e cargo do autor nos cards (`autor-badges.ts`).
 - **Moderação**: link "Ver post" na fila em `/admin/comunidade/moderacao`.
+
+## Engajamento e lives (Sprint 5)
+
+- **Central de notificações** — `/portal/comunidade/notificacoes` com filtros (menções, reposts, reações, seguimento) e marcar todas como lidas.
+- **Badges na nav** — contadores em Notificações e Solicitações no menu lateral da Comunidade.
+- **Recap de sala** — ao encerrar uma live, publica post automático no feed com total de participantes.
+- **Limite de menções** — máximo de 10 menções por post/comentário; rate limit ao notificar.
+- **Ao vivo no aside** — widget de salas ativas no aside desktop (mobile já tinha).
 
 ## Formato de menções e hashtags
 

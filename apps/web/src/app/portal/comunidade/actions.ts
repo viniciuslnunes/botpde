@@ -7,15 +7,17 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, MAX_MENCOES_POR_CONTEUDO } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId } from '@/lib/feed'
+import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const MAX_MIDIAS = 10
@@ -43,6 +45,13 @@ function parseMidias(raw: FormDataEntryValue | null): unknown {
   } catch {
     return []
   }
+}
+
+function erroMencoesExcessivas(conteudo: string): string | null {
+  if (extrairMencoes(conteudo).length > MAX_MENCOES_POR_CONTEUDO) {
+    return `Máximo de ${MAX_MENCOES_POR_CONTEUDO} menções por publicação.`
+  }
+  return null
 }
 
 const perfilSchema = z.object({
@@ -91,6 +100,9 @@ export async function publicarPost(
   }
 
   const { conteudo, midias, visibilidade } = parsed.data
+  const erroMencoes = erroMencoesExcessivas(conteudo)
+  if (erroMencoes) return { message: erroMencoes }
+
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
   const post = await db.post.create({
@@ -345,6 +357,9 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
   const parsed = editarPostSchema.safeParse({ postId, conteudo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post inválido')
 
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) throw new Error(erroMencoes)
+
   const post = await db.post.findFirst({
     where: { id: parsed.data.postId, autorId: session.user.id, tenantId: tenant.id, oculto: false },
     select: { id: true },
@@ -458,6 +473,9 @@ export async function comentarPost(
   const parsed = comentarioSchema.safeParse({ postId, conteudo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Comentário inválido')
 
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) throw new Error(erroMencoes)
+
   const limiterKey = `comment:${tenant.id}:${session.user.id}`
   if (excedeuLimiteEngajamento(limiterKey)) {
     throw new Error('Você está comentando rápido demais. Aguarde um pouco.')
@@ -540,6 +558,9 @@ export async function publicarEnquete(
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
+
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) return { message: erroMencoes }
 
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
@@ -839,6 +860,9 @@ export async function publicarPostEvento(
   })
   if (!evento) return { message: 'Evento não encontrado ou indisponível.' }
 
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) return { message: erroMencoes }
+
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
   const post = await db.post.create({
@@ -1100,6 +1124,25 @@ export async function marcarNotificacaoLida(notificacaoId: string): Promise<void
 
   revalidatePath('/portal')
   revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/comunidade/notificacoes')
+}
+
+export async function marcarTodasNotificacoesLidas(): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+
+  await db.notificacao.updateMany({
+    where: {
+      tenantId: tenant.id,
+      userId: session.user.id,
+      lida: false,
+      tipo: { in: TIPOS_NOTIFICACAO_SOCIAL },
+    },
+    data: { lida: true },
+  })
+
+  revalidatePath('/portal')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/comunidade/notificacoes')
 }
 
 /** Marca comunicados como lidos após a UI renderizar (evita write-on-read no SSR). */

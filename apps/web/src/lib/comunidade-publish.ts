@@ -1,6 +1,8 @@
 import { db } from '@torcida/db'
+import { MAX_MENCOES_POR_CONTEUDO } from '@torcida/types'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { extrairHashtags, extrairMencoes } from '@/lib/comunidade-social'
+import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 
 export async function sincronizarHashtagsDoPost(
   postId: string,
@@ -34,7 +36,17 @@ export async function notificarMencoesDoPost(opts: {
   postId: string
   link: string
 }): Promise<void> {
-  const mencoes = extrairMencoes(opts.conteudo).filter((m) => m.userId !== opts.autorId)
+  const limiterKey = `mencoes:${opts.tenantId}:${opts.autorId}`
+  if (excedeuLimiteEngajamento(limiterKey)) return
+
+  const mencoes = extrairMencoes(opts.conteudo)
+    .filter((m) => m.userId !== opts.autorId)
+    .slice(0, MAX_MENCOES_POR_CONTEUDO)
+
+  if (mencoes.length === 0) return
+
+  registrarAcaoEngajamento(limiterKey)
+
   for (const m of mencoes) {
     await criarNotificacao({
       userId: m.userId,

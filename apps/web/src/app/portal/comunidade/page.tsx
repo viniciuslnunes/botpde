@@ -8,6 +8,7 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getOrCreatePerfilMembro } from '@/lib/social'
 import { getEventosParaComposer } from '@/lib/eventos'
+import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
 
 const ComunidadeChatPanel = dynamic(
   () =>
@@ -50,6 +51,11 @@ export default async function ComunidadePage({
       ? await getEventosParaComposer(tenant.id, session.user.id)
       : []
 
+  const navBadges =
+    session?.user?.id != null
+      ? await getResumoBadgesComunidade(tenant.id, session.user.id)
+      : { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
       <ComunidadeFeedShell
@@ -58,6 +64,7 @@ export default async function ComunidadePage({
         cursor={params.cursor}
         perfilPrivado={perfilPrivado}
         eventosComposer={eventosComposer}
+        navBadges={navBadges}
       />
 
       <aside className="hidden xl:block">

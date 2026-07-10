@@ -38,6 +38,9 @@ export const publicarPostEventoSchema = z.object({
   visibilidade: z.enum(['PUBLICO', 'TENANT', 'PRIVADO']).default('PUBLICO'),
 })
 
+/** Máximo de menções distintas por publicação ou comentário. */
+export const MAX_MENCOES_POR_CONTEUDO = 10
+
 export const criarGrupoPublicoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),

@@ -8,6 +8,7 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isLiveKitConfigured } from '@/lib/env'
 import { createSala, encerrarSala as encerrarSalaNoBanco } from '@/lib/salas'
+import { linkPostComunidade } from '@/lib/comunidade-social'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -126,13 +127,30 @@ export async function encerrarSala(salaId: string) {
 
   const sala = await db.salaReuniao.findFirst({
     where: { id: parsed.data.salaId, tenantId: tenant.id },
-    select: { id: true, encerradaEm: true },
+    select: {
+      id: true,
+      titulo: true,
+      encerradaEm: true,
+      _count: { select: { participantes: true } },
+    },
   })
   if (!sala) throw new Error('Sala não encontrada.')
   if (sala.encerradaEm) return
 
   const encerrada = await encerrarSalaNoBanco(tenant.id, parsed.data.salaId)
   if (!encerrada) throw new Error('Não foi possível encerrar a sala.')
+
+  const participantes = sala._count.participantes
+  const recap = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: `📹 A sala "${sala.titulo}" foi encerrada. ${participantes} pessoa${participantes === 1 ? '' : 's'} participou${participantes === 1 ? '' : 'ram'}.`,
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+    },
+    select: { id: true },
+  })
 
   await db.auditLog.create({
     data: {
@@ -141,11 +159,14 @@ export async function encerrarSala(salaId: string) {
       acao: 'SALA_REUNIAO_ENCERRADA',
       entidade: 'SalaReuniao',
       entidadeId: parsed.data.salaId,
+      detalhes: { recapPostId: recap.id, participantes },
     },
   })
 
+  revalidatePath('/portal/comunidade')
   revalidatePath('/portal/comunidade/salas')
   revalidatePath(`/portal/comunidade/salas/${parsed.data.salaId}`)
+  revalidatePath(linkPostComunidade(recap.id))
 }
 
 export async function enviarMensagemSala(formData: FormData) {

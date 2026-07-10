@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark } from 'lucide-react'
+import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark, Bell } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -29,6 +29,7 @@ interface ComunidadeFeedShellProps {
   cursor?: string
   perfilPrivado?: boolean
   eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
+  navBadges?: { notificacoesNaoLidas: number; solicitacoesPendentes: number }
 }
 
 function ComunicadosFallback() {
@@ -54,19 +55,34 @@ function AsideWidgetsFallback() {
   )
 }
 
-export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado = true, eventosComposer = [] }: ComunidadeFeedShellProps) {
+export function ComunidadeFeedShell({
+  tenant,
+  currentUser,
+  cursor,
+  perfilPrivado = true,
+  eventosComposer = [],
+  navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 },
+}: ComunidadeFeedShellProps) {
   const navItems = [
-    { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true },
-    { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false },
-    { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark, active: false },
-    { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false },
-    { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false },
-    { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false },
+    { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
+    { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false, badge: 0 },
+    { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark, active: false, badge: 0 },
+    { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false, badge: 0 },
+    { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false, badge: 0 },
+    { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false, badge: 0 },
+    {
+      href: '/portal/comunidade/notificacoes',
+      label: 'Notificações',
+      icon: Bell,
+      active: false,
+      badge: navBadges.notificacoesNaoLidas,
+    },
     {
       href: '/portal/comunidade/seguindo',
       label: 'Solicitações',
       icon: UserPlus,
       active: false,
+      badge: navBadges.solicitacoesPendentes,
     },
     ...(currentUser.id
       ? [
@@ -75,6 +91,7 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado
             label: 'Meu perfil',
             icon: UserCircle2,
             active: false,
+            badge: 0,
           },
         ]
       : []),
@@ -112,6 +129,11 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado
                 >
                   <Icon className="h-4 w-4" />
                   <span className="flex-1">{item.label}</span>
+                  {item.badge > 0 && (
+                    <span className="min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[10px] font-bold leading-5 text-white">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
                 </Link>
               )
             })}

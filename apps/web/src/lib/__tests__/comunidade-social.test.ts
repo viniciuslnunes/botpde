@@ -34,6 +34,14 @@ describe('comunidade-social', () => {
     expect(isVideoUrl('https://res.cloudinary.com/x/image/upload/v1/a.jpg')).toBe(false)
   })
 
+  it('limita menções distintas extraídas', () => {
+    const ids = Array.from({ length: 12 }, (_, i) =>
+      `a1b2c3d4-e5f6-7890-abcd-ef1234567${String(i).padStart(3, '0')}`,
+    )
+    const texto = ids.map((id, i) => `@[User${i}](user:${id})`).join(' ')
+    expect(extrairMencoes(texto).length).toBe(12)
+  })
+
   it('gera permalink de post', () => {
     expect(linkPostComunidade('abc-123')).toBe('/portal/comunidade/post/abc-123')
   })
