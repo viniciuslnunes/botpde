@@ -13,6 +13,7 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 | `product-strategy` | Decidir o quê construir e em que ordem | opus |
 | `data-model` | Propor/validar entidades Prisma e integridade | opus |
 | `rbac` | Permissões, autorização e visibilidade cross-tenant | opus |
+| `loja` | Catálogo, sacola, checkout, cupons, pedidos e estoque | opus |
 | `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual; captura PNGs reais via Playwright, ver `apps/web/e2e/README.md`) | opus |
 | `qa-verification` | Verificar antes de dar como pronto; rodar Vitest | opus |
 | `implementation` | Codificar o combinado, com escopo mínimo | **fable** |
@@ -22,7 +23,7 @@ vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
 
 1. **Entender** → `research-dominio` (+ `aliancas-torcidas` se for do tema).
 2. **Recortar** → `product-strategy` decide escopo e fase.
-3. **Modelar** → `data-model` (dados) + `rbac` (acesso/visibilidade).
+3. **Modelar** → `data-model` (dados) + `rbac` (acesso/visibilidade); para loja, também `loja`.
 4. **Desenhar** → `ux-review` valida jornada e estados.
 5. **Fechar plano** (Opus) → aprovação humana.
 6. **Implementar** → `implementation` (Fable) segue `CLAUDE.md`.

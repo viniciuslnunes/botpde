@@ -31,6 +31,7 @@ pnpm --filter @torcida/web lint
 pnpm --filter @torcida/web test       # Vitest (RBAC, rate-limit, visibilidade)
 pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
+pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
@@ -72,4 +73,7 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - `apps/web/src/lib/hierarquia.ts` — relação entre tenants na árvore de Sede.
 - `apps/web/src/lib/salas.ts`, `salas-api.ts`, `livekit.ts` — núcleo do módulo Salas (Meet);
   ver `docs/data/modulo-salas.md`.
+- **Loja** — catálogo, sacola, checkout, cupons: `apps/web/src/app/portal/loja/`,
+  `apps/web/src/app/admin/loja/`; regras em `packages/types/src/loja.js`;
+  ver `docs/data/modulo-loja.md`.
 - `ARCHITECTURE.md` — decisões fechadas (§5) e itens em aberto (§6).

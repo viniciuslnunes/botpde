@@ -283,35 +283,89 @@ Table saas_evento_rsvps {
 
 // ─── LOJA ─────────────────────────────────────────────────────────────────
 
-Table saas_produtos {
+Table saas_categorias {
   id uuid [pk]
   tenant_id uuid [not null]
   nome varchar [not null]
+  slug varchar [not null]
+  ordem integer [default: 0]
+  parent_id uuid [note: 'opcional — hierarquia Masculino > Camisetas']
+  Indexes { (tenant_id, slug) [unique] }
+}
+
+Table saas_cupons {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  codigo varchar [not null]
+  tipo varchar [note: 'PERCENTUAL | FIXO']
+  valor decimal [not null]
+  primeira_compra boolean [default: false]
+  ativo boolean [default: true]
+  valido_ate timestamp
+  criado_em timestamp
+  Indexes { (tenant_id, codigo) [unique] }
+}
+
+Table saas_produtos {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  categoria_id uuid
+  nome varchar [not null]
+  slug varchar
   descricao varchar
   preco decimal [not null]
+  preco_original decimal [note: 'para exibir promo']
+  marca varchar
   ativo boolean
+  destaque boolean [default: false]
+  ordem integer [default: 0]
   estoque json
   tamanhos "varchar[]"
   imagens_url "varchar[]"
   criado_em timestamp
   atualizado_em timestamp
+  Indexes { (tenant_id, slug) [unique] }
+}
+
+Table saas_carrinho_itens {
+  id uuid [pk]
+  user_id uuid [not null]
+  tenant_id uuid [not null, note: 'tenant DONO do produto']
+  produto_id uuid [not null]
+  tamanho varchar [default: 'UN']
+  quantidade integer [default: 1]
+  criado_em timestamp
+  atualizado_em timestamp
+  Indexes { (user_id, produto_id, tamanho) [unique] }
 }
 
 Table saas_pedidos {
   id uuid [pk]
-  tenant_id uuid [not null]
+  tenant_id uuid [not null, note: 'tenant DONO dos produtos']
   user_id uuid [not null]
-  produto_id uuid [not null]
-  produto_nome varchar [not null]
-  tamanho varchar
-  quantidade integer [not null]
-  preco_unit decimal [not null]
+  subtotal decimal [not null]
+  desconto decimal [default: 0]
   total decimal [not null]
   status varchar [note: 'PENDENTE | CONFIRMADO | CANCELADO | ENTREGUE']
+  cupom_codigo varchar
+  modalidade_entrega varchar [default: 'RETIRADA', note: 'RETIRADA | ENVIO']
+  endereco_entrega json
+  grupo_checkout_id uuid [note: 'agrupa pedidos de um checkout multi-tenant']
   discord_id varchar
   canal_ticket_id varchar
   criado_em timestamp
   atualizado_em timestamp
+}
+
+Table saas_pedido_itens {
+  id uuid [pk]
+  pedido_id uuid [not null]
+  produto_id uuid [not null]
+  produto_nome varchar [not null, note: 'snapshot']
+  tamanho varchar
+  quantidade integer [not null]
+  preco_unit decimal [not null]
+  total decimal [not null]
 }
 
 // ─── COMUNICADOS OFICIAIS ─────────────────────────────────────────────────
@@ -559,10 +613,18 @@ Ref: saas_evento_rsvps.evento_id > saas_eventos.id [delete: cascade]
 Ref: saas_evento_rsvps.user_id > saas_users.id
 
 // Loja
+Ref: saas_categorias.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_categorias.parent_id > saas_categorias.id [delete: set null]
+Ref: saas_cupons.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_produtos.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_produtos.categoria_id > saas_categorias.id [delete: set null]
+Ref: saas_carrinho_itens.user_id > saas_users.id [delete: cascade]
+Ref: saas_carrinho_itens.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_carrinho_itens.produto_id > saas_produtos.id [delete: cascade]
 Ref: saas_pedidos.tenant_id > saas_tenants.id [delete: cascade]
 Ref: saas_pedidos.user_id > saas_users.id
-Ref: saas_pedidos.produto_id > saas_produtos.id
+Ref: saas_pedido_itens.pedido_id > saas_pedidos.id [delete: cascade]
+Ref: saas_pedido_itens.produto_id > saas_produtos.id
 
 // Comunicados
 Ref: saas_announcements.tenant_id > saas_tenants.id [delete: cascade]

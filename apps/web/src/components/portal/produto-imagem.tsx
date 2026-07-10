@@ -67,6 +67,9 @@ export function ProdutoImagem({ src, alt, variant = 'card', className }: Produto
           src={resolved}
           alt={alt}
           className={styles.img}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           onError={() => setFailed(true)}
         />
       )}

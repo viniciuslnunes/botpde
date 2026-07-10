@@ -4,7 +4,6 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { EditarProdutoForm } from '@/components/admin/produto-forms'
 import { StatusPedidoBadge } from '@/components/admin/produto-forms'
-import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -23,81 +22,68 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 
-  const produto = await db.saasProduto.findFirst({
-    where: { id, tenantId: tenant.id },
-    include: {
-      pedidos: {
-        orderBy: { criadoEm: 'desc' },
-        take: 20,
-        include: { user: { select: { nome: true, email: true } } },
-      },
-    },
-  })
+  const [produto, categorias, pedidoItens] = await Promise.all([
+    db.saasProduto.findFirst({ where: { id, tenantId: tenant.id } }),
+    db.saasCategoria.findMany({ where: { tenantId: tenant.id }, orderBy: { ordem: 'asc' } }),
+    db.saasPedidoItem.findMany({
+      where: { produtoId: id },
+      orderBy: { pedido: { criadoEm: 'desc' } },
+      take: 20,
+      include: { pedido: { include: { user: { select: { nome: true, email: true } } } } },
+    }),
+  ])
 
   if (!produto) notFound()
 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
-  const imagemUrl = firstProdutoImagemUrl(produto.imagensUrl) ?? ''
 
   return (
     <div className="p-6 space-y-8 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Link
-          href="/admin/loja"
-          className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Loja
+        <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
+          <ArrowLeft className="h-4 w-4" /> Loja
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{produto.nome}</h1>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            {produto.ativo ? (
-              <span className="text-emerald-600 dark:text-emerald-400">● Ativo</span>
-            ) : (
-              <span className="text-red-500">● Inativo</span>
-            )}
-          </p>
+          <h1 className="text-xl font-bold">{produto.nome}</h1>
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">{produto.ativo ? '● Ativo' : '● Inativo'}</p>
         </div>
       </div>
 
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
-        <h2 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Dados do produto</h2>
+        <h2 className="mb-4 font-semibold">Dados do produto</h2>
         <EditarProdutoForm
           id={id}
+          categorias={categorias.map((c: (typeof categorias)[number]) => ({ id: c.id, nome: c.nome }))}
           defaults={{
             nome: produto.nome,
             descricao: produto.descricao,
             preco: Number(produto.preco),
-            imagemUrl,
+            precoOriginal: produto.precoOriginal ? Number(produto.precoOriginal) : undefined,
+            marca: produto.marca ?? '',
+            categoriaId: produto.categoriaId ?? '',
+            destaque: produto.destaque,
+            imagensUrl: produto.imagensUrl,
             tamanhos: produto.tamanhos,
             estoque,
           }}
         />
       </div>
 
-      {/* Pedidos do produto */}
-      {produto.pedidos.length > 0 && (
+      {pedidoItens.length > 0 && (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
-          <h2 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Pedidos ({produto.pedidos.length})</h2>
+          <h2 className="mb-4 font-semibold">Pedidos recentes ({pedidoItens.length})</h2>
           <div className="space-y-2">
-            {produto.pedidos.map((pedido: (typeof produto.pedidos)[number]) => (
-              <div
-                key={pedido.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] px-4 py-3 text-sm"
-              >
+            {pedidoItens.map((item: (typeof pedidoItens)[number]) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
                 <div>
-                  <p className="font-medium text-[rgb(var(--foreground))]">
-                    {pedido.user.nome ?? pedido.user.email ?? '—'}
-                  </p>
+                  <p className="font-medium">{item.pedido.user.nome ?? item.pedido.user.email ?? '—'}</p>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    {pedido.tamanho ? `Tamanho ${pedido.tamanho} · ` : ''}
-                    {pedido.quantidade} un. · {formatarPreco(pedido.total)}
+                    {item.tamanho ? `Tam. ${item.tamanho} · ` : ''}{item.quantidade} un. · {formatarPreco(item.total)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <StatusPedidoBadge status={pedido.status} />
-                  <span className="text-xs text-[rgb(var(--foreground-muted))]">{formatarData(pedido.criadoEm)}</span>
+                  <StatusPedidoBadge status={item.pedido.status} />
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">{formatarData(item.pedido.criadoEm)}</span>
                 </div>
               </div>
             ))}

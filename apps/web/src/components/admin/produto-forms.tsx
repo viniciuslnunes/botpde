@@ -9,7 +9,7 @@ import { ImagePlus, Loader2 } from 'lucide-react'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 
-const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG']
+const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'XG', 'G1', 'G2', 'G3', 'UN']
 
 type Estoque = Record<string, number>
 
@@ -50,9 +50,11 @@ function EstoqueEditor({
 function ImagemProdutoField({
   defaultUrl,
   fieldErrors,
+  onUrlChange,
 }: {
   defaultUrl?: string
   fieldErrors?: string[]
+  onUrlChange?: (url: string) => void
 }) {
   const [imagemUrl, setImagemUrl] = useState(defaultUrl ?? '')
   const [uploading, setUploading] = useState(false)
@@ -76,6 +78,7 @@ function ImagemProdutoField({
     try {
       const url = await uploadMediaToCloudinary(file)
       setImagemUrl(url)
+      onUrlChange?.(url)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Falha no upload.')
     } finally {
@@ -113,7 +116,7 @@ function ImagemProdutoField({
           <input
             type="url"
             value={imagemUrl}
-            onChange={(e) => setImagemUrl(e.target.value)}
+            onChange={(e) => { setImagemUrl(e.target.value); onUrlChange?.(e.target.value) }}
             className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
             placeholder="Ou cole a URL da imagem (https://...)"
           />
@@ -132,13 +135,20 @@ function ImagemProdutoField({
 
 function ProdutoFormFields({
   state,
+  categorias = [],
   defaults,
 }: {
   state: ProdutoState
+  categorias?: { id: string; nome: string }[]
   defaults?: {
     nome?: string
     descricao?: string
     preco?: number
+    precoOriginal?: number
+    marca?: string
+    categoriaId?: string
+    destaque?: boolean
+    imagensUrl?: string[]
     imagemUrl?: string
     tamanhos?: string[]
     estoque?: Estoque
@@ -146,6 +156,7 @@ function ProdutoFormFields({
 }) {
   const [tamanhosSel, setTamanhosSel] = useState<string[]>(defaults?.tamanhos ?? [])
   const [estoque, setEstoque] = useState<Estoque>(defaults?.estoque ?? {})
+  const [imagemUrl, setImagemUrl] = useState(defaults?.imagensUrl?.[0] ?? defaults?.imagemUrl ?? '')
 
   const toggleTamanho = useCallback((t: string) => {
     setTamanhosSel((prev) => {
@@ -188,20 +199,38 @@ function ProdutoFormFields({
 
       <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Preço (R$) *</label>
-        <input
-          name="preco"
-          type="number"
-          step="0.01"
-          min="0"
-          defaultValue={defaults?.preco}
-          required
-          className="mt-1 w-40 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-          placeholder="49.90"
-        />
+        <input name="preco" type="number" step="0.01" min="0" defaultValue={defaults?.preco} required className="mt-1 w-40 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm" />
         <FieldError errors={state.fieldErrors?.preco} />
       </div>
 
-      <ImagemProdutoField defaultUrl={defaults?.imagemUrl} fieldErrors={state.fieldErrors?.imagemUrl} />
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Preço original (promo)</label>
+        <input name="precoOriginal" type="number" step="0.01" min="0" defaultValue={defaults?.precoOriginal} className="mt-1 w-40 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm" placeholder="Opcional" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium">Marca / coleção</label>
+          <input name="marca" defaultValue={defaults?.marca} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" placeholder="FT7, TOCHINHA..." />
+        </div>
+        {categorias.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium">Categoria</label>
+            <select name="categoriaId" defaultValue={defaults?.categoriaId ?? ''} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+              <option value="">—</option>
+              {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="destaque" defaultChecked={defaults?.destaque} value="true" />
+        Destaque (carrossel de lançamentos)
+      </label>
+
+      <ImagemProdutoField defaultUrl={imagemUrl} onUrlChange={setImagemUrl} fieldErrors={state.fieldErrors?.imagemUrl} />
+      <input type="hidden" name="imagensUrlJson" value={JSON.stringify(imagemUrl ? [imagemUrl] : (defaults?.imagensUrl ?? []))} />
 
       <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Tamanhos disponíveis</label>
@@ -227,6 +256,11 @@ function ProdutoFormFields({
       </div>
 
       <div>
+        <label className="block text-sm font-medium">Tamanhos extras (CSV)</label>
+        <input name="tamanhosExtras" placeholder="G1,G2,XG,Unico" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" />
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
           Estoque {semTamanho ? '(unidades)' : 'por tamanho'}
         </label>
@@ -243,7 +277,7 @@ function ProdutoFormFields({
 
 const initialState: ProdutoState = {}
 
-export function CriarProdutoForm() {
+export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: string; nome: string }[] }) {
   const [state, action, pending] = useActionState(criarProduto, initialState)
   const [open, setOpen] = useState(false)
 
@@ -265,7 +299,7 @@ export function CriarProdutoForm() {
             <button onClick={() => setOpen(false)} className="text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">✕</button>
           </div>
           <form action={action} className="space-y-4">
-            <ProdutoFormFields state={state} />
+            <ProdutoFormFields state={state} categorias={categorias} />
             {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">{state.error}</p>}
             <div className="flex gap-3">
               <button
@@ -294,13 +328,20 @@ export function CriarProdutoForm() {
 
 export function EditarProdutoForm({
   id,
+  categorias = [],
   defaults,
 }: {
   id: string
+  categorias?: { id: string; nome: string }[]
   defaults: {
     nome: string
     descricao?: string | null
     preco: number
+    precoOriginal?: number
+    marca?: string
+    categoriaId?: string
+    destaque?: boolean
+    imagensUrl?: string[]
     imagemUrl?: string
     tamanhos: string[]
     estoque: Estoque
@@ -313,11 +354,17 @@ export function EditarProdutoForm({
     <form action={action} className="space-y-4">
       <ProdutoFormFields
         state={state}
+        categorias={categorias}
         defaults={{
           nome: defaults.nome,
           descricao: defaults.descricao ?? '',
           preco: defaults.preco,
-          imagemUrl: defaults.imagemUrl ?? '',
+          precoOriginal: defaults.precoOriginal,
+          marca: defaults.marca,
+          categoriaId: defaults.categoriaId,
+          destaque: defaults.destaque,
+          imagensUrl: defaults.imagensUrl,
+          imagemUrl: defaults.imagemUrl ?? defaults.imagensUrl?.[0] ?? '',
           tamanhos: defaults.tamanhos,
           estoque: defaults.estoque,
         }}

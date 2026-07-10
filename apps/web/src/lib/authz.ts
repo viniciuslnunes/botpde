@@ -3,7 +3,7 @@ import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
 type AuthzResult = {
   session: Session
@@ -26,6 +26,21 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
   const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
 
   if (!hasPermission(effective, permission)) throw new Error('Sem permissão')
+
+  return { session, tenant }
+}
+
+/** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */
+export async function assertStoreView(): Promise<AuthzResult> {
+  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
+
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
+  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+
+  const canView = hasPermission(effective, PERMISSIONS.STORE_VIEW_ORDERS)
+    || hasPermission(effective, PERMISSIONS.STORE_MANAGE)
+  if (!canView) throw new Error('Sem permissão')
 
   return { session, tenant }
 }

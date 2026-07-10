@@ -1,25 +1,27 @@
 'use server'
 
 import { db } from '@torcida/db'
+import type { Prisma } from '@torcida/db'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, CategoriaSchema, CupomSchema, parseTamanhosCsv, slugify, chaveTamanho } from '@torcida/types'
 
-const TAMANHOS_VALIDOS = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'UN'] as const
-
-// ── Schema ──────────────────────────────────────────────────────────────────
+// ── Schema produto admin ──────────────────────────────────────────────────────
 
 const ProdutoSchema = z.object({
   nome: z.string().min(2, 'Nome obrigatório'),
   descricao: z.string().optional(),
   preco: z.coerce.number().positive('Preço inválido'),
-  imagemUrl: z.string().url('URL inválida').or(z.literal('')).optional(),
-  tamanhos: z.string().optional(), // CSV: "P,M,G,GG"
-  estoqueJson: z.string().optional(), // JSON: {"P":10,"M":8}
+  precoOriginal: z.coerce.number().positive().optional().or(z.literal('')),
+  marca: z.string().optional(),
+  categoriaId: z.string().uuid().optional().or(z.literal('')),
+  destaque: z.coerce.boolean().optional(),
+  imagensUrlJson: z.string().optional(),
+  tamanhos: z.string().optional(),
+  tamanhosExtras: z.string().optional(),
+  estoqueJson: z.string().optional(),
 })
-
-// ── Estado ──────────────────────────────────────────────────────────────────
 
 export type ProdutoState = {
   success?: boolean
@@ -32,27 +34,50 @@ export type PedidoStatusState = {
   error?: string
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function parseTamanhos(raw: string | undefined): string[] {
-  if (!raw) return []
-  return raw.split(',').map((t) => t.trim()).filter((t) => TAMANHOS_VALIDOS.includes(t as (typeof TAMANHOS_VALIDOS)[number]))
+export type ActionState = {
+  success?: boolean
+  error?: string
 }
 
 function parseEstoque(estoqueJson: string | undefined, tamanhos: string[]): Record<string, number> {
   if (!estoqueJson) return {}
   try {
     const parsed = JSON.parse(estoqueJson) as Record<string, number>
-    if (tamanhos.length === 0) {
-      return { UN: Number(parsed['UN'] ?? 0) }
-    }
+    if (tamanhos.length === 0) return { UN: Number(parsed['UN'] ?? 0) }
     const result: Record<string, number> = {}
-    for (const t of tamanhos) {
-      result[t] = Number(parsed[t] ?? 0)
-    }
+    for (const t of tamanhos) result[t] = Number(parsed[t] ?? 0)
     return result
   } catch {
     return {}
+  }
+}
+
+function parseImagens(raw: string | undefined, fallback: string[] = []): string[] {
+  if (!raw) return fallback
+  try {
+    const arr = JSON.parse(raw) as string[]
+    return arr.filter(Boolean).slice(0, 4)
+  } catch {
+    return fallback
+  }
+}
+
+function parseTamanhosForm(tamanhosRaw?: string, extrasRaw?: string): string[] {
+  const base = parseTamanhosCsv(tamanhosRaw)
+  const extras = parseTamanhosCsv(extrasRaw)
+  return [...new Set([...base, ...extras])]
+}
+
+async function restaurarEstoquePedido(pedidoId: string, tx: Prisma.TransactionClient) {
+  const itens = await tx.saasPedidoItem.findMany({
+    where: { pedidoId },
+    include: { produto: { select: { estoque: true } } },
+  })
+  for (const item of itens) {
+    const estoque = (item.produto.estoque ?? {}) as Record<string, number>
+    const chave = chaveTamanho(item.tamanho)
+    const novo = { ...estoque, [chave]: (estoque[chave] ?? 0) + item.quantidade }
+    await tx.saasProduto.update({ where: { id: item.produtoId }, data: { estoque: novo } })
   }
 }
 
@@ -65,13 +90,26 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
     const parsed = ProdutoSchema.safeParse(raw)
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
 
-    const { nome, descricao, preco, imagemUrl, tamanhos: tamanhosRaw, estoqueJson } = parsed.data
-    const tamanhos = parseTamanhos(tamanhosRaw)
-    const estoque = parseEstoque(estoqueJson, tamanhos)
-    const imagensUrl = imagemUrl ? [imagemUrl] : []
+    const d = parsed.data
+    const tamanhos = parseTamanhosForm(d.tamanhos, d.tamanhosExtras)
+    const imagensUrl = parseImagens(d.imagensUrlJson)
+    const slug = slugify(d.nome)
 
     await db.saasProduto.create({
-      data: { tenantId: tenant.id, nome, descricao, preco, tamanhos, estoque, imagensUrl },
+      data: {
+        tenantId: tenant.id,
+        slug,
+        nome: d.nome,
+        descricao: d.descricao,
+        preco: d.preco,
+        precoOriginal: d.precoOriginal ? Number(d.precoOriginal) : null,
+        marca: d.marca || null,
+        categoriaId: d.categoriaId || null,
+        destaque: formData.get('destaque') === 'true',
+        tamanhos,
+        estoque: parseEstoque(d.estoqueJson, tamanhos),
+        imagensUrl,
+      },
     })
 
     await db.auditLog.create({
@@ -92,19 +130,31 @@ export async function editarProduto(id: string, _prev: ProdutoState, formData: F
     const parsed = ProdutoSchema.safeParse(raw)
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
 
-    const { nome, descricao, preco, imagemUrl, tamanhos: tamanhosRaw, estoqueJson } = parsed.data
-    const tamanhos = parseTamanhos(tamanhosRaw)
-    const estoque = parseEstoque(estoqueJson, tamanhos)
-
+    const d = parsed.data
+    const tamanhos = parseTamanhosForm(d.tamanhos, d.tamanhosExtras)
     const existente = await db.saasProduto.findFirst({
       where: { id, tenantId: tenant.id },
-      select: { imagensUrl: true },
+      select: { imagensUrl: true, slug: true },
     })
-    const imagensUrl = imagemUrl ? [imagemUrl] : (existente?.imagensUrl ?? [])
+    if (!existente) return { error: 'Produto não encontrado' }
+
+    const imagensUrl = parseImagens(d.imagensUrlJson, existente.imagensUrl)
 
     await db.saasProduto.update({
       where: { id, tenantId: tenant.id },
-      data: { nome, descricao, preco, tamanhos, estoque, imagensUrl },
+      data: {
+        nome: d.nome,
+        descricao: d.descricao,
+        preco: d.preco,
+        precoOriginal: d.precoOriginal ? Number(d.precoOriginal) : null,
+        marca: d.marca || null,
+        categoriaId: d.categoriaId || null,
+        destaque: formData.get('destaque') === 'true',
+        tamanhos,
+        estoque: parseEstoque(d.estoqueJson, tamanhos),
+        imagensUrl,
+        slug: existente.slug ?? slugify(d.nome),
+      },
     })
 
     await db.auditLog.create({
@@ -128,6 +178,97 @@ export async function alterarStatusProduto(id: string, ativo: boolean) {
   revalidatePath('/admin/loja')
 }
 
+// ── Categorias ───────────────────────────────────────────────────────────────
+
+export async function criarCategoria(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+    const parsed = CategoriaSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
+
+    const slug = parsed.data.slug ?? slugify(parsed.data.nome)
+    await db.saasCategoria.create({
+      data: { tenantId: tenant.id, nome: parsed.data.nome, slug, ordem: parsed.data.ordem, parentId: parsed.data.parentId ?? null },
+    })
+    await db.auditLog.create({
+      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CATEGORIA_CRIADA', entidade: 'SaasCategoria' },
+    })
+    revalidatePath('/admin/loja/categorias')
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao criar categoria' }
+  }
+}
+
+export async function excluirCategoria(id: string) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+  await db.saasCategoria.delete({ where: { id, tenantId: tenant.id } })
+  await db.auditLog.create({
+    data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CATEGORIA_EXCLUIDA', entidade: 'SaasCategoria', entidadeId: id },
+  })
+  revalidatePath('/admin/loja/categorias')
+}
+
+export async function criarCategoriaForm(formData: FormData) {
+  await criarCategoria({}, formData)
+}
+
+export async function excluirCategoriaForm(formData: FormData) {
+  const id = formData.get('id') as string
+  if (id) await excluirCategoria(id)
+}
+
+export async function criarCupomForm(formData: FormData) {
+  await criarCupom({}, formData)
+}
+
+// ── Cupons ───────────────────────────────────────────────────────────────────
+
+export async function criarCupom(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+    const raw = Object.fromEntries(formData)
+    raw.primeiraCompra = raw.primeiraCompra === 'on' ? 'true' : 'false'
+    raw.ativo = raw.ativo === 'on' ? 'true' : 'false'
+    const parsed = CupomSchema.safeParse(raw)
+    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
+
+    await db.saasCupom.create({
+      data: {
+        tenantId: tenant.id,
+        codigo: parsed.data.codigo,
+        tipo: parsed.data.tipo,
+        valor: parsed.data.valor,
+        primeiraCompra: parsed.data.primeiraCompra,
+        ativo: parsed.data.ativo,
+        validoAte: parsed.data.validoAte ?? null,
+      },
+    })
+    await db.auditLog.create({
+      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CUPOM_CRIADO', entidade: 'SaasCupom' },
+    })
+    revalidatePath('/admin/loja/cupons')
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao criar cupom' }
+  }
+}
+
+export async function toggleCupom(id: string, ativo: boolean) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
+  await db.saasCupom.update({ where: { id, tenantId: tenant.id }, data: { ativo } })
+  await db.auditLog.create({
+    data: { tenantId: tenant.id, atorId: session.user.id, acao: ativo ? 'CUPOM_ATIVADO' : 'CUPOM_DESATIVADO', entidade: 'SaasCupom', entidadeId: id },
+  })
+  revalidatePath('/admin/loja/cupons')
+}
+
+export async function toggleCupomForm(formData: FormData) {
+  const id = formData.get('id') as string
+  const ativo = formData.get('ativo') === 'true'
+  if (id) await toggleCupom(id, ativo)
+}
+
 // ── Status Pedidos ───────────────────────────────────────────────────────────
 
 export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState, formData: FormData): Promise<PedidoStatusState> {
@@ -137,10 +278,20 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
     const validos = ['PENDENTE', 'CONFIRMADO', 'CANCELADO', 'ENTREGUE']
     if (!validos.includes(status)) return { error: 'Status inválido' }
 
-    await db.saasPedido.update({
+    const pedido = await db.saasPedido.findFirst({
       where: { id, tenantId: tenant.id },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { status: status as any },
+      select: { status: true },
+    })
+    if (!pedido) return { error: 'Pedido não encontrado' }
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (status === 'CANCELADO' && pedido.status !== 'CANCELADO') {
+        await restaurarEstoquePedido(id, tx)
+      }
+      await tx.saasPedido.update({
+        where: { id, tenantId: tenant.id },
+        data: { status: status as 'PENDENTE' | 'CONFIRMADO' | 'CANCELADO' | 'ENTREGUE' },
+      })
     })
 
     await db.auditLog.create({
@@ -148,6 +299,7 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
     })
 
     revalidatePath('/admin/loja/pedidos')
+    revalidatePath('/portal/loja/pedidos')
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao atualizar pedido' }

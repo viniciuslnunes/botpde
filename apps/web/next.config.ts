@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'cdn.discordapp.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'gavioes.jetassets.com.br' },
+      { protocol: 'https', hostname: 'www.lojagavioes.com.br' },
     ],
   },
 }

@@ -18,8 +18,10 @@ Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de ac
 - `packages/types/src/visibility.js` — `SENSIBILIDADE` (publico/restrito),
   `RECURSO_SENSIBILIDADE`, `TenantRelation`, `resolveVisibility`, `canViewRecurso`.
 - `apps/web/src/lib/authz.ts` — `assertPermission()` é o **único** critério de
-  autorização do admin (ver `ARCHITECTURE.md` §5.3). `assertAdmin`/`assertOwner` foram
+  autorização do admin (ver `ARCHITECTURE.md` §5.3). `assertStoreView()` para leitura
+  de pedidos (`STORE_VIEW_ORDERS` ou `STORE_MANAGE`). `assertAdmin`/`assertOwner` foram
   removidos.
+- Loja: `STORE_MANAGE` vs `STORE_VIEW_ORDERS` — ver `docs/data/modulo-loja.md`.
 - Testes: `apps/web/src/lib/__tests__/rbac.test.ts` e `visibilidade-cross-tenant.test.ts`.
 
 ## Invariantes que você defende

@@ -113,6 +113,9 @@ model Tenant {
   membros           SaasMembro[]
   socios            SaasSocio[]
   produtos          SaasProduto[]
+  categoriasLoja    SaasCategoria[]
+  cuponsLoja        SaasCupom[]
+  carrinhoItens     SaasCarrinhoItem[]
   pedidos           SaasPedido[]
   sedes             Sede[]
   eventos           Evento[]
@@ -168,6 +171,7 @@ model User {
   membros              SaasMembro[]
   socios               SaasSocio[]
   pedidos              SaasPedido[]
+  carrinhoItens        SaasCarrinhoItem[]
   eventosRsvp          EventoRsvp[]
   posts                Post[]
   auditLogs            AuditLog[]           @relation("AuditAtor")
@@ -555,26 +559,95 @@ enum RsvpStatus {
 
 // ─── LOJA SaaS ────────────────────────────────────────────────────────────────
 
+model SaasCategoria {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nome     String
+  slug     String
+  ordem    Int     @default(0)
+  parentId String? @map("parent_id")
+  parent   SaasCategoria?  @relation("CategoriaFilhas", fields: [parentId], references: [id], onDelete: SetNull)
+  filhas   SaasCategoria[] @relation("CategoriaFilhas")
+
+  produtos SaasProduto[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("saas_categorias")
+}
+
+model SaasCupom {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo         String
+  tipo           TipoCupom
+  valor          Decimal   @db.Decimal(10, 2)
+  primeiraCompra Boolean   @default(false) @map("primeira_compra")
+  ativo          Boolean   @default(true)
+  validoAte      DateTime? @map("valido_ate")
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId])
+  @@map("saas_cupons")
+}
+
+enum TipoCupom {
+  PERCENTUAL
+  FIXO
+}
+
 model SaasProduto {
   id       String @id @default(uuid())
   tenantId String @map("tenant_id")
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  nome       String
-  descricao  String?
-  preco      Decimal  @db.Decimal(10, 2)
-  ativo      Boolean  @default(true)
-  estoque    Json     @default("{}")
-  tamanhos   String[]
-  imagensUrl String[] @map("imagens_url")
+  nome          String
+  slug          String?
+  descricao     String?
+  preco         Decimal  @db.Decimal(10, 2)
+  precoOriginal Decimal? @map("preco_original") @db.Decimal(10, 2)
+  marca         String?
+  ativo         Boolean  @default(true)
+  destaque      Boolean  @default(false)
+  ordem         Int      @default(0)
+  estoque       Json     @default("{}")
+  tamanhos      String[]
+  imagensUrl    String[] @map("imagens_url")
+
+  categoriaId String?        @map("categoria_id")
+  categoria   SaasCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
 
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  pedidos SaasPedido[]
+  pedidoItens   SaasPedidoItem[]
+  carrinhoItens SaasCarrinhoItem[]
 
+  @@unique([tenantId, slug])
   @@index([tenantId])
+  @@index([categoriaId])
   @@map("saas_produtos")
+}
+
+model SaasCarrinhoItem {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId  String      @map("tenant_id")
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  produtoId String      @map("produto_id")
+  produto   SaasProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  tamanho   String      @default("UN")
+  quantidade Int        @default(1)
+  criadoEm  DateTime    @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@unique([userId, produtoId, tamanho])
+  @@index([userId])
+  @@map("saas_carrinho_itens")
 }
 
 model SaasPedido {
@@ -584,14 +657,15 @@ model SaasPedido {
   userId   String @map("user_id")
   user     User   @relation(fields: [userId], references: [id])
 
-  produtoId   String       @map("produto_id")
-  produto     SaasProduto  @relation(fields: [produtoId], references: [id])
-  produtoNome String       @map("produto_nome")
-  tamanho     String?
-  quantidade  Int
-  precoUnit   Decimal      @map("preco_unit") @db.Decimal(10, 2)
-  total       Decimal      @db.Decimal(10, 2)
-  status      StatusPedido @default(PENDENTE)
+  subtotal  Decimal      @db.Decimal(10, 2)
+  desconto  Decimal      @default(0) @db.Decimal(10, 2)
+  total     Decimal      @db.Decimal(10, 2)
+  status    StatusPedido @default(PENDENTE)
+
+  cupomCodigo       String?           @map("cupom_codigo")
+  modalidadeEntrega ModalidadeEntrega @default(RETIRADA) @map("modalidade_entrega")
+  enderecoEntrega   Json?             @map("endereco_entrega")
+  grupoCheckoutId   String?           @map("grupo_checkout_id")
 
   discordId     String? @map("discord_id")
   canalTicketId String? @map("canal_ticket_id")
@@ -599,10 +673,34 @@ model SaasPedido {
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
+  itens SaasPedidoItem[]
+
   @@index([tenantId])
   @@index([userId])
-  @@index([produtoId])
+  @@index([grupoCheckoutId])
   @@map("saas_pedidos")
+}
+
+model SaasPedidoItem {
+  id          String      @id @default(uuid())
+  pedidoId    String      @map("pedido_id")
+  pedido      SaasPedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produtoId   String      @map("produto_id")
+  produto     SaasProduto @relation(fields: [produtoId], references: [id])
+  produtoNome String      @map("produto_nome")
+  tamanho     String?
+  quantidade  Int
+  precoUnit   Decimal     @map("preco_unit") @db.Decimal(10, 2)
+  total       Decimal     @db.Decimal(10, 2)
+
+  @@index([pedidoId])
+  @@index([produtoId])
+  @@map("saas_pedido_itens")
+}
+
+enum ModalidadeEntrega {
+  RETIRADA
+  ENVIO
 }
 
 enum StatusPedido {

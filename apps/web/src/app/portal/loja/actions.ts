@@ -5,105 +5,308 @@ import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { resolveVisibility } from '@/lib/hierarquia'
-import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { randomUUID } from 'node:crypto'
+import {
+  CarrinhoItemSchema,
+  CheckoutSchema,
+  chaveTamanho,
+  calcularDesconto,
+  validarCupom,
+  rotuloTamanho,
+} from '@torcida/types'
 
-const PedidoSchema = z.object({
-  produtoId: z.string().uuid(),
-  tamanho: z.string().optional(),
-  quantidade: z.coerce.number().int().min(1, 'Mínimo 1 unidade').max(10, 'Máximo 10 unidades'),
-})
-
-export type FazerPedidoState = {
+export type ActionState = {
   success?: boolean
   error?: string
-  pedidoId?: string
+  pedidoIds?: string[]
+  grupoCheckoutId?: string
+  desconto?: number
 }
 
-export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): Promise<FazerPedidoState> {
+async function assertAuth() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id) return { error: 'Você precisa estar logado para fazer um pedido.' }
-  if (!tenant) return { error: 'Tenant não encontrado.' }
+  if (!session?.user?.id) throw new Error('Você precisa estar logado.')
+  if (!tenant) throw new Error('Tenant não encontrado.')
+  return { session, tenant, userId: session.user.id }
+}
 
-  const raw = Object.fromEntries(formData)
-  const parsed = PedidoSchema.safeParse(raw)
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
-
-  const { produtoId, tamanho, quantidade } = parsed.data
-
-  // Produto pode pertencer a um tenant ancestral (loja da sede-mãe cascadeia
-  // pra subsedes/PDEs) — valida visibilidade antes de tentar comprar.
-  const produtoBase = await db.saasProduto.findFirst({
+async function assertProdutoVisivel(produtoId: string, tenantId: string) {
+  const produto = await db.saasProduto.findFirst({
     where: { id: produtoId, ativo: true },
     select: { tenantId: true },
   })
-  if (!produtoBase) return { error: 'Produto não encontrado ou inativo.' }
-  if (produtoBase.tenantId !== tenant.id) {
-    const visivel = await resolveVisibility(tenant.id, produtoBase.tenantId, 'loja')
-    if (!visivel) return { error: 'Produto não encontrado ou inativo.' }
+  if (!produto) throw new Error('Produto não encontrado ou inativo.')
+  if (produto.tenantId !== tenantId) {
+    const visivel = await resolveVisibility(tenantId, produto.tenantId, 'loja')
+    if (!visivel) throw new Error('Produto não encontrado ou inativo.')
   }
-  const produtoTenantId = produtoBase.tenantId
+  return produto.tenantId
+}
 
+export async function adicionarAoCarrinho(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    let pedidoId: string | undefined
+    const { userId, tenant } = await assertAuth()
+    const parsed = CarrinhoItemSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
-    await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      // O pedido é gravado no tenant DONO do produto (não no tenant do
-      // comprador) — é quem tem o estoque e vai gerenciar/entregar o pedido.
-      const produto = await tx.saasProduto.findFirst({
-        where: { id: produtoId, tenantId: produtoTenantId, ativo: true },
-      })
-      if (!produto) throw new Error('Produto não encontrado ou inativo.')
+    const { produtoId, quantidade } = parsed.data
+    const tamanhoChave = chaveTamanho(parsed.data.tamanho)
 
-      const estoque = (produto.estoque ?? {}) as Record<string, number>
-      const chave = tamanho || 'UN'
+    const produtoTenantId = await assertProdutoVisivel(produtoId, tenant.id)
 
-      if (produto.tamanhos.length > 0 && !tamanho) {
-        throw new Error('Selecione um tamanho.')
-      }
-      if (produto.tamanhos.length > 0 && tamanho && !produto.tamanhos.includes(tamanho)) {
-        throw new Error('Tamanho inválido.')
-      }
-
-      const estoqueDisponivel = estoque[chave] ?? 0
-      if (estoqueDisponivel < quantidade) {
-        throw new Error(`Estoque insuficiente. Disponível: ${estoqueDisponivel} unidade(s).`)
-      }
-
-      // Decrementa estoque
-      const novoEstoque = { ...estoque, [chave]: estoqueDisponivel - quantidade }
-      await tx.saasProduto.update({
-        where: { id: produtoId },
-        data: { estoque: novoEstoque },
-      })
-
-      const precoUnit = produto.preco
-      const total = Number(precoUnit) * quantidade
-
-      const pedido = await tx.saasPedido.create({
-        data: {
-          tenantId: produtoTenantId,
-          userId: session.user!.id,
-          produtoId,
-          produtoNome: produto.nome,
-          tamanho: tamanho || null,
-          quantidade,
-          precoUnit,
-          total,
-        },
-      })
-
-      pedidoId = pedido.id
+    const produto = await db.saasProduto.findFirst({
+      where: { id: produtoId, ativo: true },
+      select: { tamanhos: true, estoque: true },
     })
+    if (!produto) return { error: 'Produto não encontrado.' }
 
-    await db.auditLog.create({
-      data: { tenantId: produtoTenantId, atorId: session.user.id, acao: 'PEDIDO_CRIADO', entidade: 'SaasPedido', entidadeId: pedidoId },
+    if (produto.tamanhos.length > 0 && tamanhoChave === 'UN') {
+      return { error: 'Selecione um tamanho.' }
+    }
+    if (produto.tamanhos.length > 0 && !produto.tamanhos.includes(tamanhoChave)) {
+      return { error: 'Tamanho inválido.' }
+    }
+
+    const estoque = (produto.estoque ?? {}) as Record<string, number>
+    const disponivel = estoque[tamanhoChave] ?? 0
+
+    const existente = await db.saasCarrinhoItem.findUnique({
+      where: { userId_produtoId_tamanho: { userId, produtoId, tamanho: tamanhoChave } },
+    })
+    const novaQtd = (existente?.quantidade ?? 0) + quantidade
+    if (novaQtd > disponivel) {
+      return { error: `Estoque insuficiente. Disponível: ${disponivel} unidade(s).` }
+    }
+    if (novaQtd > 10) return { error: 'Máximo 10 unidades por item.' }
+
+    await db.saasCarrinhoItem.upsert({
+      where: { userId_produtoId_tamanho: { userId, produtoId, tamanho: tamanhoChave } },
+      update: { quantidade: novaQtd },
+      create: { userId, tenantId: produtoTenantId, produtoId, tamanho: tamanhoChave, quantidade },
     })
 
     revalidatePath('/portal/loja')
-    revalidatePath('/portal/loja/pedidos')
-    return { success: true, pedidoId }
+    revalidatePath('/portal/loja/sacola')
+    return { success: true }
   } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Erro ao processar pedido.' }
+    return { error: e instanceof Error ? e.message : 'Erro ao adicionar à sacola.' }
   }
+}
+
+export async function atualizarItemCarrinho(itemId: string, quantidade: number): Promise<ActionState> {
+  try {
+    const { userId } = await assertAuth()
+    if (quantidade < 1 || quantidade > 10) return { error: 'Quantidade inválida.' }
+
+    const item = await db.saasCarrinhoItem.findFirst({
+      where: { id: itemId, userId },
+      include: { produto: { select: { estoque: true } } },
+    })
+    if (!item) return { error: 'Item não encontrado.' }
+
+    const estoque = (item.produto.estoque ?? {}) as Record<string, number>
+    if ((estoque[item.tamanho] ?? 0) < quantidade) {
+      return { error: 'Estoque insuficiente.' }
+    }
+
+    await db.saasCarrinhoItem.update({ where: { id: itemId }, data: { quantidade } })
+    revalidatePath('/portal/loja/sacola')
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao atualizar item.' }
+  }
+}
+
+export async function removerDoCarrinho(itemId: string): Promise<ActionState> {
+  try {
+    const { userId } = await assertAuth()
+    await db.saasCarrinhoItem.deleteMany({ where: { id: itemId, userId } })
+    revalidatePath('/portal/loja/sacola')
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao remover item.' }
+  }
+}
+
+export async function validarCupomAction(codigo: string, subtotal: number, tenantDonoId: string): Promise<ActionState & { desconto?: number }> {
+  try {
+    const { userId } = await assertAuth()
+    if (!codigo.trim()) return { error: 'Informe o cupom.' }
+
+    const cupom = await db.saasCupom.findFirst({
+      where: { tenantId: tenantDonoId, codigo: codigo.toUpperCase().trim(), ativo: true },
+    })
+    if (!cupom) return { error: 'Cupom inválido.' }
+
+    const pedidosAnteriores = await db.saasPedido.count({
+      where: { tenantId: tenantDonoId, userId, status: { not: 'CANCELADO' } },
+    })
+
+    const check = validarCupom(cupom, { subtotal, userJaComprou: pedidosAnteriores > 0 })
+    if (!check.ok) return { error: check.erro }
+
+    const desconto = calcularDesconto(cupom, subtotal)
+    return { success: true, desconto }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao validar cupom.' }
+  }
+}
+
+export async function finalizarPedido(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const { userId, tenant } = await assertAuth()
+
+    const raw: Record<string, FormDataEntryValue> = Object.fromEntries(formData)
+    if (typeof raw.enderecoEntrega === 'string') {
+      try {
+        raw.enderecoEntrega = JSON.parse(raw.enderecoEntrega) as unknown as FormDataEntryValue
+      } catch {
+        delete raw.enderecoEntrega
+      }
+    }
+
+    const parsed = CheckoutSchema.safeParse(raw)
+    if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
+
+    const itensCarrinho = await db.saasCarrinhoItem.findMany({
+      where: { userId },
+      include: {
+        produto: {
+          select: { id: true, nome: true, preco: true, estoque: true, tamanhos: true, tenantId: true, ativo: true },
+        },
+      },
+    })
+
+    if (itensCarrinho.length === 0) return { error: 'Sua sacola está vazia.' }
+
+    for (const item of itensCarrinho) {
+      if (!item.produto.ativo) return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
+      await assertProdutoVisivel(item.produtoId, tenant.id)
+    }
+
+    const porTenant = new Map<string, typeof itensCarrinho>()
+    for (const item of itensCarrinho) {
+      const tid = item.produto.tenantId
+      if (!porTenant.has(tid)) porTenant.set(tid, [])
+      porTenant.get(tid)!.push(item)
+    }
+
+    const grupoCheckoutId = randomUUID()
+    const pedidoIds: string[] = []
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      for (const [tenantDonoId, itens] of porTenant) {
+        let subtotal = 0
+        const linhas: Array<{
+          produtoId: string
+          produtoNome: string
+          tamanho: string | null
+          quantidade: number
+          precoUnit: number
+          total: number
+        }> = []
+
+        for (const item of itens) {
+          const produto = await tx.saasProduto.findFirst({
+            where: { id: item.produtoId, tenantId: tenantDonoId, ativo: true },
+          })
+          if (!produto) throw new Error(`Produto "${item.produto.nome}" indisponível.`)
+
+          const estoque = (produto.estoque ?? {}) as Record<string, number>
+          const chave = item.tamanho
+          const disponivel = estoque[chave] ?? 0
+          if (disponivel < item.quantidade) {
+            throw new Error(`Estoque insuficiente para "${produto.nome}" (${rotuloTamanho(chave) ?? 'único'}).`)
+          }
+
+          const precoUnit = Number(produto.preco)
+          const totalLinha = precoUnit * item.quantidade
+          subtotal += totalLinha
+          linhas.push({
+            produtoId: produto.id,
+            produtoNome: produto.nome,
+            tamanho: rotuloTamanho(chave),
+            quantidade: item.quantidade,
+            precoUnit,
+            total: totalLinha,
+          })
+
+          await tx.saasProduto.update({
+            where: { id: produto.id },
+            data: { estoque: { ...estoque, [chave]: disponivel - item.quantidade } },
+          })
+        }
+
+        let desconto = 0
+        let cupomCodigo: string | null = null
+        if (parsed.data.cupomCodigo?.trim()) {
+          const cupom = await tx.saasCupom.findFirst({
+            where: { tenantId: tenantDonoId, codigo: parsed.data.cupomCodigo.toUpperCase().trim(), ativo: true },
+          })
+          if (!cupom) throw new Error('Cupom inválido.')
+          const pedidosAnteriores = await tx.saasPedido.count({
+            where: { tenantId: tenantDonoId, userId, status: { not: 'CANCELADO' } },
+          })
+          const check = validarCupom({ ...cupom, valor: Number(cupom.valor) }, { subtotal, userJaComprou: pedidosAnteriores > 0 })
+          if (!check.ok) throw new Error(check.erro)
+          desconto = calcularDesconto({ tipo: cupom.tipo, valor: Number(cupom.valor) }, subtotal)
+          cupomCodigo = cupom.codigo
+        }
+
+        const total = Math.max(0, subtotal - desconto)
+
+        const pedido = await tx.saasPedido.create({
+          data: {
+            tenantId: tenantDonoId,
+            userId,
+            subtotal,
+            desconto,
+            total,
+            cupomCodigo,
+            modalidadeEntrega: parsed.data.modalidadeEntrega,
+            enderecoEntrega: parsed.data.enderecoEntrega ?? undefined,
+            grupoCheckoutId,
+            itens: {
+              create: linhas.map((l) => ({
+                produtoId: l.produtoId,
+                produtoNome: l.produtoNome,
+                tamanho: l.tamanho,
+                quantidade: l.quantidade,
+                precoUnit: l.precoUnit,
+                total: l.total,
+              })),
+            },
+          },
+        })
+        pedidoIds.push(pedido.id)
+      }
+
+      await tx.saasCarrinhoItem.deleteMany({ where: { userId } })
+    })
+
+    const session = await auth()
+    for (const pedidoId of pedidoIds) {
+      const p = await db.saasPedido.findUnique({ where: { id: pedidoId }, select: { tenantId: true } })
+      if (p && session?.user?.id) {
+        await db.auditLog.create({
+          data: { tenantId: p.tenantId, atorId: session.user.id, acao: 'PEDIDO_CRIADO', entidade: 'SaasPedido', entidadeId: pedidoId },
+        })
+      }
+    }
+
+    revalidatePath('/portal/loja')
+    revalidatePath('/portal/loja/sacola')
+    revalidatePath('/portal/loja/pedidos')
+    return { success: true, pedidoIds, grupoCheckoutId }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao finalizar pedido.' }
+  }
+}
+
+/** @deprecated Use adicionarAoCarrinho + finalizarPedido */
+export type FazerPedidoState = ActionState
+
+export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): Promise<FazerPedidoState> {
+  return adicionarAoCarrinho(_prev, formData)
 }

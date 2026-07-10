@@ -51,3 +51,4 @@ updates frequentes. Use `assertSalaMembro(salaId)` / `assertSalaAnfitriao(salaId
 (`apps/web/src/lib/salas-api.ts`) para autorização, não `assertPermission` direto. Para
 dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` de
 `apps/web/src/lib/livekit.ts` — degrade, não quebre. Ver `docs/data/modulo-salas.md`.
+Loja: sacola/checkout/cupom — ver `docs/data/modulo-loja.md`; agente `loja` para escopo amplo.
