@@ -5,7 +5,9 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { ComprarForm } from './comprar-form'
-import { ArrowLeft, ShoppingBag } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Produto' }
@@ -47,15 +49,12 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Imagem */}
-        <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-          {produto.imagensUrl[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={produto.imagensUrl[0]} alt={produto.nome} className="h-80 w-full object-cover lg:h-full" />
-          ) : (
-            <div className="flex h-80 items-center justify-center">
-              <ShoppingBag className="h-16 w-16 text-[rgb(var(--foreground-muted))]" />
-            </div>
-          )}
+        <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
+          <ProdutoImagem
+            src={firstProdutoImagemUrl(produto.imagensUrl)}
+            alt={produto.nome}
+            variant="detail"
+          />
         </div>
 
         {/* Info + Compra */}

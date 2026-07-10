@@ -3,6 +3,8 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { StatusPedidoBadge, StatusPedidoSelect } from '@/components/admin/produto-forms'
+import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { ArrowLeft, Package } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -116,14 +118,11 @@ export default async function AdminPedidosPage({
                 <tr key={pedido.id} className="hover:bg-[rgb(var(--background-subtle))]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {pedido.produto.imagensUrl[0] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={pedido.produto.imagensUrl[0]} alt="" className="h-8 w-8 rounded-lg object-cover" />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))]">
-                          <Package className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                        </div>
-                      )}
+                      <ProdutoImagem
+                        src={firstProdutoImagemUrl(pedido.produto.imagensUrl)}
+                        alt=""
+                        variant="mini"
+                      />
                       <span className="font-medium text-[rgb(var(--foreground))]">{pedido.produtoNome}</span>
                     </div>
                   </td>

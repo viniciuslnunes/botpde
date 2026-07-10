@@ -3,6 +3,8 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CriarProdutoForm, ToggleProdutoButton } from '@/components/admin/produto-forms'
+import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { ShoppingBag, Package, Pencil } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -77,14 +79,11 @@ export default async function AdminLojaPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ativos.map((p: Produto) => (
               <div key={p.id} className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] overflow-hidden">
-                {p.imagensUrl[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.imagensUrl[0]} alt={p.nome} className="h-40 w-full object-cover" />
-                ) : (
-                  <div className="flex h-40 items-center justify-center bg-[rgb(var(--background-subtle))]">
-                    <ShoppingBag className="h-10 w-10 text-[rgb(var(--foreground-muted))]" />
-                  </div>
-                )}
+                <ProdutoImagem
+                  src={firstProdutoImagemUrl(p.imagensUrl)}
+                  alt={p.nome}
+                  variant="admin"
+                />
                 <div className="p-4 space-y-3">
                   <div>
                     <h3 className="font-semibold text-[rgb(var(--foreground))]">{p.nome}</h3>
@@ -125,9 +124,12 @@ export default async function AdminLojaPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {inativos.map((p: Produto) => (
               <div key={p.id} className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-70 overflow-hidden">
-                <div className="flex h-32 items-center justify-center bg-[rgb(var(--background))]">
-                  <ShoppingBag className="h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-                </div>
+                <ProdutoImagem
+                  src={firstProdutoImagemUrl(p.imagensUrl)}
+                  alt={p.nome}
+                  variant="admin"
+                  className="h-32"
+                />
                 <div className="p-4 space-y-2">
                   <h3 className="font-medium text-[rgb(var(--foreground))]">{p.nome}</h3>
                   <p className="text-sm font-semibold text-[rgb(var(--foreground-muted))]">{formatarPreco(p.preco)}</p>

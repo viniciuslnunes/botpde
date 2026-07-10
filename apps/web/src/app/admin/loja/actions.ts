@@ -95,7 +95,12 @@ export async function editarProduto(id: string, _prev: ProdutoState, formData: F
     const { nome, descricao, preco, imagemUrl, tamanhos: tamanhosRaw, estoqueJson } = parsed.data
     const tamanhos = parseTamanhos(tamanhosRaw)
     const estoque = parseEstoque(estoqueJson, tamanhos)
-    const imagensUrl = imagemUrl ? [imagemUrl] : []
+
+    const existente = await db.saasProduto.findFirst({
+      where: { id, tenantId: tenant.id },
+      select: { imagensUrl: true },
+    })
+    const imagensUrl = imagemUrl ? [imagemUrl] : (existente?.imagensUrl ?? [])
 
     await db.saasProduto.update({
       where: { id, tenantId: tenant.id },

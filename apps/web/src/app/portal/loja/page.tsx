@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { ShoppingBag, Package } from 'lucide-react'
+import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Loja' }
@@ -80,14 +82,7 @@ export default async function PortalLojaPage() {
                 href={`/portal/loja/${p.id}`}
                 className="group block rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] overflow-hidden transition-all hover:shadow-md hover:scale-[1.01]"
               >
-                {p.imagensUrl[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.imagensUrl[0]} alt={p.nome} className="h-48 w-full object-cover transition-transform group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-48 items-center justify-center bg-[rgb(var(--background-subtle))]">
-                    <ShoppingBag className="h-12 w-12 text-[rgb(var(--foreground-muted))]" />
-                  </div>
-                )}
+                <ProdutoImagem src={firstProdutoImagemUrl(p.imagensUrl)} alt={p.nome} variant="card" />
                 <div className="p-4 space-y-2">
                   {p.tenantId !== tenant.id && (
                     <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">

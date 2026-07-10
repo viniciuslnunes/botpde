@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { EditarProdutoForm } from '@/components/admin/produto-forms'
 import { StatusPedidoBadge } from '@/components/admin/produto-forms'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -36,7 +37,7 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
   if (!produto) notFound()
 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
-  const imagemUrl = produto.imagensUrl[0] ?? ''
+  const imagemUrl = firstProdutoImagemUrl(produto.imagensUrl) ?? ''
 
   return (
     <div className="p-6 space-y-8 max-w-3xl">

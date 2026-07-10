@@ -4,7 +4,9 @@ import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
-import { Package, ShoppingBag, ArrowLeft } from 'lucide-react'
+import { Package, ArrowLeft } from 'lucide-react'
+import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Meus Pedidos' }
@@ -98,18 +100,11 @@ export default async function MeusPedidosPage() {
                     className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
                   >
                     <div className="flex items-start gap-4">
-                      {pedido.produto.imagensUrl[0] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={pedido.produto.imagensUrl[0]}
-                          alt={pedido.produtoNome}
-                          className="h-16 w-16 rounded-xl object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-[rgb(var(--background-subtle))]">
-                          <ShoppingBag className="h-7 w-7 text-[rgb(var(--foreground-muted))]" />
-                        </div>
-                      )}
+                      <ProdutoImagem
+                        src={firstProdutoImagemUrl(pedido.produto.imagensUrl)}
+                        alt={pedido.produtoNome}
+                        variant="thumb"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className="font-semibold text-[rgb(var(--foreground))]">{pedido.produtoNome}</h3>
