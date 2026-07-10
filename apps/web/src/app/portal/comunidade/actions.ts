@@ -7,13 +7,14 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, criarGrupoPublicoSchema, criarDestaqueSchema } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
+import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId } from '@/lib/feed'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
@@ -771,6 +772,111 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   })
 
   revalidatePath('/portal/comunidade')
+}
+
+export async function repostarComunicado(comunicadoId: string, comentario?: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = repostarComunicadoSchema.safeParse({ comunicadoId, comentario })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Repost inválido')
+
+  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const comunicado: { id: string; autorId: string } | null = await db.announcement.findFirst({
+    where: { id: parsed.data.comunicadoId, tenantId: { in: visibleIds } },
+    select: { id: true, autorId: true },
+  })
+  if (!comunicado) throw new Error('Comunicado não encontrado')
+
+  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+  const texto = parsed.data.comentario?.trim() || '📢 Compartilhou um comunicado oficial'
+  const repost = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: texto,
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      comunicadoOrigemId: comunicado.id,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'COMUNICADO_REPOSTADO',
+      entidade: 'Post',
+      entidadeId: repost.id,
+      detalhes: { comunicadoOrigemId: comunicado.id },
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+}
+
+export async function publicarPostEvento(
+  _prevState: PublicarPostState,
+  formData: FormData,
+): Promise<PublicarPostState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = publicarPostEventoSchema.safeParse({
+    conteudo: formData.get('conteudo'),
+    eventoId: formData.get('eventoId'),
+    visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
+  })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  const escopo = await getEscopoEventosVisiveis(tenant.id, session.user.id)
+  const evento: { id: string } | null = await db.evento.findFirst({
+    where: { id: parsed.data.eventoId, ...escopo },
+    select: { id: true },
+  })
+  if (!evento) return { message: 'Evento não encontrado ou indisponível.' }
+
+  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+  const post = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: parsed.data.conteudo,
+      tipo: 'MEMBRO',
+      visibilidade: parsed.data.visibilidade,
+      eventoId: evento.id,
+    },
+  })
+
+  await Promise.all([
+    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
+    notificarMencoesDoPost({
+      conteudo: parsed.data.conteudo,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      tenantId: tenant.id,
+      postId: post.id,
+      link: linkPostComunidade(post.id),
+    }),
+  ])
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_EVENTO_PUBLICADO',
+      entidade: 'Post',
+      entidadeId: post.id,
+      detalhes: { eventoId: evento.id },
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  return { success: true, token: post.id }
 }
 
 export async function criarGrupoPublico(nome: string, descricao?: string): Promise<{ id: string }> {

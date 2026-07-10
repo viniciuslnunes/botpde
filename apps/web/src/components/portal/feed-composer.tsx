@@ -1,9 +1,10 @@
 'use client'
 
 import { useActionState, useRef, useState } from 'react'
-import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign } from 'lucide-react'
+import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { publicarPost, publicarEnquete, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
 import { Avatar } from './avatar'
@@ -20,9 +21,10 @@ interface FeedComposerProps {
   userName: string | null
   userAvatar: string | null
   perfilPrivado?: boolean
+  eventos?: EventoComposerItem[]
 }
 
-export function FeedComposer({ userName, userAvatar, perfilPrivado = true }: FeedComposerProps) {
+export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [] }: FeedComposerProps) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -31,9 +33,17 @@ export function FeedComposer({ userName, userAvatar, perfilPrivado = true }: Fee
     publicarEnquete,
     INITIAL_STATE,
   )
+  const [eventState, eventAction, eventPending] = useActionState<PublicarPostState, FormData>(
+    publicarPostEvento,
+    INITIAL_STATE,
+  )
 
-  const token = postState.token ?? pollState.token ?? 'novo'
-  const state = postState.token || postState.success ? postState : pollState
+  const token = postState.token ?? pollState.token ?? eventState.token ?? 'novo'
+  const state = postState.token || postState.success
+    ? postState
+    : pollState.token || pollState.success
+      ? pollState
+      : eventState
 
   return (
     <ComposerBody
@@ -43,9 +53,12 @@ export function FeedComposer({ userName, userAvatar, perfilPrivado = true }: Fee
       perfilPrivado={perfilPrivado}
       postAction={postAction}
       pollAction={pollAction}
+      eventAction={eventAction}
       postPending={postPending}
       pollPending={pollPending}
-      serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0]}
+      eventPending={eventPending}
+      eventos={eventos}
+      serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
   )
 }
@@ -67,21 +80,29 @@ function ComposerBody({
   perfilPrivado,
   postAction,
   pollAction,
+  eventAction,
   postPending,
   pollPending,
+  eventPending,
   serverError,
+  eventos,
 }: {
   userName: string | null
   userAvatar: string | null
   perfilPrivado: boolean
   postAction: (payload: FormData) => void
   pollAction: (payload: FormData) => void
+  eventAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
+  eventPending: boolean
   serverError?: string
+  eventos: EventoComposerItem[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modoEnquete, setModoEnquete] = useState(false)
+  const [modoEvento, setModoEvento] = useState(false)
+  const [eventoId, setEventoId] = useState(eventos[0]?.id ?? '')
   const [texto, setTexto] = useState('')
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
@@ -100,7 +121,7 @@ function ComposerBody({
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
   const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
   const enviando = medias.some((m) => m.url === null && !m.error)
-  const pending = modoEnquete ? pollPending : postPending
+  const pending = modoEnquete ? pollPending : modoEvento ? eventPending : postPending
   const finalMidias = [
     ...medias.filter((m) => m.url).map((m) => m.url as string),
     ...(embedUrl ? [embedUrl] : []),
@@ -108,7 +129,9 @@ function ComposerBody({
   const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean)
   const podePublicar = modoEnquete
     ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending
-    : texto.trim().length > 0 && !enviando && !pending
+    : modoEvento
+      ? texto.trim().length > 0 && eventoId.length > 0 && !pending
+      : texto.trim().length > 0 && !enviando && !pending
 
   function handleTextoChange(value: string, cursor?: number) {
     setTexto(value)
@@ -143,6 +166,8 @@ function ComposerBody({
     const fd = new FormData(e.currentTarget)
     if (modoEnquete) {
       pollAction(fd)
+    } else if (modoEvento) {
+      eventAction(fd)
     } else {
       postAction(fd)
     }
@@ -255,6 +280,7 @@ function ComposerBody({
       {modoEnquete && (
         <input type="hidden" name="opcoes" value={JSON.stringify(opcoesValidas)} />
       )}
+      {modoEvento && <input type="hidden" name="eventoId" value={eventoId} />}
 
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
@@ -324,6 +350,23 @@ function ComposerBody({
               + Adicionar opção
             </button>
           )}
+        </div>
+      )}
+
+      {expanded && modoEvento && eventos.length > 0 && (
+        <div className="mt-3 pl-[52px]">
+          <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Evento vinculado</label>
+          <select
+            value={eventoId}
+            onChange={(e) => setEventoId(e.target.value)}
+            className="mt-1 h-9 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+          >
+            {eventos.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.titulo}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -449,6 +492,7 @@ function ComposerBody({
                 type="button"
                 onClick={() => {
                   setModoEnquete((v) => !v)
+                  setModoEvento(false)
                   setEmojiOpen(false)
                   setStickerOpen(false)
                 }}
@@ -463,6 +507,28 @@ function ComposerBody({
               >
                 <BarChart3 className="h-5 w-5" />
               </button>
+              {eventos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoEvento((v) => !v)
+                    setModoEnquete(false)
+                    setEmojiOpen(false)
+                    setStickerOpen(false)
+                    if (!eventoId && eventos[0]) setEventoId(eventos[0].id)
+                  }}
+                  aria-label="Vincular evento"
+                  title="Evento"
+                  className={[
+                    'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                    modoEvento
+                      ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
+                  ].join(' ')}
+                >
+                  <CalendarDays className="h-5 w-5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -524,7 +590,7 @@ function ComposerBody({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : 'Publicar'}
+                {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : modoEvento ? 'Publicar sobre evento' : 'Publicar'}
               </button>
             </div>
           </div>

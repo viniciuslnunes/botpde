@@ -28,6 +28,7 @@ interface ComunidadeFeedShellProps {
   currentUser: CurrentUser
   cursor?: string
   perfilPrivado?: boolean
+  eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
 }
 
 function ComunicadosFallback() {
@@ -53,7 +54,7 @@ function AsideWidgetsFallback() {
   )
 }
 
-export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado = true }: ComunidadeFeedShellProps) {
+export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado = true, eventosComposer = [] }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true },
     { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false },
@@ -182,6 +183,7 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado
             userName={currentUser.nome}
             userAvatar={currentUser.avatarUrl}
             perfilPrivado={perfilPrivado}
+            eventos={eventosComposer}
           />
         )}
 

@@ -22,9 +22,20 @@ export const votarEnqueteSchema = z.object({
   opcaoId: z.string().min(1),
 })
 
+export const repostarComunicadoSchema = z.object({
+  comunicadoId: z.string().min(1),
+  comentario: z.string().trim().max(500).optional(),
+})
+
 export const repostarSchema = z.object({
   postId: z.string().min(1),
   comentario: z.string().trim().max(500).optional(),
+})
+
+export const publicarPostEventoSchema = z.object({
+  conteudo: z.string().trim().min(1).max(3000),
+  eventoId: z.string().min(1),
+  visibilidade: z.enum(['PUBLICO', 'TENANT', 'PRIVADO']).default('PUBLICO'),
 })
 
 export const criarGrupoPublicoSchema = z.object({

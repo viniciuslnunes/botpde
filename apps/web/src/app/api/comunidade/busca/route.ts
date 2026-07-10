@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
-import { buscarMembrosComunidade } from '@/lib/comunidade-busca'
+import { buscarComunidade } from '@/lib/comunidade-busca'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +13,11 @@ export async function GET(request: NextRequest) {
     await assertMembroAtivo(tenant.id, session.user.id)
 
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
-    const membros = await buscarMembrosComunidade(tenant.id, session.user.id, q)
+    const resultado = await buscarComunidade(tenant.id, session.user.id, q)
 
-    return NextResponse.json({ membros })
+    return NextResponse.json(resultado)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao buscar membros.'
+    const message = error instanceof Error ? error.message : 'Erro na busca.'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }

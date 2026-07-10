@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Repeat2, Pin } from 'lucide-react'
+import { Repeat2, Pin, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { Avatar } from './avatar'
@@ -10,6 +10,8 @@ import { FeedPostMenu } from './feed-post-menu'
 import { PostConteudoRich } from './post-conteudo-rich'
 import { PostPoll } from './post-poll'
 import { PostRepostEmbed } from './post-repost-embed'
+import { PostComunicadoEmbed } from './post-comunicado-embed'
+import { PostEventoEmbed } from './post-evento-embed'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface FeedPostCardProps {
@@ -39,6 +41,16 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
             {showTenantBadge && (
               <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--primary))]">
                 {post.tenant.nome}
+              </span>
+            )}
+            {post.autor.sedeNome && (
+              <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                {post.autor.sedeNome}
+              </span>
+            )}
+            {post.autor.cargoNome && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                {post.autor.cargoNome}
               </span>
             )}
             {post.fixado && (
@@ -71,9 +83,20 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         </p>
       )}
 
+      {post.comunicadoOrigemId && !post.postOrigemId && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          <Megaphone className="h-3.5 w-3.5" />
+          Compartilhou um comunicado oficial
+        </p>
+      )}
+
       <PostConteudoRich conteudo={post.conteudo} className="mt-2" />
 
       {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
+
+      {post.comunicadoOrigem && <PostComunicadoEmbed comunicado={post.comunicadoOrigem} />}
+
+      {post.evento && <PostEventoEmbed evento={post.evento} />}
 
       {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
 
@@ -89,7 +112,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         totalComentarios={post.totalComentarios}
         minhaReacao={post.minhaReacao}
         currentUser={currentUser}
-        isRepost={!!post.postOrigemId}
+        isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
         salvoInicial={salvo}
       />
     </article>

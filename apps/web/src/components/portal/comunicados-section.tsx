@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Megaphone, Pin } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import { marcarComunicadosLidosAction } from '@/app/portal/comunidade/actions'
+import { ComunicadoShareButton } from '@/components/portal/comunicado-share-button'
 
 export interface ComunicadoSectionItem {
   id: string
@@ -143,10 +144,13 @@ export function ComunicadosSection({
               <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
                 {a.corpo}
               </p>
-              <div className="mt-3 flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-                <span>{a.autorNome ?? 'Administração'}</span>
-                <span>·</span>
-                <span>{formatarData(a.publicadoEm)}</span>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                  <span>{a.autorNome ?? 'Administração'}</span>
+                  <span>·</span>
+                  <span>{formatarData(a.publicadoEm)}</span>
+                </div>
+                <ComunicadoShareButton comunicadoId={a.id} />
               </div>
             </article>
           )

@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { BuscaMembrosClient } from './busca-membros-client'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Buscar Membros' }
+export const metadata: Metadata = { title: 'Buscar na Comunidade' }
 
 export default async function BuscaMembrosPage() {
   const session = await auth()
@@ -19,9 +19,9 @@ export default async function BuscaMembrosPage() {
         ← Voltar ao feed
       </Link>
       <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Buscar membros</h1>
+        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Buscar na comunidade</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Encontre torcedores da sua torcida e aliadas para seguir.
+          Encontre membros, hashtags em alta e publicações.
         </p>
       </div>
       <BuscaMembrosClient />

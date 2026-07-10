@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { MessageCircleWarning, ShieldAlert } from 'lucide-react'
+import Link from 'next/link'
+import { linkPostComunidade } from '@/lib/comunidade-social'
 import {
   resolverDenuncia,
   descartarDenuncia,
@@ -117,9 +119,18 @@ export default async function ModeracaoComunidadePage() {
                 <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
                   {denuncia.post.titulo ?? 'Post sem título'}
                 </p>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                  {formatarData(denuncia.criadoEm)}
-                </p>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={linkPostComunidade(denuncia.post.id)}
+                    className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                    target="_blank"
+                  >
+                    Ver post
+                  </Link>
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {formatarData(denuncia.criadoEm)}
+                  </p>
+                </div>
               </div>
 
               <p className="mt-2 line-clamp-3 text-sm text-[rgb(var(--foreground-muted))]">

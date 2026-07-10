@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getOrCreatePerfilMembro } from '@/lib/social'
+import { getEventosParaComposer } from '@/lib/eventos'
 
 const ComunidadeChatPanel = dynamic(
   () =>
@@ -44,6 +45,11 @@ export default async function ComunidadePage({
       ? (await getOrCreatePerfilMembro(session.user.id, tenant.id)).perfilPrivado
       : true
 
+  const eventosComposer =
+    session?.user?.id != null
+      ? await getEventosParaComposer(tenant.id, session.user.id)
+      : []
+
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
       <ComunidadeFeedShell
@@ -51,6 +57,7 @@ export default async function ComunidadePage({
         currentUser={currentUser}
         cursor={params.cursor}
         perfilPrivado={perfilPrivado}
+        eventosComposer={eventosComposer}
       />
 
       <aside className="hidden xl:block">

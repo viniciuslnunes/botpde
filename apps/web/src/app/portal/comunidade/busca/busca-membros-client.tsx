@@ -2,25 +2,24 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Search, Loader2 } from 'lucide-react'
+import { Search, Loader2, Hash, FileText } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
+import { linkPostComunidade } from '@/lib/comunidade-social'
+import type { MembroBuscaItem } from '@/lib/comunidade-busca'
+import type { PostSocialItem } from '@/lib/feed'
 
-interface MembroBusca {
-  id: string
-  nome: string | null
-  avatarUrl: string | null
-  tenantNome: string
-  perfilPrivado: boolean
-  statusSeguimento: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' | null
-  seguidores: number
-  podeSeguir: boolean
+interface BuscaResponse {
+  membros: MembroBuscaItem[]
+  hashtags: Array<{ tag: string; total: number }>
+  posts: PostSocialItem[]
 }
 
 export function BuscaMembrosClient() {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
-  const [membros, setMembros] = useState<MembroBusca[]>([])
+  const [resultado, setResultado] = useState<BuscaResponse>({ membros: [], hashtags: [], posts: [] })
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -32,22 +31,22 @@ export function BuscaMembrosClient() {
 
   const buscar = useCallback(async (termo: string) => {
     if (termo.length < 2) {
-      setMembros([])
+      setResultado({ membros: [], hashtags: [], posts: [] })
       return
     }
     setCarregando(true)
     setErro(null)
     try {
-      const res = await fetch(`/api/comunidade/membros?q=${encodeURIComponent(termo)}`)
+      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`)
       if (!res.ok) {
         const body = (await res.json()) as { error?: string }
         throw new Error(body.error ?? 'Erro na busca')
       }
-      const data = (await res.json()) as { membros: MembroBusca[] }
-      setMembros(data.membros)
+      const data = (await res.json()) as BuscaResponse
+      setResultado(data)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro na busca')
-      setMembros([])
+      setResultado({ membros: [], hashtags: [], posts: [] })
     } finally {
       setCarregando(false)
     }
@@ -57,15 +56,23 @@ export function BuscaMembrosClient() {
     startTransition(() => void buscar(debounced))
   }, [debounced, buscar])
 
+  const vazio =
+    !carregando &&
+    debounced.length >= 2 &&
+    !erro &&
+    resultado.membros.length === 0 &&
+    resultado.hashtags.length === 0 &&
+    resultado.posts.length === 0
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar membros por nome ou bio…"
+          placeholder="Buscar membros, hashtags ou posts…"
           className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pl-10 pr-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
           autoFocus
         />
@@ -84,9 +91,9 @@ export function BuscaMembrosClient() {
         </p>
       )}
 
-      {!carregando && debounced.length >= 2 && membros.length === 0 && !erro && (
+      {vazio && (
         <p className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhum membro encontrado para &quot;{debounced}&quot;.
+          Nenhum resultado para &quot;{debounced}&quot;.
         </p>
       )}
 
@@ -96,29 +103,81 @@ export function BuscaMembrosClient() {
         </p>
       )}
 
-      <div className="space-y-2">
-        {membros.map((m) => (
-          <div
-            key={m.id}
-            className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
-          >
-            <Link href={`/portal/comunidade/perfil/${m.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-              <Avatar nome={m.nome} avatarUrl={m.avatarUrl} size="md" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                  {m.nome ?? 'Membro'}
-                </p>
-                <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                  {m.tenantNome}
-                  {m.seguidores > 0 && ` · ${m.seguidores} seguidor${m.seguidores === 1 ? '' : 'es'}`}
-                  {m.perfilPrivado && ' · Privado'}
-                </p>
-              </div>
-            </Link>
-            {m.podeSeguir && <SeguimentoButtons userId={m.id} status={m.statusSeguimento} />}
+      {resultado.hashtags.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <Hash className="h-4 w-4" />
+            Hashtags
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {resultado.hashtags.map((h) => (
+              <Link
+                key={h.tag}
+                href={`/portal/comunidade/hashtag/${encodeURIComponent(h.tag)}`}
+                className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))]"
+              >
+                #{h.tag}
+                <span className="ml-1.5 text-xs text-[rgb(var(--foreground-muted))]">{h.total}</span>
+              </Link>
+            ))}
           </div>
-        ))}
-      </div>
+        </section>
+      )}
+
+      {resultado.membros.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Membros</h2>
+          <div className="space-y-2">
+            {resultado.membros.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+              >
+                <Link href={`/portal/comunidade/perfil/${m.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar nome={m.nome} avatarUrl={m.avatarUrl} size="md" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                      {m.nome ?? 'Membro'}
+                    </p>
+                    <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                      {m.tenantNome}
+                      {m.seguidores > 0 && ` · ${m.seguidores} seguidor${m.seguidores === 1 ? '' : 'es'}`}
+                      {m.perfilPrivado && ' · Privado'}
+                    </p>
+                  </div>
+                </Link>
+                {m.podeSeguir && <SeguimentoButtons userId={m.id} status={m.statusSeguimento} />}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {resultado.posts.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <FileText className="h-4 w-4" />
+            Posts
+          </h2>
+          <div className="space-y-2">
+            {resultado.posts.map((p) => (
+              <Link
+                key={p.id}
+                href={linkPostComunidade(p.id)}
+                className="block rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                  {p.autor.nome ?? 'Membro'} · {p.tenant.nome}
+                </p>
+                <PostConteudoRich
+                  conteudo={p.conteudo}
+                  className="mt-1 line-clamp-2 text-sm text-[rgb(var(--foreground))]"
+                />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

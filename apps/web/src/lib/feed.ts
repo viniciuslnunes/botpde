@@ -5,6 +5,7 @@ import { getVisibleTenantIds } from './hierarquia'
 import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
 import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
+import { enriquecerPostsComBadges } from './autor-badges'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 
@@ -32,6 +33,23 @@ export interface PostOrigemEmbed {
   oculto: boolean
 }
 
+export interface ComunicadoOrigemEmbed {
+  id: string
+  titulo: string
+  corpo: string
+  prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+  tenantNome: string
+  autorNome: string | null
+}
+
+export interface EventoPostEmbed {
+  id: string
+  titulo: string
+  data: Date
+  local: string | null
+  meuRsvp: 'CONFIRMADO' | 'RECUSADO' | null
+}
+
 export interface PostSocialItem {
   id: string
   tenantId: string
@@ -45,19 +63,35 @@ export interface PostSocialItem {
   criadoEm: Date
   autorId: string
   postOrigemId: string | null
+  comunicadoOrigemId: string | null
+  eventoId: string | null
   tenant: { nome: string }
-  autor: { id: string; nome: string | null; avatarUrl: string | null }
+  autor: {
+    id: string
+    nome: string | null
+    avatarUrl: string | null
+    sedeNome: string | null
+    cargoNome: string | null
+  }
   totalReacoes: number
   totalComentarios: number
   minhaReacao: TipoReacaoSocial | null
   postOrigem: PostOrigemEmbed | null
+  comunicadoOrigem: ComunicadoOrigemEmbed | null
+  evento: EventoPostEmbed | null
   enquete: EnquetePostItem | null
 }
 
 /** Shape cru do Prisma antes de projetar em PostSocialItem. */
 export type PostRaw = Omit<
   PostSocialItem,
-  'totalReacoes' | 'totalComentarios' | 'minhaReacao' | 'postOrigem' | 'enquete'
+  | 'totalReacoes'
+  | 'totalComentarios'
+  | 'minhaReacao'
+  | 'postOrigem'
+  | 'comunicadoOrigem'
+  | 'evento'
+  | 'enquete'
 > & {
   _count: { reacoes: number; comentarios: number }
   reacoes: { tipo: TipoReacaoSocial }[]
@@ -67,6 +101,21 @@ export type PostRaw = Omit<
     oculto: boolean
     midiaUrls: string[]
     autor: { id: string; nome: string | null; avatarUrl: string | null }
+  } | null
+  comunicadoOrigem?: {
+    id: string
+    titulo: string
+    corpo: string
+    prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+    tenant: { nome: string }
+    autor: { nome: string | null }
+  } | null
+  evento?: {
+    id: string
+    titulo: string
+    data: Date
+    local: string | null
+    rsvps: Array<{ status: 'CONFIRMADO' | 'RECUSADO' | 'TALVEZ' }>
   } | null
   enquete?: {
     id: string
@@ -95,9 +144,14 @@ export function projetarEnquete(
 }
 
 export function projetarPost(post: PostRaw): PostSocialItem {
-  const { _count, reacoes, postOrigem, enquete, ...rest } = post
+  const { _count, reacoes, postOrigem, comunicadoOrigem, evento, enquete, autor, ...rest } = post
   return {
     ...rest,
+    autor: {
+      ...autor,
+      sedeNome: null,
+      cargoNome: null,
+    },
     totalReacoes: _count.reacoes,
     totalComentarios: _count.comentarios,
     minhaReacao: reacoes[0]?.tipo ?? null,
@@ -108,6 +162,25 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           oculto: postOrigem.oculto,
           midiaUrls: postOrigem.midiaUrls,
           autor: postOrigem.autor,
+        }
+      : null,
+    comunicadoOrigem: comunicadoOrigem
+      ? {
+          id: comunicadoOrigem.id,
+          titulo: comunicadoOrigem.titulo,
+          corpo: comunicadoOrigem.corpo,
+          prioridade: comunicadoOrigem.prioridade,
+          tenantNome: comunicadoOrigem.tenant.nome,
+          autorNome: comunicadoOrigem.autor.nome,
+        }
+      : null,
+    evento: evento
+      ? {
+          id: evento.id,
+          titulo: evento.titulo,
+          data: evento.data,
+          local: evento.local,
+          meuRsvp: (evento.rsvps[0]?.status as 'CONFIRMADO' | 'RECUSADO') ?? null,
         }
       : null,
     enquete: enquete ? projetarEnquete(enquete) : null,
@@ -125,6 +198,27 @@ export function postInclude(userId?: string) {
         oculto: true,
         midiaUrls: true,
         autor: { select: { id: true, nome: true, avatarUrl: true } },
+      },
+    },
+    comunicadoOrigem: {
+      select: {
+        id: true,
+        titulo: true,
+        corpo: true,
+        prioridade: true,
+        tenant: { select: { nome: true } },
+        autor: { select: { nome: true } },
+      },
+    },
+    evento: {
+      select: {
+        id: true,
+        titulo: true,
+        data: true,
+        local: true,
+        rsvps: userId
+          ? { where: { userId }, select: { status: true }, take: 1 }
+          : ({ where: { id: '' }, select: { status: true }, take: 0 } as const),
       },
     },
     enquete: {
@@ -198,6 +292,10 @@ function sortPostsDesc(a: { criadoEm: Date }, b: { criadoEm: Date }): number {
   return b.criadoEm.getTime() - a.criadoEm.getTime()
 }
 
+async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
+  return enriquecerPostsComBadges(posts)
+}
+
 export const getPostsParaFeed = cache(async function getPostsParaFeed(
   tenantId: string,
   userId: string | undefined,
@@ -234,7 +332,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     const autorIds = sugeridos.map((p) => p.autorId)
     const semAcesso = await getAutoresSemAcesso(undefined, tenantId, autorIds)
     const visiveis = sugeridos.filter((p) => !semAcesso.has(p.autorId))
-    const slice = visiveis.slice(0, take)
+    const slice = await finalizarPosts(visiveis.slice(0, take))
     const hasMore = visiveis.length > take
     return {
       postsSeguindo: [],
@@ -277,7 +375,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   ordenados = ordenados.filter((p) => redeSet.has(p.autorId) || !semAcesso.has(p.autorId))
 
   const hasMore = ordenados.length > take
-  const pagina = ordenados.slice(0, take)
+  const pagina = await finalizarPosts(ordenados.slice(0, take))
   const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
 
   return {
@@ -454,7 +552,7 @@ export async function getPostPorId(
     visibilidade: post.visibilidade,
     oculto: false,
   })
-  return ok ? post : null
+  return ok ? (await finalizarPosts([post]))[0] ?? null : null
 }
 
 export const getPostsDaRede = cache(async function getPostsDaRede(
@@ -491,7 +589,7 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
 
   const posts = postsRaw.map(projetarPost)
   const hasMore = posts.length > take
-  const pagina = posts.slice(0, take)
+  const pagina = await finalizarPosts(posts.slice(0, take))
 
   return {
     posts: pagina,
@@ -569,7 +667,7 @@ export async function getPostsPorHashtag(
     posts = posts.filter((p) => !semAcesso.has(p.autorId))
   }
 
-  return { tag: normalized, posts }
+  return { tag: normalized, posts: await finalizarPosts(posts) }
 }
 
 export async function getPostsComVideo(
@@ -606,7 +704,7 @@ export async function getPostsComVideo(
     posts = posts.filter((p) => !semAcesso.has(p.autorId))
   }
 
-  return posts
+  return finalizarPosts(posts)
 }
 
 export async function getGruposPublicos(
@@ -686,7 +784,7 @@ export async function getPostsSalvos(
     })
     if (ok) result.push(post)
   }
-  return result
+  return finalizarPosts(result)
 }
 
 export async function getDestaquesPerfil(

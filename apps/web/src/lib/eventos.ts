@@ -43,6 +43,31 @@ export interface ProximoEventoItem {
   local: string | null
 }
 
+export interface EventoComposerItem {
+  id: string
+  titulo: string
+  data: Date
+  local: string | null
+}
+
+/** Eventos futuros visíveis para vincular a um post no composer. */
+export async function getEventosParaComposer(
+  tenantId: string,
+  userId?: string,
+): Promise<EventoComposerItem[]> {
+  const escopo = await getEscopoEventosVisiveis(tenantId, userId)
+  const eventos: EventoComposerItem[] = await db.evento.findMany({
+    where: {
+      ...escopo,
+      data: { gte: new Date() },
+    },
+    orderBy: { data: 'asc' },
+    take: 8,
+    select: { id: true, titulo: true, data: true, local: true },
+  })
+  return eventos
+}
+
 /** Próximo evento futuro visível para o associado no tenant atual. */
 export async function getProximoEvento(
   tenantId: string,

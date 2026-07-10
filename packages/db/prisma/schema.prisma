@@ -534,6 +534,7 @@ model Evento {
 
   rsvps EventoRsvp[]
   salas SalaReuniao[]
+  posts Post[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -741,6 +742,7 @@ model Announcement {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   leituras AnnouncementRead[]
+  reposts    Post[]
 
   @@index([tenantId])
   @@index([tenantId, publicadoEm])
@@ -863,6 +865,12 @@ model Post {
   postOrigem   Post?   @relation("Repost", fields: [postOrigemId], references: [id], onDelete: SetNull)
   reposts      Post[]  @relation("Repost")
 
+  comunicadoOrigemId String?       @map("comunicado_origem_id")
+  comunicadoOrigem   Announcement? @relation(fields: [comunicadoOrigemId], references: [id], onDelete: SetNull)
+
+  eventoId String? @map("evento_id")
+  evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
@@ -877,6 +885,8 @@ model Post {
   @@index([tenantId, criadoEm])
   @@index([tenantId, oculto])
   @@index([postOrigemId])
+  @@index([comunicadoOrigemId])
+  @@index([eventoId])
   @@map("saas_posts")
 }
 

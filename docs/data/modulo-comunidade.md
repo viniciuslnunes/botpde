@@ -8,7 +8,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 
 | Entidade | Tabela | Papel |
 |---|---|---|
-| `Post` | `saas_posts` | Publicações (`MEMBRO` ou `INSTITUCIONAL`); `visibilidade`: `PUBLICO`, `TENANT`, `PRIVADO`; `postOrigemId` para repost |
+| `Post` | `saas_posts` | Publicações (`MEMBRO` ou `INSTITUCIONAL`); `visibilidade`: `PUBLICO`, `TENANT`, `PRIVADO`; `postOrigemId` (repost de post), `comunicadoOrigemId` (repost de comunicado), `eventoId` (post sobre evento) |
 | `PerfilMembro` | `saas_perfis_membro` | Bio, banner, avatar social, privacidade, toggles de exibição (por tenant) |
 | `PerfilDestaque` / `PerfilDestaqueItem` | — | Destaques estilo stories no perfil |
 | `Seguimento` | `saas_seguimentos` | Grafo social; status `PENDENTE` / `APROVADO` / `REJEITADO` |
@@ -40,7 +40,7 @@ visibilidade do post).
 | `/portal/comunidade/perfil/[userId]` | Perfil unificado (abas + destaques) |
 | `/portal/comunidade/perfil/[userId]/seguidores` | Lista de seguidores |
 | `/portal/comunidade/perfil/[userId]/seguindo` | Lista de quem segue |
-| `/portal/comunidade/busca` | Busca de membros |
+| `/portal/comunidade/busca` | Busca unificada (membros, hashtags, posts) |
 | `/portal/comunidade/seguindo` | Solicitações pendentes recebidas |
 | `/portal/comunidade/salvos` | Publicações salvas pelo usuário |
 | `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
@@ -53,11 +53,12 @@ visibilidade do post).
 | Endpoint | Uso |
 |---|---|
 | `GET /api/comunidade/membros?q=` | Busca membros aprovados em tenants visíveis |
+| `GET /api/comunidade/busca?q=` | Busca unificada (membros + hashtags + posts) |
 | `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar) |
 
 ## Server Actions (`comunidade/actions.ts`)
 
-- `publicarPost`, `publicarEnquete`, `editarPost`, `excluirPost`, `repostarPost`
+- `publicarPost`, `publicarEnquete`, `publicarPostEvento`, `editarPost`, `excluirPost`, `repostarPost`, `repostarComunicado`
 - `solicitarSeguir`, `deixarDeSeguir`, `aprovarSeguimento`, `rejeitarSeguimento`
 - `atualizarPerfilSocial`, `criarDestaquePerfil`
 - `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
@@ -66,6 +67,13 @@ visibilidade do post).
 
 Notificações de menção, comentário, reação e repost apontam para
 `/portal/comunidade/post/[id]` via `linkPostComunidade()`.
+
+## Integração torcida (Sprint 4)
+
+- **Repost de comunicados**: botão "Compartilhar" nos comunicados oficiais; embed no feed via `PostComunicadoEmbed`.
+- **Post sobre evento**: composer com modo evento; card com RSVP embutido (`PostEventoEmbed`).
+- **Badges no feed**: sede e cargo do autor nos cards (`autor-badges.ts`).
+- **Moderação**: link "Ver post" na fila em `/admin/comunidade/moderacao`.
 
 ## Formato de menções e hashtags
 
