@@ -54,12 +54,21 @@ function sortComunicados(announcements: ComunicadoFeedItem[]): void {
     const pesoB = PESO_PRIORIDADE[b.prioridade]
     if (pesoA !== pesoB) return pesoB - pesoA
     if (a.fixado !== b.fixado) return a.fixado ? -1 : 1
-    return b.publicadoEm.getTime() - a.publicadoEm.getTime()
+    return reviveDate(b.publicadoEm).getTime() - reviveDate(a.publicadoEm).getTime()
   })
 }
 
+/** `unstable_cache` serializa `Date` como string — reidrata antes do consumo. */
+export function reviveDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value)
+}
+
+function reviveComunicadoDates(items: ComunicadoFeedItem[]): ComunicadoFeedItem[] {
+  return items.map((a) => ({ ...a, publicadoEm: reviveDate(a.publicadoEm) }))
+}
+
 async function fetchComunicadosBase(tenantId: string): Promise<ComunicadoFeedItem[]> {
-  return unstable_cache(
+  const cached = await unstable_cache(
     async () => {
       const tenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
       const announcements = (await db.announcement.findMany({
@@ -77,6 +86,7 @@ async function fetchComunicadosBase(tenantId: string): Promise<ComunicadoFeedIte
     ['comunicados-feed', tenantId],
     { revalidate: 120, tags: [COMUNICADOS_CACHE_TAG, comunicadosCacheTag(tenantId)] },
   )()
+  return reviveComunicadoDates(cached)
 }
 
 /**

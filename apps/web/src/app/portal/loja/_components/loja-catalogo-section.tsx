@@ -2,6 +2,7 @@ import { db } from '@torcida/db'
 import { Prisma } from '@torcida/db'
 import Link from 'next/link'
 import { ShoppingBag } from 'lucide-react'
+import { LojaProdutoGridSkeleton } from '@/components/portal/loja-produto-skeleton'
 import { ProdutoCardImagem } from '@/components/portal/produto-card-imagem'
 import { PromoBadge, LojaCarrossel } from '@/components/portal/loja-ui'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
@@ -248,19 +249,15 @@ export async function LojaCatalogoSection({
 export function LojaCatalogoFallback() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="h-40 rounded-2xl bg-[rgb(var(--border))]" />
+      <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.5)]" />
       <div className="flex gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-8 w-20 rounded-full bg-[rgb(var(--border))]" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <div className="h-64 rounded-2xl bg-[rgb(var(--border))]" />
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-72 rounded-2xl bg-[rgb(var(--border))]" />
-          ))}
-        </div>
+        <div className="hidden h-64 rounded-2xl bg-[rgb(var(--border)_/_0.45)] lg:block" />
+        <LojaProdutoGridSkeleton count={6} />
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
+import { PostLegacyImage } from './post-legacy-image'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface FeedPostCardProps {
@@ -47,14 +48,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser }: Fee
       {post.midiaUrls.length > 0 ? (
         <PostMedia urls={post.midiaUrls} />
       ) : (
-        post.imagemUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={post.imagemUrl}
-            alt=""
-            className="mt-3 max-h-[28rem] w-full rounded-xl border border-[rgb(var(--border))] object-cover"
-          />
-        )
+        post.imagemUrl && <PostLegacyImage src={post.imagemUrl} />
       )}
 
       <PostEngagement

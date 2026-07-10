@@ -6,9 +6,6 @@ import { ShoppingBag } from 'lucide-react'
 import { resolveProdutoImagens } from '@/lib/produto-imagem'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
-/** Fundo claro — combina com fotos oficiais da loja Gaviões (fundo bege/branco). */
-const CARD_IMG_SURFACE = 'bg-[#ececec]'
-
 const CARD_IMG_CLASS =
   'object-cover object-[center_18%] transition-opacity duration-300'
 
@@ -23,11 +20,13 @@ function ProdutoImg({
   alt,
   visible,
   onError,
+  onLoad,
 }: {
   src: string
   alt: string
   visible: boolean
   onError: () => void
+  onLoad: () => void
 }) {
   if (canOptimizeImageUrl(src)) {
     return (
@@ -39,6 +38,7 @@ function ProdutoImg({
         className={[CARD_IMG_CLASS, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
         referrerPolicy="no-referrer"
         onError={onError}
+        onLoad={onLoad}
       />
     )
   }
@@ -53,6 +53,7 @@ function ProdutoImg({
       loading="lazy"
       decoding="async"
       onError={onError}
+      onLoad={onLoad}
     />
   )
 }
@@ -61,23 +62,25 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
   const imagens = resolveProdutoImagens(imagensUrl)
   const [hover, setHover] = useState(false)
   const [failed, setFailed] = useState<Set<number>>(() => new Set())
+  const [loaded, setLoaded] = useState<Set<number>>(() => new Set())
 
   const frente = imagens[0]
   const verso = imagens[1]
   const showVerso = hover && verso && !failed.has(1)
+  const frenteReady = loaded.has(0) || failed.has(0)
+  const showPlaceholder = frente && !frenteReady && !failed.has(0)
 
   if (!frente || failed.has(0)) {
     return (
       <div
         className={[
-          'relative aspect-square w-full overflow-hidden',
-          CARD_IMG_SURFACE,
+          'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
           className,
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        <div className="flex h-full w-full items-center justify-center bg-[rgb(var(--background-subtle))]">
+        <div className="flex h-full w-full items-center justify-center">
           <ShoppingBag className="h-12 w-12 text-[rgb(var(--foreground-muted))]" />
         </div>
       </div>
@@ -87,8 +90,7 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
   return (
     <div
       className={[
-        'relative aspect-square w-full overflow-hidden',
-        CARD_IMG_SURFACE,
+        'relative aspect-square w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
         className,
       ]
         .filter(Boolean)
@@ -96,11 +98,18 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
+      {showPlaceholder && (
+        <div
+          className="absolute inset-0 animate-pulse bg-[rgb(var(--border)_/_0.45)]"
+          aria-hidden
+        />
+      )}
       <ProdutoImg
         src={frente}
         alt={alt}
         visible={!showVerso}
         onError={() => setFailed((s) => new Set(s).add(0))}
+        onLoad={() => setLoaded((s) => new Set(s).add(0))}
       />
       {verso && (
         <ProdutoImg
@@ -108,6 +117,7 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
           alt={`${alt} — verso`}
           visible={!!showVerso}
           onError={() => setFailed((s) => new Set(s).add(1))}
+          onLoad={() => setLoaded((s) => new Set(s).add(1))}
         />
       )}
       {verso && !failed.has(1) && (

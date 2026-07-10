@@ -82,6 +82,21 @@ export function PostMedia({ urls }: PostMediaProps) {
 }
 
 function Slide({ item, className }: { item: MediaAttachment; className: string }) {
+  const [broken, setBroken] = useState(false)
+
+  if (broken) {
+    return (
+      <div
+        className={[
+          'flex items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-xs text-[rgb(var(--foreground-muted))]',
+          className,
+        ].join(' ')}
+      >
+        Imagem indisponível
+      </div>
+    )
+  }
+
   if (item.type === 'video') {
     return (
       <video
@@ -103,11 +118,21 @@ function Slide({ item, className }: { item: MediaAttachment; className: string }
         height={800}
         sizes="(max-width: 768px) 100vw, 640px"
         className={className}
+        onError={() => setBroken(true)}
       />
     )
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={item.url} alt="" className={className} loading="lazy" decoding="async" />
+  return (
+    <img
+      src={item.url}
+      alt=""
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => setBroken(true)}
+    />
+  )
 }
 
 function MediaCarousel({ slides }: { slides: MediaAttachment[] }) {
