@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import {
   classifyMedia,
   cloudinaryVideoPoster,
@@ -55,10 +57,21 @@ export function PostMedia({ urls }: PostMediaProps) {
       {slides.length > 0 && <MediaCarousel slides={slides} />}
       {stickers.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {stickers.map((s) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={s.url} src={s.url} alt="Sticker" className="h-28 w-28 object-contain" />
-          ))}
+          {stickers.map((s) =>
+            canOptimizeImageUrl(s.url) ? (
+              <Image
+                key={s.url}
+                src={s.url}
+                alt="Sticker"
+                width={112}
+                height={112}
+                className="h-28 w-28 object-contain"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={s.url} src={s.url} alt="Sticker" className="h-28 w-28 object-contain" />
+            ),
+          )}
         </div>
       )}
       {embeds.map((url) => (
@@ -81,8 +94,20 @@ function Slide({ item, className }: { item: MediaAttachment; className: string }
       />
     )
   }
+  if (canOptimizeImageUrl(item.url)) {
+    return (
+      <Image
+        src={item.url}
+        alt=""
+        width={1200}
+        height={800}
+        sizes="(max-width: 768px) 100vw, 640px"
+        className={className}
+      />
+    )
+  }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={item.url} alt="" className={className} />
+  return <img src={item.url} alt="" className={className} loading="lazy" decoding="async" />
 }
 
 function MediaCarousel({ slides }: { slides: MediaAttachment[] }) {

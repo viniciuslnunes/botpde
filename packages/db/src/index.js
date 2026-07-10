@@ -7,11 +7,22 @@ import {
 
 export { resetPrismaQueryCount, getAndResetPrismaQueryCount }
 
+const WEB_CONNECTION_LIMIT = 5
+
+function resolveDatabaseUrl() {
+  const url = process.env.DATABASE_URL ?? ''
+  if (!url || /connection_limit=/i.test(url)) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}connection_limit=${WEB_CONNECTION_LIMIT}`
+}
+
 // ── Cliente compartilhado (banco principal da plataforma) ─────────────────────
 const globalForPrisma = globalThis
 
 function createPrismaClient() {
+  const datasourceUrl = resolveDatabaseUrl()
   const base = new PrismaClient({
+    ...(datasourceUrl ? { datasources: { db: { url: datasourceUrl } } } : {}),
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Newspaper, Users } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
-import { getPostsParaFeed } from '@/lib/feed'
+import { getSugestoesAutoresParaAside } from '@/lib/feed'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 
@@ -16,20 +16,12 @@ export async function ComunidadeAsideWidgets({
   afiliacaoId,
   currentUserId,
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, posts] = await Promise.all([
+  const [noticias, sugestoes] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
-      ? getPostsParaFeed(tenantId, currentUserId, { take: 20 })
-      : Promise.resolve({ postsSeguindo: [], postsSugeridos: [], pageInfo: { hasMore: false, nextCursor: null } }),
+      ? getSugestoesAutoresParaAside(tenantId, currentUserId)
+      : Promise.resolve([] as Array<{ id: string; nome: string | null; avatarUrl: string | null }>),
   ])
-
-  const sugestoes = Array.from(
-    new Map(
-      posts.postsSugeridos
-        .filter((p) => p.autor.id !== currentUserId)
-        .map((p) => [p.autor.id, p.autor]),
-    ).values(),
-  ).slice(0, 4)
 
   return (
     <>

@@ -20,8 +20,10 @@ import {
 } from 'lucide-react'
 import { NotificationBell, type NotificationItem } from '@/components/portal/notification-bell'
 import { useNavbarContext } from '@/lib/use-navbar-context'
+import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 const navLinks = [
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: true },
@@ -140,8 +142,18 @@ export function PortalNavbar({
                 className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
               >
                 {userAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={userAvatar} alt={firstName} className="h-5 w-5 rounded-full object-cover" />
+                  canOptimizeImageUrl(userAvatar) ? (
+                    <Image
+                      src={userAvatar}
+                      alt={firstName}
+                      width={20}
+                      height={20}
+                      className="h-5 w-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={userAvatar} alt={firstName} className="h-5 w-5 rounded-full object-cover" />
+                  )
                 ) : (
                   <div
                     className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
@@ -206,8 +218,18 @@ export function PortalNavbar({
           <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 pb-4 pt-2 md:hidden">
             <div className="mb-3 flex items-center gap-3 py-2">
               {userAvatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={userAvatar} alt={firstName} className="h-8 w-8 rounded-full object-cover" />
+                canOptimizeImageUrl(userAvatar) ? (
+                  <Image
+                    src={userAvatar}
+                    alt={firstName}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={userAvatar} alt={firstName} className="h-8 w-8 rounded-full object-cover" />
+                )
               ) : (
                 <div
                   className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"

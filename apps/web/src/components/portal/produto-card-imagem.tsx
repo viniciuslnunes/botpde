@@ -1,19 +1,60 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { ShoppingBag } from 'lucide-react'
 import { resolveProdutoImagens } from '@/lib/produto-imagem'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 /** Fundo claro — combina com fotos oficiais da loja Gaviões (fundo bege/branco). */
 const CARD_IMG_SURFACE = 'bg-[#ececec]'
 
 const CARD_IMG_CLASS =
-  'absolute inset-0 h-full w-full object-cover object-[center_18%] transition-opacity duration-300'
+  'object-cover object-[center_18%] transition-opacity duration-300'
 
 interface ProdutoCardImagemProps {
   imagensUrl: string[]
   alt: string
   className?: string
+}
+
+function ProdutoImg({
+  src,
+  alt,
+  visible,
+  onError,
+}: {
+  src: string
+  alt: string
+  visible: boolean
+  onError: () => void
+}) {
+  if (canOptimizeImageUrl(src)) {
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes="(max-width: 640px) 50vw, 33vw"
+        className={[CARD_IMG_CLASS, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
+        referrerPolicy="no-referrer"
+        onError={onError}
+      />
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={['absolute inset-0 h-full w-full', CARD_IMG_CLASS, visible ? 'opacity-100' : 'opacity-0'].join(' ')}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      onError={onError}
+    />
+  )
 }
 
 export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardImagemProps) {
@@ -55,25 +96,17 @@ export function ProdutoCardImagem({ imagensUrl, alt, className }: ProdutoCardIma
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <ProdutoImg
         src={frente}
         alt={alt}
-        className={[CARD_IMG_CLASS, showVerso ? 'opacity-0' : 'opacity-100'].join(' ')}
-        referrerPolicy="no-referrer"
-        loading="lazy"
-        decoding="async"
+        visible={!showVerso}
         onError={() => setFailed((s) => new Set(s).add(0))}
       />
       {verso && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ProdutoImg
           src={verso}
           alt={`${alt} — verso`}
-          className={[CARD_IMG_CLASS, showVerso ? 'opacity-100' : 'opacity-0'].join(' ')}
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          decoding="async"
+          visible={!!showVerso}
           onError={() => setFailed((s) => new Set(s).add(1))}
         />
       )}

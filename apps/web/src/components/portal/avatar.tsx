@@ -1,8 +1,18 @@
+import Image from 'next/image'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+
 const SIZES = {
   xs: 'h-7 w-7 text-[10px]',
   sm: 'h-9 w-9 text-xs',
   md: 'h-10 w-10 text-sm',
   lg: 'h-12 w-12 text-base',
+} as const
+
+const PIXELS = {
+  xs: 28,
+  sm: 36,
+  md: 40,
+  lg: 48,
 } as const
 
 export type AvatarSize = keyof typeof SIZES
@@ -24,16 +34,35 @@ function inicial(nome: string | null): string {
  */
 export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps) {
   const base = `inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${SIZES[size]}`
+  const px = PIXELS[size]
+
+  if (avatarUrl && canOptimizeImageUrl(avatarUrl)) {
+    return (
+      <Image
+        src={avatarUrl}
+        alt={nome ?? 'Membro'}
+        width={px}
+        height={px}
+        className={[base, 'object-cover', className ?? ''].join(' ')}
+      />
+    )
+  }
+
   if (avatarUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={avatarUrl}
         alt={nome ?? 'Membro'}
+        width={px}
+        height={px}
+        loading="lazy"
+        decoding="async"
         className={[base, 'object-cover', className ?? ''].join(' ')}
       />
     )
   }
+
   return (
     <span
       aria-hidden="true"

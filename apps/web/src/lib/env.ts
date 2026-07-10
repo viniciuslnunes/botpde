@@ -5,7 +5,9 @@ import { z } from 'zod'
 // lançam um erro explícito antes de qualquer requisição ser processada.
 
 const serverSchema = z.object({
-  // Banco de dados
+  // Banco de dados — em produção, use `?connection_limit=5` se ainda não estiver na URL
+  // (o pacote @torcida/db aplica automaticamente quando ausente). Cloudflare Free na
+  // frente do domínio acelera `/_next/static` e Brotli sem custo (proxy DNS only).
   DATABASE_URL: z
     .string()
     .min(1, 'DATABASE_URL é obrigatória')

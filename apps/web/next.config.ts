@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', '@torcida/ui'],
     staleTimes: {
-      dynamic: 30,
+      dynamic: 60,
       static: 180,
     },
   },

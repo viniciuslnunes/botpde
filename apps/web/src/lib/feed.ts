@@ -11,6 +11,8 @@ interface FeedOpts {
   afiliacaoId?: string | null
 }
 
+type SeguimentoLite = { seguidoId: string }
+
 export interface PostSocialItem {
   id: string
   tenantId: string
@@ -115,7 +117,16 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+
+  const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
+    getVisibleTenantIds(tenantId, 'comunidade'),
+    userId
+      ? db.seguimento.findMany({
+          where: { seguidorId: userId, status: 'APROVADO' },
+          select: { seguidoId: true },
+        })
+      : Promise.resolve([] as SeguimentoLite[]),
+  ])
 
   if (!userId) {
     const sugeridosRaw = (await db.post.findMany({
@@ -143,43 +154,28 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     }
   }
 
-  const seguindo: { seguidoId: string }[] = await db.seguimento.findMany({
-    where: { seguidorId: userId, status: 'APROVADO' },
-    select: { seguidoId: true },
-  })
   const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
   const redeSet = new Set(redeIds)
 
-  const [pessoalRaw, descobertaRaw] = await Promise.all([
-    db.post.findMany({
-      where: {
-        tenantId: { in: visibleTenantIds },
-        tipo: 'MEMBRO',
-        oculto: false,
-        autorId: { in: redeIds },
-        ...cursorWhere,
-      },
-      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-      take: take + 1,
-      include: postInclude(userId),
-    }) as Promise<PostRaw[]>,
-    db.post.findMany({
-      where: {
-        tenantId: { in: visibleTenantIds },
-        tipo: 'MEMBRO',
-        visibilidade: 'PUBLICO',
-        oculto: false,
-        autorId: { notIn: redeIds },
-        ...cursorWhere,
-      },
-      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-      take: take + 1,
-      include: postInclude(userId),
-    }) as Promise<PostRaw[]>,
-  ])
+  // Uma query em vez de duas (rede + descoberta) — menos round-trips no Postgres remoto.
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+      ...cursorWhere,
+      OR: [
+        { autorId: { in: redeIds } },
+        { autorId: { notIn: redeIds }, visibilidade: 'PUBLICO' },
+      ],
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: (take + 1) * 2,
+    include: postInclude(userId),
+  })) as PostRaw[]
 
   const dedup = new Map<string, PostSocialItem>()
-  for (const post of [...pessoalRaw, ...descobertaRaw].map(projetarPost)) {
+  for (const post of postsRaw.map(projetarPost)) {
     if (!dedup.has(post.id)) dedup.set(post.id, post)
   }
   const ordenados = [...dedup.values()].sort(sortPostsDesc)
@@ -202,6 +198,40 @@ export const getComunicadosParaFeed = cache(async function getComunicadosParaFee
     visibleTenantIds,
   })
   return announcements
+})
+
+/** Query leve para o painel "Para seguir" — não reutiliza o feed completo de posts. */
+export const getSugestoesAutoresParaAside = cache(async function getSugestoesAutoresParaAside(
+  tenantId: string,
+  userId: string,
+) {
+  const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
+    getVisibleTenantIds(tenantId, 'comunidade'),
+    db.seguimento.findMany({
+      where: { seguidorId: userId, status: 'APROVADO' },
+      select: { seguidoId: true },
+    }),
+  ])
+  const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
+
+  const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
+    await db.post.findMany({
+      where: {
+        tenantId: { in: visibleTenantIds },
+        tipo: 'MEMBRO',
+        visibilidade: 'PUBLICO',
+        oculto: false,
+        autorId: { notIn: redeIds },
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: 12,
+      distinct: ['autorId'],
+      select: {
+        autor: { select: { id: true, nome: true, avatarUrl: true } },
+      },
+    })
+
+  return posts.map((p) => p.autor).slice(0, 4)
 })
 
 export async function getFeedPersonalizado(
