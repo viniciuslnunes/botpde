@@ -7,7 +7,7 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, MAX_MENCOES_POR_CONTEUDO } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, MAX_MENCOES_POR_CONTEUDO } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -17,6 +17,7 @@ import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engage
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId } from '@/lib/feed'
+import { calcularExpiraStory } from '@/lib/stories'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
@@ -947,6 +948,114 @@ export async function entrarGrupoPublico(conversaId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade/grupos')
   revalidatePath('/portal/mensagens')
+}
+
+export async function publicarPostGrupo(
+  conversaId: string,
+  conteudo: string,
+): Promise<{ success: boolean; message?: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = publicarPostGrupoSchema.safeParse({ conversaId, conteudo })
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  }
+
+  const membro: { id: string } | null = await db.membroConversa.findFirst({
+    where: { conversaId: parsed.data.conversaId, userId: session.user.id, saiuEm: null },
+    select: { id: true },
+  })
+  if (!membro) return { success: false, message: 'Você precisa ser membro do grupo.' }
+
+  const conversa: { id: string; tipo: string } | null = await db.conversa.findFirst({
+    where: { id: parsed.data.conversaId, tenantId: tenant.id, tipo: 'GRUPO' },
+    select: { id: true, tipo: true },
+  })
+  if (!conversa) return { success: false, message: 'Grupo não encontrado.' }
+
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) return { success: false, message: erroMencoes }
+
+  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+  const post = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: parsed.data.conteudo,
+      tipo: 'MEMBRO',
+      visibilidade: 'TENANT',
+      conversaId: conversa.id,
+    },
+  })
+
+  await Promise.all([
+    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
+    notificarMencoesDoPost({
+      conteudo: parsed.data.conteudo,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      tenantId: tenant.id,
+      postId: post.id,
+      link: `/portal/comunidade/grupos/${conversa.id}`,
+    }),
+  ])
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_GRUPO_PUBLICADO',
+      entidade: 'Post',
+      entidadeId: post.id,
+      detalhes: { conversaId: conversa.id },
+    },
+  })
+
+  revalidatePath(`/portal/comunidade/grupos/${conversa.id}`)
+  return { success: true }
+}
+
+export async function publicarMomentoStory(
+  midiaUrl: string,
+  conteudo?: string,
+): Promise<{ success: boolean; message?: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = publicarMomentoStorySchema.safeParse({ midiaUrl, conteudo })
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  }
+  if (!isCloudinaryUrl(parsed.data.midiaUrl)) {
+    return { success: false, message: 'Mídia inválida.' }
+  }
+
+  const criadoEm = new Date()
+  const story: { id: string } = await db.momentoStory.create({
+    data: {
+      tenantId: tenant.id,
+      userId: session.user.id,
+      midiaUrl: parsed.data.midiaUrl,
+      conteudo: parsed.data.conteudo?.trim() || null,
+      expiraEm: calcularExpiraStory(criadoEm),
+    },
+    select: { id: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'MOMENTO_STORY_PUBLICADO',
+      entidade: 'MomentoStory',
+      entidadeId: story.id,
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  return { success: true }
 }
 
 export async function criarDestaquePerfil(titulo: string, postIds: string[]): Promise<void> {

@@ -128,11 +128,11 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
               </div>
               {g.souMembro ? (
                 <Link
-                  href={`/portal/mensagens?conversa=${g.id}`}
+                  href={`/portal/comunidade/grupos/${g.id}`}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))]"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  Abrir
+                  Abrir grupo
                 </Link>
               ) : (
                 <button

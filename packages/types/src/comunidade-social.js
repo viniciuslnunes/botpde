@@ -41,6 +41,16 @@ export const publicarPostEventoSchema = z.object({
 /** Máximo de menções distintas por publicação ou comentário. */
 export const MAX_MENCOES_POR_CONTEUDO = 10
 
+export const publicarPostGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+  conteudo: z.string().trim().min(1).max(3000),
+})
+
+export const publicarMomentoStorySchema = z.object({
+  midiaUrl: z.string().min(1).max(500),
+  conteudo: z.string().trim().max(280).optional(),
+})
+
 export const criarGrupoPublicoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),

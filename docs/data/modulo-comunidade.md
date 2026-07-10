@@ -16,7 +16,8 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `EnquetePost` / `OpcaoEnquetePost` / `VotoEnquetePost` | — | Enquetes embutidas em posts |
 | `Hashtag` / `PostHashtag` | — | Hashtags por tenant |
 | `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
-| `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos |
+| `MomentoStory` | `saas_momentos_story` | Momentos efêmeros (24h) no feed |
+| `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos; posts do mural via `Post.conversaId` |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
 
 ## Privacidade
@@ -45,8 +46,9 @@ visibilidade do post).
 | `/portal/comunidade/salvos` | Publicações salvas pelo usuário |
 | `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
 | `/portal/comunidade/grupos` | Grupos públicos (criar/entrar) |
+| `/portal/comunidade/grupos/[id]` | Página do grupo (mural + link ao chat) |
 | `/portal/comunidade/notificacoes` | Central de notificações sociais |
-| `/portal/comunidade/videos` | Posts com vídeo |
+| `/portal/comunidade/videos` | Reels e posts com vídeo (grade ou vertical) |
 | `/portal/perfil` | Redireciona para o perfil social do usuário logado |
 
 ## API
@@ -66,7 +68,7 @@ visibilidade do post).
 - `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
 - `fixarPostPerfil`, `salvarPost`, `removerPostSalvo`
 - `marcarNotificacaoLida`, `marcarTodasNotificacoesLidas`
-- `criarGrupoPublico`, `entrarGrupoPublico`
+- `criarGrupoPublico`, `entrarGrupoPublico`, `publicarPostGrupo`, `publicarMomentoStory`
 
 Notificações de menção, comentário, reação e repost apontam para
 `/portal/comunidade/post/[id]` via `linkPostComunidade()`.
@@ -85,6 +87,13 @@ Notificações de menção, comentário, reação e repost apontam para
 - **Recap de sala** — ao encerrar uma live, publica post automático no feed com total de participantes.
 - **Limite de menções** — máximo de 10 menções por post/comentário; rate limit ao notificar.
 - **Ao vivo no aside** — widget de salas ativas no aside desktop (mobile já tinha).
+
+## Grupos, stories e vídeos (Sprint 6)
+
+- **Transferência de admin** — `PATCH /api/conversas/[id]/membros` promove outro membro e rebaixa o admin atual; botão "Tornar admin" no painel de membros.
+- **Mural do grupo** — posts com `conversaId` ficam só no mural (`/portal/comunidade/grupos/[id]`); não entram no feed principal.
+- **Momentos 24h** — `MomentoStory` com `expiraEm`; anéis no topo do feed; viewer fullscreen.
+- **Reels** — `/portal/comunidade/videos` com modo vertical (snap scroll + autoplay) e grade.
 
 ## Formato de menções e hashtags
 

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostsComVideo } from '@/lib/feed'
-import { VideosGrid } from '@/components/portal/videos-grid'
+import { VideosPageClient } from './videos-page-client'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Vídeos — Comunidade' }
@@ -27,17 +27,11 @@ export default async function VideosPage() {
       <header>
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Vídeos</h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Publicações com vídeo da comunidade
+          Reels e publicações com vídeo da comunidade
         </p>
       </header>
 
-      {posts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhum vídeo publicado ainda.
-        </div>
-      ) : (
-        <VideosGrid posts={posts} />
-      )}
+      <VideosPageClient posts={posts} />
     </div>
   )
 }

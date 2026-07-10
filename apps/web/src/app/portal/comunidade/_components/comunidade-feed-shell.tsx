@@ -7,6 +7,7 @@ import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
+import { ComunidadeStoriesSection } from './comunidade-stories-section'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -199,6 +200,16 @@ export function ComunidadeFeedShell({
         <Suspense fallback={null}>
           <ComunidadeSalasMobile tenantId={tenant.id} />
         </Suspense>
+
+        {currentUser.id && (
+          <Suspense
+            fallback={
+              <div className="h-20 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+            }
+          >
+            <ComunidadeStoriesSection tenantId={tenant.id} currentUser={currentUser} />
+          </Suspense>
+        )}
 
         {currentUser.id && (
           <FeedComposer

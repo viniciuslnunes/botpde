@@ -142,6 +142,7 @@ model Tenant {
   hashtags          Hashtag[]
   perfilDestaques   PerfilDestaque[]
   postSalvos        PostSalvo[]
+  momentosStory     MomentoStory[]
 
   @@map("saas_tenants")
 }
@@ -207,6 +208,7 @@ model User {
   votosEnquetePost            VotoEnquetePost[]
   perfilDestaques             PerfilDestaque[]
   postsSalvos                 PostSalvo[]
+  momentosStory               MomentoStory[]
 
   @@map("saas_users")
 }
@@ -871,6 +873,9 @@ model Post {
   eventoId String? @map("evento_id")
   evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
 
+  conversaId String?    @map("conversa_id")
+  conversa   Conversa? @relation(fields: [conversaId], references: [id], onDelete: SetNull)
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
@@ -887,6 +892,7 @@ model Post {
   @@index([postOrigemId])
   @@index([comunicadoOrigemId])
   @@index([eventoId])
+  @@index([conversaId])
   @@map("saas_posts")
 }
 
@@ -1093,6 +1099,26 @@ model PostSalvo {
   @@map("saas_post_salvos")
 }
 
+/// Momento efêmero estilo story (expira em 24h).
+model MomentoStory {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  midiaUrl String  @map("midia_url")
+  conteudo String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+  expiraEm DateTime @map("expira_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, expiraEm])
+  @@index([userId, tenantId])
+  @@map("saas_momentos_story")
+}
+
 model PerfilDestaque {
   id       String  @id @default(uuid())
   userId   String  @map("user_id")
@@ -1180,6 +1206,7 @@ model Conversa {
 
   membros   MembroConversa[]
   mensagens MensagemDireta[]
+  posts     Post[]
 
   @@index([tenantId, atualizadoEm])
   @@map("saas_conversas")

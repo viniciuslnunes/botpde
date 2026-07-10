@@ -13,6 +13,10 @@ const removerSchema = z.object({
   userId: z.string().uuid().optional(),
 })
 
+const transferirAdminSchema = z.object({
+  userId: z.string().uuid(),
+})
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -90,6 +94,69 @@ export async function POST(
     return NextResponse.json({ ok: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao adicionar membro.'
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+}
+
+/** Transfere a administração do grupo para outro membro ativo. */
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id: conversaId } = await context.params
+    const { userId, tenant, membro, conversa } = await assertConversaAccess(conversaId)
+
+    if (conversa.tipo !== 'GRUPO') {
+      return NextResponse.json({ error: 'Somente grupos aceitam transferência de admin.' }, { status: 400 })
+    }
+    if (membro.papel !== 'ADMIN') {
+      return NextResponse.json({ error: 'Somente o admin atual pode transferir.' }, { status: 403 })
+    }
+
+    const body: unknown = await request.json()
+    const parsed = transferirAdminSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
+    }
+    const novoAdminId = parsed.data.userId
+    if (novoAdminId === userId) {
+      return NextResponse.json({ error: 'Escolha outro membro para receber a administração.' }, { status: 400 })
+    }
+
+    const alvo: { userId: string } | null = await db.membroConversa.findFirst({
+      where: { conversaId, userId: novoAdminId, saiuEm: null },
+      select: { userId: true },
+    })
+    if (!alvo) {
+      return NextResponse.json({ error: 'Membro não encontrado no grupo.' }, { status: 404 })
+    }
+
+    await db.$transaction([
+      db.membroConversa.updateMany({
+        where: { conversaId, userId: novoAdminId, saiuEm: null },
+        data: { papel: 'ADMIN' },
+      }),
+      db.membroConversa.updateMany({
+        where: { conversaId, userId, saiuEm: null },
+        data: { papel: 'MEMBRO' },
+      }),
+    ])
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: userId,
+        acao: 'GRUPO_ADMIN_TRANSFERIDO',
+        entidade: 'Conversa',
+        entidadeId: conversaId,
+        detalhes: { novoAdminId },
+      },
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro ao transferir admin.'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }

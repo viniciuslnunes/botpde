@@ -15,6 +15,9 @@ interface FeedOpts {
   afiliacaoId?: string | null
 }
 
+/** Posts do mural de grupo ficam fora do feed principal. */
+const escopoFeedPrincipal = { conversaId: null } as const
+
 type SeguimentoLite = { seguidoId: string }
 
 export interface EnquetePostItem {
@@ -322,6 +325,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
         tipo: 'MEMBRO',
         visibilidade: 'PUBLICO',
         oculto: false,
+        ...escopoFeedPrincipal,
         ...cursorWhere,
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
@@ -353,6 +357,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       tenantId: { in: visibleTenantIds },
       tipo: 'MEMBRO',
       oculto: false,
+      ...escopoFeedPrincipal,
       ...cursorWhere,
       OR: [
         { autorId: { in: redeIds } },
@@ -456,6 +461,7 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
         tipo: 'MEMBRO',
         visibilidade: 'PUBLICO',
         oculto: false,
+        ...escopoFeedPrincipal,
         autorId: { notIn: redeIds },
       },
       orderBy: { criadoEm: 'desc' },
@@ -489,6 +495,11 @@ export interface GrupoPublicoItem {
   descricao: string | null
   membros: number
   souMembro: boolean
+}
+
+export interface GrupoDetalheItem extends GrupoPublicoItem {
+  souAdmin: boolean
+  publica: boolean
 }
 
 export interface DestaquePerfilItem {
@@ -580,6 +591,7 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
       tipo: 'MEMBRO',
       oculto: false,
       autorId: { in: redeIds },
+      ...escopoFeedPrincipal,
       ...cursorWhere,
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
@@ -653,6 +665,7 @@ export async function getPostsPorHashtag(
       tipo: 'MEMBRO',
       oculto: false,
       visibilidade: 'PUBLICO',
+      ...escopoFeedPrincipal,
       hashtags: { some: { hashtagId: { in: hashtags.map((h) => h.id) } } },
     },
     orderBy: { criadoEm: 'desc' },
@@ -683,6 +696,7 @@ export async function getPostsComVideo(
       tipo: 'MEMBRO',
       oculto: false,
       visibilidade: 'PUBLICO',
+      ...escopoFeedPrincipal,
     },
     orderBy: { criadoEm: 'desc' },
     take: 80,
@@ -739,6 +753,71 @@ export async function getGruposPublicos(
     membros: g._count.membros,
     souMembro: g.membros.length > 0,
   }))
+}
+
+export async function getGrupoPorId(
+  conversaId: string,
+  tenantId: string,
+  userId: string,
+): Promise<GrupoDetalheItem | null> {
+  const row: {
+    id: string
+    nome: string | null
+    descricao: string | null
+    publica: boolean
+    _count: { membros: number }
+    membros: Array<{ papel: 'ADMIN' | 'MEMBRO' }>
+  } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tenantId, tipo: 'GRUPO' },
+    select: {
+      id: true,
+      nome: true,
+      descricao: true,
+      publica: true,
+      _count: { select: { membros: { where: { saiuEm: null } } } },
+      membros: {
+        where: { userId, saiuEm: null },
+        select: { papel: true },
+        take: 1,
+      },
+    },
+  })
+  if (!row) return null
+
+  const membro = row.membros[0]
+  if (!membro && !row.publica) return null
+
+  return {
+    id: row.id,
+    nome: row.nome,
+    descricao: row.descricao,
+    membros: row._count.membros,
+    souMembro: Boolean(membro),
+    souAdmin: membro?.papel === 'ADMIN',
+    publica: row.publica,
+  }
+}
+
+export async function getPostsDoGrupo(
+  conversaId: string,
+  tenantId: string,
+  userId: string,
+): Promise<PostSocialItem[]> {
+  const membro: { id: string } | null = await db.membroConversa.findFirst({
+    where: { conversaId, userId, saiuEm: null },
+    select: { id: true },
+  })
+  if (!membro) return []
+
+  const postsRaw = (await db.post.findMany({
+    where: { conversaId, tenantId, oculto: false },
+    orderBy: { criadoEm: 'desc' },
+    take: 50,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  return finalizarPosts(posts)
 }
 
 export async function getPostIdsSalvos(userId: string, tenantId: string): Promise<Set<string>> {

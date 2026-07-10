@@ -648,6 +648,22 @@ function PainelMembros({
     setVersaoMembros((v) => v + 1)
   }
 
+  async function transferirAdmin(userId: string) {
+    if (!window.confirm('Transferir a administração do grupo para este membro?')) return
+    const res = await fetch(`/api/conversas/${conversaId}/membros`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) {
+      toast.error(data.error ?? 'Erro ao transferir.')
+      return
+    }
+    toast.success('Administração transferida.')
+    setVersaoMembros((v) => v + 1)
+  }
+
   const jaNoGrupo = new Set(membros.map((m) => m.userId))
 
   return (
@@ -663,6 +679,16 @@ function PainelMembros({
             <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--primary))]">
               Admin
             </span>
+          )}
+          {isAdmin && m.userId !== currentUserId && m.papel !== 'ADMIN' && (
+            <button
+              type="button"
+              title="Transferir administração"
+              onClick={() => void transferirAdmin(m.userId)}
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+            >
+              Tornar admin
+            </button>
           )}
           {isAdmin && m.userId !== currentUserId && (
             <button
