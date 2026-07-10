@@ -15,6 +15,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `Comentario` / `Reacao` | — | Engajamento (`CURTIR`, `FORCA`, `VAMOS`, `PRESENTE`) |
 | `EnquetePost` / `OpcaoEnquetePost` / `VotoEnquetePost` | — | Enquetes embutidas em posts |
 | `Hashtag` / `PostHashtag` | — | Hashtags por tenant |
+| `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
 | `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
 
@@ -41,6 +42,7 @@ visibilidade do post).
 | `/portal/comunidade/perfil/[userId]/seguindo` | Lista de quem segue |
 | `/portal/comunidade/busca` | Busca de membros |
 | `/portal/comunidade/seguindo` | Solicitações pendentes recebidas |
+| `/portal/comunidade/salvos` | Publicações salvas pelo usuário |
 | `/portal/comunidade/hashtag/[tag]` | Posts com a hashtag |
 | `/portal/comunidade/grupos` | Grupos públicos (criar/entrar) |
 | `/portal/comunidade/videos` | Posts com vídeo |
@@ -58,7 +60,8 @@ visibilidade do post).
 - `publicarPost`, `publicarEnquete`, `editarPost`, `excluirPost`, `repostarPost`
 - `solicitarSeguir`, `deixarDeSeguir`, `aprovarSeguimento`, `rejeitarSeguimento`
 - `atualizarPerfilSocial`, `criarDestaquePerfil`
-- `comentarPost`, `reagirPost`, `votarEnquetePost`, `listarComentariosPost`, `denunciarPost`
+- `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
+- `fixarPostPerfil`, `salvarPost`, `removerPostSalvo`
 - `criarGrupoPublico`, `entrarGrupoPublico`
 
 Notificações de menção, comentário, reação e repost apontam para

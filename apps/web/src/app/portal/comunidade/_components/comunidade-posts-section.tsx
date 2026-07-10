@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { MessagesSquare } from 'lucide-react'
-import { getPostsParaFeed, type PostSocialItem } from '@/lib/feed'
+import { getPostsParaFeed, getPostIdsSalvos, type PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 
 interface CurrentUser {
@@ -20,11 +20,10 @@ export async function ComunidadePostsSection({
   currentUser,
   cursor,
 }: ComunidadePostsSectionProps) {
-  const { postsSeguindo, postsSugeridos, pageInfo } = await getPostsParaFeed(
-    tenantId,
-    currentUser.id || undefined,
-    { cursor, take: 20 },
-  )
+  const [{ postsSeguindo, postsSugeridos, pageInfo }, salvoIds] = await Promise.all([
+    getPostsParaFeed(tenantId, currentUser.id || undefined, { cursor, take: 20 }),
+    currentUser.id ? getPostIdsSalvos(currentUser.id, tenantId) : Promise.resolve(new Set<string>()),
+  ])
 
   const stream: PostSocialItem[] =
     postsSugeridos.length > 0
@@ -63,6 +62,7 @@ export async function ComunidadePostsSection({
               post={post}
               showTenantBadge={post.tenantId !== tenantId}
               currentUser={currentUser}
+              salvo={salvoIds.has(post.id)}
             />
           ))
         )}

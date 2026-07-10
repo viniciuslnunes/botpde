@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Repeat2 } from 'lucide-react'
+import { Repeat2, Pin } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { Avatar } from './avatar'
@@ -17,10 +17,11 @@ interface FeedPostCardProps {
   showTenantBadge?: boolean
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
   isAuthor?: boolean
+  salvo?: boolean
 }
 
-export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAuthor }: FeedPostCardProps) {
-  const author = post.autorId === currentUser.id
+export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAuthor, salvo = false }: FeedPostCardProps) {
+  const author = isAuthor ?? post.autorId === currentUser.id
   return (
     <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
@@ -40,6 +41,12 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
                 {post.tenant.nome}
               </span>
             )}
+            {post.fixado && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                <Pin className="h-3 w-3" />
+                Fixado
+              </span>
+            )}
           </div>
           <Link
             href={linkPostComunidade(post.id)}
@@ -48,7 +55,9 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
             {formatRelative(post.criadoEm)}
           </Link>
         </div>
-        {(isAuthor || author) && <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} />}
+        {author && (
+          <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} fixado={post.fixado} />
+        )}
       </header>
 
       {post.titulo && (
@@ -66,7 +75,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
 
       {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
 
-      {post.enquete && <PostPoll enquete={post.enquete} />}
+      {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
 
       {post.midiaUrls.length > 0 ? (
         <PostMedia urls={post.midiaUrls} />
@@ -81,6 +90,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         minhaReacao={post.minhaReacao}
         currentUser={currentUser}
         isRepost={!!post.postOrigemId}
+        salvoInicial={salvo}
       />
     </article>
   )

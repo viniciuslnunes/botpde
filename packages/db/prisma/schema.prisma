@@ -141,6 +141,7 @@ model Tenant {
   denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
   hashtags          Hashtag[]
   perfilDestaques   PerfilDestaque[]
+  postSalvos        PostSalvo[]
 
   @@map("saas_tenants")
 }
@@ -205,6 +206,7 @@ model User {
   denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
   votosEnquetePost            VotoEnquetePost[]
   perfilDestaques             PerfilDestaque[]
+  postsSalvos                 PostSalvo[]
 
   @@map("saas_users")
 }
@@ -870,6 +872,7 @@ model Post {
   enquete     EnquetePost?
   hashtags    PostHashtag[]
   destaqueItens PerfilDestaqueItem[]
+  salvos      PostSalvo[]
 
   @@index([tenantId, criadoEm])
   @@index([tenantId, oculto])
@@ -1062,6 +1065,22 @@ model PostHashtag {
   @@unique([postId, hashtagId])
   @@index([hashtagId])
   @@map("saas_post_hashtags")
+}
+
+model PostSalvo {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  postId   String   @map("post_id")
+  tenantId String   @map("tenant_id")
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, tenantId])
+  @@map("saas_post_salvos")
 }
 
 model PerfilDestaque {

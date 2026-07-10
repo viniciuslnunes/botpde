@@ -35,3 +35,27 @@ export async function getEscopoEventosVisiveis(tenantId: string, userId: string 
     ],
   }
 }
+
+export interface ProximoEventoItem {
+  id: string
+  titulo: string
+  data: Date
+  local: string | null
+}
+
+/** Próximo evento futuro visível para o associado no tenant atual. */
+export async function getProximoEvento(
+  tenantId: string,
+  userId?: string,
+): Promise<ProximoEventoItem | null> {
+  const escopo = await getEscopoEventosVisiveis(tenantId, userId)
+  const evento: ProximoEventoItem | null = await db.evento.findFirst({
+    where: {
+      ...escopo,
+      data: { gte: new Date() },
+    },
+    orderBy: { data: 'asc' },
+    select: { id: true, titulo: true, data: true, local: true },
+  })
+  return evento
+}

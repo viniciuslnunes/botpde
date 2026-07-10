@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2 } from 'lucide-react'
+import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2, Bookmark } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   comentarPost,
@@ -9,11 +9,14 @@ import {
   listarComentariosPost,
   reagirPost,
   repostarPost,
+  salvarPost,
+  removerPostSalvo,
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
 import type { TipoReacaoSocial } from '@/lib/comunidade-social'
 import { Avatar } from './avatar'
 import { PostConteudoRich } from './post-conteudo-rich'
+import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
 
 interface CurrentUser {
   id: string
@@ -28,6 +31,7 @@ interface PostEngagementProps {
   minhaReacao: TipoReacaoSocial | null
   currentUser: CurrentUser
   isRepost?: boolean
+  salvoInicial?: boolean
 }
 
 export function PostEngagement({
@@ -37,8 +41,11 @@ export function PostEngagement({
   minhaReacao,
   currentUser,
   isRepost = false,
+  salvoInicial = false,
 }: PostEngagementProps) {
   const [reacao, setReacao] = useState<TipoReacaoSocial | null>(minhaReacao)
+  const [salvo, setSalvo] = useState(salvoInicial)
+  const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
   const [totalR, setTotalR] = useState(totalReacoes)
   const [totalC, setTotalC] = useState(totalComentarios)
   const [comentarios, setComentarios] = useState<ComentarioPostItem[]>([])
@@ -151,6 +158,52 @@ export function PostEngagement({
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível denunciar.')
       }
+    })
+  }
+
+  function toggleSalvar() {
+    const eraSalvo = salvo
+    setSalvo(!eraSalvo)
+    startTransition(async () => {
+      try {
+        if (eraSalvo) {
+          await removerPostSalvo(postId)
+          toast.success('Removido dos salvos.')
+        } else {
+          await salvarPost(postId)
+          toast.success('Publicação salva.')
+        }
+      } catch (err) {
+        setSalvo(eraSalvo)
+        toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.')
+      }
+    })
+  }
+
+  function handleComentarioChange(value: string, cursor?: number) {
+    setComentario(value)
+    setMencaoQuery(detectarMencaoAtiva(value, cursor ?? value.length))
+  }
+
+  function inserirMencaoComentario(mencao: string) {
+    const el = inputRef.current
+    if (!el) {
+      setComentario((t) => t + mencao)
+      setMencaoQuery(null)
+      return
+    }
+    const cursor = el.selectionStart ?? comentario.length
+    const query = detectarMencaoAtiva(comentario, cursor)
+    if (!query) return
+    const antes = comentario.slice(0, cursor - query.length - 1)
+    const depois = comentario.slice(cursor)
+    const next = antes + mencao + depois
+    setComentario(next)
+    setMencaoQuery(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = antes.length + mencao.length
+      el.selectionStart = el.selectionEnd = pos
     })
   }
 
@@ -281,6 +334,20 @@ export function PostEngagement({
         )}
         <button
           type="button"
+          onClick={toggleSalvar}
+          aria-pressed={salvo}
+          className={[
+            btnBase,
+            salvo
+              ? 'text-[rgb(var(--primary))]'
+              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+          ].join(' ')}
+        >
+          <Bookmark className={['h-4 w-4', salvo ? 'fill-current' : ''].join(' ')} />
+          Salvar
+        </button>
+        <button
+          type="button"
           onClick={() => setDenunciando((v) => !v)}
           aria-label="Denunciar publicação"
           className={[btnBase, 'ml-auto text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-red-600'].join(' ')}
@@ -354,14 +421,24 @@ export function PostEngagement({
           {comentariosAbertos && (
             <form onSubmit={enviarComentario} className="flex items-center gap-2">
               <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
-              <input
-                ref={inputRef}
-                value={comentario}
-                onChange={(e) => setComentario(e.target.value)}
-                maxLength={500}
-                placeholder="Escreva um comentário…"
-                className="h-9 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  ref={inputRef}
+                  value={comentario}
+                  onChange={(e) => handleComentarioChange(e.target.value, e.target.selectionStart ?? undefined)}
+                  onKeyUp={(e) => handleComentarioChange(comentario, e.currentTarget.selectionStart ?? undefined)}
+                  maxLength={500}
+                  placeholder="Escreva um comentário… use @ para mencionar"
+                  className="h-9 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                />
+                {mencaoQuery !== null && (
+                  <MentionPicker
+                    query={mencaoQuery}
+                    onSelect={inserirMencaoComentario}
+                    onClose={() => setMencaoQuery(null)}
+                  />
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={pending || !comentario.trim()}

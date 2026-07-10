@@ -41,6 +41,7 @@ export interface PostSocialItem {
   midiaUrls: string[]
   tipo: 'INSTITUCIONAL' | 'MEMBRO'
   visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+  fixado: boolean
   criadoEm: Date
   autorId: string
   postOrigemId: string | null
@@ -640,6 +641,52 @@ export async function getGruposPublicos(
     membros: g._count.membros,
     souMembro: g.membros.length > 0,
   }))
+}
+
+export async function getPostIdsSalvos(userId: string, tenantId: string): Promise<Set<string>> {
+  const rows: Array<{ postId: string }> = await db.postSalvo.findMany({
+    where: { userId, tenantId },
+    select: { postId: true },
+  })
+  return new Set(rows.map((r) => r.postId))
+}
+
+export async function getPostsSalvos(
+  tenantId: string,
+  userId: string,
+): Promise<PostSocialItem[]> {
+  const salvoRows: Array<{ postId: string }> = await db.postSalvo.findMany({
+    where: { userId, tenantId },
+    orderBy: { criadoEm: 'desc' },
+    take: 50,
+    select: { postId: true },
+  })
+  if (salvoRows.length === 0) return []
+
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const postsRaw = (await db.post.findMany({
+    where: {
+      id: { in: salvoRows.map((r) => r.postId) },
+      tenantId: { in: visibleTenantIds },
+      oculto: false,
+    },
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const byId = new Map(postsRaw.map((r) => [r.id, projetarPost(r)]))
+  const result: PostSocialItem[] = []
+  for (const row of salvoRows) {
+    const post = byId.get(row.postId)
+    if (!post) continue
+    const ok = await podeVerPost(userId, {
+      autorId: post.autorId,
+      tenantId: post.tenantId,
+      visibilidade: post.visibilidade,
+      oculto: false,
+    })
+    if (ok) result.push(post)
+  }
+  return result
 }
 
 export async function getDestaquesPerfil(

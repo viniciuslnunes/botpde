@@ -142,7 +142,7 @@ export default async function PerfilComunidadePage({
           oculto: false,
           tenantId: { in: visibleTenantIds },
         },
-        orderBy: [{ criadoEm: 'desc' }],
+        orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
         take: 30,
         include: postInclude(session.user.id),
       })) as PostRaw[]).map(projetarPost)

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart } from 'lucide-react'
+import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -57,6 +57,7 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true },
     { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false },
+    { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark, active: false },
     { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false },
     { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false },

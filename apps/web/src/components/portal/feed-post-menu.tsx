@@ -1,19 +1,21 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { editarPost, excluirPost } from '@/app/portal/comunidade/actions'
+import { editarPost, excluirPost, fixarPostPerfil } from '@/app/portal/comunidade/actions'
 
 interface FeedPostMenuProps {
   postId: string
   conteudoInicial: string
+  fixado?: boolean
 }
 
-export function FeedPostMenu({ postId, conteudoInicial }: FeedPostMenuProps) {
+export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPostMenuProps) {
   const [open, setOpen] = useState(false)
   const [editando, setEditando] = useState(false)
   const [texto, setTexto] = useState(conteudoInicial)
+  const [pinned, setPinned] = useState(fixado)
   const [pending, startTransition] = useTransition()
 
   if (editando) {
@@ -76,7 +78,27 @@ export function FeedPostMenu({ postId, conteudoInicial }: FeedPostMenuProps) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 z-20 mt-1 min-w-[8rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 min-w-[9rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setOpen(false)
+                startTransition(async () => {
+                  try {
+                    await fixarPostPerfil(postId)
+                    setPinned((v) => !v)
+                    toast.success(pinned ? 'Post desafixado.' : 'Post fixado no perfil.')
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Não foi possível fixar.')
+                  }
+                })
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
+            >
+              {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+              {pinned ? 'Desafixar do perfil' : 'Fixar no perfil'}
+            </button>
             <button
               type="button"
               onClick={() => {

@@ -1,7 +1,9 @@
 import Link from 'next/link'
-import { Newspaper, Users, Hash } from 'lucide-react'
+import { Newspaper, Users, Hash, Calendar } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
+import { getProximoEvento } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
+import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 
@@ -16,16 +18,36 @@ export async function ComunidadeAsideWidgets({
   afiliacaoId,
   currentUserId,
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, sugestoes, hashtags] = await Promise.all([
+  const [noticias, sugestoes, hashtags, proximoEvento] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
       : Promise.resolve([] as SugestaoAutorAside[]),
     getHashtagsEmAlta(tenantId, 5),
+    getProximoEvento(tenantId, currentUserId),
   ])
 
   return (
     <>
+      {proximoEvento && (
+        <Link
+          href={`/portal/eventos/${proximoEvento.id}`}
+          className="block rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
+        >
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <Calendar className="h-4 w-4 text-[rgb(var(--primary))]" />
+            Próximo evento
+          </h2>
+          <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">
+            {proximoEvento.titulo}
+          </p>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+            {formatRelative(proximoEvento.data)}
+            {proximoEvento.local && ` · ${proximoEvento.local}`}
+          </p>
+        </Link>
+      )}
+
       {noticias.length > 0 && (
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">

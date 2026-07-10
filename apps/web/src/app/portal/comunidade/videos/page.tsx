@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostsComVideo } from '@/lib/feed'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { VideosGrid } from '@/components/portal/videos-grid'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Vídeos — Comunidade' }
@@ -15,14 +15,8 @@ export default async function VideosPage() {
 
   const posts = await getPostsComVideo(tenant.id, session.user.id)
 
-  const currentUser = {
-    id: session.user.id,
-    nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
-  }
-
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4">
       <Link
         href="/portal/comunidade"
         className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
@@ -42,14 +36,7 @@ export default async function VideosPage() {
           Nenhum vídeo publicado ainda.
         </div>
       ) : (
-        posts.map((post) => (
-          <FeedPostCard
-            key={post.id}
-            post={post}
-            showTenantBadge={post.tenantId !== tenant.id}
-            currentUser={currentUser}
-          />
-        ))
+        <VideosGrid posts={posts} />
       )}
     </div>
   )

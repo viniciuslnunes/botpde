@@ -1,16 +1,17 @@
 'use client'
 
 import { useTransition } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Square } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { votarEnquetePost } from '@/app/portal/comunidade/actions'
+import { votarEnquetePost, encerrarEnquetePost } from '@/app/portal/comunidade/actions'
 import type { EnquetePostItem } from '@/lib/feed'
 
 interface PostPollProps {
   enquete: EnquetePostItem
+  isAuthor?: boolean
 }
 
-export function PostPoll({ enquete }: PostPollProps) {
+export function PostPoll({ enquete, isAuthor = false }: PostPollProps) {
   const [pending, startTransition] = useTransition()
 
   function votar(opcaoId: string) {
@@ -20,6 +21,18 @@ export function PostPoll({ enquete }: PostPollProps) {
         await votarEnquetePost(enquete.id, opcaoId)
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível votar.')
+      }
+    })
+  }
+
+  function encerrar() {
+    if (!confirm('Encerrar esta enquete? Ninguém mais poderá votar.')) return
+    startTransition(async () => {
+      try {
+        await encerrarEnquetePost(enquete.id)
+        toast.success('Enquete encerrada.')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível encerrar.')
       }
     })
   }
@@ -60,11 +73,24 @@ export function PostPoll({ enquete }: PostPollProps) {
           </button>
         )
       })}
-      <p className="text-center text-[11px] text-[rgb(var(--foreground-muted))]">
-        {pending && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-        {enquete.totalVotos} voto{enquete.totalVotos === 1 ? '' : 's'}
-        {enquete.encerrada && ' · Encerrada'}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-center text-[11px] text-[rgb(var(--foreground-muted))]">
+          {pending && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+          {enquete.totalVotos} voto{enquete.totalVotos === 1 ? '' : 's'}
+          {enquete.encerrada && ' · Encerrada'}
+        </p>
+        {isAuthor && !enquete.encerrada && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={encerrar}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--primary))]"
+          >
+            <Square className="h-3 w-3" />
+            Encerrar
+          </button>
+        )}
+      </div>
     </div>
   )
 }

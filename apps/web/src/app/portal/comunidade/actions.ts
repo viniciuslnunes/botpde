@@ -14,6 +14,7 @@ import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/l
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
+import { getPostPorId } from '@/lib/feed'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const MAX_MIDIAS = 10
@@ -610,6 +611,114 @@ export async function votarEnquetePost(enqueteId: string, opcaoId: string): Prom
   })
 
   revalidatePath('/portal/comunidade')
+}
+
+export async function encerrarEnquetePost(enqueteId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const enquete: {
+    id: string
+    encerradaEm: Date | null
+    post: { autorId: string; tenantId: string; oculto: boolean }
+  } | null = await db.enquetePost.findFirst({
+    where: { id: enqueteId },
+    select: {
+      id: true,
+      encerradaEm: true,
+      post: { select: { autorId: true, tenantId: true, oculto: true } },
+    },
+  })
+  if (!enquete || enquete.post.oculto || enquete.encerradaEm) {
+    throw new Error('Enquete indisponível')
+  }
+  if (enquete.post.autorId !== session.user.id) {
+    throw new Error('Só o autor pode encerrar a enquete')
+  }
+
+  await db.enquetePost.update({
+    where: { id: enquete.id },
+    data: { encerradaEm: new Date() },
+  })
+
+  revalidatePath('/portal/comunidade')
+}
+
+export async function fixarPostPerfil(postId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const post: { id: string; fixado: boolean } | null = await db.post.findFirst({
+    where: {
+      id: postId,
+      autorId: session.user.id,
+      tenantId: tenant.id,
+      tipo: 'MEMBRO',
+      oculto: false,
+    },
+    select: { id: true, fixado: true },
+  })
+  if (!post) throw new Error('Post não encontrado')
+
+  if (!post.fixado) {
+    const fixados = await db.post.count({
+      where: {
+        autorId: session.user.id,
+        tenantId: tenant.id,
+        tipo: 'MEMBRO',
+        oculto: false,
+        fixado: true,
+      },
+    })
+    if (fixados >= 3) throw new Error('Máximo de 3 posts fixados no perfil')
+  }
+
+  await db.post.update({
+    where: { id: post.id },
+    data: { fixado: !post.fixado },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: post.fixado ? 'POST_DESAFIXADO_PERFIL' : 'POST_FIXADO_PERFIL',
+      entidade: 'Post',
+      entidadeId: post.id,
+      detalhes: {},
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+  revalidatePath(linkPostComunidade(post.id))
+}
+
+export async function salvarPost(postId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const post = await getPostPorId(postId, tenant.id, session.user.id)
+  if (!post) throw new Error('Post não encontrado')
+
+  await db.postSalvo.upsert({
+    where: { userId_postId: { userId: session.user.id, postId } },
+    create: { userId: session.user.id, postId, tenantId: tenant.id },
+    update: {},
+  })
+
+  revalidatePath('/portal/comunidade/salvos')
+}
+
+export async function removerPostSalvo(postId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  await db.postSalvo.deleteMany({
+    where: { userId: session.user.id, postId, tenantId: tenant.id },
+  })
+
+  revalidatePath('/portal/comunidade/salvos')
 }
 
 export async function repostarPost(postId: string, comentario?: string): Promise<void> {
