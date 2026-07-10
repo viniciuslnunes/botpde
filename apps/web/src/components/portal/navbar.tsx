@@ -12,6 +12,7 @@ import {
   Users,
   Video,
   MapPin,
+  MessageCircle,
   Shield,
   UserCircle2,
   LogOut,
@@ -38,6 +39,7 @@ interface PortalNavbarProps {
   tenantCor: string
   isAdmin: boolean
   notifications: NotificationItem[]
+  unreadMessages: number
 }
 
 export function PortalNavbar({
@@ -47,6 +49,7 @@ export function PortalNavbar({
   tenantCor,
   isAdmin,
   notifications,
+  unreadMessages,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -100,6 +103,27 @@ export function PortalNavbar({
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/portal/mensagens"
+            aria-label={
+              unreadMessages > 0
+                ? `Mensagens (${unreadMessages} não lidas)`
+                : 'Mensagens'
+            }
+            className={[
+              'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
+              pathname.startsWith('/portal/mensagens')
+                ? 'border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+            ].join(' ')}
+          >
+            <MessageCircle className="h-4 w-4" />
+            {unreadMessages > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1 text-[10px] font-bold text-white">
+                {unreadMessages > 99 ? '99+' : unreadMessages}
+              </span>
+            )}
+          </Link>
           <NotificationBell initialItems={notifications} />
 
           {/* User dropdown — desktop */}
@@ -189,6 +213,24 @@ export function PortalNavbar({
             <span className="text-sm font-medium text-[rgb(var(--foreground))]">{firstName}</span>
           </div>
           <nav className="space-y-1">
+            <Link
+              href="/portal/mensagens"
+              onClick={() => setMenuOpen(false)}
+              className={[
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                pathname.startsWith('/portal/mensagens')
+                  ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Mensagens
+              {unreadMessages > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-[11px] font-bold text-white">
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
+                </span>
+              )}
+            </Link>
             {navLinks.map((link) => {
               const Icon = link.icon
               const active = isActive(link)

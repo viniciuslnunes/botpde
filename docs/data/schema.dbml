@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Torcida SaaS — Modelo de dados (DBML para https://dbdiagram.io/d)
 // Fonte da verdade: packages/db/prisma/schema.prisma
-// Gerado a partir do schema em 2026-07-08. Regenerar quando o schema mudar.
+// Gerado a partir do schema em 2026-07-09. Regenerar quando o schema mudar.
 //
 // Como usar: abra https://dbdiagram.io/d, cole este arquivo inteiro no editor.
 // Nomes de tabela/coluna = nomes REAIS no Postgres (@map do Prisma).
@@ -449,6 +449,75 @@ Table saas_votos_enquete_reuniao {
   Indexes { (enquete_id, user_id) [unique, note: '1 voto por pessoa por enquete; upsert permite trocar de voto'] }
 }
 
+// ─── MENSAGERIA (DM 1×1 e grupos — ARCHITECTURE.md §6 item 27) ─────────────
+
+Table saas_conversas {
+  id uuid [pk]
+  tipo varchar [not null, note: 'DIRETA | GRUPO']
+  tenant_id uuid [not null, note: 'contexto/auditoria — leitura é por participação, não por tenant']
+  nome varchar [note: 'só GRUPO']
+  descricao varchar [note: 'só GRUPO']
+  avatar_url varchar [note: 'só GRUPO']
+  criado_por_id uuid [not null]
+  criado_em timestamp
+  atualizado_em timestamp [note: 'bumpado a cada mensagem — ordena a inbox']
+  Indexes { (tenant_id, atualizado_em) }
+  Note: 'Conversa persistente (DM/grupo). Separada do chat efêmero das salas.'
+}
+
+Table saas_membros_conversa {
+  id uuid [pk]
+  conversa_id uuid [not null]
+  user_id uuid [not null]
+  papel varchar [note: 'ADMIN | MEMBRO']
+  entrou_em timestamp
+  ultima_leitura_em timestamp [note: 'base do contador de não-lidas']
+  silenciada boolean
+  saiu_em timestamp [note: 'soft leave — histórico preservado']
+  Indexes {
+    (conversa_id, user_id) [unique]
+    (user_id, saiu_em)
+  }
+}
+
+Table saas_mensagens_diretas {
+  id uuid [pk]
+  conversa_id uuid [not null]
+  autor_id uuid [not null]
+  conteudo varchar [not null]
+  midia_urls "varchar[]" [note: 'mesmo pipeline do feed: Cloudinary, embeds, stickers']
+  resposta_a_id uuid [note: 'reply (SetNull)']
+  editada_em timestamp
+  removida_em timestamp [note: 'soft delete — mantém posição na thread']
+  criado_em timestamp
+  Indexes { (conversa_id, criado_em) }
+}
+
+Table saas_bloqueios_usuario {
+  id uuid [pk]
+  bloqueador_id uuid [not null]
+  bloqueado_id uuid [not null]
+  criado_em timestamp
+  Indexes {
+    (bloqueador_id, bloqueado_id) [unique]
+    bloqueado_id
+  }
+  Note: 'Bloqueio usuário↔usuário (mensageria). Distinto de saas_bloqueados (blocklist de registros por tenant).'
+}
+
+Table saas_denuncias_mensagem {
+  id uuid [pk]
+  tenant_id uuid [not null, note: 'tenant da conversa — moderação daquele contexto']
+  mensagem_id uuid [not null]
+  denunciante_id uuid [not null]
+  motivo varchar [not null]
+  status varchar [note: 'PENDENTE | RESOLVIDA | DESCARTADA']
+  resolvido_por_id uuid
+  resolvido_em timestamp
+  criado_em timestamp
+  Indexes { (tenant_id, status) }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // RELACIONAMENTOS (Refs)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -522,3 +591,18 @@ Ref: saas_opcoes_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: 
 Ref: saas_votos_enquete_reuniao.enquete_id > saas_enquetes_reuniao.id [delete: cascade]
 Ref: saas_votos_enquete_reuniao.opcao_id > saas_opcoes_enquete_reuniao.id [delete: cascade]
 Ref: saas_votos_enquete_reuniao.user_id > saas_users.id [delete: cascade]
+
+// Mensageria (DM e grupos)
+Ref: saas_conversas.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_conversas.criado_por_id > saas_users.id [delete: cascade]
+Ref: saas_membros_conversa.conversa_id > saas_conversas.id [delete: cascade]
+Ref: saas_membros_conversa.user_id > saas_users.id [delete: cascade]
+Ref: saas_mensagens_diretas.conversa_id > saas_conversas.id [delete: cascade]
+Ref: saas_mensagens_diretas.autor_id > saas_users.id [delete: cascade]
+Ref: saas_mensagens_diretas.resposta_a_id > saas_mensagens_diretas.id [delete: set null]
+Ref: saas_bloqueios_usuario.bloqueador_id > saas_users.id [delete: cascade]
+Ref: saas_bloqueios_usuario.bloqueado_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias_mensagem.tenant_id > saas_tenants.id [delete: cascade]
+Ref: saas_denuncias_mensagem.mensagem_id > saas_mensagens_diretas.id [delete: cascade]
+Ref: saas_denuncias_mensagem.denunciante_id > saas_users.id [delete: cascade]
+Ref: saas_denuncias_mensagem.resolvido_por_id > saas_users.id
