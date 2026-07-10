@@ -883,6 +883,11 @@ model PerfilMembro {
   bio           String?
   perfilPrivado Boolean @default(true) @map("perfil_privado")
   avatarUrl     String? @map("avatar_url")
+  bannerUrl     String? @map("banner_url")
+
+  exibirCidade Boolean @default(false) @map("exibir_cidade")
+  exibirSede   Boolean @default(false) @map("exibir_sede")
+  exibirDesde  Boolean @default(true)  @map("exibir_desde")
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

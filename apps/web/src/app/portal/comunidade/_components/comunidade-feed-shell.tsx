@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video } from 'lucide-react'
+import { Rss, UserCircle2, UserPlus, Video, Search } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -27,6 +27,7 @@ interface ComunidadeFeedShellProps {
   tenant: { id: string; nome: string; afiliacaoId: string | null }
   currentUser: CurrentUser
   cursor?: string
+  perfilPrivado?: boolean
 }
 
 function ComunicadosFallback() {
@@ -52,9 +53,10 @@ function AsideWidgetsFallback() {
   )
 }
 
-export function ComunidadeFeedShell({ tenant, currentUser, cursor }: ComunidadeFeedShellProps) {
+export function ComunidadeFeedShell({ tenant, currentUser, cursor, perfilPrivado = true }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true },
+    { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false },
     {
       href: '/portal/comunidade/seguindo',
       label: 'Solicitações',
@@ -136,6 +138,12 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor }: ComunidadeF
             <Video className="h-4 w-4" /> Salas
           </Link>
           <Link
+            href="/portal/comunidade/busca"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
+          >
+            <Search className="h-4 w-4" /> Buscar
+          </Link>
+          <Link
             href="/portal/comunidade/seguindo"
             className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
           >
@@ -148,7 +156,11 @@ export function ComunidadeFeedShell({ tenant, currentUser, cursor }: ComunidadeF
         </Suspense>
 
         {currentUser.id && (
-          <FeedComposer userName={currentUser.nome} userAvatar={currentUser.avatarUrl} />
+          <FeedComposer
+            userName={currentUser.nome}
+            userAvatar={currentUser.avatarUrl}
+            perfilPrivado={perfilPrivado}
+          />
         )}
 
         <Suspense fallback={<ComunicadosFallback />}>

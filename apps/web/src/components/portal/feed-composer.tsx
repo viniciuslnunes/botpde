@@ -18,9 +18,10 @@ const MAX_VIDEO_MB = 100
 interface FeedComposerProps {
   userName: string | null
   userAvatar: string | null
+  perfilPrivado?: boolean
 }
 
-export function FeedComposer({ userName, userAvatar }: FeedComposerProps) {
+export function FeedComposer({ userName, userAvatar, perfilPrivado = true }: FeedComposerProps) {
   const [state, action, pending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -36,6 +37,7 @@ export function FeedComposer({ userName, userAvatar }: FeedComposerProps) {
         key={state.token ?? 'novo'}
         userName={userName}
         userAvatar={userAvatar}
+        perfilPrivado={perfilPrivado}
         pending={pending}
         serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0]}
       />
@@ -57,16 +59,21 @@ interface MediaItem {
 function ComposerBody({
   userName,
   userAvatar,
+  perfilPrivado,
   pending,
   serverError,
 }: {
   userName: string | null
   userAvatar: string | null
+  perfilPrivado: boolean
   pending: boolean
   serverError?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const [texto, setTexto] = useState('')
+  const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
+    perfilPrivado ? 'PRIVADO' : 'PUBLICO',
+  )
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -184,6 +191,7 @@ function ComposerBody({
       className={dragOver ? 'rounded-xl outline-2 outline-dashed outline-[rgb(var(--primary))]' : ''}
     >
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
+      <input type="hidden" name="visibilidade" value={visibilidade} />
 
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
@@ -353,6 +361,18 @@ function ComposerBody({
             </div>
 
             <div className="flex items-center gap-2">
+              <select
+                value={visibilidade}
+                onChange={(e) =>
+                  setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
+                }
+                aria-label="Visibilidade do post"
+                className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
+              >
+                <option value="PUBLICO">Público</option>
+                <option value="TENANT">Só torcida</option>
+                <option value="PRIVADO">Só seguidores</option>
+              </select>
               <button
                 type="button"
                 onClick={() => setExpanded(false)}

@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getVisibleTenantIds } from './hierarquia'
+import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial } from './perfil-social'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 
@@ -138,12 +139,15 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
         ...cursorWhere,
       },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-      take: take + 1,
+      take: (take + 1) * 3,
       include: postInclude(),
     })) as PostRaw[]
     const sugeridos: PostSocialItem[] = sugeridosRaw.map(projetarPost)
-    const slice = sugeridos.slice(0, take)
-    const hasMore = sugeridos.length > take
+    const autorIds = sugeridos.map((p) => p.autorId)
+    const semAcesso = await getAutoresSemAcesso(undefined, tenantId, autorIds)
+    const visiveis = sugeridos.filter((p) => !semAcesso.has(p.autorId))
+    const slice = visiveis.slice(0, take)
+    const hasMore = visiveis.length > take
     return {
       postsSeguindo: [],
       postsSugeridos: slice,
@@ -178,7 +182,12 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   for (const post of postsRaw.map(projetarPost)) {
     if (!dedup.has(post.id)) dedup.set(post.id, post)
   }
-  const ordenados = [...dedup.values()].sort(sortPostsDesc)
+  let ordenados = [...dedup.values()].sort(sortPostsDesc)
+
+  const autorIdsExternos = ordenados.filter((p) => !redeSet.has(p.autorId)).map((p) => p.autorId)
+  const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIdsExternos)
+  ordenados = ordenados.filter((p) => redeSet.has(p.autorId) || !semAcesso.has(p.autorId))
+
   const hasMore = ordenados.length > take
   const pagina = ordenados.slice(0, take)
   const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
@@ -201,10 +210,17 @@ export const getComunicadosParaFeed = cache(async function getComunicadosParaFee
 })
 
 /** Query leve para o painel "Para seguir" — não reutiliza o feed completo de posts. */
+export interface SugestaoAutorAside {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+  seguidores: number
+}
+
 export const getSugestoesAutoresParaAside = cache(async function getSugestoesAutoresParaAside(
   tenantId: string,
   userId: string,
-) {
+): Promise<SugestaoAutorAside[]> {
   const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
     getVisibleTenantIds(tenantId, 'comunidade'),
     db.seguimento.findMany({
@@ -213,6 +229,39 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
     }),
   ])
   const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
+
+  const perfisPublicos: Array<{
+    userId: string
+    avatarUrl: string | null
+    user: { id: string; nome: string | null; avatarUrl: string | null }
+  }> = await db.perfilMembro.findMany({
+    where: {
+      tenantId,
+      perfilPrivado: false,
+      userId: { notIn: redeIds },
+    },
+    take: 8,
+    orderBy: { atualizadoEm: 'desc' },
+    select: {
+      userId: true,
+      avatarUrl: true,
+      user: { select: { id: true, nome: true, avatarUrl: true } },
+    },
+  })
+
+  if (perfisPublicos.length > 0) {
+    const result: SugestaoAutorAside[] = []
+    for (const p of perfisPublicos.slice(0, 4)) {
+      const contagens = await getContagensSeguimento(p.userId, tenantId)
+      result.push({
+        id: p.user.id,
+        nome: p.user.nome,
+        avatarUrl: resolverAvatarSocial(p.avatarUrl, p.user.avatarUrl),
+        seguidores: contagens.seguidores,
+      })
+    }
+    return result
+  }
 
   const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
     await db.post.findMany({
@@ -231,7 +280,21 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
       },
     })
 
-  return posts.map((p) => p.autor).slice(0, 4)
+  const autorIds = posts.map((p) => p.autor.id)
+  const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
+  const result: SugestaoAutorAside[] = []
+  for (const p of posts) {
+    if (semAcesso.has(p.autor.id)) continue
+    const contagens = await getContagensSeguimento(p.autor.id, tenantId)
+    result.push({
+      id: p.autor.id,
+      nome: p.autor.nome,
+      avatarUrl: p.autor.avatarUrl,
+      seguidores: contagens.seguidores,
+    })
+    if (result.length >= 4) break
+  }
+  return result
 })
 
 export async function getFeedPersonalizado(

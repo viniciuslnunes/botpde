@@ -6,6 +6,7 @@ const SIZES = {
   sm: 'h-9 w-9 text-xs',
   md: 'h-10 w-10 text-sm',
   lg: 'h-12 w-12 text-base',
+  xl: 'h-20 w-20 text-xl sm:h-24 sm:w-24',
 } as const
 
 const PIXELS = {
@@ -13,6 +14,7 @@ const PIXELS = {
   sm: 36,
   md: 40,
   lg: 48,
+  xl: 96,
 } as const
 
 export type AvatarSize = keyof typeof SIZES

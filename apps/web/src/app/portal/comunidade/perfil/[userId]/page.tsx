@@ -1,36 +1,75 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
+import {
+  getAtividadeDoAutor,
+  getContagensSeguimento,
+  getFotosDoAutor,
+  podeVerConteudoSocial,
+  resolverAvatarSocial,
+  segueMutuamente,
+} from '@/lib/perfil-social'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PerfilMensagemActions } from '@/components/portal/perfil-mensagem-actions'
-import { atualizarPerfil } from '@/app/portal/comunidade/actions'
+import { PerfilHeader } from '@/components/portal/perfil/perfil-header'
+import { PerfilStats } from '@/components/portal/perfil/perfil-stats'
+import { PerfilTabs, type PerfilAba } from '@/components/portal/perfil/perfil-tabs'
+import { PerfilSobre } from '@/components/portal/perfil/perfil-sobre'
+import { PerfilEditarForm } from '@/components/portal/perfil/perfil-editar-form'
+import { PerfilFotosGrid } from '@/components/portal/perfil/perfil-fotos-grid'
+import { PerfilAtividadeList } from '@/components/portal/perfil/perfil-atividade-list'
 import { postInclude, projetarPost, type PostRaw, type PostSocialItem } from '@/lib/feed'
 import { db } from '@torcida/db'
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Perfil da Comunidade' }
 
+const ABAS_VALIDAS: PerfilAba[] = ['sobre', 'publicacoes', 'fotos', 'atividade']
+
 export default async function PerfilComunidadePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ userId: string }>
+  searchParams: Promise<{ aba?: string }>
 }) {
-  const [{ userId }, session, tenant] = await Promise.all([params, auth(), getTenantFromHost()])
+  const [{ userId }, { aba: abaRaw }, session, tenant] = await Promise.all([
+    params,
+    searchParams,
+    auth(),
+    getTenantFromHost(),
+  ])
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
-  const [perfil, user] = await Promise.all([
-    db.perfilMembro.findUnique({
-      where: { userId_tenantId: { userId, tenantId: tenant.id } },
-      select: { bio: true, perfilPrivado: true, atualizadoEm: true },
-    }),
+  const aba: PerfilAba = ABAS_VALIDAS.includes(abaRaw as PerfilAba) ? (abaRaw as PerfilAba) : 'publicacoes'
+
+  const [user, membro, socio] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
-      select: { id: true, nome: true, avatarUrl: true },
+      select: { id: true, nome: true, avatarUrl: true, email: true, criadoEm: true },
+    }),
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId } },
+      select: {
+        nome: true,
+        idade: true,
+        telefone: true,
+        cidade: true,
+        discordTag: true,
+        tipo: true,
+        status: true,
+        criadoEm: true,
+        sede: { select: { nome: true } },
+      },
+    }),
+    db.saasSocio.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId } },
+      select: { numeroSocio: true, validade: true },
     }),
   ])
 
@@ -39,17 +78,39 @@ export default async function PerfilComunidadePage({
   const isSelf = session.user.id === userId
   const perfilAtual = isSelf
     ? await getOrCreatePerfilMembro(session.user.id, tenant.id)
-    : perfil ?? { bio: null, perfilPrivado: true, atualizadoEm: new Date() }
+    : await db.perfilMembro.findUnique({
+        where: { userId_tenantId: { userId, tenantId: tenant.id } },
+        select: {
+          bio: true,
+          perfilPrivado: true,
+          avatarUrl: true,
+          bannerUrl: true,
+          exibirCidade: true,
+          exibirSede: true,
+          exibirDesde: true,
+        },
+      })
 
-  const [podeSeguir, statusSeguimento] = isSelf
-    ? [false, null]
+  const perfil = perfilAtual ?? {
+    bio: null,
+    perfilPrivado: true,
+    avatarUrl: null,
+    bannerUrl: null,
+    exibirCidade: false,
+    exibirSede: false,
+    exibirDesde: true,
+  }
+
+  const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoce] = isSelf
+    ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false]
     : await Promise.all([
         canFollowUser(session.user.id, userId, tenant.id),
         getSeguimentoStatus(session.user.id, userId),
+        podeVerConteudoSocial(session.user.id, userId, tenant.id),
+        getContagensSeguimento(userId, tenant.id),
+        segueMutuamente(userId, session.user.id),
       ])
 
-  // Best-effort: tabela de bloqueio pode não existir antes da migração da
-  // mensageria — nesse caso o perfil abre sem os botões de conversa.
   let bloqueadoPorMim = false
   let mensageriaDisponivel = true
   if (!isSelf) {
@@ -69,11 +130,10 @@ export default async function PerfilComunidadePage({
     }
   }
 
-  const podeVerPosts =
-    isSelf || perfilAtual.perfilPrivado === false || statusSeguimento === 'APROVADO'
-
   const visibleTenantIds = await getVisibleTenantIds(tenant.id, 'comunidade')
-  const posts: PostSocialItem[] = podeVerPosts
+  const avatarUrl = resolverAvatarSocial(perfil.avatarUrl, user.avatarUrl)
+
+  const posts: PostSocialItem[] = podeVer
     ? ((await db.post.findMany({
         where: {
           autorId: userId,
@@ -82,10 +142,17 @@ export default async function PerfilComunidadePage({
           tenantId: { in: visibleTenantIds },
         },
         orderBy: [{ criadoEm: 'desc' }],
-        take: 20,
+        take: 30,
         include: postInclude(session.user.id),
       })) as PostRaw[]).map(projetarPost)
     : []
+
+  const [fotos, atividade] = podeVer
+    ? await Promise.all([
+        getFotosDoAutor(userId, tenant.id, visibleTenantIds),
+        getAtividadeDoAutor(userId, visibleTenantIds),
+      ])
+    : [[], []]
 
   const currentUser = {
     id: session.user.id,
@@ -93,8 +160,21 @@ export default async function PerfilComunidadePage({
     avatarUrl: session.user.image ?? null,
   }
 
+  const acoes = !isSelf ? (
+    <>
+      {podeSeguir && <SeguimentoButtons userId={userId} status={statusSeguimento} />}
+      {mensageriaDisponivel && (
+        <PerfilMensagemActions
+          userId={userId}
+          podeConversar={podeSeguir}
+          bloqueadoPorMim={bloqueadoPorMim}
+        />
+      )}
+    </>
+  ) : undefined
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-4">
       <Link
         href="/portal/comunidade"
         className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
@@ -102,100 +182,95 @@ export default async function PerfilComunidadePage({
         ← Voltar ao feed
       </Link>
 
-      <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{user.nome ?? 'Membro'}</h1>
-            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-              {perfilAtual.perfilPrivado ? 'Perfil privado' : 'Perfil público'}
-            </p>
-          </div>
-          {!isSelf && (
-            <div className="flex flex-col items-end gap-2">
-              {podeSeguir && (
-                <SeguimentoButtons mode="follow" userId={userId} status={statusSeguimento} />
-              )}
-              {mensageriaDisponivel && (
-                <PerfilMensagemActions
-                  userId={userId}
-                  podeConversar={podeSeguir}
-                  bloqueadoPorMim={bloqueadoPorMim}
+      <PerfilHeader
+        nome={user.nome}
+        avatarUrl={avatarUrl}
+        bannerUrl={perfil.bannerUrl}
+        perfilPrivado={perfil.perfilPrivado}
+        tenantNome={tenant.nome}
+        segueVoce={segueVoce}
+        isSelf={isSelf}
+        acoes={acoes}
+      />
+
+      <PerfilStats
+        userId={userId}
+        publicacoes={contagens.publicacoes}
+        seguidores={contagens.seguidores}
+        seguindo={contagens.seguindo}
+        podeVerRede={podeVer}
+      />
+
+      <PerfilTabs userId={userId} abaAtiva={aba} />
+
+      {!podeVer && aba !== 'sobre' ? (
+        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Este perfil é privado. Envie uma solicitação para seguir.
+        </div>
+      ) : (
+        <>
+          {aba === 'sobre' && (
+            <>
+              {isSelf && (
+                <PerfilEditarForm
+                  bio={perfil.bio ?? ''}
+                  perfilPrivado={perfil.perfilPrivado}
+                  exibirCidade={perfil.exibirCidade}
+                  exibirSede={perfil.exibirSede}
+                  exibirDesde={perfil.exibirDesde}
+                  bannerUrl={perfil.bannerUrl}
+                  avatarUrl={perfil.avatarUrl}
                 />
               )}
-            </div>
+              <PerfilSobre
+                isSelf={isSelf}
+                bio={perfil.bio}
+                exibirCidade={perfil.exibirCidade}
+                exibirSede={perfil.exibirSede}
+                exibirDesde={perfil.exibirDesde}
+                cidade={membro?.cidade ?? null}
+                sedeNome={membro?.sede?.nome ?? null}
+                membroDesde={membro?.criadoEm ?? user.criadoEm}
+                email={isSelf ? user.email : null}
+                tipoMembro={membro?.tipo ?? null}
+                numeroSocio={isSelf ? (socio?.numeroSocio ?? null) : null}
+                validadeSocio={isSelf ? (socio?.validade ?? null) : null}
+                membroForm={{
+                  nome: membro?.nome ?? user.nome ?? '',
+                  idade: membro?.idade,
+                  telefone: membro?.telefone,
+                  cidade: membro?.cidade,
+                  discordTag: membro?.discordTag,
+                  temMembro: !!membro,
+                }}
+              />
+            </>
           )}
-        </div>
-        {perfilAtual.bio && (
-          <p className="mt-3 whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">{perfilAtual.bio}</p>
-        )}
-      </section>
 
-      {isSelf && (
-        <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            Editar perfil social
-          </h2>
-          <form
-            action={async (formData: FormData) => {
-              'use server'
-              await atualizarPerfil(
-                String(formData.get('bio') ?? ''),
-                formData.get('perfilPrivado') === 'on',
-              )
-            }}
-            className="space-y-3"
-          >
-            <textarea
-              name="bio"
-              defaultValue={perfilAtual.bio ?? ''}
-              maxLength={280}
-              rows={3}
-              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
-              placeholder="Escreva sua bio para a comunidade."
-            />
-            <label className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
-              <input
-                type="checkbox"
-                name="perfilPrivado"
-                defaultChecked={perfilAtual.perfilPrivado}
-              />
-              Perfil privado (aceita seguidores manualmente)
-            </label>
-            <button
-              type="submit"
-              className="rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              Salvar perfil
-            </button>
-          </form>
-        </section>
+          {aba === 'publicacoes' && (
+            <section className="space-y-4">
+              {posts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                  Nenhum post publicado por enquanto.
+                </div>
+              ) : (
+                posts.map((post) => (
+                  <FeedPostCard
+                    key={post.id}
+                    post={post}
+                    showTenantBadge={post.tenantId !== tenant.id}
+                    currentUser={currentUser}
+                    isAuthor={isSelf}
+                  />
+                ))
+              )}
+            </section>
+          )}
+
+          {aba === 'fotos' && <PerfilFotosGrid fotos={fotos} />}
+          {aba === 'atividade' && <PerfilAtividadeList itens={atividade} />}
+        </>
       )}
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Publicações
-        </h2>
-        {!podeVerPosts ? (
-          <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-6 text-sm text-[rgb(var(--foreground-muted))]">
-            Este perfil é privado. Envie uma solicitação para seguir.
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-6 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum post publicado por enquanto.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                showTenantBadge={post.tenantId !== tenant.id}
-                currentUser={currentUser}
-              />
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Newspaper, Users } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
-import { getSugestoesAutoresParaAside } from '@/lib/feed'
+import { getSugestoesAutoresParaAside, type SugestaoAutorAside } from '@/lib/feed'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 
@@ -20,7 +20,7 @@ export async function ComunidadeAsideWidgets({
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
-      : Promise.resolve([] as Array<{ id: string; nome: string | null; avatarUrl: string | null }>),
+      : Promise.resolve([] as SugestaoAutorAside[]),
   ])
 
   return (
@@ -70,8 +70,12 @@ export async function ComunidadeAsideWidgets({
                 >
                   {autor.nome ?? 'Membro'}
                 </Link>
+                {'seguidores' in autor && autor.seguidores > 0 && (
+                  <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
+                    {autor.seguidores} seg.
+                  </span>
+                )}
                 <SeguimentoButtons
-                  mode="follow"
                   userId={autor.id}
                   status={null}
                   isSelf={autor.id === currentUserId}

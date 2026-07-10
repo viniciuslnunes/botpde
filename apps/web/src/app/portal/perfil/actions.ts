@@ -83,6 +83,7 @@ export async function salvarPerfil(
   }
 
   revalidatePath('/portal/perfil')
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath('/portal')
   return { success: true }
 }

@@ -1,0 +1,362 @@
+import { db } from '@torcida/db'
+import { getSeguimentoStatus } from './social'
+
+export interface PerfilSocialLite {
+  id: string
+  userId: string
+  tenantId: string
+  bio: string | null
+  perfilPrivado: boolean
+  avatarUrl: string | null
+  bannerUrl: string | null
+  exibirCidade: boolean
+  exibirSede: boolean
+  exibirDesde: boolean
+  criadoEm: Date
+}
+
+export interface ContagensSeguimento {
+  seguidores: number
+  seguindo: number
+  publicacoes: number
+}
+
+export interface MembroRedeItem {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+  perfilPrivado: boolean
+  segueVoce: boolean
+}
+
+const perfilSelect = {
+  id: true,
+  userId: true,
+  tenantId: true,
+  bio: true,
+  perfilPrivado: true,
+  avatarUrl: true,
+  bannerUrl: true,
+  exibirCidade: true,
+  exibirSede: true,
+  exibirDesde: true,
+  criadoEm: true,
+} as const
+
+export function resolverAvatarSocial(
+  perfilAvatar: string | null | undefined,
+  userAvatar: string | null | undefined,
+): string | null {
+  return perfilAvatar ?? userAvatar ?? null
+}
+
+/** Versão síncrona para testes e uso interno. */
+export function podeVerConteudoSocialSync(
+  viewerId: string | undefined,
+  autorId: string,
+  perfilPrivado: boolean,
+  seguimentoAprovado: boolean,
+): boolean {
+  if (!viewerId) return false
+  if (viewerId === autorId) return true
+  if (!perfilPrivado) return true
+  return seguimentoAprovado
+}
+
+/** Self, perfil público ou seguimento aprovado. */
+export async function podeVerConteudoSocial(
+  viewerId: string | undefined,
+  autorId: string,
+  tenantId: string,
+): Promise<boolean> {
+  if (!viewerId) return false
+  if (viewerId === autorId) return true
+
+  const perfil: { perfilPrivado: boolean } | null = await db.perfilMembro.findUnique({
+    where: { userId_tenantId: { userId: autorId, tenantId } },
+    select: { perfilPrivado: true },
+  })
+
+  const status = await getSeguimentoStatus(viewerId, autorId)
+  return podeVerConteudoSocialSync(
+    viewerId,
+    autorId,
+    perfil?.perfilPrivado ?? true,
+    status === 'APROVADO',
+  )
+}
+
+/** IDs de autores cujo conteúdo o viewer não pode ver (perfil privado sem follow). */
+export async function getAutoresSemAcesso(
+  viewerId: string | undefined,
+  tenantId: string,
+  autorIds: string[],
+): Promise<Set<string>> {
+  if (!viewerId) return new Set(autorIds)
+  const unique = [...new Set(autorIds)].filter((id) => id !== viewerId)
+  if (unique.length === 0) return new Set()
+
+  const perfis: Array<{ userId: string; perfilPrivado: boolean }> = await db.perfilMembro.findMany({
+    where: { userId: { in: unique }, tenantId },
+    select: { userId: true, perfilPrivado: true },
+  })
+  const perfilMap = new Map(perfis.map((p) => [p.userId, p.perfilPrivado]))
+
+  const candidatosPrivados = unique.filter((id) => perfilMap.get(id) ?? true)
+  if (candidatosPrivados.length === 0) return new Set()
+
+  const aprovados: Array<{ seguidoId: string }> = await db.seguimento.findMany({
+    where: {
+      seguidorId: viewerId,
+      seguidoId: { in: candidatosPrivados },
+      status: 'APROVADO',
+    },
+    select: { seguidoId: true },
+  })
+  const seguidos = new Set(aprovados.map((s) => s.seguidoId))
+
+  const bloqueados = new Set<string>()
+  for (const id of candidatosPrivados) {
+    if (!seguidos.has(id)) bloqueados.add(id)
+  }
+  return bloqueados
+}
+
+export async function getPerfilSocial(
+  userId: string,
+  tenantId: string,
+): Promise<PerfilSocialLite | null> {
+  const perfil: PerfilSocialLite | null = await db.perfilMembro.findUnique({
+    where: { userId_tenantId: { userId, tenantId } },
+    select: perfilSelect,
+  })
+  return perfil
+}
+
+export async function getContagensSeguimento(
+  userId: string,
+  tenantId: string,
+): Promise<ContagensSeguimento> {
+  const [seguidores, seguindo, publicacoes] = await Promise.all([
+    db.seguimento.count({ where: { seguidoId: userId, status: 'APROVADO' } }),
+    db.seguimento.count({ where: { seguidorId: userId, status: 'APROVADO' } }),
+    db.post.count({
+      where: { autorId: userId, tenantId, tipo: 'MEMBRO', oculto: false },
+    }),
+  ])
+  return { seguidores, seguindo, publicacoes }
+}
+
+export async function podeVerListasRede(
+  viewerId: string | undefined,
+  alvoId: string,
+  tenantId: string,
+): Promise<boolean> {
+  return podeVerConteudoSocial(viewerId, alvoId, tenantId)
+}
+
+export async function listarRedeSocial(
+  alvoId: string,
+  tenantId: string,
+  tipo: 'seguidores' | 'seguindo',
+  viewerId: string | undefined,
+  opts: { take?: number; cursor?: string } = {},
+): Promise<{ membros: MembroRedeItem[]; nextCursor: string | null }> {
+  const podeVer = await podeVerListasRede(viewerId, alvoId, tenantId)
+  if (!podeVer) return { membros: [], nextCursor: null }
+
+  const take = Math.min(Math.max(opts.take ?? 30, 1), 50)
+  const where =
+    tipo === 'seguidores'
+      ? { seguidoId: alvoId, status: 'APROVADO' as const }
+      : { seguidorId: alvoId, status: 'APROVADO' as const }
+
+  const rows: Array<{
+    id: string
+    seguidorId: string
+    seguidoId: string
+    seguidor: { id: string; nome: string | null; avatarUrl: string | null }
+    seguido: { id: string; nome: string | null; avatarUrl: string | null }
+  }> = await db.seguimento.findMany({
+    where: {
+      ...where,
+      ...(opts.cursor ? { id: { lt: opts.cursor } } : {}),
+    },
+    orderBy: { id: 'desc' },
+    take: take + 1,
+    include: {
+      seguidor: { select: { id: true, nome: true, avatarUrl: true } },
+      seguido: { select: { id: true, nome: true, avatarUrl: true } },
+    },
+  })
+
+  const hasMore = rows.length > take
+  const slice = rows.slice(0, take)
+  const userIds = slice.map((r) => (tipo === 'seguidores' ? r.seguidorId : r.seguidoId))
+
+  const perfis: Array<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }> =
+    await db.perfilMembro.findMany({
+      where: { userId: { in: userIds }, tenantId },
+      select: { userId: true, perfilPrivado: true, avatarUrl: true },
+    })
+  const perfilMap = new Map(perfis.map((p) => [p.userId, p]))
+
+  let segueViewer: Set<string> = new Set()
+  if (viewerId && tipo === 'seguidores') {
+    const mutuos: Array<{ seguidorId: string }> = await db.seguimento.findMany({
+      where: { seguidorId: { in: userIds }, seguidoId: viewerId, status: 'APROVADO' },
+      select: { seguidorId: true },
+    })
+    segueViewer = new Set(mutuos.map((m) => m.seguidorId))
+  }
+
+  const membros: MembroRedeItem[] = slice.map((r) => {
+    const user = tipo === 'seguidores' ? r.seguidor : r.seguido
+    const perfil = perfilMap.get(user.id)
+    return {
+      userId: user.id,
+      nome: user.nome,
+      avatarUrl: resolverAvatarSocial(perfil?.avatarUrl, user.avatarUrl),
+      perfilPrivado: perfil?.perfilPrivado ?? true,
+      segueVoce: segueViewer.has(user.id),
+    }
+  })
+
+  return {
+    membros,
+    nextCursor: hasMore && slice.length > 0 ? slice[slice.length - 1].id : null,
+  }
+}
+
+export async function segueMutuamente(
+  viewerId: string,
+  alvoId: string,
+): Promise<boolean> {
+  const [a, b]: [{ id: string } | null, { id: string } | null] = await Promise.all([
+    db.seguimento.findFirst({
+      where: { seguidorId: viewerId, seguidoId: alvoId, status: 'APROVADO' },
+      select: { id: true },
+    }),
+    db.seguimento.findFirst({
+      where: { seguidorId: alvoId, seguidoId: viewerId, status: 'APROVADO' },
+      select: { id: true },
+    }),
+  ])
+  return a !== null && b !== null
+}
+
+export interface FotoPerfilItem {
+  url: string
+  postId: string
+  criadoEm: Date
+}
+
+export interface AtividadePerfilItem {
+  id: string
+  tipo: 'COMENTARIO' | 'CURTIR' | 'FORCA'
+  conteudo: string
+  criadoEm: Date
+  postId: string
+  postSnippet: string
+}
+
+export async function getFotosDoAutor(
+  autorId: string,
+  tenantId: string,
+  visibleTenantIds: string[],
+): Promise<FotoPerfilItem[]> {
+  const posts: Array<{
+    id: string
+    criadoEm: Date
+    imagemUrl: string | null
+    midiaUrls: string[]
+  }> = await db.post.findMany({
+    where: {
+      autorId,
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+    },
+    orderBy: { criadoEm: 'desc' },
+    take: 50,
+    select: { id: true, criadoEm: true, imagemUrl: true, midiaUrls: true },
+  })
+
+  const fotos: FotoPerfilItem[] = []
+  for (const post of posts) {
+    const urls = [
+      ...(post.imagemUrl ? [post.imagemUrl] : []),
+      ...post.midiaUrls.filter((u) => u.includes('res.cloudinary.com') && !u.includes('/video/')),
+    ]
+    for (const url of urls) {
+      fotos.push({ url, postId: post.id, criadoEm: post.criadoEm })
+    }
+  }
+  return fotos
+}
+
+export async function getAtividadeDoAutor(
+  autorId: string,
+  visibleTenantIds: string[],
+): Promise<AtividadePerfilItem[]> {
+  const [comentarios, reacoes]: [
+    Array<{
+      id: string
+      conteudo: string
+      criadoEm: Date
+      post: { id: string; conteudo: string; tenantId: string; oculto: boolean }
+    }>,
+    Array<{
+      id: string
+      tipo: 'CURTIR' | 'FORCA'
+      criadoEm: Date
+      post: { id: string; conteudo: string; tenantId: string; oculto: boolean }
+    }>,
+  ] = await Promise.all([
+    db.comentario.findMany({
+      where: { autorId },
+      orderBy: { criadoEm: 'desc' },
+      take: 40,
+      include: {
+        post: { select: { id: true, conteudo: true, tenantId: true, oculto: true } },
+      },
+    }),
+    db.reacao.findMany({
+      where: { userId: autorId },
+      orderBy: { criadoEm: 'desc' },
+      take: 40,
+      include: {
+        post: { select: { id: true, conteudo: true, tenantId: true, oculto: true } },
+      },
+    }),
+  ])
+
+  const visibleSet = new Set(visibleTenantIds)
+  const itens: AtividadePerfilItem[] = []
+
+  for (const c of comentarios) {
+    if (c.post.oculto || !visibleSet.has(c.post.tenantId)) continue
+    itens.push({
+      id: c.id,
+      tipo: 'COMENTARIO',
+      conteudo: c.conteudo,
+      criadoEm: c.criadoEm,
+      postId: c.post.id,
+      postSnippet: c.post.conteudo.slice(0, 120),
+    })
+  }
+  for (const r of reacoes) {
+    if (r.post.oculto || !visibleSet.has(r.post.tenantId)) continue
+    itens.push({
+      id: r.id,
+      tipo: r.tipo,
+      conteudo: r.tipo === 'FORCA' ? 'Deu Força' : 'Curtiu',
+      criadoEm: r.criadoEm,
+      postId: r.post.id,
+      postSnippet: r.post.conteudo.slice(0, 120),
+    })
+  }
+
+  itens.sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime())
+  return itens.slice(0, 40)
+}

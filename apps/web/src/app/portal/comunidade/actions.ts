@@ -7,7 +7,7 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema } from '@torcida/types'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
@@ -29,6 +29,7 @@ const midiaUrlSchema = z
 const postSchema = z.object({
   conteudo: z.string().trim().min(1, 'Conteúdo é obrigatório').max(3000),
   midias: z.array(midiaUrlSchema).max(MAX_MIDIAS, 'Máximo de 10 anexos').default([]),
+  visibilidade: visibilidadePostSchema.default('PUBLICO'),
 })
 
 function parseMidias(raw: FormDataEntryValue | null): unknown {
@@ -78,13 +79,14 @@ export async function publicarPost(
   const parsed = postSchema.safeParse({
     conteudo: formData.get('conteudo'),
     midias: parseMidias(formData.get('midias')),
+    visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
   })
 
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { conteudo, midias } = parsed.data
+  const { conteudo, midias, visibilidade } = parsed.data
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
   const post = await db.post.create({
@@ -94,7 +96,7 @@ export async function publicarPost(
       conteudo,
       midiaUrls: midias,
       tipo: 'MEMBRO',
-      visibilidade: 'PUBLICO',
+      visibilidade,
     },
   })
 
@@ -176,6 +178,15 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
     data: { status: 'APROVADO' },
   })
 
+  await criarNotificacao({
+    userId: seguimento.seguidorId,
+    tenantId: tenant.id,
+    tipo: 'SEGUIMENTO_APROVADO',
+    titulo: 'Solicitação aprovada',
+    corpo: `${session.user.name ?? 'Um membro'} aceitou você.`,
+    link: `/portal/comunidade/perfil/${session.user.id}`,
+  })
+
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
   revalidatePath('/portal/comunidade/seguindo')
@@ -201,15 +212,99 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
 }
 
-export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Promise<void> {
+export async function deixarDeSeguir(userId: string): Promise<void> {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
   await assertMembroAtivo(tenant.id, session.user.id)
-  const parsed = perfilSchema.safeParse({ bio, perfilPrivado })
+
+  await db.seguimento.deleteMany({
+    where: {
+      seguidorId: session.user.id,
+      seguidoId: userId,
+      status: 'APROVADO',
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${userId}`)
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+}
+
+export interface AtualizarPerfilSocialInput {
+  bio: string
+  perfilPrivado: boolean
+  exibirCidade: boolean
+  exibirSede: boolean
+  exibirDesde: boolean
+  bannerUrl: string | null
+  avatarUrl: string | null
+}
+
+export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): Promise<void> {
+  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  if (!session?.user?.id) throw new Error('Não autenticado')
+  if (!tenant) throw new Error('Tenant não encontrado')
+
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = atualizarPerfilSocialSchema.safeParse(input)
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
 
+  if (parsed.data.bannerUrl && !isCloudinaryUrl(parsed.data.bannerUrl)) {
+    throw new Error('Banner inválido')
+  }
+  if (parsed.data.avatarUrl && !isCloudinaryUrl(parsed.data.avatarUrl)) {
+    throw new Error('Avatar inválido')
+  }
+
+  await db.perfilMembro.upsert({
+    where: { userId_tenantId: { userId: session.user.id, tenantId: tenant.id } },
+    create: {
+      userId: session.user.id,
+      tenantId: tenant.id,
+      bio: parsed.data.bio?.trim() || null,
+      perfilPrivado: parsed.data.perfilPrivado,
+      exibirCidade: parsed.data.exibirCidade,
+      exibirSede: parsed.data.exibirSede,
+      exibirDesde: parsed.data.exibirDesde,
+      bannerUrl: parsed.data.bannerUrl ?? null,
+      avatarUrl: parsed.data.avatarUrl ?? null,
+    },
+    update: {
+      bio: parsed.data.bio?.trim() || null,
+      perfilPrivado: parsed.data.perfilPrivado,
+      exibirCidade: parsed.data.exibirCidade,
+      exibirSede: parsed.data.exibirSede,
+      exibirDesde: parsed.data.exibirDesde,
+      bannerUrl: parsed.data.bannerUrl ?? null,
+      avatarUrl: parsed.data.avatarUrl ?? null,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'PERFIL_SOCIAL_ATUALIZADO',
+      entidade: 'PerfilMembro',
+      entidadeId: session.user.id,
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+}
+
+/** @deprecated Use atualizarPerfilSocial */
+export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Promise<void> {
+  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  if (!session?.user?.id) throw new Error('Não autenticado')
+  if (!tenant) throw new Error('Tenant não encontrado')
+  await assertMembroAtivo(tenant.id, session.user.id)
+  const parsed = perfilSchema.safeParse({ bio, perfilPrivado })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
   await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId: session.user.id, tenantId: tenant.id } },
     create: {
@@ -221,6 +316,66 @@ export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Prom
     update: {
       bio: parsed.data.bio?.trim() || null,
       perfilPrivado: parsed.data.perfilPrivado,
+    },
+  })
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+}
+
+export async function editarPost(postId: string, conteudo: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = editarPostSchema.safeParse({ postId, conteudo })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post inválido')
+
+  const post = await db.post.findFirst({
+    where: { id: parsed.data.postId, autorId: session.user.id, tenantId: tenant.id, oculto: false },
+    select: { id: true },
+  })
+  if (!post) throw new Error('Post não encontrado')
+
+  await db.post.update({
+    where: { id: post.id },
+    data: { conteudo: parsed.data.conteudo },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_SOCIAL_EDITADO',
+      entidade: 'Post',
+      entidadeId: post.id,
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+}
+
+export async function excluirPost(postId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const post = await db.post.findFirst({
+    where: { id: postId, autorId: session.user.id, tenantId: tenant.id },
+    select: { id: true },
+  })
+  if (!post) throw new Error('Post não encontrado')
+
+  await db.post.update({
+    where: { id: post.id },
+    data: { oculto: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_SOCIAL_EXCLUIDO',
+      entidade: 'Post',
+      entidadeId: post.id,
     },
   })
 

@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
-import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { SeguimentoReviewButtons } from '@/components/portal/seguimento-buttons'
+import { aprovarSeguimento, rejeitarSeguimento } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import type { Metadata } from 'next'
 
@@ -94,7 +95,11 @@ export default async function SeguindoPage() {
                   </p>
                 </div>
               </div>
-              <SeguimentoButtons mode="review" seguimentoId={item.id} />
+              <SeguimentoReviewButtons
+                seguimentoId={item.id}
+                onAprovar={aprovarSeguimento}
+                onRejeitar={rejeitarSeguimento}
+              />
             </div>
           ))}
         </div>

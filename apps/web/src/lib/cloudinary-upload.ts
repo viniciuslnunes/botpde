@@ -3,7 +3,11 @@
 /** Upload de imagem direto para o Cloudinary, com assinatura do nosso backend. */
 
 const MAX_WIDTH = 1600
+const BANNER_MAX_WIDTH = 1920
+const AVATAR_MAX_WIDTH = 512
 const JPEG_QUALITY = 0.85
+
+type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar'
 
 interface SignResponse {
   cloudName: string
@@ -14,11 +18,13 @@ interface SignResponse {
 }
 
 /** Redimensiona/comprime no cliente antes de subir (economiza banda e storage). */
-async function compress(file: File): Promise<Blob> {
+async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
   if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+  const maxWidth =
+    purpose === 'perfil-avatar' ? AVATAR_MAX_WIDTH : purpose === 'perfil-banner' ? BANNER_MAX_WIDTH : MAX_WIDTH
   try {
     const bitmap = await createImageBitmap(file)
-    const ratio = Math.min(1, MAX_WIDTH / bitmap.width)
+    const ratio = Math.min(1, maxWidth / bitmap.width)
     if (ratio === 1) return file
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(bitmap.width * ratio)
@@ -38,10 +44,18 @@ async function compress(file: File): Promise<Blob> {
 export async function uploadMediaToCloudinary(
   file: File,
   onProgress?: (pct: number) => void,
+  purpose: UploadPurpose = 'comunidade',
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/')
+  if (purpose !== 'comunidade' && isVideo) {
+    throw new Error('Apenas imagens são permitidas para o perfil.')
+  }
 
-  const signRes = await fetch('/api/upload/sign', { method: 'POST' })
+  const signRes = await fetch('/api/upload/sign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ purpose }),
+  })
   if (signRes.status === 501) {
     throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')
   }
@@ -52,7 +66,7 @@ export async function uploadMediaToCloudinary(
   const sign = (await signRes.json()) as SignResponse
 
   // Vídeo sobe sem compressão no cliente; imagem é redimensionada antes.
-  const blob = isVideo ? file : await compress(file)
+  const blob = isVideo ? file : await compress(file, purpose)
   const form = new FormData()
   form.append('file', blob, file.name)
   form.append('api_key', sign.apiKey)

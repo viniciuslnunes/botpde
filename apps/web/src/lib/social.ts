@@ -8,6 +8,10 @@ interface PerfilMembroLite {
   bio: string | null
   perfilPrivado: boolean
   avatarUrl: string | null
+  bannerUrl: string | null
+  exibirCidade: boolean
+  exibirSede: boolean
+  exibirDesde: boolean
 }
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO'
@@ -27,6 +31,10 @@ export async function getOrCreatePerfilMembro(
       bio: true,
       perfilPrivado: true,
       avatarUrl: true,
+      bannerUrl: true,
+      exibirCidade: true,
+      exibirSede: true,
+      exibirDesde: true,
     },
   })
   return perfil

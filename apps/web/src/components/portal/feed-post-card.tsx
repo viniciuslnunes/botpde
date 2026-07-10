@@ -4,15 +4,18 @@ import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
 import { PostLegacyImage } from './post-legacy-image'
+import { FeedPostMenu } from './feed-post-menu'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface FeedPostCardProps {
   post: PostSocialItem
   showTenantBadge?: boolean
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
+  isAuthor?: boolean
 }
 
-export function FeedPostCard({ post, showTenantBadge = false, currentUser }: FeedPostCardProps) {
+export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAuthor }: FeedPostCardProps) {
+  const author = post.autorId === currentUser.id
   return (
     <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
@@ -35,6 +38,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser }: Fee
           </div>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">{formatRelative(post.criadoEm)}</p>
         </div>
+        {(isAuthor || author) && <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} />}
       </header>
 
       {post.titulo && (

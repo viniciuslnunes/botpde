@@ -6,6 +6,7 @@ import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
+import { getOrCreatePerfilMembro } from '@/lib/social'
 
 const ComunidadeChatPanel = dynamic(
   () =>
@@ -38,12 +39,18 @@ export default async function ComunidadePage({
     avatarUrl: session?.user?.image ?? null,
   }
 
+  const perfilPrivado =
+    session?.user?.id != null
+      ? (await getOrCreatePerfilMembro(session.user.id, tenant.id)).perfilPrivado
+      : true
+
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
       <ComunidadeFeedShell
         tenant={{ id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId }}
         currentUser={currentUser}
         cursor={params.cursor}
+        perfilPrivado={perfilPrivado}
       />
 
       <aside className="hidden xl:block">

@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getCloudinaryConfig, signCloudinaryParams } from '@/lib/cloudinary'
 
+const purposeSchema = z.enum(['comunidade', 'perfil-banner', 'perfil-avatar']).default('comunidade')
+
 /**
- * Gera uma assinatura para upload direto ao Cloudinary (o arquivo vai do
- * navegador para o Cloudinary, não passa pelo nosso servidor). Protegido:
- * só membros ativos que podem publicar recebem assinatura.
+ * Gera assinatura para upload direto ao Cloudinary.
+ * purpose define a pasta de destino.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
     if (!session?.user?.id || !tenant) {
@@ -25,8 +27,22 @@ export async function POST() {
       )
     }
 
+    let purpose: z.infer<typeof purposeSchema> = 'comunidade'
+    try {
+      const body = (await request.json()) as { purpose?: string }
+      purpose = purposeSchema.parse(body.purpose ?? 'comunidade')
+    } catch {
+      purpose = 'comunidade'
+    }
+
+    const folder =
+      purpose === 'comunidade'
+        ? `torcida/${tenant.id}/comunidade`
+        : purpose === 'perfil-banner'
+          ? `torcida/${tenant.id}/perfis/${session.user.id}/banner`
+          : `torcida/${tenant.id}/perfis/${session.user.id}/avatar`
+
     const timestamp = Math.floor(Date.now() / 1000)
-    const folder = `torcida/${tenant.id}/comunidade`
     const signature = signCloudinaryParams({ folder, timestamp }, config.apiSecret)
 
     return NextResponse.json({
