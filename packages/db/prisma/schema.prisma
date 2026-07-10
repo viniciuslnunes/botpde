@@ -139,6 +139,8 @@ model Tenant {
   denuncias         Denuncia[]
   conversas         Conversa[]
   denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
+  hashtags          Hashtag[]
+  perfilDestaques   PerfilDestaque[]
 
   @@map("saas_tenants")
 }
@@ -201,6 +203,8 @@ model User {
   bloqueiosRecebidos          BloqueioUsuario[]  @relation("BloqueioBloqueado")
   denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
   denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
+  votosEnquetePost            VotoEnquetePost[]
+  perfilDestaques             PerfilDestaque[]
 
   @@map("saas_users")
 }
@@ -853,15 +857,23 @@ model Post {
   fixado      Boolean          @default(false)
   oculto      Boolean          @default(false)
 
+  postOrigemId String? @map("post_origem_id")
+  postOrigem   Post?   @relation("Repost", fields: [postOrigemId], references: [id], onDelete: SetNull)
+  reposts      Post[]  @relation("Repost")
+
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   comentarios Comentario[]
   reacoes     Reacao[]
   denuncias   Denuncia[]
+  enquete     EnquetePost?
+  hashtags    PostHashtag[]
+  destaqueItens PerfilDestaqueItem[]
 
   @@index([tenantId, criadoEm])
   @@index([tenantId, oculto])
+  @@index([postOrigemId])
   @@map("saas_posts")
 }
 
@@ -955,6 +967,8 @@ model Reacao {
 enum TipoReacao {
   CURTIR
   FORCA
+  VAMOS
+  PRESENTE
 }
 
 model Denuncia {
@@ -983,6 +997,102 @@ enum StatusDenuncia {
   DESCARTADA
 }
 
+model EnquetePost {
+  id          String    @id @default(uuid())
+  postId      String    @unique @map("post_id")
+  encerradaEm DateTime? @map("encerrada_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  post   Post               @relation(fields: [postId], references: [id], onDelete: Cascade)
+  opcoes OpcaoEnquetePost[]
+  votos  VotoEnquetePost[]
+
+  @@map("saas_enquetes_post")
+}
+
+model OpcaoEnquetePost {
+  id        String @id @default(uuid())
+  enqueteId String @map("enquete_id")
+  texto     String
+  ordem     Int    @default(0)
+
+  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  votos   VotoEnquetePost[]
+
+  @@index([enqueteId, ordem])
+  @@map("saas_opcoes_enquete_post")
+}
+
+model VotoEnquetePost {
+  id        String   @id @default(uuid())
+  enqueteId String   @map("enquete_id")
+  opcaoId   String   @map("opcao_id")
+  userId    String   @map("user_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  opcao   OpcaoEnquetePost @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enqueteId, userId])
+  @@map("saas_votos_enquete_post")
+}
+
+model Hashtag {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tag      String
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts  PostHashtag[]
+
+  @@unique([tenantId, tag])
+  @@index([tag])
+  @@map("saas_hashtags")
+}
+
+model PostHashtag {
+  id        String @id @default(uuid())
+  postId    String @map("post_id")
+  hashtagId String @map("hashtag_id")
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, hashtagId])
+  @@index([hashtagId])
+  @@map("saas_post_hashtags")
+}
+
+model PerfilDestaque {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  tenantId String  @map("tenant_id")
+  titulo   String
+  capaUrl  String? @map("capa_url")
+  ordem    Int     @default(0)
+
+  user   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  itens  PerfilDestaqueItem[]
+
+  @@index([userId, tenantId])
+  @@map("saas_perfil_destaques")
+}
+
+model PerfilDestaqueItem {
+  id         String @id @default(uuid())
+  destaqueId String @map("destaque_id")
+  postId     String @map("post_id")
+  ordem      Int    @default(0)
+
+  destaque PerfilDestaque @relation(fields: [destaqueId], references: [id], onDelete: Cascade)
+  post     Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([destaqueId, postId])
+  @@map("saas_perfil_destaque_itens")
+}
+
 model Notificacao {
   id        String           @id @default(uuid())
   userId    String           @map("user_id")
@@ -1009,6 +1119,8 @@ enum TipoNotificacao {
   COMUNICADO_URGENTE
   DENUNCIA_NOVA
   NOVA_MENSAGEM
+  MENCAO
+  REPOST
 }
 
 // ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
@@ -1027,6 +1139,8 @@ model Conversa {
   nome      String?
   descricao String?
   avatarUrl String? @map("avatar_url")
+  // Grupos públicos da comunidade — qualquer membro ativo do tenant pode entrar
+  publica   Boolean @default(false)
 
   criadoPorId String @map("criado_por_id")
   criadoPor   User   @relation("ConversaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Cascade)

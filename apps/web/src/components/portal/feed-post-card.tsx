@@ -1,10 +1,14 @@
 import Link from 'next/link'
+import { Repeat2 } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
 import { PostLegacyImage } from './post-legacy-image'
 import { FeedPostMenu } from './feed-post-menu'
+import { PostConteudoRich } from './post-conteudo-rich'
+import { PostPoll } from './post-poll'
+import { PostRepostEmbed } from './post-repost-embed'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface FeedPostCardProps {
@@ -45,9 +49,18 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">{post.titulo}</h3>
       )}
 
-      <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]">
-        {post.conteudo}
-      </p>
+      {post.postOrigemId && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          <Repeat2 className="h-3.5 w-3.5" />
+          Compartilhou uma publicação
+        </p>
+      )}
+
+      <PostConteudoRich conteudo={post.conteudo} className="mt-2" />
+
+      {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
+
+      {post.enquete && <PostPoll enquete={post.enquete} />}
 
       {post.midiaUrls.length > 0 ? (
         <PostMedia urls={post.midiaUrls} />
@@ -61,6 +74,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         totalComentarios={post.totalComentarios}
         minhaReacao={post.minhaReacao}
         currentUser={currentUser}
+        isRepost={!!post.postOrigemId}
       />
     </article>
   )

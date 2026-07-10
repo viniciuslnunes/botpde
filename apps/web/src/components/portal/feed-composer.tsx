@@ -1,14 +1,15 @@
 'use client'
 
 import { useActionState, useRef, useState } from 'react'
-import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play } from 'lucide-react'
+import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { publicarPost, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import { publicarPost, publicarEnquete, type PublicarPostState } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
+import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
 
 const INITIAL_STATE: PublicarPostState = {}
 const MAX_ANEXOS = 10
@@ -22,26 +23,30 @@ interface FeedComposerProps {
 }
 
 export function FeedComposer({ userName, userAvatar, perfilPrivado = true }: FeedComposerProps) {
-  const [state, action, pending] = useActionState<PublicarPostState, FormData>(
+  const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
   )
+  const [pollState, pollAction, pollPending] = useActionState<PublicarPostState, FormData>(
+    publicarEnquete,
+    INITIAL_STATE,
+  )
+
+  const token = postState.token ?? pollState.token ?? 'novo'
+  const state = postState.token || postState.success ? postState : pollState
 
   return (
-    <form
-      action={action}
-      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
-    >
-      {/* Remonta (limpa) a cada publicação bem-sucedida via token */}
-      <ComposerBody
-        key={state.token ?? 'novo'}
-        userName={userName}
-        userAvatar={userAvatar}
-        perfilPrivado={perfilPrivado}
-        pending={pending}
-        serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0]}
-      />
-    </form>
+    <ComposerBody
+      key={token}
+      userName={userName}
+      userAvatar={userAvatar}
+      perfilPrivado={perfilPrivado}
+      postAction={postAction}
+      pollAction={pollAction}
+      postPending={postPending}
+      pollPending={pollPending}
+      serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0]}
+    />
   )
 }
 
@@ -60,17 +65,26 @@ function ComposerBody({
   userName,
   userAvatar,
   perfilPrivado,
-  pending,
+  postAction,
+  pollAction,
+  postPending,
+  pollPending,
   serverError,
 }: {
   userName: string | null
   userAvatar: string | null
   perfilPrivado: boolean
-  pending: boolean
+  postAction: (payload: FormData) => void
+  pollAction: (payload: FormData) => void
+  postPending: boolean
+  pollPending: boolean
   serverError?: string
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [modoEnquete, setModoEnquete] = useState(false)
   const [texto, setTexto] = useState('')
+  const [opcoes, setOpcoes] = useState(['', ''])
+  const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
   const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
     perfilPrivado ? 'PRIVADO' : 'PUBLICO',
   )
@@ -86,11 +100,53 @@ function ComposerBody({
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
   const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
   const enviando = medias.some((m) => m.url === null && !m.error)
+  const pending = modoEnquete ? pollPending : postPending
   const finalMidias = [
     ...medias.filter((m) => m.url).map((m) => m.url as string),
     ...(embedUrl ? [embedUrl] : []),
   ]
-  const podePublicar = texto.trim().length > 0 && !enviando && !pending
+  const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean)
+  const podePublicar = modoEnquete
+    ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending
+    : texto.trim().length > 0 && !enviando && !pending
+
+  function handleTextoChange(value: string, cursor?: number) {
+    setTexto(value)
+    const pos = cursor ?? value.length
+    setMencaoQuery(detectarMencaoAtiva(value, pos))
+  }
+
+  function inserirMencao(mencao: string) {
+    const el = textareaRef.current
+    if (!el) {
+      setTexto((t) => t + mencao)
+      setMencaoQuery(null)
+      return
+    }
+    const cursor = el.selectionStart ?? texto.length
+    const query = detectarMencaoAtiva(texto, cursor)
+    if (!query) return
+    const antes = texto.slice(0, cursor - query.length - 1)
+    const depois = texto.slice(cursor)
+    const next = antes + mencao + depois
+    setTexto(next)
+    setMencaoQuery(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = antes.length + mencao.length
+      el.selectionStart = el.selectionEnd = pos
+    })
+  }
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    if (modoEnquete) {
+      pollAction(fd)
+    } else {
+      postAction(fd)
+    }
+  }
 
   function open() {
     setExpanded(true)
@@ -176,6 +232,10 @@ function ComposerBody({
   }
 
   return (
+    <form
+      onSubmit={submit}
+      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
+    >
     <div
       onDragOver={(e) => {
         if (!expanded) return
@@ -192,10 +252,13 @@ function ComposerBody({
     >
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
       <input type="hidden" name="visibilidade" value={visibilidade} />
+      {modoEnquete && (
+        <input type="hidden" name="opcoes" value={JSON.stringify(opcoesValidas)} />
+      )}
 
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
-        <div className="min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1">
           {!expanded ? (
             <button
               type="button"
@@ -212,7 +275,8 @@ function ComposerBody({
               maxLength={3000}
               rows={3}
               value={texto}
-              onChange={(e) => setTexto(e.target.value)}
+              onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
+              onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
               onPaste={(e) => {
                 const files = Array.from(e.clipboardData.files).filter(
                   (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
@@ -222,12 +286,46 @@ function ComposerBody({
                   addFiles(files)
                 }
               }}
-              placeholder={`No que você tá pensando, ${firstName}?`}
+              placeholder={`No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`}
               className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+            />
+          )}
+          {mencaoQuery !== null && expanded && (
+            <MentionPicker
+              query={mencaoQuery}
+              onSelect={inserirMencao}
+              onClose={() => setMencaoQuery(null)}
             />
           )}
         </div>
       </div>
+
+      {expanded && modoEnquete && (
+        <div className="mt-3 space-y-2 pl-[52px]">
+          <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Opções da enquete</p>
+          {opcoes.map((op, i) => (
+            <input
+              key={i}
+              value={op}
+              onChange={(e) =>
+                setOpcoes((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+              }
+              maxLength={120}
+              placeholder={`Opção ${i + 1}`}
+              className="h-9 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+            />
+          ))}
+          {opcoes.length < 6 && (
+            <button
+              type="button"
+              onClick={() => setOpcoes((prev) => [...prev, ''])}
+              className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+            >
+              + Adicionar opção
+            </button>
+          )}
+        </div>
+      )}
 
       {expanded && (
         <>
@@ -347,6 +445,46 @@ function ComposerBody({
                   <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModoEnquete((v) => !v)
+                  setEmojiOpen(false)
+                  setStickerOpen(false)
+                }}
+                aria-label="Criar enquete"
+                title="Enquete"
+                className={[
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                  modoEnquete
+                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                    : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
+                ].join(' ')}
+              >
+                <BarChart3 className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const el = textareaRef.current
+                  if (el) {
+                    const pos = el.selectionStart ?? texto.length
+                    const next = texto.slice(0, pos) + '@' + texto.slice(pos)
+                    handleTextoChange(next, pos + 1)
+                    requestAnimationFrame(() => {
+                      el.focus()
+                      el.selectionStart = el.selectionEnd = pos + 1
+                    })
+                  } else {
+                    handleTextoChange(texto + '@')
+                  }
+                }}
+                aria-label="Mencionar membro"
+                title="Mencionar"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              >
+                <AtSign className="h-5 w-5" />
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -386,12 +524,13 @@ function ComposerBody({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {enviando ? 'Enviando…' : pending ? 'Publicando…' : 'Publicar'}
+                {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : 'Publicar'}
               </button>
             </div>
           </div>
         </>
       )}
     </div>
+    </form>
   )
 }

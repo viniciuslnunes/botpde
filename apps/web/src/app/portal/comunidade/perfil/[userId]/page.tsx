@@ -22,7 +22,8 @@ import { PerfilSobre } from '@/components/portal/perfil/perfil-sobre'
 import { PerfilEditarForm } from '@/components/portal/perfil/perfil-editar-form'
 import { PerfilFotosGrid } from '@/components/portal/perfil/perfil-fotos-grid'
 import { PerfilAtividadeList } from '@/components/portal/perfil/perfil-atividade-list'
-import { postInclude, projetarPost, type PostRaw, type PostSocialItem } from '@/lib/feed'
+import { PerfilDestaques } from '@/components/portal/perfil/perfil-destaques'
+import { postInclude, projetarPost, getDestaquesPerfil, type PostRaw, type PostSocialItem } from '@/lib/feed'
 import { db } from '@torcida/db'
 import type { Metadata } from 'next'
 
@@ -147,12 +148,13 @@ export default async function PerfilComunidadePage({
       })) as PostRaw[]).map(projetarPost)
     : []
 
-  const [fotos, atividade] = podeVer
+  const [fotos, atividade, destaques] = podeVer
     ? await Promise.all([
         getFotosDoAutor(userId, tenant.id, visibleTenantIds),
         getAtividadeDoAutor(userId, visibleTenantIds),
+        getDestaquesPerfil(userId, tenant.id),
       ])
-    : [[], []]
+    : [[], [], []]
 
   const currentUser = {
     id: session.user.id,
@@ -200,6 +202,15 @@ export default async function PerfilComunidadePage({
         seguindo={contagens.seguindo}
         podeVerRede={podeVer}
       />
+
+      {(destaques.length > 0 || isSelf) && podeVer && (
+        <PerfilDestaques
+          destaques={destaques}
+          posts={posts}
+          isSelf={isSelf}
+          userId={userId}
+        />
+      )}
 
       <PerfilTabs userId={userId} abaAtiva={aba} />
 

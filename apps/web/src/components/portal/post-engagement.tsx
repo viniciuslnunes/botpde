@@ -1,18 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
-import { Heart, Flag, MessageCircle, Zap, Send, Loader2 } from 'lucide-react'
+import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   comentarPost,
   denunciarPost,
   listarComentariosPost,
   reagirPost,
+  repostarPost,
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
+import type { TipoReacaoSocial } from '@/lib/comunidade-social'
 import { Avatar } from './avatar'
-
-type Reacao = 'CURTIR' | 'FORCA'
+import { PostConteudoRich } from './post-conteudo-rich'
 
 interface CurrentUser {
   id: string
@@ -24,8 +25,9 @@ interface PostEngagementProps {
   postId: string
   totalReacoes: number
   totalComentarios: number
-  minhaReacao: Reacao | null
+  minhaReacao: TipoReacaoSocial | null
   currentUser: CurrentUser
+  isRepost?: boolean
 }
 
 export function PostEngagement({
@@ -34,8 +36,9 @@ export function PostEngagement({
   totalComentarios,
   minhaReacao,
   currentUser,
+  isRepost = false,
 }: PostEngagementProps) {
-  const [reacao, setReacao] = useState<Reacao | null>(minhaReacao)
+  const [reacao, setReacao] = useState<TipoReacaoSocial | null>(minhaReacao)
   const [totalR, setTotalR] = useState(totalReacoes)
   const [totalC, setTotalC] = useState(totalComentarios)
   const [comentarios, setComentarios] = useState<ComentarioPostItem[]>([])
@@ -43,6 +46,8 @@ export function PostEngagement({
   const [carregandoComentarios, setCarregandoComentarios] = useState(false)
   const [comentario, setComentario] = useState('')
   const [denunciando, setDenunciando] = useState(false)
+  const [repostando, setRepostando] = useState(false)
+  const [comentarioRepost, setComentarioRepost] = useState('')
   const [motivo, setMotivo] = useState('')
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -68,7 +73,7 @@ export function PostEngagement({
     }
   }, [totalComentarios, carregarComentarios])
 
-  function handleReacao(tipo: Reacao) {
+  function handleReacao(tipo: TipoReacaoSocial) {
     const anterior = reacao
     if (anterior === tipo) {
       setReacao(null)
@@ -149,6 +154,21 @@ export function PostEngagement({
     })
   }
 
+  function enviarRepost(e: React.FormEvent) {
+    e.preventDefault()
+    if (pending) return
+    startTransition(async () => {
+      try {
+        await repostarPost(postId, comentarioRepost.trim() || undefined)
+        setRepostando(false)
+        setComentarioRepost('')
+        toast.success('Publicação compartilhada!')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível compartilhar.')
+      }
+    })
+  }
+
   const btnBase =
     'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50'
 
@@ -202,6 +222,36 @@ export function PostEngagement({
         </button>
         <button
           type="button"
+          disabled={pending}
+          onClick={() => handleReacao('VAMOS')}
+          aria-pressed={reacao === 'VAMOS'}
+          className={[
+            btnBase,
+            reacao === 'VAMOS'
+              ? 'text-orange-500'
+              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+          ].join(' ')}
+        >
+          <Flame className={['h-4 w-4', reacao === 'VAMOS' ? 'fill-current' : ''].join(' ')} />
+          Vamos!
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => handleReacao('PRESENTE')}
+          aria-pressed={reacao === 'PRESENTE'}
+          className={[
+            btnBase,
+            reacao === 'PRESENTE'
+              ? 'text-emerald-500'
+              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+          ].join(' ')}
+        >
+          <CheckCircle className={['h-4 w-4', reacao === 'PRESENTE' ? 'fill-current' : ''].join(' ')} />
+          Presente
+        </button>
+        <button
+          type="button"
           onClick={abrirComentarios}
           aria-expanded={comentariosAbertos}
           className={[
@@ -214,6 +264,21 @@ export function PostEngagement({
           <MessageCircle className="h-4 w-4" />
           Comentar
         </button>
+        {!isRepost && (
+          <button
+            type="button"
+            onClick={() => setRepostando((v) => !v)}
+            className={[
+              btnBase,
+              repostando
+                ? 'text-[rgb(var(--primary))]'
+                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+            ].join(' ')}
+          >
+            <Repeat2 className="h-4 w-4" />
+            Compartilhar
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setDenunciando((v) => !v)}
@@ -223,6 +288,25 @@ export function PostEngagement({
           <Flag className="h-4 w-4" />
         </button>
       </div>
+
+      {repostando && (
+        <form onSubmit={enviarRepost} className="mt-2 flex items-center gap-2">
+          <input
+            value={comentarioRepost}
+            onChange={(e) => setComentarioRepost(e.target.value)}
+            maxLength={500}
+            placeholder="Adicione um comentário (opcional)…"
+            className="h-9 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={pending}
+            className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            Compartilhar
+          </button>
+        </form>
+      )}
 
       {denunciando && (
         <form onSubmit={enviarDenuncia} className="mt-2 flex items-center gap-2">
@@ -259,7 +343,10 @@ export function PostEngagement({
                 <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
                   {c.autor.id === currentUser.id ? 'Você' : (c.autor.nome ?? 'Membro')}
                 </p>
-                <p className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">{c.conteudo}</p>
+                <PostConteudoRich
+                  conteudo={c.conteudo}
+                  className="text-sm text-[rgb(var(--foreground))]"
+                />
               </div>
             </div>
           ))}

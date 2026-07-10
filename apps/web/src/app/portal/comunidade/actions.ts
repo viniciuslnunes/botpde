@@ -7,7 +7,8 @@ import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema } from '@torcida/types'
+import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, criarGrupoPublicoSchema, criarDestaqueSchema } from '@torcida/types'
+import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
@@ -53,7 +54,7 @@ const comentarioSchema = z.object({
 
 const reacaoSchema = z.object({
   postId: z.string().min(1),
-  tipo: z.enum(['CURTIR', 'FORCA']),
+  tipo: reacaoTipoSchema,
 })
 
 const denunciaSchema = z.object({
@@ -110,6 +111,18 @@ export async function publicarPost(
       detalhes: { tipo: 'MEMBRO' },
     },
   })
+
+  await Promise.all([
+    sincronizarHashtagsDoPost(post.id, tenant.id, conteudo),
+    notificarMencoesDoPost({
+      conteudo,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      tenantId: tenant.id,
+      postId: post.id,
+      link: '/portal/comunidade',
+    }),
+  ])
 
   revalidatePath('/portal/comunidade')
   return { success: true, token: post.id }
@@ -482,6 +495,15 @@ export async function comentarPost(
     },
   })
 
+  await notificarMencoesDoPost({
+    conteudo: parsed.data.conteudo,
+    autorId: session.user.id,
+    autorNome: session.user.name ?? null,
+    tenantId: tenant.id,
+    postId: post.id,
+    link: '/portal/comunidade',
+  })
+
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
 
@@ -493,7 +515,249 @@ export async function comentarPost(
   }
 }
 
-export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA'): Promise<void> {
+export async function publicarEnquete(
+  _prevState: PublicarPostState,
+  formData: FormData,
+): Promise<PublicarPostState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  let opcoesRaw: unknown = []
+  try {
+    opcoesRaw = JSON.parse(String(formData.get('opcoes') ?? '[]'))
+  } catch {
+    return { message: 'Opções de enquete inválidas.' }
+  }
+
+  const parsed = publicarEnqueteSchema.safeParse({
+    conteudo: formData.get('conteudo'),
+    opcoes: opcoesRaw,
+    visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
+  })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+  const post = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: parsed.data.conteudo,
+      tipo: 'MEMBRO',
+      visibilidade: parsed.data.visibilidade,
+      enquete: {
+        create: {
+          opcoes: {
+            create: parsed.data.opcoes.map((texto, ordem) => ({ texto, ordem })),
+          },
+        },
+      },
+    },
+  })
+
+  await Promise.all([
+    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
+    notificarMencoesDoPost({
+      conteudo: parsed.data.conteudo,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      tenantId: tenant.id,
+      postId: post.id,
+      link: '/portal/comunidade',
+    }),
+  ])
+
+  revalidatePath('/portal/comunidade')
+  return { success: true, token: post.id }
+}
+
+export async function votarEnquetePost(enqueteId: string, opcaoId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = votarEnqueteSchema.safeParse({ enqueteId, opcaoId })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Voto inválido')
+
+  const enquete: { id: string; encerradaEm: Date | null; post: { tenantId: string; oculto: boolean } } | null =
+    await db.enquetePost.findFirst({
+      where: { id: parsed.data.enqueteId },
+      select: {
+        id: true,
+        encerradaEm: true,
+        post: { select: { tenantId: true, oculto: true } },
+      },
+    })
+  if (!enquete || enquete.post.oculto || enquete.encerradaEm) {
+    throw new Error('Enquete indisponível')
+  }
+
+  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  if (!visibleIds.includes(enquete.post.tenantId)) throw new Error('Enquete não encontrada')
+
+  const opcao: { id: string } | null = await db.opcaoEnquetePost.findFirst({
+    where: { id: parsed.data.opcaoId, enqueteId: enquete.id },
+    select: { id: true },
+  })
+  if (!opcao) throw new Error('Opção inválida')
+
+  await db.votoEnquetePost.upsert({
+    where: { enqueteId_userId: { enqueteId: enquete.id, userId: session.user.id } },
+    create: { enqueteId: enquete.id, opcaoId: opcao.id, userId: session.user.id },
+    update: { opcaoId: opcao.id },
+  })
+
+  revalidatePath('/portal/comunidade')
+}
+
+export async function repostarPost(postId: string, comentario?: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = repostarSchema.safeParse({ postId, comentario })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Repost inválido')
+
+  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const original: { id: string; autorId: string; oculto: boolean; visibilidade: string } | null =
+    await db.post.findFirst({
+      where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
+      select: { id: true, autorId: true, oculto: true, visibilidade: true },
+    })
+  if (!original) throw new Error('Post não encontrado')
+
+  const texto = parsed.data.comentario?.trim() || '🔁 Compartilhou uma publicação'
+  const repost = await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      conteudo: texto,
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      postOrigemId: original.id,
+    },
+  })
+
+  if (original.autorId !== session.user.id) {
+    await criarNotificacao({
+      userId: original.autorId,
+      tenantId: tenant.id,
+      tipo: 'REPOST',
+      titulo: 'Sua publicação foi compartilhada',
+      corpo: `${session.user.name ?? 'Um membro'} compartilhou seu post.`,
+      link: '/portal/comunidade',
+    })
+  }
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'POST_REPOSTADO',
+      entidade: 'Post',
+      entidadeId: repost.id,
+      detalhes: { postOrigemId: original.id },
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
+}
+
+export async function criarGrupoPublico(nome: string, descricao?: string): Promise<{ id: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.GROUPS_CREATE)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = criarGrupoPublicoSchema.safeParse({ nome, descricao })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Grupo inválido')
+
+  const conversa: { id: string } = await db.conversa.create({
+    data: {
+      tipo: 'GRUPO',
+      tenantId: tenant.id,
+      nome: parsed.data.nome,
+      descricao: parsed.data.descricao?.trim() || null,
+      publica: true,
+      criadoPorId: session.user.id,
+      membros: {
+        create: { userId: session.user.id, papel: 'ADMIN' },
+      },
+    },
+    select: { id: true },
+  })
+
+  revalidatePath('/portal/comunidade/grupos')
+  return conversa
+}
+
+export async function entrarGrupoPublico(conversaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const conversa: { id: string; publica: boolean; tipo: string } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tenantId: tenant.id, tipo: 'GRUPO', publica: true },
+    select: { id: true, publica: true, tipo: true },
+  })
+  if (!conversa) throw new Error('Grupo não encontrado')
+
+  await db.membroConversa.upsert({
+    where: { conversaId_userId: { conversaId, userId: session.user.id } },
+    create: { conversaId, userId: session.user.id, papel: 'MEMBRO' },
+    update: { saiuEm: null },
+  })
+
+  revalidatePath('/portal/comunidade/grupos')
+  revalidatePath('/portal/mensagens')
+}
+
+export async function criarDestaquePerfil(titulo: string, postIds: string[]): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = criarDestaqueSchema.safeParse({ titulo, postIds })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Destaque inválido')
+
+  const posts: Array<{ id: string }> = await db.post.findMany({
+    where: {
+      id: { in: parsed.data.postIds },
+      autorId: session.user.id,
+      tenantId: tenant.id,
+      oculto: false,
+    },
+    select: { id: true },
+  })
+  if (posts.length === 0) throw new Error('Nenhum post válido para o destaque')
+
+  const count = await db.perfilDestaque.count({
+    where: { userId: session.user.id, tenantId: tenant.id },
+  })
+
+  const destaque: { id: string } = await db.perfilDestaque.create({
+    data: {
+      userId: session.user.id,
+      tenantId: tenant.id,
+      titulo: parsed.data.titulo,
+      ordem: count,
+      itens: {
+        create: posts.map((p, ordem) => ({ postId: p.id, ordem })),
+      },
+    },
+    select: { id: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'PERFIL_DESTAQUE_CRIADO',
+      entidade: 'PerfilDestaque',
+      entidadeId: destaque.id,
+    },
+  })
+
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+}
+
+export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE'): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
   await assertMembroAtivo(tenant.id, session.user.id)
 
@@ -533,7 +797,14 @@ export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA'): Prom
       tenantId: tenant.id,
       tipo: 'NOVA_REACAO',
       titulo: 'Nova reação no seu post',
-      corpo: parsed.data.tipo === 'FORCA' ? 'Recebeu uma reação de Força.' : 'Recebeu uma curtida.',
+      corpo:
+        parsed.data.tipo === 'FORCA'
+          ? 'Recebeu uma reação de Força.'
+          : parsed.data.tipo === 'VAMOS'
+            ? 'Recebeu um Vamos!'
+            : parsed.data.tipo === 'PRESENTE'
+              ? 'Marcou presença no seu post.'
+              : 'Recebeu uma curtida.',
       link: '/portal/comunidade',
     })
   }
