@@ -80,16 +80,16 @@ export function MensagensShell({
 
   useVisibleInterval(() => void atualizarInbox(), 15000)
 
-  function zerarNaoLidas(conversaId: string) {
+  const zerarNaoLidas = useCallback((conversaId: string) => {
     setConversas((prev) =>
       prev.map((c) => (c.id === conversaId ? { ...c, naoLidas: 0 } : c)),
     )
-  }
+  }, [])
 
-  function removerDaLista(conversaId: string) {
+  const removerDaLista = useCallback((conversaId: string) => {
     setConversas((prev) => prev.filter((c) => c.id !== conversaId))
     setSelecionadaId(null)
-  }
+  }, [])
 
   async function abrirConversa(conversaId: string) {
     setSelecionadaId(conversaId)

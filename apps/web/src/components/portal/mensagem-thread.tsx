@@ -142,18 +142,23 @@ export function MensagemThread({
     [conversaId, marcarLida],
   )
 
-  // O shell monta este componente com key={conversa.id}, então cada conversa
-  // remonta o thread do zero — o estado inicial dos useState já cobre o reset.
+  const carregarRef = useRef(carregar)
+  const marcarLidaRef = useRef(marcarLida)
+  carregarRef.current = carregar
+  marcarLidaRef.current = marcarLida
+
+  // Só reexecuta ao trocar de conversa — evita loop de loading quando onLida
+  // atualiza o inbox do shell pai.
   useEffect(() => {
     setCarregando(true)
     setErro(null)
     lastCriadoEmRef.current = null
-    void carregar(true)
-    marcarLida()
-  }, [conversaId, carregar, marcarLida])
+    void carregarRef.current(true)
+    marcarLidaRef.current()
+  }, [conversaId])
 
-  useVisibleInterval(() => void carregar(false), 4000)
-  useVisibleInterval(() => void carregar(true), 20000)
+  useVisibleInterval(() => void carregarRef.current(false), 4000)
+  useVisibleInterval(() => void carregarRef.current(true), 20000)
 
   function insertEmoji(emoji: string) {
     const el = inputRef.current
