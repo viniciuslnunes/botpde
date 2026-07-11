@@ -8,8 +8,8 @@ import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import type { MembroBuscaItem } from '@/lib/comunidade-busca'
-import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais'
-import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais'
+import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais-shared'
+import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface BuscaResponse {

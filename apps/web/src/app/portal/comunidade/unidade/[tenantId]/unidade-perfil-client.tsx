@@ -12,7 +12,7 @@ import {
   labelTipoUnidade,
   linkCanalComunidade,
   type PerfilInstitucional,
-} from '@/lib/canais'
+} from '@/lib/canais-shared'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface CurrentUser {

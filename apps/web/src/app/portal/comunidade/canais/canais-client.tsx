@@ -12,7 +12,7 @@ import {
   linkUnidadeComunidade,
   type CanalItem,
   type UnidadeBuscaItem,
-} from '@/lib/canais'
+} from '@/lib/canais-shared'
 
 interface CanaisClientProps {
   canais: CanalItem[]

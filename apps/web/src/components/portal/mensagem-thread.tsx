@@ -30,7 +30,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { PostMedia } from './post-media'
-import { isConversaGrupoLike } from '@/lib/canais'
+import { isConversaGrupoLike } from '@/lib/canais-shared'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto

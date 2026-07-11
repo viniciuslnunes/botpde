@@ -5,7 +5,7 @@ import {
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
   linkCanalComunidade,
-} from '../canais'
+} from '../canais-shared'
 
 describe('canais', () => {
   it('identifica conversas de grupo e canal', () => {

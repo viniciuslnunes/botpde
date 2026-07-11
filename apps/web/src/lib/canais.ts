@@ -1,66 +1,34 @@
+import 'server-only'
+
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { canViewRecurso } from '@torcida/types'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
-import { getEscopoEventosVisiveis, type ProximoEventoItem } from './eventos'
-import { postInclude, projetarPost, finalizarPosts, type PostSocialItem, type PostRaw } from './feed'
+import { getEscopoEventosVisiveis } from './eventos'
+import { postInclude, projetarPost, finalizarPosts, type PostRaw, type PostSocialItem } from './feed'
+import type {
+  CanalItem,
+  ComunicadoInstitucionalItem,
+  PerfilInstitucional,
+  UnidadeBuscaItem,
+  VisibilidadeCanal,
+} from './canais-shared'
 
-export type VisibilidadeCanal = 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'
-
-export interface CanalItem {
-  id: string
-  tenantId: string
-  nome: string | null
-  descricao: string | null
-  avatarUrl: string | null
-  institucional: boolean
-  canalOficial: boolean
-  visibilidadeCanal: VisibilidadeCanal
-  somenteAdminPublica: boolean
-  publica: boolean
-  membros: number
-  souMembro: boolean
-  souAdmin: boolean
-  tenantNome: string
-}
-
-export interface UnidadeBuscaItem {
-  tenantId: string
-  nome: string
-  logoUrl: string | null
-  tipo: string
-  cidade: string | null
-}
-
-export interface ComunicadoInstitucionalItem {
-  id: string
-  titulo: string
-  corpo: string
-  prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
-  fixado: boolean
-  publicadoEm: Date
-}
-
-export interface PerfilInstitucional {
-  tenantId: string
-  nome: string
-  logoUrl: string | null
-  corPrimaria: string
-  tipo: string
-  cidade: string | null
-  canalOficialId: string
-  souMembroCanal: boolean
-  podePublicar: boolean
-  comunicados: ComunicadoInstitucionalItem[]
-  postsInstitucionais: PostSocialItem[]
-  postsCanal: PostSocialItem[]
-  proximosEventos: ProximoEventoItem[]
-}
-
-export function isConversaGrupoLike(tipo: string): boolean {
-  return tipo === 'GRUPO' || tipo === 'CANAL'
-}
+export type {
+  CanalItem,
+  ComunicadoInstitucionalItem,
+  PerfilInstitucional,
+  UnidadeBuscaItem,
+  VisibilidadeCanal,
+} from './canais-shared'
+export {
+  isConversaGrupoLike,
+  labelTipoUnidade,
+  labelVisibilidadeCanal,
+  linkCanalComunidade,
+  linkUnidadeComunidade,
+} from './canais-shared'
 
 export async function podeVerCanal(
   viewerTenantId: string,
@@ -556,40 +524,4 @@ export async function buscarCanaisEUnidades(
   })
 
   return { canais, unidades }
-}
-
-export function linkUnidadeComunidade(tenantId: string): string {
-  return `/portal/comunidade/unidade/${tenantId}`
-}
-
-export function linkCanalComunidade(conversaId: string): string {
-  return `/portal/comunidade/canais/${conversaId}`
-}
-
-export function labelTipoUnidade(tipo: string): string {
-  switch (tipo) {
-    case 'SEDE':
-      return 'Sede'
-    case 'SUBSEDE':
-      return 'Subsede'
-    case 'PONTO_ENCONTRO':
-      return 'PDE'
-    default:
-      return 'Unidade'
-  }
-}
-
-export function labelVisibilidadeCanal(v: VisibilidadeCanal): string {
-  switch (v) {
-    case 'TENANT':
-      return 'Só esta torcida'
-    case 'HIERARQUIA':
-      return 'Hierarquia (sede/subsede/PDE)'
-    case 'ALIADOS':
-      return 'Hierarquia + aliados'
-    case 'PUBLICO':
-      return 'Comunidade aberta'
-    default:
-      return v
-  }
 }

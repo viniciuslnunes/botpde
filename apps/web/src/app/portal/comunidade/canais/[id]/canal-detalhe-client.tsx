@@ -6,7 +6,7 @@ import { MessageCircle, Users, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostCanal, entrarCanal } from '@/app/portal/comunidade/actions'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
-import { labelVisibilidadeCanal, linkUnidadeComunidade, type CanalItem } from '@/lib/canais'
+import { labelVisibilidadeCanal, linkUnidadeComunidade, type CanalItem } from '@/lib/canais-shared'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface CurrentUser {
