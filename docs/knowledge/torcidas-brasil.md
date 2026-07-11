@@ -3,7 +3,9 @@
 > Mantido pelos agentes `aliancas-torcidas` e `research-dominio`. Perfis por
 > afiliação (time), com fonte e data. Números de associados são estimativas de
 > imprensa — tratar como ordem de grandeza, não como dado exato.
-> Relações aliado/rival: ver [`aliancas.md`](aliancas.md).
+> Relações aliado/rival: ver [`aliancas.md`](aliancas.md). Cobertura ampla
+> clube-a-clube de todo o país (não só as âncoras): ver
+> [`diretorio-nacional.md`](diretorio-nacional.md).
 
 ## Panorama
 

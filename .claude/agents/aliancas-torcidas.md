@@ -40,6 +40,9 @@ agente `performance` se listagens ficarem pesadas.
   rivalidades estruturais (só moderação) e entradas por torcida.
 - `docs/knowledge/torcidas-brasil.md` — perfis das principais organizadas
   (fundação, tamanho, escola de samba, bloco).
+- `docs/knowledge/diretorio-nacional.md` — mapa amplo clube → torcidas por
+  estado (21 UFs). Use para desambiguar homônimos (Camisa 12, Mancha Azul,
+  Trovão Azul existem em vários clubes) antes de recomendar aliança.
 - `docs/knowledge/README.md` — protocolo de fontes e confiança (obrigatório).
 
 Mantenha estrutura por clube/torcida com: aliados conhecidos, rivais conhecidos,
