@@ -7,7 +7,7 @@ const BANNER_MAX_WIDTH = 1920
 const AVATAR_MAX_WIDTH = 512
 const JPEG_QUALITY = 0.85
 
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar'
+type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro'
 
 interface SignResponse {
   cloudName: string
@@ -21,7 +21,11 @@ interface SignResponse {
 async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
   if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
   const maxWidth =
-    purpose === 'perfil-avatar' ? AVATAR_MAX_WIDTH : purpose === 'perfil-banner' ? BANNER_MAX_WIDTH : MAX_WIDTH
+    purpose === 'perfil-avatar'
+      ? AVATAR_MAX_WIDTH
+      : purpose === 'perfil-banner'
+        ? BANNER_MAX_WIDTH
+        : MAX_WIDTH
   try {
     const bitmap = await createImageBitmap(file)
     const ratio = Math.min(1, maxWidth / bitmap.width)
@@ -45,16 +49,20 @@ export async function uploadMediaToCloudinary(
   file: File,
   onProgress?: (pct: number) => void,
   purpose: UploadPurpose = 'comunidade',
+  tenantId?: string,
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/')
   if (purpose !== 'comunidade' && isVideo) {
     throw new Error('Apenas imagens são permitidas para o perfil.')
   }
+  if (purpose === 'cadastro' && !tenantId) {
+    throw new Error('Torcida inválida para upload.')
+  }
 
   const signRes = await fetch('/api/upload/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ purpose }),
+    body: JSON.stringify({ purpose, tenantId }),
   })
   if (signRes.status === 501) {
     throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')

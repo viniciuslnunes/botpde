@@ -87,19 +87,46 @@ export async function checarPodePublicarNoFeed(
   userId: string,
   tenantId: string,
 ): Promise<string | null> {
+  const hostTenant = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { nome: true },
+  })
+  const hostNome = hostTenant?.nome ?? 'esta torcida'
+
+  const membroHost = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true },
+  })
+
+  if (!membroHost) {
+    const membroOutro = await db.saasMembro.findFirst({
+      where: { userId, NOT: { tenantId } },
+      select: {
+        status: true,
+        tenant: { select: { nome: true } },
+      },
+      orderBy: { criadoEm: 'desc' },
+    })
+    if (membroOutro?.status === 'PENDENTE') {
+      return `Sua solicitação na ${membroOutro.tenant.nome} está em análise. Este portal é da ${hostNome}.`
+    }
+    if (membroOutro?.status === 'APROVADO') {
+      return `Você é membro da ${membroOutro.tenant.nome}. Este portal é da ${hostNome} — acesse o portal da sua torcida.`
+    }
+    if (membroOutro) {
+      return `Seu vínculo com ${membroOutro.tenant.nome} não está ativo. Este portal é da ${hostNome}.`
+    }
+    return 'Associe-se à torcida para publicar no feed.'
+  }
+
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
   const effective = calculateEffectivePermissions(rolePermissions, overrides)
 
   if (!hasPermission(effective, PERMISSIONS.COMMUNITY_POST)) {
-    const membro = await db.saasMembro.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { status: true },
-    })
-    if (!membro) return 'Associe-se à torcida para publicar no feed.'
-    if (membro.status === 'PENDENTE') {
+    if (membroHost.status === 'PENDENTE') {
       return 'Seu vínculo ainda está em análise. Publicar libera quando a torcida aprovar seu cadastro.'
     }
-    if (membro.status !== 'APROVADO') {
+    if (membroHost.status !== 'APROVADO') {
       return 'Seu cadastro de associado não está ativo.'
     }
     return 'Você não tem permissão para publicar.'

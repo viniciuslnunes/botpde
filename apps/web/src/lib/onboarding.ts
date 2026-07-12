@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
+import { torcidaAcessivelNoHost } from '@/lib/tenant'
 
 export type SerieCampeonato = 'A' | 'B' | 'C' | 'D' | 'ESTADUAL' | 'OUTRA'
 
@@ -30,6 +31,8 @@ export type TorcidaOnboarding = {
   corPrimaria: string
   membrosAprovados: number
   sedes: SedeOnboarding[]
+  /** Se o portal desta torcida está neste host (subdomínio ou TENANT_SLUG). */
+  acessivelNoHost: boolean
 }
 
 export type DepartamentoOnboarding = {
@@ -120,6 +123,7 @@ export const getTorcidasPorAfiliacao = cache(
       corPrimaria: t.corPrimaria,
       membrosAprovados: t._count.membros,
       sedes: t.sedes,
+      acessivelNoHost: torcidaAcessivelNoHost(t.slug),
     }))
   },
 )

@@ -12,6 +12,7 @@ import {
   type TorcidaOnboarding,
   type DepartamentoOnboarding,
 } from '@/lib/onboarding'
+import { buildPortalUrl } from '@/lib/tenant'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -141,9 +142,7 @@ const solicitarVinculoSchema = z.object({
     .transform((v) => v?.trim() || undefined),
   imagemProva: z
     .string()
-    .url()
-    .optional()
-    .or(z.literal('').transform(() => undefined)),
+    .url('Envie uma foto da carteirinha ou comprovante de vínculo'),
   // Sem `.uuid()`: sede/departamento podem ter IDs não-UUID (dados legados/seed,
   // ex.: "sede-principal-pde"). A existência é validada contra o banco abaixo —
   // esse é o guard real; o formato UUID travava vínculos válidos.
@@ -185,10 +184,21 @@ export async function solicitarVinculo(
 
   const tenant = await db.tenant.findFirst({
     where: { id: data.tenantId, ativo: true },
-    select: { id: true },
+    select: { id: true, slug: true, nome: true },
   })
   if (!tenant) {
     return { message: 'Torcida não encontrada.' }
+  }
+
+  const dadosMembro = {
+    nome: data.nome,
+    tipo: data.tipo,
+    idade: data.idade,
+    telefone: data.telefone,
+    cidade: data.cidade,
+    numeroAssociado: data.numeroAssociado,
+    imagemProva: data.imagemProva,
+    sedeId: undefined as string | undefined,
   }
 
   // Vínculo territorial: 1 sede → usa direto; várias → exige seleção válida.
@@ -205,6 +215,7 @@ export async function solicitarVinculo(
     }
     sedeId = data.sedeId
   }
+  dadosMembro.sedeId = sedeId
 
   // Valida departamento (se informado) pertence ao tenant.
   let departamentoId: string | undefined
@@ -229,20 +240,19 @@ export async function solicitarVinculo(
       return { message: 'Você já é membro aprovado desta torcida.' }
     }
     if (existing.status === 'PENDENTE') {
-      // Já pendente — apenas garante conclusão do onboarding e segue.
+      await db.saasMembro.update({
+        where: { id: existing.id },
+        data: {
+          ...dadosMembro,
+          status: 'PENDENTE',
+        },
+      })
     } else {
       // REPROVADO — permite nova tentativa (atualiza o registro).
       await db.saasMembro.update({
         where: { id: existing.id },
         data: {
-          nome: data.nome,
-          tipo: data.tipo,
-          idade: data.idade,
-          telefone: data.telefone,
-          cidade: data.cidade,
-          numeroAssociado: data.numeroAssociado,
-          imagemProva: data.imagemProva,
-          sedeId,
+          ...dadosMembro,
           status: 'PENDENTE',
           aprovadoPorId: null,
           aprovadoPorNome: null,
@@ -264,14 +274,7 @@ export async function solicitarVinculo(
       data: {
         tenantId: tenant.id,
         userId,
-        nome: data.nome,
-        tipo: data.tipo,
-        idade: data.idade,
-        telefone: data.telefone,
-        cidade: data.cidade,
-        numeroAssociado: data.numeroAssociado,
-        imagemProva: data.imagemProva,
-        sedeId,
+        ...dadosMembro,
         status: 'PENDENTE',
       },
     })
@@ -308,6 +311,6 @@ export async function solicitarVinculo(
     update: { onboardingConcluidoEm: new Date() },
   })
 
-  redirect('/portal/comunidade')
+  redirect(buildPortalUrl(tenant.slug))
   return { ok: true }
 }

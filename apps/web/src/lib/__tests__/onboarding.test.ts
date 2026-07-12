@@ -30,12 +30,22 @@ vi.mock('@torcida/db', () => ({
 }))
 vi.mock('@/lib/auth', () => ({ auth: authFn }))
 vi.mock('next/navigation', () => ({ redirect: redirectFn }))
+vi.mock('@/lib/tenant', () => ({
+  buildPortalUrl: (slug: string) => `/portal/comunidade?torcida=${slug}`,
+}))
 
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { salvarClubeRegiao, solicitarVinculo, concluirComoTorcedor } from '@/app/onboarding/actions'
 
 const UUID = '11111111-1111-4111-8111-111111111111'
 const UUID2 = '22222222-2222-4222-8222-222222222222'
+const PROVA_URL = 'https://res.cloudinary.com/demo/image/upload/sample.jpg'
+
+const vinculoBase = {
+  tenantId: UUID,
+  nome: 'Fulano da Silva',
+  imagemProva: PROVA_URL,
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -96,23 +106,23 @@ describe('solicitarVinculo — validação', () => {
   })
 
   it('rejeita nome curto', async () => {
-    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'ab' })
+    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'ab', imagemProva: PROVA_URL })
     expect(r.errors?.nome).toBeTruthy()
   })
 
   it('erra quando tenant não existe', async () => {
     tenantFindFirst.mockResolvedValue(null)
-    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' })
+    const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
     expect(r.message).toBeTruthy()
   })
 
   it('cria SaasMembro + AuditLog e conclui onboarding (torcedor)', async () => {
-    tenantFindFirst.mockResolvedValue({ id: UUID })
+    tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([{ id: 's1' }])
     membroFindUnique.mockResolvedValue(null)
     membroCreate.mockResolvedValue({ id: 'novo' })
     await expect(
-      solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' }),
+      solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva', imagemProva: PROVA_URL }),
     ).rejects.toThrow('REDIRECT')
     expect(membroCreate).toHaveBeenCalled()
     expect(auditLogCreate).toHaveBeenCalledWith(
@@ -122,7 +132,7 @@ describe('solicitarVinculo — validação', () => {
   })
 
   it('sócio com departamento associa via UserDepartamento', async () => {
-    tenantFindFirst.mockResolvedValue({ id: UUID })
+    tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([])
     departamentoFindFirst.mockResolvedValue({ id: UUID2 })
     membroFindUnique.mockResolvedValue(null)
@@ -133,16 +143,17 @@ describe('solicitarVinculo — validação', () => {
         tipo: 'SOCIO',
         nome: 'Fulano da Silva',
         departamentoId: UUID2,
+        imagemProva: PROVA_URL,
       }),
     ).rejects.toThrow('REDIRECT')
     expect(userDepartamentoUpsert).toHaveBeenCalled()
   })
 
   it('bloqueia quando já APROVADO', async () => {
-    tenantFindFirst.mockResolvedValue({ id: UUID })
+    tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([{ id: 's1' }])
     membroFindUnique.mockResolvedValue({ id: 'm1', status: 'APROVADO' })
-    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' })
+    const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
     expect(r.message).toContain('já é membro aprovado')
   })
 })

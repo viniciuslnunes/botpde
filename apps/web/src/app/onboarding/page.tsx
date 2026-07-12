@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { getAfiliacoesParaOnboarding } from '@/lib/onboarding'
+import { db } from '@torcida/db'
+import { getAfiliacoesParaOnboarding, getEstadoOnboarding } from '@/lib/onboarding'
+import { getTenantFromHost } from '@/lib/tenant'
 import { OnboardingWizard } from './wizard'
 
 // Estados brasileiros para o passo de região.
@@ -12,6 +14,23 @@ const UFS = [
 export default async function OnboardingPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
+
+  const [estado, hostTenant] = await Promise.all([
+    getEstadoOnboarding(session.user.id),
+    getTenantFromHost(),
+  ])
+
+  if (hostTenant) {
+    const membroHost = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: hostTenant.id, userId: session.user.id } },
+      select: { status: true },
+    })
+    if (membroHost?.status === 'APROVADO') {
+      redirect('/portal/comunidade')
+    }
+  } else if (estado.perfil?.onboardingConcluidoEm && estado.temMembro) {
+    redirect('/portal/comunidade')
+  }
 
   const afiliacoesIniciais = await getAfiliacoesParaOnboarding()
 

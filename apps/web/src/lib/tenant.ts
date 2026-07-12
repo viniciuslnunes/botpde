@@ -69,6 +69,28 @@ function extractSlugFromHost(host: string): string | null {
   return env.TENANT_SLUG ?? null
 }
 
+/**
+ * URL base do portal de uma torcida (subdomínio quando ROOT_DOMAIN existe).
+ * Retorna path relativo quando a torcida é a do deploy atual (TENANT_SLUG).
+ */
+export function buildPortalUrl(tenantSlug: string, path = '/portal/comunidade'): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  if (env.ROOT_DOMAIN) {
+    const protocol = env.NODE_ENV === 'production' ? 'https' : 'http'
+    return `${protocol}://${tenantSlug}.${env.ROOT_DOMAIN}${normalized}`
+  }
+  if (env.TENANT_SLUG && tenantSlug === env.TENANT_SLUG) {
+    return normalized
+  }
+  return `/onboarding/solicitado?torcida=${encodeURIComponent(tenantSlug)}`
+}
+
+/** Torcida disponível neste deploy (subdomínio ou TENANT_SLUG único). */
+export function torcidaAcessivelNoHost(tenantSlug: string): boolean {
+  if (env.ROOT_DOMAIN) return true
+  return !env.TENANT_SLUG || tenantSlug === env.TENANT_SLUG
+}
+
 async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
   const [userRoles, userPermissions] = await Promise.all([
     db.userRole.findMany({

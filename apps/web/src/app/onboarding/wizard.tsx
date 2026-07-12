@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2 } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
@@ -448,6 +448,11 @@ function PassoTorcida({
                     <Users className="h-3 w-3" />
                     {t.membrosAprovados} {t.membrosAprovados === 1 ? 'membro' : 'membros'}
                   </p>
+                  {!t.acessivelNoHost && (
+                    <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                      Portal em outro endereço — solicitação válida, aprovação na torcida escolhida.
+                    </p>
+                  )}
                 </div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
               </button>
@@ -531,9 +536,12 @@ function PassoVinculo({
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
     setErrosCampo({})
-    // Feedback imediato antes do round-trip (a Server Action também valida).
     if (precisaEscolherUnidade && !unidadeId) {
       onErro('Selecione a unidade da torcida para continuar.')
+      return
+    }
+    if (!imagemProva) {
+      onErro('Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.')
       return
     }
     startTransition(async () => {
@@ -559,13 +567,12 @@ function PassoVinculo({
     })
   }
 
-  async function onArquivo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  async function onArquivo(file: File | undefined) {
     if (!file) return
     setUploadPend(true)
     onErro(null)
     try {
-      const url = await uploadMediaToCloudinary(file)
+      const url = await uploadMediaToCloudinary(file, undefined, 'cadastro', torcida.id)
       setImagemProva(url)
     } catch (err) {
       onErro(err instanceof Error ? err.message : 'Falha no upload da imagem.')
@@ -585,17 +592,33 @@ function PassoVinculo({
           Sócios passam por aprovação e têm acesso a benefícios exclusivos.
         </p>
 
+        {!torcida.acessivelNoHost && (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            O portal da <strong>{torcida.nome}</strong> fica em outro endereço. Sua solicitação será
+            analisada pela diretoria dessa torcida — não aparecerá pendente no admin deste site.
+          </p>
+        )}
+
         {precisaEscolherUnidade && (
           <div className="mt-6">
             <SeletorUnidade sedes={torcida.sedes} value={unidadeId} onChange={setUnidadeId} />
           </div>
         )}
 
+        <div className="mt-6">
+          <BlocoImagemProva
+            imagemProva={imagemProva}
+            uploadPend={uploadPend}
+            erros={errosCampo.imagemProva}
+            onArquivo={onArquivo}
+          />
+        </div>
+
         <div className="mt-6 space-y-3">
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
-            disabled={pending}
+            disabled={pending || uploadPend || !imagemProva}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
             <Users className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -677,27 +700,19 @@ function PassoVinculo({
           </Campo>
         )}
 
-        <div>
-          <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Imagem de prova (comprovante / foto) — opcional
-          </span>
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]">
-            {uploadPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {imagemProva ? 'Imagem enviada — trocar' : 'Enviar imagem'}
-            <input type="file" accept="image/*" className="hidden" onChange={onArquivo} disabled={uploadPend} />
-          </label>
-          {imagemProva && (
-            <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600">
-              <Check className="h-3 w-3" /> Anexado
-            </p>
-          )}
-        </div>
+        <BlocoImagemProva
+          imagemProva={imagemProva}
+          uploadPend={uploadPend}
+          erros={errosCampo.imagemProva}
+          onArquivo={onArquivo}
+        />
       </div>
 
       <div className="mt-8">
         <BotaoPrimario
           onClick={() => enviar('SOCIO')}
           pending={pending || uploadPend}
+          disabled={!imagemProva}
           label="Enviar solicitação"
         />
       </div>
@@ -744,6 +759,74 @@ function SeletorUnidade({
   )
 }
 
+function BlocoImagemProva({
+  imagemProva,
+  uploadPend,
+  erros,
+  onArquivo,
+}: {
+  imagemProva?: string
+  uploadPend: boolean
+  erros?: string[]
+  onArquivo: (file: File | undefined) => void
+}) {
+  const inputGaleriaId = 'onboarding-upload-galeria'
+  const inputCameraId = 'onboarding-upload-camera'
+
+  return (
+    <div>
+      <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Foto da carteirinha ou comprovante de vínculo <span className="text-red-500">*</span>
+      </span>
+      <div className="flex flex-wrap gap-2">
+        <label
+          htmlFor={inputGaleriaId}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+        >
+          {uploadPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Enviar arquivo
+        </label>
+        <label
+          htmlFor={inputCameraId}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+        >
+          {uploadPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+          Tirar foto
+        </label>
+      </div>
+      <input
+        id={inputGaleriaId}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        disabled={uploadPend}
+        onChange={(e) => {
+          void onArquivo(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+      <input
+        id={inputCameraId}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        disabled={uploadPend}
+        onChange={(e) => {
+          void onArquivo(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+      {imagemProva && (
+        <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+          <Check className="h-3 w-3" /> Imagem anexada
+        </p>
+      )}
+      {erros?.[0] && <p className="mt-1 text-xs text-red-600">{erros[0]}</p>}
+    </div>
+  )
+}
+
 function BotaoVoltar({
   onClick,
   disabled,
@@ -769,17 +852,19 @@ function BotaoVoltar({
 function BotaoPrimario({
   onClick,
   pending,
+  disabled,
   label,
 }: {
   onClick: () => void
   pending?: boolean
+  disabled?: boolean
   label: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={pending}
+      disabled={pending || disabled}
       className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}
