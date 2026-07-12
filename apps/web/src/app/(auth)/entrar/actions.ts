@@ -3,42 +3,47 @@
 import { db } from '@torcida/db'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
+import { redirect } from 'next/navigation'
 import { excedeuLimite } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
 export type LoginSenhaState = { message?: string }
 
-export async function entrarComSenha(
-  _prev: LoginSenhaState,
-  formData: FormData,
-): Promise<LoginSenhaState> {
-  const email = formData.get('email') as string
-  const senha = formData.get('senha') as string
-
-  // Checagem rápida (evita round-trip completo do signIn) — o registro da
-  // tentativa falha (registrarTentativaFalha) e a aplicação real do limite
-  // acontecem em authorize() (lib/auth.ts), o único ponto por onde toda
-  // tentativa de login passa de fato.
-  if (email && excedeuLimite(email)) {
-    return { message: 'Muitas tentativas com este e-mail. Tente novamente em alguns minutos.' }
-  }
-
+/** signIn em Server Action: grava cookie com redirect:false e navega depois. */
+async function entrarComCredenciais(email: string, senha: string): Promise<LoginSenhaState> {
   try {
-    // Em caso de sucesso, signIn() lança um redirect (NEXT_REDIRECT) que sai
-    // desta função pelo `throw error` abaixo.
-    await signIn('credentials', { email, password: senha, redirectTo: '/auth/contexto' })
+    const result = await signIn('credentials', {
+      email,
+      password: senha,
+      redirect: false,
+      redirectTo: '/auth/contexto',
+    })
+    if (typeof result === 'string' && result.includes('error=')) {
+      return { message: 'E-mail ou senha inválidos.' }
+    }
   } catch (error) {
-    // AuthError = falha de autenticação real (e-mail/senha inválidos, ou
-    // rate-limit excedido — authorize() retorna null nos dois casos).
-    // Qualquer outro erro (inclusive o redirect de sucesso) deve propagar.
     if (error instanceof AuthError) {
       return { message: 'E-mail ou senha inválidos.' }
     }
     throw error
   }
 
-  return {}
+  redirect('/auth/contexto')
+}
+
+export async function entrarComSenha(
+  _prev: LoginSenhaState,
+  formData: FormData,
+): Promise<LoginSenhaState> {
+  const email = (formData.get('email') as string)?.trim().toLowerCase()
+  const senha = formData.get('senha') as string
+
+  if (email && excedeuLimite(email)) {
+    return { message: 'Muitas tentativas com este e-mail. Tente novamente em alguns minutos.' }
+  }
+
+  return entrarComCredenciais(email, senha)
 }
 
 const contaSchema = z
@@ -74,11 +79,13 @@ export async function criarContaComSenha(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { nome, email, senha } = parsed.data
+  const { nome, senha } = parsed.data
+  const email = parsed.data.email.trim().toLowerCase()
 
-  // Não mescla com conta OAuth existente do mesmo e-mail — evita que alguém
-  // "tome" uma conta Discord/Google só sabendo o e-mail dela.
-  const existente = await db.user.findUnique({ where: { email } })
+  const existente = await db.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
+  })
   if (existente) {
     return { message: 'Já existe uma conta com este e-mail. Tente entrar.' }
   }
@@ -86,6 +93,13 @@ export async function criarContaComSenha(
   const senhaHash = await bcrypt.hash(senha, 10)
   await db.user.create({ data: { nome, email, senhaHash } })
 
-  await signIn('credentials', { email, password: senha, redirectTo: '/auth/contexto' })
-  return {}
+  const login = await entrarComCredenciais(email, senha)
+  if (login.message) {
+    return {
+      message:
+        'Conta criada, mas não foi possível entrar automaticamente. Use /entrar com seu e-mail e senha.',
+    }
+  }
+
+  return login
 }

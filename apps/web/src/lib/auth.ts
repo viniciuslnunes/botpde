@@ -38,17 +38,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       credentials: { email: {}, password: {} },
       async authorize(credentials) {
-        const email = credentials?.email as string | undefined
+        const emailRaw = credentials?.email as string | undefined
         const password = credentials?.password as string | undefined
-        if (!email || !password) return null
+        if (!emailRaw || !password) return null
 
-        // Aplicado aqui (não só na Server Action de /entrar) porque este é o
-        // único ponto por onde toda tentativa de login realmente passa —
-        // uma chamada direta a /api/auth/callback/credentials, pulando a UI,
-        // teria burlado o limite se ele só existisse na Server Action.
+        const email = emailRaw.trim().toLowerCase()
+
         if (excedeuLimite(email)) return null
 
-        const user = await db.user.findUnique({ where: { email } })
+        const user = await db.user.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+        })
         // Erro genérico (usuário inexistente ou sem senha cadastrada) —
         // não diferenciar do caso de senha errada, evita enumeração de contas.
         if (!user?.senhaHash) {
@@ -87,6 +87,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async signIn({ user, account, profile }) {
       if (!account) return false
+
+      // E-mail/senha: authorize() já validou; findOrCreateUser é só OAuth.
+      if (account.provider === 'credentials') {
+        return Boolean(user?.id)
+      }
 
       try {
         const existingUser = await findOrCreateUser(
