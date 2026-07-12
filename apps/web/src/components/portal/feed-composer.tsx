@@ -1,7 +1,8 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
-import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
+import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays, Plus } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
@@ -11,6 +12,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
+import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 
 const INITIAL_STATE: PublicarPostState = {}
 const MAX_ANEXOS = 10
@@ -141,8 +143,10 @@ function ComposerBody({
   const [stickerOpen, setStickerOpen] = useState(false)
   const [embedDispensado, setEmbedDispensado] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [extrasOpen, setExtrasOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const extrasRef = useRef<HTMLDivElement>(null)
   const [, startTransition] = useTransition()
 
   const firstName = userName?.split(' ')[0] ?? 'torcedor'
@@ -220,6 +224,58 @@ function ComposerBody({
     }
     return () => window.removeEventListener('comunidade:compose', onCompose)
   }, [])
+
+  useEffect(() => {
+    function onPointerDown(e: MouseEvent) {
+      if (!extrasRef.current?.contains(e.target as Node)) {
+        setExtrasOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
+
+  function fecharExtras() {
+    setExtrasOpen(false)
+  }
+
+  function toggleEnquete() {
+    setModoEnquete((v) => !v)
+    setModoEvento(false)
+    setEmojiOpen(false)
+    setStickerOpen(false)
+    fecharExtras()
+  }
+
+  function toggleEvento() {
+    setModoEvento((v) => !v)
+    setModoEnquete(false)
+    setEmojiOpen(false)
+    setStickerOpen(false)
+    if (!eventoId && eventos[0]) setEventoId(eventos[0].id)
+    fecharExtras()
+  }
+
+  function inserirArroba() {
+    const el = textareaRef.current
+    if (el) {
+      const pos = el.selectionStart ?? texto.length
+      const next = texto.slice(0, pos) + '@' + texto.slice(pos)
+      handleTextoChange(next, pos + 1)
+      requestAnimationFrame(() => {
+        el.focus()
+        el.selectionStart = el.selectionEnd = pos + 1
+      })
+    } else {
+      handleTextoChange(texto + '@')
+    }
+    fecharExtras()
+  }
+
+  const toolBtnClass =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]'
+  const toolBtnActiveClass =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))] transition-colors'
 
   function insertEmoji(emoji: string) {
     const el = textareaRef.current
@@ -300,9 +356,10 @@ function ComposerBody({
   }
 
   return (
-    <form
+    <m.form
+      layout
       onSubmit={submit}
-      className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
+      className="card-soft min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
     >
     <div
       onDragOver={(e) => {
@@ -328,37 +385,50 @@ function ComposerBody({
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
         <div className="relative min-w-0 flex-1">
-          {!expanded ? (
-            <button
-              type="button"
-              onClick={open}
-              className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
-            >
-              No que você tá pensando, {firstName}?
-            </button>
-          ) : (
-            <textarea
-              ref={textareaRef}
-              name="conteudo"
-              required
-              maxLength={3000}
-              rows={3}
-              value={texto}
-              onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
-              onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
-              onPaste={(e) => {
-                const files = Array.from(e.clipboardData.files).filter(
-                  (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
-                )
-                if (files.length) {
-                  e.preventDefault()
-                  addFiles(files)
-                }
-              }}
-              placeholder={`No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`}
-              className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
-            />
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            {!expanded ? (
+              <m.button
+                key="composer-prompt"
+                type="button"
+                onClick={open}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={springSnappy}
+                whileTap={{ scale: 0.99 }}
+                className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
+              >
+                No que você tá pensando, {firstName}?
+              </m.button>
+            ) : (
+              <m.textarea
+                key="composer-textarea"
+                ref={textareaRef}
+                name="conteudo"
+                required
+                maxLength={3000}
+                rows={3}
+                value={texto}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={springGentle}
+                onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
+                onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
+                onPaste={(e) => {
+                  const files = Array.from(e.clipboardData.files).filter(
+                    (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+                  )
+                  if (files.length) {
+                    e.preventDefault()
+                    addFiles(files)
+                  }
+                }}
+                placeholder={`No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`}
+                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+              />
+            )}
+          </AnimatePresence>
           {mencaoQuery !== null && expanded && (
             <MentionPicker
               query={mencaoQuery}
@@ -369,8 +439,17 @@ function ComposerBody({
         </div>
       </div>
 
-      {expanded && modoEnquete && (
-        <div className="mt-3 space-y-2 pl-[52px]">
+      <AnimatePresence initial={false}>
+        {expanded && modoEnquete && (
+          <m.div
+            key="poll-options"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={springGentle}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 space-y-2 pl-[52px]">
           <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Opções da enquete</p>
           {opcoes.map((op, i) => (
             <input
@@ -393,11 +472,22 @@ function ComposerBody({
               + Adicionar opção
             </button>
           )}
-        </div>
-      )}
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
-      {expanded && modoEvento && eventos.length > 0 && (
-        <div className="mt-3 pl-[52px]">
+      <AnimatePresence initial={false}>
+        {expanded && modoEvento && eventos.length > 0 && (
+          <m.div
+            key="event-select"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={springGentle}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 pl-[52px]">
           <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Evento vinculado</label>
           <select
             value={eventoId}
@@ -410,11 +500,21 @@ function ComposerBody({
               </option>
             ))}
           </select>
-        </div>
-      )}
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
-      {expanded && (
-        <>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <m.div
+            key="composer-expanded"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={springGentle}
+            className="overflow-hidden"
+          >
           {/* Prévia dos anexos */}
           {medias.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 pl-[52px]">
@@ -488,126 +588,238 @@ function ComposerBody({
             </p>
           )}
 
-          <div className="mt-3 flex items-center justify-between border-t border-[rgb(var(--border))] pt-3">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Adicionar foto ou vídeo"
-                title="Foto ou vídeo"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-              >
-                <ImagePlus className="h-5 w-5" />
-              </button>
-              <div className="relative">
+          <div className="mt-3 space-y-2.5 border-t border-[rgb(var(--border))] pt-3 sm:space-y-0">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEmojiOpen((v) => !v)
-                    setStickerOpen(false)
-                  }}
-                  aria-label="Emojis"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Adicionar foto ou vídeo"
+                  title="Foto ou vídeo"
+                  className={toolBtnClass}
                 >
-                  <Smile className="h-5 w-5" />
+                  <ImagePlus className="h-5 w-5" />
                 </button>
-                {emojiOpen && (
-                  <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
-                )}
-              </div>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStickerOpen((v) => !v)
-                    setEmojiOpen(false)
-                  }}
-                  aria-label="Stickers"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-                >
-                  <StickerIcon className="h-5 w-5" />
-                </button>
-                {stickerOpen && (
-                  <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setModoEnquete((v) => !v)
-                  setModoEvento(false)
-                  setEmojiOpen(false)
-                  setStickerOpen(false)
-                }}
-                aria-label="Criar enquete"
-                title="Enquete"
-                className={[
-                  'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
-                  modoEnquete
-                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
-                    : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
-                ].join(' ')}
-              >
-                <BarChart3 className="h-5 w-5" />
-              </button>
-              {eventos.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModoEvento((v) => !v)
-                    setModoEnquete(false)
-                    setEmojiOpen(false)
-                    setStickerOpen(false)
-                    if (!eventoId && eventos[0]) setEventoId(eventos[0].id)
-                  }}
-                  aria-label="Vincular evento"
-                  title="Evento"
-                  className={[
-                    'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
-                    modoEvento
-                      ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
-                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
-                  ].join(' ')}
-                >
-                  <CalendarDays className="h-5 w-5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  const el = textareaRef.current
-                  if (el) {
-                    const pos = el.selectionStart ?? texto.length
-                    const next = texto.slice(0, pos) + '@' + texto.slice(pos)
-                    handleTextoChange(next, pos + 1)
-                    requestAnimationFrame(() => {
-                      el.focus()
-                      el.selectionStart = el.selectionEnd = pos + 1
-                    })
-                  } else {
-                    handleTextoChange(texto + '@')
-                  }
-                }}
-                aria-label="Mencionar membro"
-                title="Mencionar"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-              >
-                <AtSign className="h-5 w-5" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) addFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-            </div>
 
-            <div className="flex items-center gap-2">
+                {/* Desktop: todas as opções visíveis */}
+                <div className="hidden items-center gap-1 sm:flex">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmojiOpen((v) => !v)
+                        setStickerOpen(false)
+                      }}
+                      aria-label="Emojis"
+                      className={toolBtnClass}
+                    >
+                      <Smile className="h-5 w-5" />
+                    </button>
+                    {emojiOpen && (
+                      <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
+                    )}
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStickerOpen((v) => !v)
+                        setEmojiOpen(false)
+                      }}
+                      aria-label="Stickers"
+                      className={toolBtnClass}
+                    >
+                      <StickerIcon className="h-5 w-5" />
+                    </button>
+                    {stickerOpen && (
+                      <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleEnquete}
+                    aria-label="Criar enquete"
+                    title="Enquete"
+                    className={modoEnquete ? toolBtnActiveClass : toolBtnClass}
+                  >
+                    <BarChart3 className="h-5 w-5" />
+                  </button>
+                  {eventos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleEvento}
+                      aria-label="Vincular evento"
+                      title="Evento"
+                      className={modoEvento ? toolBtnActiveClass : toolBtnClass}
+                    >
+                      <CalendarDays className="h-5 w-5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={inserirArroba}
+                    aria-label="Mencionar membro"
+                    title="Mencionar"
+                    className={toolBtnClass}
+                  >
+                    <AtSign className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Mobile: opções extras no menu + */}
+                <div ref={extrasRef} className="relative sm:hidden">
+                  <m.button
+                    type="button"
+                    onClick={() => {
+                      setExtrasOpen((v) => !v)
+                      setEmojiOpen(false)
+                      setStickerOpen(false)
+                    }}
+                    aria-label="Mais opções de publicação"
+                    aria-expanded={extrasOpen}
+                    whileTap={{ scale: 0.92 }}
+                    transition={springSnappy}
+                    className={[
+                      toolBtnClass,
+                      extrasOpen || modoEnquete || modoEvento
+                        ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                        : '',
+                    ].join(' ')}
+                  >
+                    <m.span
+                      animate={{ rotate: extrasOpen ? 45 : 0 }}
+                      transition={springSnappy}
+                      className="inline-flex"
+                    >
+                      <Plus className="h-5 w-5" />
+                    </m.span>
+                  </m.button>
+
+                  <AnimatePresence>
+                    {extrasOpen && (
+                      <m.div
+                        key="extras-menu"
+                        variants={popoverPanel}
+                        initial="hidden"
+                        animate="show"
+                        exit="exit"
+                        transition={springGentle}
+                        className="card-soft absolute bottom-full left-0 z-20 mb-2 min-w-[11rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1"
+                      >
+                        <m.button
+                          type="button"
+                          custom={0}
+                          variants={menuItemStagger}
+                          initial="hidden"
+                          animate="show"
+                          onClick={() => {
+                            fecharExtras()
+                            setStickerOpen(false)
+                            setEmojiOpen(true)
+                          }}
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                        >
+                          <Smile className="h-4 w-4 shrink-0" />
+                          Emoji
+                        </m.button>
+                        <m.button
+                          type="button"
+                          custom={1}
+                          variants={menuItemStagger}
+                          initial="hidden"
+                          animate="show"
+                          onClick={() => {
+                            fecharExtras()
+                            setEmojiOpen(false)
+                            setStickerOpen(true)
+                          }}
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                        >
+                          <StickerIcon className="h-4 w-4 shrink-0" />
+                          Sticker
+                        </m.button>
+                        <m.button
+                          type="button"
+                          custom={2}
+                          variants={menuItemStagger}
+                          initial="hidden"
+                          animate="show"
+                          onClick={toggleEnquete}
+                          className={[
+                            'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                            modoEnquete ? 'font-medium text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground))]',
+                          ].join(' ')}
+                        >
+                          <BarChart3 className="h-4 w-4 shrink-0" />
+                          Enquete
+                        </m.button>
+                        {eventos.length > 0 && (
+                          <m.button
+                            type="button"
+                            custom={3}
+                            variants={menuItemStagger}
+                            initial="hidden"
+                            animate="show"
+                            onClick={toggleEvento}
+                            className={[
+                              'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                              modoEvento ? 'font-medium text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground))]',
+                            ].join(' ')}
+                          >
+                            <CalendarDays className="h-4 w-4 shrink-0" />
+                            Evento
+                          </m.button>
+                        )}
+                        <m.button
+                          type="button"
+                          custom={eventos.length > 0 ? 4 : 3}
+                          variants={menuItemStagger}
+                          initial="hidden"
+                          animate="show"
+                          onClick={inserirArroba}
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                        >
+                          <AtSign className="h-4 w-4 shrink-0" />
+                          Mencionar
+                        </m.button>
+                      </m.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {(emojiOpen || stickerOpen) && (
+                      <m.div
+                        key="mobile-pickers"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={springGentle}
+                        className="absolute bottom-full left-0 z-30 mb-2"
+                      >
+                        {emojiOpen && (
+                          <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
+                        )}
+                        {stickerOpen && (
+                          <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
+                        )}
+                      </m.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+
               {!somentePublico && (
                 <select
                   value={visibilidade}
@@ -615,15 +827,20 @@ function ComposerBody({
                     setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
                   }
                   aria-label="Visibilidade do post"
-                  className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
+                  className="max-w-[7.5rem] shrink-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))] sm:max-w-none"
                 >
                   <option value="PUBLICO">Público</option>
                   <option value="TENANT">Só torcida</option>
                   <option value="PRIVADO">Só seguidores</option>
                 </select>
               )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
               {somentePublico && (
-                <span className="text-xs text-[rgb(var(--foreground-muted))]">Visível para torcedores do clube</span>
+                <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
+                  Visível para torcedores do clube
+                </span>
               )}
               <button
                 type="button"
@@ -635,16 +852,19 @@ function ComposerBody({
               <button
                 type="submit"
                 disabled={!podePublicar}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
               >
                 {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : modoEvento ? 'Publicar sobre evento' : 'Publicar'}
+                <span className="max-sm:sr-only">
+                  {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : modoEvento ? 'Publicar evento' : 'Publicar'}
+                </span>
               </button>
             </div>
           </div>
-        </>
-      )}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
-    </form>
+    </m.form>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Search, Loader2, Hash, FileText, Radio, Building2 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
@@ -21,8 +22,10 @@ interface BuscaResponse {
 }
 
 export function BuscaMembrosClient() {
-  const [q, setQ] = useState('')
-  const [debounced, setDebounced] = useState('')
+  const searchParams = useSearchParams()
+  const inicial = searchParams.get('q') ?? ''
+  const [q, setQ] = useState(inicial)
+  const [debounced, setDebounced] = useState(inicial.trim())
   const [resultado, setResultado] = useState<BuscaResponse>({
     membros: [],
     hashtags: [],
@@ -86,7 +89,7 @@ export function BuscaMembrosClient() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar membros, canais, unidades, hashtags ou posts…"
           className="h-11 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] pl-10 pr-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          autoFocus
+          autoFocus={!inicial}
         />
       </div>
 

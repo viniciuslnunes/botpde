@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { m } from 'motion/react'
+import { springSnappy } from '@/lib/motion-presets'
 
 /**
  * Segmented control "Descobrir / Seguindo" no topo do feed, no padrão social.
- * Descobrir = stream sugerido da torcida; Seguindo = só quem o membro segue.
- * O estado é derivado do searchParam `filtro`, lido no server pela posts-section.
  */
 export function ComunidadeFeedTabs() {
   const params = useSearchParams()
@@ -35,12 +35,13 @@ export function ComunidadeFeedTabs() {
             ].join(' ')}
           >
             {tab.label}
-            <span
-              className={[
-                'absolute inset-x-0 -bottom-px h-0.5 rounded-full transition-all duration-200',
-                ativo ? 'bg-[rgb(var(--primary))]' : 'bg-transparent',
-              ].join(' ')}
-            />
+            {ativo && (
+              <m.span
+                layoutId="comunidade-feed-tab-indicator"
+                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))]"
+                transition={springSnappy}
+              />
+            )}
           </Link>
         )
       })}

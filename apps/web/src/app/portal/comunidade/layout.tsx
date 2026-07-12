@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { MotionShell } from '@/components/motion/motion-shell'
 import { ComunidadeDock } from './_components/comunidade-dock'
 
 /**
@@ -19,9 +20,11 @@ export default async function ComunidadeLayout({
   }
 
   return (
-    <div className="pb-24 lg:pb-0">
-      {children}
-      {currentUser.id && <ComunidadeDock currentUser={currentUser} />}
-    </div>
+    <MotionShell>
+      <div className="pb-24 lg:pb-0">
+        {children}
+        {currentUser.id && <ComunidadeDock currentUser={currentUser} />}
+      </div>
+    </MotionShell>
   )
 }

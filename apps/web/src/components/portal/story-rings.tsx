@@ -50,7 +50,7 @@ export function StoryRings({
 
   return (
     <>
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="app-scrollbar-none flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {currentUserId && (
           <button
             type="button"

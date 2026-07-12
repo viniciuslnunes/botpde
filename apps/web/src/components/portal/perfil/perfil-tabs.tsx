@@ -16,7 +16,7 @@ const ABAS: { id: PerfilAba; label: string }[] = [
 
 export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
   return (
-    <nav className="flex gap-6 overflow-x-auto border-b border-[rgb(var(--border))] px-1">
+    <nav className="app-scrollbar-none flex gap-6 overflow-x-auto border-b border-[rgb(var(--border))] px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {ABAS.map((aba) => {
         const ativo = aba.id === abaAtiva
         return (

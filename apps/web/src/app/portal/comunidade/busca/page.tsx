@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { Search } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { BuscaMembrosClient } from './busca-membros-client'
@@ -18,7 +19,9 @@ export default async function BuscaMembrosPage() {
         titulo="Buscar na comunidade"
         subtitulo="Encontre membros, hashtags em alta e publicações."
       />
-      <BuscaMembrosClient />
+      <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-[rgb(var(--border))]" />}>
+        <BuscaMembrosClient />
+      </Suspense>
     </div>
   )
 }

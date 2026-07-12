@@ -24,6 +24,7 @@
     "livekit-client": "^2.15.7",
     "livekit-server-sdk": "^2.13.0",
     "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.29",
     "next-intl": "^3.26.3",

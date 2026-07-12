@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { MessagesSquare } from 'lucide-react'
 import { getPostsParaFeed, getPostIdsSalvos, type PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 
 interface CurrentUser {
   id: string
@@ -67,14 +68,15 @@ export async function ComunidadePostsSection({
             </p>
           </div>
         ) : (
-          stream.map((post) => (
-            <FeedPostCard
-              key={post.id}
-              post={post}
-              showTenantBadge={post.tenantId !== tenantId}
-              currentUser={currentUser}
-              salvo={salvoIds.has(post.id)}
-            />
+          stream.map((post, index) => (
+            <MotionReveal key={post.id} index={index}>
+              <FeedPostCard
+                post={post}
+                showTenantBadge={post.tenantId !== tenantId}
+                currentUser={currentUser}
+                salvo={salvoIds.has(post.id)}
+              />
+            </MotionReveal>
           ))
         )}
       </section>

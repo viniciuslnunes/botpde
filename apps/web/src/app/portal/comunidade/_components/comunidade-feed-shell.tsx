@@ -9,6 +9,7 @@ import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeFeedTabs } from './comunidade-feed-tabs'
+import { ComunidadeSearchBar } from './comunidade-search-bar'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -160,7 +161,8 @@ export function ComunidadeFeedShell({
       </aside>
 
       <main className="min-w-0 space-y-4">
-        <div className="sticky top-14 z-20 -mx-4 bg-[rgb(var(--background-subtle))]/85 px-4 pt-1 backdrop-blur-md sm:top-14 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:backdrop-blur-none">
+        <div className="sticky top-14 z-20 -mx-4 min-w-0 space-y-3 overflow-x-clip bg-[rgb(var(--background-subtle))]/90 px-4 pb-2 pt-1 backdrop-blur-md lg:top-16 lg:mx-0 lg:px-0">
+          <ComunidadeSearchBar />
           <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
             <ComunidadeFeedTabs />
           </Suspense>

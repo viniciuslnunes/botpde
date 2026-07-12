@@ -358,13 +358,13 @@ export function PostEngagement({
       </div>
 
       {repostando && (
-        <form onSubmit={enviarRepost} className="mt-2 flex items-center gap-2">
+        <form onSubmit={enviarRepost} className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <input
             value={comentarioRepost}
             onChange={(e) => setComentarioRepost(e.target.value)}
             maxLength={500}
             placeholder="Adicione um comentário (opcional)…"
-            className="h-9 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
           />
           <button
             type="submit"
@@ -377,13 +377,13 @@ export function PostEngagement({
       )}
 
       {denunciando && (
-        <form onSubmit={enviarDenuncia} className="mt-2 flex items-center gap-2">
+        <form onSubmit={enviarDenuncia} className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <input
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             maxLength={500}
             placeholder="Por que está denunciando?"
-            className="h-9 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-red-500"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-red-500"
           />
           <button
             type="submit"
