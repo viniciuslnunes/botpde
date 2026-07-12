@@ -47,7 +47,9 @@ interface ComunidadeChatPanelProps {
 export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
-  const [cadastroPendente, setCadastroPendente] = useState(false)
+  const [bloqueioInbox, setBloqueioInbox] = useState<
+    'nenhum' | 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
+  >('nenhum')
   const [carregando, setCarregando] = useState(false)
   const carregouRef = useRef(false)
 
@@ -56,8 +58,16 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
     try {
       const res = await fetch('/api/conversas', { cache: 'no-store' })
       if (!res.ok) return
-      const data = (await res.json()) as { conversas?: InboxItemDto[]; cadastroPendente?: boolean }
-      setCadastroPendente(Boolean(data.cadastroPendente))
+      const data = (await res.json()) as {
+        conversas?: InboxItemDto[]
+        cadastroPendente?: boolean
+        semVinculo?: boolean
+        cadastroReprovado?: boolean
+      }
+      if (data.cadastroPendente) setBloqueioInbox('cadastro_pendente')
+      else if (data.semVinculo) setBloqueioInbox('sem_vinculo')
+      else if (data.cadastroReprovado) setBloqueioInbox('cadastro_reprovado')
+      else setBloqueioInbox('nenhum')
       if (data.conversas) setConversas(data.conversas)
     } catch {
       // silencioso
@@ -124,9 +134,17 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
       <div className={expanded ? 'p-2' : 'hidden'} aria-hidden={!expanded}>
         {!shellPronto ? (
           <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
-        ) : cadastroPendente ? (
+        ) : bloqueioInbox === 'cadastro_pendente' ? (
           <p className="px-3 py-6 text-center text-xs text-[rgb(var(--foreground-muted))]">
             Seu vínculo ainda está em análise. O chat libera quando a torcida aprovar seu cadastro.
+          </p>
+        ) : bloqueioInbox === 'cadastro_reprovado' ? (
+          <p className="px-3 py-6 text-center text-xs text-[rgb(var(--foreground-muted))]">
+            Seu cadastro de associado não está ativo. Entre em contato com a diretoria da torcida.
+          </p>
+        ) : bloqueioInbox === 'sem_vinculo' ? (
+          <p className="px-3 py-6 text-center text-xs text-[rgb(var(--foreground-muted))]">
+            Associe-se à torcida para conversar com outros membros.
           </p>
         ) : (
           <MensagensShell

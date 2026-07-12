@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo, assertPermission } from '@/lib/authz'
+import { assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
@@ -94,8 +94,13 @@ export async function publicarPost(
   _prevState: PublicarPostState,
   formData: FormData,
 ): Promise<PublicarPostState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  let session: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['tenant']
+  try {
+    ;({ session, tenant } = await assertPodePublicarNoFeed())
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+  }
 
   const parsed = postSchema.safeParse({
     conteudo: formData.get('conteudo'),
@@ -548,8 +553,13 @@ export async function publicarEnquete(
   _prevState: PublicarPostState,
   formData: FormData,
 ): Promise<PublicarPostState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  let session: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['tenant']
+  try {
+    ;({ session, tenant } = await assertPodePublicarNoFeed())
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+  }
 
   let opcoesRaw: unknown = []
   try {
@@ -849,8 +859,13 @@ export async function publicarPostEvento(
   _prevState: PublicarPostState,
   formData: FormData,
 ): Promise<PublicarPostState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  let session: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['session']
+  let tenant: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['tenant']
+  try {
+    ;({ session, tenant } = await assertPodePublicarNoFeed())
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+  }
 
   const parsed = publicarPostEventoSchema.safeParse({
     conteudo: formData.get('conteudo'),

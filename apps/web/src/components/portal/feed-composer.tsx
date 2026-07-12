@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useTransition } from 'react'
 import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
@@ -22,9 +22,30 @@ interface FeedComposerProps {
   userAvatar: string | null
   perfilPrivado?: boolean
   eventos?: EventoComposerItem[]
+  /** Quando definido, substitui o composer por aviso (ex.: cadastro pendente). */
+  bloqueioPublicacao?: string | null
 }
 
-export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [] }: FeedComposerProps) {
+export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [], bloqueioPublicacao = null }: FeedComposerProps) {
+  if (bloqueioPublicacao) {
+    return (
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
+        {bloqueioPublicacao}
+      </div>
+    )
+  }
+
+  return (
+    <FeedComposerActive
+      userName={userName}
+      userAvatar={userAvatar}
+      perfilPrivado={perfilPrivado}
+      eventos={eventos}
+    />
+  )
+}
+
+function FeedComposerActive({ userName, userAvatar, perfilPrivado = true, eventos = [] }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -116,6 +137,7 @@ function ComposerBody({
   const [dragOver, setDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [, startTransition] = useTransition()
 
   const firstName = userName?.split(' ')[0] ?? 'torcedor'
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
@@ -164,13 +186,15 @@ function ComposerBody({
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    if (modoEnquete) {
-      pollAction(fd)
-    } else if (modoEvento) {
-      eventAction(fd)
-    } else {
-      postAction(fd)
-    }
+    startTransition(() => {
+      if (modoEnquete) {
+        pollAction(fd)
+      } else if (modoEvento) {
+        eventAction(fd)
+      } else {
+        postAction(fd)
+      }
+    })
   }
 
   function open() {

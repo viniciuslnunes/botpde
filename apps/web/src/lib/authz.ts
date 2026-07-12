@@ -72,3 +72,43 @@ export async function assertMembroAtivo(tenantId: string, userId: string): Promi
     }
   }
 }
+
+/** Publicar no feed: permissão `community:post` + membro APROVADO (e carteirinha válida se sócio). */
+export async function assertPodePublicarNoFeed(): Promise<AuthzResult> {
+  const ctx = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  await assertMembroAtivo(ctx.tenant.id, ctx.session.user.id)
+  return ctx
+}
+
+/**
+ * Checagem read-only para UI — retorna mensagem de bloqueio ou `null` se pode publicar.
+ */
+export async function checarPodePublicarNoFeed(
+  userId: string,
+  tenantId: string,
+): Promise<string | null> {
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
+  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+
+  if (!hasPermission(effective, PERMISSIONS.COMMUNITY_POST)) {
+    const membro = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { status: true },
+    })
+    if (!membro) return 'Associe-se à torcida para publicar no feed.'
+    if (membro.status === 'PENDENTE') {
+      return 'Seu vínculo ainda está em análise. Publicar libera quando a torcida aprovar seu cadastro.'
+    }
+    if (membro.status !== 'APROVADO') {
+      return 'Seu cadastro de associado não está ativo.'
+    }
+    return 'Você não tem permissão para publicar.'
+  }
+
+  try {
+    await assertMembroAtivo(tenantId, userId)
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Não é possível publicar.'
+  }
+}

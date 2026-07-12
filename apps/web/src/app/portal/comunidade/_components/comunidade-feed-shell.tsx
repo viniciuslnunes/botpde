@@ -32,6 +32,7 @@ interface ComunidadeFeedShellProps {
   /** `data` em ISO — serializado na page antes de cruzar para o FeedComposer (client). */
   eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
   navBadges?: { notificacoesNaoLidas: number; solicitacoesPendentes: number }
+  bloqueioPublicacao?: string | null
 }
 
 function ComunicadosFallback() {
@@ -64,6 +65,7 @@ export function ComunidadeFeedShell({
   perfilPrivado = true,
   eventosComposer = [],
   navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 },
+  bloqueioPublicacao = null,
 }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
@@ -225,6 +227,7 @@ export function ComunidadeFeedShell({
             userAvatar={currentUser.avatarUrl}
             perfilPrivado={perfilPrivado}
             eventos={eventosComposer}
+            bloqueioPublicacao={bloqueioPublicacao}
           />
         )}
 

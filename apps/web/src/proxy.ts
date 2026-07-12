@@ -2,7 +2,16 @@ import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { resetPrismaQueryCount } from '@torcida/db'
 
-const PUBLIC_PATHS = ['/entrar', '/api/auth', '/_next', '/favicon.ico']
+const PUBLIC_PATHS = [
+  '/entrar',
+  '/api/auth',
+  '/_next',
+  '/favicon.ico',
+  // Assets públicos de marca — nunca podem ser gated (o otimizador de
+  // imagem os busca sem sessão; um redirect vira 400 em /_next/image).
+  '/escudos',
+  '/stickers',
+]
 
 export const proxy = auth((req) => {
   if (process.env.NODE_ENV === 'development') {

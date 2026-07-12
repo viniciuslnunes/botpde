@@ -12,7 +12,10 @@ import {
   MAX_MEMBROS_GRUPO,
   serializeConversasInbox,
 } from '@/lib/mensageria'
-import { assertPodeEnviarMensagens, assertUsuarioMensageria } from '@/lib/mensageria-api'
+import {
+  assertPodeEnviarMensagens,
+  getStatusInboxMensageria,
+} from '@/lib/mensageria-api'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 
 const criarDmSchema = z.object({
@@ -38,24 +41,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
-    const membro = await db.saasMembro.findUnique({
-      where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-      select: { status: true },
-    })
-    if (!membro) {
-      return NextResponse.json(
-        { error: 'Você precisa ser associado desta torcida para usar o chat.' },
-        { status: 403 },
-      )
-    }
-    if (membro.status === 'PENDENTE') {
-      return NextResponse.json({ conversas: [], cadastroPendente: true })
-    }
-    if (membro.status !== 'APROVADO') {
-      return NextResponse.json(
-        { error: 'Seu cadastro de associado não está ativo.' },
-        { status: 403 },
-      )
+    const status = await getStatusInboxMensageria(session.user.id, tenant.id)
+    if (!status.podeListar) {
+      return NextResponse.json({
+        conversas: [],
+        cadastroPendente: status.motivo === 'cadastro_pendente',
+        semVinculo: status.motivo === 'sem_vinculo',
+        cadastroReprovado: status.motivo === 'cadastro_reprovado',
+      })
     }
 
     const conversas = await listConversas(session.user.id)

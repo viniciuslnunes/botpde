@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
+import { checarPodePublicarNoFeed } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -44,15 +45,18 @@ export default async function ComunidadePage({
   let perfilPrivado = true
   let eventosComposer: EventoComposerItem[] = []
   let navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
+  let bloqueioPublicacao: string | null = null
   if (session?.user?.id != null) {
-    const [perfil, eventos, badges] = await Promise.all([
+    const [perfil, eventos, badges, bloqueio] = await Promise.all([
       getOrCreatePerfilMembro(session.user.id, tenant.id),
       getEventosParaComposer(tenant.id, session.user.id),
       getResumoBadgesComunidade(tenant.id, session.user.id),
+      checarPodePublicarNoFeed(session.user.id, tenant.id),
     ])
     perfilPrivado = perfil.perfilPrivado
     eventosComposer = eventos
     navBadges = badges
+    bloqueioPublicacao = bloqueio
   }
 
   return (
@@ -64,6 +68,7 @@ export default async function ComunidadePage({
         perfilPrivado={perfilPrivado}
         eventosComposer={eventosComposer}
         navBadges={navBadges}
+        bloqueioPublicacao={bloqueioPublicacao}
       />
 
       <aside className="hidden xl:block">
