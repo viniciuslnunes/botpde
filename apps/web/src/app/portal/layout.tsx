@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getEstadoOnboarding } from '@/lib/onboarding'
 import { PortalNavbar } from '@/components/portal/navbar'
 
 export default async function PortalLayout({
@@ -10,8 +11,16 @@ export default async function PortalLayout({
 }) {
   const session = await auth()
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect('/entrar')
+  }
+
+  // Gate de onboarding: quem ainda não concluiu e não tem vínculo é direcionado
+  // ao hub. Membros existentes (temMembro) e quem já concluiu são poupados
+  // (grandfather). O /onboarding tem layout próprio, fora do portal → sem loop.
+  const estado = await getEstadoOnboarding(session.user.id)
+  if (!estado.perfil?.onboardingConcluidoEm && !estado.temMembro) {
+    redirect('/onboarding')
   }
 
   const tenant = await getTenantFromHost()
