@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getActiveTenant } from '@/lib/tenant'
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { PortalNavbar } from '@/components/portal/navbar'
+import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 
 export default async function PortalLayout({
   children,
@@ -34,7 +35,7 @@ export default async function PortalLayout({
         tenantCor={tenant?.corPrimaria ?? '#7c3aed'}
       />
       <main className="app-container relative py-8">
-        {children}
+        <PortalMotionShell>{children}</PortalMotionShell>
       </main>
     </div>
   )

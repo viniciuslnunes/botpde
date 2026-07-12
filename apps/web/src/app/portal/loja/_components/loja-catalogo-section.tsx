@@ -1,10 +1,9 @@
 import { db } from '@torcida/db'
 import { Prisma } from '@torcida/db'
 import Link from 'next/link'
-import { ShoppingBag } from 'lucide-react'
 import { LojaProdutoGridSkeleton } from '@/components/portal/loja-produto-skeleton'
-import { ProdutoCardImagem } from '@/components/portal/produto-card-imagem'
-import { PromoBadge, LojaCarrossel } from '@/components/portal/loja-ui'
+import { LojaProdutoGridAnimated, type LojaProdutoGridItem } from '@/components/portal/loja-produto-grid-animated'
+import { LojaCarrossel } from '@/components/portal/loja-ui'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
 import { toLojaProdutoCard } from '@/lib/loja-serialize'
 import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/types'
@@ -132,6 +131,25 @@ export async function LojaCatalogoSection({
   type ProdutoLite = (typeof produtos)[number]
   type DestaqueLite = (typeof destaques)[number]
 
+  const gridItems: LojaProdutoGridItem[] = produtos.map((p: ProdutoLite) => {
+    const sem = estoqueTotal(p.estoque as Record<string, number>)
+    const off = percentualDesconto(p.precoOriginal, p.preco)
+    return {
+      id: p.id,
+      nome: p.nome,
+      href: `/portal/loja/${p.id}`,
+      tenantBadge: p.tenantId !== tenantId ? p.tenant.nome : null,
+      precoLabel: formatarPreco(p.preco),
+      precoOriginalLabel:
+        p.precoOriginal && Number(p.precoOriginal) > Number(p.preco)
+          ? formatarPreco(p.precoOriginal)
+          : null,
+      imagensUrl: p.imagensUrl,
+      esgotado: sem === 0,
+      descontoPct: off,
+    }
+  })
+
   return (
     <>
       <LojaCarrossel produtos={destaques.map((p: DestaqueLite) => toLojaProdutoCard(p))} />
@@ -162,85 +180,33 @@ export async function LojaCatalogoSection({
           searchParams={sp}
         />
 
-        {produtos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[rgb(var(--border))] py-20 text-center">
-            <ShoppingBag className="mb-3 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
-            <h3 className="font-semibold">Nenhum produto encontrado</h3>
-            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">Tente outros filtros.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {produtos.map((p: ProdutoLite) => {
-                const sem = estoqueTotal(p.estoque as Record<string, number>)
-                const off = percentualDesconto(p.precoOriginal, p.preco)
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/portal/loja/${p.id}`}
-                    className="group relative flex flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-all hover:shadow-md"
-                  >
-                    <div className="relative shrink-0">
-                      <PromoBadge percentual={off} />
-                      <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />
-                    </div>
-                    <div className="flex flex-1 flex-col p-4">
-                      {p.tenantId !== tenantId && (
-                        <span className="mb-1 inline-flex w-fit rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-                          {p.tenant.nome}
-                        </span>
-                      )}
-                      <h3 className="flex-1 font-semibold leading-snug line-clamp-2 group-hover:text-[rgb(var(--primary))]">
-                        {p.nome}
-                      </h3>
-                      <div className="mt-3 flex items-end justify-between gap-2">
-                        <div className="min-w-0">
-                          {p.precoOriginal && Number(p.precoOriginal) > Number(p.preco) && (
-                            <span className="block text-sm text-[rgb(var(--foreground-muted))] line-through">
-                              {formatarPreco(p.precoOriginal)}
-                            </span>
-                          )}
-                          <span className="text-lg font-bold text-[rgb(var(--primary))]">
-                            {formatarPreco(p.preco)}
-                          </span>
-                        </div>
-                        {sem === 0 ? (
-                          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
-                            Esgotado
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+        <div className="space-y-4">
+          <LojaProdutoGridAnimated produtos={gridItems} />
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 pt-4">
-                {page > 1 && (
-                  <Link
-                    href={buildLojaPageUrl(sp, page - 1)}
-                    className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    Anterior
-                  </Link>
-                )}
-                <span className="text-sm text-[rgb(var(--foreground-muted))]">
-                  Página {page} de {totalPages}
-                </span>
-                {page < totalPages && (
-                  <Link
-                    href={buildLojaPageUrl(sp, page + 1)}
-                    className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    Próxima
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-4">
+              {page > 1 && (
+                <Link
+                  href={buildLojaPageUrl(sp, page - 1)}
+                  className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  Anterior
+                </Link>
+              )}
+              <span className="text-sm text-[rgb(var(--foreground-muted))]">
+                Página {page} de {totalPages}
+              </span>
+              {page < totalPages && (
+                <Link
+                  href={buildLojaPageUrl(sp, page + 1)}
+                  className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  Próxima
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </>
   )

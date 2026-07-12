@@ -123,3 +123,9 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
 - Posts: `torcida/{tenantId}/comunidade`
 - Perfil: `torcida/{tenantId}/perfis/{userId}/banner|avatar`
 - Validação server-side com `isCloudinaryUrl` em `social-embed.ts`
+
+## UI e animações
+
+Feed, stories, engajamento e demais interações usam **Motion** (`motion` v12).
+Presets e padrões de implementação: [`docs/frontend/motion.md`](../frontend/motion.md).
+Shell atual: `apps/web/src/app/portal/comunidade/layout.tsx` (`MotionShell`).

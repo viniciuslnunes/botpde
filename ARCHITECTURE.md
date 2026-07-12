@@ -518,6 +518,17 @@ em cinco fases; commits de referência na `main`:
   página inteira).
 - Mensageria em polling HTTP (item 27 — SSE/WebSocket só com demanda de escala).
 
+### 5.7 Animações Motion (2026-07)
+
+Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em
+`apps/web/src/lib/motion-presets.ts`. Hoje montado em `/portal/comunidade`
+(`MotionShell`); guia completo para replicar em Loja, Onboarding e demais módulos:
+**`docs/frontend/motion.md`**.
+
+**Regras:** usar `m` (não `motion`) dentro do shell; presets centralizados;
+`reducedMotion="user"`; listas SSR via `MotionReveal` ou wrappers client;
+portais no `body` para lightbox/dock.
+
 **Fora do escopo do plano concluído** (evolução arquitetural, não “Fase 6
 grátis”): PgBouncer/Accelerate, Redis, WebSocket, SWR/React Query global,
 migração Vercel+Neon, virtualização de listas longas. Ver §5.4 para critérios

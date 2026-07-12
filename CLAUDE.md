@@ -57,6 +57,10 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Performance** (páginas com muitas queries, feed ou polling): siga `ARCHITECTURE.md`
   §5.6 — `React.cache`/`unstable_cache`, Suspense, prefetch on-hover, `useVisibleInterval`,
   `next/image` quando aplicável. Dúvida de diagnóstico → agente `performance` antes de codar.
+- **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
+  `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
+  `m`, `MotionReveal`, `MotionEmptyState`). Expandir shell para `portal/layout` antes de
+  animar Loja/Onboarding.
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.

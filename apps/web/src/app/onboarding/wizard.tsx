@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
+import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -46,8 +48,14 @@ type Props = {
 
 export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props) {
   const [passo, setPasso] = useState<Passo>('clube')
+  const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  function irPara(novo: Passo, dir = 1) {
+    setSlideDir(dir)
+    setPasso(novo)
+  }
 
   // Seleções acumuladas
   const [clube, setClube] = useState<AfiliacaoOnboarding | null>(null)
@@ -65,7 +73,7 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
   function selecionarClube(afiliacao: AfiliacaoOnboarding) {
     setClube(afiliacao)
     limparErro()
-    setPasso('regiao')
+    irPara('regiao', 1)
   }
 
   // ── Passo 2 → 3: persiste clube + região, carrega torcidas ───────────────────
@@ -82,7 +90,7 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
       const lista = await buscarTorcidas(clube.id)
       setTorcidas(lista)
       limparErro()
-      setPasso('torcida')
+      irPara('torcida', 1)
     })
   }
 
@@ -90,18 +98,18 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
   function escolherTorcida(t: TorcidaOnboarding) {
     setTorcida(t)
     limparErro()
-    setPasso('vinculo')
+    irPara('vinculo', 1)
   }
 
   function seguirComoTorcedorGlobal() {
     setErro(null)
-    setPasso('concluindo')
+    irPara('concluindo', 1)
     startTransition(async () => {
       const res = await concluirComoTorcedor()
       // Se retornou (não redirecionou), houve erro.
       if (res?.message) {
         setErro(res.message)
-        setPasso('torcida')
+        irPara('torcida', -1)
       }
     })
   }
@@ -126,54 +134,104 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
       )}
 
       <div className="flex-1">
-        {passo === 'clube' && (
-          <PassoClube
-            afiliacoesIniciais={afiliacoesIniciais}
-            onSelecionar={selecionarClube}
-          />
-        )}
+        <AnimatePresence mode="wait" custom={slideDir}>
+          {passo === 'clube' && (
+            <m.div
+              key="clube"
+              custom={slideDir}
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+            >
+              <PassoClube
+                afiliacoesIniciais={afiliacoesIniciais}
+                onSelecionar={selecionarClube}
+              />
+            </m.div>
+          )}
 
-        {passo === 'regiao' && (
-          <PassoRegiao
-            clube={clube}
-            ufs={ufs}
-            uf={uf}
-            cidade={cidade}
-            onUf={setUf}
-            onCidade={setCidade}
-            pending={pending}
-            onVoltar={() => setPasso('clube')}
-            onContinuar={() => avancarDaRegiao(false)}
-            onPular={() => avancarDaRegiao(true)}
-          />
-        )}
+          {passo === 'regiao' && (
+            <m.div
+              key="regiao"
+              custom={slideDir}
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+            >
+              <PassoRegiao
+                clube={clube}
+                ufs={ufs}
+                uf={uf}
+                cidade={cidade}
+                onUf={setUf}
+                onCidade={setCidade}
+                pending={pending}
+                onVoltar={() => irPara('clube', -1)}
+                onContinuar={() => avancarDaRegiao(false)}
+                onPular={() => avancarDaRegiao(true)}
+              />
+            </m.div>
+          )}
 
-        {passo === 'torcida' && (
-          <PassoTorcida
-            clube={clube}
-            torcidas={torcidas ?? []}
-            pending={pending}
-            onEscolher={escolherTorcida}
-            onTorcedorGlobal={seguirComoTorcedorGlobal}
-            onVoltar={() => setPasso('regiao')}
-          />
-        )}
+          {passo === 'torcida' && (
+            <m.div
+              key="torcida"
+              custom={slideDir}
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+            >
+              <PassoTorcida
+                clube={clube}
+                torcidas={torcidas ?? []}
+                pending={pending}
+                onEscolher={escolherTorcida}
+                onTorcedorGlobal={seguirComoTorcedorGlobal}
+                onVoltar={() => irPara('regiao', -1)}
+              />
+            </m.div>
+          )}
 
-        {passo === 'vinculo' && torcida && (
-          <PassoVinculo
-            torcida={torcida}
-            nomeInicial={nomeInicial}
-            onVoltar={() => setPasso('torcida')}
-            onErro={setErro}
-          />
-        )}
+          {passo === 'vinculo' && torcida && (
+            <m.div
+              key="vinculo"
+              custom={slideDir}
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+            >
+              <PassoVinculo
+                torcida={torcida}
+                nomeInicial={nomeInicial}
+                onVoltar={() => irPara('torcida', -1)}
+                onErro={setErro}
+              />
+            </m.div>
+          )}
 
-        {passo === 'concluindo' && (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center text-[rgb(var(--foreground-muted))]">
-            <Loader2 className="h-8 w-8 animate-spin text-[rgb(var(--color-primary))]" />
-            <p>Concluindo seu cadastro...</p>
-          </div>
-        )}
+          {passo === 'concluindo' && (
+            <m.div
+              key="concluindo"
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+              className="flex flex-col items-center justify-center gap-3 py-20 text-center text-[rgb(var(--foreground-muted))]"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-[rgb(var(--color-primary))]" />
+              <p>Concluindo seu cadastro...</p>
+            </m.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -188,14 +246,15 @@ function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
         const feito = i < indiceAtual
         const atual = i === indiceAtual
         return (
-          <li key={p.key} className="flex flex-1 flex-col gap-1.5">
-            <div
-              className={`h-1.5 rounded-full transition-colors ${
-                feito || atual
-                  ? 'bg-[rgb(var(--color-primary))]'
-                  : 'bg-[rgb(var(--border))]'
-              }`}
-            />
+          <li key={p.key} className="relative flex flex-1 flex-col gap-1.5">
+            <div className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border))]">
+              <m.div
+                className="h-full rounded-full bg-[rgb(var(--color-primary))]"
+                initial={false}
+                animate={{ width: feito || atual ? '100%' : '0%' }}
+                transition={springSnappy}
+              />
+            </div>
             <span
               className={`text-[11px] font-medium ${
                 atual
@@ -205,6 +264,13 @@ function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
             >
               {p.label}
             </span>
+            {atual && (
+              <m.span
+                layoutId="onboarding-step-indicator"
+                className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full bg-[rgb(var(--color-primary))]"
+                transition={springSnappy}
+              />
+            )}
           </li>
         )
       })}
