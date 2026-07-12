@@ -5,6 +5,7 @@ import { getActiveTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
+import { db } from '@torcida/db'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getOrCreatePerfilMembro } from '@/lib/social'
@@ -49,17 +50,23 @@ export default async function ComunidadePage({
   let eventosComposer: EventoComposerItem[] = []
   let navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
   let bloqueioPublicacao: string | null = null
+  let somentePublico = false
   if (session?.user?.id != null) {
-    const [perfil, eventos, badges, bloqueio] = await Promise.all([
+    const [perfil, eventos, badges, bloqueio, membro] = await Promise.all([
       getOrCreatePerfilMembro(session.user.id, tenant.id),
       getEventosParaComposer(tenant.id, session.user.id),
       getResumoBadgesComunidade(tenant.id, session.user.id),
       checarPodePublicarNoFeed(session.user.id, tenant.id),
+      db.saasMembro.findUnique({
+        where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+        select: { status: true },
+      }),
     ])
     perfilPrivado = perfil.perfilPrivado
     eventosComposer = eventos
     navBadges = badges
     bloqueioPublicacao = bloqueio
+    somentePublico = bloqueio === null && membro?.status !== 'APROVADO'
   }
 
   return (
@@ -72,6 +79,7 @@ export default async function ComunidadePage({
         eventosComposer={eventosComposer}
         navBadges={navBadges}
         bloqueioPublicacao={bloqueioPublicacao}
+        somentePublico={somentePublico}
       />
 
       <aside className="hidden xl:block">

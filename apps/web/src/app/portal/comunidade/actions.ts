@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
+import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
@@ -101,14 +101,6 @@ export async function publicarPost(
   _prevState: PublicarPostState,
   formData: FormData,
 ): Promise<PublicarPostState> {
-  let session: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['session']
-  let tenant: Awaited<ReturnType<typeof assertPodePublicarNoFeed>>['tenant']
-  try {
-    ;({ session, tenant } = await assertPodePublicarNoFeed())
-  } catch (error) {
-    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
-  }
-
   const parsed = postSchema.safeParse({
     conteudo: formData.get('conteudo'),
     midias: parseMidias(formData.get('midias')),
@@ -120,47 +112,61 @@ export async function publicarPost(
   }
 
   const { conteudo, midias, visibilidade } = parsed.data
+
+  let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
+  let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
+  try {
+    ;({ session, tenant } = await assertAutorPublicacaoPost(visibilidade))
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+  }
+
   const erroMencoes = erroMencoesExcessivas(conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
-  await getOrCreatePerfilMembro(session.user.id, tenant.id)
+  try {
+    await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
-  const post = await db.post.create({
-    data: {
-      tenantId: tenant.id,
-      autorId: session.user.id,
-      conteudo,
-      midiaUrls: midias,
-      tipo: 'MEMBRO',
-      visibilidade,
-    },
-  })
+    const post = await db.post.create({
+      data: {
+        tenantId: tenant.id,
+        autorId: session.user.id,
+        conteudo,
+        midiaUrls: midias,
+        tipo: 'MEMBRO',
+        visibilidade,
+      },
+    })
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'POST_SOCIAL_PUBLICADO',
-      entidade: 'Post',
-      entidadeId: post.id,
-      detalhes: { tipo: 'MEMBRO' },
-    },
-  })
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'POST_SOCIAL_PUBLICADO',
+        entidade: 'Post',
+        entidadeId: post.id,
+        detalhes: { tipo: 'MEMBRO' },
+      },
+    })
 
-  await Promise.all([
-    sincronizarHashtagsDoPost(post.id, tenant.id, conteudo),
-    notificarMencoesDoPost({
-      conteudo,
-      autorId: session.user.id,
-      autorNome: session.user.name ?? null,
-      tenantId: tenant.id,
-      postId: post.id,
-      link: linkPostComunidade(post.id),
-    }),
-  ])
+    await Promise.all([
+      sincronizarHashtagsDoPost(post.id, tenant.id, conteudo),
+      notificarMencoesDoPost({
+        conteudo,
+        autorId: session.user.id,
+        autorNome: session.user.name ?? null,
+        tenantId: tenant.id,
+        postId: post.id,
+        link: linkPostComunidade(post.id),
+      }),
+    ])
 
-  revalidatePath('/portal/comunidade')
-  return { success: true, token: post.id }
+    revalidatePath('/portal/comunidade')
+    return { success: true, token: post.id }
+  } catch (error) {
+    console.error('[publicarPost]', error)
+    return { message: 'Não foi possível publicar. Tente novamente.' }
+  }
 }
 
 export async function solicitarSeguir(userId: string): Promise<void> {

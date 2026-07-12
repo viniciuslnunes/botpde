@@ -22,11 +22,13 @@ interface FeedComposerProps {
   userAvatar: string | null
   perfilPrivado?: boolean
   eventos?: EventoComposerItem[]
+  /** Quando true, só permite posts PUBLICO (torcedor aguardando aprovação / global). */
+  somentePublico?: boolean
   /** Quando definido, substitui o composer por aviso (ex.: cadastro pendente). */
   bloqueioPublicacao?: string | null
 }
 
-export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [], bloqueioPublicacao = null }: FeedComposerProps) {
+export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [], bloqueioPublicacao = null, somentePublico = false }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -41,11 +43,12 @@ export function FeedComposer({ userName, userAvatar, perfilPrivado = true, event
       userAvatar={userAvatar}
       perfilPrivado={perfilPrivado}
       eventos={eventos}
+      somentePublico={somentePublico}
     />
   )
 }
 
-function FeedComposerActive({ userName, userAvatar, perfilPrivado = true, eventos = [] }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
+function FeedComposerActive({ userName, userAvatar, perfilPrivado = true, eventos = [], somentePublico = false }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -79,6 +82,7 @@ function FeedComposerActive({ userName, userAvatar, perfilPrivado = true, evento
       pollPending={pollPending}
       eventPending={eventPending}
       eventos={eventos}
+      somentePublico={somentePublico}
       serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
   )
@@ -107,6 +111,7 @@ function ComposerBody({
   eventPending,
   serverError,
   eventos,
+  somentePublico = false,
 }: {
   userName: string | null
   userAvatar: string | null
@@ -119,6 +124,7 @@ function ComposerBody({
   eventPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
+  somentePublico?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [modoEnquete, setModoEnquete] = useState(false)
@@ -128,7 +134,7 @@ function ComposerBody({
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
   const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
-    perfilPrivado ? 'PRIVADO' : 'PUBLICO',
+    somentePublico ? 'PUBLICO' : perfilPrivado ? 'PRIVADO' : 'PUBLICO',
   )
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -589,18 +595,23 @@ function ComposerBody({
             </div>
 
             <div className="flex items-center gap-2">
-              <select
-                value={visibilidade}
-                onChange={(e) =>
-                  setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
-                }
-                aria-label="Visibilidade do post"
-                className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
-              >
-                <option value="PUBLICO">Público</option>
-                <option value="TENANT">Só torcida</option>
-                <option value="PRIVADO">Só seguidores</option>
-              </select>
+              {!somentePublico && (
+                <select
+                  value={visibilidade}
+                  onChange={(e) =>
+                    setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
+                  }
+                  aria-label="Visibilidade do post"
+                  className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
+                >
+                  <option value="PUBLICO">Público</option>
+                  <option value="TENANT">Só torcida</option>
+                  <option value="PRIVADO">Só seguidores</option>
+                </select>
+              )}
+              {somentePublico && (
+                <span className="text-xs text-[rgb(var(--foreground-muted))]">Visível para torcedores do clube</span>
+              )}
               <button
                 type="button"
                 onClick={() => setExpanded(false)}

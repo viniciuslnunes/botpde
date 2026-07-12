@@ -2,13 +2,46 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
 type AuthzResult = {
   session: Session
   tenant: Tenant
+}
+
+type VisibilidadePost = 'PUBLICO' | 'TENANT' | 'PRIVADO'
+
+async function resolvePortalTenant(session: Session): Promise<Tenant | null> {
+  return getActiveTenant(session.user.id, session.user.email)
+}
+
+/** Torcedor global ou PENDENTE no clube — posts PUBLICO no feed cross-torcida (spec §3.1). */
+async function podePublicarComoTorcedorFeed(
+  userId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const perfil: { onboardingConcluidoEm: Date | null; afiliacaoId: string | null } | null =
+    await db.perfilTorcedor.findUnique({
+      where: { userId },
+      select: { onboardingConcluidoEm: true, afiliacaoId: true },
+    })
+  if (!perfil?.onboardingConcluidoEm) return false
+
+  const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { afiliacaoId: true },
+  })
+  if (!tenant?.afiliacaoId || tenant.afiliacaoId !== perfil.afiliacaoId) return false
+
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true },
+  })
+  if (membro?.status === 'PENDENTE') return true
+  if (!membro) return true
+  return false
 }
 
 /**
@@ -18,9 +51,11 @@ type AuthzResult = {
  * customizados (ver ARCHITECTURE.md item 16).
  */
 export async function assertPermission(permission: string): Promise<AuthzResult> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
 
-  if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
     return { session, tenant }
@@ -37,8 +72,11 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 
 /** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */
 export async function assertStoreView(): Promise<AuthzResult> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) throw new Error('Não autorizado')
 
   if (isSuperAdminEmail(session.user.email)) {
     return { session, tenant }
@@ -90,61 +128,95 @@ export async function assertPodePublicarNoFeed(): Promise<AuthzResult> {
 }
 
 /**
+ * Autor de post no feed: membro aprovado (qualquer visibilidade) ou torcedor
+ * (somente PUBLICO enquanto aguarda aprovação / sem vínculo de sócio).
+ */
+export async function assertAutorPublicacaoPost(
+  visibilidade: VisibilidadePost,
+): Promise<AuthzResult> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) throw new Error('Não autorizado')
+
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant }
+  }
+
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true },
+  })
+
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+    session.user.id,
+    tenant.id,
+  )
+  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  const temPermissao = hasPermission(effective, PERMISSIONS.COMMUNITY_POST)
+
+  if (membro?.status === 'APROVADO' && temPermissao) {
+    await assertMembroAtivo(tenant.id, session.user.id)
+    return { session, tenant }
+  }
+
+  if (visibilidade !== 'PUBLICO') {
+    throw new Error(
+      'Enquanto seu vínculo não for aprovado, publique apenas posts públicos no feed de torcedor.',
+    )
+  }
+
+  if (await podePublicarComoTorcedorFeed(session.user.id, tenant.id)) {
+    return { session, tenant }
+  }
+
+  if (membro?.status === 'PENDENTE') {
+    throw new Error('Seu vínculo ainda está em análise.')
+  }
+  if (membro && membro.status !== 'APROVADO') {
+    throw new Error('Seu cadastro de associado não está ativo.')
+  }
+  throw new Error('Conclua o onboarding do torcedor para publicar.')
+}
+
+/**
  * Checagem read-only para UI — retorna mensagem de bloqueio ou `null` se pode publicar.
  */
 export async function checarPodePublicarNoFeed(
   userId: string,
   tenantId: string,
 ): Promise<string | null> {
-  const hostTenant = await db.tenant.findUnique({
-    where: { id: tenantId },
-    select: { nome: true },
-  })
-  const hostNome = hostTenant?.nome ?? 'esta torcida'
-
-  const membroHost = await db.saasMembro.findUnique({
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
     select: { status: true },
   })
 
-  if (!membroHost) {
-    const membroOutro = await db.saasMembro.findFirst({
-      where: { userId, NOT: { tenantId } },
-      select: {
-        status: true,
-        tenant: { select: { nome: true } },
-      },
-      orderBy: { criadoEm: 'desc' },
-    })
-    if (membroOutro?.status === 'PENDENTE') {
-      return `Sua solicitação na ${membroOutro.tenant.nome} está em análise. Este portal é da ${hostNome}.`
-    }
-    if (membroOutro?.status === 'APROVADO') {
-      return `Você é membro da ${membroOutro.tenant.nome}. Este portal é da ${hostNome} — acesse o portal da sua torcida.`
-    }
-    if (membroOutro) {
-      return `Seu vínculo com ${membroOutro.tenant.nome} não está ativo. Este portal é da ${hostNome}.`
-    }
-    return 'Associe-se à torcida para publicar no feed.'
-  }
-
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
   const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  const temPermissao = hasPermission(effective, PERMISSIONS.COMMUNITY_POST)
 
-  if (!hasPermission(effective, PERMISSIONS.COMMUNITY_POST)) {
-    if (membroHost.status === 'PENDENTE') {
-      return 'Seu vínculo ainda está em análise. Publicar libera quando a torcida aprovar seu cadastro.'
+  if (membro?.status === 'APROVADO' && temPermissao) {
+    try {
+      await assertMembroAtivo(tenantId, userId)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Não é possível publicar.'
     }
-    if (membroHost.status !== 'APROVADO') {
-      return 'Seu cadastro de associado não está ativo.'
-    }
+  }
+
+  if (await podePublicarComoTorcedorFeed(userId, tenantId)) {
+    return null
+  }
+
+  if (membro?.status === 'PENDENTE') {
+    return 'Seu vínculo ainda está em análise. Publicar libera quando a torcida aprovar seu cadastro.'
+  }
+  if (membro && membro.status !== 'APROVADO') {
+    return 'Seu cadastro de associado não está ativo.'
+  }
+  if (membro && !temPermissao) {
     return 'Você não tem permissão para publicar.'
   }
-
-  try {
-    await assertMembroAtivo(tenantId, userId)
-    return null
-  } catch (error) {
-    return error instanceof Error ? error.message : 'Não é possível publicar.'
-  }
+  return 'Conclua o onboarding do torcedor para publicar no feed.'
 }
