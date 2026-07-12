@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { PERMISSIONS, hasPermission } from '@torcida/types'
+import { auth } from '@/lib/auth'
+import { getTenantFromHost } from '@/lib/tenant'
 import {
   canMessageUser,
   criarGrupoConversa,
@@ -31,8 +33,32 @@ const criarSchema = z.discriminatedUnion('tipo', [criarDmSchema, criarGrupoSchem
 
 export async function GET() {
   try {
-    const { userId } = await assertUsuarioMensageria()
-    const conversas = await listConversas(userId)
+    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+    if (!session?.user?.id || !tenant) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+
+    const membro = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+      select: { status: true },
+    })
+    if (!membro) {
+      return NextResponse.json(
+        { error: 'Você precisa ser associado desta torcida para usar o chat.' },
+        { status: 403 },
+      )
+    }
+    if (membro.status === 'PENDENTE') {
+      return NextResponse.json({ conversas: [], cadastroPendente: true })
+    }
+    if (membro.status !== 'APROVADO') {
+      return NextResponse.json(
+        { error: 'Seu cadastro de associado não está ativo.' },
+        { status: 403 },
+      )
+    }
+
+    const conversas = await listConversas(session.user.id)
     return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao carregar conversas.'

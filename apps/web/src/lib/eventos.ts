@@ -43,10 +43,11 @@ export interface ProximoEventoItem {
   local: string | null
 }
 
+/** Props do composer (client) — `data` serializada como ISO na fronteira RSC. */
 export interface EventoComposerItem {
   id: string
   titulo: string
-  data: Date
+  data: string
   local: string | null
 }
 
@@ -56,7 +57,7 @@ export async function getEventosParaComposer(
   userId?: string,
 ): Promise<EventoComposerItem[]> {
   const escopo = await getEscopoEventosVisiveis(tenantId, userId)
-  const eventos: EventoComposerItem[] = await db.evento.findMany({
+  const eventos = await db.evento.findMany({
     where: {
       ...escopo,
       data: { gte: new Date() },
@@ -65,7 +66,12 @@ export async function getEventosParaComposer(
     take: 8,
     select: { id: true, titulo: true, data: true, local: true },
   })
-  return eventos
+  return eventos.map((e: { id: string; titulo: string; data: Date; local: string | null }) => ({
+    id: e.id,
+    titulo: e.titulo,
+    data: e.data.toISOString(),
+    local: e.local,
+  }))
 }
 
 /** Próximo evento futuro visível para o associado no tenant atual. */

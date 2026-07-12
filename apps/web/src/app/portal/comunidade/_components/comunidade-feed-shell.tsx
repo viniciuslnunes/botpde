@@ -29,6 +29,7 @@ interface ComunidadeFeedShellProps {
   currentUser: CurrentUser
   cursor?: string
   perfilPrivado?: boolean
+  /** `data` em ISO — serializado na page antes de cruzar para o FeedComposer (client). */
   eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
   navBadges?: { notificacoesNaoLidas: number; solicitacoesPendentes: number }
 }

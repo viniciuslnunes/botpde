@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Escudos versionados em public/escudos — Next 16 exige localPatterns explícito.
+    localPatterns: [
+      { pathname: '/escudos/**' },
+      { pathname: '/stickers/**' },
+    ],
     remotePatterns: [
       { protocol: 'https', hostname: 'cdn.discordapp.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },

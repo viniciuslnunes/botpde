@@ -47,6 +47,7 @@ interface ComunidadeChatPanelProps {
 export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
+  const [cadastroPendente, setCadastroPendente] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const carregouRef = useRef(false)
 
@@ -55,7 +56,8 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
     try {
       const res = await fetch('/api/conversas', { cache: 'no-store' })
       if (!res.ok) return
-      const data = (await res.json()) as { conversas?: InboxItemDto[] }
+      const data = (await res.json()) as { conversas?: InboxItemDto[]; cadastroPendente?: boolean }
+      setCadastroPendente(Boolean(data.cadastroPendente))
       if (data.conversas) setConversas(data.conversas)
     } catch {
       // silencioso
@@ -122,6 +124,10 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
       <div className={expanded ? 'p-2' : 'hidden'} aria-hidden={!expanded}>
         {!shellPronto ? (
           <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
+        ) : cadastroPendente ? (
+          <p className="px-3 py-6 text-center text-xs text-[rgb(var(--foreground-muted))]">
+            Seu vínculo ainda está em análise. O chat libera quando a torcida aprovar seu cadastro.
+          </p>
         ) : (
           <MensagensShell
             variant="embedded"
