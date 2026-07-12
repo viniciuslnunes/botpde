@@ -1,8 +1,10 @@
 'use client'
 
 import { useActionState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { Video } from 'lucide-react'
 import { criarSala, type CriarSalaState } from '@/app/portal/comunidade/salas/actions'
+import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 
 interface EventoOption {
   id: string
@@ -19,17 +21,32 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
   const [state, action, pending] = useActionState<CriarSalaState, FormData>(criarSala, INITIAL)
 
   return (
-    <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+    <m.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSnappy}
+      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
+    >
       <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
         <Video className="h-4 w-4 text-[rgb(var(--primary))]" />
         Abrir uma sala
       </h2>
 
-      {state.message && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-          {state.message}
-        </div>
-      )}
+      <AnimatePresence>
+        {state.message && (
+          <m.div
+            key="erro"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="mb-3 overflow-hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+          >
+            {state.message}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <form action={action} className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
         <input
@@ -54,14 +71,16 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
             </option>
           ))}
         </select>
-        <button
+        <m.button
           type="submit"
           disabled={pending}
+          whileTap={{ scale: pending ? 1 : 0.96 }}
+          transition={springSnappy}
           className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending ? 'Criando…' : 'Criar sala'}
-        </button>
+        </m.button>
       </form>
-    </section>
+    </m.section>
   )
 }

@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
+import { AdminRouteTransition } from '@/components/motion/admin-route-transition'
 import {
   ADMIN_MENU,
   calculateEffectivePermissions,
@@ -64,7 +66,9 @@ export default async function AdminLayout({
             ficam isolados por torcida; troque no seletor ao lado.
           </div>
         )}
-        {children}
+        <AdminMotionShell>
+          <AdminRouteTransition>{children}</AdminRouteTransition>
+        </AdminMotionShell>
       </main>
     </div>
   )

@@ -2,8 +2,10 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
-import Link from 'next/link'
-import { CalendarX, ChevronRight, Clock, MapPin, Users } from 'lucide-react'
+import {
+  EventosListAnimated,
+  type EventoCardItem,
+} from '@/components/portal/eventos-list-animated'
 
 interface EventoListItem {
   id: string
@@ -28,91 +30,23 @@ function diasParaEvento(data: Date) {
   return `Em ${diff} dias`
 }
 
-function EventoCard({
-  evento,
-  passado = false,
-  tenantId,
-  rsvpStatus,
-}: {
-  evento: EventoListItem
-  passado?: boolean
-  tenantId: string
-  rsvpStatus?: string
-}) {
-  const dias = !passado ? diasParaEvento(new Date(evento.data)) : null
-  const herdado = evento.tenantId !== tenantId
-
-  let rsvpBadge = null
-  if (!passado && rsvpStatus === 'CONFIRMADO') {
-    rsvpBadge = (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-        Confirmado ✓
-      </span>
-    )
-  } else if (!passado && rsvpStatus === 'RECUSADO') {
-    rsvpBadge = (
-      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
-        Recusado
-      </span>
-    )
+function serializarEvento(
+  evento: EventoListItem,
+  tenantId: string,
+  passado: boolean,
+  rsvpStatus?: string,
+): EventoCardItem {
+  return {
+    id: evento.id,
+    titulo: evento.titulo,
+    dataLabel: formatarData(new Date(evento.data)),
+    local: evento.local,
+    tenantNome: evento.tenantId !== tenantId ? evento.tenant.nome : null,
+    passado,
+    diasLabel: passado ? null : diasParaEvento(new Date(evento.data)),
+    rsvpStatus,
+    confirmados: evento._count.rsvps,
   }
-
-  return (
-    <Link
-      href={`/portal/eventos/${evento.id}`}
-      className={[
-        'group flex flex-col gap-3 rounded-xl border p-5 transition-all hover:shadow-md',
-        passado
-          ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-70'
-          : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
-      ].join(' ')}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-[rgb(var(--foreground))]">{evento.titulo}</h3>
-            {dias && (
-              <span
-                className={[
-                  'rounded-full px-2 py-0.5 text-xs font-semibold',
-                  dias === 'Hoje' || dias === 'Amanhã'
-                    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
-                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                ].join(' ')}
-              >
-                {dias}
-              </span>
-            )}
-            {herdado && (
-              <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-                {evento.tenant.nome}
-              </span>
-            )}
-            {rsvpBadge}
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-3 text-xs text-[rgb(var(--foreground-muted))]">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              {formatarData(new Date(evento.data))}
-            </span>
-            {evento.local && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" />
-                {evento.local}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Users className="h-3.5 w-3.5" />
-              {evento._count.rsvps} {passado ? 'presença(s)' : 'confirmado(s)'}
-            </span>
-          </div>
-        </div>
-
-        <ChevronRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-hover:translate-x-0.5" />
-      </div>
-    </Link>
-  )
 }
 
 function ListaFallback() {
@@ -158,33 +92,16 @@ export async function EventosProximosSection() {
 
   if (!tenant) return null
 
+  const itens = proximos.map((e) =>
+    serializarEvento(e, tenant.id, false, rsvpMap.get(e.id)),
+  )
+
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         Próximos eventos
       </h2>
-      {proximos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] py-12 text-center">
-          <CalendarX className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-          <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-            Nenhum evento agendado
-          </p>
-          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Fique de olho — novidades em breve!
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {proximos.map((e) => (
-            <EventoCard
-              key={e.id}
-              evento={e}
-              tenantId={tenant.id}
-              rsvpStatus={rsvpMap.get(e.id)}
-            />
-          ))}
-        </div>
-      )}
+      <EventosListAnimated eventos={itens} />
     </div>
   )
 }
@@ -212,16 +129,18 @@ export async function EventosPassadosSection() {
 
   if (!tenant || passados.length === 0) return null
 
+  const itens = passados.map((e) => serializarEvento(e, tenant.id, true))
+
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         Histórico
       </h2>
-      <div className="space-y-3">
-        {passados.map((e) => (
-          <EventoCard key={e.id} evento={e} passado tenantId={tenant.id} />
-        ))}
-      </div>
+      <EventosListAnimated
+        eventos={itens}
+        emptyTitle="Nenhum evento no histórico"
+        emptyDescription=""
+      />
     </div>
   )
 }

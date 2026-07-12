@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CreditCard, ArrowRight, CheckCircle2, Clock } from 'lucide-react'
 import { CarteirinhaValidadeAlerts } from '@/components/portal/carteirinha-validade-alerts'
+import { CarteirinhaReveal } from '@/components/portal/carteirinha-motion'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha Carteirinha' }
@@ -82,9 +83,11 @@ export default async function CarteirinhaPage() {
   if (membro.status === 'APROVADO' && !socio) {
     return (
       <div className="space-y-6">
+        <CarteirinhaReveal index={0}>
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
+        </CarteirinhaReveal>
 
-        {/* Card de torcedor (sem número de sócio) */}
+        <CarteirinhaReveal index={1}>
         <div
           className="relative overflow-hidden rounded-2xl p-6 shadow-lg"
           style={{
@@ -127,12 +130,15 @@ export default async function CarteirinhaPage() {
             </div>
           </div>
         </div>
+        </CarteirinhaReveal>
 
+        <CarteirinhaReveal index={2}>
         <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
           <p className="text-sm text-[rgb(var(--foreground-muted))]">
             Você é um torcedor aprovado. Para obter uma carteirinha numerada de sócio, entre em contato com a administração.
           </p>
         </div>
+        </CarteirinhaReveal>
       </div>
     )
   }
@@ -143,6 +149,7 @@ export default async function CarteirinhaPage() {
 
   return (
     <div className="space-y-6">
+      <CarteirinhaReveal index={0}>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
         {!vencida && (
@@ -151,8 +158,9 @@ export default async function CarteirinhaPage() {
           </span>
         )}
       </div>
+      </CarteirinhaReveal>
 
-      {/* A carteirinha */}
+      <CarteirinhaReveal index={1}>
       <div
         className={[
           'relative overflow-hidden rounded-2xl shadow-xl transition-all',
@@ -229,10 +237,13 @@ export default async function CarteirinhaPage() {
           </div>
         </div>
       </div>
+      </CarteirinhaReveal>
 
+      <CarteirinhaReveal index={2}>
       <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
+      </CarteirinhaReveal>
 
-      {/* Detalhes */}
+      <CarteirinhaReveal index={3}>
       <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] divide-y divide-[rgb(var(--border))]">
         {[
           { label: 'Nome', value: socio.nome },
@@ -246,7 +257,9 @@ export default async function CarteirinhaPage() {
           </div>
         ))}
       </div>
+      </CarteirinhaReveal>
 
+      <CarteirinhaReveal index={4}>
       <Link
         href="/portal"
         className="flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
@@ -254,6 +267,7 @@ export default async function CarteirinhaPage() {
         Voltar ao portal
         <ArrowRight className="h-4 w-4" />
       </Link>
+      </CarteirinhaReveal>
     </div>
   )
 }

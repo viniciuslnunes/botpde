@@ -112,3 +112,8 @@ export const lightboxContent: Variants = {
   show: { opacity: 1, scale: 1 },
   exit: { opacity: 0, scale: 0.96 },
 }
+
+/** Saída de item da sacola (remover linha). */
+export const cartItemExit: Variants = {
+  exit: { opacity: 0, x: -24, height: 0, transition: springSnappy },
+}

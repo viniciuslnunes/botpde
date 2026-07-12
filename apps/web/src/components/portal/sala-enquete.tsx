@@ -1,9 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { toast } from '@torcida/ui'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { collapsePanel, springGentle, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 type VotanteEnquete = {
   userId: string
@@ -127,22 +130,31 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
           Enquetes
         </h2>
         {isHost && (
-          <button
+          <m.button
             type="button"
             onClick={() => setMostrarForm((v) => !v)}
+            whileTap={{ scale: 0.96 }}
+            transition={springSnappy}
             className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
           >
             {mostrarForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {mostrarForm ? 'Cancelar' : 'Nova enquete'}
-          </button>
+          </m.button>
         )}
       </div>
 
-      {isHost && mostrarForm && (
-        <form
-          onSubmit={criarEnquete}
-          className="mb-4 space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3"
-        >
+      <AnimatePresence>
+        {isHost && mostrarForm && (
+          <m.form
+            key="form-enquete"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            onSubmit={criarEnquete}
+            className="mb-4 overflow-hidden space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3"
+          >
           <input
             value={pergunta}
             onChange={(e) => setPergunta(e.target.value)}
@@ -174,15 +186,18 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
               + Adicionar opção
             </button>
           )}
-          <button
+          <m.button
             type="submit"
             disabled={criando}
+            whileTap={{ scale: 0.96 }}
+            transition={springSnappy}
             className="rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {criando ? 'Publicando…' : 'Publicar enquete'}
-          </button>
-        </form>
-      )}
+          </m.button>
+          </m.form>
+        )}
+      </AnimatePresence>
 
       {carregando ? (
         <div className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
@@ -190,14 +205,20 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
           Carregando enquetes…
         </div>
       ) : enquetes.length === 0 ? (
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhuma enquete ativa.</p>
+        <MotionEmptyState title="Nenhuma enquete ativa" className="py-4 text-center text-sm" />
       ) : (
-        <ul className="space-y-4">
-          {enquetes.map((enquete) => (
-            <li
-              key={enquete.id}
-              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4"
-            >
+        <m.ul variants={staggerContainer} initial="hidden" animate="show" className="space-y-4">
+          <AnimatePresence mode="popLayout">
+            {enquetes.map((enquete) => (
+              <m.li
+                key={enquete.id}
+                layout
+                variants={staggerItem}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
+                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4"
+              >
               <div className="mb-3 flex items-start justify-between gap-2">
                 <p className="text-base font-semibold text-[rgb(var(--foreground))]">{enquete.pergunta}</p>
                 {isHost && (
@@ -227,8 +248,10 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                             : 'border-[rgb(var(--border))] hover:border-[rgb(var(--foreground-muted))]'
                         }`}
                       >
-                        <div
-                          className="absolute inset-y-0 left-0 transition-all duration-500"
+                        <m.div
+                          layout
+                          transition={springGentle}
+                          className="absolute inset-y-0 left-0"
                           style={{
                             width: `${Math.max(opcao.percentual, opcao.votos > 0 ? 6 : 0)}%`,
                             backgroundColor: 'rgb(var(--color-primary) / 0.35)',
@@ -293,9 +316,10 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
               <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
                 {enquete.totalVotos} voto(s) no total · toque em uma opção para votar ou alterar
               </p>
-            </li>
-          ))}
-        </ul>
+            </m.li>
+            ))}
+          </AnimatePresence>
+        </m.ul>
       )}
     </section>
   )

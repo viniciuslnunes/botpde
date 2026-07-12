@@ -6,18 +6,12 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
   Users,
-  Clock,
-  CreditCard,
   Calendar,
-  MapPin,
-  AlertTriangle,
-  XCircle,
   CheckCircle2,
-  TrendingUp,
-  ArrowRight,
   Activity,
 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { AdminDashboardKpis } from '@/components/motion/admin-dashboard-kpis'
 
 export const metadata: Metadata = { title: 'Dashboard — Admin' }
 
@@ -114,7 +108,7 @@ async function DashboardKpis({ tenant }: { tenant: TenantInfo }) {
   type KpiCard = {
     label: string
     value: number
-    icon: React.ElementType
+    icon: string
     href?: string
     badge?: string
   }
@@ -123,139 +117,67 @@ async function DashboardKpis({ tenant }: { tenant: TenantInfo }) {
     {
       label: 'Membros ativos',
       value: totalMembros,
-      icon: Users,
+      icon: 'Users',
       href: '/admin/membros',
       badge: novosUltimos30d > 0 ? `+${novosUltimos30d} este mês` : undefined,
     },
     {
       label: 'Aguardando aprovação',
       value: pendentes,
-      icon: Clock,
+      icon: 'Clock',
       href: '/admin/membros',
     },
     {
       label: 'Sócios com carteirinha',
       value: totalSocios,
-      icon: CreditCard,
+      icon: 'CreditCard',
       href: '/admin/socios',
     },
     {
       label: 'Próximos eventos',
       value: proxEventosCount,
-      icon: Calendar,
+      icon: 'Calendar',
       href: '/admin/eventos',
     },
   ]
 
   const secundarios = [
-    { label: 'Sedes ativas', value: `${sedesAtivas} / ${totalSedes}`, icon: MapPin, href: '/admin/sedes' },
-    { label: 'Cadastros reprovados', value: reprovados, icon: XCircle, cor: reprovados > 0 ? 'text-red-500' : undefined },
-    { label: 'Carteirinhas vencendo (30d)', value: sociosVencendo, icon: AlertTriangle, cor: sociosVencendo > 0 ? 'text-yellow-500' : undefined, href: '/admin/socios' },
-    { label: 'Carteirinhas vencidas', value: sociosVencidos, icon: XCircle, cor: sociosVencidos > 0 ? 'text-red-500' : undefined, href: '/admin/socios' },
+    { label: 'Sedes ativas', value: `${sedesAtivas} / ${totalSedes}`, icon: 'MapPin', href: '/admin/sedes' },
+    { label: 'Cadastros reprovados', value: reprovados, icon: 'XCircle', cor: reprovados > 0 ? 'text-red-500' : undefined },
+    { label: 'Carteirinhas vencendo (30d)', value: sociosVencendo, icon: 'AlertTriangle', cor: sociosVencendo > 0 ? 'text-yellow-500' : undefined, href: '/admin/socios' },
+    { label: 'Carteirinhas vencidas', value: sociosVencidos, icon: 'XCircle', cor: sociosVencidos > 0 ? 'text-red-500' : undefined, href: '/admin/socios' },
   ]
 
+  const alertas: { href: string; label: string; variant: 'yellow' | 'red' | 'orange' }[] = []
+  if (pendentes > 0) {
+    alertas.push({
+      href: '/admin/membros',
+      label: `${pendentes} ${pendentes === 1 ? 'membro aguarda' : 'membros aguardam'} aprovação`,
+      variant: 'yellow',
+    })
+  }
+  if (sociosVencidos > 0) {
+    alertas.push({
+      href: '/admin/socios',
+      label: `${sociosVencidos} carteirinha${sociosVencidos !== 1 ? 's' : ''} vencida${sociosVencidos !== 1 ? 's' : ''}`,
+      variant: 'red',
+    })
+  }
+  if (sociosVencendo > 0) {
+    alertas.push({
+      href: '/admin/socios',
+      label: `${sociosVencendo} carteirinha${sociosVencendo !== 1 ? 's' : ''} vence${sociosVencendo !== 1 ? 'm' : ''} em 30 dias`,
+      variant: 'orange',
+    })
+  }
+
   return (
-    <div className="space-y-7">
-      {/* Alertas */}
-      {(pendentes > 0 || sociosVencendo > 0 || sociosVencidos > 0) && (
-        <div className="space-y-2">
-          {pendentes > 0 && (
-            <Link
-              href="/admin/membros"
-              className="flex items-center justify-between rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm hover:brightness-95 dark:border-yellow-800 dark:bg-yellow-950"
-            >
-              <span className="flex items-center gap-2 font-medium text-yellow-800 dark:text-yellow-200">
-                <Clock className="h-4 w-4" />
-                {pendentes} {pendentes === 1 ? 'membro aguarda' : 'membros aguardam'} aprovação
-              </span>
-              <ArrowRight className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-            </Link>
-          )}
-          {sociosVencidos > 0 && (
-            <Link
-              href="/admin/socios"
-              className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm hover:brightness-95 dark:border-red-800 dark:bg-red-950"
-            >
-              <span className="flex items-center gap-2 font-medium text-red-800 dark:text-red-200">
-                <XCircle className="h-4 w-4" />
-                {sociosVencidos} carteirinha{sociosVencidos !== 1 ? 's' : ''} vencida{sociosVencidos !== 1 ? 's' : ''}
-              </span>
-              <ArrowRight className="h-4 w-4 text-red-500" />
-            </Link>
-          )}
-          {sociosVencendo > 0 && (
-            <Link
-              href="/admin/socios"
-              className="flex items-center justify-between rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm hover:brightness-95 dark:border-orange-800 dark:bg-orange-950"
-            >
-              <span className="flex items-center gap-2 font-medium text-orange-800 dark:text-orange-200">
-                <AlertTriangle className="h-4 w-4" />
-                {sociosVencendo} carteirinha{sociosVencendo !== 1 ? 's' : ''} vence{sociosVencendo !== 1 ? 'm' : ''} em 30 dias
-              </span>
-              <ArrowRight className="h-4 w-4 text-orange-500" />
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* KPIs principais — neutros por padrão; cor do tenant só no ícone */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((k) => {
-          const Icon = k.icon
-          const inner = (
-            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    {k.label}
-                  </p>
-                  <p className="mt-2 text-4xl font-bold text-[rgb(var(--foreground))]">{k.value}</p>
-                  {k.badge && (
-                    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      <TrendingUp className="h-3 w-3" />
-                      {k.badge}
-                    </p>
-                  )}
-                </div>
-                <div className="rounded-xl bg-[rgb(var(--background-subtle))] p-2.5">
-                  <Icon className="h-5 w-5" style={{ color: tenant.corPrimaria }} />
-                </div>
-              </div>
-            </div>
-          )
-          return k.href ? (
-            <Link key={k.label} href={k.href} className="block transition-all hover:shadow-md">
-              {inner}
-            </Link>
-          ) : (
-            <div key={k.label}>{inner}</div>
-          )
-        })}
-      </div>
-
-      {/* Secundários */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {secundarios.map((s) => {
-          const Icon = s.icon
-          const inner = (
-            <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-              <Icon className={`h-4 w-4 shrink-0 ${s.cor ?? 'text-[rgb(var(--foreground-muted))]'}`} />
-              <div>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">{s.label}</p>
-                <p className="font-semibold text-[rgb(var(--foreground))]">{s.value}</p>
-              </div>
-            </div>
-          )
-          return s.href ? (
-            <Link key={s.label} href={s.href} className="block transition-all hover:shadow-sm">
-              {inner}
-            </Link>
-          ) : (
-            <div key={s.label}>{inner}</div>
-          )
-        })}
-      </div>
-    </div>
+    <AdminDashboardKpis
+      alertas={alertas}
+      kpis={kpis}
+      secundarios={secundarios}
+      corPrimaria={tenant.corPrimaria}
+    />
   )
 }
 

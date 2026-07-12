@@ -1,9 +1,9 @@
 import { db } from '@torcida/db'
 import { Prisma } from '@torcida/db'
-import Link from 'next/link'
 import { LojaProdutoGridSkeleton } from '@/components/portal/loja-produto-skeleton'
 import { LojaProdutoGridAnimated, type LojaProdutoGridItem } from '@/components/portal/loja-produto-grid-animated'
 import { LojaCarrossel } from '@/components/portal/loja-ui'
+import { LojaCategoriaChips, LojaPaginacao } from '@/components/portal/loja-catalogo-motion'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
 import { toLojaProdutoCard } from '@/lib/loja-serialize'
 import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/types'
@@ -154,23 +154,17 @@ export async function LojaCatalogoSection({
     <>
       <LojaCarrossel produtos={destaques.map((p: DestaqueLite) => toLojaProdutoCard(p))} />
 
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/portal/loja"
-          className={`rounded-full px-3 py-1 text-sm font-medium border ${!sp.categoria ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]' : 'border-[rgb(var(--foreground-muted)_/_0.35)] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.5)]'}`}
-        >
-          Todos
-        </Link>
-        {categorias.map((c: CategoriaLite) => (
-          <Link
-            key={c.slug}
-            href={`/portal/loja?categoria=${c.slug}`}
-            className={`rounded-full px-3 py-1 text-sm font-medium border ${sp.categoria === c.slug ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]' : 'border-[rgb(var(--foreground-muted)_/_0.35)] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.5)]'}`}
-          >
-            {c.nome}
-          </Link>
-        ))}
-      </div>
+      <LojaCategoriaChips
+        chips={[
+          { slug: 'todos', nome: 'Todos', href: '/portal/loja', active: !sp.categoria },
+          ...categorias.map((c: CategoriaLite) => ({
+            slug: c.slug,
+            nome: c.nome,
+            href: `/portal/loja?categoria=${c.slug}`,
+            active: sp.categoria === c.slug,
+          })),
+        ]}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <LojaFiltros
@@ -183,29 +177,12 @@ export async function LojaCatalogoSection({
         <div className="space-y-4">
           <LojaProdutoGridAnimated produtos={gridItems} />
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 pt-4">
-              {page > 1 && (
-                <Link
-                  href={buildLojaPageUrl(sp, page - 1)}
-                  className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  Anterior
-                </Link>
-              )}
-              <span className="text-sm text-[rgb(var(--foreground-muted))]">
-                Página {page} de {totalPages}
-              </span>
-              {page < totalPages && (
-                <Link
-                  href={buildLojaPageUrl(sp, page + 1)}
-                  className="rounded-full border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  Próxima
-                </Link>
-              )}
-            </div>
-          )}
+          <LojaPaginacao
+            page={page}
+            totalPages={totalPages}
+            prevHref={page > 1 ? buildLojaPageUrl(sp, page - 1) : null}
+            nextHref={page < totalPages ? buildLojaPageUrl(sp, page + 1) : null}
+          />
         </div>
       </div>
     </>

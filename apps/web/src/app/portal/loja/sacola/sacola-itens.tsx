@@ -8,7 +8,7 @@ import { Trash2, ArrowRight, ShoppingBag } from 'lucide-react'
 import { rotuloTamanho } from '@torcida/types'
 import { ProdutoCardImagem } from '@/components/portal/produto-card-imagem'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { springSnappy } from '@/lib/motion-presets'
+import { cartItemExit, springSnappy } from '@/lib/motion-presets'
 import type { SacolaItemSerializado } from '@/lib/loja-serialize'
 
 function formatarPreco(preco: number) {
@@ -59,7 +59,8 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
               layout
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -24, height: 0, transition: springSnappy }}
+              exit="exit"
+              variants={cartItemExit}
               transition={springSnappy}
               className="flex gap-4 overflow-hidden p-4"
             >

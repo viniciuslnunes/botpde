@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import {
   AlertCircle,
   Bell,
@@ -32,6 +33,7 @@ import {
   type SalaModeracaoMessage,
 } from '@/lib/sala-moderacao'
 import './meet-room.css'
+import { fadeScale, collapsePanel, springSnappy } from '@/lib/motion-presets'
 
 type MeetRoomProps = {
   salaId: string
@@ -400,16 +402,36 @@ function MeetConference({
   return (
     <div className="meet-room-layout">
       <div className="meet-room-stage">
-        {!conectado ? (
-          <div className="meet-room-connecting">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Conectando à sala…</span>
-          </div>
-        ) : (
-          <GridLayout tracks={tracks} className="meet-room-grid">
-            <ParticipantTile />
-          </GridLayout>
-        )}
+        <AnimatePresence mode="wait">
+          {!conectado ? (
+            <m.div
+              key="connecting"
+              variants={fadeScale}
+              initial="hidden"
+              animate="show"
+              exit="hidden"
+              transition={springSnappy}
+              className="meet-room-connecting"
+            >
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Conectando à sala…</span>
+            </m.div>
+          ) : (
+            <m.div
+              key="grid"
+              variants={fadeScale}
+              initial="hidden"
+              animate="show"
+              exit="hidden"
+              transition={springSnappy}
+              className="h-full w-full"
+            >
+              <GridLayout tracks={tracks} className="meet-room-grid">
+                <ParticipantTile />
+              </GridLayout>
+            </m.div>
+          )}
+        </AnimatePresence>
 
         {conectado && !isHost && !canSpeak && !canScreen && (
           <div className="meet-room-local-status">
@@ -488,18 +510,28 @@ export function MeetRoom({
 
   if (loadError) {
     return (
-      <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[rgb(var(--border))] p-6 text-center">
+      <m.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={springSnappy}
+        className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[rgb(var(--border))] p-6 text-center"
+      >
         <AlertCircle className="h-8 w-8 text-[rgb(var(--foreground-muted))]" />
         <p className="max-w-md text-sm text-[rgb(var(--foreground-muted))]">{loadError}</p>
-      </div>
+      </m.div>
     )
   }
 
   if (!lk) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+      <m.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={springSnappy}
+        className="flex min-h-[420px] items-center justify-center rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+      >
         <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
-      </div>
+      </m.div>
     )
   }
 
@@ -507,8 +539,18 @@ export function MeetRoom({
 
   return (
     <div className="meet-room-root" data-lk-theme="default">
-      {mediaHint && (
-        <div className="meet-room-alert" role="status">
+      <AnimatePresence>
+        {mediaHint && (
+          <m.div
+            key="hint"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="meet-room-alert overflow-hidden"
+            role="status"
+          >
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{mediaHint}</span>
@@ -521,8 +563,9 @@ export function MeetRoom({
               <X className="h-4 w-4" />
             </button>
           </div>
-        </div>
-      )}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       {!isHost && (
         <p className="meet-room-hint">

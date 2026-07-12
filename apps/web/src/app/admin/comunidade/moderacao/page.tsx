@@ -4,14 +4,13 @@ import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { MessageCircleWarning, ShieldAlert } from 'lucide-react'
-import Link from 'next/link'
-import { linkPostComunidade } from '@/lib/comunidade-social'
 import {
   resolverDenuncia,
   descartarDenuncia,
   resolverDenunciaMensagem,
   descartarDenunciaMensagem,
 } from './actions'
+import { ModeracaoDenunciasClient } from './moderacao-denuncias-client'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Moderação da Comunidade' }
@@ -65,7 +64,6 @@ export default async function ModeracaoComunidadePage() {
       })
     : []
 
-  // Best-effort: tabela pode não existir antes da migração da mensageria
   let denunciasMensagem: DenunciaMensagemPendente[] = []
   if (podeModerarMensagens) {
     try {
@@ -104,68 +102,25 @@ export default async function ModeracaoComunidadePage() {
         </div>
       </div>
 
-      {podeModerarPosts && denuncias.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhuma denúncia de post pendente no momento.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {denuncias.map((denuncia) => (
-            <div
-              key={denuncia.id}
-              className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                  {denuncia.post.titulo ?? 'Post sem título'}
-                </p>
-                <div className="flex items-center gap-3">
-                  <Link
-                    href={linkPostComunidade(denuncia.post.id)}
-                    className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
-                    target="_blank"
-                  >
-                    Ver post
-                  </Link>
-                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    {formatarData(denuncia.criadoEm)}
-                  </p>
-                </div>
-              </div>
-
-              <p className="mt-2 line-clamp-3 text-sm text-[rgb(var(--foreground-muted))]">
-                {denuncia.post.conteudo}
-              </p>
-
-              <div className="mt-3 rounded-lg bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm">
-                <p className="font-medium text-[rgb(var(--foreground))]">Motivo da denúncia</p>
-                <p className="mt-1 text-[rgb(var(--foreground-muted))]">{denuncia.motivo}</p>
-                <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-                  Denunciante: {denuncia.denunciante.nome ?? denuncia.denunciante.email ?? 'Usuário'}
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <form action={resolverDenuncia.bind(null, denuncia.id)}>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                  >
-                    Resolver e ocultar post
-                  </button>
-                </form>
-                <form action={descartarDenuncia.bind(null, denuncia.id)}>
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                  >
-                    Descartar denúncia
-                  </button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </div>
+      {podeModerarPosts && (
+        <ModeracaoDenunciasClient
+          denunciasPosts={denuncias.map((d) => ({
+            id: d.id,
+            motivo: d.motivo,
+            criadoEmLabel: formatarData(d.criadoEm),
+            postId: d.post.id,
+            postTitulo: d.post.titulo ?? 'Post sem título',
+            postConteudo: d.post.conteudo,
+            denunciante: d.denunciante.nome ?? d.denunciante.email ?? 'Usuário',
+          }))}
+          denunciasMensagens={[]}
+          podeModerarPosts
+          podeModerarMensagens={false}
+          onResolverPost={resolverDenuncia}
+          onDescartarPost={descartarDenuncia}
+          onResolverMensagem={resolverDenunciaMensagem}
+          onDescartarMensagem={descartarDenunciaMensagem}
+        />
       )}
 
       {podeModerarMensagens && (
@@ -182,61 +137,24 @@ export default async function ModeracaoComunidadePage() {
             </div>
           </div>
 
-          {denunciasMensagem.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhuma denúncia de mensagem pendente no momento.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {denunciasMensagem.map((denuncia) => (
-                <div
-                  key={denuncia.id}
-                  className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                      Mensagem de {denuncia.mensagem.autor.nome ?? 'Membro'}
-                      {denuncia.mensagem.removidaEm && ' (já removida)'}
-                    </p>
-                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                      {formatarData(denuncia.criadoEm)}
-                    </p>
-                  </div>
-
-                  <p className="mt-2 line-clamp-3 text-sm text-[rgb(var(--foreground-muted))]">
-                    {denuncia.mensagem.removidaEm ? 'Mensagem removida' : denuncia.mensagem.conteudo}
-                  </p>
-
-                  <div className="mt-3 rounded-lg bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm">
-                    <p className="font-medium text-[rgb(var(--foreground))]">Motivo da denúncia</p>
-                    <p className="mt-1 text-[rgb(var(--foreground-muted))]">{denuncia.motivo}</p>
-                    <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-                      Denunciante: {denuncia.denunciante.nome ?? denuncia.denunciante.email ?? 'Usuário'}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <form action={resolverDenunciaMensagem.bind(null, denuncia.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                      >
-                        Resolver e remover mensagem
-                      </button>
-                    </form>
-                    <form action={descartarDenunciaMensagem.bind(null, denuncia.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                      >
-                        Descartar denúncia
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <ModeracaoDenunciasClient
+            denunciasPosts={[]}
+            denunciasMensagens={denunciasMensagem.map((d) => ({
+              id: d.id,
+              motivo: d.motivo,
+              criadoEmLabel: formatarData(d.criadoEm),
+              autorNome: d.mensagem.autor.nome ?? 'Membro',
+              conteudo: d.mensagem.removidaEm ? 'Mensagem removida' : d.mensagem.conteudo,
+              removida: Boolean(d.mensagem.removidaEm),
+              denunciante: d.denunciante.nome ?? d.denunciante.email ?? 'Usuário',
+            }))}
+            podeModerarPosts={false}
+            podeModerarMensagens
+            onResolverPost={resolverDenuncia}
+            onDescartarPost={descartarDenuncia}
+            onResolverMensagem={resolverDenunciaMensagem}
+            onDescartarMensagem={descartarDenunciaMensagem}
+          />
         </section>
       )}
     </div>

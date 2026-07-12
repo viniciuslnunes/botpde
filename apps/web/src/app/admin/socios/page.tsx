@@ -5,6 +5,7 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { redirect } from 'next/navigation'
 import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { EmitirCarteirinhaForm, SocioActions } from '@/components/admin/socio-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Sócios — Admin' }
@@ -170,6 +171,7 @@ export default async function SociosPage({
             )}
           </div>
         ) : (
+          <MotionReveal index={0}>
           <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
             <table className="w-full min-w-[40rem] text-sm">
               <thead>
@@ -268,6 +270,7 @@ export default async function SociosPage({
               </tbody>
             </table>
           </div>
+          </MotionReveal>
         )}
         </div>
       </div>

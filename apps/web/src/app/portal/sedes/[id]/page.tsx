@@ -10,9 +10,9 @@ import {
   Clock,
   Users,
   FileText,
-  Calendar,
 } from 'lucide-react'
 import type { Metadata } from 'next'
+import { SedeDetailReveal, SedeLinksAnimated } from '@/components/portal/sede-detail-motion'
 
 export const metadata: Metadata = { title: 'Sede' }
 
@@ -77,7 +77,7 @@ export default async function SedeDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
+      <SedeDetailReveal index={0}>
       <div>
         <Link
           href="/portal/sedes"
@@ -106,9 +106,10 @@ export default async function SedeDetailPage({
           </p>
         )}
       </div>
+      </SedeDetailReveal>
 
-      {/* Informações */}
       {infoRows.length > 0 && (
+        <SedeDetailReveal index={1}>
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
           <div className="space-y-3">
             {infoRows.map(({ icon: Icon, label, value }) => (
@@ -133,66 +134,51 @@ export default async function SedeDetailPage({
             </div>
           )}
         </div>
+        </SedeDetailReveal>
       )}
 
-      {/* Subsedes e pontos de encontro */}
       {sede.filhos.length > 0 && (
+        <SedeDetailReveal index={2}>
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Locais vinculados ({sede.filhos.length})
           </h2>
-          <div className="space-y-2">
-            {sede.filhos.map((filho: (typeof sede.filhos)[number]) => (
-              <Link
-                key={filho.id}
-                href={`/portal/sedes/${filho.id}`}
-                className="flex items-center justify-between rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm hover:shadow-sm"
-              >
-                <div>
-                  <span className={`mr-2 rounded-full px-2 py-0.5 text-xs font-semibold ${tipoCor[filho.tipo]}`}>
-                    {tipoLabel[filho.tipo]}
-                  </span>
-                  <span className="font-medium text-[rgb(var(--foreground))]">{filho.nome}</span>
-                  {filho.cidade && (
-                    <span className="ml-2 text-xs text-[rgb(var(--foreground-muted))]">
-                      {filho.cidade}
-                    </span>
-                  )}
-                </div>
-                <ArrowLeft className="h-4 w-4 rotate-180 text-[rgb(var(--foreground-muted))]" />
-              </Link>
-            ))}
-          </div>
+          <SedeLinksAnimated
+            variant="filho"
+            items={sede.filhos.map((filho: (typeof sede.filhos)[number]) => ({
+              id: filho.id,
+              href: `/portal/sedes/${filho.id}`,
+              tipoLabel: tipoLabel[filho.tipo],
+              tipoClass: tipoCor[filho.tipo],
+              titulo: filho.nome,
+              subtitulo: filho.cidade,
+            }))}
+          />
         </div>
+        </SedeDetailReveal>
       )}
 
-      {/* Próximos eventos nesta sede */}
       {sede.eventos.length > 0 && (
+        <SedeDetailReveal index={3}>
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Próximos eventos aqui
           </h2>
-          <div className="space-y-2">
-            {sede.eventos.map((evento: (typeof sede.eventos)[number]) => (
-              <Link
-                key={evento.id}
-                href={`/portal/eventos/${evento.id}`}
-                className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm hover:shadow-sm"
-              >
-                <Calendar className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-[rgb(var(--foreground))]">{evento.titulo}</p>
-                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-                      new Date(evento.data),
-                    )}
-                  </p>
-                </div>
-                <ArrowLeft className="h-4 w-4 shrink-0 rotate-180 text-[rgb(var(--foreground-muted))]" />
-              </Link>
-            ))}
-          </div>
+          <SedeLinksAnimated
+            variant="evento"
+            items={sede.eventos.map((evento: (typeof sede.eventos)[number]) => ({
+              id: evento.id,
+              href: `/portal/eventos/${evento.id}`,
+              tipoLabel: '',
+              tipoClass: '',
+              titulo: evento.titulo,
+              subtitulo: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
+                new Date(evento.data),
+              ),
+            }))}
+          />
         </div>
+        </SedeDetailReveal>
       )}
     </div>
   )

@@ -1,8 +1,10 @@
 'use client'
 
 import { useTransition } from 'react'
+import { m } from 'motion/react'
 import { responderRsvp } from '../actions'
 import { Loader2, UserCheck, UserX } from 'lucide-react'
+import { springSnappy } from '@/lib/motion-presets'
 
 type Props = {
   eventoId: string
@@ -20,9 +22,12 @@ export function RsvpButtons({ eventoId, statusAtual }: Props) {
 
   return (
     <div className="flex flex-wrap gap-3">
-      <button
+      <m.button
+        layout
         onClick={() => responder('CONFIRMADO')}
         disabled={pending}
+        whileTap={{ scale: pending ? 1 : 0.96 }}
+        transition={springSnappy}
         className={[
           'flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-60',
           statusAtual === 'CONFIRMADO'
@@ -36,11 +41,14 @@ export function RsvpButtons({ eventoId, statusAtual }: Props) {
           <UserCheck className="h-4 w-4" />
         )}
         {statusAtual === 'CONFIRMADO' ? 'Confirmado ✓' : 'Vou comparecer'}
-      </button>
+      </m.button>
 
-      <button
+      <m.button
+        layout
         onClick={() => responder('RECUSADO')}
         disabled={pending}
+        whileTap={{ scale: pending ? 1 : 0.96 }}
+        transition={springSnappy}
         className={[
           'flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-60',
           statusAtual === 'RECUSADO'
@@ -54,7 +62,7 @@ export function RsvpButtons({ eventoId, statusAtual }: Props) {
           <UserX className="h-4 w-4" />
         )}
         {statusAtual === 'RECUSADO' ? 'Recusado' : 'Não vou'}
-      </button>
+      </m.button>
     </div>
   )
 }

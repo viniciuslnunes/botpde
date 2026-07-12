@@ -62,6 +62,7 @@ Arquivo: `apps/web/src/lib/motion-presets.ts` — **fonte única** de timings e 
 | `routePage` | Variants | Transição entre rotas (`initial` / `animate` / `exit`) |
 | `lightboxBackdrop` | Variants | Overlay fullscreen (stories, fotos, reels) |
 | `lightboxContent` | Variants | Zoom suave do conteúdo do lightbox |
+| `cartItemExit` | Variants | Saída de linha ao remover item da sacola |
 
 ### Componentes reutilizáveis (genéricos)
 
@@ -305,11 +306,12 @@ Remover `MotionShell` duplicado de `comunidade/layout.tsx` se o portal já envol
 
 ### Passo 3 — Prioridade sugerida
 
-1. **Portal layout** — transição Comunidade ↔ Loja ↔ Eventos
-2. **Loja** — `sacola-itens.tsx`, catálogo, checkout
-3. **Onboarding** — `wizard.tsx` (maior impacto UX)
-4. **Salas / Mensagens** — entrada na sala, thread
-5. **Admin** — moderação, tabelas com ações
+1. ~~**Portal layout** — transição Comunidade ↔ Loja ↔ Eventos~~
+2. ~~**Loja** — sacola, catálogo, checkout, pedidos~~
+3. ~~**Onboarding** — wizard~~
+4. ~~**Salas / Mensagens** — listagem, thread, modal nova conversa~~
+5. ~~**Admin** — moderação com saída animada~~
+6. ~~**Eventos / Portal restante** — listas, detalhe, RSVP, sedes, carteirinha~~
 
 ### Passo 4 — Checklist por PR
 
@@ -363,14 +365,20 @@ Commits de referência na `main`:
 - `e68392d` — engajamento, pickers, rotas, lightbox, reels
 - `0cfa7b6` — polish Comunidade (listas, abas, empty states, aside)
 
-### Expansão portal (em andamento)
+### Expansão portal (concluída)
 
 | Módulo | Componentes | Status |
 |--------|-------------|--------|
 | Portal global | `PortalMotionShell`, `PortalRouteTransition`, `MotionRouteTransition` | `portal/layout.tsx` |
 | Comunidade | `ComunidadeRouteTransition` (sem `MotionShell` duplicado) | layout filho |
-| Loja | `LojaProdutoGridAnimated`, `SacolaItens` animado | catálogo + sacola |
+| Loja | `LojaProdutoGridAnimated`, `SacolaItens`, `CheckoutForm`, `AdicionarSacolaForm`, `LojaPedidosList`, `LojaCategoriaChips`, `LojaPaginacao`, `LojaFiltros`, `ProdutoDetailCol`, `ProdutoRelacionadosGrid`, `LojaCarrossel`, `SacolaBadge` | catálogo + detalhe + sacola |
 | Onboarding | `MotionShell` em `onboarding/layout`, wizard com `AnimatePresence` | wizard |
+| Salas | `SalasListAnimated`, `CriarSalaForm`, `SalaAtivaClient`, `SalaChat`, `SalaEnquete`, `SalaParticipantes`, `MeetRoom` | listagem, sala ao vivo, Meet |
+| Mensagens | `MensagensShell` (inbox, modal chips), `MensagemThread` (painéis, anexos, `PainelMembros`) | inbox + thread + grupo |
+| Eventos | `EventosListAnimated`, `EventoDetailReveal`, `EventoConfirmadosGrid`, `RsvpButtons` | lista, detalhe, RSVP |
+| Sedes | `SedesListAnimated`, `SedeDetailReveal`, `SedeLinksAnimated` | lista + detalhe |
+| Carteirinha | `CarteirinhaReveal` | card e detalhes |
+| Admin | `AdminMotionShell`, `AdminRouteTransition`, `AdminDashboardKpis`, `AdminEventosList`, `AdminLojaProdutosGrid`, `ModeracaoDenunciasClient`, `AdminPedidosList`, `AdminMembrosTable` | dashboard, eventos, loja, moderação, pedidos, membros, sedes, sócios, comunidade |
 
 Arquivos genéricos novos:
 
@@ -379,6 +387,25 @@ components/motion/
   motion-route-transition.tsx
   portal-route-transition.tsx
   portal-motion-shell.tsx
+  motion-success-panel.tsx
+  admin-motion-shell.tsx
+  admin-route-transition.tsx
+  admin-dashboard-kpis.tsx
+components/portal/
+  eventos-list-animated.tsx
+  evento-detail-motion.tsx
+  sedes-list-animated.tsx
+  sede-detail-motion.tsx
+  carteirinha-motion.tsx
+  salas-list-animated.tsx
+  loja-pedidos-list.tsx
+  produto-relacionados-grid.tsx
+app/admin/eventos/
+  admin-eventos-list.tsx
+app/admin/loja/
+  admin-loja-produtos-grid.tsx
+app/admin/comunidade/moderacao/
+  moderacao-denuncias-client.tsx
 ```
 
 ---
@@ -388,7 +415,7 @@ components/motion/
 Adicionar em `motion-presets.ts` com comentário de uso, export nomeado, e atualizar
 esta tabela. Evitar magic numbers nos componentes.
 
-Exemplo futuro para Loja — item da sacola:
+Preset `cartItemExit` — saída de item da sacola:
 
 ```ts
 export const cartItemExit: Variants = {

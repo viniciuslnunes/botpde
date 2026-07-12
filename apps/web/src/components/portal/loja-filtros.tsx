@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { m } from 'motion/react'
+import { springGentle, springSnappy } from '@/lib/motion-presets'
 
 function formatarPrecoCurto(valor: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -61,7 +63,9 @@ function LojaPrecoRange({
 
       <div className="relative mt-4 h-6">
         <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[rgb(var(--foreground-muted)_/_0.2)]">
-          <div
+          <m.div
+            layout
+            transition={springGentle}
             className="absolute h-full rounded-full bg-[rgb(var(--primary))]"
             style={{ left: `${pctMin}%`, width: `${Math.max(0, pctMax - pctMin)}%` }}
           />
@@ -199,12 +203,14 @@ export function LojaFiltros({
         </select>
       </div>
 
-      <button
+      <m.button
         type="submit"
+        whileTap={{ scale: 0.98 }}
+        transition={springSnappy}
         className="w-full rounded-xl border-2 border-[rgb(var(--primary))] bg-[rgb(var(--primary))] py-2.5 text-sm font-semibold text-white hover:opacity-90"
       >
         Aplicar filtros
-      </button>
+      </m.button>
     </form>
   )
 }

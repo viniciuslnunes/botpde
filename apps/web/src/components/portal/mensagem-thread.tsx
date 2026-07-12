@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import {
   ArrowLeft,
   Flag,
@@ -25,6 +26,8 @@ import {
   type MensagemDto,
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
+import { fadeUp, collapsePanel, springSnappy, staggerContainer, menuItemStagger } from '@/lib/motion-presets'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useVisibleInterval, useVisibleBackoffInterval } from '@/lib/use-visible-interval'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
@@ -286,7 +289,12 @@ export function MensagemThread({
   const titulo = tituloConversa(conversa)
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <m.div
+      initial={{ opacity: 0, x: 12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={springSnappy}
+      className="flex h-full min-h-0 flex-col"
+    >
       {/* Cabeçalho */}
       <div className="flex items-center gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
         <button
@@ -328,12 +336,24 @@ export function MensagemThread({
       </div>
 
       {painelMembros && isConversaGrupoLike(conversa.tipo) && (
-        <PainelMembros
-          conversaId={conversaId}
-          currentUserId={currentUserId}
-          isAdmin={conversa.meuPapel === 'ADMIN'}
-          onSaiu={() => onSaiu(conversaId)}
-        />
+        <AnimatePresence>
+          <m.div
+            key="painel-membros"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="overflow-hidden"
+          >
+            <PainelMembros
+              conversaId={conversaId}
+              currentUserId={currentUserId}
+              isAdmin={conversa.meuPapel === 'ADMIN'}
+              onSaiu={() => onSaiu(conversaId)}
+            />
+          </m.div>
+        </AnimatePresence>
       )}
 
       {/* Mensagens */}
@@ -345,15 +365,23 @@ export function MensagemThread({
         ) : erro ? (
           <p className="py-10 text-center text-sm text-red-600 dark:text-red-400">{erro}</p>
         ) : mensagens.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Comece a conversa — diga um oi 👋
-          </p>
+          <MotionEmptyState
+            title="Comece a conversa — diga um oi 👋"
+            className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+          />
         ) : (
-          mensagens.map((m) => {
-            const minha = m.autor.id === currentUserId
+          mensagens.map((msg) => {
+            const minha = msg.autor.id === currentUserId
             return (
-              <div key={m.id} className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}>
-                {!minha && <Avatar nome={m.autor.nome} avatarUrl={m.autor.avatarUrl} size="sm" />}
+              <m.div
+                key={msg.id}
+                layout
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}
+              >
+                {!minha && <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />}
                 <div className={['max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
                   <div
                     className={[
@@ -365,15 +393,15 @@ export function MensagemThread({
                   >
                     {isConversaGrupoLike(conversa.tipo) && !minha && (
                       <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--primary))]">
-                        {m.autor.nome ?? 'Membro'}
+                        {msg.autor.nome ?? 'Membro'}
                       </p>
                     )}
-                    {m.removida ? (
+                    {msg.removida ? (
                       <p className="text-sm italic opacity-70">Mensagem removida</p>
                     ) : (
                       <>
-                        <p className="whitespace-pre-wrap break-words text-sm">{m.conteudo}</p>
-                        {m.midiaUrls.length > 0 && <PostMedia urls={m.midiaUrls} />}
+                        <p className="whitespace-pre-wrap break-words text-sm">{msg.conteudo}</p>
+                        {msg.midiaUrls.length > 0 && <PostMedia urls={msg.midiaUrls} />}
                       </>
                     )}
                   </div>
@@ -384,17 +412,17 @@ export function MensagemThread({
                     ].join(' ')}
                   >
                     <span suppressHydrationWarning>
-                      {formatRelative(new Date(m.criadoEm))}
-                      {isTemp(m.id) && ' · enviando…'}
-                      {m.editadaEm && ' · editada'}
+                      {formatRelative(new Date(msg.criadoEm))}
+                      {isTemp(msg.id) && ' · enviando…'}
+                      {msg.editadaEm && ' · editada'}
                     </span>
-                    {!isTemp(m.id) && !m.removida && (
+                    {!isTemp(msg.id) && !msg.removida && (
                       <span className="hidden gap-1 group-hover:flex">
                         {minha ? (
                           <button
                             type="button"
                             title="Remover mensagem"
-                            onClick={() => void removerMensagem(m.id)}
+                            onClick={() => void removerMensagem(msg.id)}
                             className="rounded p-0.5 text-red-500 hover:bg-red-500/10"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -404,7 +432,7 @@ export function MensagemThread({
                             type="button"
                             title="Denunciar mensagem"
                             onClick={() => {
-                              setDenunciandoId(denunciandoId === m.id ? null : m.id)
+                              setDenunciandoId(denunciandoId === msg.id ? null : msg.id)
                               setMotivoDenuncia('')
                             }}
                             className="rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
@@ -415,29 +443,37 @@ export function MensagemThread({
                       </span>
                     )}
                   </div>
-                  {denunciandoId === m.id && (
-                    <form
-                      className="mt-1 flex gap-1.5"
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        void denunciar(m.id)
-                      }}
-                    >
-                      <input
-                        value={motivoDenuncia}
-                        onChange={(e) => setMotivoDenuncia(e.target.value)}
-                        maxLength={500}
-                        autoFocus
-                        placeholder="Motivo da denúncia"
-                        className="w-52 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
-                      />
-                      <button type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
-                        Enviar
-                      </button>
-                    </form>
-                  )}
+                  <AnimatePresence>
+                    {denunciandoId === msg.id && (
+                      <m.form
+                        key="denuncia"
+                        variants={collapsePanel}
+                        initial="hidden"
+                        animate="show"
+                        exit="exit"
+                        transition={springSnappy}
+                        className="mt-1 flex gap-1.5 overflow-hidden"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          void denunciar(msg.id)
+                        }}
+                      >
+                        <input
+                          value={motivoDenuncia}
+                          onChange={(e) => setMotivoDenuncia(e.target.value)}
+                          maxLength={500}
+                          autoFocus
+                          placeholder="Motivo da denúncia"
+                          className="w-52 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
+                        />
+                        <button type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
+                          Enviar
+                        </button>
+                      </m.form>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
+              </m.div>
             )
           })
         )}
@@ -445,36 +481,50 @@ export function MensagemThread({
 
       {/* Composer */}
       <form onSubmit={enviar} className="border-t border-[rgb(var(--border))] p-3">
-        {medias.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {medias.map((m) => (
-              <div
-                key={m.id}
-                className="relative h-14 w-14 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
-              >
-                {m.kind === 'video' ? (
-                  <video src={m.localUrl} muted playsInline className="h-full w-full object-cover" />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.localUrl} alt="" className="h-full w-full object-cover" />
-                )}
-                {m.url === null && !m.error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <Loader2 className="h-4 w-4 animate-spin text-white" />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setMedias((prev) => prev.filter((x) => x.id !== m.id))}
-                  aria-label="Remover anexo"
-                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
+        <AnimatePresence mode="popLayout">
+          {medias.length > 0 && (
+            <m.div
+              key="medias"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={springSnappy}
+              className="mb-2 flex flex-wrap gap-2 overflow-hidden"
+            >
+              {medias.map((media) => (
+                <m.div
+                  key={media.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={springSnappy}
+                  className="relative h-14 w-14 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
                 >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+                  {media.kind === 'video' ? (
+                    <video src={media.localUrl} muted playsInline className="h-full w-full object-cover" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={media.localUrl} alt="" className="h-full w-full object-cover" />
+                  )}
+                  {media.url === null && !media.error && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMedias((prev) => prev.filter((x) => x.id !== media.id))}
+                    aria-label="Remover anexo"
+                    className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </m.div>
+              ))}
+            </m.div>
+          )}
+        </AnimatePresence>
         <div className="flex items-end gap-1.5">
           <div className="relative flex items-center">
             <button
@@ -558,9 +608,11 @@ export function MensagemThread({
             placeholder="Escreva uma mensagem"
             className="max-h-32 min-h-[36px] flex-1 resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
           />
-          <button
+          <m.button
             type="submit"
             disabled={enviando || uploadPendente || !texto.trim()}
+            whileTap={{ scale: 0.94 }}
+            transition={springSnappy}
             aria-label="Enviar mensagem"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary))] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
@@ -569,10 +621,10 @@ export function MensagemThread({
             ) : (
               <Send className="h-4 w-4" />
             )}
-          </button>
+          </m.button>
         </div>
       </form>
-    </div>
+    </m.div>
   )
 }
 
@@ -677,40 +729,55 @@ function PainelMembros({
 
   return (
     <div className="max-h-64 space-y-2 overflow-y-auto border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3">
-      {membros.map((m) => (
-        <div key={m.userId} className="flex items-center gap-2">
-          <Avatar nome={m.user.nome} avatarUrl={m.user.avatarUrl} size="sm" />
-          <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
-            {m.user.nome ?? 'Membro'}
-            {m.userId === currentUserId && ' (você)'}
-          </span>
-          {m.papel === 'ADMIN' && (
-            <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--primary))]">
-              Admin
-            </span>
-          )}
-          {isAdmin && m.userId !== currentUserId && m.papel !== 'ADMIN' && (
-            <button
-              type="button"
-              title="Transferir administração"
-              onClick={() => void transferirAdmin(m.userId)}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+      <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
+        <AnimatePresence mode="popLayout">
+          {membros.map((membro, i) => (
+            <m.div
+              key={membro.userId}
+              layout
+              custom={i}
+              variants={menuItemStagger}
+              exit={{ opacity: 0, x: -8, transition: { duration: 0.15 } }}
+              className="flex items-center gap-2"
             >
-              Tornar admin
-            </button>
-          )}
-          {isAdmin && m.userId !== currentUserId && (
-            <button
-              type="button"
-              title="Remover do grupo"
-              onClick={() => void remover(m.userId)}
-              className="rounded p-1 text-red-500 hover:bg-red-500/10"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      ))}
+              <Avatar nome={membro.user.nome} avatarUrl={membro.user.avatarUrl} size="sm" />
+              <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
+                {membro.user.nome ?? 'Membro'}
+                {membro.userId === currentUserId && ' (você)'}
+              </span>
+              {membro.papel === 'ADMIN' && (
+                <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--primary))]">
+                  Admin
+                </span>
+              )}
+              {isAdmin && membro.userId !== currentUserId && membro.papel !== 'ADMIN' && (
+                <m.button
+                  type="button"
+                  title="Transferir administração"
+                  onClick={() => void transferirAdmin(membro.userId)}
+                  whileTap={{ scale: 0.95 }}
+                  transition={springSnappy}
+                  className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+                >
+                  Tornar admin
+                </m.button>
+              )}
+              {isAdmin && membro.userId !== currentUserId && (
+                <m.button
+                  type="button"
+                  title="Remover do grupo"
+                  onClick={() => void remover(membro.userId)}
+                  whileTap={{ scale: 0.9 }}
+                  transition={springSnappy}
+                  className="rounded p-1 text-red-500 hover:bg-red-500/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </m.button>
+              )}
+            </m.div>
+          ))}
+        </AnimatePresence>
+      </m.div>
 
       <div className="flex items-center gap-2 pt-1">
         {isAdmin && (
@@ -732,36 +799,52 @@ function PainelMembros({
       </div>
 
       {adicionando && (
-        <div className="space-y-1.5 pt-1">
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            autoFocus
-            placeholder="Buscar membro pelo nome"
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-sm text-[rgb(var(--foreground))]"
-          />
-          {resultados
-            .filter((c) => !jaNoGrupo.has(c.id))
-            .slice(0, 6)
-            .map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => void adicionar(c.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[rgb(var(--surface))]"
-              >
-                <Avatar nome={c.nome} avatarUrl={c.avatarUrl} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
-                  {c.nome ?? 'Membro'}
-                </span>
-                {!c.mesmoTenant && (
-                  <span className="truncate text-[10px] text-[rgb(var(--foreground-muted))]">
-                    {c.tenantNome}
-                  </span>
-                )}
-              </button>
-            ))}
-        </div>
+        <AnimatePresence>
+          <m.div
+            key="add-membro"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="space-y-1.5 overflow-hidden pt-1"
+          >
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              autoFocus
+              placeholder="Buscar membro pelo nome"
+              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-sm text-[rgb(var(--foreground))]"
+            />
+            <m.div variants={staggerContainer} initial="hidden" animate="show">
+              {resultados
+                .filter((c) => !jaNoGrupo.has(c.id))
+                .slice(0, 6)
+                .map((c, i) => (
+                  <m.button
+                    key={c.id}
+                    custom={i}
+                    variants={menuItemStagger}
+                    type="button"
+                    onClick={() => void adicionar(c.id)}
+                    whileTap={{ scale: 0.99 }}
+                    transition={springSnappy}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[rgb(var(--surface))]"
+                  >
+                    <Avatar nome={c.nome} avatarUrl={c.avatarUrl} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
+                      {c.nome ?? 'Membro'}
+                    </span>
+                    {!c.mesmoTenant && (
+                      <span className="truncate text-[10px] text-[rgb(var(--foreground-muted))]">
+                        {c.tenantNome}
+                      </span>
+                    )}
+                  </m.button>
+                ))}
+            </m.div>
+          </m.div>
+        </AnimatePresence>
       )}
     </div>
   )

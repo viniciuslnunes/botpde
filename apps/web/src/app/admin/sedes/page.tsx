@@ -4,6 +4,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CriarSedeForm, ToggleSedeButton } from '@/components/admin/sede-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import {
   MapPin,
   Building2,
@@ -196,11 +197,13 @@ export default async function AdminSedesPage() {
             </p>
           </div>
         ) : (
+          <MotionReveal index={0}>
           <div className="space-y-4">
             {raizes.map((sede) => (
               <SedeCard key={sede.id} sede={sede} />
             ))}
           </div>
+          </MotionReveal>
         )}
       </div>
     </div>

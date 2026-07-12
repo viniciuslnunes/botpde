@@ -1,9 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, Pin, Send, Trash2, Pencil } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
+import { Loader2, MessageSquare, Pin, Send, Trash2, Pencil } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatDateTimeShort } from '@/lib/format-datetime'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { collapsePanel, fadeUp, springSnappy } from '@/lib/motion-presets'
 
 export type SalaMensagem = {
   id: string
@@ -34,12 +37,12 @@ function ordenarMensagens(lista: SalaMensagem[]): SalaMensagem[] {
 }
 
 function mesclarComServidor(prev: SalaMensagem[], server: SalaMensagem[]): SalaMensagem[] {
-  const pendentes = prev.filter((m) => isMensagemTemporaria(m.id))
+  const pendentes = prev.filter((msg) => isMensagemTemporaria(msg.id))
   return ordenarMensagens([...server, ...pendentes])
 }
 
 function ultimaMensagemServidor(lista: SalaMensagem[]): string | null {
-  const server = lista.filter((m) => !isMensagemTemporaria(m.id))
+  const server = lista.filter((msg) => !isMensagemTemporaria(msg.id))
   if (server.length === 0) return null
   return [...server].sort(
     (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime(),
@@ -85,17 +88,17 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
         setMensagens((prev) => {
           const merged = after
             ? ordenarMensagens([
-                ...prev.filter((m) => !data.mensagens!.some((n) => n.id === m.id)),
-                ...data.mensagens!.map((m) => ({
-                  ...m,
-                  criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+                ...prev.filter((msg) => !data.mensagens!.some((n) => n.id === msg.id)),
+                ...data.mensagens!.map((msg) => ({
+                  ...msg,
+                  criadoEmFormatado: formatDateTimeShort(msg.criadoEm),
                 })),
               ])
             : mesclarComServidor(
                 prev,
-                data.mensagens!.map((m) => ({
-                  ...m,
-                  criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+                data.mensagens!.map((msg) => ({
+                  ...msg,
+                  criadoEmFormatado: formatDateTimeShort(msg.criadoEm),
                 })),
               )
           const last = ultimaMensagemServidor(merged)
@@ -120,9 +123,9 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
         setMensagens((prev) => {
           const merged = mesclarComServidor(
             prev,
-            data.mensagens!.map((m) => ({
-              ...m,
-              criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+            data.mensagens!.map((msg) => ({
+              ...msg,
+              criadoEmFormatado: formatDateTimeShort(msg.criadoEm),
             })),
           )
           const last = ultimaMensagemServidor(merged)
@@ -134,7 +137,6 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
       }
     }
 
-    // Backoff: ritmo base com atividade; sem mensagens novas, dobra até o teto.
     const BASE_MS = 4000
     const MAX_MS = 15000
     let delay = BASE_MS
@@ -190,7 +192,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
 
       setMensagens((prev) => {
         const next = ordenarMensagens(
-          prev.filter((m) => m.id !== tempId).concat({
+          prev.filter((msg) => msg.id !== tempId).concat({
             ...data.mensagem!,
             criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
           }),
@@ -200,7 +202,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
         return next
       })
     } catch (error) {
-      setMensagens((prev) => prev.filter((m) => m.id !== tempId))
+      setMensagens((prev) => prev.filter((msg) => msg.id !== tempId))
       setConteudo(texto)
       setErro(error instanceof Error ? error.message : 'Erro ao enviar mensagem.')
     } finally {
@@ -221,7 +223,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
         toast.error('Não foi possível excluir a mensagem.')
         return
       }
-      setMensagens((prev) => prev.filter((m) => m.id !== mensagemId))
+      setMensagens((prev) => prev.filter((msg) => msg.id !== mensagemId))
       toast.success('Mensagem removida.')
       return
     }
@@ -239,13 +241,13 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
 
     setMensagens((prev) =>
       ordenarMensagens(
-        prev.map((m) =>
-          m.id === mensagemId
+        prev.map((msg) =>
+          msg.id === mensagemId
             ? {
                 ...data.mensagem!,
                 criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
               }
-            : m,
+            : msg,
         ),
       ),
     )
@@ -265,106 +267,141 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
           placeholder="Escreva uma mensagem para o grupo"
           className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60"
         />
-        <button
+        <m.button
           type="submit"
           disabled={enviando || !conteudo.trim()}
+          whileTap={{ scale: 0.96 }}
+          transition={springSnappy}
           className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Enviar
-        </button>
+        </m.button>
       </form>
 
-      {erro && (
-        <p className="mb-3 text-sm text-red-600 dark:text-red-400" role="alert">
-          {erro}
-        </p>
-      )}
+      <AnimatePresence>
+        {erro && (
+          <m.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            role="alert"
+            className="mb-3 text-sm text-red-600 dark:text-red-400"
+          >
+            {erro}
+          </m.p>
+        )}
+      </AnimatePresence>
 
       {mensagens.length === 0 ? (
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">Sem mensagens ainda.</p>
+        <MotionEmptyState
+          icon={<MessageSquare className="mb-2 h-6 w-6 text-[rgb(var(--foreground-muted))]" />}
+          title="Sem mensagens ainda"
+          description="Seja o primeiro a falar com a torcida nesta sala."
+          className="py-6 text-center"
+        />
       ) : (
         <div ref={listRef} className="max-h-80 space-y-3 overflow-y-auto pr-1">
-          {mensagens.map((mensagem) => {
-            const temporaria = isMensagemTemporaria(mensagem.id)
-            return (
-              <div
-                key={mensagem.id}
-                className={`rounded-xl border p-3 ${
-                  mensagem.destacada
-                    ? 'border-amber-500/50 bg-amber-500/10'
-                    : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
-                } ${temporaria ? 'opacity-80' : ''}`}
-              >
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
-                    {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
-                    {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
-                    {temporaria && ' · enviando…'}
-                    {mensagem.editadaEm && ' · editada'}
-                    {mensagem.destacada && ' · destacada'}
-                  </div>
-                  {isHost && !temporaria && (
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        title={mensagem.destacada ? 'Remover destaque' : 'Destacar'}
-                        onClick={() =>
-                          void moderar(mensagem.id, { destacada: !mensagem.destacada })
-                        }
-                        className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-                      >
-                        <Pin className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Editar"
-                        onClick={() => {
-                          setEditandoId(mensagem.id)
-                          setEditandoTexto(mensagem.conteudo)
-                        }}
-                        className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Excluir"
-                        onClick={() => void moderar(mensagem.id, {}, true)}
-                        className="rounded p-1 text-red-500 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+          <AnimatePresence mode="popLayout" initial={false}>
+            {mensagens.map((mensagem) => {
+              const temporaria = isMensagemTemporaria(mensagem.id)
+              return (
+                <m.div
+                  key={mensagem.id}
+                  layout
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, x: -12, transition: { duration: 0.2 } }}
+                  className={`rounded-xl border p-3 ${
+                    mensagem.destacada
+                      ? 'border-amber-500/50 bg-amber-500/10'
+                      : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
+                  } ${temporaria ? 'opacity-80' : ''}`}
+                >
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
+                      {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
+                      {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
+                      {temporaria && ' · enviando…'}
+                      {mensagem.editadaEm && ' · editada'}
+                      {mensagem.destacada && ' · destacada'}
                     </div>
-                  )}
-                </div>
+                    {isHost && !temporaria && (
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          title={mensagem.destacada ? 'Remover destaque' : 'Destacar'}
+                          onClick={() =>
+                            void moderar(mensagem.id, { destacada: !mensagem.destacada })
+                          }
+                          className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                        >
+                          <Pin className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Editar"
+                          onClick={() => {
+                            setEditandoId(mensagem.id)
+                            setEditandoTexto(mensagem.conteudo)
+                          }}
+                          className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Excluir"
+                          onClick={() => void moderar(mensagem.id, {}, true)}
+                          className="rounded p-1 text-red-500 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                {editandoId === mensagem.id ? (
-                  <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      void moderar(mensagem.id, { conteudo: editandoTexto.trim() })
-                    }}
-                  >
-                    <input
-                      value={editandoTexto}
-                      onChange={(e) => setEditandoTexto(e.target.value)}
-                      maxLength={800}
-                      className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
-                    />
-                    <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary))]">
-                      Salvar
-                    </button>
-                  </form>
-                ) : (
-                  <p className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]">
-                    {mensagem.conteudo}
-                  </p>
-                )}
-              </div>
-            )
-          })}
+                  <AnimatePresence mode="wait">
+                    {editandoId === mensagem.id ? (
+                      <m.form
+                        key="edit"
+                        variants={collapsePanel}
+                        initial="hidden"
+                        animate="show"
+                        exit="exit"
+                        transition={springSnappy}
+                        className="flex gap-2 overflow-hidden"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          void moderar(mensagem.id, { conteudo: editandoTexto.trim() })
+                        }}
+                      >
+                        <input
+                          value={editandoTexto}
+                          onChange={(e) => setEditandoTexto(e.target.value)}
+                          maxLength={800}
+                          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
+                        />
+                        <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary))]">
+                          Salvar
+                        </button>
+                      </m.form>
+                    ) : (
+                      <m.p
+                        key="view"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]"
+                      >
+                        {mensagem.conteudo}
+                      </m.p>
+                    )}
+                  </AnimatePresence>
+                </m.div>
+              )
+            })}
+          </AnimatePresence>
         </div>
       )}
     </div>

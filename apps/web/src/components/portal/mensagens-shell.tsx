@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, startTransition } from 'react'
 import dynamic from 'next/dynamic'
+import { AnimatePresence, m } from 'motion/react'
 import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
@@ -11,6 +12,15 @@ import {
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import {
+  lightboxBackdrop,
+  lightboxContent,
+  menuItemStagger,
+  springSnappy,
+  staggerContainer,
+  staggerItem,
+} from '@/lib/motion-presets'
 import { Avatar } from './avatar'
 
 const MensagemThread = dynamic(
@@ -163,39 +173,46 @@ export function MensagensShell({
               ))}
             </div>
           ) : conversas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-              <MessagesSquare className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />
-              <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-                Nenhuma conversa ainda
-              </p>
-              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                Comece uma conversa com um membro da torcida ou crie um grupo.
-              </p>
-              <button
-                type="button"
-                onClick={() => setModal('dm')}
-                className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                Nova conversa
-              </button>
-            </div>
+            <MotionEmptyState
+              icon={<MessagesSquare className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+              title="Nenhuma conversa ainda"
+              description={
+                <>
+                  <p className="mt-0.5">Comece uma conversa com um membro da torcida ou crie um grupo.</p>
+                  <m.button
+                    type="button"
+                    onClick={() => setModal('dm')}
+                    whileTap={{ scale: 0.96 }}
+                    transition={springSnappy}
+                    className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                  >
+                    Nova conversa
+                  </m.button>
+                </>
+              }
+              className="flex flex-col items-center justify-center px-6 py-14 text-center"
+            />
           ) : (
-            conversas.map((c) => {
-              const titulo = tituloConversa(c)
-              const avatarUrl =
-                c.tipo === 'DIRETA' ? c.outroMembro?.avatarUrl ?? null : c.avatarUrl
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => void abrirConversa(c.id)}
-                  className={[
-                    'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
-                    c.id === selecionadaId
-                      ? 'bg-[rgb(var(--primary)_/_0.08)]'
-                      : 'hover:bg-[rgb(var(--background-subtle))]',
-                  ].join(' ')}
-                >
+            <m.div variants={staggerContainer} initial="hidden" animate="show">
+              {conversas.map((c) => {
+                const titulo = tituloConversa(c)
+                const avatarUrl =
+                  c.tipo === 'DIRETA' ? c.outroMembro?.avatarUrl ?? null : c.avatarUrl
+                return (
+                  <m.button
+                    key={c.id}
+                    variants={staggerItem}
+                    type="button"
+                    onClick={() => void abrirConversa(c.id)}
+                    whileTap={{ scale: 0.99 }}
+                    transition={springSnappy}
+                    className={[
+                      'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
+                      c.id === selecionadaId
+                        ? 'bg-[rgb(var(--primary)_/_0.08)]'
+                        : 'hover:bg-[rgb(var(--background-subtle))]',
+                    ].join(' ')}
+                  >
                   <Avatar nome={titulo} avatarUrl={avatarUrl} size="md" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
@@ -225,9 +242,10 @@ export function MensagensShell({
                       )}
                     </div>
                   </div>
-                </button>
-              )
-            })
+                  </m.button>
+                )
+              })}
+            </m.div>
           )}
         </div>
       </div>
@@ -251,26 +269,26 @@ export function MensagensShell({
           />
         ) : (
           !embedded && (
-            <div className="hidden h-full flex-col items-center justify-center px-6 text-center md:flex">
-              <MessagesSquare className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
-              <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-                Selecione uma conversa
-              </p>
-              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                Ou comece uma nova com um membro da torcida.
-              </p>
-            </div>
+            <MotionEmptyState
+              icon={<MessagesSquare className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
+              title="Selecione uma conversa"
+              description="Ou comece uma nova com um membro da torcida."
+              className="hidden h-full flex-col items-center justify-center px-6 text-center md:flex"
+            />
           )
         )}
       </div>
 
-      {modal !== 'nenhum' && (
-        <NovaConversaModal
-          tipo={modal}
-          onClose={() => setModal('nenhum')}
-          onCriada={criadaNova}
-        />
-      )}
+      <AnimatePresence>
+        {modal !== 'nenhum' && (
+          <NovaConversaModal
+            key={modal}
+            tipo={modal}
+            onClose={() => setModal('nenhum')}
+            onCriada={criadaNova}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -348,7 +366,7 @@ function NovaConversaModal({
   const idsSelecionados = new Set(selecionados.map((c) => c.id))
 
   return (
-    <div
+    <m.div
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
@@ -356,9 +374,21 @@ function NovaConversaModal({
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose()
       }}
+      initial="hidden"
+      animate="show"
+      exit="exit"
+      variants={lightboxBackdrop}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl">
+      <m.div
+        variants={lightboxContent}
+        initial="hidden"
+        animate="show"
+        exit="exit"
+        transition={springSnappy}
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl"
+      >
         <div className="flex items-center justify-between border-b border-[rgb(var(--border))] px-4 py-3">
           <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">
             {tipo === 'dm' ? 'Nova conversa' : 'Novo grupo'}
@@ -384,25 +414,32 @@ function NovaConversaModal({
                 className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
               />
               {selecionados.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selecionados.map((c) => (
-                    <span
-                      key={c.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))]"
-                    >
-                      {c.nome ?? 'Membro'}
-                      <button
-                        type="button"
-                        aria-label={`Remover ${c.nome ?? 'membro'}`}
-                        onClick={() =>
-                          setSelecionados((prev) => prev.filter((x) => x.id !== c.id))
-                        }
+                <m.div layout className="flex flex-wrap gap-1.5">
+                  <AnimatePresence mode="popLayout">
+                    {selecionados.map((c) => (
+                      <m.span
+                        key={c.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85 }}
+                        transition={springSnappy}
+                        className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))]"
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
+                        {c.nome ?? 'Membro'}
+                        <button
+                          type="button"
+                          aria-label={`Remover ${c.nome ?? 'membro'}`}
+                          onClick={() =>
+                            setSelecionados((prev) => prev.filter((x) => x.id !== c.id))
+                          }
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </m.span>
+                    ))}
+                  </AnimatePresence>
+                </m.div>
               )}
             </>
           )}
@@ -429,14 +466,19 @@ function NovaConversaModal({
               Nenhum membro encontrado.
             </p>
           ) : (
-            resultados.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                disabled={criando || idsSelecionados.has(c.id)}
-                onClick={() => escolher(c)}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-              >
+            <m.div variants={staggerContainer} initial="hidden" animate="show">
+              {resultados.map((c, i) => (
+                <m.button
+                  key={c.id}
+                  custom={i}
+                  variants={menuItemStagger}
+                  type="button"
+                  disabled={criando || idsSelecionados.has(c.id)}
+                  onClick={() => escolher(c)}
+                  whileTap={{ scale: 0.99 }}
+                  transition={springSnappy}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                >
                 <Avatar nome={c.nome} avatarUrl={c.avatarUrl} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm text-[rgb(var(--foreground))]">
                   {c.nome ?? 'Membro'}
@@ -446,16 +488,19 @@ function NovaConversaModal({
                     {c.tenantNome}
                   </span>
                 )}
-              </button>
-            ))
+              </m.button>
+              ))}
+            </m.div>
           )}
         </div>
 
         {tipo === 'grupo' && (
           <div className="border-t border-[rgb(var(--border))] p-4">
-            <button
+            <m.button
               type="button"
               disabled={criando || nome.trim().length < 3 || selecionados.length === 0}
+              whileTap={{ scale: 0.98 }}
+              transition={springSnappy}
               onClick={() =>
                 void criar({
                   tipo: 'GRUPO',
@@ -466,10 +511,10 @@ function NovaConversaModal({
               className="w-full rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {criando ? 'Criando…' : `Criar grupo (${selecionados.length + 1} participantes)`}
-            </button>
+            </m.button>
           </div>
         )}
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   )
 }

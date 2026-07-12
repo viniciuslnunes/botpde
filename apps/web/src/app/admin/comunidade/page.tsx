@@ -7,6 +7,7 @@ import { MessagesSquare, Megaphone } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { CriarPostForm, PostsManager } from '@/components/admin/post-forms'
 import { CriarComunicadoForm, ComunicadosManager } from '@/components/admin/comunicado-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Comunidade — Admin' }
@@ -57,6 +58,7 @@ export default async function AdminComunidadePage() {
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-8">
           {podeGerenciarPosts && (
+            <MotionReveal index={0}>
             <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 Gerencie canais oficiais e comunidades temáticas em{' '}
@@ -66,9 +68,11 @@ export default async function AdminComunidadePage() {
                 .
               </p>
             </section>
+            </MotionReveal>
           )}
 
           {podePublicarComunicado && (
+            <MotionReveal index={1}>
             <section className="space-y-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 <Megaphone className="h-4 w-4" /> Comunicados oficiais
@@ -79,9 +83,11 @@ export default async function AdminComunidadePage() {
               </div>
               <ComunicadosManager comunicados={comunicados} />
             </section>
+            </MotionReveal>
           )}
 
           {podeGerenciarPosts && (
+            <MotionReveal index={2}>
             <section className="space-y-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 <MessagesSquare className="h-4 w-4" /> Mural da comunidade
@@ -92,6 +98,7 @@ export default async function AdminComunidadePage() {
               </div>
               <PostsManager posts={posts} />
             </section>
+            </MotionReveal>
           )}
         </div>
       </div>

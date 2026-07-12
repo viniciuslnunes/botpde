@@ -15,8 +15,8 @@ import { AdicionarSacolaForm } from './adicionar-sacola-form'
 import { ArrowLeft, Tag } from 'lucide-react'
 
 import { ProdutoGaleria } from '@/components/portal/produto-galeria'
-
-import { ProdutoCardImagem } from '@/components/portal/produto-card-imagem'
+import { ProdutoRelacionadosGrid } from '@/components/portal/produto-relacionados-grid'
+import { ProdutoDetailCol } from '@/components/portal/produto-detail-col'
 
 import { percentualDesconto } from '@torcida/types'
 
@@ -124,7 +124,7 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
 
 
-        <div className="space-y-6">
+        <ProdutoDetailCol>
 
           <div className="space-y-3">
 
@@ -262,7 +262,7 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
           <AdicionarSacolaForm produto={{ id: produto.id, tamanhos: produto.tamanhos, estoque }} />
 
-        </div>
+        </ProdutoDetailCol>
 
       </div>
 
@@ -274,35 +274,14 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
           <h2 className="mb-5 text-lg font-semibold">Você também pode gostar</h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-            {relacionados.map((r: (typeof relacionados)[number]) => (
-
-              <Link
-
-                key={r.id}
-
-                href={`/portal/loja/${r.id}`}
-
-                className="group overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:shadow-md"
-
-              >
-
-                <ProdutoCardImagem imagensUrl={r.imagensUrl} alt={r.nome} />
-
-                <div className="p-3">
-
-                  <p className="text-sm font-medium line-clamp-2 group-hover:text-[rgb(var(--primary))]">{r.nome}</p>
-
-                  <p className="mt-1 text-sm font-bold text-[rgb(var(--primary))]">{formatarPreco(r.preco)}</p>
-
-                </div>
-
-              </Link>
-
-            ))}
-
-          </div>
+          <ProdutoRelacionadosGrid
+            produtos={relacionados.map((r: (typeof relacionados)[number]) => ({
+              id: r.id,
+              nome: r.nome,
+              precoLabel: formatarPreco(r.preco),
+              imagensUrl: (r.imagensUrl ?? []) as string[],
+            }))}
+          />
 
         </section>
 

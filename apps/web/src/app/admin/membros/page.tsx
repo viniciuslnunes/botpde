@@ -1,11 +1,9 @@
-import Image from 'next/image'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
-import { MemberActions } from '@/components/admin/member-actions'
+import { AdminMembrosTable, AdminMembrosTabs } from './admin-membros-client'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membros — Admin' }
@@ -112,42 +110,19 @@ export default async function MembrosPage({
             </div>
           </div>
 
-        {/* Abas de status */}
-        <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon
-            const active = statusFiltro === tab.status
-            return (
-              <Link
-                key={tab.status}
-                href={buildHref({ status: tab.status, pagina: '1' })}
-                className={[
-                  'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
-                    : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-                ].join(' ')}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span
-                    className={[
-                      'rounded-full px-1.5 py-0.5 text-xs font-semibold',
-                      active
-                        ? 'bg-[rgb(var(--primary))] text-white'
-                        : tab.status === 'PENDENTE'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                    ].join(' ')}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
+        <AdminMembrosTabs
+          tabs={tabs.map((tab) => ({
+            status: tab.status,
+            label: tab.label,
+            href: buildHref({ status: tab.status, pagina: '1' }),
+            active: statusFiltro === tab.status,
+            count: tab.count,
+            countClass:
+              tab.status === 'PENDENTE' && statusFiltro !== tab.status
+                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                : undefined,
+          }))}
+        />
 
         {/* Busca */}
         <form method="GET" action="/admin/membros" className="mt-3">
@@ -168,118 +143,24 @@ export default async function MembrosPage({
       {/* Tabela */}
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
-        {membros.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Users className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-lg font-medium text-[rgb(var(--foreground))]">Nenhum membro encontrado</p>
-            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-              {busca ? 'Tente ajustar os filtros de busca' : 'Aguardando candidatos nesta categoria'}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-            <table className="w-full min-w-[42rem] text-sm">
-              <thead>
-                <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    Membro
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden sm:table-cell">
-                    Tipo
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden md:table-cell">
-                    Cidade
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden lg:table-cell">
-                    Cadastro
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[rgb(var(--border))]">
-                {membros.map((membro: (typeof membros)[number]) => {
-                  const badge = STATUS_BADGE[membro.status]
-                  return (
-                    <tr
-                      key={membro.id}
-                      className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          {membro.user.avatarUrl ? (
-                            canOptimizeImageUrl(membro.user.avatarUrl) ? (
-                              <Image
-                                src={membro.user.avatarUrl}
-                                alt={membro.nome}
-                                width={32}
-                                height={32}
-                                className="h-8 w-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={membro.user.avatarUrl}
-                                alt={membro.nome}
-                                loading="lazy"
-                                decoding="async"
-                                className="h-8 w-8 rounded-full object-cover"
-                              />
-                            )
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--primary))]">
-                              {membro.nome.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-medium text-[rgb(var(--foreground))]">{membro.nome}</p>
-                            {membro.discordTag && (
-                              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                                {membro.discordTag}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                          {TIPO_BADGE[membro.tipo] ?? membro.tipo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                          {membro.cidade ?? '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                          {new Date(membro.criadoEm).toLocaleDateString('pt-BR')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <MemberActions
-                          membroId={membro.id}
-                          status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
-                        />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <AdminMembrosTable
+          membros={membros.map((membro: (typeof membros)[number]) => {
+            const badge = STATUS_BADGE[membro.status]
+            return {
+              id: membro.id,
+              nome: membro.nome,
+              discordTag: membro.discordTag,
+              tipo: TIPO_BADGE[membro.tipo] ?? membro.tipo,
+              cidade: membro.cidade,
+              status: membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO',
+              statusLabel: badge.label,
+              statusClass: badge.className,
+              criadoEmLabel: new Date(membro.criadoEm).toLocaleDateString('pt-BR'),
+              avatarUrl: membro.user.avatarUrl,
+              inicial: membro.nome.charAt(0).toUpperCase(),
+            }
+          })}
+        />
 
         {/* Paginação */}
         {totalPaginas > 1 && (

@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Crown, Loader2, User } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
+import { Crown, Loader2, User, Users } from 'lucide-react'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export type ParticipanteSala = {
   userId: string
@@ -96,14 +99,21 @@ export function SalaParticipantes({
       </div>
 
       {participantes.length === 0 ? (
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">Ninguém online no momento.</p>
+        <MotionEmptyState
+          icon={<Users className="mb-2 h-6 w-6 text-[rgb(var(--foreground-muted))]" />}
+          title="Ninguém online no momento"
+          className="py-4 text-center"
+        />
       ) : (
-        <ul className="space-y-2">
-          {participantes.map((p) => (
-            <li
-              key={p.userId}
-              className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2"
-            >
+        <m.ul variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
+          <AnimatePresence mode="popLayout">
+            {participantes.map((p) => (
+              <m.li
+                key={p.userId}
+                layout
+                variants={staggerItem}
+                className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2"
+              >
               <Avatar nome={p.nome} avatarUrl={p.avatarUrl} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
@@ -119,9 +129,10 @@ export function SalaParticipantes({
               {p.papel !== 'HOST' && (
                 <User className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
               )}
-            </li>
-          ))}
-        </ul>
+            </m.li>
+            ))}
+          </AnimatePresence>
+        </m.ul>
       )}
     </div>
   )

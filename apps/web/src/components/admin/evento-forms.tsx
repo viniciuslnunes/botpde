@@ -1,10 +1,12 @@
 'use client'
 
 import { useActionState, useTransition } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/app/admin/eventos/actions'
 import { Loader2, Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
+import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
@@ -23,11 +25,21 @@ export function CriarEventoForm() {
 
   return (
     <form action={action} className="space-y-4">
-      {state.message && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {state.message}
-        </div>
-      )}
+      <AnimatePresence>
+        {state.message && (
+          <m.div
+            key="erro"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="overflow-hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+          >
+            {state.message}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -93,11 +105,21 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
 
   return (
     <form action={action} className="space-y-4">
-      {state.message && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {state.message}
-        </div>
-      )}
+      <AnimatePresence>
+        {state.message && (
+          <m.div
+            key="erro"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="overflow-hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+          >
+            {state.message}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
