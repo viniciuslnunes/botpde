@@ -66,26 +66,23 @@ export function CanaisClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">
-          Canais oficiais das unidades e comunidades temáticas
-        </p>
-        {podeCriarCanal && (
+      {podeCriarCanal && (
+        <div className="flex items-center justify-end">
           <button
             type="button"
             onClick={() => setCriando((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
             Novo canal
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {criando && (
         <form
           onSubmit={criar}
-          className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+          className="card-soft space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
         >
           <input
             value={nome}
@@ -136,7 +133,7 @@ export function CanaisClient({
             <Link
               key={u.tenantId}
               href={linkUnidadeComunidade(u.tenantId)}
-              className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              className="card-soft flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
             >
               {u.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -201,7 +198,7 @@ function CanalCard({
   pending: boolean
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <div className="card-soft flex items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <div className="min-w-0">
         <p className="font-semibold text-[rgb(var(--foreground))]">
           {canal.nome ?? 'Canal'}

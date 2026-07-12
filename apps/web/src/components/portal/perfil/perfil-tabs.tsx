@@ -16,21 +16,28 @@ const ABAS: { id: PerfilAba; label: string }[] = [
 
 export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
   return (
-    <nav className="flex gap-1 overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1">
+    <nav className="flex gap-6 overflow-x-auto border-b border-[rgb(var(--border))] px-1">
       {ABAS.map((aba) => {
         const ativo = aba.id === abaAtiva
         return (
           <Link
             key={aba.id}
             href={`/portal/comunidade/perfil/${userId}?aba=${aba.id}`}
+            aria-current={ativo ? 'page' : undefined}
             className={[
-              'shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+              'relative -mb-px shrink-0 pb-3 pt-1 text-sm font-semibold transition-colors',
               ativo
-                ? 'bg-[rgb(var(--primary))] text-white'
-                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                ? 'text-[rgb(var(--foreground))]'
+                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             {aba.label}
+            <span
+              className={[
+                'absolute inset-x-0 -bottom-px h-0.5 rounded-full transition-all duration-200',
+                ativo ? 'bg-[rgb(var(--primary))]' : 'bg-transparent',
+              ].join(' ')}
+            />
           </Link>
         )
       })}

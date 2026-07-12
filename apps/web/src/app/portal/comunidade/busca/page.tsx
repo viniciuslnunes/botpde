@@ -1,7 +1,8 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Search } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { BuscaMembrosClient } from './busca-membros-client'
+import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Buscar na Comunidade' }
@@ -11,19 +12,12 @@ export default async function BuscaMembrosPage() {
   if (!session?.user?.id) redirect('/entrar')
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <Link
-        href="/portal/comunidade"
-        className="text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-      >
-        ← Voltar ao feed
-      </Link>
-      <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Buscar na comunidade</h1>
-        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Encontre membros, hashtags em alta e publicações.
-        </p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <ComunidadePageHeader
+        icon={Search}
+        titulo="Buscar na comunidade"
+        subtitulo="Encontre membros, hashtags em alta e publicações."
+      />
       <BuscaMembrosClient />
     </div>
   )

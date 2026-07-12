@@ -62,13 +62,13 @@ export function CanalDetalheClient({
 
   return (
     <div className="space-y-4">
-      <header className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <header className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+            <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--primary))]">
               {canal.canalOficial ? 'Canal oficial' : 'Comunidade temática'}
-            </p>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{canal.nome ?? 'Canal'}</h1>
+            </span>
+            <h1 className="mt-1.5 text-xl font-bold text-[rgb(var(--foreground))]">{canal.nome ?? 'Canal'}</h1>
             {canal.descricao && (
               <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">{canal.descricao}</p>
             )}
@@ -94,7 +94,7 @@ export function CanalDetalheClient({
             {canal.souMembro ? (
               <Link
                 href={`/portal/mensagens?c=${canal.id}`}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))]"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-[rgb(var(--background-subtle))]"
               >
                 <MessageCircle className="h-4 w-4" />
                 Chat
@@ -104,7 +104,7 @@ export function CanalDetalheClient({
                 type="button"
                 disabled={pending}
                 onClick={inscrever}
-                className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="rounded-full bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Inscrever
               </button>
@@ -116,7 +116,7 @@ export function CanalDetalheClient({
       {canal.souMembro && podePublicar && (
         <form
           onSubmit={publicar}
-          className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+          className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
         >
           <textarea
             value={conteudo}
@@ -124,12 +124,12 @@ export function CanalDetalheClient({
             maxLength={3000}
             rows={3}
             placeholder="Publicar no canal…"
-            className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
+            className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
           />
           <button
             type="submit"
             disabled={pending || !conteudo.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Publicar
@@ -138,7 +138,7 @@ export function CanalDetalheClient({
       )}
 
       {!canal.souMembro && (
-        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+        <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
           Inscreva-se no canal para ver o mural completo e participar do chat.
         </div>
       )}
@@ -146,7 +146,7 @@ export function CanalDetalheClient({
       {canal.souMembro && (
         <>
           {posts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center text-sm text-[rgb(var(--foreground-muted))]">
               Nenhuma publicação no canal ainda.
             </div>
           ) : (

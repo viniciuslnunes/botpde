@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
@@ -31,9 +32,10 @@ export default async function GrupoDetalhePage({
     <div className="mx-auto max-w-2xl space-y-4">
       <Link
         href="/portal/comunidade/grupos"
-        className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+        className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
       >
-        ← Voltar aos grupos
+        <ArrowLeft className="h-4 w-4" />
+        Voltar aos grupos
       </Link>
 
       <GrupoDetalheClient

@@ -16,7 +16,7 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
 
   if (posts.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
+      <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center text-sm text-[rgb(var(--foreground-muted))]">
         Nenhum vídeo publicado ainda.
       </div>
     )
@@ -25,15 +25,15 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="inline-flex rounded-lg border border-[rgb(var(--border))] p-0.5">
+        <div className="inline-flex rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1">
           <button
             type="button"
             onClick={() => setModo('reels')}
             className={[
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               modo === 'reels'
                 ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
-                : 'text-[rgb(var(--foreground-muted))]',
+                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             <Smartphone className="h-4 w-4" />
@@ -43,10 +43,10 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
             type="button"
             onClick={() => setModo('grid')}
             className={[
-              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               modo === 'grid'
                 ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
-                : 'text-[rgb(var(--foreground-muted))]',
+                : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             <LayoutGrid className="h-4 w-4" />

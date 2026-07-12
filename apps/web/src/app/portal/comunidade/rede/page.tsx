@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Users } from 'lucide-react'
+import { Users, Heart } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostsDaRede } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha rede — Comunidade' }
@@ -34,20 +35,12 @@ export default async function RedeComunidadePage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <Link
-        href="/portal/comunidade"
-        className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-      >
-        ← Voltar ao feed
-      </Link>
-
-      <header>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Minha rede</h1>
-        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Publicações de quem você segue e as suas
-        </p>
-      </header>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <ComunidadePageHeader
+        icon={Heart}
+        titulo="Minha rede"
+        subtitulo="Publicações de quem você segue e as suas"
+      />
 
       {posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
@@ -60,7 +53,7 @@ export default async function RedeComunidadePage({
           </p>
           <Link
             href="/portal/comunidade/busca"
-            className="mt-4 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-4 rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
           >
             Buscar membros
           </Link>

@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import Image from 'next/image'
 import { Lock, Globe } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -26,8 +25,9 @@ export function PerfilHeader({
   acoes,
 }: PerfilHeaderProps) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-      <div className="relative h-32 sm:h-40">
+    <section className="card-soft overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+      {/* Faixa de topo: banner do membro quando existe, senão gradiente da torcida. */}
+      <div className="relative h-28 sm:h-36">
         {bannerUrl ? (
           canOptimizeImageUrl(bannerUrl) ? (
             <Image src={bannerUrl} alt="" fill sizes="(max-width: 640px) 100vw, 42rem" className="object-cover" />
@@ -36,38 +36,44 @@ export function PerfilHeader({
             <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
           )
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-[rgb(var(--primary))]/30 to-[rgb(var(--background-subtle))]" />
+          <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />
         )}
       </div>
-      <div className="relative px-4 pb-4 sm:px-5">
-        <div className="-mt-10 mb-3 flex items-end justify-between gap-3 sm:-mt-12">
-          <div className="rounded-full ring-4 ring-[rgb(var(--surface))]">
-            <Avatar nome={nome} avatarUrl={avatarUrl} size="xl" />
-          </div>
-          {acoes && <div className="mb-1 flex shrink-0 flex-col items-end gap-2">{acoes}</div>}
+
+      <div className="relative flex flex-col items-center px-5 pb-5 text-center">
+        <div className="-mt-12 rounded-full ring-4 ring-[rgb(var(--surface))] sm:-mt-14">
+          <Avatar nome={nome} avatarUrl={avatarUrl} size="xl" />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{nome ?? 'Membro'}</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span
-              className={[
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                perfilPrivado
-                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
-                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
-              ].join(' ')}
-            >
-              {perfilPrivado ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-              {perfilPrivado ? 'Perfil privado' : 'Perfil público'}
+
+        <h1 className="mt-3 text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">
+          {nome ?? 'Membro'}
+        </h1>
+        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <span
+            className={[
+              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+              perfilPrivado
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
+            ].join(' ')}
+          >
+            {perfilPrivado ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+            {perfilPrivado ? 'Perfil privado' : 'Perfil público'}
+          </span>
+          {segueVoce && !isSelf && (
+            <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+              Segue você
             </span>
-            {segueVoce && !isSelf && (
-              <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                Segue você
-              </span>
-            )}
-          </div>
+          )}
         </div>
+
+        {acoes && (
+          <div className="mt-4 flex w-full max-w-xs flex-wrap items-center justify-center gap-2">
+            {acoes}
+          </div>
+        )}
       </div>
     </section>
   )

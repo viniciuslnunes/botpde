@@ -58,7 +58,7 @@ export function PerfilDestaques({
 
   return (
     <section className="space-y-3">
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="flex justify-center gap-3 overflow-x-auto pb-1">
         {visiveis.map((d, idx) => (
           <button
             key={d.id}

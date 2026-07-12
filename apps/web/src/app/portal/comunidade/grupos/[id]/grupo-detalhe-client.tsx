@@ -48,15 +48,20 @@ export function GrupoDetalheClient({
 
   return (
     <div className="space-y-4">
-      <header className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-        <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{grupo.nome ?? 'Grupo'}</h1>
-        {grupo.descricao && (
-          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">{grupo.descricao}</p>
-        )}
-        <span className="mt-2 inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
-          <Users className="h-3.5 w-3.5" />
-          {grupo.membros} membro{grupo.membros === 1 ? '' : 's'}
+      <header className="card-soft flex items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-lg font-bold text-[rgb(var(--primary))]">
+          {(grupo.nome ?? 'G').charAt(0).toUpperCase()}
         </span>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{grupo.nome ?? 'Grupo'}</h1>
+          {grupo.descricao && (
+            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">{grupo.descricao}</p>
+          )}
+          <span className="mt-2 inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+            <Users className="h-3.5 w-3.5" />
+            {grupo.membros} membro{grupo.membros === 1 ? '' : 's'}
+          </span>
+        </div>
       </header>
 
       <div className="flex gap-2 border-b border-[rgb(var(--border))]">
@@ -85,7 +90,7 @@ export function GrupoDetalheClient({
         <div className="space-y-4">
           <form
             onSubmit={publicar}
-            className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+            className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
           >
             <textarea
               value={conteudo}
@@ -93,12 +98,12 @@ export function GrupoDetalheClient({
               maxLength={3000}
               rows={3}
               placeholder="Publique no mural do grupo…"
-              className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
+              className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
             />
             <button
               type="submit"
               disabled={pending || !conteudo.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
               Publicar
@@ -106,7 +111,7 @@ export function GrupoDetalheClient({
           </form>
 
           {postsIniciais.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center text-sm text-[rgb(var(--foreground-muted))]">
               Nenhuma publicação no mural ainda. Seja o primeiro!
             </div>
           ) : (
