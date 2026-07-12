@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, m } from 'motion/react'
 import { X, Volume2, VolumeX } from 'lucide-react'
 import { Avatar } from './avatar'
 import { PostConteudoRich } from './post-conteudo-rich'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { linkPostComunidade, isVideoUrl } from '@/lib/comunidade-social'
+import { lightboxBackdrop, springGentle, springSnappy } from '@/lib/motion-presets'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface VideosReelsFeedProps {
@@ -24,10 +27,16 @@ function videoUrl(post: PostSocialItem): string | null {
 export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReelsFeedProps) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
   const [muted, setMuted] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map())
 
   const reels = posts.filter((p) => videoUrl(p) != null)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const playActive = useCallback(() => {
     videoRefs.current.forEach((video, idx) => {
@@ -79,17 +88,18 @@ export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReel
 
   if (reels.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-        Nenhum vídeo para exibir.
-      </div>
+      <MotionEmptyState
+        className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+        title="Nenhum vídeo para exibir."
+      />
     )
   }
 
-  return (
+  const feed = (
     <div
       ref={containerRef}
       className={[
-        'snap-y snap-mandatory overflow-y-auto',
+        'snap-y snap-mandatory overflow-y-auto scroll-smooth',
         onClose ? 'fixed inset-0 z-50 bg-black' : 'h-[calc(100vh-8rem)] rounded-2xl',
       ].join(' ')}
     >
@@ -97,22 +107,26 @@ export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReel
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3">
           <span className="text-sm font-semibold text-white">Reels</span>
           <div className="flex items-center gap-2">
-            <button
+            <m.button
               type="button"
               onClick={() => setMuted((m) => !m)}
+              whileTap={{ scale: 0.9 }}
+              transition={springSnappy}
               className="rounded-full p-2 text-white/80 hover:bg-white/10"
               aria-label={muted ? 'Ativar som' : 'Silenciar'}
             >
               {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </button>
-            <button
+            </m.button>
+            <m.button
               type="button"
               onClick={onClose}
+              whileTap={{ scale: 0.9 }}
+              transition={springSnappy}
               className="rounded-full p-2 text-white/80 hover:bg-white/10"
               aria-label="Fechar"
             >
               <X className="h-5 w-5" />
-            </button>
+            </m.button>
           </div>
         </div>
       )}
@@ -120,13 +134,20 @@ export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReel
       {reels.map((post, idx) => {
         const src = videoUrl(post)
         if (!src) return null
+        const isActive = idx === activeIdx
         return (
-          <section
+          <m.section
             key={post.id}
             data-idx={idx}
+            layout
+            animate={{
+              scale: isActive ? 1 : 0.96,
+              opacity: isActive ? 1 : 0.55,
+            }}
+            transition={springGentle}
             className="relative flex h-full min-h-[calc(100vh-4rem)] snap-start snap-always flex-col items-center justify-center px-4 py-6"
           >
-            <video
+            <m.video
               ref={(el) => {
                 if (el) videoRefs.current.set(idx, el)
                 else videoRefs.current.delete(idx)
@@ -135,9 +156,15 @@ export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReel
               playsInline
               loop
               muted={muted}
+              animate={{ scale: isActive ? 1 : 0.98 }}
+              transition={springGentle}
               className="max-h-[80vh] w-full max-w-md rounded-2xl object-contain"
             />
-            <div className="mt-4 w-full max-w-md space-y-2">
+            <m.div
+              animate={{ opacity: isActive ? 1 : 0.4, y: isActive ? 0 : 8 }}
+              transition={springGentle}
+              className="mt-4 w-full max-w-md space-y-2"
+            >
               <div className="flex items-center gap-2">
                 <Avatar nome={post.autor.nome} avatarUrl={post.autor.avatarUrl} size="sm" />
                 <span className="text-sm font-semibold text-white">{post.autor.nome ?? 'Membro'}</span>
@@ -149,10 +176,29 @@ export function VideosReelsFeed({ posts, initialIndex = 0, onClose }: VideosReel
               >
                 Ver publicação completa →
               </Link>
-            </div>
-          </section>
+            </m.div>
+          </m.section>
         )
       })}
     </div>
   )
+
+  if (onClose && mounted) {
+    return (
+      <AnimatePresence>
+        <m.div
+          key="reels-fullscreen"
+          variants={lightboxBackdrop}
+          initial="hidden"
+          animate="show"
+          exit="exit"
+          transition={{ duration: 0.2 }}
+        >
+          {feed}
+        </m.div>
+      </AnimatePresence>
+    )
+  }
+
+  return feed
 }

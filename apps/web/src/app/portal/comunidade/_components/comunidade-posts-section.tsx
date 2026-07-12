@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { MessagesSquare } from 'lucide-react'
 import { getPostsParaFeed, getPostIdsSalvos, type PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
 
 interface CurrentUser {
   id: string
@@ -48,25 +48,7 @@ export async function ComunidadePostsSection({
     <>
       <section className="space-y-4">
         {stream.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
-            <MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />
-            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-              {filtro === 'seguindo' ? 'Nada de quem você segue ainda' : 'O feed começa com você'}
-            </p>
-            <p className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
-              {filtro === 'seguindo' ? (
-                <>
-                  Siga membros da torcida para ver as publicações deles aqui, ou volte para{' '}
-                  <Link href="/portal/comunidade" className="font-medium text-[rgb(var(--primary))] hover:underline">
-                    Descobrir
-                  </Link>
-                  .
-                </>
-              ) : (
-                'Publique a primeira mensagem ou siga outros membros para ver o que a torcida está falando.'
-              )}
-            </p>
-          </div>
+          <ComunidadeFeedEmpty filtro={filtro} />
         ) : (
           stream.map((post, index) => (
             <MotionReveal key={post.id} index={index}>

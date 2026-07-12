@@ -56,3 +56,59 @@ export const menuItemStagger: Variants = {
     transition: { ...springSnappy, delay: i * 0.04 },
   }),
 }
+
+/** Painéis que expandem/colapsam (comentários, forms inline). */
+export const collapsePanel: Variants = {
+  hidden: { opacity: 0, height: 0 },
+  show: { opacity: 1, height: 'auto' },
+  exit: { opacity: 0, height: 0 },
+}
+
+/** Slide horizontal entre stories (dir: 1 = avançar, -1 = voltar). */
+export const storySlideVariants: Variants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 48 : -48,
+    opacity: 0,
+    scale: 0.98,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    scale: 1,
+    transition: springGentle,
+  },
+  exit: (dir: number) => ({
+    x: dir > 0 ? -48 : 48,
+    opacity: 0,
+    scale: 0.98,
+    transition: { duration: 0.18 },
+  }),
+}
+
+export const reactionPop: Transition = {
+  type: 'spring',
+  stiffness: 560,
+  damping: 18,
+  mass: 0.6,
+}
+
+/** Transição entre rotas da comunidade. */
+export const routePage: Variants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+}
+
+/** Backdrop de lightbox / viewer fullscreen. */
+export const lightboxBackdrop: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1 },
+  exit: { opacity: 0 },
+}
+
+/** Conteúdo do lightbox (zoom suave). */
+export const lightboxContent: Variants = {
+  hidden: { opacity: 0, scale: 0.92 },
+  show: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.96 },
+}

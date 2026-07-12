@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
+import { m } from 'motion/react'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { Avatar } from './avatar'
@@ -8,6 +9,7 @@ import { StoryViewer } from './story-viewer'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { publicarMomentoStory } from '@/app/portal/comunidade/actions'
 import type { StoryRingItem } from '@/lib/stories'
+import { springSnappy } from '@/lib/motion-presets'
 
 interface StoryRingsProps {
   rings: StoryRingItem[]
@@ -52,10 +54,12 @@ export function StoryRings({
     <>
       <div className="app-scrollbar-none flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {currentUserId && (
-          <button
+          <m.button
             type="button"
             disabled={pending}
             onClick={() => inputRef.current?.click()}
+            whileTap={{ scale: 0.92 }}
+            transition={springSnappy}
             className="flex shrink-0 flex-col items-center gap-1"
           >
             <div className="relative">
@@ -86,13 +90,15 @@ export function StoryRings({
                 e.target.value = ''
               }}
             />
-          </button>
+          </m.button>
         )}
 
         {meuRing && meuRing.momentos.length > 0 && (
-          <button
+          <m.button
             type="button"
             onClick={() => setViewerIdx(rings.findIndex((r) => r.userId === currentUserId))}
+            whileTap={{ scale: 0.92 }}
+            transition={springSnappy}
             className="flex shrink-0 flex-col items-center gap-1"
           >
             <div className="rounded-full bg-gradient-to-tr from-[rgb(var(--primary))] to-pink-500 p-0.5">
@@ -103,16 +109,19 @@ export function StoryRings({
             <span className="max-w-14 truncate text-[10px] font-medium text-[rgb(var(--foreground))]">
               Você
             </span>
-          </button>
+          </m.button>
         )}
 
         {outrosRings.map((ring) => {
           const idx = rings.findIndex((r) => r.userId === ring.userId)
           return (
-            <button
+            <m.button
               key={ring.userId}
               type="button"
               onClick={() => setViewerIdx(idx)}
+              whileTap={{ scale: 0.92 }}
+              whileHover={{ scale: 1.04 }}
+              transition={springSnappy}
               className="flex shrink-0 flex-col items-center gap-1"
             >
               <div
@@ -130,7 +139,7 @@ export function StoryRings({
               <span className="max-w-14 truncate text-[10px] text-[rgb(var(--foreground-muted))]">
                 {ring.nome ?? 'Membro'}
               </span>
-            </button>
+            </m.button>
           )
         })}
       </div>

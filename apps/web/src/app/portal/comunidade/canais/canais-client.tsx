@@ -2,9 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, m } from 'motion/react'
 import { Radio, Plus, Loader2, Users, Building2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { criarCanalTematico, entrarCanal } from '@/app/portal/comunidade/actions'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import {
   labelTipoUnidade,
   labelVisibilidadeCanal,
@@ -68,92 +71,108 @@ export function CanaisClient({
     <div className="space-y-6">
       {podeCriarCanal && (
         <div className="flex items-center justify-end">
-          <button
+          <m.button
             type="button"
             onClick={() => setCriando((v) => !v)}
+            whileTap={{ scale: 0.96 }}
+            transition={springSnappy}
             className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
             Novo canal
-          </button>
+          </m.button>
         </div>
       )}
 
-      {criando && (
-        <form
-          onSubmit={criar}
-          className="card-soft space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-        >
-          <input
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            maxLength={80}
-            placeholder="Nome do canal temático"
-            required
-            className="h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
-          />
-          <textarea
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            maxLength={280}
-            rows={2}
-            placeholder="Descrição (opcional)"
-            className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
-          />
-          <select
-            value={visibilidade}
-            onChange={(e) =>
-              setVisibilidade(e.target.value as 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO')
-            }
-            className="h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+      <AnimatePresence>
+        {criando && (
+          <m.form
+            key="criar-canal"
+            onSubmit={criar}
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="card-soft space-y-3 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
           >
-            <option value="TENANT">Só esta torcida</option>
-            <option value="HIERARQUIA">Hierarquia (sede/subsede/PDE)</option>
-            <option value="ALIADOS">Hierarquia + aliados</option>
-            <option value="PUBLICO">Comunidade aberta</option>
-          </select>
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Criar canal
-          </button>
-        </form>
-      )}
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              maxLength={80}
+              placeholder="Nome do canal temático"
+              required
+              className="h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+            />
+            <textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              maxLength={280}
+              rows={2}
+              placeholder="Descrição (opcional)"
+              className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
+            />
+            <select
+              value={visibilidade}
+              onChange={(e) =>
+                setVisibilidade(e.target.value as 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO')
+              }
+              className="h-10 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+            >
+              <option value="TENANT">Só esta torcida</option>
+              <option value="HIERARQUIA">Hierarquia (sede/subsede/PDE)</option>
+              <option value="ALIADOS">Hierarquia + aliados</option>
+              <option value="PUBLICO">Comunidade aberta</option>
+            </select>
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Criar canal
+            </button>
+          </m.form>
+        )}
+      </AnimatePresence>
 
       <section className="space-y-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
           <Building2 className="h-4 w-4" />
           Unidades na hierarquia
         </h2>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <m.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="grid gap-2 sm:grid-cols-2"
+        >
           {unidades.map((u) => (
-            <Link
-              key={u.tenantId}
-              href={linkUnidadeComunidade(u.tenantId)}
-              className="card-soft flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
-            >
-              {u.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.logoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.12)] text-sm font-bold text-[rgb(var(--primary))]">
-                  {u.nome.charAt(0)}
+            <m.div key={u.tenantId} variants={staggerItem}>
+              <Link
+                href={linkUnidadeComunidade(u.tenantId)}
+                className="card-soft flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                {u.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={u.logoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.12)] text-sm font-bold text-[rgb(var(--primary))]">
+                    {u.nome.charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-[rgb(var(--foreground))]">{u.nome}</p>
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {labelTipoUnidade(u.tipo)}
+                    {u.cidade ? ` · ${u.cidade}` : ''}
+                    {u.tenantId === tenantAtualId ? ' · você' : ''}
+                  </p>
                 </div>
-              )}
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-[rgb(var(--foreground))]">{u.nome}</p>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                  {labelTipoUnidade(u.tipo)}
-                  {u.cidade ? ` · ${u.cidade}` : ''}
-                  {u.tenantId === tenantAtualId ? ' · você' : ''}
-                </p>
-              </div>
-            </Link>
+              </Link>
+            </m.div>
           ))}
-        </div>
+        </m.div>
       </section>
 
       {oficiais.length > 0 && (
@@ -162,26 +181,41 @@ export function CanaisClient({
             <Radio className="h-4 w-4" />
             Canais oficiais
           </h2>
-          <div className="space-y-2">
+          <m.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="space-y-2"
+          >
             {oficiais.map((c) => (
-              <CanalCard key={c.id} canal={c} onEntrar={entrar} pending={pending} />
+              <m.div key={c.id} variants={staggerItem}>
+                <CanalCard canal={c} onEntrar={entrar} pending={pending} />
+              </m.div>
             ))}
-          </div>
+          </m.div>
         </section>
       )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Comunidades temáticas</h2>
         {tematicos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum canal temático ainda.
-          </div>
+          <MotionEmptyState
+            className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
+            title="Nenhum canal temático ainda."
+          />
         ) : (
-          <div className="space-y-2">
+          <m.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="space-y-2"
+          >
             {tematicos.map((c) => (
-              <CanalCard key={c.id} canal={c} onEntrar={entrar} pending={pending} />
+              <m.div key={c.id} variants={staggerItem}>
+                <CanalCard canal={c} onEntrar={entrar} pending={pending} />
+              </m.div>
             ))}
-          </div>
+          </m.div>
         )}
       </section>
     </div>
@@ -230,14 +264,16 @@ function CanalCard({
           Abrir
         </Link>
       ) : (
-        <button
+        <m.button
           type="button"
           disabled={pending || !canal.publica}
           onClick={() => onEntrar(canal.id)}
+          whileTap={{ scale: 0.94 }}
+          transition={springSnappy}
           className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
         >
           Inscrever
-        </button>
+        </m.button>
       )}
     </div>
   )

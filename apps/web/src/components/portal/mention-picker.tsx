@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { Loader2 } from 'lucide-react'
 import { Avatar } from './avatar'
 import { formatarMencao } from '@/lib/comunidade-social'
+import { menuItemStagger, popoverPanel, springSnappy } from '@/lib/motion-presets'
 
 interface MembroMencao {
   id: string
@@ -56,31 +58,66 @@ export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) 
   if (query.length < 1) return null
 
   return (
-    <div
+    <m.div
       ref={ref}
-      className="absolute left-0 top-full z-20 mt-1 w-full max-w-xs overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg"
+      variants={popoverPanel}
+      initial="hidden"
+      animate="show"
+      exit="exit"
+      transition={springSnappy}
+      className="card-soft absolute left-0 top-full z-20 mt-1 w-full max-w-xs overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg"
     >
-      {carregando && (
-        <div className="flex items-center gap-2 px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Buscando…
-        </div>
-      )}
-      {!carregando && membros.length === 0 && (
-        <p className="px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">Nenhum membro encontrado</p>
-      )}
-      {membros.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          onClick={() => onSelect(formatarMencao(m.nome ?? 'Membro', m.id))}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
-        >
-          <Avatar nome={m.nome} avatarUrl={m.avatarUrl} size="xs" />
-          <span className="truncate font-medium text-[rgb(var(--foreground))]">{m.nome ?? 'Membro'}</span>
-        </button>
-      ))}
-    </div>
+      <AnimatePresence mode="wait">
+        {carregando ? (
+          <m.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Buscando…
+          </m.div>
+        ) : membros.length === 0 ? (
+          <m.p
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]"
+          >
+            Nenhum membro encontrado
+          </m.p>
+        ) : (
+          <m.div
+            key="lista"
+            initial="hidden"
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.04 } } }}
+          >
+            {membros.map((membro, i) => (
+              <m.button
+                key={membro.id}
+                type="button"
+                custom={i}
+                variants={menuItemStagger}
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.98 }}
+                transition={springSnappy}
+                onClick={() => onSelect(formatarMencao(membro.nome ?? 'Membro', membro.id))}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="xs" />
+                <span className="truncate font-medium text-[rgb(var(--foreground))]">
+                  {membro.nome ?? 'Membro'}
+                </span>
+              </m.button>
+            ))}
+          </m.div>
+        )}
+      </AnimatePresence>
+    </m.div>
   )
 }
 

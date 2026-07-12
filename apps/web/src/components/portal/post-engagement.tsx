@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2, Bookmark } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
@@ -14,6 +15,13 @@ import {
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
 import type { TipoReacaoSocial } from '@/lib/comunidade-social'
+import {
+  collapsePanel,
+  menuItemStagger,
+  reactionPop,
+  springGentle,
+  springSnappy,
+} from '@/lib/motion-presets'
 import { Avatar } from './avatar'
 import { PostConteudoRich } from './post-conteudo-rich'
 import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
@@ -32,6 +40,39 @@ interface PostEngagementProps {
   currentUser: CurrentUser
   isRepost?: boolean
   salvoInicial?: boolean
+}
+
+function EngajamentoBtn({
+  children,
+  active,
+  className,
+  onClick,
+  disabled,
+  ...rest
+}: {
+  children: React.ReactNode
+  active?: boolean
+  className: string
+  onClick?: () => void
+  disabled?: boolean
+  'aria-label'?: string
+  'aria-pressed'?: boolean
+  'aria-expanded'?: boolean
+}) {
+  return (
+    <m.button
+      type="button"
+      whileTap={{ scale: 0.9 }}
+      animate={active ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+      transition={active ? reactionPop : springSnappy}
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </m.button>
+  )
 }
 
 export function PostEngagement({
@@ -131,8 +172,8 @@ export function PostEngagement({
     setComentariosAbertos(true)
     startTransition(async () => {
       try {
-        const salvo = await comentarPost(postId, texto)
-        setComentarios((prev) => prev.map((c) => (c.id === tempId ? salvo : c)))
+        const salvoComentario = await comentarPost(postId, texto)
+        setComentarios((prev) => prev.map((c) => (c.id === tempId ? salvoComentario : c)))
         comentariosCarregadosRef.current = true
       } catch (err) {
         setComentarios((prev) => prev.filter((c) => c.id !== tempId))
@@ -231,22 +272,35 @@ export function PostEngagement({
 
   return (
     <div className="mt-3">
-      {(totalR > 0 || totalC > 0) && (
-        <div className="flex items-center gap-3 pb-2 text-xs text-[rgb(var(--foreground-muted))]">
-          {totalR > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <Heart className="h-3.5 w-3.5 fill-[rgb(var(--primary))] text-[rgb(var(--primary))]" />
-              {totalR}
-            </span>
-          )}
-          {totalC > 0 && <span>{totalC} comentário{totalC === 1 ? '' : 's'}</span>}
-        </div>
-      )}
+      <AnimatePresence>
+        {(totalR > 0 || totalC > 0) && (
+          <m.div
+            key="contagens"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+            className="flex items-center gap-3 pb-2 text-xs text-[rgb(var(--foreground-muted))]"
+          >
+            {totalR > 0 && (
+              <m.span layout className="inline-flex items-center gap-1">
+                <Heart className="h-3.5 w-3.5 fill-[rgb(var(--primary))] text-[rgb(var(--primary))]" />
+                {totalR}
+              </m.span>
+            )}
+            {totalC > 0 && (
+              <m.span layout>
+                {totalC} comentário{totalC === 1 ? '' : 's'}
+              </m.span>
+            )}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex flex-wrap items-center gap-1 border-t border-[rgb(var(--border))] pt-2">
-        <button
-          type="button"
+        <EngajamentoBtn
           disabled={pending}
+          active={reacao === 'CURTIR'}
           onClick={() => handleReacao('CURTIR')}
           aria-pressed={reacao === 'CURTIR'}
           className={[
@@ -258,10 +312,10 @@ export function PostEngagement({
         >
           <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
           Curtir
-        </button>
-        <button
-          type="button"
+        </EngajamentoBtn>
+        <EngajamentoBtn
           disabled={pending}
+          active={reacao === 'FORCA'}
           onClick={() => handleReacao('FORCA')}
           aria-pressed={reacao === 'FORCA'}
           className={[
@@ -273,10 +327,10 @@ export function PostEngagement({
         >
           <Zap className={['h-4 w-4', reacao === 'FORCA' ? 'fill-current' : ''].join(' ')} />
           Força
-        </button>
-        <button
-          type="button"
+        </EngajamentoBtn>
+        <EngajamentoBtn
           disabled={pending}
+          active={reacao === 'VAMOS'}
           onClick={() => handleReacao('VAMOS')}
           aria-pressed={reacao === 'VAMOS'}
           className={[
@@ -288,10 +342,10 @@ export function PostEngagement({
         >
           <Flame className={['h-4 w-4', reacao === 'VAMOS' ? 'fill-current' : ''].join(' ')} />
           Vamos!
-        </button>
-        <button
-          type="button"
+        </EngajamentoBtn>
+        <EngajamentoBtn
           disabled={pending}
+          active={reacao === 'PRESENTE'}
           onClick={() => handleReacao('PRESENTE')}
           aria-pressed={reacao === 'PRESENTE'}
           className={[
@@ -303,9 +357,9 @@ export function PostEngagement({
         >
           <CheckCircle className={['h-4 w-4', reacao === 'PRESENTE' ? 'fill-current' : ''].join(' ')} />
           Presente
-        </button>
-        <button
-          type="button"
+        </EngajamentoBtn>
+        <EngajamentoBtn
+          active={comentariosAbertos}
           onClick={abrirComentarios}
           aria-expanded={comentariosAbertos}
           className={[
@@ -317,10 +371,10 @@ export function PostEngagement({
         >
           <MessageCircle className="h-4 w-4" />
           Comentar
-        </button>
+        </EngajamentoBtn>
         {!isRepost && (
-          <button
-            type="button"
+          <EngajamentoBtn
+            active={repostando}
             onClick={() => setRepostando((v) => !v)}
             className={[
               btnBase,
@@ -331,10 +385,10 @@ export function PostEngagement({
           >
             <Repeat2 className="h-4 w-4" />
             Compartilhar
-          </button>
+          </EngajamentoBtn>
         )}
-        <button
-          type="button"
+        <EngajamentoBtn
+          active={salvo}
           onClick={toggleSalvar}
           aria-pressed={salvo}
           className={[
@@ -346,112 +400,163 @@ export function PostEngagement({
         >
           <Bookmark className={['h-4 w-4', salvo ? 'fill-current' : ''].join(' ')} />
           Salvar
-        </button>
-        <button
-          type="button"
+        </EngajamentoBtn>
+        <EngajamentoBtn
           onClick={() => setDenunciando((v) => !v)}
           aria-label="Denunciar publicação"
           className={[btnBase, 'ml-auto text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-red-600'].join(' ')}
         >
           <Flag className="h-4 w-4" />
-        </button>
+        </EngajamentoBtn>
       </div>
 
-      {repostando && (
-        <form onSubmit={enviarRepost} className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            value={comentarioRepost}
-            onChange={(e) => setComentarioRepost(e.target.value)}
-            maxLength={500}
-            placeholder="Adicione um comentário (opcional)…"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={pending}
-            className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+      <AnimatePresence initial={false}>
+        {repostando && (
+          <m.form
+            key="repost-form"
+            onSubmit={enviarRepost}
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springGentle}
+            className="mt-2 flex min-w-0 flex-col gap-2 overflow-hidden sm:flex-row sm:items-center"
           >
-            Compartilhar
-          </button>
-        </form>
-      )}
+            <input
+              value={comentarioRepost}
+              onChange={(e) => setComentarioRepost(e.target.value)}
+              maxLength={500}
+              placeholder="Adicione um comentário (opcional)…"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+            />
+            <m.button
+              type="submit"
+              disabled={pending}
+              whileTap={{ scale: 0.96 }}
+              transition={springSnappy}
+              className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Compartilhar
+            </m.button>
+          </m.form>
+        )}
+      </AnimatePresence>
 
-      {denunciando && (
-        <form onSubmit={enviarDenuncia} className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            maxLength={500}
-            placeholder="Por que está denunciando?"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-red-500"
-          />
-          <button
-            type="submit"
-            disabled={pending}
-            className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+      <AnimatePresence initial={false}>
+        {denunciando && (
+          <m.form
+            key="denuncia-form"
+            onSubmit={enviarDenuncia}
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springGentle}
+            className="mt-2 flex min-w-0 flex-col gap-2 overflow-hidden sm:flex-row sm:items-center"
           >
-            Enviar
-          </button>
-        </form>
-      )}
+            <input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              maxLength={500}
+              placeholder="Por que está denunciando?"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-red-500"
+            />
+            <m.button
+              type="submit"
+              disabled={pending}
+              whileTap={{ scale: 0.96 }}
+              transition={springSnappy}
+              className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              Enviar
+            </m.button>
+          </m.form>
+        )}
+      </AnimatePresence>
 
-      {mostrarSecaoComentarios && (
-        <div className="mt-3 space-y-3">
-          {carregandoComentarios && comentarios.length === 0 && (
-            <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Carregando comentários…
-            </div>
-          )}
-
-          {comentarios.map((c) => (
-            <div key={c.id} className="flex items-start gap-2">
-              <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
-              <div className="min-w-0 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
-                <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
-                  {c.autor.id === currentUser.id ? 'Você' : (c.autor.nome ?? 'Membro')}
-                </p>
-                <PostConteudoRich
-                  conteudo={c.conteudo}
-                  className="text-sm text-[rgb(var(--foreground))]"
-                />
+      <AnimatePresence initial={false}>
+        {mostrarSecaoComentarios && (
+          <m.div
+            key="comentarios"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springGentle}
+            className="mt-3 space-y-3 overflow-hidden"
+          >
+            {carregandoComentarios && comentarios.length === 0 && (
+              <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Carregando comentários…
               </div>
-            </div>
-          ))}
+            )}
 
-          {comentariosAbertos && (
-            <form onSubmit={enviarComentario} className="flex items-center gap-2">
-              <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
-              <div className="relative min-w-0 flex-1">
-                <input
-                  ref={inputRef}
-                  value={comentario}
-                  onChange={(e) => handleComentarioChange(e.target.value, e.target.selectionStart ?? undefined)}
-                  onKeyUp={(e) => handleComentarioChange(comentario, e.currentTarget.selectionStart ?? undefined)}
-                  maxLength={500}
-                  placeholder="Escreva um comentário… use @ para mencionar"
-                  className="h-9 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-                />
-                {mencaoQuery !== null && (
-                  <MentionPicker
-                    query={mencaoQuery}
-                    onSelect={inserirMencaoComentario}
-                    onClose={() => setMencaoQuery(null)}
+            <m.div
+              layout
+              className="space-y-3"
+              variants={{ show: { transition: { staggerChildren: 0.05 } } }}
+              initial="hidden"
+              animate="show"
+            >
+              {comentarios.map((c, i) => (
+                <m.div
+                  key={c.id}
+                  custom={i}
+                  variants={menuItemStagger}
+                  layout
+                  className="flex items-start gap-2"
+                >
+                  <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
+                  <div className="min-w-0 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
+                    <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
+                      {c.autor.id === currentUser.id ? 'Você' : (c.autor.nome ?? 'Membro')}
+                    </p>
+                    <PostConteudoRich
+                      conteudo={c.conteudo}
+                      className="text-sm text-[rgb(var(--foreground))]"
+                    />
+                  </div>
+                </m.div>
+              ))}
+            </m.div>
+
+            {comentariosAbertos && (
+              <form onSubmit={enviarComentario} className="flex items-center gap-2">
+                <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="xs" />
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    ref={inputRef}
+                    value={comentario}
+                    onChange={(e) => handleComentarioChange(e.target.value, e.target.selectionStart ?? undefined)}
+                    onKeyUp={(e) => handleComentarioChange(comentario, e.currentTarget.selectionStart ?? undefined)}
+                    maxLength={500}
+                    placeholder="Escreva um comentário… use @ para mencionar"
+                    className="h-9 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
                   />
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={pending || !comentario.trim()}
-                aria-label="Enviar comentário"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </form>
-          )}
-        </div>
-      )}
+                  {mencaoQuery !== null && (
+                    <MentionPicker
+                      query={mencaoQuery}
+                      onSelect={inserirMencaoComentario}
+                      onClose={() => setMencaoQuery(null)}
+                    />
+                  )}
+                </div>
+                <m.button
+                  type="submit"
+                  disabled={pending || !comentario.trim()}
+                  whileTap={{ scale: 0.9 }}
+                  transition={springSnappy}
+                  aria-label="Enviar comentário"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                </m.button>
+              </form>
+            )}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

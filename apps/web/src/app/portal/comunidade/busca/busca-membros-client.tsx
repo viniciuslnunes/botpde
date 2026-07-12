@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { AnimatePresence, m } from 'motion/react'
 import { Search, Loader2, Hash, FileText, Radio, Building2 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
@@ -12,6 +13,7 @@ import type { MembroBuscaItem } from '@/lib/comunidade-busca'
 import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais-shared'
 import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
 import type { PostSocialItem } from '@/lib/feed'
+import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
 
 interface BuscaResponse {
   membros: MembroBuscaItem[]
@@ -93,33 +95,73 @@ export function BuscaMembrosClient() {
         />
       </div>
 
-      {carregando && (
-        <div className="flex items-center justify-center gap-2 py-8 text-sm text-[rgb(var(--foreground-muted))]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Buscando…
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {carregando && (
+          <m.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center justify-center gap-2 py-8 text-sm text-[rgb(var(--foreground-muted))]"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Buscando…
+          </m.div>
+        )}
 
-      {erro && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-          {erro}
-        </p>
-      )}
+        {!carregando && erro && (
+          <m.p
+            key="erro"
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            transition={springSnappy}
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+          >
+            {erro}
+          </m.p>
+        )}
 
-      {vazio && (
-        <p className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhum resultado para &quot;{debounced}&quot;.
-        </p>
-      )}
+        {!carregando && vazio && (
+          <m.p
+            key="vazio"
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            transition={springSnappy}
+            className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
+          >
+            Nenhum resultado para &quot;{debounced}&quot;.
+          </m.p>
+        )}
 
-      {debounced.length < 2 && !carregando && (
-        <p className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Digite ao menos 2 caracteres para buscar.
-        </p>
-      )}
+        {!carregando && debounced.length < 2 && (
+          <m.p
+            key="hint"
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            transition={springSnappy}
+            className="py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
+          >
+            Digite ao menos 2 caracteres para buscar.
+          </m.p>
+        )}
+      </AnimatePresence>
 
+      {!carregando && !erro && debounced.length >= 2 && !vazio && (
+        <m.div
+          key={debounced}
+          initial="hidden"
+          animate="show"
+          variants={{ show: { transition: { staggerChildren: 0.05 } } }}
+          className="space-y-6"
+        >
       {resultado.unidades.length > 0 && (
-        <section className="space-y-2">
+        <m.section custom={0} variants={menuItemStagger} className="space-y-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
             <Building2 className="h-4 w-4" />
             Unidades
@@ -139,11 +181,11 @@ export function BuscaMembrosClient() {
               </Link>
             ))}
           </div>
-        </section>
+        </m.section>
       )}
 
       {resultado.canais.length > 0 && (
-        <section className="space-y-2">
+        <m.section custom={1} variants={menuItemStagger} className="space-y-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
             <Radio className="h-4 w-4" />
             Canais
@@ -163,11 +205,11 @@ export function BuscaMembrosClient() {
               </Link>
             ))}
           </div>
-        </section>
+        </m.section>
       )}
 
       {resultado.hashtags.length > 0 && (
-        <section className="space-y-2">
+        <m.section custom={2} variants={menuItemStagger} className="space-y-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
             <Hash className="h-4 w-4" />
             Hashtags
@@ -184,11 +226,11 @@ export function BuscaMembrosClient() {
               </Link>
             ))}
           </div>
-        </section>
+        </m.section>
       )}
 
       {resultado.membros.length > 0 && (
-        <section className="space-y-2">
+        <m.section custom={3} variants={menuItemStagger} className="space-y-2">
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Membros</h2>
           <div className="space-y-2">
             {resultado.membros.map((m) => (
@@ -213,11 +255,11 @@ export function BuscaMembrosClient() {
               </div>
             ))}
           </div>
-        </section>
+        </m.section>
       )}
 
       {resultado.posts.length > 0 && (
-        <section className="space-y-2">
+        <m.section custom={4} variants={menuItemStagger} className="space-y-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
             <FileText className="h-4 w-4" />
             Posts
@@ -239,7 +281,9 @@ export function BuscaMembrosClient() {
               </Link>
             ))}
           </div>
-        </section>
+        </m.section>
+      )}
+        </m.div>
       )}
     </div>
   )

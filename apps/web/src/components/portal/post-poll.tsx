@@ -1,25 +1,42 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { Loader2, Square } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { votarEnquetePost, encerrarEnquetePost } from '@/app/portal/comunidade/actions'
 import type { EnquetePostItem } from '@/lib/feed'
+import { springGentle, springSnappy } from '@/lib/motion-presets'
 
 interface PostPollProps {
   enquete: EnquetePostItem
   isAuthor?: boolean
 }
 
-export function PostPoll({ enquete, isAuthor = false }: PostPollProps) {
+export function PostPoll({ enquete: enqueteInicial, isAuthor = false }: PostPollProps) {
+  const [enquete, setEnquete] = useState(enqueteInicial)
   const [pending, startTransition] = useTransition()
 
+  const mostrarResultados = enquete.encerrada || enquete.meuVotoOpcaoId !== null
+
   function votar(opcaoId: string) {
-    if (enquete.encerrada || pending) return
+    if (enquete.encerrada || pending || enquete.meuVotoOpcaoId !== null) return
+
+    const jaVotou = enquete.meuVotoOpcaoId
+    setEnquete((prev) => ({
+      ...prev,
+      meuVotoOpcaoId: opcaoId,
+      totalVotos: jaVotou ? prev.totalVotos : prev.totalVotos + 1,
+      opcoes: prev.opcoes.map((op) =>
+        op.id === opcaoId ? { ...op, votos: op.votos + 1 } : op,
+      ),
+    }))
+
     startTransition(async () => {
       try {
         await votarEnquetePost(enquete.id, opcaoId)
       } catch (e) {
+        setEnquete(enqueteInicial)
         toast.error(e instanceof Error ? e.message : 'Não foi possível votar.')
       }
     })
@@ -30,6 +47,7 @@ export function PostPoll({ enquete, isAuthor = false }: PostPollProps) {
     startTransition(async () => {
       try {
         await encerrarEnquetePost(enquete.id)
+        setEnquete((prev) => ({ ...prev, encerrada: true }))
         toast.success('Enquete encerrada.')
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível encerrar.')
@@ -37,20 +55,24 @@ export function PostPoll({ enquete, isAuthor = false }: PostPollProps) {
     })
   }
 
-  const mostrarResultados = enquete.encerrada || enquete.meuVotoOpcaoId !== null
-
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
+    <m.div
+      layout
+      className="mt-3 space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3"
+    >
       {enquete.opcoes.map((op) => {
         const pct =
           enquete.totalVotos > 0 ? Math.round((op.votos / enquete.totalVotos) * 100) : 0
         const selecionada = enquete.meuVotoOpcaoId === op.id
         return (
-          <button
+          <m.button
             key={op.id}
             type="button"
+            layout
             disabled={enquete.encerrada || pending || enquete.meuVotoOpcaoId !== null}
             onClick={() => votar(op.id)}
+            whileTap={enquete.meuVotoOpcaoId === null && !enquete.encerrada ? { scale: 0.98 } : undefined}
+            transition={springSnappy}
             className={[
               'relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left text-sm transition-colors',
               selecionada
@@ -58,39 +80,68 @@ export function PostPoll({ enquete, isAuthor = false }: PostPollProps) {
                 : 'border-[rgb(var(--border))] hover:border-[rgb(var(--primary)_/_0.4)]',
             ].join(' ')}
           >
-            {mostrarResultados && (
-              <span
-                className="absolute inset-y-0 left-0 bg-[rgb(var(--primary)_/_0.12)]"
-                style={{ width: `${pct}%` }}
-              />
-            )}
+            <AnimatePresence>
+              {mostrarResultados && (
+                <m.span
+                  layout
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={springGentle}
+                  className="absolute inset-y-0 left-0 bg-[rgb(var(--primary)_/_0.12)]"
+                />
+              )}
+            </AnimatePresence>
             <span className="relative flex items-center justify-between gap-2">
               <span>{op.texto}</span>
-              {mostrarResultados && (
-                <span className="text-xs text-[rgb(var(--foreground-muted))]">{pct}%</span>
-              )}
+              <AnimatePresence>
+                {mostrarResultados && (
+                  <m.span
+                    key={`pct-${op.id}-${pct}`}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={springSnappy}
+                    className="text-xs text-[rgb(var(--foreground-muted))]"
+                  >
+                    {pct}%
+                  </m.span>
+                )}
+              </AnimatePresence>
             </span>
-          </button>
+          </m.button>
         )
       })}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-center text-[11px] text-[rgb(var(--foreground-muted))]">
+        <m.p layout className="text-center text-[11px] text-[rgb(var(--foreground-muted))]">
           {pending && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
           {enquete.totalVotos} voto{enquete.totalVotos === 1 ? '' : 's'}
-          {enquete.encerrada && ' · Encerrada'}
-        </p>
+          <AnimatePresence>
+            {enquete.encerrada && (
+              <m.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={springSnappy}
+              >
+                {' '}
+                · Encerrada
+              </m.span>
+            )}
+          </AnimatePresence>
+        </m.p>
         {isAuthor && !enquete.encerrada && (
-          <button
+          <m.button
             type="button"
             disabled={pending}
             onClick={encerrar}
+            whileTap={{ scale: 0.95 }}
+            transition={springSnappy}
             className="inline-flex items-center gap-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--primary))]"
           >
             <Square className="h-3 w-3" />
             Encerrar
-          </button>
+          </m.button>
         )}
       </div>
-    </div>
+    </m.div>
   )
 }

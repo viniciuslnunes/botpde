@@ -615,9 +615,11 @@ function ComposerBody({
                     >
                       <Smile className="h-5 w-5" />
                     </button>
-                    {emojiOpen && (
-                      <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
-                    )}
+                    <AnimatePresence>
+                      {emojiOpen && (
+                        <EmojiPicker key="emoji" onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
+                      )}
+                    </AnimatePresence>
                   </div>
                   <div className="relative">
                     <button
@@ -631,9 +633,11 @@ function ComposerBody({
                     >
                       <StickerIcon className="h-5 w-5" />
                     </button>
-                    {stickerOpen && (
-                      <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
-                    )}
+                    <AnimatePresence>
+                      {stickerOpen && (
+                        <StickerPicker key="sticker" onSelect={addSticker} onClose={() => setStickerOpen(false)} />
+                      )}
+                    </AnimatePresence>
                   </div>
                   <button
                     type="button"
@@ -787,21 +791,14 @@ function ComposerBody({
                   </AnimatePresence>
 
                   <AnimatePresence>
-                    {(emojiOpen || stickerOpen) && (
-                      <m.div
-                        key="mobile-pickers"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4 }}
-                        transition={springGentle}
-                        className="absolute bottom-full left-0 z-30 mb-2"
-                      >
-                        {emojiOpen && (
-                          <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
-                        )}
-                        {stickerOpen && (
-                          <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
-                        )}
+                    {emojiOpen && (
+                      <m.div key="emoji-mobile" className="absolute bottom-full left-0 z-30 mb-2">
+                        <EmojiPicker onSelect={(e) => insertEmoji(e)} onClose={() => setEmojiOpen(false)} />
+                      </m.div>
+                    )}
+                    {stickerOpen && (
+                      <m.div key="sticker-mobile" className="absolute bottom-full left-0 z-30 mb-2">
+                        <StickerPicker onSelect={addSticker} onClose={() => setStickerOpen(false)} />
                       </m.div>
                     )}
                   </AnimatePresence>

@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { m } from 'motion/react'
+import { springSnappy } from '@/lib/motion-presets'
 
 export type PerfilAba = 'sobre' | 'publicacoes' | 'fotos' | 'atividade'
 
@@ -32,12 +36,13 @@ export function PerfilTabs({ userId, abaAtiva }: PerfilTabsProps) {
             ].join(' ')}
           >
             {aba.label}
-            <span
-              className={[
-                'absolute inset-x-0 -bottom-px h-0.5 rounded-full transition-all duration-200',
-                ativo ? 'bg-[rgb(var(--primary))]' : 'bg-transparent',
-              ].join(' ')}
-            />
+            {ativo && (
+              <m.span
+                layoutId="perfil-tab-indicator"
+                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))]"
+                transition={springSnappy}
+              />
+            )}
           </Link>
         )
       })}
