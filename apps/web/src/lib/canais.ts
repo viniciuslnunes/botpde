@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import { canViewRecurso } from '@torcida/types'
+import { canViewRecurso, SYSTEM_ROLES } from '@torcida/types'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
 import { getEscopoEventosVisiveis } from './eventos'
@@ -53,13 +53,13 @@ export async function podeVerCanal(
 
 async function resolverOwnerId(tenantId: string): Promise<string> {
   const owner: { userId: string } | null = await db.userRole.findFirst({
-    where: { tenantId, role: { slug: 'owner' } },
+    where: { tenantId, role: { nome: SYSTEM_ROLES.OWNER, isSystem: true } },
     select: { userId: true },
   })
   if (owner) return owner.userId
 
   const admin: { userId: string } | null = await db.userRole.findFirst({
-    where: { tenantId, role: { slug: 'admin' } },
+    where: { tenantId, role: { nome: SYSTEM_ROLES.ADMIN, isSystem: true } },
     select: { userId: true },
   })
   if (admin) return admin.userId

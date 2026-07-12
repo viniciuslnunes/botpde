@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
+import { db, type Sede } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -34,24 +34,24 @@ export default async function AdminSedesPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id || !tenant) redirect('/portal')
 
-  // Busca todas as sedes do tenant organizadas hierarquicamente
-  const todasSedes = await db.sede.findMany({
+  // Busca todas as sedes do tenant; a árvore é montada em memória (N níveis)
+  const todasSedes: Sede[] = await db.sede.findMany({
     where: { tenantId: tenant.id },
     orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
-    include: {
-      filhos: {
-        orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
-        include: {
-          filhos: { orderBy: { nome: 'asc' } },
-        },
-      },
-    },
   })
 
-  type SedeFlat = (typeof todasSedes)[number]
+  type SedeFlat = Sede
+  type SedeNode = SedeFlat & { filhos: SedeNode[] }
 
-  // Apenas raízes (sem sede pai)
-  const raizes = todasSedes.filter((s: SedeFlat) => !s.sedeId)
+  const nodes = new Map<string, SedeNode>(
+    todasSedes.map((s: SedeFlat) => [s.id, { ...s, filhos: [] }]),
+  )
+  const raizes: SedeNode[] = []
+  for (const node of nodes.values()) {
+    const pai = node.sedeId ? nodes.get(node.sedeId) : undefined
+    if (pai) pai.filhos.push(node)
+    else raizes.push(node)
+  }
 
   // Para o select de sede pai no formulário de criação
   const sedesOption = todasSedes.map((s: SedeFlat) => ({
@@ -59,10 +59,6 @@ export default async function AdminSedesPage() {
     nome: s.nome,
     tipo: s.tipo,
   }))
-
-  type SedeNode = (typeof todasSedes)[number] & {
-    filhos: SedeNode[]
-  }
 
   function SedeCard({ sede, nivel = 0 }: { sede: SedeNode; nivel?: number }) {
     return (
@@ -146,7 +142,7 @@ export default async function AdminSedesPage() {
         {/* Filhos */}
         {sede.filhos.length > 0 && (
           <div className="mt-3 space-y-3">
-            {(sede.filhos as SedeNode[]).map((filho) => (
+            {sede.filhos.map((filho) => (
               <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} />
             ))}
           </div>
@@ -201,7 +197,7 @@ export default async function AdminSedesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {(raizes as SedeNode[]).map((sede) => (
+            {raizes.map((sede) => (
               <SedeCard key={sede.id} sede={sede} />
             ))}
           </div>
