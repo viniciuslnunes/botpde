@@ -57,6 +57,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Torcida não encontrada.' }, { status: 400 })
       }
       folder = `torcida/${torcida.id}/cadastro/${session.user.id}`
+    } else if (
+      tenantIdCadastro
+      && (purpose === 'perfil-banner' || purpose === 'perfil-avatar')
+    ) {
+      const torcida = await db.tenant.findFirst({
+        where: { id: tenantIdCadastro, ativo: true },
+        select: { id: true },
+      })
+      if (!torcida) {
+        return NextResponse.json({ error: 'Torcida não encontrada.' }, { status: 404 })
+      }
+      await assertMembroAtivo(torcida.id, session.user.id)
+      folder =
+        purpose === 'perfil-banner'
+          ? `torcida/${torcida.id}/perfis/${session.user.id}/banner`
+          : `torcida/${torcida.id}/perfis/${session.user.id}/avatar`
     } else {
       const tenant = await getTenantFromHost()
       if (!tenant) {

@@ -7,7 +7,7 @@ import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertP
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -299,69 +299,10 @@ export interface AtualizarPerfilSocialInput {
 }
 
 export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): Promise<void> {
-  // Usa o tenantId da tela (mesmo da página RSC). Re-resolver por host atrás de
-  // proxy/cookie multi-torcida gravava em outra linha de PerfilMembro — banner
-  // sumia no refresh enquanto a prévia local ainda mostrava a imagem.
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
-
-  const parsed = atualizarPerfilSocialSchema.safeParse(input)
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
-
-  const tenantId = parsed.data.tenantId
-  const tenant: { id: string; ativo: boolean } | null = await db.tenant.findUnique({
-    where: { id: tenantId },
-    select: { id: true, ativo: true },
-  })
-  if (!tenant?.ativo) throw new Error('Tenant não encontrado')
-
-  await assertMembroAtivo(tenant.id, session.user.id)
-
-  if (parsed.data.bannerUrl && !isCloudinaryUrl(parsed.data.bannerUrl)) {
-    throw new Error('Banner inválido')
-  }
-  if (parsed.data.avatarUrl && !isCloudinaryUrl(parsed.data.avatarUrl)) {
-    throw new Error('Avatar inválido')
-  }
-
-  await db.perfilMembro.upsert({
-    where: { userId_tenantId: { userId: session.user.id, tenantId: tenant.id } },
-    create: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
-      exibirCidade: parsed.data.exibirCidade,
-      exibirSede: parsed.data.exibirSede,
-      exibirDesde: parsed.data.exibirDesde,
-      bannerUrl: parsed.data.bannerUrl ?? null,
-      bannerPos: parsed.data.bannerPos ?? null,
-      avatarUrl: parsed.data.avatarUrl ?? null,
-    },
-    update: {
-      bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
-      exibirCidade: parsed.data.exibirCidade,
-      exibirSede: parsed.data.exibirSede,
-      exibirDesde: parsed.data.exibirDesde,
-      bannerUrl: parsed.data.bannerUrl ?? null,
-      bannerPos: parsed.data.bannerPos ?? null,
-      avatarUrl: parsed.data.avatarUrl ?? null,
-    },
-  })
-
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'PERFIL_SOCIAL_ATUALIZADO',
-      entidade: 'PerfilMembro',
-      entidadeId: session.user.id,
-    },
-  })
-
-  revalidatePath('/portal/comunidade')
-  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+  const { salvarPerfilSocial } = await import('@/lib/salvar-perfil-social')
+  await salvarPerfilSocial(session.user.id, input)
 }
 
 /** @deprecated Use atualizarPerfilSocial */
