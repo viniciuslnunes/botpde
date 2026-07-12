@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
-import { Camera, Loader2, Save } from 'lucide-react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { atualizarPerfilSocial } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
@@ -14,6 +14,8 @@ interface PerfilEditarFormProps {
   exibirDesde: boolean
   bannerUrl: string | null
   avatarUrl: string | null
+  /** Foto de login usada como fallback de exibição quando não há avatar social próprio. */
+  avatarFallback: string | null
 }
 
 export function PerfilEditarForm({
@@ -24,6 +26,7 @@ export function PerfilEditarForm({
   exibirDesde: desdeInicial,
   bannerUrl: bannerInicial,
   avatarUrl: avatarInicial,
+  avatarFallback,
 }: PerfilEditarFormProps) {
   const [bio, setBio] = useState(bioInicial)
   const [perfilPrivado, setPerfilPrivado] = useState(privadoInicial)
@@ -33,9 +36,23 @@ export function PerfilEditarForm({
   const [bannerUrl, setBannerUrl] = useState(bannerInicial)
   const [avatarUrl, setAvatarUrl] = useState(avatarInicial)
   const [uploading, setUploading] = useState<'banner' | 'avatar' | null>(null)
+  const [avatarMenu, setAvatarMenu] = useState(false)
   const [pending, startTransition] = useTransition()
   const bannerRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
+  const avatarBox = useRef<HTMLDivElement>(null)
+
+  // Avatar mostrado no slot: o social próprio quando existe, senão a foto de login.
+  const displayAvatar = avatarUrl ?? avatarFallback
+
+  useEffect(() => {
+    if (!avatarMenu) return
+    function onDown(e: MouseEvent) {
+      if (avatarBox.current && !avatarBox.current.contains(e.target as Node)) setAvatarMenu(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [avatarMenu])
 
   async function handleUpload(file: File, tipo: 'banner' | 'avatar') {
     setUploading(tipo)
@@ -128,27 +145,23 @@ export function PerfilEditarForm({
         </div>
 
         <div className="flex items-center gap-3 bg-[rgb(var(--surface))] px-4 pb-3">
-          <div className="-mt-8 shrink-0">
+          <div ref={avatarBox} className="relative -mt-8 shrink-0">
             <button
               type="button"
               disabled={uploading !== null}
-              onClick={() => avatarRef.current?.click()}
+              onClick={() => (displayAvatar ? setAvatarMenu((v) => !v) : avatarRef.current?.click())}
               className="group relative block h-16 w-16 overflow-hidden rounded-full ring-4 ring-[rgb(var(--surface))] disabled:opacity-60"
             >
-              {avatarUrl ? (
+              {displayAvatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img src={displayAvatar} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="grid h-full w-full place-items-center bg-[rgb(var(--background-subtle))]">
                   <Camera className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
                 </span>
               )}
               <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
-                {uploading === 'avatar' ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-white" />
-                ) : (
-                  <Camera className="h-4 w-4 text-white" />
-                )}
+                <Camera className="h-4 w-4 text-white" />
               </span>
               {uploading === 'avatar' && (
                 <span className="absolute inset-0 grid place-items-center bg-black/45">
@@ -156,9 +169,36 @@ export function PerfilEditarForm({
                 </span>
               )}
             </button>
+
+            {avatarMenu && displayAvatar && (
+              <div className="absolute left-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarMenu(false)
+                    window.open(displayAvatar, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <Eye className="h-4 w-4" />
+                  Ver imagem
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarMenu(false)
+                    avatarRef.current?.click()
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Alterar imagem de perfil
+                </button>
+              </div>
+            )}
           </div>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Toque na capa ou na foto para trocar. As alterações valem após salvar.
+            Toque na capa para trocar. Toque na foto para ver ou alterar. As alterações valem após salvar.
           </p>
         </div>
       </div>

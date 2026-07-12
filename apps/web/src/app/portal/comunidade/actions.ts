@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
-import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
 import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
@@ -297,8 +297,13 @@ export interface AtualizarPerfilSocialInput {
 }
 
 export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): Promise<void> {
-  const { session, tenant } = await getSessionAndPortalTenant()
+  // A edição pertence ao perfil DA torcida que está sendo vista na tela. A página
+  // resolve o tenant por `getTenantFromHost()`; a escrita precisa usar o mesmo, senão
+  // (usuário multi-torcida) o banner/avatar é gravado no PerfilMembro de outra torcida
+  // e nunca reflete no perfil aberto.
+  const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
+  const tenant = await getTenantFromHost()
   if (!tenant) throw new Error('Tenant não encontrado')
 
   await assertMembroAtivo(tenant.id, session.user.id)

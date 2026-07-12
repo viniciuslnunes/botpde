@@ -232,6 +232,7 @@ export default async function PerfilComunidadePage({
                   exibirDesde={perfil.exibirDesde}
                   bannerUrl={perfil.bannerUrl}
                   avatarUrl={perfil.avatarUrl}
+                  avatarFallback={user.avatarUrl}
                 />
               )}
               <PerfilSobre
