@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -18,6 +18,28 @@ interface PerfilEditarFormProps {
   avatarUrl: string | null
   /** Foto de login usada como fallback de exibição quando não há avatar social próprio. */
   avatarFallback: string | null
+}
+
+type PerfilPersistPayload = {
+  tenantId: string
+  bio: string
+  perfilPrivado: boolean
+  exibirCidade: boolean
+  exibirSede: boolean
+  exibirDesde: boolean
+  bannerUrl: string | null
+  bannerPos: number | null
+  avatarUrl: string | null
+}
+
+type PerfilPersistResponse = {
+  ok?: boolean
+  error?: string
+  perfil?: {
+    bannerUrl: string | null
+    bannerPos: number | null
+    avatarUrl: string | null
+  }
 }
 
 export function PerfilEditarForm({
@@ -47,11 +69,85 @@ export function PerfilEditarForm({
   const bannerRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const avatarBox = useRef<HTMLDivElement>(null)
-  // Estado do arraste vertical para enquadrar o banner (object-position Y).
+  const posSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drag = useRef<{ startY: number; startPos: number; h: number } | null>(null)
 
-  // Avatar mostrado no slot: o social próprio quando existe, senão a foto de login.
   const displayAvatar = avatarUrl ?? avatarFallback
+
+  // Sincroniza com dados do servidor após router.refresh().
+  useEffect(() => {
+    setBio(bioInicial)
+    setPerfilPrivado(privadoInicial)
+    setExibirCidade(cidadeInicial)
+    setExibirSede(sedeInicial)
+    setExibirDesde(desdeInicial)
+    setBannerUrl(bannerInicial)
+    setBannerPos(bannerPosInicial ?? 50)
+    setAvatarUrl(avatarInicial)
+  }, [
+    bioInicial,
+    privadoInicial,
+    cidadeInicial,
+    sedeInicial,
+    desdeInicial,
+    bannerInicial,
+    bannerPosInicial,
+    avatarInicial,
+  ])
+
+  const buildPayload = useCallback(
+    (overrides?: Partial<Pick<PerfilPersistPayload, 'bannerUrl' | 'bannerPos' | 'avatarUrl'>>): PerfilPersistPayload => {
+      const nextBanner = overrides?.bannerUrl !== undefined ? overrides.bannerUrl : bannerUrl
+      const nextPos = overrides?.bannerPos !== undefined ? overrides.bannerPos : bannerPos
+      return {
+        tenantId,
+        bio,
+        perfilPrivado,
+        exibirCidade,
+        exibirSede,
+        exibirDesde,
+        bannerUrl: nextBanner,
+        bannerPos: nextBanner ? nextPos : null,
+        avatarUrl: overrides?.avatarUrl !== undefined ? overrides.avatarUrl : avatarUrl,
+      }
+    },
+    [
+      tenantId,
+      bio,
+      perfilPrivado,
+      exibirCidade,
+      exibirSede,
+      exibirDesde,
+      bannerUrl,
+      bannerPos,
+      avatarUrl,
+    ],
+  )
+
+  const persistPerfil = useCallback(
+    async (
+      overrides?: Partial<Pick<PerfilPersistPayload, 'bannerUrl' | 'bannerPos' | 'avatarUrl'>>,
+      options?: { silent?: boolean; refresh?: boolean },
+    ) => {
+      const payload = buildPayload(overrides)
+      const res = await fetch('/api/perfil/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = (await res.json().catch(() => ({}))) as PerfilPersistResponse
+      if (!res.ok) throw new Error(body.error ?? 'Não foi possível salvar.')
+
+      if (body.perfil?.bannerUrl !== undefined) setBannerUrl(body.perfil.bannerUrl)
+      if (body.perfil?.bannerPos !== undefined) setBannerPos(body.perfil.bannerPos ?? 50)
+      if (body.perfil?.avatarUrl !== undefined) setAvatarUrl(body.perfil.avatarUrl)
+
+      if (options?.refresh !== false) router.refresh()
+      if (!options?.silent) toast.success('Perfil social atualizado.')
+      return body
+    },
+    [buildPayload, router],
+  )
 
   function onBannerPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!bannerUrl || uploading !== null) return
@@ -61,19 +157,26 @@ export function PerfilEditarForm({
   }
   function onBannerPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!drag.current) return
-    // Arrastar para cima revela a parte de baixo da imagem (posição aumenta).
     const delta = ((e.clientY - drag.current.startY) / drag.current.h) * 100
     setBannerPos(Math.min(100, Math.max(0, Math.round(drag.current.startPos - delta))))
   }
   function onBannerPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const moved = drag.current !== null
     drag.current = null
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    if (!moved || !bannerUrl) return
+    if (posSaveTimer.current) clearTimeout(posSaveTimer.current)
+    posSaveTimer.current = setTimeout(() => {
+      void persistPerfil(undefined, { silent: true, refresh: true }).catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível salvar o enquadramento.')
+      })
+    }, 400)
   }
 
   useEffect(() => {
     if (!avatarMenu) return
-    function onDown(e: MouseEvent) {
-      if (avatarBox.current && !avatarBox.current.contains(e.target as Node)) setAvatarMenu(false)
+    function onDown(ev: MouseEvent) {
+      if (avatarBox.current && !avatarBox.current.contains(ev.target as Node)) setAvatarMenu(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
@@ -86,9 +189,14 @@ export function PerfilEditarForm({
       const url = await uploadMediaToCloudinary(file, undefined, purpose, tenantId)
       if (tipo === 'banner') {
         setBannerUrl(url)
-        setBannerPos(50) // nova imagem começa centralizada
-      } else setAvatarUrl(url)
-      toast.success(tipo === 'banner' ? 'Banner carregado. Clique em salvar.' : 'Foto carregada. Clique em salvar.')
+        setBannerPos(50)
+        await persistPerfil({ bannerUrl: url, bannerPos: 50 }, { silent: true, refresh: true })
+        toast.success('Capa salva no perfil.')
+      } else {
+        setAvatarUrl(url)
+        await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true })
+        toast.success('Foto de perfil salva.')
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha no upload.')
     } finally {
@@ -99,25 +207,7 @@ export function PerfilEditarForm({
   function salvar() {
     startTransition(async () => {
       try {
-        const res = await fetch('/api/perfil/social', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenantId,
-            bio,
-            perfilPrivado,
-            exibirCidade,
-            exibirSede,
-            exibirDesde,
-            bannerUrl,
-            bannerPos: bannerUrl ? bannerPos : null,
-            avatarUrl,
-          }),
-        })
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        if (!res.ok) throw new Error(body.error ?? 'Não foi possível salvar.')
-        toast.success('Perfil social atualizado.')
-        router.refresh()
+        await persistPerfil()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível salvar.')
       }
@@ -129,6 +219,9 @@ export function PerfilEditarForm({
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         Editar perfil social
       </h2>
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Capa e foto são salvas automaticamente após o upload. Use o botão abaixo para bio e privacidade.
+      </p>
 
       <input
         ref={bannerRef}
@@ -153,7 +246,6 @@ export function PerfilEditarForm({
         }}
       />
 
-      {/* Prévia: faixa de capa + avatar sobreposto, espelhando o header do perfil. */}
       <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
         <div
           className={`relative h-28 select-none touch-none sm:h-32 ${bannerUrl ? 'cursor-ns-resize' : ''}`}
@@ -190,7 +282,7 @@ export function PerfilEditarForm({
 
           <button
             type="button"
-            disabled={uploading !== null}
+            disabled={uploading !== null || pending}
             onClick={() => bannerRef.current?.click()}
             className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur transition-opacity hover:opacity-90 disabled:opacity-60"
           >
@@ -203,7 +295,7 @@ export function PerfilEditarForm({
           <div ref={avatarBox} className="relative -mt-8 shrink-0">
             <button
               type="button"
-              disabled={uploading !== null}
+              disabled={uploading !== null || pending}
               onClick={() => (displayAvatar ? setAvatarMenu((v) => !v) : avatarRef.current?.click())}
               className="group relative block h-16 w-16 overflow-hidden rounded-full ring-4 ring-[rgb(var(--surface))] disabled:opacity-60"
             >
@@ -253,7 +345,7 @@ export function PerfilEditarForm({
             )}
           </div>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Toque na capa para trocar. Toque na foto para ver ou alterar. As alterações valem após salvar.
+            A capa aparece no topo do perfil assim que o upload terminar.
           </p>
         </div>
       </div>
@@ -299,7 +391,7 @@ export function PerfilEditarForm({
         className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        Salvar perfil
+        Salvar bio e privacidade
       </button>
     </section>
   )

@@ -118,7 +118,10 @@ export function PerfilSobre({
 
       {isSelf && (
         <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <h3 className="mb-4 text-sm font-semibold text-[rgb(var(--foreground))]">Dados pessoais</h3>
+          <h3 className="mb-1 text-sm font-semibold text-[rgb(var(--foreground))]">Dados pessoais</h3>
+          <p className="mb-4 text-xs text-[rgb(var(--foreground-muted))]">
+            Nome, telefone e cidade da filiação — não altera capa nem foto do perfil social.
+          </p>
           <PerfilForm {...membroForm} />
         </section>
       )}

@@ -4,10 +4,18 @@ import { atualizarPerfilSocialSchema } from '@torcida/types'
 import { assertMembroAtivo } from '@/lib/authz'
 import { isCloudinaryUrl } from '@/lib/social-embed'
 
+export interface PerfilSocialSalvo {
+  bannerUrl: string | null
+  bannerPos: number | null
+  avatarUrl: string | null
+  bio: string | null
+  perfilPrivado: boolean
+}
+
 export async function salvarPerfilSocial(
   userId: string,
   input: unknown,
-): Promise<void> {
+): Promise<PerfilSocialSalvo> {
   const parsed = atualizarPerfilSocialSchema.safeParse(input)
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
@@ -21,14 +29,18 @@ export async function salvarPerfilSocial(
 
   await assertMembroAtivo(tenant.id, userId)
 
-  if (parsed.data.bannerUrl && !isCloudinaryUrl(parsed.data.bannerUrl)) {
+  const bannerUrl = parsed.data.bannerUrl ?? null
+  const bannerPos = parsed.data.bannerPos ?? null
+  const avatarUrl = parsed.data.avatarUrl ?? null
+
+  if (bannerUrl && !isCloudinaryUrl(bannerUrl)) {
     throw new Error('Banner inválido')
   }
-  if (parsed.data.avatarUrl && !isCloudinaryUrl(parsed.data.avatarUrl)) {
+  if (avatarUrl && !isCloudinaryUrl(avatarUrl)) {
     throw new Error('Avatar inválido')
   }
 
-  await db.perfilMembro.upsert({
+  const saved: PerfilSocialSalvo = await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId, tenantId: tenant.id } },
     create: {
       userId,
@@ -38,9 +50,9 @@ export async function salvarPerfilSocial(
       exibirCidade: parsed.data.exibirCidade,
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,
-      bannerUrl: parsed.data.bannerUrl ?? null,
-      bannerPos: parsed.data.bannerPos ?? null,
-      avatarUrl: parsed.data.avatarUrl ?? null,
+      bannerUrl,
+      bannerPos,
+      avatarUrl,
     },
     update: {
       bio: parsed.data.bio?.trim() || null,
@@ -48,11 +60,22 @@ export async function salvarPerfilSocial(
       exibirCidade: parsed.data.exibirCidade,
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,
-      bannerUrl: parsed.data.bannerUrl ?? null,
-      bannerPos: parsed.data.bannerPos ?? null,
-      avatarUrl: parsed.data.avatarUrl ?? null,
+      bannerUrl,
+      bannerPos,
+      avatarUrl,
+    },
+    select: {
+      bannerUrl: true,
+      bannerPos: true,
+      avatarUrl: true,
+      bio: true,
+      perfilPrivado: true,
     },
   })
+
+  if (bannerUrl && saved.bannerUrl !== bannerUrl) {
+    throw new Error('Falha ao gravar a capa no banco. Confira se o schema está atualizado (db:push).')
+  }
 
   await db.auditLog.create({
     data: {
@@ -61,9 +84,12 @@ export async function salvarPerfilSocial(
       acao: 'PERFIL_SOCIAL_ATUALIZADO',
       entidade: 'PerfilMembro',
       entidadeId: userId,
+      detalhes: bannerUrl ? { bannerUrl: true } : undefined,
     },
   })
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
+
+  return saved
 }

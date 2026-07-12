@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
-import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
+import { canFollowUser, getSeguimentoStatus } from '@/lib/social'
 import {
   getAtividadeDoAutor,
   getContagensSeguimento,
@@ -29,7 +30,20 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Perfil da Comunidade' }
 
+export const dynamic = 'force-dynamic'
+
 const ABAS_VALIDAS: PerfilAba[] = ['sobre', 'publicacoes', 'fotos', 'atividade']
+
+const perfilSelect = {
+  bio: true,
+  perfilPrivado: true,
+  avatarUrl: true,
+  bannerUrl: true,
+  bannerPos: true,
+  exibirCidade: true,
+  exibirSede: true,
+  exibirDesde: true,
+} as const
 
 export default async function PerfilComunidadePage({
   params,
@@ -38,13 +52,15 @@ export default async function PerfilComunidadePage({
   params: Promise<{ userId: string }>
   searchParams: Promise<{ aba?: string }>
 }) {
-  const [{ userId }, { aba: abaRaw }, session, tenant] = await Promise.all([
+  noStore()
+  const [{ userId }, { aba: abaRaw }, session] = await Promise.all([
     params,
     searchParams,
     auth(),
-    getTenantFromHost(),
   ])
   if (!session?.user?.id) redirect('/entrar')
+
+  const tenant = await resolvePerfilTenantForUser(userId, session.user.id)
   if (!tenant) redirect('/portal')
 
   const aba: PerfilAba = ABAS_VALIDAS.includes(abaRaw as PerfilAba) ? (abaRaw as PerfilAba) : 'publicacoes'
@@ -77,21 +93,10 @@ export default async function PerfilComunidadePage({
   if (!user) redirect('/portal/comunidade')
 
   const isSelf = session.user.id === userId
-  const perfilAtual = isSelf
-    ? await getOrCreatePerfilMembro(session.user.id, tenant.id)
-    : await db.perfilMembro.findUnique({
-        where: { userId_tenantId: { userId, tenantId: tenant.id } },
-        select: {
-          bio: true,
-          perfilPrivado: true,
-          avatarUrl: true,
-          bannerUrl: true,
-          bannerPos: true,
-          exibirCidade: true,
-          exibirSede: true,
-          exibirDesde: true,
-        },
-      })
+  const perfilAtual = await db.perfilMembro.findUnique({
+    where: { userId_tenantId: { userId, tenantId: tenant.id } },
+    select: perfilSelect,
+  })
 
   const perfil = perfilAtual ?? {
     bio: null,
