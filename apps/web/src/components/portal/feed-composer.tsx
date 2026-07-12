@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState, useTransition } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
@@ -208,6 +208,19 @@ function ComposerBody({
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
+  // Abre o composer a partir do FAB do dock (evento) ou de `?compose=1` na URL.
+  useEffect(() => {
+    function onCompose() {
+      setExpanded(true)
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    }
+    window.addEventListener('comunidade:compose', onCompose)
+    if (new URLSearchParams(window.location.search).get('compose') === '1') {
+      onCompose()
+    }
+    return () => window.removeEventListener('comunidade:compose', onCompose)
+  }, [])
+
   function insertEmoji(emoji: string) {
     const el = textareaRef.current
     if (!el) {
@@ -289,7 +302,7 @@ function ComposerBody({
   return (
     <form
       onSubmit={submit}
-      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
+      className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
     >
     <div
       onDragOver={(e) => {

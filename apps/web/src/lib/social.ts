@@ -17,6 +17,18 @@ interface PerfilMembroLite {
 
 type SeguimentoStatus = 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO'
 
+/** Leitura do perfil social — use em pages/RSC (sem upsert em GET). */
+export async function getPerfilMembroForPortal(
+  userId: string,
+  tenantId: string,
+): Promise<Pick<PerfilMembroLite, 'perfilPrivado'>> {
+  const perfil: { perfilPrivado: boolean } | null = await db.perfilMembro.findUnique({
+    where: { userId_tenantId: { userId, tenantId } },
+    select: { perfilPrivado: true },
+  })
+  return { perfilPrivado: perfil?.perfilPrivado ?? true }
+}
+
 export async function getOrCreatePerfilMembro(
   userId: string,
   tenantId: string,

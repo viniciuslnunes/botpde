@@ -19,7 +19,7 @@ export async function ComunidadeStoriesSection({
   const rings = await getStoryRings(tenantId, currentUser.id)
   if (rings.length === 0) {
     return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+      <div className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
         <StoryRings
           rings={[]}
           currentUserId={currentUser.id}
@@ -31,7 +31,7 @@ export async function ComunidadeStoriesSection({
   }
 
   return (
-    <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+    <div className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
       <StoryRings
         rings={rings}
         currentUserId={currentUser.id}

@@ -101,30 +101,30 @@ export async function publicarPost(
   _prevState: PublicarPostState,
   formData: FormData,
 ): Promise<PublicarPostState> {
-  const parsed = postSchema.safeParse({
-    conteudo: formData.get('conteudo'),
-    midias: parseMidias(formData.get('midias')),
-    visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
-  })
-
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
-  }
-
-  const { conteudo, midias, visibilidade } = parsed.data
-
-  let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
-  let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
   try {
-    ;({ session, tenant } = await assertAutorPublicacaoPost(visibilidade))
-  } catch (error) {
-    return { message: error instanceof Error ? error.message : 'Não autorizado.' }
-  }
+    const parsed = postSchema.safeParse({
+      conteudo: formData.get('conteudo'),
+      midias: parseMidias(formData.get('midias')),
+      visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
+    })
 
-  const erroMencoes = erroMencoesExcessivas(conteudo)
-  if (erroMencoes) return { message: erroMencoes }
+    if (!parsed.success) {
+      return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+    }
 
-  try {
+    const { conteudo, midias, visibilidade } = parsed.data
+
+    let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
+    let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
+    try {
+      ;({ session, tenant } = await assertAutorPublicacaoPost(visibilidade))
+    } catch (error) {
+      return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+    }
+
+    const erroMencoes = erroMencoesExcessivas(conteudo)
+    if (erroMencoes) return { message: erroMencoes }
+
     await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
     const post = await db.post.create({

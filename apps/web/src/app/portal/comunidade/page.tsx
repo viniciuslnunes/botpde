@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { db } from '@torcida/db'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
-import { getOrCreatePerfilMembro } from '@/lib/social'
+import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
 
@@ -31,9 +31,10 @@ function SalasFallback() {
 export default async function ComunidadePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string }>
+  searchParams: Promise<{ cursor?: string; filtro?: string }>
 }) {
   const params = await searchParams
+  const filtro = params.filtro === 'seguindo' ? 'seguindo' : 'descobrir'
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
@@ -53,7 +54,7 @@ export default async function ComunidadePage({
   let somentePublico = false
   if (session?.user?.id != null) {
     const [perfil, eventos, badges, bloqueio, membro] = await Promise.all([
-      getOrCreatePerfilMembro(session.user.id, tenant.id),
+      getPerfilMembroForPortal(session.user.id, tenant.id),
       getEventosParaComposer(tenant.id, session.user.id),
       getResumoBadgesComunidade(tenant.id, session.user.id),
       checarPodePublicarNoFeed(session.user.id, tenant.id),
@@ -80,6 +81,7 @@ export default async function ComunidadePage({
         navBadges={navBadges}
         bloqueioPublicacao={bloqueioPublicacao}
         somentePublico={somentePublico}
+        filtro={filtro}
       />
 
       <aside className="hidden xl:block">

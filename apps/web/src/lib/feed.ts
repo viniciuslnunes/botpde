@@ -272,11 +272,12 @@ function decodeCursor(cursor?: string): FeedCursor | null {
   }
 }
 
-function encodeCursor(post: { id: string; criadoEm: Date }): string {
+function encodeCursor(post: { id: string; criadoEm: Date | string }): string {
+  const criadoEm = post.criadoEm instanceof Date ? post.criadoEm : new Date(post.criadoEm)
   return Buffer.from(
     JSON.stringify({
       id: post.id,
-      criadoEmIso: post.criadoEm.toISOString(),
+      criadoEmIso: criadoEm.toISOString(),
     }),
     'utf8',
   ).toString('base64url')
@@ -291,8 +292,12 @@ function buildCursorWhere(cursor: FeedCursor | null) {
   }
 }
 
-function sortPostsDesc(a: { criadoEm: Date }, b: { criadoEm: Date }): number {
-  return b.criadoEm.getTime() - a.criadoEm.getTime()
+function asDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value)
+}
+
+function sortPostsDesc(a: { criadoEm: Date | string }, b: { criadoEm: Date | string }): number {
+  return asDate(b.criadoEm).getTime() - asDate(a.criadoEm).getTime()
 }
 
 export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {

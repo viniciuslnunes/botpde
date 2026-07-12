@@ -25,7 +25,7 @@ interface FeedPostCardProps {
 export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAuthor, salvo = false }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
   return (
-    <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
         <Link href={`/portal/comunidade/perfil/${post.autor.id}`}>
           <Avatar nome={post.autor.nome} avatarUrl={post.autor.avatarUrl} size="md" />

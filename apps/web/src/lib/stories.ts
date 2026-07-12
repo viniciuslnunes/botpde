@@ -10,8 +10,8 @@ export interface MomentoStoryItem {
   userId: string
   midiaUrl: string
   conteudo: string | null
-  criadoEm: Date
-  expiraEm: Date
+  criadoEm: string
+  expiraEm: string
 }
 
 export interface StoryRingItem {
@@ -31,7 +31,14 @@ export const getMomentosStoryDoAutor = cache(async function getMomentosStoryDoAu
   tenantId: string,
 ): Promise<MomentoStoryItem[]> {
   const agora = new Date()
-  const rows: MomentoStoryItem[] = await db.momentoStory.findMany({
+  const rows: Array<{
+    id: string
+    userId: string
+    midiaUrl: string
+    conteudo: string | null
+    criadoEm: Date
+    expiraEm: Date
+  }> = await db.momentoStory.findMany({
     where: { userId, tenantId, expiraEm: { gt: agora } },
     orderBy: { criadoEm: 'asc' },
     select: {
@@ -43,7 +50,14 @@ export const getMomentosStoryDoAutor = cache(async function getMomentosStoryDoAu
       expiraEm: true,
     },
   })
-  return rows
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    midiaUrl: row.midiaUrl,
+    conteudo: row.conteudo,
+    criadoEm: row.criadoEm.toISOString(),
+    expiraEm: row.expiraEm.toISOString(),
+  }))
 })
 
 export const getStoryRings = cache(async function getStoryRings(
@@ -97,13 +111,13 @@ export const getStoryRings = cache(async function getStoryRings(
       userId: row.userId,
       midiaUrl: row.midiaUrl,
       conteudo: row.conteudo,
-      criadoEm: row.criadoEm,
-      expiraEm: row.expiraEm,
+      criadoEm: row.criadoEm.toISOString(),
+      expiraEm: row.expiraEm.toISOString(),
     }
 
     if (existente) {
       existente.momentos.push(momento)
-      if (momento.criadoEm > new Date(Date.now() - 6 * 60 * 60 * 1000)) {
+      if (new Date(momento.criadoEm) > new Date(Date.now() - 6 * 60 * 60 * 1000)) {
         existente.temNovo = true
       }
     } else {
@@ -122,8 +136,8 @@ export const getStoryRings = cache(async function getStoryRings(
     if (a.userId === viewerId) return -1
     if (b.userId === viewerId) return 1
     if (a.temNovo !== b.temNovo) return a.temNovo ? -1 : 1
-    return (b.momentos[b.momentos.length - 1]?.criadoEm.getTime() ?? 0) -
-      (a.momentos[a.momentos.length - 1]?.criadoEm.getTime() ?? 0)
+    return (new Date(b.momentos[b.momentos.length - 1]?.criadoEm ?? 0).getTime() ?? 0) -
+      (new Date(a.momentos[a.momentos.length - 1]?.criadoEm ?? 0).getTime() ?? 0)
   })
 
   return rings

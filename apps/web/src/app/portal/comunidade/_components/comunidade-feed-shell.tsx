@@ -8,6 +8,7 @@ import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
+import { ComunidadeFeedTabs } from './comunidade-feed-tabs'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -34,6 +35,7 @@ interface ComunidadeFeedShellProps {
   navBadges?: { notificacoesNaoLidas: number; solicitacoesPendentes: number }
   bloqueioPublicacao?: string | null
   somentePublico?: boolean
+  filtro?: 'descobrir' | 'seguindo'
 }
 
 function ComunicadosFallback() {
@@ -68,6 +70,7 @@ export function ComunidadeFeedShell({
   navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 },
   bloqueioPublicacao = null,
   somentePublico = false,
+  filtro = 'descobrir',
 }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
@@ -157,56 +160,29 @@ export function ComunidadeFeedShell({
       </aside>
 
       <main className="min-w-0 space-y-4">
-        <div className="lg:hidden">
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Comunidade</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            O feed da sua torcida e das aliadas
-          </p>
+        <div className="sticky top-14 z-20 -mx-4 bg-[rgb(var(--background-subtle))]/85 px-4 pt-1 backdrop-blur-md sm:top-14 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:backdrop-blur-none">
+          <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
+            <ComunidadeFeedTabs />
+          </Suspense>
         </div>
 
-        <nav className="flex flex-wrap gap-2 lg:hidden">
-          <Link
-            href="/portal/comunidade/salas"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Video className="h-4 w-4" /> Salas
-          </Link>
-          <Link
-            href="/portal/comunidade/rede"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Heart className="h-4 w-4" /> Minha rede
-          </Link>
-          <Link
-            href="/portal/comunidade/videos"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Video className="h-4 w-4" /> Vídeos
-          </Link>
-          <Link
-            href="/portal/comunidade/canais"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Radio className="h-4 w-4" /> Canais
-          </Link>
-          <Link
-            href="/portal/comunidade/grupos"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Users className="h-4 w-4" /> Grupos
-          </Link>
-          <Link
-            href="/portal/comunidade/busca"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <Search className="h-4 w-4" /> Buscar
-          </Link>
-          <Link
-            href="/portal/comunidade/seguindo"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))]"
-          >
-            <UserPlus className="h-4 w-4" /> Solicitações
-          </Link>
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+          {[
+            { href: '/portal/comunidade/salas', label: 'Salas', icon: Video },
+            { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart },
+            { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users },
+            { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio },
+            { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
+            { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
+          ].map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </Link>
+          ))}
         </nav>
 
         <Suspense fallback={null}>
@@ -243,6 +219,7 @@ export function ComunidadeFeedShell({
             tenantId={tenant.id}
             currentUser={currentUser}
             cursor={cursor}
+            filtro={filtro}
           />
         </Suspense>
       </main>
