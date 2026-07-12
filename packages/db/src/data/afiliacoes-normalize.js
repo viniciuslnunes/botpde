@@ -1,0 +1,145 @@
+/**
+ * Lógica pura (offline, testável) do seed de Afiliacao:
+ * normalização de nomes, geração de slug único e casamento
+ * clube-do-diretório ↔ time-da-API (TheSportsDB).
+ *
+ * Nenhuma dependência de rede ou de Prisma aqui — de propósito, para
+ * poder ser testada sem sandbox (ver `scripts/test-afiliacoes.js`).
+ */
+
+/** Ligas brasileiras na TheSportsDB → série do enum SerieCampeonato. */
+export const LIGAS = [
+  { liga: 'Brazilian_Serie_A', serie: 'A' },
+  { liga: 'Brazilian_Serie_B', serie: 'B' },
+  { liga: 'Brazilian_Serie_C', serie: 'C' },
+  { liga: 'Brazilian_Serie_D', serie: 'D' },
+]
+
+/**
+ * Aliases: `normalizeNome(nome do diretório)` → nome como aparece na API.
+ * Chave PRESERVA a UF (ex.: 'atletico mg' vs 'atletico go') porque a
+ * `chaveMatch` colapsaria ambos em 'atletico'. Valor passa por `chaveMatch`
+ * no lookup do índice. Só entram casos em que a normalização direta não casa.
+ */
+export const ALIASES = {
+  'athletico pr': 'athletico paranaense',
+  'atletico mg': 'atletico mineiro',
+  'atletico go': 'atletico goianiense',
+  'america mg': 'america mineiro',
+  'america rn': 'america de natal',
+  'bragantino': 'red bull bragantino',
+  'vasco': 'vasco da gama',
+}
+
+const SUFIXOS_UF = new Set([
+  'ac','al','am','ap','ba','ce','df','es','go','ma','mg','ms','mt','pa','pb',
+  'pe','pi','pr','rj','rn','ro','rr','rs','sc','se','sp','to',
+])
+
+const PALAVRAS_RUIDO = new Set([
+  'fc','ec','cf','ac','sc','fbc','afc','clube','club','futebol','esporte',
+  'esportivo','esportiva','de','da','do','das','dos','e','associacao',
+  'atletico', // NÃO: atletico é distintivo; removido da lista abaixo
+])
+// `atletico` é distintivo (Atlético-MG/GO/PR) — não deve ser ruído.
+PALAVRAS_RUIDO.delete('atletico')
+
+/**
+ * Remove acentos, baixa a caixa, tira pontuação e colapsa espaços.
+ * @param {string} nome
+ * @returns {string}
+ */
+export function normalizeNome(nome) {
+  return String(nome)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // acentos (combining diacritical marks)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ') // pontuação → espaço
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+/**
+ * Chave de casamento: normaliza e remove sufixos de UF e palavras de ruído
+ * (FC, EC, "de", "clube"…), preservando tokens distintivos.
+ * @param {string} nome
+ * @returns {string}
+ */
+export function chaveMatch(nome) {
+  const base = normalizeNome(nome)
+  const tokens = base
+    .split(' ')
+    .filter((t) => t.length > 0)
+    .filter((t) => !SUFIXOS_UF.has(t))
+    .filter((t) => !PALAVRAS_RUIDO.has(t))
+  const limpos = tokens.length > 0 ? tokens : base.split(' ')
+  return limpos.join(' ').trim()
+}
+
+/**
+ * Constrói índice normalizado da API: chaveMatch(strTeam) → dados.
+ * @param {{teams: Array<{strTeam:string,strTeamShort?:string,strBadge?:string,strLocation?:string}>|null}} payload
+ * @param {string} serie
+ * @param {Map<string, {nome:string,badge:string|null,serie:string,location:string|null}>} [into]
+ * @returns {Map<string, {nome:string,badge:string|null,serie:string,location:string|null}>}
+ */
+export function indexarLiga(payload, serie, into = new Map()) {
+  const teams = payload?.teams
+  if (!Array.isArray(teams)) return into
+  for (const t of teams) {
+    if (!t?.strTeam) continue
+    const chave = chaveMatch(t.strTeam)
+    if (!chave || into.has(chave)) continue
+    into.set(chave, {
+      nome: t.strTeam,
+      badge: t.strBadge || null,
+      serie,
+      location: t.strLocation || null,
+    })
+  }
+  return into
+}
+
+/**
+ * Casa um clube do diretório com o índice da API.
+ * Ordem: chave direta → alias → sem ruído.
+ * @param {{nome:string}} clube
+ * @param {Map<string, {nome:string,badge:string|null,serie:string,location:string|null}>} indice
+ * @returns {{nome:string,badge:string|null,serie:string,location:string|null}|null}
+ */
+export function casarClube(clube, indice) {
+  const chave = chaveMatch(clube.nome)
+  if (indice.has(chave)) return indice.get(chave)
+
+  const aliasKey = normalizeNome(clube.nome)
+  const alias = ALIASES[aliasKey]
+  if (alias) {
+    const chaveAlias = chaveMatch(alias)
+    if (indice.has(chaveAlias)) return indice.get(chaveAlias)
+  }
+  return null
+}
+
+/**
+ * Gera slug a partir de nome + UF, garantindo UNICIDADE contra um Set de
+ * slugs já usados (mutado). Sufixo incremental em colisão.
+ * @param {string} nome
+ * @param {string} estado UF
+ * @param {Set<string>} usados slugs já existentes/gerados (será mutado)
+ * @returns {string}
+ */
+export function gerarSlugUnico(nome, estado, usados) {
+  const baseNome = normalizeNome(nome).replace(/\s+/g, '-')
+  const uf = normalizeNome(estado || '').replace(/\s+/g, '-')
+  let base = uf ? `${baseNome}-${uf}` : baseNome
+  base = base.replace(/^-+|-+$/g, '') || 'clube'
+
+  let slug = base
+  let n = 2
+  while (usados.has(slug)) {
+    slug = `${base}-${n}`
+    n += 1
+  }
+  usados.add(slug)
+  return slug
+}

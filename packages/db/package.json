@@ -12,6 +12,8 @@
     "db:repair-system-roles": "node scripts/repair-system-role-permissions.js",
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
     "seed:loja-gavioes": "node --use-system-ca scripts/seed-loja-gavioes.js",
+    "seed:afiliacoes": "node --use-system-ca scripts/seed-afiliacoes.js",
+    "test:afiliacoes": "node scripts/test-afiliacoes.js",
     "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js"
   },
   "dependencies": {
