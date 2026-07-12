@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { PortalNavbar } from '@/components/portal/navbar'
 
@@ -23,7 +23,7 @@ export default async function PortalLayout({
     redirect('/onboarding')
   }
 
-  const tenant = await getTenantFromHost()
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
 
   return (
     <div className="min-h-screen bg-[rgb(var(--background-subtle))]">

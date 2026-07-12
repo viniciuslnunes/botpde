@@ -45,19 +45,20 @@ export default async function SucessoPage({
       )}
 
       <div className="rounded-xl border border-blue-900 bg-blue-950/50 p-4 text-sm text-blue-300">
-        <p className="font-semibold text-blue-200">Configure a variável de ambiente no Railway</p>
-        <div className="mt-2 rounded-lg bg-zinc-950 p-3 font-mono text-xs text-zinc-300">
-          <p>
-            <span className="text-zinc-500">Variável: </span>TENANT_SLUG
-          </p>
-          <p>
-            <span className="text-zinc-500">Valor: </span>
-            <span className="text-emerald-400">{slug ?? 'seu-slug'}</span>
-          </p>
-        </div>
+        <p className="font-semibold text-blue-200">Próximo passo: multi-tenant ou single-tenant</p>
         <p className="mt-2 text-xs text-blue-400">
-          Após definir essa variável e fazer redeploy, o sistema resolve o tenant corretamente em
-          qualquer domínio que não seja subdomínio do seu domínio principal.
+          Com <code className="font-mono text-blue-200">ROOT_DOMAIN</code> (recomendado), cada torcida
+          fica em <code className="font-mono text-blue-200">{slug ?? 'slug'}.seudominio.com</code>.
+          Sem domínio próprio, use <code className="font-mono text-blue-200">TENANT_SLUG={slug ?? 'seu-slug'}</code>{' '}
+          no Railway (modo legado). Ver{' '}
+          <code className="font-mono text-blue-200">docs/ops/deploy-multi-tenant.md</code>.
+        </p>
+        <p className="mt-2 text-xs text-blue-400">
+          Transfira a propriedade para o presidente em{' '}
+          <Link href="/super-admin/torcidas" className="text-blue-200 underline">
+            Torcidas da plataforma
+          </Link>
+          .
         </p>
       </div>
 

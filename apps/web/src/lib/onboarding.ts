@@ -58,7 +58,10 @@ export type EstadoOnboarding = {
 export const getAfiliacoesParaOnboarding = cache(
   async (busca?: string): Promise<AfiliacaoOnboarding[]> => {
     const termo = busca?.trim()
-    const afiliacoes: AfiliacaoOnboarding[] = await db.afiliacao.findMany({
+    type AfiliacaoComVinculos = AfiliacaoOnboarding & {
+      _count: { tenants: number }
+    }
+    const afiliacoes: AfiliacaoComVinculos[] = await db.afiliacao.findMany({
       where: termo
         ? {
             OR: [
@@ -75,12 +78,36 @@ export const getAfiliacoesParaOnboarding = cache(
         cidade: true,
         estado: true,
         serie: true,
+        _count: { select: { tenants: true } },
       },
-      // Postgres ordena NULLs por último em asc → escudoUrl asc coloca os não-nulos
-      // primeiro? Não: NULLS LAST em asc coloca não-nulos primeiro. Garantimos via ordem.
       orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
     })
-    return afiliacoes
+
+    // Bancos que receberam a versão antiga do seed podem ter duplicatas por
+    // nome+UF. Mostra uma só opção e prioriza a que está ligada a tenants,
+    // evitando selecionar uma cópia de Corinthians sem Gaviões/Camisa 12.
+    const unicas = new Map<string, AfiliacaoComVinculos>()
+    for (const afiliacao of afiliacoes) {
+      const chave = `${afiliacao.nome.trim().toLocaleLowerCase('pt-BR')}|${afiliacao.estado ?? ''}`
+      const atual = unicas.get(chave)
+      const deveSubstituir =
+        !atual
+        || afiliacao._count.tenants > atual._count.tenants
+        || (afiliacao._count.tenants === atual._count.tenants
+          && Boolean(afiliacao.escudoUrl)
+          && !atual.escudoUrl)
+      if (deveSubstituir) unicas.set(chave, afiliacao)
+    }
+
+    return [...unicas.values()].map((afiliacao) => ({
+      id: afiliacao.id,
+      nome: afiliacao.nome,
+      apelido: afiliacao.apelido,
+      escudoUrl: afiliacao.escudoUrl,
+      cidade: afiliacao.cidade,
+      estado: afiliacao.estado,
+      serie: afiliacao.serie,
+    }))
   },
 )
 
@@ -89,6 +116,27 @@ export const getAfiliacoesParaOnboarding = cache(
  */
 export const getTorcidasPorAfiliacao = cache(
   async (afiliacaoId: string): Promise<TorcidaOnboarding[]> => {
+    const afiliacaoSelecionada: { nome: string; estado: string | null } | null =
+      await db.afiliacao.findUnique({
+        where: { id: afiliacaoId },
+        select: { nome: true, estado: true },
+      })
+
+    // Compatibilidade com bancos afetados pelo seed antigo: procura todos os
+    // IDs do mesmo clube para que um PerfilTorcedor salvo na cópia sem Tenant
+    // ainda encontre Gaviões, Camisa 12, Pavilhão Nove etc.
+    let afiliacaoIds = [afiliacaoId]
+    if (afiliacaoSelecionada) {
+      const equivalentes: { id: string }[] = await db.afiliacao.findMany({
+        where: {
+          nome: { equals: afiliacaoSelecionada.nome, mode: 'insensitive' },
+          estado: afiliacaoSelecionada.estado,
+        },
+        select: { id: true },
+      })
+      afiliacaoIds = equivalentes.map((a) => a.id)
+    }
+
     type TenantComContagem = {
       id: string
       nome: string
@@ -99,7 +147,7 @@ export const getTorcidasPorAfiliacao = cache(
       sedes: SedeOnboarding[]
     }
     const tenants: TenantComContagem[] = await db.tenant.findMany({
-      where: { afiliacaoId, ativo: true },
+      where: { afiliacaoId: { in: afiliacaoIds }, ativo: true },
       select: {
         id: true,
         nome: true,

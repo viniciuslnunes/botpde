@@ -1,9 +1,11 @@
 import { cache } from 'react'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import { env } from '@/lib/env'
+import { TENANT_CTX_COOKIE } from '@/lib/tenant-context'
 
 export const TENANT_CACHE_TAG = 'tenant-by-slug'
 
@@ -38,35 +40,50 @@ async function fetchTenantBySlug(slug: string): Promise<Tenant | null> {
 }
 
 /**
- * Resolve o tenant a partir do hostname da requisição.
- * Ex: pde-gavioes.torcida.app → slug "pde-gavioes"
- * Em desenvolvimento: usa variável TENANT_SLUG como fallback.
+ * Resolve o tenant ativo da requisição.
+ * Ordem: subdomínio (ROOT_DOMAIN) → cookie torcida_ctx → TENANT_SLUG.
  */
 export const getTenantFromHost = cache(async function getTenantFromHost(): Promise<Tenant | null> {
   const headersList = await headers()
   const host = headersList.get('host') ?? ''
 
-  const slug = extractSlugFromHost(host)
-  if (!slug) return null
+  const slugFromHost = extractSlugFromSubdomain(host)
+  if (slugFromHost) return fetchTenantBySlug(slugFromHost)
 
-  return fetchTenantBySlug(slug)
+  const cookieStore = await cookies()
+  const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
+  if (slugFromCookie) return fetchTenantBySlug(slugFromCookie)
+
+  const fallback = fallbackTenantSlug(host)
+  if (fallback) return fetchTenantBySlug(fallback)
+
+  return null
 })
 
-function extractSlugFromHost(host: string): string | null {
+/** Slug vindo só de subdomínio real — não inclui TENANT_SLUG nem cookie. */
+function extractSlugFromSubdomain(host: string): string | null {
   const hostname = host.split(':')[0]
+  const rootDomain = env.ROOT_DOMAIN
+  if (!rootDomain) return null
 
+  if (hostname === rootDomain || hostname === `www.${rootDomain}`) return null
+
+  if (hostname.endsWith(`.${rootDomain}`)) {
+    return hostname.slice(0, -(rootDomain.length + 1)).split('.')[0] || null
+  }
+
+  return null
+}
+
+function fallbackTenantSlug(host: string): string | null {
+  const hostname = host.split(':')[0]
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return env.TENANT_SLUG ?? null
   }
-
-  const rootDomain = env.ROOT_DOMAIN
-  const parts = hostname.split('.')
-
-  if (rootDomain && hostname.endsWith(`.${rootDomain}`)) {
-    return parts[0]
+  if (!env.ROOT_DOMAIN) {
+    return env.TENANT_SLUG ?? null
   }
-
-  return env.TENANT_SLUG ?? null
+  return null
 }
 
 /**
@@ -82,13 +99,37 @@ export function buildPortalUrl(tenantSlug: string, path = '/portal/comunidade'):
   if (env.TENANT_SLUG && tenantSlug === env.TENANT_SLUG) {
     return normalized
   }
+  // Single-tenant com cookie: mesmo host, contexto via torcida_ctx.
+  if (!env.ROOT_DOMAIN) {
+    return normalized
+  }
   return `/onboarding/solicitado?torcida=${encodeURIComponent(tenantSlug)}`
 }
 
-/** Torcida disponível neste deploy (subdomínio ou TENANT_SLUG único). */
-export function torcidaAcessivelNoHost(tenantSlug: string): boolean {
+/** Torcida disponível neste host (subdomínio, cookie ou TENANT_SLUG). */
+export function torcidaAcessivelNoHost(_tenantSlug: string): boolean {
   if (env.ROOT_DOMAIN) return true
-  return !env.TENANT_SLUG || tenantSlug === env.TENANT_SLUG
+  // Single-tenant: cookie torcida_ctx permite qualquer torcida provisionada.
+  return true
+}
+
+/** Torcida ativa: host → cookie → vínculo do usuário (mesma requisição). */
+export async function getActiveTenant(
+  userId?: string,
+  email?: string | null,
+): Promise<Tenant | null> {
+  const fromHost = await getTenantFromHost()
+  if (fromHost) return fromHost
+
+  if (userId) {
+    const { resolveHomeTenantSlugForUser, isSuperAdminEmail } = await import('@/lib/tenant-context')
+    if (!isSuperAdminEmail(email)) {
+      const slug = await resolveHomeTenantSlugForUser(userId)
+      if (slug) return fetchTenantBySlug(slug)
+    }
+  }
+
+  return null
 }
 
 async function fetchUserPermissionsImpl(userId: string, tenantId: string) {

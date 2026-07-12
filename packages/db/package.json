@@ -13,6 +13,7 @@
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
     "seed:loja-gavioes": "node --use-system-ca scripts/seed-loja-gavioes.js",
     "seed:afiliacoes": "node --use-system-ca scripts/seed-afiliacoes.js",
+    "seed:migrate-escudos-cloudinary": "node --use-system-ca scripts/migrate-escudos-cloudinary.js",
     "seed:torcidas-nacional": "node scripts/seed-torcidas-nacional.js",
     "test:afiliacoes": "node scripts/test-afiliacoes.js",
     "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js"

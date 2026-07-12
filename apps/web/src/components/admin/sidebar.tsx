@@ -19,6 +19,8 @@ import {
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
+import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import type { TorcidaOpcao } from '@/lib/tenant-context'
 
 /** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */
 const ICON_BY_ID: Record<string, LucideIcon> = {
@@ -47,11 +49,21 @@ interface AdminMenuItem {
 interface AdminSidebarProps {
   tenantNome: string
   tenantCor: string
+  tenantSlug: string
   /** Itens já filtrados pelas permissões efetivas do usuário (ver ADMIN_MENU/filterMenuByPermissions) */
   items: AdminMenuItem[]
+  isSuperAdmin?: boolean
+  torcidas?: TorcidaOpcao[]
 }
 
-export function AdminSidebar({ tenantNome, tenantCor, items }: AdminSidebarProps) {
+export function AdminSidebar({
+  tenantNome,
+  tenantCor,
+  tenantSlug,
+  items,
+  isSuperAdmin = false,
+  torcidas = [],
+}: AdminSidebarProps) {
   const pathname = usePathname()
 
   function isActive(item: AdminMenuItem) {
@@ -74,6 +86,17 @@ export function AdminSidebar({ tenantNome, tenantCor, items }: AdminSidebarProps
           <p className="text-xs text-[rgb(var(--foreground-muted))]">Administração</p>
         </div>
       </div>
+
+      {isSuperAdmin && torcidas.length > 0 && (
+        <div className="border-b border-[rgb(var(--border))] px-4 py-3">
+          <TenantSwitcher
+            torcidas={torcidas}
+            torcidaAtualSlug={tenantSlug}
+            destino="admin"
+            variant="admin"
+          />
+        </div>
+      )}
 
       {/* Navegação */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">

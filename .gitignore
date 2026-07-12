@@ -47,5 +47,8 @@ apps/web/test-results/
 apps/bot/img/
 apps/bot/fonts/
 
+# Escudos de clubes — hospedados no Cloudinary (ver seed:migrate-escudos-cloudinary)
+apps/web/public/escudos/*.png
+
 # Config pessoal de editor (Cursor)
 .cursor/

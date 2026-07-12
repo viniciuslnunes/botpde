@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { superAdminEmails } from '@/lib/env'
+import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
+import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import { getTenantFromHost } from '@/lib/tenant'
+import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
 
 /**
  * Layout do Super Admin (operador do SaaS).
@@ -18,21 +21,35 @@ export default async function SuperAdminLayout({
     redirect('/entrar')
   }
 
-  if (!session.user.email || !superAdminEmails.includes(session.user.email)) {
+  if (!session.user.email || !isSuperAdminEmail(session.user.email)) {
     redirect('/')
   }
 
+  const [torcidas, tenant] = await Promise.all([
+    listarTorcidasParaSelecao(),
+    getTenantFromHost(),
+  ])
+
   return (
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Sidebar super-admin — tema fixo dark, independente do tenant */}
-      <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-900">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900">
         <div className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Super Admin
           </p>
           <p className="mt-1 text-sm font-medium text-zinc-200">Torcida SaaS</p>
         </div>
-        {/* SuperAdminNav */}
+        <SuperAdminNav />
+        {torcidas.length > 0 && (
+          <div className="mt-auto border-t border-zinc-800 p-4">
+            <TenantSwitcher
+              torcidas={torcidas}
+              torcidaAtualSlug={tenant?.slug ?? null}
+              destino="admin"
+              variant="super-admin"
+            />
+          </div>
+        )}
       </aside>
       <main className="flex-1 overflow-auto p-8">{children}</main>
     </div>

@@ -26,10 +26,10 @@ export default async function OnboardingPage() {
       select: { status: true },
     })
     if (membroHost?.status === 'APROVADO') {
-      redirect('/portal/comunidade')
+      redirect('/auth/contexto')
     }
   } else if (estado.perfil?.onboardingConcluidoEm && estado.temMembro) {
-    redirect('/portal/comunidade')
+    redirect('/auth/contexto')
   }
 
   const afiliacoesIniciais = await getAfiliacoesParaOnboarding()

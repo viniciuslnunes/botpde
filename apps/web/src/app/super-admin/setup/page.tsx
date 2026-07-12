@@ -96,11 +96,14 @@ export default async function SetupPage() {
 
       {/* Instrução de variável de ambiente */}
       <div className="rounded-xl border border-blue-900 bg-blue-950/50 p-4 text-sm text-blue-300">
-        <p className="font-semibold text-blue-200">Próximo passo após criar</p>
+        <p className="font-semibold text-blue-200">Multi-tenant em produção</p>
         <p className="mt-1">
-          Defina a variável de ambiente <code className="font-mono text-blue-100">TENANT_SLUG</code>{' '}
-          com o slug da torcida criada (ex: <code className="font-mono text-blue-100">pde</code>) no Railway para que a
-          resolução de tenant funcione enquanto não há domínio próprio com subdomínio.
+          Configure <code className="font-mono text-blue-100">ROOT_DOMAIN</code> + DNS wildcard no
+          Railway para cada torcida ter portal próprio. Modo legado:{' '}
+          <code className="font-mono text-blue-100">TENANT_SLUG</code> fixo.
+        </p>
+        <p className="mt-2 text-xs text-blue-400">
+          Runbook completo: <code className="font-mono">docs/ops/deploy-multi-tenant.md</code>
         </p>
       </div>
     </div>

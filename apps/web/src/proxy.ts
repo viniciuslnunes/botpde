@@ -7,9 +7,7 @@ const PUBLIC_PATHS = [
   '/api/auth',
   '/_next',
   '/favicon.ico',
-  // Assets públicos de marca — nunca podem ser gated (o otimizador de
-  // imagem os busca sem sessão; um redirect vira 400 em /_next/image).
-  '/escudos',
+  // Stickers locais — o otimizador de imagem busca sem sessão.
   '/stickers',
 ]
 
@@ -32,7 +30,7 @@ export const proxy = auth((req) => {
   }
 
   if (pathname === '/entrar') {
-    return NextResponse.redirect(new URL('/portal/comunidade', req.url))
+    return NextResponse.redirect(new URL('/auth/contexto', req.url))
   }
 
   const requestHeaders = new Headers(req.headers)

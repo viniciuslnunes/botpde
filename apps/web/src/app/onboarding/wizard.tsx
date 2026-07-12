@@ -292,7 +292,9 @@ function PassoClube({
 }
 
 function EscudoClube({ afiliacao }: { afiliacao: AfiliacaoOnboarding }) {
-  if (afiliacao.escudoUrl) {
+  const [imagemFalhou, setImagemFalhou] = useState(false)
+
+  if (afiliacao.escudoUrl && !imagemFalhou) {
     return (
       <Image
         src={afiliacao.escudoUrl}
@@ -300,6 +302,7 @@ function EscudoClube({ afiliacao }: { afiliacao: AfiliacaoOnboarding }) {
         width={56}
         height={56}
         className="h-14 w-14 object-contain"
+        onError={() => setImagemFalhou(true)}
       />
     )
   }

@@ -66,7 +66,7 @@ export default async function EntrarPage() {
               <form
                 action={async () => {
                   'use server'
-                  await signIn('discord', { redirectTo: '/portal/comunidade' })
+                  await signIn('discord', { redirectTo: '/auth/contexto' })
                 }}
               >
                 <button
@@ -89,7 +89,7 @@ export default async function EntrarPage() {
               <form
                 action={async () => {
                   'use server'
-                  await signIn('google', { redirectTo: '/portal/comunidade' })
+                  await signIn('google', { redirectTo: '/auth/contexto' })
                 }}
               >
                 <button

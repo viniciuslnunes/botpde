@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
 type AuthzResult = {
@@ -21,6 +22,10 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 
   if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
 
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant }
+  }
+
   const { rolePermissions, overrides }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
     await getUserPermissionsInTenant(session.user.id, tenant.id)
   const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
@@ -34,6 +39,10 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 export async function assertStoreView(): Promise<AuthzResult> {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id || !tenant) throw new Error('Não autorizado')
+
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant }
+  }
 
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(session.user.id, tenant.id)
   const effective = calculateEffectivePermissions(rolePermissions, overrides)
