@@ -17,7 +17,7 @@ export default async function NotificacoesComunidadePage() {
   const notificacoes = await listarNotificacoesSociais(tenant.id, session.user.id)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Bell}
         titulo="Notificações"

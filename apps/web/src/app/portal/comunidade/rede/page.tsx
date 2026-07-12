@@ -35,7 +35,7 @@ export default async function RedeComunidadePage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Heart}
         titulo="Minha rede"

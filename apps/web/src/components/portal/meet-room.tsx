@@ -180,7 +180,7 @@ function MeetControls({
   }, [isHost, localParticipant])
 
   useEffect(() => {
-    syncPermissions()
+    queueMicrotask(() => syncPermissions())
     localParticipant.on('participantPermissionsChanged', syncPermissions)
     return () => {
       localParticipant.off('participantPermissionsChanged', syncPermissions)

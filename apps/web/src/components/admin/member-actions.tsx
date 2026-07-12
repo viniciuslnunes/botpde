@@ -34,17 +34,17 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
 
   if (status === 'PENDENTE') {
     return (
-      <div className="flex items-center gap-2 justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           onClick={handleAprovar}
-          className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+          className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
         >
           <Check className="h-3 w-3" />
           Aprovar
         </button>
         <button
           onClick={handleReprovar}
-          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+          className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
         >
           <X className="h-3 w-3" />
           Reprovar
@@ -54,10 +54,10 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 justify-end">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <button
         onClick={handleReverter}
-        className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         title="Mover de volta para pendente"
       >
         <RotateCcw className="h-3 w-3" />
@@ -66,7 +66,7 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
       {status === 'REPROVADO' && (
         <button
           onClick={handleAprovar}
-          className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+          className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
         >
           <Check className="h-3 w-3" />
           Aprovar

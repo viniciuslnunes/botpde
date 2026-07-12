@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
 import { resolveProdutoImagemUrl } from '@/lib/produto-imagem'
 
@@ -44,15 +44,17 @@ interface ProdutoImagemProps {
   className?: string
 }
 
-export function ProdutoImagem({ src, alt, variant = 'card', className }: ProdutoImagemProps) {
-  const resolved = resolveProdutoImagemUrl(src)
+interface ProdutoImagemInnerProps {
+  resolved: string
+  alt: string
+  variant: ProdutoImagemVariant
+  className?: string
+}
+
+function ProdutoImagemInner({ resolved, alt, variant, className }: ProdutoImagemInnerProps) {
   const [failed, setFailed] = useState(false)
   const styles = VARIANT[variant]
-  const showPlaceholder = !resolved || failed
-
-  useEffect(() => {
-    setFailed(false)
-  }, [resolved])
+  const showPlaceholder = failed
 
   return (
     <div className={[styles.wrapper, className].filter(Boolean).join(' ')}>
@@ -63,7 +65,6 @@ export function ProdutoImagem({ src, alt, variant = 'card', className }: Produto
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={resolved}
           src={resolved}
           alt={alt}
           className={styles.img}
@@ -74,5 +75,30 @@ export function ProdutoImagem({ src, alt, variant = 'card', className }: Produto
         />
       )}
     </div>
+  )
+}
+
+export function ProdutoImagem({ src, alt, variant = 'card', className }: ProdutoImagemProps) {
+  const resolved = resolveProdutoImagemUrl(src)
+  const styles = VARIANT[variant]
+
+  if (!resolved) {
+    return (
+      <div className={[styles.wrapper, className].filter(Boolean).join(' ')}>
+        <div className="flex h-full w-full items-center justify-center">
+          <ShoppingBag className={[styles.icon, 'text-[rgb(var(--foreground-muted))]'].join(' ')} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <ProdutoImagemInner
+      key={resolved}
+      resolved={resolved}
+      alt={alt}
+      variant={variant}
+      className={className}
+    />
   )
 }

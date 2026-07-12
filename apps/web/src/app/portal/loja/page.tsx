@@ -55,7 +55,7 @@ export default async function PortalLojaPage({
   ])
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-gradient-to-br from-[rgb(var(--primary)_/_0.15)] to-transparent p-6">
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Loja oficial da torcida</h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">

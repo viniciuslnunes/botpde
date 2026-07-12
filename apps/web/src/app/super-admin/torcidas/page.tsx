@@ -27,7 +27,7 @@ export default async function TorcidasPage() {
   const semProvisionamento = totalTenants <= 1
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Gerenciar torcidas</h1>
         <p className="mt-2 text-sm text-zinc-400">

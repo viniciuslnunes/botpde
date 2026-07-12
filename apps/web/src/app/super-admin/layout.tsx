@@ -51,7 +51,9 @@ export default async function SuperAdminLayout({
           </div>
         )}
       </aside>
-      <main className="flex-1 overflow-auto p-8">{children}</main>
+      <main className="app-shell-bg flex-1 overflow-auto">
+        <div className="app-container py-8">{children}</div>
+      </main>
     </div>
   )
 }

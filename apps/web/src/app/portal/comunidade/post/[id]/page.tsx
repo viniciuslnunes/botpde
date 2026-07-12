@@ -33,7 +33,7 @@ export default async function PostComunidadePage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       <Link
         href="/portal/comunidade"
         className="inline-flex items-center text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"

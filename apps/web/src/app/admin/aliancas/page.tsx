@@ -37,8 +37,8 @@ export default async function AdminAliancasPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container flex items-center gap-3">
           <Handshake className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Alianças</h1>
@@ -49,8 +49,8 @@ export default async function AdminAliancasPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto max-w-3xl">
+      <div className="flex-1 overflow-auto py-6">
+        <div className="app-container">
           <AliancaForms
             tenantId={authz.tenant.id}
             aliancas={aliancas}

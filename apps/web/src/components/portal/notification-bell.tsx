@@ -38,7 +38,7 @@ export function NotificationBell({ initialItems }: { initialItems: NotificationI
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+        className="app-action relative flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
         title="Notificações"
       >
         <Bell className="h-4 w-4" />
@@ -52,7 +52,7 @@ export function NotificationBell({ initialItems }: { initialItems: NotificationI
       {open && (
         <>
           <button type="button" onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-          <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg">
+          <div className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg">
             <div className="border-b border-[rgb(var(--border))] px-2 pb-2">
               <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Notificações</p>
             </div>

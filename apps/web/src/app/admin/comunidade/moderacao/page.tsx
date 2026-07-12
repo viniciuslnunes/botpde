@@ -93,7 +93,7 @@ export default async function ModeracaoComunidadePage() {
   }
 
   return (
-    <div className="space-y-6 px-8 py-6">
+    <div className="app-container space-y-6 py-6">
       <div className="flex items-start gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 text-[rgb(var(--foreground-muted))]" />
         <div>

@@ -1,6 +1,6 @@
 export default function HierarquiaLoading() {
   return (
-    <div className="animate-pulse space-y-6 p-6">
+    <div className="app-container animate-pulse space-y-6 py-8">
       <div className="h-8 w-48 rounded-lg bg-[rgb(var(--border))]" />
       <div className="space-y-3">
         {Array.from({ length: 6 }).map((_, i) => (

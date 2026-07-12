@@ -8,8 +8,8 @@ export default function OnboardingLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-[rgb(var(--background-subtle))]">
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-4 py-8 sm:px-6">
+    <div className="app-shell-bg min-h-screen">
+      <main className="app-container relative flex min-h-screen flex-col py-8">
         {children}
       </main>
     </div>

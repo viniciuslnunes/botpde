@@ -2,6 +2,7 @@ import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { MessagesSquare, Megaphone } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { CriarPostForm, PostsManager } from '@/components/admin/post-forms'
@@ -41,8 +42,8 @@ export default async function AdminComunidadePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container flex items-center gap-3">
           <MessagesSquare className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Comunidade</h1>
@@ -53,15 +54,15 @@ export default async function AdminComunidadePage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto max-w-3xl space-y-8">
+      <div className="flex-1 overflow-auto py-6">
+        <div className="app-container space-y-8">
           {podeGerenciarPosts && (
             <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 Gerencie canais oficiais e comunidades temáticas em{' '}
-                <a href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--primary))] hover:underline">
+                <Link href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--primary))] hover:underline">
                   Portal → Comunidade → Canais
-                </a>
+                </Link>
                 .
               </p>
             </section>

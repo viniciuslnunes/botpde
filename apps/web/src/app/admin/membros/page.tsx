@@ -101,18 +101,19 @@ export default async function MembrosPage({
   return (
     <div className="flex flex-col h-full">
       {/* Cabeçalho */}
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Membros</h1>
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              {total} {total === 1 ? 'resultado' : 'resultados'}
-            </p>
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Membros</h1>
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                {total} {total === 1 ? 'resultado' : 'resultados'}
+              </p>
+            </div>
           </div>
-        </div>
 
         {/* Abas de status */}
-        <div className="mt-4 flex gap-1">
+        <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const active = statusFiltro === tab.status
@@ -161,10 +162,12 @@ export default async function MembrosPage({
             className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
           />
         </form>
+        </div>
       </div>
 
       {/* Tabela */}
-      <div className="flex-1 overflow-auto px-8 py-4">
+      <div className="flex-1 overflow-auto py-4">
+        <div className="app-container">
         {membros.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Users className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
@@ -174,8 +177,8 @@ export default async function MembrosPage({
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+            <table className="w-full min-w-[42rem] text-sm">
               <thead>
                 <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -304,6 +307,7 @@ export default async function MembrosPage({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

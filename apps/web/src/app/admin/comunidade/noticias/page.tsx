@@ -32,7 +32,7 @@ export default async function AdminNoticiasPage() {
 
   if (!tenant.afiliacaoId) {
     return (
-      <div className="px-8 py-6">
+      <div className="app-container py-6">
         <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
           Este tenant ainda não possui afiliação configurada para curadoria de notícias.
         </div>
@@ -47,7 +47,7 @@ export default async function AdminNoticiasPage() {
   })
 
   return (
-    <div className="space-y-6 px-8 py-6">
+    <div className="app-container space-y-6 py-6">
       <div className="flex items-start gap-3">
         <Newspaper className="mt-0.5 h-5 w-5 text-[rgb(var(--foreground-muted))]" />
         <div>

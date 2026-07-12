@@ -14,15 +14,15 @@ interface EmitirCarteirinhaFormProps {
   membrosElegiveis: MembroElegivel[]
 }
 
+function getValidadePadrao() {
+  return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+}
+
 export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFormProps) {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-
-  // Validade padrão: 1 ano a partir de hoje
-  const defaultValidade = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0]
+  const [defaultValidade] = useState(getValidadePadrao)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -141,12 +141,10 @@ interface SocioActionsProps {
   validade: string
 }
 
-export function SocioActions({ socioId, validade }: SocioActionsProps) {
+export function SocioActions({ socioId }: SocioActionsProps) {
   const [renovando, setRenovando] = useState(false)
   const [pending, startTransition] = useTransition()
-  const [novaValidade, setNovaValidade] = useState(
-    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  )
+  const [novaValidade, setNovaValidade] = useState(getValidadePadrao)
 
   function handleRenovar() {
     startTransition(async () => {
@@ -170,23 +168,23 @@ export function SocioActions({ socioId, validade }: SocioActionsProps) {
 
   if (renovando) {
     return (
-      <div className="flex items-center gap-2 justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <input
           type="date"
           value={novaValidade}
           onChange={(e) => setNovaValidade(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
-          className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
         />
         <button
           onClick={handleRenovar}
-          className="flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
+          className="app-action flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
         >
           <Check className="h-3 w-3" /> OK
         </button>
         <button
           onClick={() => setRenovando(false)}
-          className="rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+          className="app-action rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
         >
           <X className="h-3 w-3" />
         </button>
@@ -195,10 +193,10 @@ export function SocioActions({ socioId, validade }: SocioActionsProps) {
   }
 
   return (
-    <div className="flex items-center gap-1 justify-end">
+    <div className="flex flex-wrap items-center justify-end gap-1">
       <button
         onClick={() => setRenovando(true)}
-        className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         title="Renovar validade"
       >
         <RefreshCw className="h-3 w-3" />
@@ -206,7 +204,7 @@ export function SocioActions({ socioId, validade }: SocioActionsProps) {
       </button>
       <button
         onClick={handleRevogar}
-        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+        className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
         title="Revogar carteirinha"
       >
         <Trash2 className="h-3 w-3" />

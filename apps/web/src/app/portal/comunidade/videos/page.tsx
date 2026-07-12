@@ -17,7 +17,7 @@ export default async function VideosPage() {
   const posts = await getPostsComVideo(tenant.id, session.user.id)
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Video}
         titulo="Vídeos"

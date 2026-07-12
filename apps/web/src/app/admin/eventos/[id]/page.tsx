@@ -38,7 +38,7 @@ export default async function EditarEventoPage({
   const recusados = evento.rsvps.filter((r: Rsvp) => r.status === 'RECUSADO')
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="app-container space-y-6 py-8">
       <div>
         <Link
           href="/admin/eventos"

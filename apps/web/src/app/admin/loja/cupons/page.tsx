@@ -23,7 +23,7 @@ export default async function AdminCuponsPage() {
   })
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="app-container space-y-6 py-8">
       <Link href="/admin/loja" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
         <ArrowLeft className="h-4 w-4" /> Loja
       </Link>

@@ -3,7 +3,8 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, AlertTriangle, ArrowRight, CheckCircle2, Clock } from 'lucide-react'
+import { CreditCard, ArrowRight, CheckCircle2, Clock } from 'lucide-react'
+import { CarteirinhaValidadeAlerts } from '@/components/portal/carteirinha-validade-alerts'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha Carteirinha' }
@@ -80,7 +81,7 @@ export default async function CarteirinhaPage() {
   // Torcedor aprovado mas sem número de sócio
   if (membro.status === 'APROVADO' && !socio) {
     return (
-      <div className="mx-auto max-w-md space-y-6">
+      <div className="space-y-6">
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
 
         {/* Card de torcedor (sem número de sócio) */}
@@ -139,10 +140,9 @@ export default async function CarteirinhaPage() {
   if (!socio) return null
 
   const vencida = isVencida(socio.validade)
-  const diasRestantes = Math.ceil((socio.validade.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
         {!vencida && (
@@ -230,38 +230,7 @@ export default async function CarteirinhaPage() {
         </div>
       </div>
 
-      {/* Status e alertas */}
-      {vencida ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-          <div>
-            <p className="font-semibold text-red-800 dark:text-red-200">Carteirinha vencida</p>
-            <p className="mt-0.5 text-sm text-red-700 dark:text-red-300">
-              Sua carteirinha venceu em {socio.validade.toLocaleDateString('pt-BR')}. Entre em contato com a administração para renovar.
-            </p>
-          </div>
-        </div>
-      ) : diasRestantes <= 30 ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div>
-            <p className="font-semibold text-amber-800 dark:text-amber-200">Vence em breve</p>
-            <p className="mt-0.5 text-sm text-amber-700 dark:text-amber-300">
-              Sua carteirinha vence em {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}. Entre em contato com a administração para renovar.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-          <div>
-            <p className="font-semibold text-green-800 dark:text-green-200">Carteirinha ativa</p>
-            <p className="mt-0.5 text-sm text-green-700 dark:text-green-300">
-              Válida por mais {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}, até {socio.validade.toLocaleDateString('pt-BR')}.
-            </p>
-          </div>
-        </div>
-      )}
+      <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
 
       {/* Detalhes */}
       <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] divide-y divide-[rgb(var(--border))]">

@@ -104,8 +104,8 @@ export default async function HierarquiaPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container flex items-center gap-3">
           <Network className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Hierarquia</h1>
@@ -116,8 +116,8 @@ export default async function HierarquiaPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex-1 overflow-auto py-6">
+        <div className="app-container space-y-6">
           {!ancestral && descendentes.length === 0 && (
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               {tenant.nome} ainda não está vinculado a nenhuma sede ou subsede na plataforma.

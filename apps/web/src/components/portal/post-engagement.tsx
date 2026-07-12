@@ -76,7 +76,8 @@ export function PostEngagement({
 
   useEffect(() => {
     if (totalComentarios > 0) {
-      void carregarComentarios()
+      const timer = window.setTimeout(() => void carregarComentarios(), 0)
+      return () => window.clearTimeout(timer)
     }
   }, [totalComentarios, carregarComentarios])
 

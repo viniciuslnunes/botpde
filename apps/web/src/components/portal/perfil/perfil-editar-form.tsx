@@ -76,14 +76,16 @@ export function PerfilEditarForm({
 
   // Sincroniza com dados do servidor após router.refresh().
   useEffect(() => {
-    setBio(bioInicial)
-    setPerfilPrivado(privadoInicial)
-    setExibirCidade(cidadeInicial)
-    setExibirSede(sedeInicial)
-    setExibirDesde(desdeInicial)
-    setBannerUrl(bannerInicial)
-    setBannerPos(bannerPosInicial ?? 50)
-    setAvatarUrl(avatarInicial)
+    startTransition(() => {
+      setBio(bioInicial)
+      setPerfilPrivado(privadoInicial)
+      setExibirCidade(cidadeInicial)
+      setExibirSede(sedeInicial)
+      setExibirDesde(desdeInicial)
+      setBannerUrl(bannerInicial)
+      setBannerPos(bannerPosInicial ?? 50)
+      setAvatarUrl(avatarInicial)
+    })
   }, [
     bioInicial,
     privadoInicial,

@@ -60,7 +60,7 @@ export default async function AdminPedidosPage({
   const total = Object.values(contagemPorStatus).reduce((a, b) => a + b, 0)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="app-container space-y-6 py-8">
       <div className="flex items-center gap-3">
         <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
           <ArrowLeft className="h-4 w-4" /> Loja

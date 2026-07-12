@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, startTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -47,8 +47,10 @@ export function MensagensShell({
 
   useEffect(() => {
     if (initialConversas.length > 0) {
-      setConversas(initialConversas)
-      setCarregando(false)
+      startTransition(() => {
+        setConversas(initialConversas)
+        setCarregando(false)
+      })
     }
   }, [initialConversas])
 
@@ -60,21 +62,24 @@ export function MensagensShell({
       if (!res.ok) return
       const data = (await res.json()) as { conversas?: InboxItemDto[] }
       if (data.conversas) {
-        setConversas(data.conversas)
-        if (initialSelecionadaId && data.conversas.some((c) => c.id === initialSelecionadaId)) {
-          setSelecionadaId(initialSelecionadaId)
-        }
+        startTransition(() => {
+          setConversas(data.conversas!)
+          if (initialSelecionadaId && data.conversas!.some((c) => c.id === initialSelecionadaId)) {
+            setSelecionadaId(initialSelecionadaId)
+          }
+        })
       }
     } catch {
       // polling silencioso
     } finally {
-      setCarregando(false)
+      startTransition(() => setCarregando(false))
     }
   }, [initialSelecionadaId])
 
   useEffect(() => {
     if (initialConversas.length === 0) {
-      void atualizarInbox()
+      const timer = window.setTimeout(() => void atualizarInbox(), 0)
+      return () => window.clearTimeout(timer)
     }
   }, [initialConversas.length, atualizarInbox])
 

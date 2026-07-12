@@ -36,7 +36,7 @@ export default async function CadastroPage() {
   // Cadastro pendente → mostra aviso, não o formulário
   if (membro?.status === 'PENDENTE') {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="space-y-6">
         <div>
           <Link
             href="/portal"
@@ -83,7 +83,7 @@ export default async function CadastroPage() {
   const nomeInicial = membro?.nome ?? session.user.name ?? ''
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+      <div className="space-y-6">
       {/* Cabeçalho */}
       <div>
         <Link

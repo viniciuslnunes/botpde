@@ -11,7 +11,7 @@ export default async function CriarContaPage() {
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[rgb(var(--background))] p-4">
+    <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{

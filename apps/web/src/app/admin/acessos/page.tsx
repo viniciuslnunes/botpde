@@ -109,8 +109,8 @@ export default async function AcessosPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container flex items-center gap-3">
           <KeyRound className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Controle de acesso</h1>
@@ -121,8 +121,8 @@ export default async function AcessosPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto max-w-4xl">
+      <div className="flex-1 overflow-auto py-6">
+        <div className="app-container">
           {roles.length === 0 && departamentos.length === 0 ? (
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               Crie ao menos um cargo ou departamento em Configurações antes de atribuir acesso.

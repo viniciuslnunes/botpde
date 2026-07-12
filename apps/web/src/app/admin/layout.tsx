@@ -48,7 +48,7 @@ export default async function AdminLayout({
   const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[rgb(var(--background-subtle))]">
+    <div className="flex h-screen overflow-hidden">
       <AdminSidebar
         tenantNome={tenant.nome}
         tenantCor={tenant.corPrimaria}
@@ -57,7 +57,7 @@ export default async function AdminLayout({
         isSuperAdmin={isSuperAdmin}
         torcidas={torcidas}
       />
-      <main className="flex-1 overflow-auto">
+      <main className="app-shell-bg min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
         {isSuperAdmin && (
           <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
             Modo operador — gerenciando <strong>{tenant.nome}</strong>. Dados confidenciais

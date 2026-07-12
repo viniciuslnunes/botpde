@@ -100,7 +100,7 @@ export default async function AdminEventosPage() {
   }
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="app-container space-y-8 py-8">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div>

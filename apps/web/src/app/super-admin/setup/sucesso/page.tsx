@@ -12,7 +12,7 @@ export default async function SucessoPage({
   const { tenant: tenantId, slug } = await searchParams
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start gap-4 rounded-2xl border border-emerald-800 bg-emerald-950/50 p-6">
         <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-emerald-400" />
         <div>

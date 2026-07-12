@@ -26,7 +26,9 @@ export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
   useEffect(() => {
     // --color-primary é consumida como `rgb(var(--color-primary))` em todo o
     // app (ver globals.css) — precisa ser canais RGB, não o hex puro.
-    document.documentElement.style.setProperty('--color-primary', hexToRgb(cor))
+    const rgb = hexToRgb(cor)
+    document.documentElement.style.setProperty('--color-primary', rgb)
+    document.documentElement.style.setProperty('--primary', rgb)
     document.documentElement.style.setProperty('--color-primary-raw', cor)
   }, [cor])
 
@@ -34,8 +36,9 @@ export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
     <TenantThemeContext.Provider value={tenant ?? { corPrimaria: cor, nome: '' }}>
       <NextThemesProvider
         attribute="class"
-        defaultTheme="system"
-        enableSystem
+        defaultTheme="dark"
+        enableSystem={false}
+        storageKey="torcida-theme"
         disableTransitionOnChange
       >
         {children}

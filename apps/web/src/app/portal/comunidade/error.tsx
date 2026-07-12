@@ -15,7 +15,7 @@ export default function ComunidadeError({
   }, [error])
 
   return (
-    <div className="mx-auto max-w-lg rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center">
+    <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center">
       <h1 className="text-lg font-semibold text-[rgb(var(--foreground))]">
         Não foi possível carregar a comunidade
       </h1>

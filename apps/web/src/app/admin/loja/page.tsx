@@ -40,7 +40,7 @@ export default async function AdminLojaPage() {
   const inativos = produtos.filter((p: Produto) => !p.ativo)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="app-container space-y-6 py-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Loja</h1>

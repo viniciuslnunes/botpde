@@ -23,7 +23,7 @@ export default async function SalvosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Bookmark}
         titulo="Salvos"

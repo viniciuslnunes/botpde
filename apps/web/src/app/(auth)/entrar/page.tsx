@@ -10,22 +10,13 @@ export default async function EntrarPage() {
   const cor = tenant?.corPrimaria ?? '#7c3aed'
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[rgb(var(--background))] p-4">
+    <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
 
       {/* Gradiente decorativo de fundo */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
           background: `radial-gradient(ellipse 80% 60% at 50% -10%, ${cor}, transparent)`,
-        }}
-      />
-
-      {/* Grid pattern sutil */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(rgb(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--foreground)) 1px, transparent 1px)`,
-          backgroundSize: '48px 48px',
         }}
       />
 

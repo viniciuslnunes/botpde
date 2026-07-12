@@ -26,7 +26,7 @@ export default async function CheckoutPage() {
   const subtotal = itens.reduce((acc, i) => acc + i.produto.preco * i.quantidade, 0)
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 space-y-6">
+    <div className="space-y-6">
       <Link href="/portal/loja/sacola" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
         <ArrowLeft className="h-4 w-4" />
         Voltar à sacola

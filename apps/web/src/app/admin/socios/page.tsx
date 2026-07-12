@@ -91,7 +91,8 @@ export default async function SociosPage({
   return (
     <div className="flex flex-col h-full">
       {/* Cabeçalho */}
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-8 py-5">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
+        <div className="app-container">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Sócios</h1>
@@ -103,7 +104,7 @@ export default async function SociosPage({
         </div>
 
         {/* Abas */}
-        <div className="mt-4 flex gap-1">
+        <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
           {tabs.map((tab) => {
             const active = statusFiltro === tab.key
             return (
@@ -150,10 +151,12 @@ export default async function SociosPage({
             className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
           />
         </form>
+        </div>
       </div>
 
       {/* Conteúdo */}
-      <div className="flex-1 overflow-auto px-8 py-4">
+      <div className="flex-1 overflow-auto py-4">
+        <div className="app-container">
         {sociosFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <CreditCard className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
@@ -167,8 +170,8 @@ export default async function SociosPage({
             )}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+            <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">Nº</th>
@@ -266,6 +269,7 @@ export default async function SociosPage({
             </table>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

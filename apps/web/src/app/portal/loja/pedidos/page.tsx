@@ -83,7 +83,7 @@ export default async function MeusPedidosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/portal/loja" className="flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
           <ArrowLeft className="h-4 w-4" /> Loja

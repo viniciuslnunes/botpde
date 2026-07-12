@@ -18,12 +18,13 @@ import {
   X,
   ChevronDown,
 } from 'lucide-react'
-import { NotificationBell, type NotificationItem } from '@/components/portal/notification-bell'
+import { NotificationBell } from '@/components/portal/notification-bell'
 import { useNavbarContext } from '@/lib/use-navbar-context'
 import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const navLinks = [
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
@@ -59,7 +60,7 @@ export function PortalNavbar({
 
   function linkClass(active: boolean) {
     return [
-      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+      'app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
       active
         ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -68,7 +69,7 @@ export function PortalNavbar({
 
   function mobileLinkClass(active: boolean) {
     return [
-      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+      'app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
       active
         ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -78,7 +79,7 @@ export function PortalNavbar({
   return (
     <NavPendingProvider>
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="app-container flex h-14 items-center gap-4">
 
           <PortalNavLink href="/portal/comunidade" className="flex shrink-0 items-center gap-2" showSpinner={false}>
             <div
@@ -92,7 +93,7 @@ export function PortalNavbar({
             </span>
           </PortalNavLink>
 
-          <nav className="hidden flex-1 items-center gap-1 md:flex">
+          <nav className="hidden min-w-0 flex-1 items-center gap-1 lg:flex">
             {navLinks.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
@@ -135,8 +136,11 @@ export function PortalNavbar({
               )}
             </PortalNavLink>
             <NotificationBell initialItems={notifications} />
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
 
-            <div className="relative hidden md:block">
+            <div className="relative hidden lg:block">
               <button
                 onClick={() => setUserDropOpen((v) => !v)}
                 className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
@@ -207,7 +211,8 @@ export function PortalNavbar({
 
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] md:hidden"
+              className="app-action flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] lg:hidden"
+              aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
             >
               {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
@@ -215,7 +220,7 @@ export function PortalNavbar({
         </div>
 
         {menuOpen && (
-          <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 pb-4 pt-2 md:hidden">
+          <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 pb-4 pt-2 lg:hidden">
             <div className="mb-3 flex items-center gap-3 py-2">
               {userAvatar ? (
                 canOptimizeImageUrl(userAvatar) ? (
@@ -282,9 +287,10 @@ export function PortalNavbar({
                   Área Admin
                 </Link>
               )}
+              <ThemeToggle variant="row" />
               <button
                 onClick={() => signOut({ callbackUrl: '/entrar' })}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                className="app-action flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
               >
                 <LogOut className="h-4 w-4" />
                 Sair

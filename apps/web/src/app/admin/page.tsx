@@ -420,7 +420,7 @@ export default async function AdminPage() {
   const tenantInfo: TenantInfo = { id: tenant.id, nome: tenant.nome, corPrimaria: tenant.corPrimaria }
 
   return (
-    <div className="p-6 space-y-7">
+    <div className="app-container space-y-7 py-8">
       {/* Cabeçalho */}
       <div className="flex items-start justify-between">
         <div>

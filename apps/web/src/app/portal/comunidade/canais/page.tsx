@@ -32,7 +32,7 @@ export default async function CanaisPage() {
   ])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Radio}
         titulo="Canais"

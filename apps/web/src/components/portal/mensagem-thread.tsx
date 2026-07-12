@@ -146,14 +146,15 @@ export function MensagemThread({
 
   const carregarRef = useRef(carregar)
   const marcarLidaRef = useRef(marcarLida)
-  carregarRef.current = carregar
-  marcarLidaRef.current = marcarLida
+
+  useEffect(() => {
+    carregarRef.current = carregar
+    marcarLidaRef.current = marcarLida
+  }, [carregar, marcarLida])
 
   // Só reexecuta ao trocar de conversa — evita loop de loading quando onLida
   // atualiza o inbox do shell pai.
   useEffect(() => {
-    setCarregando(true)
-    setErro(null)
     lastCriadoEmRef.current = null
     void carregarRef.current(true)
     marcarLidaRef.current()

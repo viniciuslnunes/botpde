@@ -24,7 +24,7 @@ export default async function SacolaPage() {
   const itens: SacolaItemSerializado[] = rows.map(toSacolaItem)
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
+    <div className="space-y-6">
       <Link
         href="/portal/loja"
         className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"

@@ -2,7 +2,7 @@ import { LojaProdutoGridSkeleton } from '@/components/portal/loja-produto-skelet
 
 export default function LojaLoading() {
   return (
-    <div className="mx-auto max-w-7xl animate-pulse space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="animate-pulse space-y-6">
       <div className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.5)]" />
       <div className="flex gap-2">
         {Array.from({ length: 4 }).map((_, i) => (

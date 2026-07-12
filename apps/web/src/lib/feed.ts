@@ -937,7 +937,7 @@ export async function getDestaquesPerfil(
   })
 
   const postIds = [...new Set(rows.flatMap((d) => d.itens.map((i) => i.postId)))]
-  let postsMap = new Map<string, PostSocialItem>()
+  const postsMap = new Map<string, PostSocialItem>()
 
   if (viewerId && postIds.length > 0) {
     const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')

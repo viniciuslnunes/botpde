@@ -14,6 +14,7 @@
   /* Cor primária — sobrescrita por JavaScript com a cor do tenant */
   --color-primary: 124 58 237;       /* violet-700 padrão */
   --color-primary-raw: 124 58 237;
+  --primary: var(--color-primary);
 
   /* Backgrounds */
   --background: 255 255 255;
@@ -61,6 +62,7 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 /* ── Utilitários com cor primária do tenant ──────────────────── */
@@ -130,5 +132,63 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dock-rise {
     animation: none;
+  }
+}
+
+/* ── Shell do app: largura padrão (navbar) + grid de fundo ─────────
+   Use .app-shell-bg no wrapper externo; .app-container no conteúdo.
+   Cards e superfícies internas não devem herdar o grid. */
+.app-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 80rem; /* max-w-7xl — alinhado à navbar */
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+@media (min-width: 640px) {
+  .app-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .app-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.app-shell-bg {
+  position: relative;
+  background-color: rgb(var(--background-subtle));
+}
+.app-shell-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image:
+    linear-gradient(rgb(var(--foreground)) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--foreground)) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.app-scrollbar-none {
+  scrollbar-width: none;
+}
+.app-scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.app-action {
+  min-height: 2.5rem;
+}
+
+@media (pointer: coarse) {
+  .app-action {
+    min-height: 2.75rem;
   }
 }

@@ -38,7 +38,7 @@ export default async function CanalDetalhePage({
   const podePublicar = await podePublicarNoCanal(canal, tenant.id, permissoes)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="space-y-4">
       <Link
         href="/portal/comunidade/canais"
         className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"

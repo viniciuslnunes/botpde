@@ -152,7 +152,7 @@ export default async function AdminSedesPage() {
   }
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="app-container space-y-8 py-8">
       {/* Cabeçalho */}
       <div>
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Sedes</h1>

@@ -26,14 +26,14 @@ export default async function PortalLayout({
   const tenant = await getActiveTenant(session.user.id, session.user.email)
 
   return (
-    <div className="min-h-screen bg-[rgb(var(--background-subtle))]">
+    <div className="app-shell-bg min-h-screen">
       <PortalNavbar
         userName={session.user.name ?? null}
         userAvatar={session.user.image ?? null}
         tenantNome={tenant?.nome ?? 'Torcida'}
         tenantCor={tenant?.corPrimaria ?? '#7c3aed'}
       />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="app-container relative py-8">
         {children}
       </main>
     </div>

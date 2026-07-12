@@ -1,6 +1,6 @@
 export default function AdminPedidosLoading() {
   return (
-    <div className="animate-pulse space-y-6 p-6">
+    <div className="app-container animate-pulse space-y-6 py-8">
       <div className="flex items-center gap-3">
         <div className="h-9 w-20 rounded-lg bg-[rgb(var(--border))]" />
         <div className="h-7 w-28 rounded-lg bg-[rgb(var(--border))]" />

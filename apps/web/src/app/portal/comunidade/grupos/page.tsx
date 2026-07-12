@@ -17,7 +17,7 @@ export default async function GruposPage() {
   const grupos = await getGruposPublicos(tenant.id, session.user.id)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <ComunidadePageHeader
         icon={Users}
         titulo="Grupos"

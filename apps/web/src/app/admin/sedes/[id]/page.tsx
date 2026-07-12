@@ -30,7 +30,7 @@ export default async function EditarSedePage({
   if (!sede || sede.tenantId !== tenant.id) notFound()
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="app-container space-y-6 py-8">
       <div>
         <Link
           href="/admin/sedes"
