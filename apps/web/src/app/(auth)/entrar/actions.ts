@@ -3,23 +3,39 @@
 import { db } from '@torcida/db'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
-import { redirect } from 'next/navigation'
 import { excedeuLimite } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
-export type LoginSenhaState = { message?: string }
+export type LoginSenhaState = { message?: string; redirectTo?: string }
 
-/** signIn em Server Action: grava cookie com redirect:false e navega depois. */
-async function entrarComCredenciais(email: string, senha: string): Promise<LoginSenhaState> {
+function signInRetornouErro(result: unknown): boolean {
+  if (result == null || typeof result !== 'string') return true
+  try {
+    const url = new URL(result, 'http://local.invalid')
+    return url.searchParams.has('error')
+  } catch {
+    return result.includes('error=')
+  }
+}
+
+/**
+ * signIn com redirect:false grava o cookie na resposta da Server Action;
+ * o redirect() do servidor pode descartar esse cookie — o cliente navega depois.
+ */
+async function entrarComCredenciais(
+  email: string,
+  senha: string,
+  redirectTo: string,
+): Promise<LoginSenhaState> {
   try {
     const result = await signIn('credentials', {
       email,
       password: senha,
       redirect: false,
-      redirectTo: '/auth/contexto',
+      redirectTo,
     })
-    if (typeof result === 'string' && result.includes('error=')) {
+    if (signInRetornouErro(result)) {
       return { message: 'E-mail ou senha inválidos.' }
     }
   } catch (error) {
@@ -29,7 +45,7 @@ async function entrarComCredenciais(email: string, senha: string): Promise<Login
     throw error
   }
 
-  redirect('/auth/contexto')
+  return { redirectTo }
 }
 
 export async function entrarComSenha(
@@ -43,7 +59,7 @@ export async function entrarComSenha(
     return { message: 'Muitas tentativas com este e-mail. Tente novamente em alguns minutos.' }
   }
 
-  return entrarComCredenciais(email, senha)
+  return entrarComCredenciais(email, senha, '/auth/contexto')
 }
 
 const contaSchema = z
@@ -61,6 +77,7 @@ const contaSchema = z
 export type ContaState = {
   errors?: Record<string, string[]>
   message?: string
+  redirectTo?: string
 }
 
 export async function criarContaComSenha(
@@ -93,7 +110,7 @@ export async function criarContaComSenha(
   const senhaHash = await bcrypt.hash(senha, 10)
   await db.user.create({ data: { nome, email, senhaHash } })
 
-  const login = await entrarComCredenciais(email, senha)
+  const login = await entrarComCredenciais(email, senha, '/onboarding')
   if (login.message) {
     return {
       message:

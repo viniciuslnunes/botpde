@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { entrarComSenha, type LoginSenhaState } from './actions'
+import { AuthRedirectEffect } from './auth-redirect-effect'
 import { Mail, Lock, ChevronRight } from 'lucide-react'
 import { Input, SubmitButton, hexToRgb } from '@torcida/ui'
 import Link from 'next/link'
@@ -12,6 +13,7 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
   return (
     <div className="space-y-3">
       <form action={action} className="space-y-3">
+        <AuthRedirectEffect redirectTo={state.redirectTo} />
         {state.message && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
             {state.message}

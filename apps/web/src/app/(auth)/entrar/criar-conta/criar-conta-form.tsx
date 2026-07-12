@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { criarContaComSenha, type ContaState } from '../actions'
+import { AuthRedirectEffect } from '../auth-redirect-effect'
 import { UserCircle2, Mail, Lock, ChevronRight } from 'lucide-react'
 import { FieldError, Input, SubmitButton, hexToRgb } from '@torcida/ui'
 
@@ -10,6 +11,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
 
   return (
     <form action={action} className="space-y-4">
+      <AuthRedirectEffect redirectTo={state.redirectTo} />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}
