@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
-import { canViewRecurso, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
+import { canViewRecurso, ordenarPar, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
 
 export const HIERARCHY_CACHE_TAG = 'tenant-hierarchy'
 
@@ -15,7 +15,18 @@ export function invalidateHierarchyCache(tenantId?: string): void {
   if (tenantId) revalidateTag(hierarchyCacheTag(tenantId), 'max')
 }
 
-export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied'
+export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied' | 'rival'
+
+/**
+ * Invalida o cache de relações após mudanças em rivalidade (clube ou torcida).
+ * Rivalidade é GLOBAL (clube×clube) — as tags por tenant
+ * (`hierarchyCacheTag(tenantId)`) não cobrem todos os pares afetados, então a
+ * invalidação é da tag global. O CRUD de rivalidade (increment futuro) DEVE
+ * chamar esta função, senão a relação 'rival' fica obsoleta por até 300s.
+ */
+export function invalidateRivalidadeCache(): void {
+  revalidateTag(HIERARCHY_CACHE_TAG, 'max')
+}
 
 interface SedeNode {
   id: string
@@ -161,8 +172,44 @@ export async function tenantsAreAllied(tenantAId: string, tenantBId: string): Pr
 }
 
 /**
+ * Verifica se dois tenants são rivais (simétrico): existe RivalidadeTorcida
+ * entre eles (override torcida×torcida) OU RivalidadeClube entre as
+ * Afiliacoes dos dois (rivalidade herdada do clube). Pares gravados na forma
+ * canônica `aId < bId` — a consulta normaliza via `ordenarPar` (@torcida/types).
+ *
+ * NÃO checa aliança aqui: a neutralização "rival E NÃO aliancaAtiva" é
+ * garantida pela PRECEDÊNCIA em getTenantRelationImpl (allied vem antes).
+ */
+export async function tenantsAreRivais(tenantAId: string, tenantBId: string): Promise<boolean> {
+  if (tenantAId === tenantBId) return false
+
+  const [torcidaA, torcidaB] = ordenarPar(tenantAId, tenantBId)
+  const rivalTorcida: number = await db.rivalidadeTorcida.count({
+    where: { tenantAId: torcidaA, tenantBId: torcidaB },
+  })
+  if (rivalTorcida > 0) return true
+
+  const tenants: { id: string; afiliacaoId: string | null }[] = await db.tenant.findMany({
+    where: { id: { in: [tenantAId, tenantBId] } },
+    select: { id: true, afiliacaoId: true },
+  })
+  const afiliacaoA = tenants.find((t) => t.id === tenantAId)?.afiliacaoId
+  const afiliacaoB = tenants.find((t) => t.id === tenantBId)?.afiliacaoId
+  // Tenant sem afiliação não herda rivalidade de clube; mesmo clube nunca é rival.
+  if (!afiliacaoA || !afiliacaoB || afiliacaoA === afiliacaoB) return false
+
+  const [clubeA, clubeB] = ordenarPar(afiliacaoA, afiliacaoB)
+  const rivalClube: number = await db.rivalidadeClube.count({
+    where: { afiliacaoAId: clubeA, afiliacaoBId: clubeB },
+  })
+  return rivalClube > 0
+}
+
+/**
  * Determina o papel do tenant ATOR em relação ao tenant alvo — hierarquia
- * de Sede ou aliança ATIVA entre torcidas.
+ * de Sede, aliança ATIVA ou rivalidade entre torcidas.
+ * Precedência: self > ancestor/descendant > allied > rival > unrelated
+ * (aliança explícita ATIVA vence rivalidade herdada do clube).
  */
 async function getTenantRelationImpl(
   actorTenantId: string,
@@ -189,6 +236,10 @@ async function getTenantRelationImpl(
   }
 
   if (await tenantsAreAllied(actorTenantId, targetTenantId)) return 'allied'
+
+  // Só cai em 'rival' quando NÃO há self/hierarquia/allied — a aliança ATIVA
+  // neutraliza a rivalidade herdada do clube (spec-onboarding §3.2).
+  if (await tenantsAreRivais(actorTenantId, targetTenantId)) return 'rival'
 
   return 'unrelated'
 }

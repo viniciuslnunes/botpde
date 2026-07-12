@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
-import { getAlliedTenantIds, tenantsAreAllied } from './hierarquia'
+import { saoRivais } from '@torcida/types'
+import { getAlliedTenantIds, getTenantRelation, tenantsAreAllied } from './hierarquia'
 
 interface PerfilMembroLite {
   id: string
@@ -54,19 +55,36 @@ export async function canFollowUser(
         status: 'APROVADO',
         userId: { in: [seguidorId, seguidoId] },
       },
-      select: { userId: true, tenantId: true },
-    }) as Promise<{ userId: string; tenantId: string }[]>,
+      select: { userId: true, tenantId: true, tipo: true },
+    }) as Promise<{ userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }[]>,
   ])
 
   const visiveisNoContexto = new Set([tenantContextoId, ...aliadosContexto])
-  const seguidorTenants = vinculos
-    .filter((v) => v.userId === seguidorId && visiveisNoContexto.has(v.tenantId))
-    .map((v) => v.tenantId)
-  const seguidoTenants = vinculos
-    .filter((v) => v.userId === seguidoId && visiveisNoContexto.has(v.tenantId))
-    .map((v) => v.tenantId)
+  const seguidorVinculos = vinculos.filter(
+    (v) => v.userId === seguidorId && visiveisNoContexto.has(v.tenantId),
+  )
+  const seguidoVinculos = vinculos.filter(
+    (v) => v.userId === seguidoId && visiveisNoContexto.has(v.tenantId),
+  )
 
-  if (seguidorTenants.length === 0 || seguidoTenants.length === 0) return false
+  if (seguidorVinculos.length === 0 || seguidoVinculos.length === 0) return false
+
+  // Bloqueio de rivalidade (spec-onboarding §3.2): SOMENTE quando AMBOS os
+  // lados são sócios (tipo SOCIO, status APROVADO — o where já filtra) de
+  // torcidas rivais. Torcedores se relacionam livremente, inclusive entre
+  // rivais. canMessageUser delega para cá — este é o ponto único do funil.
+  for (const vinculoSeguidor of seguidorVinculos) {
+    if (vinculoSeguidor.tipo !== 'SOCIO') continue
+    for (const vinculoSeguido of seguidoVinculos) {
+      if (vinculoSeguido.tipo !== 'SOCIO') continue
+      if (vinculoSeguidor.tenantId === vinculoSeguido.tenantId) continue
+      const relation = await getTenantRelation(vinculoSeguidor.tenantId, vinculoSeguido.tenantId)
+      if (saoRivais(relation)) return false
+    }
+  }
+
+  const seguidorTenants = seguidorVinculos.map((v) => v.tenantId)
+  const seguidoTenants = seguidoVinculos.map((v) => v.tenantId)
 
   const seguidorSet = new Set(seguidorTenants)
   for (const tenantId of seguidoTenants) {

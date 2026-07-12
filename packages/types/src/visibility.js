@@ -26,7 +26,7 @@ export const RECURSO_SENSIBILIDADE = /** @type {const} */ ({
  * Relação entre dois tenants na árvore de Sede — computada por quem tem
  * acesso ao banco (ver getTenantRelation em apps/web/src/lib/hierarquia.ts),
  * consumida aqui de forma pura.
- * @typedef {'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied'} TenantRelation
+ * @typedef {'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied' | 'rival'} TenantRelation
  */
 
 /**
@@ -46,6 +46,10 @@ export function resolveVisibility(relation, sensibilidade) {
   if (relation === 'descendant' || relation === 'allied') {
     return sensibilidade === SENSIBILIDADE.PUBLICO
   }
+  // Rival nunca vê NADA — nem o público. Caso explícito (e não só o fallback)
+  // para a segregação sobreviver a mudanças no return final: rivalidade é o
+  // mecanismo anti-infiltração entre torcidas (spec-onboarding §3.2).
+  if (relation === 'rival') return false
   return false
 }
 
