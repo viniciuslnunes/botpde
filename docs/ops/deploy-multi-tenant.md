@@ -27,6 +27,8 @@ compartilhado entre subdomínios e isolamento de dados por tenant.
 | `TENANT_SLUG` | *(remover ou deixar vazio)* | Só fallback de dev local |
 | `SUPER_ADMIN_EMAILS` | `ops@exemplo.com` | E-mails do operador SaaS |
 | `AUTH_SECRET` | *(manter)* | Mín. 32 caracteres |
+| `AUTH_URL` / `NEXTAUTH_URL` | *(omitir ou domínio público)* | **Nunca** `http://localhost:3000` em produção — quebra login/OAuth |
+| `AUTH_TRUST_HOST` | `true` | Opcional; o código já define `trustHost: true` no NextAuth |
 | OAuth Discord/Google | *(manter)* | Ver seção 4 |
 
 Após alterar env vars, redeploy do serviço.

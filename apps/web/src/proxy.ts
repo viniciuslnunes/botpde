@@ -24,13 +24,17 @@ export const proxy = auth((req) => {
   }
 
   if (!session) {
-    const loginUrl = new URL('/entrar', req.url)
+    const loginUrl = req.nextUrl.clone()
+    loginUrl.pathname = '/entrar'
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   if (pathname === '/entrar') {
-    return NextResponse.redirect(new URL('/auth/contexto', req.url))
+    const dest = req.nextUrl.clone()
+    dest.pathname = '/auth/contexto'
+    dest.search = ''
+    return NextResponse.redirect(dest)
   }
 
   const requestHeaders = new Headers(req.headers)

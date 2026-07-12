@@ -14,6 +14,9 @@ import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
 const cookieDomain = env.ROOT_DOMAIN ? `.${env.ROOT_DOMAIN}` : undefined
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Railway e outros proxies: confiar no Host/x-forwarded-* da requisição.
+  // Sem isso, callbacks OAuth podem montar URL com localhost em produção.
+  trustHost: true,
   providers: [
     Discord({
       clientId: env.DISCORD_CLIENT_ID,

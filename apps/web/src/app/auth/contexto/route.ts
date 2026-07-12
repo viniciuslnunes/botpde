@@ -11,20 +11,23 @@ import {
  * Pós-login: define cookie de torcida (single-tenant) ou redireciona
  * para subdomínio (multi-tenant). Cookies só podem ser gravados aqui
  * (Route Handler), não em layouts/pages.
+ *
+ * Redirects same-origin usam path relativo — evita localhost quando
+ * request.url reflete o host interno do container (Railway).
  */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL('/entrar', request.url))
+    return NextResponse.redirect('/entrar')
   }
 
   if (isSuperAdminEmail(session.user.email)) {
-    return NextResponse.redirect(new URL('/super-admin/torcidas', request.url))
+    return NextResponse.redirect('/super-admin/torcidas')
   }
 
   const slug = await resolveHomeTenantSlugForUser(session.user.id)
   if (!slug) {
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+    return NextResponse.redirect('/onboarding')
   }
 
   if (env.ROOT_DOMAIN) {
@@ -34,7 +37,7 @@ export async function GET(request: Request) {
     )
   }
 
-  const response = NextResponse.redirect(new URL('/portal/comunidade', request.url))
+  const response = NextResponse.redirect('/portal/comunidade')
   response.cookies.set(TENANT_CTX_COOKIE, slug, {
     httpOnly: true,
     sameSite: 'lax',

@@ -121,6 +121,24 @@ function validateEnv() {
 
 export const env = validateEnv()
 
+if (process.env.NODE_ENV === 'production') {
+  const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL
+  if (authUrl) {
+    try {
+      const { hostname } = new URL(authUrl)
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        console.error(
+          '\n❌  AUTH_URL/NEXTAUTH_URL aponta para localhost em produção.\n' +
+            '   Remova a variável ou defina o domínio público (ex.: https://torcida.app).\n' +
+            '   Alternativa: AUTH_TRUST_HOST=true e sem AUTH_URL.\n',
+        )
+      }
+    } catch {
+      // Auth.js reportará URL inválida.
+    }
+  }
+}
+
 // ── Helpers derivados ─────────────────────────────────────────────────────────
 
 export const superAdminEmails: string[] = env.SUPER_ADMIN_EMAILS
