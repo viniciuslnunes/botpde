@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { env, isProd } from '@/lib/env'
+import { publicUrl } from '@/lib/request-origin'
 import {
   isSuperAdminEmail,
   resolveHomeTenantSlugForUser,
@@ -12,22 +13,22 @@ import {
  * para subdomínio (multi-tenant). Cookies só podem ser gravados aqui
  * (Route Handler), não em layouts/pages.
  *
- * Redirects same-origin usam path relativo — evita localhost quando
- * request.url reflete o host interno do container (Railway).
+ * Route Handlers exigem URL absoluta em NextResponse.redirect — usar
+ * publicUrl() para respeitar x-forwarded-host no Railway (não localhost).
  */
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
-    return NextResponse.redirect('/entrar')
+    return NextResponse.redirect(publicUrl('/entrar', request))
   }
 
   if (isSuperAdminEmail(session.user.email)) {
-    return NextResponse.redirect('/super-admin/torcidas')
+    return NextResponse.redirect(publicUrl('/super-admin/torcidas', request))
   }
 
   const slug = await resolveHomeTenantSlugForUser(session.user.id)
   if (!slug) {
-    return NextResponse.redirect('/onboarding')
+    return NextResponse.redirect(publicUrl('/onboarding', request))
   }
 
   if (env.ROOT_DOMAIN) {
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     )
   }
 
-  const response = NextResponse.redirect('/portal/comunidade')
+  const response = NextResponse.redirect(publicUrl('/portal/comunidade', request))
   response.cookies.set(TENANT_CTX_COOKIE, slug, {
     httpOnly: true,
     sameSite: 'lax',
