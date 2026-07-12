@@ -65,7 +65,8 @@ async function resolverOwnerId(tenantId: string): Promise<string> {
   if (admin) return admin.userId
 
   const membro: { userId: string } | null = await db.saasMembro.findFirst({
-    where: { tenantId, status: 'ATIVO' },
+    // StatusMembro não tem 'ATIVO' — APROVADO é o estado ativo terminal.
+    where: { tenantId, status: 'APROVADO' },
     select: { userId: true },
     orderBy: { criadoEm: 'asc' },
   })

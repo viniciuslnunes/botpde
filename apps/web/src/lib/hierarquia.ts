@@ -195,7 +195,10 @@ async function getTenantRelationImpl(
 
 export const getTenantRelation = cache(
   async (actorTenantId: string, targetTenantId: string): Promise<TenantRelation> => {
-    const pairKey = [actorTenantId, targetTenantId].sort().join(':')
+    // Chave DIRECIONAL: a relação é assimétrica (ancestor ≠ descendant) —
+    // chave simétrica servia a 1ª direção cacheada para as duas, deixando
+    // um descendente ver RESTRITO do ancestral.
+    const pairKey = `${actorTenantId}:${targetTenantId}`
     return unstable_cache(
       () => getTenantRelationImpl(actorTenantId, targetTenantId),
       ['tenant-relation', pairKey],

@@ -515,6 +515,21 @@ export interface HashtagEmAlta {
   total: number
 }
 
+/**
+ * Gate do feed de sócios: só vínculo APROVADO no tenant libera posts TENANT.
+ * PENDENTE/REPROVADO/sem vínculo → só feed de torcedor (ver spec §3.1).
+ */
+export const podeVerFeedSocios = cache(
+  async (userId: string | undefined, tenantId: string): Promise<boolean> => {
+    if (!userId) return false
+    const membro: { status: string } | null = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { status: true },
+    })
+    return membro?.status === 'APROVADO'
+  },
+)
+
 /** Verifica se o viewer pode abrir o post (perfil + visibilidade do post). */
 export async function podeVerPost(
   viewerId: string,
@@ -530,11 +545,8 @@ export async function podeVerPost(
   if (viewerId === post.autorId) return true
   if (post.visibilidade === 'PUBLICO') return true
   if (post.visibilidade === 'TENANT') {
-    const membro: { status: string } | null = await db.saasMembro.findUnique({
-      where: { tenantId_userId: { tenantId: post.tenantId, userId: viewerId } },
-      select: { status: true },
-    })
-    return membro?.status === 'ATIVO'
+    // TODO(onboarding): aplicar podeVerFeedSocios no where — ver spec §3.1
+    return podeVerFeedSocios(viewerId, post.tenantId)
   }
   const status = await getSeguimentoStatus(viewerId, post.autorId)
   return status === 'APROVADO'

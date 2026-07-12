@@ -143,6 +143,8 @@ model Tenant {
   perfilDestaques   PerfilDestaque[]
   postSalvos        PostSalvo[]
   momentosStory     MomentoStory[]
+  rivalTorcidaA     RivalidadeTorcida[]   @relation("RivalTorcidaA")
+  rivalTorcidaB     RivalidadeTorcida[]   @relation("RivalTorcidaB")
 
   @@map("saas_tenants")
 }
@@ -209,6 +211,7 @@ model User {
   perfilDestaques             PerfilDestaque[]
   postsSalvos                 PostSalvo[]
   momentosStory               MomentoStory[]
+  perfilTorcedor              PerfilTorcedor?
 
   @@map("saas_users")
 }
@@ -777,19 +780,82 @@ model AnnouncementRead {
 // ─── AFILIAÇÃO GLOBAL (time apoiado) ─────────────────────────────────────────
 
 model Afiliacao {
-  id             String   @id @default(uuid())
+  id             String            @id @default(uuid())
   nome           String
   apelido        String?
-  escudoUrl      String?  @map("escudo_url")
+  slug           String?           @unique
+  serie          SerieCampeonato?
+  escudoUrl      String?           @map("escudo_url")
   cidade         String?
   estado         String?
-  apiExternalId  String?  @map("api_external_id")
-  criadoEm       DateTime @default(now()) @map("criado_em")
+  apiExternalId  String?           @map("api_external_id")
+  criadoEm       DateTime          @default(now()) @map("criado_em")
 
-  tenants  Tenant[]
-  noticias Noticia[]
+  tenants     Tenant[]
+  noticias    Noticia[]
+  torcedores  PerfilTorcedor[]
+  rivalClubeA RivalidadeClube[] @relation("RivalClubeA")
+  rivalClubeB RivalidadeClube[] @relation("RivalClubeB")
 
   @@map("saas_afiliacoes")
+}
+
+enum SerieCampeonato {
+  A
+  B
+  C
+  D
+  ESTADUAL
+  OUTRA
+}
+
+// ─── PERFIL GLOBAL DE TORCEDOR (independe de tenant) ─────────────────────────
+
+model PerfilTorcedor {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  afiliacaoId           String?   @map("afiliacao_id") // clube que torce
+  regiao                String?   // cidade/estado do torcedor
+  bio                   String?
+  onboardingConcluidoEm DateTime? @map("onboarding_concluido_em")
+  criadoEm              DateTime  @default(now()) @map("criado_em")
+  atualizadoEm          DateTime  @updatedAt @map("atualizado_em")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  afiliacao Afiliacao? @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+
+  @@index([afiliacaoId])
+  @@map("saas_perfis_torcedor")
+}
+
+// ─── RIVALIDADES (par canônico: sempre gravar com aId < bId) ─────────────────
+
+model RivalidadeClube {
+  id           String   @id @default(uuid())
+  afiliacaoAId String   @map("afiliacao_a_id")
+  afiliacaoBId String   @map("afiliacao_b_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  afiliacaoA Afiliacao @relation("RivalClubeA", fields: [afiliacaoAId], references: [id], onDelete: Cascade)
+  afiliacaoB Afiliacao @relation("RivalClubeB", fields: [afiliacaoBId], references: [id], onDelete: Cascade)
+
+  @@unique([afiliacaoAId, afiliacaoBId])
+  @@index([afiliacaoBId])
+  @@map("saas_rivalidades_clube")
+}
+
+model RivalidadeTorcida {
+  id        String   @id @default(uuid())
+  tenantAId String   @map("tenant_a_id")
+  tenantBId String   @map("tenant_b_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  tenantA Tenant @relation("RivalTorcidaA", fields: [tenantAId], references: [id], onDelete: Cascade)
+  tenantB Tenant @relation("RivalTorcidaB", fields: [tenantBId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantAId, tenantBId])
+  @@index([tenantBId])
+  @@map("saas_rivalidades_torcida")
 }
 
 // ─── ALIANÇAS ENTRE TORCIDAS ─────────────────────────────────────────────────
