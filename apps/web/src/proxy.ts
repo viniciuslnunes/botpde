@@ -11,6 +11,9 @@ const PUBLIC_PATHS = [
   '/stickers',
 ]
 
+/** Auth real fica no Route Handler / página — evita falso negativo do proxy. */
+const AUTH_DEFER_PATHS = ['/auth/contexto', '/onboarding']
+
 export const proxy = auth((req) => {
   if (process.env.NODE_ENV === 'development') {
     resetPrismaQueryCount()
@@ -20,6 +23,10 @@ export const proxy = auth((req) => {
   const session = req.auth
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next()
+  }
+
+  if (AUTH_DEFER_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next()
   }
 

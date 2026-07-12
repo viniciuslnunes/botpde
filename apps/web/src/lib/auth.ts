@@ -6,12 +6,10 @@ import bcrypt from 'bcryptjs'
 import { db } from '@torcida/db'
 import { env, isProd } from '@/lib/env'
 import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
+import { resolveSharedCookieDomain } from '@/lib/session-cookie'
 
-// Domínio do cookie de sessão — só sobrescrito quando ROOT_DOMAIN está
-// configurado (subdomínio real ou lvh.me em dev), pra sessão ser
-// compartilhada entre sede/subsede/PDE. Sem ROOT_DOMAIN, comportamento
-// padrão do NextAuth (cookie escopado ao host atual) não muda.
-const cookieDomain = env.ROOT_DOMAIN ? `.${env.ROOT_DOMAIN}` : undefined
+// Cookie compartilhado entre subdomínios só quando o host público = ROOT_DOMAIN.
+const cookieDomain = resolveSharedCookieDomain()
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Railway e outros proxies: confiar no Host/x-forwarded-* da requisição.

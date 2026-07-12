@@ -29,6 +29,7 @@ compartilhado entre subdomínios e isolamento de dados por tenant.
 | `AUTH_SECRET` | *(manter)* | Mín. 32 caracteres |
 | `AUTH_URL` / `NEXTAUTH_URL` | *(omitir ou domínio público)* | **Nunca** `http://localhost:3000` em produção — quebra login/OAuth |
 | `AUTH_TRUST_HOST` | `true` | Opcional; o código já define `trustHost: true` no NextAuth |
+| `ROOT_DOMAIN` + Railway | ver nota abaixo | Com `*.up.railway.app`, cookies de sessão ficam host-only automaticamente |
 | OAuth Discord/Google | *(manter)* | Ver seção 4 |
 
 Após alterar env vars, redeploy do serviço.
