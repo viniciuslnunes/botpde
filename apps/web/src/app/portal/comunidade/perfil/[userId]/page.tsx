@@ -86,6 +86,7 @@ export default async function PerfilComunidadePage({
           perfilPrivado: true,
           avatarUrl: true,
           bannerUrl: true,
+          bannerPos: true,
           exibirCidade: true,
           exibirSede: true,
           exibirDesde: true,
@@ -97,6 +98,7 @@ export default async function PerfilComunidadePage({
     perfilPrivado: true,
     avatarUrl: null,
     bannerUrl: null,
+    bannerPos: null,
     exibirCidade: false,
     exibirSede: false,
     exibirDesde: true,
@@ -188,6 +190,7 @@ export default async function PerfilComunidadePage({
         nome={user.nome}
         avatarUrl={avatarUrl}
         bannerUrl={perfil.bannerUrl}
+        bannerPos={perfil.bannerPos}
         perfilPrivado={perfil.perfilPrivado}
         tenantNome={tenant.nome}
         segueVoce={segueVoce}
@@ -231,6 +234,7 @@ export default async function PerfilComunidadePage({
                   exibirSede={perfil.exibirSede}
                   exibirDesde={perfil.exibirDesde}
                   bannerUrl={perfil.bannerUrl}
+                  bannerPos={perfil.bannerPos}
                   avatarUrl={perfil.avatarUrl}
                   avatarFallback={user.avatarUrl}
                 />

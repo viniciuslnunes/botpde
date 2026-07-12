@@ -13,6 +13,7 @@ export const atualizarPerfilSocialSchema = z.object({
   exibirSede: z.boolean(),
   exibirDesde: z.boolean(),
   bannerUrl: cloudinaryUrlSchema.nullable().optional(),
+  bannerPos: z.number().int().min(0).max(100).nullable().optional(),
   avatarUrl: cloudinaryUrlSchema.nullable().optional(),
 })
 

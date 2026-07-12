@@ -293,6 +293,7 @@ export interface AtualizarPerfilSocialInput {
   exibirSede: boolean
   exibirDesde: boolean
   bannerUrl: string | null
+  bannerPos: number | null
   avatarUrl: string | null
 }
 
@@ -329,6 +330,7 @@ export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): 
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,
       bannerUrl: parsed.data.bannerUrl ?? null,
+      bannerPos: parsed.data.bannerPos ?? null,
       avatarUrl: parsed.data.avatarUrl ?? null,
     },
     update: {
@@ -338,6 +340,7 @@ export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): 
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,
       bannerUrl: parsed.data.bannerUrl ?? null,
+      bannerPos: parsed.data.bannerPos ?? null,
       avatarUrl: parsed.data.avatarUrl ?? null,
     },
   })

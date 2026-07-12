@@ -10,6 +10,7 @@ interface PerfilMembroLite {
   perfilPrivado: boolean
   avatarUrl: string | null
   bannerUrl: string | null
+  bannerPos: number | null
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
@@ -45,6 +46,7 @@ export async function getOrCreatePerfilMembro(
       perfilPrivado: true,
       avatarUrl: true,
       bannerUrl: true,
+      bannerPos: true,
       exibirCidade: true,
       exibirSede: true,
       exibirDesde: true,

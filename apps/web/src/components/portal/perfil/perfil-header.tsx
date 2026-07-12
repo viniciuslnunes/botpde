@@ -7,6 +7,7 @@ interface PerfilHeaderProps {
   nome: string | null
   avatarUrl: string | null
   bannerUrl: string | null
+  bannerPos?: number | null
   perfilPrivado: boolean
   tenantNome: string
   segueVoce: boolean
@@ -18,22 +19,31 @@ export function PerfilHeader({
   nome,
   avatarUrl,
   bannerUrl,
+  bannerPos,
   perfilPrivado,
   tenantNome,
   segueVoce,
   isSelf,
   acoes,
 }: PerfilHeaderProps) {
+  const objectPosition = `center ${Math.min(100, Math.max(0, bannerPos ?? 50))}%`
   return (
     <section className="card-soft overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
       {/* Faixa de topo: banner do membro quando existe, senão gradiente da torcida. */}
       <div className="relative h-28 sm:h-36">
         {bannerUrl ? (
           canOptimizeImageUrl(bannerUrl) ? (
-            <Image src={bannerUrl} alt="" fill sizes="(max-width: 640px) 100vw, 42rem" className="object-cover" />
+            <Image
+              src={bannerUrl}
+              alt=""
+              fill
+              sizes="(max-width: 640px) 100vw, 42rem"
+              className="object-cover"
+              style={{ objectPosition }}
+            />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+            <img src={bannerUrl} alt="" className="h-full w-full object-cover" style={{ objectPosition }} />
           )
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />

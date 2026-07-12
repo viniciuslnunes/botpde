@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
+import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { atualizarPerfilSocial } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
@@ -13,6 +13,7 @@ interface PerfilEditarFormProps {
   exibirSede: boolean
   exibirDesde: boolean
   bannerUrl: string | null
+  bannerPos: number | null
   avatarUrl: string | null
   /** Foto de login usada como fallback de exibição quando não há avatar social próprio. */
   avatarFallback: string | null
@@ -25,6 +26,7 @@ export function PerfilEditarForm({
   exibirSede: sedeInicial,
   exibirDesde: desdeInicial,
   bannerUrl: bannerInicial,
+  bannerPos: bannerPosInicial,
   avatarUrl: avatarInicial,
   avatarFallback,
 }: PerfilEditarFormProps) {
@@ -34,6 +36,7 @@ export function PerfilEditarForm({
   const [exibirSede, setExibirSede] = useState(sedeInicial)
   const [exibirDesde, setExibirDesde] = useState(desdeInicial)
   const [bannerUrl, setBannerUrl] = useState(bannerInicial)
+  const [bannerPos, setBannerPos] = useState(bannerPosInicial ?? 50)
   const [avatarUrl, setAvatarUrl] = useState(avatarInicial)
   const [uploading, setUploading] = useState<'banner' | 'avatar' | null>(null)
   const [avatarMenu, setAvatarMenu] = useState(false)
@@ -41,9 +44,28 @@ export function PerfilEditarForm({
   const bannerRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const avatarBox = useRef<HTMLDivElement>(null)
+  // Estado do arraste vertical para enquadrar o banner (object-position Y).
+  const drag = useRef<{ startY: number; startPos: number; h: number } | null>(null)
 
   // Avatar mostrado no slot: o social próprio quando existe, senão a foto de login.
   const displayAvatar = avatarUrl ?? avatarFallback
+
+  function onBannerPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!bannerUrl || uploading !== null) return
+    const h = e.currentTarget.getBoundingClientRect().height
+    drag.current = { startY: e.clientY, startPos: bannerPos, h }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function onBannerPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return
+    // Arrastar para cima revela a parte de baixo da imagem (posição aumenta).
+    const delta = ((e.clientY - drag.current.startY) / drag.current.h) * 100
+    setBannerPos(Math.min(100, Math.max(0, Math.round(drag.current.startPos - delta))))
+  }
+  function onBannerPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    drag.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
 
   useEffect(() => {
     if (!avatarMenu) return
@@ -59,8 +81,10 @@ export function PerfilEditarForm({
     try {
       const purpose = tipo === 'banner' ? 'perfil-banner' : 'perfil-avatar'
       const url = await uploadMediaToCloudinary(file, undefined, purpose)
-      if (tipo === 'banner') setBannerUrl(url)
-      else setAvatarUrl(url)
+      if (tipo === 'banner') {
+        setBannerUrl(url)
+        setBannerPos(50) // nova imagem começa centralizada
+      } else setAvatarUrl(url)
       toast.success(tipo === 'banner' ? 'Banner carregado. Clique em salvar.' : 'Foto carregada. Clique em salvar.')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha no upload.')
@@ -79,6 +103,7 @@ export function PerfilEditarForm({
           exibirSede,
           exibirDesde,
           bannerUrl,
+          bannerPos: bannerUrl ? bannerPos : null,
           avatarUrl,
         })
         toast.success('Perfil social atualizado.')
@@ -119,10 +144,22 @@ export function PerfilEditarForm({
 
       {/* Prévia: faixa de capa + avatar sobreposto, espelhando o header do perfil. */}
       <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
-        <div className="relative h-28 sm:h-32">
+        <div
+          className={`relative h-28 select-none touch-none sm:h-32 ${bannerUrl ? 'cursor-ns-resize' : ''}`}
+          onPointerDown={onBannerPointerDown}
+          onPointerMove={onBannerPointerMove}
+          onPointerUp={onBannerPointerUp}
+          onPointerCancel={onBannerPointerUp}
+        >
           {bannerUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+            <img
+              src={bannerUrl}
+              alt=""
+              draggable={false}
+              className="h-full w-full object-cover"
+              style={{ objectPosition: `center ${bannerPos}%` }}
+            />
           ) : (
             <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />
           )}
@@ -131,6 +168,13 @@ export function PerfilEditarForm({
             <div className="absolute inset-0 grid place-items-center bg-black/40">
               <Loader2 className="h-5 w-5 animate-spin text-white" />
             </div>
+          )}
+
+          {bannerUrl && uploading !== 'banner' && (
+            <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium text-white backdrop-blur">
+              <ArrowsUpDown className="h-3 w-3" />
+              Arraste para enquadrar
+            </span>
           )}
 
           <button

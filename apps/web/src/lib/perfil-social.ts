@@ -9,6 +9,7 @@ export interface PerfilSocialLite {
   perfilPrivado: boolean
   avatarUrl: string | null
   bannerUrl: string | null
+  bannerPos: number | null
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
@@ -37,6 +38,7 @@ const perfilSelect = {
   perfilPrivado: true,
   avatarUrl: true,
   bannerUrl: true,
+  bannerPos: true,
   exibirCidade: true,
   exibirSede: true,
   exibirDesde: true,
