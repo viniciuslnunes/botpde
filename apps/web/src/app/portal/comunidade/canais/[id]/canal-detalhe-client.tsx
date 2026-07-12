@@ -2,11 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { m } from 'motion/react'
 import { MessageCircle, Users, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostCanal, entrarCanal } from '@/app/portal/comunidade/actions'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { labelVisibilidadeCanal, linkUnidadeComunidade, type CanalItem } from '@/lib/canais-shared'
+import { springSnappy } from '@/lib/motion-presets'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface CurrentUser {
@@ -62,7 +65,12 @@ export function CanalDetalheClient({
 
   return (
     <div className="space-y-4">
-      <header className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <m.header
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSnappy}
+        className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--primary))]">
@@ -100,18 +108,20 @@ export function CanalDetalheClient({
                 Chat
               </Link>
             ) : (
-              <button
+              <m.button
                 type="button"
                 disabled={pending}
                 onClick={inscrever}
+                whileTap={{ scale: 0.96 }}
+                transition={springSnappy}
                 className="rounded-full bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Inscrever
-              </button>
+              </m.button>
             )}
           </div>
         </div>
-      </header>
+      </m.header>
 
       {canal.souMembro && podePublicar && (
         <form
@@ -126,41 +136,35 @@ export function CanalDetalheClient({
             placeholder="Publicar no canal…"
             className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
           />
-          <button
+          <m.button
             type="submit"
             disabled={pending || !conteudo.trim()}
+            whileTap={{ scale: 0.96 }}
+            transition={springSnappy}
             className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Publicar
-          </button>
+          </m.button>
         </form>
       )}
 
       {!canal.souMembro && (
-        <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Inscreva-se no canal para ver o mural completo e participar do chat.
-        </div>
+        <MotionEmptyState
+          className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
+          title="Inscreva-se no canal"
+          description="Para ver o mural completo e participar do chat."
+        />
       )}
 
       {canal.souMembro && (
-        <>
-          {posts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhuma publicação no canal ainda.
-            </div>
-          ) : (
-            posts.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                currentUser={currentUser}
-                salvo={salvoIds.includes(post.id)}
-                showTenantBadge
-              />
-            ))
-          )}
-        </>
+        <ComunidadePostsAnimated
+          posts={posts}
+          currentUser={currentUser}
+          salvoIds={salvoIds}
+          showTenantBadge
+          emptyTitle="Nenhuma publicação no canal ainda."
+        />
       )}
     </div>
   )

@@ -13,7 +13,7 @@ import {
   resolverAvatarSocial,
   segueMutuamente,
 } from '@/lib/perfil-social'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PerfilMensagemActions } from '@/components/portal/perfil-mensagem-actions'
 import { PerfilHeader } from '@/components/portal/perfil/perfil-header'
@@ -271,23 +271,14 @@ export default async function PerfilComunidadePage({
           )}
 
           {aba === 'publicacoes' && (
-            <section className="space-y-4">
-              {posts.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-                  Nenhum post publicado por enquanto.
-                </div>
-              ) : (
-                posts.map((post) => (
-                  <FeedPostCard
-                    key={post.id}
-                    post={post}
-                    showTenantBadge={post.tenantId !== tenant.id}
-                    currentUser={currentUser}
-                    isAuthor={isSelf}
-                  />
-                ))
-              )}
-            </section>
+            <ComunidadePostsAnimated
+              posts={posts}
+              currentUser={currentUser}
+              tenantId={tenant.id}
+              showTenantBadge="auto"
+              isAuthor={isSelf}
+              emptyTitle="Nenhum post publicado por enquanto."
+            />
           )}
 
           {aba === 'fotos' && <PerfilFotosGrid fotos={fotos} />}

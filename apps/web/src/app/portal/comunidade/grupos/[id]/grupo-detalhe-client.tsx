@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
+import { AnimatePresence, m } from 'motion/react'
 import { MessageCircle, Users, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostGrupo } from '@/app/portal/comunidade/actions'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadeTabBar } from '../../_components/comunidade-tab-bar'
+import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
+import { springSnappy } from '@/lib/motion-presets'
 import type { GrupoDetalheItem, PostSocialItem } from '@/lib/feed'
 
 interface CurrentUser {
@@ -48,7 +50,12 @@ export function GrupoDetalheClient({
 
   return (
     <div className="space-y-4">
-      <header className="card-soft flex items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <m.header
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSnappy}
+        className="card-soft flex items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+      >
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-lg font-bold text-[rgb(var(--primary))]">
           {(grupo.nome ?? 'G').charAt(0).toUpperCase()}
         </span>
@@ -62,70 +69,68 @@ export function GrupoDetalheClient({
             {grupo.membros} membro{grupo.membros === 1 ? '' : 's'}
           </span>
         </div>
-      </header>
+      </m.header>
 
-      <div className="flex gap-2 border-b border-[rgb(var(--border))]">
-        <button
-          type="button"
-          onClick={() => setAba('mural')}
-          className={[
-            'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-            aba === 'mural'
-              ? 'border-[rgb(var(--primary))] text-[rgb(var(--primary))]'
-              : 'border-transparent text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-          ].join(' ')}
-        >
-          Mural
-        </button>
-        <Link
-          href={`/portal/mensagens?c=${grupo.id}`}
-          className="inline-flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Chat
-        </Link>
-      </div>
+      <ComunidadeTabBar
+        layoutId="grupo-tab-indicator"
+        activeId={aba}
+        onTabChange={(id) => setAba(id as 'mural' | 'chat')}
+        items={[
+          { kind: 'button', id: 'mural', label: 'Mural' },
+          {
+            kind: 'link',
+            id: 'chat',
+            label: 'Chat',
+            href: `/portal/mensagens?c=${grupo.id}`,
+            icon: <MessageCircle className="h-4 w-4" />,
+          },
+        ]}
+      />
 
-      {aba === 'mural' && (
-        <div className="space-y-4">
-          <form
-            onSubmit={publicar}
-            className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+      <AnimatePresence mode="wait">
+        {aba === 'mural' && (
+          <m.div
+            key="mural"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+            className="space-y-4"
           >
-            <textarea
-              value={conteudo}
-              onChange={(e) => setConteudo(e.target.value)}
-              maxLength={3000}
-              rows={3}
-              placeholder="Publique no mural do grupo…"
-              className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
-            />
-            <button
-              type="submit"
-              disabled={pending || !conteudo.trim()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            <form
+              onSubmit={publicar}
+              className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
             >
-              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Publicar
-            </button>
-          </form>
-
-          {postsIniciais.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhuma publicação no mural ainda. Seja o primeiro!
-            </div>
-          ) : (
-            postsIniciais.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                currentUser={currentUser}
-                salvo={salvoIds.includes(post.id)}
+              <textarea
+                value={conteudo}
+                onChange={(e) => setConteudo(e.target.value)}
+                maxLength={3000}
+                rows={3}
+                placeholder="Publique no mural do grupo…"
+                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
               />
-            ))
-          )}
-        </div>
-      )}
+              <m.button
+                type="submit"
+                disabled={pending || !conteudo.trim()}
+                whileTap={{ scale: 0.96 }}
+                transition={springSnappy}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Publicar
+              </m.button>
+            </form>
+
+            <ComunidadePostsAnimated
+              posts={postsIniciais}
+              currentUser={currentUser}
+              salvoIds={salvoIds}
+              emptyTitle="Nenhuma publicação no mural ainda."
+              emptyDescription="Seja o primeiro!"
+            />
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

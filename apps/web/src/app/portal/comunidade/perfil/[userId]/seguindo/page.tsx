@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { listarRedeSocial, podeVerListasRede } from '@/lib/perfil-social'
-import { Avatar } from '@/components/portal/avatar'
-import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
+import { ComunidadeMemberList } from '../../../_components/comunidade-member-list'
 import { getSeguimentoStatus } from '@/lib/social'
 import { db } from '@torcida/db'
 import type { Metadata } from 'next'
@@ -47,28 +46,13 @@ export default async function PerfilSeguindoPage({
         {user.nome ?? 'Membro'} segue
       </h1>
 
-      {!podeVer ? (
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">Lista privada.</p>
-      ) : membros.length === 0 ? (
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">Não segue ninguém ainda.</p>
-      ) : (
-        <div className="space-y-2">
-          {membros.map((m, i) => (
-            <div
-              key={m.userId}
-              className="flex items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
-            >
-              <Link href={`/portal/comunidade/perfil/${m.userId}`} className="flex min-w-0 items-center gap-3">
-                <Avatar nome={m.nome} avatarUrl={m.avatarUrl} size="md" />
-                <p className="truncate text-sm font-semibold">{m.nome ?? 'Membro'}</p>
-              </Link>
-              {m.userId !== session.user.id && (
-                <SeguimentoButtons userId={m.userId} status={statuses[i]} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <ComunidadeMemberList
+        membros={membros}
+        statuses={statuses}
+        currentUserId={session.user.id}
+        podeVer={podeVer}
+        emptyTitle="Não segue ninguém ainda."
+      />
     </div>
   )
 }

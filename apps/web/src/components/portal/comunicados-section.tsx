@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { ChevronDown, Megaphone, Pin } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import { marcarComunicadosLidosAction } from '@/app/portal/comunidade/actions'
 import { ComunicadoShareButton } from '@/components/portal/comunicado-share-button'
+import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export interface ComunicadoSectionItem {
   id: string
@@ -82,9 +84,11 @@ export function ComunicadosSection({
 
   return (
     <section className="space-y-3">
-      <button
+      <m.button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        whileTap={{ scale: 0.98 }}
+        transition={springSnappy}
         className="flex w-full items-center gap-2 rounded-xl px-1 py-0.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]"
         aria-expanded={expanded}
       >
@@ -102,21 +106,34 @@ export function ComunicadosSection({
             {preview}
           </span>
         )}
-        <ChevronDown
-          className={[
-            'ml-auto h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform',
-            expanded ? 'rotate-180' : '',
-          ].join(' ')}
-        />
-      </button>
+        <m.div
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={springSnappy}
+          className="ml-auto shrink-0"
+        >
+          <ChevronDown className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+        </m.div>
+      </m.button>
 
-      {expanded &&
-        announcements.map((a) => {
+      <AnimatePresence>
+        {expanded && (
+          <m.div
+            key="comunicados-lista"
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="overflow-hidden"
+          >
+            <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3 pt-1">
+        {announcements.map((a) => {
           const herdado = a.tenantId !== tenantId
           const urgente = a.prioridade === 'URGENTE'
           return (
-            <article
+            <m.article
               key={a.id}
+              variants={staggerItem}
               className={[
                 'rounded-2xl border p-4',
                 urgente
@@ -152,9 +169,13 @@ export function ComunicadosSection({
                 </div>
                 <ComunicadoShareButton comunicadoId={a.id} />
               </div>
-            </article>
+            </m.article>
           )
         })}
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
     </section>
   )
 }

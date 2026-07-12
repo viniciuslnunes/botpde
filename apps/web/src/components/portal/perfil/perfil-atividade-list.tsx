@@ -1,5 +1,9 @@
-import Link from 'next/link'
+'use client'
+
+import { m } from 'motion/react'
 import { Heart, MessageCircle, Zap } from 'lucide-react'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { AtividadePerfilItem } from '@/lib/perfil-social'
 import { formatRelative } from '@/lib/format-datetime'
 
@@ -16,17 +20,19 @@ function IconeAtividade({ tipo }: { tipo: AtividadePerfilItem['tipo'] }) {
 export function PerfilAtividadeList({ itens }: PerfilAtividadeListProps) {
   if (itens.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-        Nenhuma interação registrada ainda.
-      </div>
+      <MotionEmptyState
+        className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+        title="Nenhuma interação registrada ainda."
+      />
     )
   }
 
   return (
-    <div className="space-y-3">
+    <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3">
       {itens.map((item) => (
-        <div
+        <m.div
           key={`${item.tipo}-${item.id}`}
+          variants={staggerItem}
           className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
         >
           <div className="flex items-start gap-3">
@@ -47,11 +53,11 @@ export function PerfilAtividadeList({ itens }: PerfilAtividadeListProps) {
               </p>
             </div>
           </div>
-        </div>
+        </m.div>
       ))}
       <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
         Interações recentes no feed da comunidade
       </p>
-    </div>
+    </m.div>
   )
 }

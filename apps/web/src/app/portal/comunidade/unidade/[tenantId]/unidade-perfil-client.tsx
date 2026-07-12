@@ -2,10 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, m } from 'motion/react'
 import { MessageCircle, MapPin, Loader2, Megaphone, CalendarDays } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostCanal } from '@/app/portal/comunidade/actions'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadeTabBar } from '../../_components/comunidade-tab-bar'
+import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { formatRelative } from '@/lib/format-datetime'
 import {
@@ -13,6 +16,7 @@ import {
   linkCanalComunidade,
   type PerfilInstitucional,
 } from '@/lib/canais-shared'
+import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { PostSocialItem } from '@/lib/feed'
 
 interface CurrentUser {
@@ -28,13 +32,15 @@ interface UnidadePerfilClientProps {
   isPropriaUnidade: boolean
 }
 
+type AbaUnidade = 'mural' | 'comunicados' | 'eventos'
+
 export function UnidadePerfilClient({
   perfil,
   salvoIds,
   currentUser,
   isPropriaUnidade,
 }: UnidadePerfilClientProps) {
-  const [aba, setAba] = useState<'mural' | 'comunicados' | 'eventos'>('mural')
+  const [aba, setAba] = useState<AbaUnidade>('mural')
   const [conteudo, setConteudo] = useState('')
   const [pending, startTransition] = useTransition()
 
@@ -59,7 +65,10 @@ export function UnidadePerfilClient({
 
   return (
     <div className="space-y-4">
-      <header
+      <m.header
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={springSnappy}
         className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
         style={{ borderTopColor: perfil.corPrimaria, borderTopWidth: 3 }}
       >
@@ -103,139 +112,157 @@ export function UnidadePerfilClient({
             Chat
           </Link>
         </div>
-      </header>
+      </m.header>
 
-      <div className="flex gap-2 border-b border-[rgb(var(--border))]">
-        {(['mural', 'comunicados', 'eventos'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setAba(tab)}
-            className={[
-              'border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors',
-              aba === tab
-                ? 'border-[rgb(var(--primary))] text-[rgb(var(--primary))]'
-                : 'border-transparent text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-            ].join(' ')}
+      <ComunidadeTabBar
+        layoutId="unidade-tab-indicator"
+        activeId={aba}
+        onTabChange={(id) => setAba(id as AbaUnidade)}
+        items={[
+          { kind: 'button', id: 'mural', label: 'Mural' },
+          { kind: 'button', id: 'comunicados', label: 'Comunicados' },
+          { kind: 'button', id: 'eventos', label: 'Eventos' },
+        ]}
+      />
+
+      <AnimatePresence mode="wait">
+        {aba === 'mural' && (
+          <m.div
+            key="mural"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+            className="space-y-4"
           >
-            {tab === 'mural' ? 'Mural' : tab === 'comunicados' ? 'Comunicados' : 'Eventos'}
-          </button>
-        ))}
-      </div>
-
-      {aba === 'mural' && (
-        <div className="space-y-4">
-          {perfil.podePublicar && (
-            <form
-              onSubmit={publicar}
-              className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-            >
-              <textarea
-                value={conteudo}
-                onChange={(e) => setConteudo(e.target.value)}
-                maxLength={3000}
-                rows={3}
-                placeholder="Publicar no canal oficial da unidade…"
-                className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={pending || !conteudo.trim()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            {perfil.podePublicar && (
+              <form
+                onSubmit={publicar}
+                className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
               >
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Publicar como unidade
-              </button>
-            </form>
-          )}
+                <textarea
+                  value={conteudo}
+                  onChange={(e) => setConteudo(e.target.value)}
+                  maxLength={3000}
+                  rows={3}
+                  placeholder="Publicar no canal oficial da unidade…"
+                  className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
+                />
+                <m.button
+                  type="submit"
+                  disabled={pending || !conteudo.trim()}
+                  whileTap={{ scale: 0.96 }}
+                  transition={springSnappy}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Publicar como unidade
+                </m.button>
+              </form>
+            )}
 
-          {muralPosts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhuma publicação no mural oficial ainda.
-            </div>
-          ) : (
-            muralPosts.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                currentUser={currentUser}
-                salvo={salvoIds.includes(post.id)}
-                showTenantBadge
+            <ComunidadePostsAnimated
+              posts={muralPosts}
+              currentUser={currentUser}
+              salvoIds={salvoIds}
+              showTenantBadge
+              emptyTitle="Nenhuma publicação no mural oficial ainda."
+            />
+          </m.div>
+        )}
+
+        {aba === 'comunicados' && (
+          <m.div
+            key="comunicados"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+            className="space-y-3"
+          >
+            {perfil.comunicados.length === 0 ? (
+              <MotionEmptyState
+                className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+                title="Nenhum comunicado oficial publicado."
               />
-            ))
-          )}
-        </div>
-      )}
-
-      {aba === 'comunicados' && (
-        <div className="space-y-3">
-          {perfil.comunicados.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhum comunicado oficial publicado.
-            </div>
-          ) : (
-            perfil.comunicados.map((c) => (
-              <article
-                key={c.id}
-                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-              >
-                <div className="flex items-start gap-2">
-                  <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-[rgb(var(--foreground))]">{c.titulo}</h3>
-                      {c.fixado && (
-                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                          Fixado
-                        </span>
-                      )}
-                      {c.prioridade !== 'NORMAL' && (
-                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">
-                          {c.prioridade}
-                        </span>
-                      )}
+            ) : (
+              <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3">
+                {perfil.comunicados.map((c) => (
+                  <m.article
+                    key={c.id}
+                    variants={staggerItem}
+                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-[rgb(var(--foreground))]">{c.titulo}</h3>
+                          {c.fixado && (
+                            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                              Fixado
+                            </span>
+                          )}
+                          {c.prioridade !== 'NORMAL' && (
+                            <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">
+                              {c.prioridade}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                          {formatRelative(c.publicadoEm)}
+                        </p>
+                        <PostConteudoRich
+                          conteudo={c.corpo}
+                          className="mt-2 text-sm text-[rgb(var(--foreground))]"
+                        />
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-                      {formatRelative(c.publicadoEm)}
-                    </p>
-                    <PostConteudoRich
-                      conteudo={c.corpo}
-                      className="mt-2 text-sm text-[rgb(var(--foreground))]"
-                    />
-                  </div>
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-      )}
+                  </m.article>
+                ))}
+              </m.div>
+            )}
+          </m.div>
+        )}
 
-      {aba === 'eventos' && (
-        <div className="space-y-3">
-          {perfil.proximosEventos.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhum evento futuro agendado.
-            </div>
-          ) : (
-            perfil.proximosEventos.map((ev) => (
-              <Link
-                key={ev.id}
-                href={`/portal/eventos/${ev.id}`}
-                className="flex items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:bg-[rgb(var(--background-subtle))]"
-              >
-                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
-                <div>
-                  <p className="font-semibold text-[rgb(var(--foreground))]">{ev.titulo}</p>
-                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    {formatRelative(ev.data)}
-                    {ev.local ? ` · ${ev.local}` : ''}
-                  </p>
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-      )}
+        {aba === 'eventos' && (
+          <m.div
+            key="eventos"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+            className="space-y-3"
+          >
+            {perfil.proximosEventos.length === 0 ? (
+              <MotionEmptyState
+                className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+                title="Nenhum evento futuro agendado."
+              />
+            ) : (
+              <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3">
+                {perfil.proximosEventos.map((ev) => (
+                  <m.div key={ev.id} variants={staggerItem} whileTap={{ scale: 0.98 }} transition={springSnappy}>
+                    <Link
+                      href={`/portal/eventos/${ev.id}`}
+                      className="flex items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                    >
+                      <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+                      <div>
+                        <p className="font-semibold text-[rgb(var(--foreground))]">{ev.titulo}</p>
+                        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                          {formatRelative(ev.data)}
+                          {ev.local ? ` · ${ev.local}` : ''}
+                        </p>
+                      </div>
+                    </Link>
+                  </m.div>
+                ))}
+              </m.div>
+            )}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
         <Link href={linkCanalComunidade(perfil.canalOficialId)} className="text-[rgb(var(--primary))] hover:underline">

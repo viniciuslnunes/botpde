@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostPorId } from '@/lib/feed'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import type { Metadata } from 'next'
 
@@ -41,12 +42,14 @@ export default async function PostComunidadePage({
         ← Voltar ao feed
       </Link>
 
-      <FeedPostCard
-        post={post}
-        showTenantBadge={post.tenantId !== tenant.id}
-        currentUser={currentUser}
-        isAuthor={post.autorId === session.user.id}
-      />
+      <MotionReveal>
+        <FeedPostCard
+          post={post}
+          showTenantBadge={post.tenantId !== tenant.id}
+          currentUser={currentUser}
+          isAuthor={post.autorId === session.user.id}
+        />
+      </MotionReveal>
     </div>
   )
 }

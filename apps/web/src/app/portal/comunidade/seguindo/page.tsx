@@ -1,12 +1,10 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { UserPlus } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
-import { SeguimentoReviewButtons } from '@/components/portal/seguimento-buttons'
+import { SeguimentoPendentesList } from '../_components/seguimento-pendentes-list'
 import { aprovarSeguimento, rejeitarSeguimento } from '@/app/portal/comunidade/actions'
-import { Avatar } from '@/components/portal/avatar'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -20,12 +18,6 @@ interface SeguimentoPendenteRow {
     nome: string | null
     avatarUrl: string | null
   }
-}
-
-function formatarData(data: Date): string {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
-    new Date(data),
-  )
 }
 
 export default async function SeguindoPage() {
@@ -51,6 +43,12 @@ export default async function SeguindoPage() {
     },
   })
 
+  const itens = pendentes.map((item) => ({
+    id: item.id,
+    criadoEm: item.criadoEm.toISOString(),
+    seguidor: item.seguidor,
+  }))
+
   return (
     <div className="space-y-5">
       <ComunidadePageHeader
@@ -59,44 +57,11 @@ export default async function SeguindoPage() {
         subtitulo="Aprove ou rejeite pedidos pendentes do seu perfil."
       />
 
-      {pendentes.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center">
-          <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">
-            Sem solicitações pendentes.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {pendentes.map((item) => (
-            <div
-              key={item.id}
-              className="card-soft flex items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <Link href={`/portal/comunidade/perfil/${item.seguidor.id}`}>
-                  <Avatar nome={item.seguidor.nome} avatarUrl={item.seguidor.avatarUrl} size="md" />
-                </Link>
-                <div className="min-w-0">
-                  <Link
-                    href={`/portal/comunidade/perfil/${item.seguidor.id}`}
-                    className="truncate text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
-                  >
-                    {item.seguidor.nome ?? 'Membro'}
-                  </Link>
-                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    solicitou em {formatarData(item.criadoEm)}
-                  </p>
-                </div>
-              </div>
-              <SeguimentoReviewButtons
-                seguimentoId={item.id}
-                onAprovar={aprovarSeguimento}
-                onRejeitar={rejeitarSeguimento}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      <SeguimentoPendentesList
+        itensIniciais={itens}
+        onAprovar={aprovarSeguimento}
+        onRejeitar={rejeitarSeguimento}
+      />
     </div>
   )
 }

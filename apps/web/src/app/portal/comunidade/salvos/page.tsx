@@ -3,7 +3,7 @@ import { Bookmark } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostsSalvos } from '@/lib/feed'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadePostsAnimated } from '../_components/comunidade-posts-animated'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -30,27 +30,17 @@ export default async function SalvosPage() {
         subtitulo="Publicações que você guardou para ler depois"
       />
 
-      {posts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
-          <Bookmark className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />
-          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Nada salvo ainda</p>
-          <p className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
-            Toque em Salvar em qualquer publicação para encontrá-la aqui.
-          </p>
-        </div>
-      ) : (
-        <section className="space-y-4">
-          {posts.map((post) => (
-            <FeedPostCard
-              key={post.id}
-              post={post}
-              showTenantBadge={post.tenantId !== tenant.id}
-              currentUser={currentUser}
-              salvo
-            />
-          ))}
-        </section>
-      )}
+      <ComunidadePostsAnimated
+        posts={posts}
+        currentUser={currentUser}
+        tenantId={tenant.id}
+        showTenantBadge="auto"
+        salvoIds={posts.map((p) => p.id)}
+        emptyIcon={<Bookmark className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+        emptyTitle="Nada salvo ainda"
+        emptyDescription="Toque em Salvar em qualquer publicação para encontrá-la aqui."
+        emptyClassName="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center"
+      />
     </div>
   )
 }

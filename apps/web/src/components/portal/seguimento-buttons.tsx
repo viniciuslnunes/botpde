@@ -143,25 +143,64 @@ export function SeguimentoReviewButtons({
   onRejeitar,
 }: SeguimentoReviewButtonsProps) {
   const [pending, startTransition] = useTransition()
+  const [resolved, setResolved] = useState<'aprovar' | 'rejeitar' | null>(null)
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => startTransition(() => onAprovar(seguimentoId))}
-        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-      >
-        Aprovar
-      </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => startTransition(() => onRejeitar(seguimentoId))}
-        className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60"
-      >
-        Rejeitar
-      </button>
-    </div>
+    <AnimatePresence mode="wait">
+      {resolved === 'aprovar' ? (
+        <m.span
+          key="aprovado"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={springSnappy}
+          className="text-xs font-semibold text-emerald-600"
+        >
+          Aprovado
+        </m.span>
+      ) : resolved === 'rejeitar' ? (
+        <m.span
+          key="rejeitado"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={springSnappy}
+          className="text-xs font-semibold text-[rgb(var(--foreground-muted))]"
+        >
+          Rejeitado
+        </m.span>
+      ) : (
+        <m.div key="acoes" className="flex items-center gap-2" layout>
+          <m.button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await onAprovar(seguimentoId)
+                setResolved('aprovar')
+              })
+            }
+            whileTap={{ scale: 0.94 }}
+            transition={springSnappy}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            Aprovar
+          </m.button>
+          <m.button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await onRejeitar(seguimentoId)
+                setResolved('rejeitar')
+              })
+            }
+            whileTap={{ scale: 0.94 }}
+            transition={springSnappy}
+            className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60"
+          >
+            Rejeitar
+          </m.button>
+        </m.div>
+      )}
+    </AnimatePresence>
   )
 }

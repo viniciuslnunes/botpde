@@ -4,7 +4,7 @@ import { Users, Heart } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostsDaRede } from '@/lib/feed'
-import { FeedPostCard } from '@/components/portal/feed-post-card'
+import { ComunidadePostsAnimated } from '../_components/comunidade-posts-animated'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -42,34 +42,26 @@ export default async function RedeComunidadePage({
         subtitulo="Publicações de quem você segue e as suas"
       />
 
-      {posts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center">
-          <Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />
-          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Sua rede ainda está vazia
-          </p>
-          <p className="mt-1 max-w-xs text-xs text-[rgb(var(--foreground-muted))]">
-            Siga outros membros ou publique algo para ver atividade aqui.
-          </p>
-          <Link
-            href="/portal/comunidade/busca"
-            className="mt-4 rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
-          >
-            Buscar membros
-          </Link>
-        </div>
-      ) : (
-        <section className="space-y-4">
-          {posts.map((post) => (
-            <FeedPostCard
-              key={post.id}
-              post={post}
-              showTenantBadge={post.tenantId !== tenant.id}
-              currentUser={currentUser}
-            />
-          ))}
-        </section>
-      )}
+      <ComunidadePostsAnimated
+        posts={posts}
+        currentUser={currentUser}
+        tenantId={tenant.id}
+        showTenantBadge="auto"
+        emptyIcon={<Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+        emptyTitle="Sua rede ainda está vazia"
+        emptyDescription={
+          <>
+            Siga outros membros ou publique algo para ver atividade aqui.{' '}
+            <Link
+              href="/portal/comunidade/busca"
+              className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+            >
+              Buscar membros
+            </Link>
+          </>
+        }
+        emptyClassName="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center"
+      />
 
       {pageInfo.hasMore && pageInfo.nextCursor && (
         <div className="flex justify-center pt-2">

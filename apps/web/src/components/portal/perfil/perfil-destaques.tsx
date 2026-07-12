@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
+import { AnimatePresence, m } from 'motion/react'
 import { Plus, Loader2 } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
 import { criarDestaquePerfil } from '@/app/portal/comunidade/actions'
+import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { DestaqueViewer } from './destaque-viewer'
 import type { DestaquePerfilItem, PostSocialItem } from '@/lib/feed'
 
@@ -60,13 +62,16 @@ export function PerfilDestaques({
     <section className="space-y-3">
       <div className="flex justify-center gap-3 overflow-x-auto pb-1">
         {visiveis.map((d, idx) => (
-          <button
+          <m.button
             key={d.id}
             type="button"
             onClick={() => setViewerIdx(idx)}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ scale: 1.04 }}
+            transition={springSnappy}
             className="flex shrink-0 flex-col items-center gap-1"
           >
-            <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[rgb(var(--primary))] p-0.5 transition-transform hover:scale-105">
+            <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[rgb(var(--primary))] p-0.5">
               {d.capaUrl ? (
                 canOptimizeImageUrl(d.capaUrl) ? (
                   <Image src={d.capaUrl} alt="" width={64} height={64} className="h-full w-full rounded-full object-cover" />
@@ -83,19 +88,21 @@ export function PerfilDestaques({
             <span className="max-w-[4.5rem] truncate text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
               {d.titulo}
             </span>
-          </button>
+          </m.button>
         ))}
         {isSelf && (
-          <button
+          <m.button
             type="button"
             onClick={() => setCriando((v) => !v)}
+            whileTap={{ scale: 0.92 }}
+            transition={springSnappy}
             className="flex shrink-0 flex-col items-center gap-1"
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary))]">
               <Plus className="h-5 w-5" />
             </div>
             <span className="text-[10px] font-medium text-[rgb(var(--foreground-muted))]">Novo</span>
-          </button>
+          </m.button>
         )}
       </div>
 
@@ -110,10 +117,17 @@ export function PerfilDestaques({
       )}
 
       {criando && isSelf && (
-        <form
-          onSubmit={salvarDestaque}
-          className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-        >
+        <AnimatePresence>
+          <m.form
+            key="criar-destaque"
+            onSubmit={salvarDestaque}
+            variants={collapsePanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            className="space-y-3 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+          >
           <input
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
@@ -146,7 +160,8 @@ export function PerfilDestaques({
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Criar destaque
           </button>
-        </form>
+          </m.form>
+        </AnimatePresence>
       )}
     </section>
   )

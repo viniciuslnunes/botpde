@@ -1,5 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { m } from 'motion/react'
 import { Users, Video } from 'lucide-react'
+import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
 interface ComunidadeSalasLiveWidgetProps {
@@ -11,7 +15,12 @@ export function ComunidadeSalasLiveWidget({ salas, limite = 2 }: ComunidadeSalas
   if (salas.length === 0) return null
 
   return (
-    <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+    <m.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSnappy}
+      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+    >
       <div className="mb-3 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
           <span className="relative flex h-2 w-2">
@@ -27,26 +36,27 @@ export function ComunidadeSalasLiveWidget({ salas, limite = 2 }: ComunidadeSalas
           Ver todas
         </Link>
       </div>
-      <div className="space-y-2">
+      <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
         {salas.slice(0, limite).map((sala) => (
-          <Link
-            key={sala.id}
-            href={`/portal/comunidade/salas/${sala.id}`}
-            className="flex items-center justify-between gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <Video className="h-4 w-4 shrink-0 text-red-500" />
-              <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                {sala.titulo}
-              </p>
-            </div>
-            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
-              <Users className="h-3.5 w-3.5" />
-              {sala._count.participantes}
-            </span>
-          </Link>
+          <m.div key={sala.id} variants={staggerItem} whileTap={{ scale: 0.98 }} transition={springSnappy}>
+            <Link
+              href={`/portal/comunidade/salas/${sala.id}`}
+              className="flex items-center justify-between gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <Video className="h-4 w-4 shrink-0 text-red-500" />
+                <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                  {sala.titulo}
+                </p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+                <Users className="h-3.5 w-3.5" />
+                {sala._count.participantes}
+              </span>
+            </Link>
+          </m.div>
         ))}
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   )
 }
