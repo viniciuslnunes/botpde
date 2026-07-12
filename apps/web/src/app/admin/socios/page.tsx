@@ -1,5 +1,7 @@
+import Image from 'next/image'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { redirect } from 'next/navigation'
 import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { EmitirCarteirinhaForm, SocioActions } from '@/components/admin/socio-forms'
@@ -193,8 +195,12 @@ export default async function SociosPage({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {socio.user.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={socio.user.avatarUrl} alt={socio.nome} className="h-8 w-8 rounded-full object-cover" />
+                            canOptimizeImageUrl(socio.user.avatarUrl) ? (
+                              <Image src={socio.user.avatarUrl} alt={socio.nome} width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={socio.user.avatarUrl} alt={socio.nome} loading="lazy" decoding="async" className="h-8 w-8 rounded-full object-cover" />
+                            )
                           ) : (
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--primary))]">
                               {socio.nome.charAt(0).toUpperCase()}

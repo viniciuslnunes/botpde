@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Lock, Globe } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 interface PerfilHeaderProps {
   nome: string | null
@@ -27,8 +29,12 @@ export function PerfilHeader({
     <section className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
       <div className="relative h-32 sm:h-40">
         {bannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+          canOptimizeImageUrl(bannerUrl) ? (
+            <Image src={bannerUrl} alt="" fill sizes="(max-width: 640px) 100vw, 42rem" className="object-cover" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+          )
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-[rgb(var(--primary))]/30 to-[rgb(var(--background-subtle))]" />
         )}

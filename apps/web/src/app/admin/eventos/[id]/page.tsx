@@ -1,5 +1,7 @@
+import Image from 'next/image'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
@@ -75,8 +77,12 @@ export default async function EditarEventoPage({
                     <div key={r.id} className="flex items-center justify-between gap-2 text-sm text-[rgb(var(--foreground))]">
                       <div className="flex min-w-0 items-center gap-2">
                         {r.user.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={r.user.image} alt="" className="h-6 w-6 shrink-0 rounded-full" />
+                          canOptimizeImageUrl(r.user.image) ? (
+                            <Image src={r.user.image} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.user.image} alt="" loading="lazy" decoding="async" className="h-6 w-6 shrink-0 rounded-full" />
+                          )
                         ) : (
                           <div className="h-6 w-6 shrink-0 rounded-full bg-[rgb(var(--border))]" />
                         )}
@@ -100,8 +106,12 @@ export default async function EditarEventoPage({
                     <div key={r.id} className="flex items-center justify-between gap-2 text-sm text-[rgb(var(--foreground-muted))]">
                       <div className="flex min-w-0 items-center gap-2">
                         {r.user.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={r.user.image} alt="" className="h-6 w-6 shrink-0 rounded-full opacity-50" />
+                          canOptimizeImageUrl(r.user.image) ? (
+                            <Image src={r.user.image} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full opacity-50" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.user.image} alt="" loading="lazy" decoding="async" className="h-6 w-6 shrink-0 rounded-full opacity-50" />
+                          )
                         ) : (
                           <div className="h-6 w-6 shrink-0 rounded-full bg-[rgb(var(--border))]" />
                         )}

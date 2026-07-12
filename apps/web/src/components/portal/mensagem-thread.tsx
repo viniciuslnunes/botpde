@@ -25,7 +25,7 @@ import {
   type MensagemDto,
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
-import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { useVisibleInterval, useVisibleBackoffInterval } from '@/lib/use-visible-interval'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -106,8 +106,8 @@ export function MensagemThread({
   }, [conversaId, onLida])
 
   const carregar = useCallback(
-    async (full: boolean) => {
-      if (document.visibilityState !== 'visible') return
+    async (full: boolean): Promise<boolean> => {
+      if (document.visibilityState !== 'visible') return false
       const after = lastCriadoEmRef.current
       const url =
         !full && after
@@ -117,10 +117,10 @@ export function MensagemThread({
         const res = await fetch(url, { cache: 'no-store' })
         if (!res.ok) {
           if (full) setErro('Não foi possível carregar a conversa.')
-          return
+          return false
         }
         const data = (await res.json()) as { mensagens?: MensagemDto[] }
-        if (!data.mensagens) return
+        if (!data.mensagens) return false
         const novas = data.mensagens
         setMensagens((prev) => {
           const pendentes = prev.filter((m) => isTemp(m.id))
@@ -133,11 +133,13 @@ export function MensagemThread({
           return merged
         })
         if (novas.length > 0) marcarLida()
+        return novas.length > 0
       } catch {
         // polling silencioso
       } finally {
         if (full) setCarregando(false)
       }
+      return false
     },
     [conversaId, marcarLida],
   )
@@ -157,8 +159,8 @@ export function MensagemThread({
     marcarLidaRef.current()
   }, [conversaId])
 
-  useVisibleInterval(() => void carregarRef.current(false), 4000)
-  useVisibleInterval(() => void carregarRef.current(true), 20000)
+  useVisibleBackoffInterval(() => carregarRef.current(false), 4000, 15000)
+  useVisibleInterval(() => void carregarRef.current(true), 30000)
 
   function insertEmoji(emoji: string) {
     const el = inputRef.current

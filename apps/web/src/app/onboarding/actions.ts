@@ -144,14 +144,17 @@ const solicitarVinculoSchema = z.object({
     .url()
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  // Sem `.uuid()`: sede/departamento podem ter IDs não-UUID (dados legados/seed,
+  // ex.: "sede-principal-pde"). A existência é validada contra o banco abaixo —
+  // esse é o guard real; o formato UUID travava vínculos válidos.
   departamentoId: z
     .string()
-    .uuid()
+    .max(64)
     .optional()
     .or(z.literal('').transform(() => undefined)),
   sedeId: z
     .string()
-    .uuid()
+    .max(64)
     .optional()
     .or(z.literal('').transform(() => undefined)),
 })

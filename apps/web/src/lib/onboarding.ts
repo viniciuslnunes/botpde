@@ -16,6 +16,12 @@ export type AfiliacaoOnboarding = {
   serie: SerieCampeonato | null
 }
 
+export type SedeOnboarding = {
+  id: string
+  nome: string
+  tipo: string
+}
+
 export type TorcidaOnboarding = {
   id: string
   nome: string
@@ -23,6 +29,7 @@ export type TorcidaOnboarding = {
   logoUrl: string | null
   corPrimaria: string
   membrosAprovados: number
+  sedes: SedeOnboarding[]
 }
 
 export type DepartamentoOnboarding = {
@@ -86,6 +93,7 @@ export const getTorcidasPorAfiliacao = cache(
       logoUrl: string | null
       corPrimaria: string
       _count: { membros: number }
+      sedes: SedeOnboarding[]
     }
     const tenants: TenantComContagem[] = await db.tenant.findMany({
       where: { afiliacaoId, ativo: true },
@@ -96,6 +104,11 @@ export const getTorcidasPorAfiliacao = cache(
         logoUrl: true,
         corPrimaria: true,
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
+        sedes: {
+          where: { ativa: true },
+          select: { id: true, nome: true, tipo: true },
+          orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+        },
       },
       orderBy: { nome: 'asc' },
     })
@@ -106,6 +119,7 @@ export const getTorcidasPorAfiliacao = cache(
       logoUrl: t.logoUrl,
       corPrimaria: t.corPrimaria,
       membrosAprovados: t._count.membros,
+      sedes: t.sedes,
     }))
   },
 )

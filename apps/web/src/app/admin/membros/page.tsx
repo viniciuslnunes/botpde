@@ -1,5 +1,7 @@
+import Image from 'next/image'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
@@ -207,12 +209,24 @@ export default async function MembrosPage({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {membro.user.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={membro.user.avatarUrl}
-                              alt={membro.nome}
-                              className="h-8 w-8 rounded-full object-cover"
-                            />
+                            canOptimizeImageUrl(membro.user.avatarUrl) ? (
+                              <Image
+                                src={membro.user.avatarUrl}
+                                alt={membro.nome}
+                                width={32}
+                                height={32}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={membro.user.avatarUrl}
+                                alt={membro.nome}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            )
                           ) : (
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--primary))]">
                               {membro.nome.charAt(0).toUpperCase()}

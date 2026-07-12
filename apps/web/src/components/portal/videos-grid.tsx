@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Play } from 'lucide-react'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { Avatar } from '@/components/portal/avatar'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { isVideoUrl } from '@/lib/comunidade-social'
@@ -36,11 +38,21 @@ export function VideosGrid({ posts }: VideosGridProps) {
                   preload="metadata"
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
+              ) : canOptimizeImageUrl(thumb) ? (
+                <Image
+                  src={thumb}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 50vw, 33vw"
+                  className="object-cover transition-transform group-hover:scale-105"
+                />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={thumb}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
               )

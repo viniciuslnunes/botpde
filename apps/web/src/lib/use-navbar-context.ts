@@ -11,7 +11,7 @@ interface NavbarContext {
   notifications: NotificationItem[]
 }
 
-const CACHE_MS = 30_000
+const CACHE_MS = 60_000
 let cached: NavbarContext | null = null
 let cachedAt = 0
 let inflight: Promise<NavbarContext> | null = null

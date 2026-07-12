@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { toast } from '@torcida/ui'
 
 type VotanteEnquete = {
@@ -58,9 +59,9 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
 
   useEffect(() => {
     void carregar()
-    const id = window.setInterval(() => void carregar(), 3000)
-    return () => window.clearInterval(id)
   }, [carregar])
+
+  useVisibleInterval(() => void carregar(), 8000)
 
   async function criarEnquete(event: React.FormEvent) {
     event.preventDefault()

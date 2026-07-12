@@ -69,8 +69,8 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
   useEffect(() => {
     let active = true
 
-    async function sincronizar() {
-      if (document.visibilityState !== 'visible') return
+    async function sincronizar(): Promise<boolean> {
+      if (document.visibilityState !== 'visible') return false
       const after = lastCriadoEmRef.current
       const url = after
         ? `/api/salas/${salaId}/mensagens?after=${encodeURIComponent(after)}`
@@ -78,9 +78,9 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
 
       try {
         const res = await fetch(url, { cache: 'no-store' })
-        if (!res.ok || !active) return
+        if (!res.ok || !active) return false
         const data = (await res.json()) as { mensagens?: SalaMensagem[] }
-        if (!data.mensagens?.length) return
+        if (!data.mensagens?.length) return false
 
         setMensagens((prev) => {
           const merged = after
@@ -102,9 +102,11 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
           if (last) lastCriadoEmRef.current = last
           return merged
         })
+        return true
       } catch {
         // polling silencioso
       }
+      return false
     }
 
     async function sincronizarCompleto() {
@@ -132,12 +134,24 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
       }
     }
 
-    void sincronizar()
-    const novasId = window.setInterval(sincronizar, 3000)
-    const fullId = window.setInterval(sincronizarCompleto, 15000)
+    // Backoff: ritmo base com atividade; sem mensagens novas, dobra até o teto.
+    const BASE_MS = 4000
+    const MAX_MS = 15000
+    let delay = BASE_MS
+    let novasId: number | undefined
+
+    async function loop() {
+      const houveNovas = await sincronizar()
+      if (!active) return
+      delay = houveNovas ? BASE_MS : Math.min(delay * 2, MAX_MS)
+      novasId = window.setTimeout(loop, delay)
+    }
+
+    void loop()
+    const fullId = window.setInterval(sincronizarCompleto, 30000)
     return () => {
       active = false
-      window.clearInterval(novasId)
+      if (novasId !== undefined) window.clearTimeout(novasId)
       window.clearInterval(fullId)
     }
   }, [salaId])

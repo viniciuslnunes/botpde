@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { Plus, Loader2 } from 'lucide-react'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
 import { criarDestaquePerfil } from '@/app/portal/comunidade/actions'
 import { DestaqueViewer } from './destaque-viewer'
@@ -66,8 +68,12 @@ export function PerfilDestaques({
           >
             <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[rgb(var(--primary))] p-0.5 transition-transform hover:scale-105">
               {d.capaUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={d.capaUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                canOptimizeImageUrl(d.capaUrl) ? (
+                  <Image src={d.capaUrl} alt="" width={64} height={64} className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.capaUrl} alt="" loading="lazy" decoding="async" className="h-full w-full rounded-full object-cover" />
+                )
               ) : (
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-lg">
                   ★

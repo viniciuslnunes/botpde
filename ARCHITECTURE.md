@@ -529,6 +529,28 @@ domínio — cache de `/_next/static` e Brotli; documentado em `apps/web/src/lib
 Agente responsável por auditorias e novos recortes: `performance` (ver
 `docs/agents/README.md`).
 
+**Rodada complementar (2026-07-10, pós-plano):** ofensores residuais atacados
+sem mudança de arquitetura:
+- `portal/comunidade/page.tsx`: 3 queries do shell (perfil, eventos do composer,
+  badges) paralelizadas em `Promise.all` (antes em série).
+- `loading.tsx` criados nas 7 rotas admin que ficavam em branco na navegação
+  (membros, socios, eventos, sedes, loja, hierarquia, configuracoes).
+- `admin/page.tsx` (dashboard): dividido em `DashboardKpis` + `DashboardListas`,
+  cada um em `<Suspense>` — o first byte não espera mais as 12 queries.
+- `<img>` cru → `next/image` gated por `canOptimizeImageUrl` em perfil (banner,
+  fotos, destaques), videos-grid e avatares das listas admin. Fallbacks `<img>`
+  para hosts fora de `remotePatterns` e previews locais (blob) permanecem por design.
+- `next.config.ts`: `images.formats` avif/webp; `staleTimes.dynamic` 60→120;
+  `@next/bundle-analyzer` integrado (script `build:analyze`, gate `ANALYZE=true`).
+- Polling: novo `useVisibleBackoffInterval` (`use-visible-interval.ts`) — dobra o
+  intervalo em inatividade até um teto. Aplicado em `sala-chat` (4s→15s inline)
+  e `mensagem-thread` (4s→15s); `sala-enquete` 3s→8s (agora com gate de
+  visibilidade), `sala-participantes` 5s→15s, full-sync do chat/thread 15/20s→30s,
+  navbar-context 30s→60s.
+- **React Compiler avaliado e revertido**: habilitá-lo ativa regras de lint
+  (`react-hooks/purity`, `set-state-in-effect`, `refs`) que reprovam padrões
+  pré-existentes em ~10 arquivos. Reavaliar após saneamento desses padrões.
+
 ### 5.7 Dois bugs achados via a captura visual (2026-07-10)
 
 **Bug 1 — CTA invisível em `/entrar` e `/entrar/criar-conta` (corrigido).**
@@ -637,3 +659,24 @@ NextAuth/Next.js.
   (`/portal/comunidade/unidade/[tenantId]`), canal oficial auto-provisionado,
   comunidades temáticas com visibilidade hierárquica/aliados, busca de canais
   e unidades, permissão `channels:manage`.
+- **Item 28 — Onboarding, Torcedor global e Rivalidade (plano fechado 2026-07-11).**
+  Spec completa em `docs/data/spec-onboarding.md`. Objetivo: ao logar, o usuário
+  passa por onboarding que garante direcionamento e **segregação anti-infiltrado**
+  (escolhe clube → região → torcida ou "só torcedor" → sócio/torcedor). Decisões
+  fechadas com o usuário: **(1)** ponto de entrada é um **hub central** no
+  domínio-mãe (hoje o app é resolvido só por subdomínio via `getTenantFromHost`);
+  **(2)** torcedor vira **perfil global** (`PerfilTorcedor` ligado ao `User`,
+  independe de tenant) — `SaasMembro` continua sendo só o vínculo com uma torcida;
+  **(3)** **rivalidade** modelada em nível de clube (`Afiliacao`) com override
+  torcida×torcida (`Rivalidade` + enum `OrigemRivalidade`), semeada da tabela de
+  `docs/knowledge/aliancas.md`; **(4)** base de clubes por **seed nacional curado**
+  de `docs/knowledge/diretorio-nacional.md` + escudos versionados no projeto (API
+  gratuita só na coleta, nunca em runtime). Segregação: **dois níveis de feed** —
+  torcedor (público nacional, default até aprovação) vs sócios (gated por vínculo
+  ATIVO). Regra de relacionamento: torcedores se relacionam cross-torcida livremente
+  (até rivais); **única restrição é sócio×sócio de torcidas rivais** (revisável).
+  Achado no caminho: **bug** em `apps/web/src/lib/feed.ts:537` (`status === 'ATIVO'`,
+  valor inexistente no enum `StatusMembro`) — a visibilidade `TENANT` de posts hoje
+  nunca libera; corrigir junto. Fases: 1=MVP hub+perfil+gating de feed;
+  2=rivalidade+departamento; 3=enriquecimento por API. Validação prévia pelos
+  agentes `data-model` e `rbac` antes de codar via Fable.

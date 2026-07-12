@@ -17,6 +17,7 @@ import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
   DepartamentoOnboarding,
+  SedeOnboarding,
 } from '@/lib/onboarding'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'vinculo' | 'concluindo'
@@ -269,8 +270,13 @@ function PassoClube({
               >
                 <EscudoClube afiliacao={a} />
                 <span className="text-xs font-semibold text-[rgb(var(--foreground))] line-clamp-2">
-                  {a.apelido || a.nome}
+                  {a.nome}
                 </span>
+                {(a.apelido || a.estado) && (
+                  <span className="text-[10px] text-[rgb(var(--foreground-muted))] line-clamp-1">
+                    {[a.apelido, a.estado].filter(Boolean).join(' · ')}
+                  </span>
+                )}
                 {a.serie && (
                   <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
                     {SERIE_LABEL[a.serie] ?? a.serie}
@@ -503,6 +509,12 @@ function PassoVinculo({
   const [imagemProva, setImagemProva] = useState<string | undefined>()
   const [uploadPend, setUploadPend] = useState(false)
 
+  // Vínculo territorial: quando a torcida tem mais de uma unidade ativa, o
+  // associado precisa escolher a sua (a Server Action exige isso e, sem o
+  // seletor, o fluxo travava silenciosamente — ver onboarding.ts).
+  const [unidadeId, setUnidadeId] = useState('')
+  const precisaEscolherUnidade = torcida.sedes.length > 1
+
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
 
   function abrirSocio() {
@@ -519,6 +531,11 @@ function PassoVinculo({
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
     setErrosCampo({})
+    // Feedback imediato antes do round-trip (a Server Action também valida).
+    if (precisaEscolherUnidade && !unidadeId) {
+      onErro('Selecione a unidade da torcida para continuar.')
+      return
+    }
     startTransition(async () => {
       const res = await solicitarVinculo({
         tenantId: torcida.id,
@@ -530,6 +547,7 @@ function PassoVinculo({
         numeroAssociado: numeroAssociado || undefined,
         imagemProva,
         departamentoId: departamentoId || undefined,
+        sedeId: unidadeId || undefined,
       })
       // Sucesso redireciona no servidor; se retornou, houve erro/validação.
       if (res?.errors) {
@@ -566,6 +584,12 @@ function PassoVinculo({
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
           Sócios passam por aprovação e têm acesso a benefícios exclusivos.
         </p>
+
+        {precisaEscolherUnidade && (
+          <div className="mt-6">
+            <SeletorUnidade sedes={torcida.sedes} value={unidadeId} onChange={setUnidadeId} />
+          </div>
+        )}
 
         <div className="mt-6 space-y-3">
           <button
@@ -612,6 +636,12 @@ function PassoVinculo({
       </p>
 
       <div className="mt-6 space-y-4">
+        {precisaEscolherUnidade && (
+          <Campo label="Unidade da torcida" obrigatorio erros={errosCampo.sedeId}>
+            <SeletorUnidade sedes={torcida.sedes} value={unidadeId} onChange={setUnidadeId} semLabel />
+          </Campo>
+        )}
+
         <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
           <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
         </Campo>
@@ -676,6 +706,43 @@ function PassoVinculo({
 }
 
 // ─── Peças compartilhadas ───────────────────────────────────────────────────────
+
+const TIPO_SEDE_LABEL: Record<string, string> = {
+  SEDE: 'Sede',
+  SUBSEDE: 'Subsede',
+  PONTO_ENCONTRO: 'Ponto de encontro',
+}
+
+function SeletorUnidade({
+  sedes,
+  value,
+  onChange,
+  semLabel,
+}: {
+  sedes: SedeOnboarding[]
+  value: string
+  onChange: (v: string) => void
+  semLabel?: boolean
+}) {
+  return (
+    <div>
+      {!semLabel && (
+        <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Qual unidade você frequenta?
+        </span>
+      )}
+      <Select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Selecione sua unidade</option>
+        {sedes.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nome}
+            {TIPO_SEDE_LABEL[s.tipo] ? ` · ${TIPO_SEDE_LABEL[s.tipo]}` : ''}
+          </option>
+        ))}
+      </Select>
+    </div>
+  )
+}
 
 function BotaoVoltar({
   onClick,

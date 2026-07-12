@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import type { FotoPerfilItem } from '@/lib/perfil-social'
 
 interface PerfilFotosGridProps {
@@ -26,10 +28,20 @@ export function PerfilFotosGrid({ fotos }: PerfilFotosGridProps) {
             key={`${foto.postId}-${i}`}
             type="button"
             onClick={() => setLightbox(foto.url)}
-            className="aspect-square overflow-hidden rounded-xl bg-[rgb(var(--background-subtle))]"
+            className="relative aspect-square overflow-hidden rounded-xl bg-[rgb(var(--background-subtle))]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={foto.url} alt="" className="h-full w-full object-cover transition-transform hover:scale-105" />
+            {canOptimizeImageUrl(foto.url) ? (
+              <Image
+                src={foto.url}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 50vw, 33vw"
+                className="object-cover transition-transform hover:scale-105"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={foto.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform hover:scale-105" />
+            )}
           </button>
         ))}
       </div>

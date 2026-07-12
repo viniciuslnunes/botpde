@@ -1,15 +1,21 @@
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
 
 const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', '@torcida/ui'],
     staleTimes: {
-      dynamic: 60,
+      dynamic: 120,
       static: 180,
     },
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       { protocol: 'https', hostname: 'cdn.discordapp.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
@@ -20,7 +26,7 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   org: 'devinicius',
   project: 'torcida-web',
 

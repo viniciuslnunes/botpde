@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getOrCreatePerfilMembro } from '@/lib/social'
-import { getEventosParaComposer } from '@/lib/eventos'
+import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
 
 const ComunidadeChatPanel = dynamic(
@@ -41,20 +41,19 @@ export default async function ComunidadePage({
     avatarUrl: session?.user?.image ?? null,
   }
 
-  const perfilPrivado =
-    session?.user?.id != null
-      ? (await getOrCreatePerfilMembro(session.user.id, tenant.id)).perfilPrivado
-      : true
-
-  const eventosComposer =
-    session?.user?.id != null
-      ? await getEventosParaComposer(tenant.id, session.user.id)
-      : []
-
-  const navBadges =
-    session?.user?.id != null
-      ? await getResumoBadgesComunidade(tenant.id, session.user.id)
-      : { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
+  let perfilPrivado = true
+  let eventosComposer: EventoComposerItem[] = []
+  let navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
+  if (session?.user?.id != null) {
+    const [perfil, eventos, badges] = await Promise.all([
+      getOrCreatePerfilMembro(session.user.id, tenant.id),
+      getEventosParaComposer(tenant.id, session.user.id),
+      getResumoBadgesComunidade(tenant.id, session.user.id),
+    ])
+    perfilPrivado = perfil.perfilPrivado
+    eventosComposer = eventos
+    navBadges = badges
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">

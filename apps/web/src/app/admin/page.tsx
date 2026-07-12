@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
@@ -50,10 +51,38 @@ const acaoLabel: Record<string, string> = {
   SEDE_DESATIVADA: 'Sede desativada',
 }
 
-export default async function AdminPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id || !tenant) redirect('/')
+type TenantInfo = { id: string; nome: string; corPrimaria: string }
 
+function KpisSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-16 rounded-xl bg-[rgb(var(--border)_/_0.45)]" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ListasSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="h-64 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+        <div className="h-64 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+      </div>
+      <div className="h-56 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+    </div>
+  )
+}
+
+async function DashboardKpis({ tenant }: { tenant: TenantInfo }) {
   const agora = new Date()
   const em30dias = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000)
   const ha30dias = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -66,11 +95,9 @@ export default async function AdminPage() {
     totalSocios,
     sociosVencendo,
     sociosVencidos,
-    proxEventos,
+    proxEventosCount,
     totalSedes,
     sedesAtivas,
-    auditLog,
-    membroRecentes,
   ] = await Promise.all([
     db.saasMembro.count({ where: { tenantId: tenant.id, status: 'APROVADO' } }),
     db.saasMembro.count({ where: { tenantId: tenant.id, status: 'PENDENTE' } }),
@@ -79,25 +106,9 @@ export default async function AdminPage() {
     db.saasSocio.count({ where: { tenantId: tenant.id } }),
     db.saasSocio.count({ where: { tenantId: tenant.id, validade: { gte: agora, lte: em30dias } } }),
     db.saasSocio.count({ where: { tenantId: tenant.id, validade: { lt: agora } } }),
-    db.evento.findMany({
-      where: { tenantId: tenant.id, data: { gte: agora } },
-      orderBy: { data: 'asc' },
-      take: 3,
-      include: { _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } } },
-    }),
+    db.evento.count({ where: { tenantId: tenant.id, data: { gte: agora } } }),
     db.sede.count({ where: { tenantId: tenant.id } }),
     db.sede.count({ where: { tenantId: tenant.id, ativa: true } }),
-    db.auditLog.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { criadoEm: 'desc' },
-      take: 8,
-    }),
-    db.saasMembro.findMany({
-      where: { tenantId: tenant.id, status: 'APROVADO', aprovadoEm: { not: null } },
-      orderBy: { aprovadoEm: 'desc' },
-      take: 5,
-      select: { nome: true, tipo: true, aprovadoEm: true },
-    }),
   ])
 
   type KpiCard = {
@@ -130,7 +141,7 @@ export default async function AdminPage() {
     },
     {
       label: 'Próximos eventos',
-      value: proxEventos.length,
+      value: proxEventosCount,
       icon: Calendar,
       href: '/admin/eventos',
     },
@@ -144,19 +155,7 @@ export default async function AdminPage() {
   ]
 
   return (
-    <div className="p-6 space-y-7">
-      {/* Cabeçalho */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="text-xs text-[rgb(var(--foreground-muted))]">Operacional</span>
-        </div>
-      </div>
-
+    <div className="space-y-7">
       {/* Alertas */}
       {(pendentes > 0 || sociosVencendo > 0 || sociosVencidos > 0) && (
         <div className="space-y-2">
@@ -256,7 +255,35 @@ export default async function AdminPage() {
           )
         })}
       </div>
+    </div>
+  )
+}
 
+async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
+  const agora = new Date()
+
+  const [proxEventos, auditLog, membroRecentes] = await Promise.all([
+    db.evento.findMany({
+      where: { tenantId: tenant.id, data: { gte: agora } },
+      orderBy: { data: 'asc' },
+      take: 3,
+      include: { _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } } },
+    }),
+    db.auditLog.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { criadoEm: 'desc' },
+      take: 8,
+    }),
+    db.saasMembro.findMany({
+      where: { tenantId: tenant.id, status: 'APROVADO', aprovadoEm: { not: null } },
+      orderBy: { aprovadoEm: 'desc' },
+      take: 5,
+      select: { nome: true, tipo: true, aprovadoEm: true },
+    }),
+  ])
+
+  return (
+    <div className="space-y-7">
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Próximos eventos */}
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
@@ -382,6 +409,37 @@ export default async function AdminPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+export default async function AdminPage() {
+  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  if (!session?.user?.id || !tenant) redirect('/')
+
+  const tenantInfo: TenantInfo = { id: tenant.id, nome: tenant.nome, corPrimaria: tenant.corPrimaria }
+
+  return (
+    <div className="p-6 space-y-7">
+      {/* Cabeçalho */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Dashboard</h1>
+          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="text-xs text-[rgb(var(--foreground-muted))]">Operacional</span>
+        </div>
+      </div>
+
+      <Suspense fallback={<KpisSkeleton />}>
+        <DashboardKpis tenant={tenantInfo} />
+      </Suspense>
+
+      <Suspense fallback={<ListasSkeleton />}>
+        <DashboardListas tenant={tenantInfo} />
+      </Suspense>
     </div>
   )
 }
