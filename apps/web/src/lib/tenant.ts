@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import { env } from '@/lib/env'
+import { resolveRequestHost } from '@/lib/request-origin'
 import { TENANT_CTX_COOKIE } from '@/lib/tenant-context'
 
 export const TENANT_CACHE_TAG = 'tenant-by-slug'
@@ -43,9 +44,16 @@ async function fetchTenantBySlug(slug: string): Promise<Tenant | null> {
  * Resolve o tenant ativo da requisição.
  * Ordem: subdomínio (ROOT_DOMAIN) → cookie torcida_ctx → TENANT_SLUG.
  */
-export const getTenantFromHost = cache(async function getTenantFromHost(): Promise<Tenant | null> {
+async function readRequestHost(): Promise<string> {
   const headersList = await headers()
-  const host = headersList.get('host') ?? ''
+  return resolveRequestHost(
+    headersList.get('x-forwarded-host'),
+    headersList.get('host'),
+  )
+}
+
+export const getTenantFromHost = cache(async function getTenantFromHost(): Promise<Tenant | null> {
+  const host = await readRequestHost()
 
   const slugFromHost = extractSlugFromSubdomain(host)
   if (slugFromHost) return fetchTenantBySlug(slugFromHost)
@@ -125,8 +133,7 @@ export async function getActiveTenant(
   userId?: string,
   email?: string | null,
 ): Promise<Tenant | null> {
-  const headersList = await headers()
-  const host = headersList.get('host') ?? ''
+  const host = await readRequestHost()
   const slugFromHost = extractSlugFromSubdomain(host)
   if (slugFromHost) return fetchTenantBySlug(slugFromHost)
 

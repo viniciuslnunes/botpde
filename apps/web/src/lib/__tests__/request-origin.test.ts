@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { getPublicOrigin, publicUrl } from '@/lib/request-origin'
+import { getPublicOrigin, publicUrl, resolveRequestHost } from '@/lib/request-origin'
+
+describe('resolveRequestHost', () => {
+  it('prioriza x-forwarded-host sobre host interno', () => {
+    expect(
+      resolveRequestHost('pde-gavioes-fiel.torcida.app', 'torcidaweb-production.up.railway.app'),
+    ).toBe('pde-gavioes-fiel.torcida.app')
+  })
+
+  it('usa host quando não há encaminhamento', () => {
+    expect(resolveRequestHost(null, 'localhost:3000')).toBe('localhost:3000')
+  })
+})
 
 describe('getPublicOrigin', () => {
   it('usa x-forwarded-host e x-forwarded-proto do proxy', () => {

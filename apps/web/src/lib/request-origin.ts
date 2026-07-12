@@ -1,12 +1,26 @@
 /**
- * Origem pública da requisição (Railway/Vercel atrás de proxy).
- * Evita redirects para localhost quando request.url reflete o host interno.
+ * Host efetivo da requisição atrás de proxy (Railway, Cloudflare, etc.).
+ * Next.js compara Origin vs Host/X-Forwarded-Host em Server Actions — tenant
+ * e redirects precisam usar o mesmo valor.
  *
  * Sem dependência de `@/lib/env` — usável em testes sem carregar o schema completo.
  */
+export function resolveRequestHost(
+  forwardedHost: string | null | undefined,
+  host: string | null | undefined,
+): string {
+  return forwardedHost?.split(',')[0]?.trim() || host?.trim() || ''
+}
+
+/**
+ * Origem pública da requisição (Railway/Vercel atrás de proxy).
+ * Evita redirects para localhost quando request.url reflete o host interno.
+ */
 export function getPublicOrigin(request: Request): string {
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const host = forwardedHost?.split(',')[0]?.trim() || request.headers.get('host')
+  const host = resolveRequestHost(
+    request.headers.get('x-forwarded-host'),
+    request.headers.get('host'),
+  )
 
   if (host) {
     const forwardedProto = request.headers.get('x-forwarded-proto')

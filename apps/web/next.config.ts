@@ -6,12 +6,23 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 })
 
+const rootDomain = process.env.ROOT_DOMAIN?.trim()
+const serverActionOrigins = [
+  '*.up.railway.app',
+  ...(rootDomain ? [rootDomain, `*.${rootDomain}`] : []),
+]
+
 const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', '@torcida/ui'],
     staleTimes: {
       dynamic: 120,
       static: 180,
+    },
+    serverActions: {
+      // Origin (subdomínio público) vs Host interno do proxy — sem isso o POST
+      // da Server Action é rejeitado antes de executar (parece “nada dispara”).
+      allowedOrigins: serverActionOrigins,
     },
   },
   images: {
