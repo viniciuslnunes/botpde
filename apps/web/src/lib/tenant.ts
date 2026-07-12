@@ -113,21 +113,54 @@ export function torcidaAcessivelNoHost(_tenantSlug: string): boolean {
   return true
 }
 
-/** Torcida ativa: host → cookie → vínculo do usuário (mesma requisição). */
+/**
+ * Torcida ativa no portal logado.
+ * Ordem: subdomínio real → vínculo do usuário (pendente/aprovado) → torcedor global
+ * (clube do PerfilTorcedor) → cookie → TENANT_SLUG do deploy.
+ *
+ * Não delega a getTenantFromHost() inteiro — em single-tenant o TENANT_SLUG do deploy
+ * (ex.: Gaviões) não pode vencer um SaasMembro PENDENTE em outra torcida (Camisa 12).
+ */
 export async function getActiveTenant(
   userId?: string,
   email?: string | null,
 ): Promise<Tenant | null> {
-  const fromHost = await getTenantFromHost()
-  if (fromHost) return fromHost
+  const headersList = await headers()
+  const host = headersList.get('host') ?? ''
+  const slugFromHost = extractSlugFromSubdomain(host)
+  if (slugFromHost) return fetchTenantBySlug(slugFromHost)
 
-  if (userId) {
-    const { resolveHomeTenantSlugForUser, isSuperAdminEmail } = await import('@/lib/tenant-context')
-    if (!isSuperAdminEmail(email)) {
-      const slug = await resolveHomeTenantSlugForUser(userId)
-      if (slug) return fetchTenantBySlug(slug)
+  const { resolveUserTenantSlugForUser, isSuperAdminEmail } = await import('@/lib/tenant-context')
+
+  if (userId && !isSuperAdminEmail(email)) {
+    const userSlug = await resolveUserTenantSlugForUser(userId)
+    if (userSlug) return fetchTenantBySlug(userSlug)
+
+    const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
+      where: { userId },
+      select: { afiliacaoId: true },
+    })
+    if (perfil?.afiliacaoId) {
+      const cookieStore = await cookies()
+      const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
+      if (slugFromCookie) {
+        const fromCookie = await fetchTenantBySlug(slugFromCookie)
+        if (fromCookie?.afiliacaoId === perfil.afiliacaoId) return fromCookie
+      }
+      const clubeTenant: Tenant | null = await db.tenant.findFirst({
+        where: { afiliacaoId: perfil.afiliacaoId, ativo: true },
+        orderBy: { nome: 'asc' },
+      })
+      if (clubeTenant) return clubeTenant
     }
   }
+
+  const cookieStore = await cookies()
+  const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
+  if (slugFromCookie) return fetchTenantBySlug(slugFromCookie)
+
+  const fallback = fallbackTenantSlug(host)
+  if (fallback) return fetchTenantBySlug(fallback)
 
   return null
 }

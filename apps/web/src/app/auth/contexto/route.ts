@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { db } from '@torcida/db'
 import { env, isProd } from '@/lib/env'
 import { publicUrl } from '@/lib/request-origin'
 import { sharedCookieOptions } from '@/lib/session-cookie'
@@ -31,6 +32,13 @@ export async function GET(request: Request) {
 
   const slug = await resolveUserTenantSlugForUser(session.user.id)
   if (!slug) {
+    const perfil = await db.perfilTorcedor.findUnique({
+      where: { userId: session.user.id },
+      select: { onboardingConcluidoEm: true, afiliacaoId: true },
+    })
+    if (perfil?.onboardingConcluidoEm) {
+      return NextResponse.redirect(publicUrl('/portal/comunidade', request))
+    }
     return NextResponse.redirect(publicUrl('/onboarding', request))
   }
 

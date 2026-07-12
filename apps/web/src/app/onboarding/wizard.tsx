@@ -615,13 +615,18 @@ function PassoVinculo({
             erros={errosCampo.imagemProva}
             onArquivo={onArquivo}
           />
+          {!imagemProva && !uploadPend && (
+            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+              Envie um comprovante de vínculo para continuar como torcedor ou sócio da torcida.
+            </p>
+          )}
         </div>
 
         <div className="mt-6 space-y-3">
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
-            disabled={pending || uploadPend || !imagemProva}
+            disabled={pending || uploadPend || (precisaEscolherUnidade && !unidadeId)}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
             <Users className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />

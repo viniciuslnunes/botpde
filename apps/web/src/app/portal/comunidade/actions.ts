@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
 import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
@@ -29,6 +29,13 @@ import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const MAX_MIDIAS = 10
+
+async function getSessionAndPortalTenant() {
+  const session = await auth()
+  if (!session?.user?.id) return { session, tenant: null }
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
+  return { session, tenant }
+}
 
 // Cada anexo deve ser mídia do nosso Cloudinary (imagem/vídeo), um link de rede
 // social (embed) ou um sticker do app — bloqueia URLs arbitrárias de terceiros.
@@ -157,7 +164,7 @@ export async function publicarPost(
 }
 
 export async function solicitarSeguir(userId: string): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
@@ -204,7 +211,7 @@ export async function solicitarSeguir(userId: string): Promise<void> {
 }
 
 export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
@@ -234,7 +241,7 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
 }
 
 export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
@@ -254,7 +261,7 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
 }
 
 export async function deixarDeSeguir(userId: string): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
@@ -284,7 +291,7 @@ export interface AtualizarPerfilSocialInput {
 }
 
 export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
 
@@ -340,7 +347,7 @@ export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): 
 
 /** @deprecated Use atualizarPerfilSocial */
 export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Promise<void> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
   if (!tenant) throw new Error('Tenant não encontrado')
   await assertMembroAtivo(tenant.id, session.user.id)

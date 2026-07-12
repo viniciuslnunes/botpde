@@ -299,6 +299,32 @@ export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocia
   return enriquecerPostsComBadges(posts)
 }
 
+async function resolveVisibleTenantIdsForFeed(
+  tenantId: string,
+  userId: string | undefined,
+): Promise<string[]> {
+  const base = await getVisibleTenantIds(tenantId, 'comunidade')
+  if (!userId) return base
+
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true },
+  })
+  if (membro?.status === 'APROVADO') return base
+
+  const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { afiliacaoId: true },
+  })
+  if (!tenant?.afiliacaoId) return base
+
+  const siblings: { id: string }[] = await db.tenant.findMany({
+    where: { afiliacaoId: tenant.afiliacaoId, ativo: true },
+    select: { id: true },
+  })
+  return [...new Set([...base, ...siblings.map((s) => s.id)])]
+}
+
 export const getPostsParaFeed = cache(async function getPostsParaFeed(
   tenantId: string,
   userId: string | undefined,
@@ -309,7 +335,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const cursorWhere = buildCursorWhere(decodedCursor)
 
   const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
-    getVisibleTenantIds(tenantId, 'comunidade'),
+    resolveVisibleTenantIdsForFeed(tenantId, userId),
     userId
       ? db.seguimento.findMany({
           where: { seguidorId: userId, status: 'APROVADO' },
@@ -391,7 +417,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
 })
 
 export const getComunicadosParaFeed = cache(async function getComunicadosParaFeed(tenantId: string, userId?: string) {
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const visibleTenantIds = await resolveVisibleTenantIdsForFeed(tenantId, userId)
   const { announcements } = await getFeedComunidade(tenantId, {
     userId,
     takePosts: 0,

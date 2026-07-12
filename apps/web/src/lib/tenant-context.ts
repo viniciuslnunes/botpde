@@ -83,7 +83,16 @@ export async function resolvePortalHomeForUser(
   }
 
   const slug = await resolveUserTenantSlugForUser(userId)
-  if (!slug) return '/onboarding'
+  if (!slug) {
+    const perfil = await db.perfilTorcedor.findUnique({
+      where: { userId },
+      select: { onboardingConcluidoEm: true },
+    })
+    if (perfil?.onboardingConcluidoEm) {
+      return env.ROOT_DOMAIN ? '/auth/contexto' : '/portal/comunidade'
+    }
+    return '/onboarding'
+  }
 
   if (env.ROOT_DOMAIN) {
     const protocol = env.NODE_ENV === 'production' ? 'https' : 'http'

@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { checarPodePublicarNoFeed } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
@@ -33,7 +33,10 @@ export default async function ComunidadePage({
   searchParams: Promise<{ cursor?: string }>
 }) {
   const params = await searchParams
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  if (!session?.user?.id) redirect('/entrar')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
   if (!tenant) redirect('/')
 
   const currentUser = {

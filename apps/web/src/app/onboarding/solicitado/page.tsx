@@ -3,19 +3,17 @@ import { redirect } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { buildPortalUrl, getTenantFromHost } from '@/lib/tenant'
+import { buildPortalUrl, getActiveTenant } from '@/lib/tenant'
 
 export default async function SolicitacaoEnviadaPage({
   searchParams,
 }: {
   searchParams: Promise<{ torcida?: string }>
 }) {
-  const [params, session, hostTenant] = await Promise.all([
-    searchParams,
-    auth(),
-    getTenantFromHost(),
-  ])
+  const [params, session] = await Promise.all([searchParams, auth()])
   if (!session?.user?.id) redirect('/entrar')
+
+  const hostTenant = await getActiveTenant(session.user.id, session.user.email)
 
   const slug = params.torcida?.trim()
   const torcida = slug
@@ -37,8 +35,9 @@ export default async function SolicitacaoEnviadaPage({
       <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
         {torcida ? (
           <>
-            Sua solicitação foi registrada na <strong>{torcida.nome}</strong>. A liderança vai
-            analisar e você recebe acesso ao portal quando for aprovado.
+            Sua solicitação foi registrada na <strong>{torcida.nome}</strong>. Enquanto a
+            liderança analisa, você pode usar o feed de torcedor e interagir com outros
+            torcedores do clube.
           </>
         ) : (
           <>Sua solicitação foi registrada. A liderança da torcida vai analisar em breve.</>
@@ -47,9 +46,8 @@ export default async function SolicitacaoEnviadaPage({
 
       {hostTenant && torcida && hostTenant.slug !== torcida.slug && (
         <p className="mx-auto mt-4 max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Este endereço é o portal da <strong>{hostTenant.nome}</strong>. Sua solicitação é na{' '}
-          <strong>{torcida.nome}</strong> — o feed e a aprovação ficam no portal da torcida
-          escolhida.
+          Seu contexto foi ajustado para a <strong>{torcida.nome}</strong>. A aprovação é feita
+          pela diretoria dessa torcida.
         </p>
       )}
 
@@ -59,7 +57,7 @@ export default async function SolicitacaoEnviadaPage({
             href={portalUrl}
             className="inline-flex rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
           >
-            Ir para o portal da {torcida?.nome ?? 'torcida'}
+            Ir para o feed de torcedor
           </a>
         ) : (
           <Link

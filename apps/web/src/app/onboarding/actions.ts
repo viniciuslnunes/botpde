@@ -12,7 +12,7 @@ import {
   type TorcidaOnboarding,
   type DepartamentoOnboarding,
 } from '@/lib/onboarding'
-import { buildPortalUrl } from '@/lib/tenant'
+import { setTenantContextSlug } from '@/lib/tenant-context'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -311,6 +311,7 @@ export async function solicitarVinculo(
     update: { onboardingConcluidoEm: new Date() },
   })
 
-  redirect(buildPortalUrl(tenant.slug))
+  await setTenantContextSlug(tenant.slug)
+  redirect(`/onboarding/solicitado?torcida=${encodeURIComponent(tenant.slug)}`)
   return { ok: true }
 }
