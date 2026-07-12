@@ -46,10 +46,13 @@ async function fetchTenantBySlug(slug: string): Promise<Tenant | null> {
  */
 async function readRequestHost(): Promise<string> {
   const headersList = await headers()
-  return resolveRequestHost(
-    headersList.get('x-forwarded-host'),
-    headersList.get('host'),
-  )
+  const host = headersList.get('host') ?? ''
+  const forwarded = headersList.get('x-forwarded-host')?.split(',')[0]?.trim() ?? ''
+  // Prefere o header que carrega o subdomínio da torcida — atrás de proxy o
+  // x-forwarded-host às vezes é o host interno e apaga o slug (pde-…).
+  if (extractSlugFromSubdomain(host)) return host
+  if (forwarded && extractSlugFromSubdomain(forwarded)) return forwarded
+  return resolveRequestHost(forwarded, host)
 }
 
 export const getTenantFromHost = cache(async function getTenantFromHost(): Promise<Tenant | null> {

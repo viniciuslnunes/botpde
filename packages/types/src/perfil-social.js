@@ -7,6 +7,8 @@ const cloudinaryUrlSchema = z
   .refine((url) => url.includes('res.cloudinary.com'), 'URL de imagem inválida')
 
 export const atualizarPerfilSocialSchema = z.object({
+  /** Tenant da tela aberta — evita gravar no tenant errado quando o host/proxy diverge. */
+  tenantId: z.string().min(1),
   bio: z.string().max(280, 'Bio deve ter no máximo 280 caracteres').optional(),
   perfilPrivado: z.boolean(),
   exibirCidade: z.boolean(),

@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { atualizarPerfilSocial } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 
 interface PerfilEditarFormProps {
+  tenantId: string
   bio: string
   perfilPrivado: boolean
   exibirCidade: boolean
@@ -20,6 +22,7 @@ interface PerfilEditarFormProps {
 }
 
 export function PerfilEditarForm({
+  tenantId,
   bio: bioInicial,
   perfilPrivado: privadoInicial,
   exibirCidade: cidadeInicial,
@@ -30,6 +33,7 @@ export function PerfilEditarForm({
   avatarUrl: avatarInicial,
   avatarFallback,
 }: PerfilEditarFormProps) {
+  const router = useRouter()
   const [bio, setBio] = useState(bioInicial)
   const [perfilPrivado, setPerfilPrivado] = useState(privadoInicial)
   const [exibirCidade, setExibirCidade] = useState(cidadeInicial)
@@ -97,6 +101,7 @@ export function PerfilEditarForm({
     startTransition(async () => {
       try {
         await atualizarPerfilSocial({
+          tenantId,
           bio,
           perfilPrivado,
           exibirCidade,
@@ -107,6 +112,9 @@ export function PerfilEditarForm({
           avatarUrl,
         })
         toast.success('Perfil social atualizado.')
+        // Atualiza o PerfilHeader (RSC) com banner/avatar gravados — sem isso a
+        // prévia do form mostra a capa e o card de cima fica cinza até F5.
+        router.refresh()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível salvar.')
       }

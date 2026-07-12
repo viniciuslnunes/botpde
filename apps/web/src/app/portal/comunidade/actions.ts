@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
-import { getActiveTenant, getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
 import { PERMISSIONS, atualizarPerfilSocialSchema, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
@@ -287,6 +287,7 @@ export async function deixarDeSeguir(userId: string): Promise<void> {
 }
 
 export interface AtualizarPerfilSocialInput {
+  tenantId: string
   bio: string
   perfilPrivado: boolean
   exibirCidade: boolean
@@ -298,19 +299,23 @@ export interface AtualizarPerfilSocialInput {
 }
 
 export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): Promise<void> {
-  // A edição pertence ao perfil DA torcida que está sendo vista na tela. A página
-  // resolve o tenant por `getTenantFromHost()`; a escrita precisa usar o mesmo, senão
-  // (usuário multi-torcida) o banner/avatar é gravado no PerfilMembro de outra torcida
-  // e nunca reflete no perfil aberto.
+  // Usa o tenantId da tela (mesmo da página RSC). Re-resolver por host atrás de
+  // proxy/cookie multi-torcida gravava em outra linha de PerfilMembro — banner
+  // sumia no refresh enquanto a prévia local ainda mostrava a imagem.
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
-  const tenant = await getTenantFromHost()
-  if (!tenant) throw new Error('Tenant não encontrado')
-
-  await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = atualizarPerfilSocialSchema.safeParse(input)
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
+
+  const tenantId = parsed.data.tenantId
+  const tenant: { id: string; ativo: boolean } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { id: true, ativo: true },
+  })
+  if (!tenant?.ativo) throw new Error('Tenant não encontrado')
+
+  await assertMembroAtivo(tenant.id, session.user.id)
 
   if (parsed.data.bannerUrl && !isCloudinaryUrl(parsed.data.bannerUrl)) {
     throw new Error('Banner inválido')

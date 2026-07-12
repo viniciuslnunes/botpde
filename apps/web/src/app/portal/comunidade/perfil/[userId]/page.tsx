@@ -228,6 +228,7 @@ export default async function PerfilComunidadePage({
             <>
               {isSelf && (
                 <PerfilEditarForm
+                  tenantId={tenant.id}
                   bio={perfil.bio ?? ''}
                   perfilPrivado={perfil.perfilPrivado}
                   exibirCidade={perfil.exibirCidade}
