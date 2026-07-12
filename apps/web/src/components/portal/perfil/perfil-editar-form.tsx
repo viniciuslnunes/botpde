@@ -44,6 +44,7 @@ export function PerfilEditarForm({
       const url = await uploadMediaToCloudinary(file, undefined, purpose)
       if (tipo === 'banner') setBannerUrl(url)
       else setAvatarUrl(url)
+      toast.success(tipo === 'banner' ? 'Banner carregado. Clique em salvar.' : 'Foto carregada. Clique em salvar.')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Falha no upload.')
     } finally {
@@ -76,46 +77,90 @@ export function PerfilEditarForm({
         Editar perfil social
       </h2>
 
-      <div className="flex flex-wrap gap-3">
-        <input
-          ref={bannerRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void handleUpload(f, 'banner')
-          }}
-        />
-        <button
-          type="button"
-          disabled={uploading !== null}
-          onClick={() => bannerRef.current?.click()}
-          className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-        >
-          {uploading === 'banner' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          {bannerUrl ? 'Trocar banner' : 'Adicionar banner'}
-        </button>
+      <input
+        ref={bannerRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void handleUpload(f, 'banner')
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={avatarRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void handleUpload(f, 'avatar')
+          e.target.value = ''
+        }}
+      />
 
-        <input
-          ref={avatarRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void handleUpload(f, 'avatar')
-          }}
-        />
-        <button
-          type="button"
-          disabled={uploading !== null}
-          onClick={() => avatarRef.current?.click()}
-          className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-        >
-          {uploading === 'avatar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          {avatarUrl ? 'Trocar foto' : 'Foto do perfil'}
-        </button>
+      {/* Prévia: faixa de capa + avatar sobreposto, espelhando o header do perfil. */}
+      <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
+        <div className="relative h-28 sm:h-32">
+          {bannerUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />
+          )}
+
+          {uploading === 'banner' && (
+            <div className="absolute inset-0 grid place-items-center bg-black/40">
+              <Loader2 className="h-5 w-5 animate-spin text-white" />
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={uploading !== null}
+            onClick={() => bannerRef.current?.click()}
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            {bannerUrl ? 'Trocar capa' : 'Adicionar capa'}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 bg-[rgb(var(--surface))] px-4 pb-3">
+          <div className="-mt-8 shrink-0">
+            <button
+              type="button"
+              disabled={uploading !== null}
+              onClick={() => avatarRef.current?.click()}
+              className="group relative block h-16 w-16 overflow-hidden rounded-full ring-4 ring-[rgb(var(--surface))] disabled:opacity-60"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center bg-[rgb(var(--background-subtle))]">
+                  <Camera className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
+                </span>
+              )}
+              <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
+                {uploading === 'avatar' ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  <Camera className="h-4 w-4 text-white" />
+                )}
+              </span>
+              {uploading === 'avatar' && (
+                <span className="absolute inset-0 grid place-items-center bg-black/45">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </span>
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            Toque na capa ou na foto para trocar. As alterações valem após salvar.
+          </p>
+        </div>
       </div>
 
       <textarea
