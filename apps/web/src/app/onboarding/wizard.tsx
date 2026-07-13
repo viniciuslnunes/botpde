@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
+import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
@@ -334,7 +335,11 @@ function PassoClube({
                 onClick={() => onSelecionar(a)}
                 className="flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
               >
-                <EscudoClube afiliacao={a} />
+                <EscudoClube
+                  nome={a.nome}
+                  apelido={a.apelido}
+                  escudoUrl={a.escudoUrl}
+                />
                 <span className="text-xs font-semibold text-[rgb(var(--foreground))] line-clamp-2">
                   {a.nome}
                 </span>
@@ -353,28 +358,6 @@ function PassoClube({
           ))}
         </ul>
       )}
-    </div>
-  )
-}
-
-function EscudoClube({ afiliacao }: { afiliacao: AfiliacaoOnboarding }) {
-  const [imagemFalhou, setImagemFalhou] = useState(false)
-
-  if (afiliacao.escudoUrl && !imagemFalhou) {
-    return (
-      <Image
-        src={afiliacao.escudoUrl}
-        alt={afiliacao.nome}
-        width={56}
-        height={56}
-        className="h-14 w-14 object-contain"
-        onError={() => setImagemFalhou(true)}
-      />
-    )
-  }
-  return (
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-lg font-bold text-[rgb(var(--foreground-muted))]">
-      {(afiliacao.apelido || afiliacao.nome).charAt(0).toUpperCase()}
     </div>
   )
 }

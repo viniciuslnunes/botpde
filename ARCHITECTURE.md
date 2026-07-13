@@ -648,7 +648,8 @@ Detalhe operacional e **plano de progresso** da inteligência de casamento:
   `packages/db/src/data/escudos-soccerwiki-report.json`.
 - **Estado (2026-07-13)**: 139/325 com escudo (Fases A–C + D parcial); 186 pendentes.
   Módulo `escudos-wiki-match.js`; Soccer Wiki esgotado (246 clubes).
-- **Regra de produto**: escudo errado é pior que vazio — matching conservador.
+- **Regra de produto**: escudo errado é pior que vazio — matching conservador;
+  placeholder neutro no grid (`EscudoClube`) quando sem `escudoUrl`.
 
 ## 6. Itens em aberto (aguardando decisão)
 

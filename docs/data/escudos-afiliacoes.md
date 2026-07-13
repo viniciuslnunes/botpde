@@ -282,13 +282,19 @@ Com chave pública + busca: poucos matches adicionais (estaduais raramente na AP
 2. Aliases Wiki/API pontuais conforme relatórios (`semMatchLista`).
 3. Placeholder neutro no UI para clubes sem escudo (não inventar imagem).
 
-### Fase E — Qualidade contínua
+### Fase E — Onboarding UI + qualidade contínua ✅ (2026-07-13)
+
+- [x] Componente `EscudoClube` (`apps/web/src/components/onboarding/escudo-clube.tsx`):
+  inicial + ícone neutro quando `escudoUrl` ausente ou com falha de carga.
+- [x] Gate em `getAfiliacoesParaOnboarding`: herda `escudoUrl` de duplicata do grupo
+  após dedup canônica; reordena com escudo primeiro.
+- [x] Testes Vitest: `onboarding-afiliacoes.test.ts`.
+
+**Qualidade contínua (pipeline de escudos):**
 
 - Rodar `--report-only` antes de cada upload em produção; revisar pares com `score: 90`
   na lista manualmente.
 - Teste de regressão: amostra de homônimos em `scripts/test-afiliacoes.js`.
-- Gate no onboarding: priorizar `escudoUrl` da afiliação canônica após dedup
-  (`apps/web/src/lib/onboarding.ts`).
 
 ## Agentes e responsabilidades
 

@@ -84,7 +84,8 @@ export const getAfiliacoesParaOnboarding = cache(
     })
 
     // Duplicatas por nome literal OU pelo mesmo clube (ex.: Corinthians ×
-    // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo.
+    // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo;
+    // herda escudoUrl de qualquer duplicata do grupo (Fase E).
     const unicas: AfiliacaoComVinculos[] = []
     for (const afiliacao of afiliacoes) {
       const idxGrupo = unicas.findIndex((u) => saoMesmoClube(u, afiliacao))
@@ -94,18 +95,27 @@ export const getAfiliacoesParaOnboarding = cache(
       }
       const grupo = [unicas[idxGrupo], afiliacao]
       const canonIdx = indiceAfiliacaoCanonica(grupo)
-      unicas[idxGrupo] = grupo[canonIdx]
+      const canon = grupo[canonIdx]
+      const escudoUrl = canon.escudoUrl ?? grupo.find((g) => g.escudoUrl)?.escudoUrl ?? null
+      unicas[idxGrupo] = { ...canon, escudoUrl }
     }
 
-    return unicas.map((afiliacao) => ({
-      id: afiliacao.id,
-      nome: afiliacao.nome,
-      apelido: afiliacao.apelido,
-      escudoUrl: afiliacao.escudoUrl,
-      cidade: afiliacao.cidade,
-      estado: afiliacao.estado,
-      serie: afiliacao.serie,
-    }))
+    return unicas
+      .map((afiliacao) => ({
+        id: afiliacao.id,
+        nome: afiliacao.nome,
+        apelido: afiliacao.apelido,
+        escudoUrl: afiliacao.escudoUrl,
+        cidade: afiliacao.cidade,
+        estado: afiliacao.estado,
+        serie: afiliacao.serie,
+      }))
+      .sort((a, b) => {
+        const comEscudo = (x: AfiliacaoOnboarding) => (x.escudoUrl ? 0 : 1)
+        const diff = comEscudo(a) - comEscudo(b)
+        if (diff !== 0) return diff
+        return a.nome.localeCompare(b.nome, 'pt-BR')
+      })
   },
 )
 
