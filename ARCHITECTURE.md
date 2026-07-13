@@ -646,8 +646,8 @@ Detalhe operacional e **plano de progresso** da inteligência de casamento:
 - **Casamento**: `inferirUfDoNome`, `saoMesmoClube`, `chaveGrupoClube`, bloqueio de
   homônimos, score ≥ 90, atribuição 1:1. Relatório versionado em
   `packages/db/src/data/escudos-soccerwiki-report.json`.
-- **Estado (2026-07-13)**: 139/325 com escudo (Fases A–C + D parcial); 186 pendentes.
-  Módulo `escudos-wiki-match.js`; Soccer Wiki esgotado (246 clubes).
+- **Estado (2026-07-13)**: 255/325 com escudo (Fases A–F); 70 pendentes.
+  Catálogo Ogol: 9.858 clubes; Soccer Wiki esgotado (246 clubes).
 - **Regra de produto**: escudo errado é pior que vazio — matching conservador;
   placeholder neutro no grid (`EscudoClube`) quando sem `escudoUrl`.
 

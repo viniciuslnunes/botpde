@@ -16,6 +16,8 @@ import {
 } from '../src/data/afiliacoes-normalize.js'
 import { scoreWikiAfiliacao } from '../src/data/escudos-wiki-match.js'
 import { casarAfiliacaoBusca } from '../src/data/escudos-thesportsdb-match.js'
+import { parseOgolLocal, deveExcluirOgolClube, normalizarOgolClube } from '../src/data/ogol-parse.js'
+import { scoreOgolAfiliacao } from '../src/data/escudos-ogol-match.js'
 import { AFILIACOES_BRASIL } from '../src/data/afiliacoes-brasil.js'
 
 let passed = 0
@@ -238,6 +240,43 @@ ok('dataset gera slugs únicos para os 5 regiões inteiras', () => {
     gerarSlugUnico(c.nome, c.estado, usados)
   }
   assert.equal(usados.size, AFILIACOES_BRASIL.length, 'colisão não resolvida')
+})
+
+ok('parseOgolLocal extrai cidade, UF e fundação', () => {
+  assert.deepEqual(parseOgolLocal('Brasil · Rio de Janeiro (RJ) · 1895'), {
+    cidade: 'Rio de Janeiro',
+    uf: 'RJ',
+    fundacao: 1895,
+  })
+})
+
+ok('deveExcluirOgolClube ignora feminino e base', () => {
+  assert.equal(deveExcluirOgolClube({ titulo: 'Flamengo', nomeOficial: 'CR Flamengo' }), false)
+  assert.equal(
+    deveExcluirOgolClube({ titulo: 'Sub-20', nomeOficial: 'Corinthians Sub-20' }),
+    true,
+  )
+  assert.equal(
+    deveExcluirOgolClube({ titulo: 'Minas Brasília FF', nomeOficial: 'Minas Brasília Futebol Feminino' }),
+    true,
+  )
+})
+
+ok('scoreOgolAfiliacao casa nome oficial com UF', () => {
+  const ogol = normalizarOgolClube(
+    {
+      ogolId: '2256',
+      slug: 'sao-paulo',
+      titulo: 'São Paulo',
+      nomeOficial: 'São Paulo Futebol Clube',
+      local: 'Brasil · São Paulo (SP) · 1930',
+      logoUrl: 'https://cdn-img.staticzz.com/x.png',
+      modalidade: '1',
+    },
+    1,
+  )
+  const score = scoreOgolAfiliacao(ogol, { nome: 'São Paulo (SP)', estado: 'SP' })
+  assert.ok(score >= 90)
 })
 
 console.log(`\n${passed} asserções OK — ${AFILIACOES_BRASIL.length} clubes no dataset.`)

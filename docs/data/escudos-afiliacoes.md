@@ -17,8 +17,10 @@ a exibir o escudo de outro clube.
 | Métrica | Valor |
 |---|---|
 | Afiliações totais | 325 |
-| Com escudo | 139 |
-| Sem escudo | 186 |
+| Com escudo | 255 |
+| Sem escudo | 70 |
+| Catálogo Ogol coletado (Fase F) | 9.858 clubes masculinos |
+| Escudos via Ogol (seed 2026-07-13) | 116 |
 | Escudos via Soccer Wiki (Fases A+B+D parcial) | 120 |
 | Clubes raspados no Soccer Wiki | 246 (listagem completa até offset 300) |
 
@@ -32,6 +34,8 @@ Relatório versionado: `packages/db/src/data/escudos-soccerwiki-report.json`
 3. **Soccer Wiki** — scrape paginado Brasil (`seed:escudos-soccerwiki.js`).
 4. **TheSportsDB** — índice Séries A–D + busca (`seed:escudos-thesportsdb.js`);
    requer `THESPORTSDB_KEY` patrono para cobertura ampla.
+5. **Ogol** — catálogo paginado Brasil (`coleta:ogol-clubes` →
+   `ogol-clubes-brasil.json`; `seed:escudos-ogol`).
 
 ### Lógica de casamento (estrita)
 
@@ -59,8 +63,10 @@ pnpm --filter @torcida/db seed:escudos-soccerwiki -- --report-only
 pnpm --filter @torcida/db seed:escudos-soccerwiki -- --dry-run
 pnpm --filter @torcida/db seed:escudos-soccerwiki
 pnpm --filter @torcida/db seed:escudos-thesportsdb -- --report-only
-pnpm --filter @torcida/db seed:escudos-thesportsdb -- --sem-busca
-pnpm --filter @torcida/db seed:escudos-thesportsdb
+pnpm --filter @torcida/db coleta:ogol-clubes
+pnpm --filter @torcida/db coleta:ogol-clubes -- --page-from=1 --page-to=10
+pnpm --filter @torcida/db seed:escudos-ogol -- --report-only
+pnpm --filter @torcida/db seed:escudos-ogol
 pnpm --filter @torcida/db db:repair-afiliacoes-torcidas   # funde duplicatas de clube
 pnpm --filter @torcida/db test:afiliacoes
 ```
@@ -281,6 +287,15 @@ Com chave pública + busca: poucos matches adicionais (estaduais raramente na AP
 1. Rodar `seed:escudos-thesportsdb` em produção com `THESPORTSDB_KEY` patrono.
 2. Aliases Wiki/API pontuais conforme relatórios (`semMatchLista`).
 3. Placeholder neutro no UI para clubes sem escudo (não inventar imagem).
+
+### Fase F — Ogol (catálogo nacional) ✅ (2026-07-13)
+
+- [x] `coleta:ogol-clubes` — 506 páginas, **9.858** clubes masculinos (feminino/base filtrados).
+- [x] Dataset versionado `ogol-clubes-brasil.json`.
+- [x] `seed:escudos-ogol` + `escudos-ogol-match.js` (casamento estrito, score ≥90).
+- [x] **116 escudos** publicados; **70** afiliações ainda sem match (`escudos-ogol-report.json`).
+
+Cobertura onboarding: **255/325** com escudo (78%).
 
 ### Fase E — Onboarding UI + qualidade contínua ✅ (2026-07-13)
 
