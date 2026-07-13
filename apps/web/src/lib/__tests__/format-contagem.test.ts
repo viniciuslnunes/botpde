@@ -31,8 +31,8 @@ describe('formatTorcedoresEstimados', () => {
     expect(formatTorcedoresEstimados(142, 'PLATAFORMA')).toBe('142 torcedores na plataforma')
   })
 
-  it('formata limite conservador dinâmico', () => {
-    expect(formatTorcedoresEstimados(2_000, 'LIMITE_ATE')).toBe('até 2 mil torcedores ou menos')
+  it('indica estimativa indisponível fora do IBOPE', () => {
+    expect(formatTorcedoresEstimados(2_000, 'LIMITE_ATE')).toBe('base digital não estimada')
   })
 
   it('fallback legado com til', () => {

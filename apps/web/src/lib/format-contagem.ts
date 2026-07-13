@@ -17,7 +17,13 @@ export function formatContagem(n: number): string {
   return n.toLocaleString('pt-BR')
 }
 
-/** Estimativa pública por tier (IBOPE digital, plataforma ou teto conservador). */
+/** Copy quando não há dado IBOPE nem contagem na plataforma. */
+export const TEXTO_ESTIMATIVA_INDISPONIVEL = 'base digital não estimada'
+
+export const TOOLTIP_ESTIMATIVA_INDISPONIVEL =
+  'Fora do Top 50 IBOPE Repucom; não há dado publicado de inscritos digitais para este clube'
+
+/** Estimativa pública por tier (IBOPE digital, plataforma ou indisponível). */
 export function formatTorcedoresEstimados(
   n: number,
   tipo?: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA' | null,
@@ -26,7 +32,7 @@ export function formatTorcedoresEstimados(
     return `${formatContagem(n)} torcedores na plataforma`
   }
   if (tipo === 'LIMITE_ATE') {
-    return `até ${formatContagem(n)} torcedores ou menos`
+    return TEXTO_ESTIMATIVA_INDISPONIVEL
   }
   if (tipo === 'IBOPE_DIGITAL') {
     return `${formatContagem(n)} inscritos digitais`

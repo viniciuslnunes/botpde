@@ -37,11 +37,8 @@ export function calcularMenorValorEstimadosConhecido() {
 /** @deprecated Use calcularMenorValorEstimadosConhecido() — mantido para testes legados. */
 export const LIMITE_TORCEDORES_FORA_IBOPE = calcularMenorValorEstimadosConhecido()
 
-export function fonteLimiteDesconhecido(teto = calcularMenorValorEstimadosConhecido()) {
-  return (
-    `Estimativa conservadora: clube fora do Top 50 IBOPE Repucom, sem contagem na plataforma; ` +
-    `menor valor conhecido na base curada — até ${teto.toLocaleString('pt-BR')} torcedores ou menos`
-  )
+export function fonteLimiteDesconhecido() {
+  return 'Fora do Top 50 IBOPE Repucom; não há dado publicado de inscritos digitais para este clube'
 }
 
 /**
@@ -75,7 +72,7 @@ export function resolverTorcedoresEstimados(chave) {
   return {
     valor: teto,
     tipo: 'LIMITE_ATE',
-    fonte: fonteLimiteDesconhecido(teto),
+    fonte: fonteLimiteDesconhecido(),
     posicao: null,
   }
 }

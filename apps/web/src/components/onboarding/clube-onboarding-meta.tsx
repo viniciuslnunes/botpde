@@ -3,6 +3,7 @@ import {
   formatContagem,
   formatTorcedoresEstimados,
   formatTotalComOnline,
+  TOOLTIP_ESTIMATIVA_INDISPONIVEL,
 } from '@/lib/format-contagem'
 import type { StatsClubeOnboarding } from '@/lib/onboarding-clube-stats'
 import type { TorcedoresEstimadosTipo } from '@/lib/onboarding'
@@ -66,7 +67,7 @@ export function ClubeOnboardingMeta({
       ? 'Base digital oficial (5 redes) — IBOPE Repucom'
       : torcedoresEstimadosTipo === 'PLATAFORMA'
         ? 'Contagem real na plataforma Torcida SaaS'
-        : 'Estimativa conservadora com base no menor valor conhecido na base curada')
+        : TOOLTIP_ESTIMATIVA_INDISPONIVEL)
 
   return (
     <div className="mt-auto flex w-full min-h-[52px] flex-col justify-end gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">

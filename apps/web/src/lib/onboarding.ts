@@ -6,6 +6,7 @@ import {
   getTetoLimiteTorcedoresGlobal,
   type StatsClubeOnboarding,
 } from '@/lib/onboarding-clube-stats'
+import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
 
 export type { StatsClubeOnboarding }
 
@@ -53,9 +54,7 @@ function aplicarEstimativaRealNoCard(
   if (row.torcedoresEstimadosTipo === 'LIMITE_ATE') {
     return {
       torcedoresEstimados: tetoLimiteGlobal,
-      torcedoresEstimadosFonte:
-        `Estimativa conservadora: menor valor conhecido na base (IBOPE + plataforma); ` +
-        `até ${tetoLimiteGlobal.toLocaleString('pt-BR')} torcedores ou menos`,
+      torcedoresEstimadosFonte: TOOLTIP_ESTIMATIVA_INDISPONIVEL,
       torcedoresEstimadosTipo: 'LIMITE_ATE',
     }
   }

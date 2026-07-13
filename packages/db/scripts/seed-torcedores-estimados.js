@@ -53,10 +53,11 @@ async function main() {
     if (dados.tipo === 'IBOPE_DIGITAL') ibope += 1
     else limite += 1
 
-    const rotulo = dados.tipo === 'LIMITE_ATE' ? 'até' : ''
-    console.log(
-      `  ✓ ${af.nome} (${af.estado ?? '?'}) → ${rotulo}${dados.valor.toLocaleString('pt-BR')} [${dados.tipo}]`,
-    )
+    const rotulo =
+      dados.tipo === 'LIMITE_ATE'
+        ? 'não estimado'
+        : dados.valor.toLocaleString('pt-BR')
+    console.log(`  ✓ ${af.nome} (${af.estado ?? '?'}) → ${rotulo} [${dados.tipo}]`)
   }
 
   console.log(
