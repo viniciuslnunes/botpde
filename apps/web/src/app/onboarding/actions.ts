@@ -47,6 +47,13 @@ export type OnboardingActionState = {
   ok?: boolean
   errors?: Record<string, string[]>
   message?: string
+  emailHref?: string
+}
+
+function getSuperAdminEmails(): string[] {
+  return process.env.SUPER_ADMIN_EMAILS
+    ? process.env.SUPER_ADMIN_EMAILS.split(',').map((e) => e.trim()).filter(Boolean)
+    : []
 }
 
 // ─── 1. Clube + região ─────────────────────────────────────────────────────────
@@ -171,11 +178,58 @@ const interesseUnidadeSchema = z.object({
     .max(120)
     .optional()
     .transform((v) => v?.trim() || undefined),
-  observacao: z
+  nomeUnidade: z
     .string()
-    .max(500)
+    .min(3, 'Informe o nome da unidade')
+    .max(100)
+    .transform((v) => v.trim()),
+  tipoUnidade: z.enum(['SUBSEDE', 'PONTO_ENCONTRO'], {
+    message: 'Informe se é subsede ou ponto de encontro',
+  }),
+  cidade: z
+    .string()
+    .min(2, 'Informe a cidade')
+    .max(80)
+    .transform((v) => v.trim()),
+  estado: z
+    .string()
+    .min(2, 'Informe a UF')
+    .max(2, 'Use a sigla do estado')
+    .transform((v) => v.trim().toUpperCase()),
+  endereco: z
+    .string()
+    .max(160)
     .optional()
     .transform((v) => v?.trim() || undefined),
+  contatoNome: z
+    .string()
+    .min(3, 'Informe seu nome')
+    .max(100)
+    .transform((v) => v.trim()),
+  contatoEmail: z
+    .string()
+    .email('E-mail inválido')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  contatoTelefone: z
+    .string()
+    .max(30)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  vinculo: z
+    .string()
+    .min(20, 'Explique o vínculo da unidade com a sede da torcida')
+    .max(1200)
+    .transform((v) => v.trim()),
+  provasUrls: z.array(z.string().url()).max(5).default([]),
+  observacao: z
+    .string()
+    .max(800)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+}).refine((data) => data.contatoEmail || data.contatoTelefone, {
+  message: 'Informe e-mail ou telefone para retorno',
+  path: ['contatoEmail'],
 })
 
 /**
@@ -185,6 +239,16 @@ const interesseUnidadeSchema = z.object({
 export async function registrarInteresseUnidade(input: {
   tenantId: string
   regiao?: string
+  nomeUnidade?: string
+  tipoUnidade?: 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade?: string
+  estado?: string
+  endereco?: string
+  contatoNome?: string
+  contatoEmail?: string
+  contatoTelefone?: string
+  vinculo?: string
+  provasUrls?: string[]
   observacao?: string
 }): Promise<OnboardingActionState> {
   const session = await auth()
@@ -205,6 +269,42 @@ export async function registrarInteresseUnidade(input: {
     return { message: 'Torcida não encontrada.' }
   }
 
+  const assunto = `[Onboarding] Unidade não listada — ${parsed.data.nomeUnidade} (${tenant.nome})`
+  const tipoLabel = parsed.data.tipoUnidade === 'SUBSEDE' ? 'Subsede' : 'Ponto de encontro'
+  const superAdminEmails = getSuperAdminEmails()
+  const linhasEmail = [
+    `Nova solicitação de cadastro de unidade afiliada no onboarding.`,
+    '',
+    `Torcida: ${tenant.nome}`,
+    `Unidade: ${parsed.data.nomeUnidade}`,
+    `Tipo: ${tipoLabel}`,
+    `Região informada no onboarding: ${parsed.data.regiao ?? 'não informada'}`,
+    `Local: ${parsed.data.cidade} - ${parsed.data.estado}`,
+    `Endereço: ${parsed.data.endereco ?? 'não informado'}`,
+    '',
+    `Contato para retorno:`,
+    `Nome: ${parsed.data.contatoNome}`,
+    `E-mail: ${parsed.data.contatoEmail ?? 'não informado'}`,
+    `Telefone/WhatsApp: ${parsed.data.contatoTelefone ?? 'não informado'}`,
+    '',
+    `Vínculo e credenciamento:`,
+    parsed.data.vinculo,
+    '',
+    `Observações:`,
+    parsed.data.observacao ?? 'sem observações',
+    '',
+    `Provas/anexos:`,
+    parsed.data.provasUrls.length > 0
+      ? parsed.data.provasUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')
+      : 'nenhuma imagem anexada',
+    '',
+    `Usuário solicitante: ${session.user.email ?? session.user.name ?? session.user.id}`,
+  ]
+  const emailHref =
+    superAdminEmails.length > 0
+      ? `mailto:${encodeURIComponent(superAdminEmails.join(','))}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(linhasEmail.join('\n'))}`
+      : undefined
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -213,13 +313,24 @@ export async function registrarInteresseUnidade(input: {
       entidade: 'Sede',
       detalhes: {
         regiao: parsed.data.regiao ?? null,
+        nomeUnidade: parsed.data.nomeUnidade,
+        tipoUnidade: parsed.data.tipoUnidade,
+        cidade: parsed.data.cidade,
+        estado: parsed.data.estado,
+        endereco: parsed.data.endereco ?? null,
+        contatoNome: parsed.data.contatoNome,
+        contatoEmail: parsed.data.contatoEmail ?? null,
+        contatoTelefone: parsed.data.contatoTelefone ?? null,
+        vinculo: parsed.data.vinculo,
+        provasUrls: parsed.data.provasUrls,
         observacao: parsed.data.observacao ?? null,
+        emailDestinatarios: superAdminEmails,
         origem: 'onboarding',
       },
     },
   })
 
-  return { ok: true }
+  return { ok: true, emailHref }
 }
 
 /**

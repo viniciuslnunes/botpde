@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
@@ -21,6 +21,7 @@ import {
   registrarInteresseUnidade,
 } from './actions'
 import { agruparSedesPorRegiao } from '@/lib/onboarding-unidade'
+import { reverseGeocodeRegion, type GoogleMapsRegion } from '@/lib/google-maps'
 import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
@@ -70,6 +71,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   const [clube, setClube] = useState<AfiliacaoOnboarding | null>(null)
   const [uf, setUf] = useState('')
   const [cidade, setCidade] = useState('')
+  const [localizacaoPrecisa, setLocalizacaoPrecisa] = useState<GoogleMapsRegion | null>(null)
   const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(null)
   const [unidadeId, setUnidadeId] = useState<string | null>(null)
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
@@ -190,6 +192,11 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 cidade={cidade}
                 onUf={setUf}
                 onCidade={setCidade}
+                onLocalizacao={(regiao) => {
+                  setUf(regiao.estado)
+                  setCidade(regiao.cidade)
+                  setLocalizacaoPrecisa(regiao)
+                }}
                 pending={pending}
                 onVoltar={() => irPara('clube', -1)}
                 onContinuar={() => avancarDaRegiao(false)}
@@ -234,6 +241,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 uf={uf}
                 cidade={cidade}
                 regiaoLabel={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
+                localizacao={localizacaoPrecisa ?? undefined}
                 pending={pending}
                 onConfirmar={confirmarUnidade}
                 onVoltar={() => irPara('torcida', -1)}
@@ -476,6 +484,7 @@ function PassoRegiao({
   cidade,
   onUf,
   onCidade,
+  onLocalizacao,
   pending,
   onVoltar,
   onContinuar,
@@ -487,11 +496,44 @@ function PassoRegiao({
   cidade: string
   onUf: (v: string) => void
   onCidade: (v: string) => void
+  onLocalizacao: (regiao: GoogleMapsRegion) => void
   pending: boolean
   onVoltar: () => void
   onContinuar: () => void
   onPular: () => void
 }) {
+  const [localizando, setLocalizando] = useState(false)
+  const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null)
+
+  function usarLocalizacao() {
+    setErroLocalizacao(null)
+    if (!navigator.geolocation) {
+      setErroLocalizacao('Seu navegador não permite detectar localização automaticamente.')
+      return
+    }
+
+    setLocalizando(true)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const regiao = await reverseGeocodeRegion({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        })
+        setLocalizando(false)
+        if (!regiao) {
+          setErroLocalizacao('Não conseguimos resolver sua cidade pelo Google Maps. Preencha manualmente.')
+          return
+        }
+        onLocalizacao(regiao)
+      },
+      () => {
+        setLocalizando(false)
+        setErroLocalizacao('Permissão negada ou localização indisponível. Você ainda pode preencher manualmente.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    )
+  }
+
   return (
     <div>
       <BotaoVoltar onClick={onVoltar} disabled={pending} />
@@ -500,6 +542,41 @@ function PassoRegiao({
         Sua região ajuda a conectar você a torcedores e eventos por perto
         {clube ? ` do ${clube.apelido || clube.nome}` : ''}. É opcional.
       </p>
+
+      <div className="mt-5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                Recomendações por proximidade
+              </p>
+              <p className="mt-0.5 max-w-xl text-xs text-[rgb(var(--foreground-muted))]">
+                Use sua localização para priorizar subsedes e pontos de encontro realmente próximos.
+                Se preferir, preencha cidade e estado manualmente.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={usarLocalizacao}
+            disabled={pending || localizando}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+          >
+            {localizando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LocateFixed className="h-4 w-4" />
+            )}
+            {localizando ? 'Localizando...' : 'Usar minha localização'}
+          </button>
+        </div>
+        {erroLocalizacao && (
+          <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{erroLocalizacao}</p>
+        )}
+      </div>
 
       <div className="mt-6 space-y-4">
         <div>
@@ -648,6 +725,7 @@ function PassoUnidade({
   uf,
   cidade,
   regiaoLabel,
+  localizacao,
   pending,
   onConfirmar,
   onVoltar,
@@ -657,6 +735,7 @@ function PassoUnidade({
   uf: string
   cidade: string
   regiaoLabel?: string
+  localizacao?: GoogleMapsRegion
   pending: boolean
   onConfirmar: (sedeId: string | null, naoListada: boolean) => void
   onVoltar: () => void
@@ -664,10 +743,22 @@ function PassoUnidade({
 }) {
   const [selecionada, setSelecionada] = useState<string | null>(null)
   const [modoNaoListada, setModoNaoListada] = useState(false)
+  const [nomeUnidade, setNomeUnidade] = useState('')
+  const [tipoUnidade, setTipoUnidade] = useState<'SUBSEDE' | 'PONTO_ENCONTRO'>('PONTO_ENCONTRO')
+  const [cidadeUnidade, setCidadeUnidade] = useState(cidade)
+  const [estadoUnidade, setEstadoUnidade] = useState(uf)
+  const [enderecoUnidade, setEnderecoUnidade] = useState('')
+  const [contatoNome, setContatoNome] = useState('')
+  const [contatoEmail, setContatoEmail] = useState('')
+  const [contatoTelefone, setContatoTelefone] = useState('')
+  const [vinculo, setVinculo] = useState('')
   const [observacao, setObservacao] = useState('')
+  const [provasUrls, setProvasUrls] = useState<string[]>([])
+  const [uploadProvaPend, setUploadProvaPend] = useState(false)
+  const [errosUnidade, setErrosUnidade] = useState<Record<string, string[]>>({})
   const [enviando, startEnvio] = useTransition()
 
-  const { recomendadas, outras } = agruparSedesPorRegiao(torcida.sedes, uf, cidade)
+  const { recomendadas, outras } = agruparSedesPorRegiao(torcida.sedes, uf, cidade, localizacao)
   const temUnidades = torcida.sedes.length > 0
 
   function selecionarUnidade(id: string) {
@@ -685,18 +776,55 @@ function PassoUnidade({
 
   function avancarSemListagem() {
     onErro(null)
+    setErrosUnidade({})
     startEnvio(async () => {
       const res = await registrarInteresseUnidade({
         tenantId: torcida.id,
         regiao: regiaoLabel,
+        nomeUnidade,
+        tipoUnidade,
+        cidade: cidadeUnidade,
+        estado: estadoUnidade,
+        endereco: enderecoUnidade || undefined,
+        contatoNome,
+        contatoEmail: contatoEmail || undefined,
+        contatoTelefone: contatoTelefone || undefined,
+        vinculo,
+        provasUrls,
         observacao: observacao || undefined,
       })
+      if (res.errors) {
+        setErrosUnidade(res.errors)
+        onErro('Confira os dados da unidade afiliada antes de continuar.')
+        return
+      }
       if (res.message || res.errors) {
         onErro(res.message ?? 'Não foi possível registrar seu interesse. Tente novamente.')
         return
       }
+      if (res.emailHref) {
+        window.location.href = res.emailHref
+      }
       onConfirmar(null, true)
     })
+  }
+
+  async function anexarProvaUnidade(file: File | undefined) {
+    if (!file) return
+    if (provasUrls.length >= 5) {
+      onErro('Envie no máximo 5 imagens de prova.')
+      return
+    }
+    setUploadProvaPend(true)
+    onErro(null)
+    try {
+      const url = await uploadMediaToCloudinary(file, undefined, 'cadastro', torcida.id)
+      setProvasUrls((atuais) => [...atuais, url])
+    } catch (err) {
+      onErro(err instanceof Error ? err.message : 'Falha ao enviar a imagem da unidade.')
+    } finally {
+      setUploadProvaPend(false)
+    }
   }
 
   return (
@@ -747,14 +875,21 @@ function PassoUnidade({
         </div>
       )}
 
-      <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-4">
-        <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-          Minha unidade não está listada
-        </p>
-        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-          A liderança da subsede ou ponto de encontro pode entrar em contato com nosso time para
-          cadastrar a unidade e comprovar o vínculo com a sede da torcida.
-        </p>
+      <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))]/60 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+              Unidade afiliada não listada
+            </p>
+            <p className="mt-1 max-w-2xl text-xs text-[rgb(var(--foreground-muted))]">
+              Envie dados, contato e provas de credenciamento da subsede ou PDE. A solicitação será
+              registrada e um e-mail será preparado para avaliação do time.
+            </p>
+          </div>
+        </div>
         {!modoNaoListada ? (
           <button
             type="button"
@@ -766,25 +901,160 @@ function PassoUnidade({
             className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
           >
             <Mail className="h-4 w-4" />
-            Solicitar cadastro da minha unidade
+            Solicitar cadastro de unidade afiliada
           </button>
         ) : (
-          <div className="mt-4 space-y-3">
-            <Campo label="Conte mais sobre sua unidade (opcional)">
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo label="Nome da unidade" obrigatorio erros={errosUnidade.nomeUnidade}>
+                <Input
+                  value={nomeUnidade}
+                  onChange={(e) => setNomeUnidade(e.target.value)}
+                  placeholder="Ex: Gaviões Praia Grande"
+                />
+              </Campo>
+              <Campo label="Tipo" obrigatorio erros={errosUnidade.tipoUnidade}>
+                <Select
+                  value={tipoUnidade}
+                  onChange={(e) => setTipoUnidade(e.target.value as 'SUBSEDE' | 'PONTO_ENCONTRO')}
+                >
+                  <option value="PONTO_ENCONTRO">Ponto de encontro / PDE</option>
+                  <option value="SUBSEDE">Subsede</option>
+                </Select>
+              </Campo>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_96px]">
+              <Campo label="Cidade" obrigatorio erros={errosUnidade.cidade}>
+                <Input
+                  value={cidadeUnidade}
+                  onChange={(e) => setCidadeUnidade(e.target.value)}
+                  placeholder="Ex: Praia Grande"
+                />
+              </Campo>
+              <Campo label="UF" obrigatorio erros={errosUnidade.estado}>
+                <Input
+                  value={estadoUnidade}
+                  onChange={(e) => setEstadoUnidade(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="SP"
+                />
+              </Campo>
+            </div>
+
+            <Campo label="Endereço ou ponto de referência" erros={errosUnidade.endereco}>
               <Input
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                placeholder="Ex: Barril Zona Norte, embaixada em Campinas..."
+                value={enderecoUnidade}
+                onChange={(e) => setEnderecoUnidade(e.target.value)}
+                placeholder="Rua, número, bairro ou local de encontro"
               />
             </Campo>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Campo label="Seu nome" obrigatorio erros={errosUnidade.contatoNome}>
+                <Input
+                  value={contatoNome}
+                  onChange={(e) => setContatoNome(e.target.value)}
+                  placeholder="Responsável pelo envio"
+                />
+              </Campo>
+              <Campo label="E-mail para retorno" erros={errosUnidade.contatoEmail}>
+                <Input
+                  type="email"
+                  value={contatoEmail}
+                  onChange={(e) => setContatoEmail(e.target.value)}
+                  placeholder="voce@email.com"
+                />
+              </Campo>
+              <Campo label="WhatsApp para retorno" erros={errosUnidade.contatoTelefone}>
+                <Input
+                  type="tel"
+                  value={contatoTelefone}
+                  onChange={(e) => setContatoTelefone(e.target.value)}
+                  placeholder="(13) 99999-9999"
+                />
+              </Campo>
+            </div>
+
+            <Campo label="Como comprova que é subsede/PDE credenciado?" obrigatorio erros={errosUnidade.vinculo}>
+              <textarea
+                value={vinculo}
+                onChange={(e) => setVinculo(e.target.value)}
+                rows={4}
+                placeholder="Ex: vínculo com diretoria da sede, responsável local, redes oficiais, autorização, reuniões, faixas, carteirinhas ou comunicados."
+                className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
+              />
+            </Campo>
+
+            <Campo label="Observações adicionais" erros={errosUnidade.observacao}>
+              <textarea
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                rows={3}
+                placeholder="Ex: horários de reunião, redes sociais, contato da liderança local..."
+                className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
+              />
+            </Campo>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Imagens, registros e provas (até 5)
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <label
+                  htmlFor="unidade-provas-upload"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  {uploadProvaPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  Anexar imagem
+                </label>
+                <input
+                  id="unidade-provas-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadProvaPend || provasUrls.length >= 5}
+                  onChange={(e) => {
+                    void anexarProvaUnidade(e.target.files?.[0])
+                    e.target.value = ''
+                  }}
+                />
+                {provasUrls.length > 0 && (
+                  <span className="text-xs text-emerald-600">
+                    {provasUrls.length} imagem(ns) anexada(s)
+                  </span>
+                )}
+              </div>
+              {provasUrls.length > 0 && (
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {provasUrls.map((url, index) => (
+                    <li
+                      key={url}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]"
+                    >
+                      <span className="truncate">Prova {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setProvasUrls((atuais) => atuais.filter((item) => item !== url))}
+                        className="text-[rgb(var(--foreground-muted))] hover:text-red-500"
+                        aria-label={`Remover prova ${index + 1}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-              Registramos sua solicitação para o time de desenvolvimento. Você pode seguir o
-              onboarding e informar a unidade depois, quando ela for validada.
+              Ao continuar, registramos a solicitação e abrimos um e-mail para os super admins com
+              os dados, contato e links das provas anexadas.
             </p>
             <BotaoPrimario
               onClick={avancarSemListagem}
               pending={enviando}
-              label="Continuar sem unidade listada"
+              disabled={uploadProvaPend}
+              label="Enviar para avaliação"
             />
           </div>
         )}
@@ -814,7 +1084,7 @@ function ListaUnidades({
       {subtitulo && (
         <p className="mb-3 text-[10px] text-[rgb(var(--foreground-muted))]">{subtitulo}</p>
       )}
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className={sedes.length === 1 ? 'grid gap-4' : 'grid gap-4 xl:grid-cols-2'}>
         {sedes.map((s) => (
           <li key={s.id}>
             <UnidadeOnboardingCard

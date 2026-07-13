@@ -4,6 +4,13 @@ export function isGoogleMapsConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim())
 }
 
+export type GoogleMapsRegion = {
+  cidade: string
+  estado: string
+  lat: number
+  lng: number
+}
+
 function queryLocal(sede: {
   endereco?: string | null
   cidade?: string | null
@@ -57,4 +64,62 @@ export function buildGoogleMapsUrl(sede: {
   const q = queryLocal(sede) ?? sede.nome
   if (!q) return null
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
+}
+
+type GeocodeAddressComponent = {
+  long_name: string
+  short_name: string
+  types: string[]
+}
+
+type GeocodeResult = {
+  address_components?: GeocodeAddressComponent[]
+}
+
+type GeocodeResponse = {
+  status: string
+  results?: GeocodeResult[]
+}
+
+function componente(
+  componentes: GeocodeAddressComponent[],
+  tipo: string,
+  campo: 'long_name' | 'short_name' = 'long_name',
+): string | null {
+  return componentes.find((c) => c.types.includes(tipo))?.[campo] ?? null
+}
+
+/**
+ * Resolve cidade/UF a partir da localização do navegador.
+ * Útil para recomendar subsedes/PDEs por proximidade sem exigir digitação manual.
+ */
+export async function reverseGeocodeRegion(
+  coords: { lat: number; lng: number },
+): Promise<GoogleMapsRegion | null> {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  if (!key) return null
+
+  const params = new URLSearchParams({
+    latlng: `${coords.lat},${coords.lng}`,
+    key,
+    language: 'pt-BR',
+    region: 'br',
+    result_type: 'locality|administrative_area_level_2|administrative_area_level_1',
+  })
+  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`)
+  if (!res.ok) return null
+
+  const data = (await res.json()) as GeocodeResponse
+  const componentes = data.results?.[0]?.address_components
+  if (data.status !== 'OK' || !componentes) return null
+
+  const cidade =
+    componente(componentes, 'administrative_area_level_2') ??
+    componente(componentes, 'locality') ??
+    componente(componentes, 'sublocality') ??
+    ''
+  const estado = componente(componentes, 'administrative_area_level_1', 'short_name') ?? ''
+
+  if (!cidade || !estado) return null
+  return { cidade, estado, lat: coords.lat, lng: coords.lng }
 }

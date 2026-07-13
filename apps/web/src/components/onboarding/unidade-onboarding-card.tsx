@@ -37,14 +37,14 @@ export function UnidadeOnboardingCard({ sede, selecionada, onSelecionar }: Props
           : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary))]/50'
       }`}
     >
-      <div className="relative h-32 w-full bg-[rgb(var(--background-subtle))]">
+      <div className="relative h-56 w-full bg-[rgb(var(--background-subtle))] sm:h-64">
         {streetViewUrl ? (
           <Image
             src={streetViewUrl}
             alt={`Fachada — ${sede.nome}`}
             fill
             className="object-cover"
-            sizes="(max-width: 768px) 100vw, 480px"
+            sizes="(max-width: 768px) 100vw, 720px"
             unoptimized
           />
         ) : (
@@ -67,15 +67,15 @@ export function UnidadeOnboardingCard({ sede, selecionada, onSelecionar }: Props
         )}
       </div>
 
-      <div className="flex items-start gap-3 p-4">
+      <div className="flex items-start gap-3 p-5">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold uppercase text-[rgb(var(--foreground))]">{sede.nome}</p>
-          <p className="text-[10px] text-[rgb(var(--foreground-muted))]">
+          <p className="text-sm font-semibold uppercase text-[rgb(var(--foreground))]">{sede.nome}</p>
+          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
             {TIPO_LABEL[sede.tipo]}
             {local ? ` · ${local}` : ''}
           </p>
           {sede.endereco && (
-            <p className="mt-0.5 line-clamp-2 text-[10px] text-[rgb(var(--foreground-muted))]">
+            <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
               {sede.endereco}
             </p>
           )}
