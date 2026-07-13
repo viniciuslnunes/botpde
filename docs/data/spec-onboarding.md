@@ -66,6 +66,13 @@ Adicionar: `slug String? @unique` (backfill com unicidade garantida na geração
 `SerieCampeonato { A B C D ESTADUAL OUTRA }` (parecer `data-model`: string livre é
 frágil para filtro). Back-refs: `torcedores`, `rivalClubeA/B`.
 
+**Metadados no card de clube (2026-07-13, entregue):**
+- `torcedoresEstimados`, `torcedoresEstimadosFonte`, `torcedoresEstimadosTipo`
+  (`IBOPE_DIGITAL` | `LIMITE_ATE`) — seed offline IBOPE Repucom Top 50 + teto 10 mil
+  fora do ranking. Ver `docs/data/torcedores-estimados.md`.
+- Presença online da plataforma: `User.ultimoAcessoEm` + stats agregadas por clube
+  (`onboarding-clube-stats.ts`); exibidas no mesmo card, separadas da estimativa web.
+
 ### 1.3 Rivalidade — DUAS tabelas (clube + torcida)
 > Parecer `data-model`: **rejeitado** o modelo de tabela única com `origem` + 4 FKs
 > nullable — `@@unique` **não funciona sobre colunas nullable no Postgres** (NULLs são
@@ -192,21 +199,30 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
 
 - Rota `/onboarding` no domínio-mãe; gate por `PerfilTorcedor.onboardingConcluidoEm == null`.
 - Passos: clube → região → torcida (ou "só torcedor") → sócio/torcedor → pendência.
+- **Passo clube (grid):** escudo (`EscudoClube`), nome, apelido·UF, série, metadados
+  (`ClubeOnboardingMeta`):
+  - Estimativa web: inscritos digitais (IBOPE Top 50) ou “até 10 mil torcedores ou menos”.
+  - Plataforma: sócios e torcedores (total + online, ponto verde).
+  - Busca por prefixo (`startsWith`) em nome/apelido; dedup `saoMesmoClube`.
 - Passo sócio coleta: nome, nº associado, idade, telefone, unidade/sede, imagem-prova,
   **departamento de atuação** (lista `Departamento` do tenant).
 - Tela de pendência reaproveita `apps/web/src/app/portal/cadastro/page.tsx`.
 - Server Actions com `assertPermission` nas mutações administrativas + `AuditLog`.
 
-## 5. Base de clubes (seed) + escudos
+## 5. Base de clubes (seed) + escudos + estimativa de torcedores
 
 - Script `seed:afiliacoes` popula `Afiliacao` a partir de `diretorio-nacional.md`
   (nome, apelido, cidade, estado, série, slug, escudoUrl local).
 - Escudos: coletar via API gratuita (ex.: TheSportsDB) **na etapa de seed**, baixar e
   hospedar no Cloudinary (`torcida/catalogo/escudos/<slug>`). Nunca depender da
   API em runtime; gate `isXConfigured()` se usar serviço externo.
-- **Soccer Wiki** (2026-07-13): `seed:escudos-soccerwiki` — scrape Brasil offset
-  0–300, casamento estrito por UF/homônimos, relatório em
-  `escudos-soccerwiki-report.json`. Plano: `docs/data/escudos-afiliacoes.md`.
+- **Soccer Wiki / Ogol / TheSportsDB** — ver `docs/data/escudos-afiliacoes.md`.
+- **Estimativa torcedores / base digital (2026-07-13):**
+  - Fonte Top 50: [IBOPE Repucom Ranking Digital](https://www.iboperepucom.com/br/rankings/)
+    (inscritos em 5 redes — **não** torcedores presenciais).
+  - `seed:torcedores-estimados` preenche **todos** os clubes: IBOPE ou teto 10 mil.
+  - Dados: `ibope-ranking-digital.js`, `torcedores-estimados.js`.
+  - Inteligência: `docs/data/torcedores-estimados.md`, `docs/knowledge/futebol-dados-publicos.md`.
 - Torcidas que ainda não aderiram aparecem como referência (aproveita
   `Sede.sedeReferenciaNome/Slug`).
 
@@ -215,7 +231,8 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
 - **Fase 1 (MVP)**: hub `/onboarding` + clube/torcida + `PerfilTorcedor` + criação de
   `SaasMembro` + tela de pendência + **correção do gating feed sócio×torcedor**. Sem rivalidade.
 - **Fase 2**: `Rivalidade` + bloqueio sócio×sócio rival + passo de departamento.
-- **Fase 3**: enriquecer base por API, sugestões por região, comunidade nacional do clube.
+- **Fase 3**: coleta mensal IBOPE (completar Top 50), sugestões por região,
+  comunidade nacional do clube. Script futuro `coleta:ibope-ranking`.
 
 ## 7. Riscos / pontos de atenção
 
@@ -225,5 +242,5 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   tipos de retorno em toda query nova.
 - Cookie de sessão compartilhado entre domínio-mãe e subdomínios (`ROOT_DOMAIN`) já
   cobre o hub central → tenant (ver `lib/auth.ts`).
-</content>
-</invoke>
+- Copy do card de clube: inscritos digitais (IBOPE) ≠ torcedores presenciais;
+  teto 10 mil é conservador para fora do Top 50 — não comparar com Flamengo/Corinthians.

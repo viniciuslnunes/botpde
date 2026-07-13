@@ -34,6 +34,7 @@ pnpm --filter @torcida/web test       # Vitest (RBAC, rate-limit, visibilidade)
 pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
+pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
@@ -85,4 +86,7 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Loja** — catálogo, sacola, checkout, cupons: `apps/web/src/app/portal/loja/`,
   `apps/web/src/app/admin/loja/`; regras em `packages/types/src/loja.js`;
   ver `docs/data/modulo-loja.md`.
+- **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
+  estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
+  `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.
 - `ARCHITECTURE.md` — decisões fechadas (§5) e itens em aberto (§6).

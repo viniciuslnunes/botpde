@@ -32,6 +32,9 @@ operacional** antes de expandir para comunidade/informação.
   ensaios, base popular mobile-first.
 - `glossario.md` — nomeie features com o vocabulário do movimento (caravana,
   sede, materiais), nunca jargão de "rede social" ou "fã-clube".
+- `futebol-dados-publicos.md` — card de clube no onboarding usa IBOPE Repucom
+  (Top 50, inscritos digitais) + teto 10 mil fora do ranking; valor social da
+  plataforma = sócios/torcedores reais online (dado próprio, não IBOPE).
 
 Dores recorrentes do nicho para priorização: caravanas (logística + listas de
 embarque + pagamento), inadimplência de mensalidade, inventário de patrimônio

@@ -39,6 +39,8 @@ web para o que ela não cobre:
 - `glossario.md` — vocabulário do nicho.
 - `diretorio-nacional.md` — mapa clube → torcidas; escudos parciais (ver
   `docs/data/escudos-afiliacoes.md`).
+- `futebol-dados-publicos.md` — IBOPE Ranking Digital (inscritos vs torcedores);
+  ver `docs/data/torcedores-estimados.md` para pipeline operacional.
 - Alianças/rivalidades são do agente `aliancas-torcidas` (`aliancas.md`).
 
 **Você é co-mantenedor desta base**: quando uma pesquisa sua produzir fato novo

@@ -50,7 +50,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         estado: 'SP',
         serie: 'A',
         torcedoresEstimados: 30_000_000,
-        torcedoresEstimadosFonte: 'Wikipedia PT',
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
         _count: { tenants: 0 },
       },
       {
@@ -63,6 +64,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 2 },
       },
     ])
@@ -87,6 +89,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 3 },
       },
       {
@@ -98,7 +101,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         estado: 'SP',
         serie: 'A',
         torcedoresEstimados: 30_000_000,
-        torcedoresEstimadosFonte: 'Wikipedia PT',
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
         _count: { tenants: 0 },
       },
     ])
@@ -141,6 +145,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'C',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 0 },
       },
       {
@@ -153,6 +158,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 1 },
       },
     ])

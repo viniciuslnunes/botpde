@@ -57,3 +57,8 @@ dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` d
 Loja: sacola/checkout/cupom — ver `docs/data/modulo-loja.md`; agente `loja` para escopo amplo.
 Performance: ver `ARCHITECTURE.md` §5.6; não reintroduza fetch-on-mount onde já há SSR ou
 prefetch agressivo na navbar.
+Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
+Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
+`seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Copy distinta:
+“inscritos digitais” (IBOPE) vs “até X torcedores ou menos” (LIMITE_ATE). Nunca
+chamar API IBOPE em runtime.

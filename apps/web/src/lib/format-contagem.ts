@@ -17,8 +17,17 @@ export function formatContagem(n: number): string {
   return n.toLocaleString('pt-BR')
 }
 
-/** Estimativa pública de torcedores (web). */
-export function formatTorcedoresEstimados(n: number): string {
+/** Estimativa pública por tier (IBOPE digital ou teto conservador). */
+export function formatTorcedoresEstimados(
+  n: number,
+  tipo?: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null,
+): string {
+  if (tipo === 'LIMITE_ATE') {
+    return `até ${formatContagem(n)} torcedores ou menos`
+  }
+  if (tipo === 'IBOPE_DIGITAL') {
+    return `${formatContagem(n)} inscritos digitais`
+  }
   return `~${formatContagem(n)} torcedores`
 }
 

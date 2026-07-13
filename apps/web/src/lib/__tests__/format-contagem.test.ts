@@ -23,7 +23,15 @@ describe('formatContagem', () => {
 })
 
 describe('formatTorcedoresEstimados', () => {
-  it('prefixa estimativa', () => {
+  it('formata inscritos IBOPE', () => {
+    expect(formatTorcedoresEstimados(30_000_000, 'IBOPE_DIGITAL')).toBe('30 mi inscritos digitais')
+  })
+
+  it('formata limite conservador', () => {
+    expect(formatTorcedoresEstimados(10_000, 'LIMITE_ATE')).toBe('até 10 mil torcedores ou menos')
+  })
+
+  it('fallback legado com til', () => {
     expect(formatTorcedoresEstimados(30_000_000)).toBe('~30 mi torcedores')
   })
 })

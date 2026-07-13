@@ -357,6 +357,7 @@ function PassoClube({
                 <ClubeOnboardingMeta
                   torcedoresEstimados={a.torcedoresEstimados}
                   torcedoresEstimadosFonte={a.torcedoresEstimadosFonte}
+                  torcedoresEstimadosTipo={a.torcedoresEstimadosTipo}
                   stats={a.stats}
                 />
               </button>

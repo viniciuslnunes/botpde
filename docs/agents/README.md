@@ -53,13 +53,33 @@ As Fases 1–5 de otimização web estão documentadas em `ARCHITECTURE.md` §5.
 
 Não há “Fase 6 grátis” planejada — ganhos adicionais exigem mudança arquitetural.
 
-## Escudos de clubes (`Afiliacao`) — plano em andamento
+## Escudos de clubes (`Afiliacao`) — entregue (Fases A–F)
 
-Inteligência de casamento clube ↔ imagem para o onboarding. **Fase A entregue**
-(2026-07-13): script Soccer Wiki + matching estrito + 87 escudos seguros.
-Próximas fases: aliases de nomes longos, herança em duplicatas, fontes além do Wiki.
+Inteligência de casamento clube ↔ imagem para o onboarding. **Fase A–F entregues**
+(2026-07-13): Soccer Wiki, Ogol, TheSportsDB, placeholder `EscudoClube`, dedup.
 Ver `docs/data/escudos-afiliacoes.md` e `ARCHITECTURE.md` §5.9.
 Agentes: `data-model`, `research-dominio`, `implementation`, `qa-verification`.
+
+## Estimativa de torcedores / base digital — em produção (2026-07-13)
+
+Metadados no **card de clube** do onboarding: inscritos digitais (IBOPE Repucom
+Top 50), teto conservador para demais clubes, sócios/torcedores da plataforma
+com presença online.
+
+| Doc | Conteúdo |
+|-----|----------|
+| `docs/data/torcedores-estimados.md` | Metodologia, tiers, comandos seed |
+| `docs/knowledge/futebol-dados-publicos.md` | Fontes IBOPE, limitações, manutenção |
+| `ARCHITECTURE.md` §5.10 | Decisões fechadas no repo |
+
+**Regras de copy:** Top 50 → “inscritos digitais”; fora do Top 50 → “até X torcedores
+ou menos”. Nunca confundir inscritos em rede social com torcedores presenciais.
+Coleta mensual offline — **nunca** IBOPE em runtime.
+
+Agentes: `research-dominio` (atualizar knowledge), `data-model` (enum/campos),
+`ux-review` (card/tooltip), `implementation` (seed + UI), `qa-verification`
+(`test:torcedores-estimados`, Vitest format-contagem).
+
 
 ## Princípios
 

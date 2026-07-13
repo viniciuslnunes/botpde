@@ -1,10 +1,16 @@
 import { Globe } from 'lucide-react'
-import { formatContagem, formatTorcedoresEstimados } from '@/lib/format-contagem'
+import {
+  formatContagem,
+  formatTorcedoresEstimados,
+  formatTotalComOnline,
+} from '@/lib/format-contagem'
 import type { StatsClubeOnboarding } from '@/lib/onboarding-clube-stats'
+import type { TorcedoresEstimadosTipo } from '@/lib/onboarding'
 
 type Props = {
   torcedoresEstimados: number | null
   torcedoresEstimadosFonte: string | null
+  torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
   stats: StatsClubeOnboarding
 }
 
@@ -49,6 +55,7 @@ function LinhaPlataforma({ rotulo, total, online }: { rotulo: string; total: num
 export function ClubeOnboardingMeta({
   torcedoresEstimados,
   torcedoresEstimadosFonte,
+  torcedoresEstimadosTipo,
   stats,
 }: Props) {
   const temEstimativa = torcedoresEstimados != null && torcedoresEstimados > 0
@@ -57,9 +64,11 @@ export function ClubeOnboardingMeta({
 
   if (!temEstimativa && !temSocios && !temTorcedores) return null
 
-  const tooltipEstimativa = torcedoresEstimadosFonte
-    ? `Estimativa pública · Fonte: ${torcedoresEstimadosFonte}`
-    : 'Estimativa pública de torcedores'
+  const tooltipEstimativa =
+    torcedoresEstimadosFonte ??
+    (torcedoresEstimadosTipo === 'IBOPE_DIGITAL'
+      ? 'Base digital oficial (5 redes) — IBOPE Repucom'
+      : 'Estimativa conservadora para clubes fora do Top 50 IBOPE')
 
   return (
     <div className="mt-1 flex w-full flex-col gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">
@@ -70,7 +79,7 @@ export function ClubeOnboardingMeta({
         >
           <Globe className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
           <span className="underline decoration-dotted decoration-[rgb(var(--foreground-muted)_/_0.45)] underline-offset-2">
-            {formatTorcedoresEstimados(torcedoresEstimados!)}
+            {formatTorcedoresEstimados(torcedoresEstimados!, torcedoresEstimadosTipo)}
           </span>
         </span>
       )}

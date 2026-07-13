@@ -797,8 +797,10 @@ model Afiliacao {
   estado         String?
   apiExternalId  String?           @map("api_external_id")
   /// Estimativa pública de torcedores (seed offline — nunca API em runtime).
-  torcedoresEstimados      Int?    @map("torcedores_estimados")
-  torcedoresEstimadosFonte String? @map("torcedores_estimados_fonte")
+  torcedoresEstimados      Int?                     @map("torcedores_estimados")
+  torcedoresEstimadosFonte String?                  @map("torcedores_estimados_fonte")
+  /// IBOPE_DIGITAL = total publicado no Ranking Digital; LIMITE_ATE = fora do Top 50 (teto conservador).
+  torcedoresEstimadosTipo  TorcedoresEstimadosTipo? @map("torcedores_estimados_tipo")
   criadoEm       DateTime          @default(now()) @map("criado_em")
 
   tenants            Tenant[]
@@ -840,6 +842,11 @@ model TorcidaConhecida {
 
   @@index([afiliacaoId])
   @@map("saas_torcidas_conhecidas")
+}
+
+enum TorcedoresEstimadosTipo {
+  IBOPE_DIGITAL
+  LIMITE_ATE
 }
 
 enum SerieCampeonato {

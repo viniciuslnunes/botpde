@@ -49,6 +49,13 @@ responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho
   **sem LiveKit configurado** (sala ainda deve funcionar como chat/enquetes/presença, sem
   UI quebrada onde o vídeo iria). Ver `docs/data/modulo-salas.md`.
+- **Onboarding — passo Clube** (`/onboarding`, `ClubeOnboardingMeta`): card denso
+  (escudo, nome, série, estimativa, sócios/torcedores online). Regras de copy:
+  - Top 50 IBOPE → **“inscritos digitais”** (não “torcedores no Brasil”).
+  - Fora do Top 50 → **“até 10 mil torcedores ou menos”** (teto conservador).
+  - Tooltip com fonte (`torcedoresEstimadosFonte`); ícone globo + sublinhado pontilhado.
+  - Online: ponto verde + “N online”; ocultar linhas zeradas de plataforma.
+  - Ver `docs/data/torcedores-estimados.md` e `docs/knowledge/futebol-dados-publicos.md`.
 
 ## Captura visual de fluxo (Playwright)
 Antes de avaliar uma tela real (não só o código), prefira evidência de tela a

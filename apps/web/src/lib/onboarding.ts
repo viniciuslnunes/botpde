@@ -20,6 +20,8 @@ const STATS_VAZIAS: StatsClubeOnboarding = {
 // ─── Tipos de retorno explícitos (a inferência do Prisma quebra silenciosamente
 // neste schema — ver ARCHITECTURE.md §5.2). ─────────────────────────────────────
 
+export type TorcedoresEstimadosTipo = 'IBOPE_DIGITAL' | 'LIMITE_ATE'
+
 export type AfiliacaoOnboarding = {
   id: string
   nome: string
@@ -30,6 +32,7 @@ export type AfiliacaoOnboarding = {
   serie: SerieCampeonato | null
   torcedoresEstimados: number | null
   torcedoresEstimadosFonte: string | null
+  torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
   stats: StatsClubeOnboarding
 }
 export type SedeOnboarding = {
@@ -84,6 +87,7 @@ export const getAfiliacoesParaOnboarding = cache(
       serie: SerieCampeonato | null
       torcedoresEstimados: number | null
       torcedoresEstimadosFonte: string | null
+      torcedoresEstimadosTipo: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
       _count: { tenants: number }
     }
     type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
@@ -107,6 +111,7 @@ export const getAfiliacoesParaOnboarding = cache(
         serie: true,
         torcedoresEstimados: true,
         torcedoresEstimadosFonte: true,
+        torcedoresEstimadosTipo: true,
         _count: { select: { tenants: true } },
       },
       orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
@@ -136,11 +141,16 @@ export const getAfiliacoesParaOnboarding = cache(
         canon.torcedoresEstimadosFonte ??
         grupo.find((g) => g.torcedoresEstimadosFonte)?.torcedoresEstimadosFonte ??
         null
+      const torcedoresEstimadosTipo =
+        canon.torcedoresEstimadosTipo ??
+        grupo.find((g) => g.torcedoresEstimadosTipo)?.torcedoresEstimadosTipo ??
+        null
       unicas[idxGrupo] = {
         ...canon,
         escudoUrl,
         torcedoresEstimados,
         torcedoresEstimadosFonte,
+        torcedoresEstimadosTipo,
         idsGrupo: existente.idsGrupo,
       }
     }
@@ -160,6 +170,7 @@ export const getAfiliacoesParaOnboarding = cache(
         serie: afiliacao.serie,
         torcedoresEstimados: afiliacao.torcedoresEstimados,
         torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+        torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
         stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
       }))
       .sort((a, b) => {

@@ -1,35 +1,40 @@
 /**
- * Preenche Afiliacao.torcedoresEstimados a partir de dados curados offline.
+ * Preenche Afiliacao.torcedoresEstimados para TODOS os clubes.
  *
  *   pnpm --filter @torcida/db seed:torcedores-estimados
  *   pnpm --filter @torcida/db seed:torcedores-estimados -- --dry-run
  */
 import { PrismaClient } from '@prisma/client'
 import { chaveGrupoClube } from '../src/data/afiliacoes-normalize.js'
-import { indiceTorcedoresEstimados } from '../src/data/torcedores-estimados.js'
+import { resolverTorcedoresEstimados } from '../src/data/torcedores-estimados.js'
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const db = new PrismaClient()
 
 async function main() {
-  const indice = indiceTorcedoresEstimados()
   const afiliacoes = await db.afiliacao.findMany({
-    select: { id: true, nome: true, estado: true, torcedoresEstimados: true },
+    select: {
+      id: true,
+      nome: true,
+      estado: true,
+      torcedoresEstimados: true,
+      torcedoresEstimadosTipo: true,
+    },
     orderBy: { nome: 'asc' },
   })
 
   let atualizados = 0
-  let ignorados = 0
+  let ibope = 0
+  let limite = 0
 
   for (const af of afiliacoes) {
     const chave = chaveGrupoClube(af.nome, af.estado)
-    const dados = indice.get(chave)
-    if (!dados) {
-      ignorados += 1
-      continue
-    }
-    if (af.torcedoresEstimados === dados.valor) {
-      ignorados += 1
+    const dados = resolverTorcedoresEstimados(chave)
+
+    if (
+      af.torcedoresEstimados === dados.valor &&
+      af.torcedoresEstimadosTipo === dados.tipo
+    ) {
       continue
     }
 
@@ -39,14 +44,24 @@ async function main() {
         data: {
           torcedoresEstimados: dados.valor,
           torcedoresEstimadosFonte: dados.fonte,
+          torcedoresEstimadosTipo: dados.tipo,
         },
       })
     }
+
     atualizados += 1
-    console.log(`  ✓ ${af.nome} (${af.estado ?? '?'}) → ${dados.valor.toLocaleString('pt-BR')}`)
+    if (dados.tipo === 'IBOPE_DIGITAL') ibope += 1
+    else limite += 1
+
+    const rotulo = dados.tipo === 'LIMITE_ATE' ? 'até' : ''
+    console.log(
+      `  ✓ ${af.nome} (${af.estado ?? '?'}) → ${rotulo}${dados.valor.toLocaleString('pt-BR')} [${dados.tipo}]`,
+    )
   }
 
-  console.log(`\nTorcedores estimados — ${atualizados} atualizados, ${ignorados} sem mudança/ausentes`)
+  console.log(
+    `\nTorcedores estimados — ${atualizados} atualizados (${ibope} IBOPE, ${limite} limite ≤10 mil)`,
+  )
   if (DRY_RUN) console.log('(dry-run — nada gravado)')
 }
 
