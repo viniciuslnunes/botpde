@@ -1,15 +1,9 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding } from '@/lib/onboarding'
+import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding, UFS_BRASIL } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
 import { OnboardingWizard } from './wizard'
-
-// Estados brasileiros para o passo de região.
-const UFS = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
-  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-]
 
 export default async function OnboardingPage() {
   const session = await auth()
@@ -41,7 +35,7 @@ export default async function OnboardingPage() {
     <OnboardingWizard
       afiliacoesIniciais={afiliacoesIniciais}
       regioes={regioes}
-      ufs={UFS}
+      ufs={UFS_BRASIL}
       nomeInicial={session.user.name ?? ''}
     />
   )

@@ -8,10 +8,12 @@ import {
   getAfiliacoesParaOnboarding,
   getTorcidasPorAfiliacao,
   getDepartamentosDoTenant,
+  UFS_BRASIL,
   type AfiliacaoOnboarding,
   type TorcidaOnboarding,
   type DepartamentoOnboarding,
 } from '@/lib/onboarding'
+import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { setTenantContextSlug } from '@/lib/tenant-context'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
@@ -30,6 +32,14 @@ export async function buscarTorcidas(afiliacaoId: string): Promise<TorcidaOnboar
   if (!session?.user?.id) return []
   if (!z.string().uuid().safeParse(afiliacaoId).success) return []
   return getTorcidasPorAfiliacao(afiliacaoId)
+}
+
+export async function buscarCidadesDaUf(uf: string): Promise<string[]> {
+  const session = await auth()
+  if (!session?.user?.id) return []
+  const ufUpper = uf.toUpperCase()
+  if (!UFS_BRASIL.includes(ufUpper)) return []
+  return listarMunicipiosPorUf(ufUpper)
 }
 
 export async function buscarDepartamentos(
@@ -60,20 +70,27 @@ function getSuperAdminEmails(): string[] {
 
 const clubeRegiaoSchema = z.object({
   afiliacaoId: z.string().uuid('Clube inválido'),
-  regiao: z
+  uf: z
     .string()
+    .length(2, 'Estado inválido')
+    .transform((v) => v.toUpperCase())
+    .refine((v) => UFS_BRASIL.includes(v), 'Estado inválido'),
+  cidade: z
+    .string()
+    .min(2, 'Informe a cidade')
     .max(120)
-    .optional()
-    .transform((v) => v?.trim() || undefined),
+    .transform((v) => v.trim()),
 })
 
 /**
- * Salva o clube que o usuário torce e (opcionalmente) a região, criando ou
- * atualizando o PerfilTorcedor. Valida que a Afiliacao existe.
+ * Salva o clube que o usuário torce e a região (UF + cidade, obrigatórias),
+ * criando ou atualizando o PerfilTorcedor. Valida que a Afiliacao existe e que
+ * a cidade pertence à UF segundo o IBGE — só aceita seleção da lista.
  */
 export async function salvarClubeRegiao(input: {
   afiliacaoId: string
-  regiao?: string
+  uf: string
+  cidade: string
 }): Promise<OnboardingActionState> {
   const session = await auth()
   if (!session?.user?.id) {
@@ -85,7 +102,7 @@ export async function salvarClubeRegiao(input: {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { afiliacaoId, regiao } = parsed.data
+  const { afiliacaoId, uf, cidade } = parsed.data
 
   const afiliacao = await db.afiliacao.findUnique({
     where: { id: afiliacaoId },
@@ -94,6 +111,15 @@ export async function salvarClubeRegiao(input: {
   if (!afiliacao) {
     return { errors: { afiliacaoId: ['Clube não encontrado'] } }
   }
+
+  const cidadeCanonica = await cidadePertenceUf(cidade, uf)
+  if (!cidadeCanonica) {
+    return {
+      errors: { cidade: ['Selecione uma cidade válida da lista para o estado escolhido.'] },
+    }
+  }
+
+  const regiao = `${cidadeCanonica} - ${uf}`
 
   await db.perfilTorcedor.upsert({
     where: { userId: session.user.id },

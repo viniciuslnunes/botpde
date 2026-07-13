@@ -18,9 +18,11 @@ import {
   buscarAfiliacoes,
   buscarTorcidas,
   buscarDepartamentos,
+  buscarCidadesDaUf,
   registrarInteresseUnidade,
 } from './actions'
-import { agruparSedesPorRegiao } from '@/lib/onboarding-unidade'
+import { ComboboxCidade } from './combobox-cidade'
+import { agruparSedesPorRegiao, normalizarTexto } from '@/lib/onboarding-unidade'
 import { reverseGeocodeRegion, type GoogleMapsRegion } from '@/lib/google-maps'
 import type {
   AfiliacaoOnboarding,
@@ -91,11 +93,10 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
 
   // ── Passo 2 → 3: persiste clube + região, carrega torcidas ───────────────────
   const [torcidas, setTorcidas] = useState<TorcidaOnboarding[] | null>(null)
-  function avancarDaRegiao(pular: boolean) {
+  function avancarDaRegiao() {
     if (!clube) return
-    const regiao = pular ? undefined : [cidade.trim(), uf].filter(Boolean).join(' - ') || undefined
     startTransition(async () => {
-      const res = await salvarClubeRegiao({ afiliacaoId: clube.id, regiao })
+      const res = await salvarClubeRegiao({ afiliacaoId: clube.id, uf, cidade })
       if (res.message || res.errors) {
         setErro(res.message ?? 'Não foi possível salvar. Tente novamente.')
         return
@@ -190,7 +191,12 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 ufs={ufs}
                 uf={uf}
                 cidade={cidade}
-                onUf={setUf}
+                onUf={(v) => {
+                  // Trocar de estado invalida a cidade (só vale seleção da lista da UF).
+                  setUf(v)
+                  setCidade('')
+                  setLocalizacaoPrecisa(null)
+                }}
                 onCidade={setCidade}
                 onLocalizacao={(regiao) => {
                   setUf(regiao.estado)
@@ -199,8 +205,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 }}
                 pending={pending}
                 onVoltar={() => irPara('clube', -1)}
-                onContinuar={() => avancarDaRegiao(false)}
-                onPular={() => avancarDaRegiao(true)}
+                onContinuar={avancarDaRegiao}
               />
             </m.div>
           )}
@@ -488,7 +493,6 @@ function PassoRegiao({
   pending,
   onVoltar,
   onContinuar,
-  onPular,
 }: {
   clube: AfiliacaoOnboarding | null
   ufs: string[]
@@ -500,7 +504,6 @@ function PassoRegiao({
   pending: boolean
   onVoltar: () => void
   onContinuar: () => void
-  onPular: () => void
 }) {
   const [localizando, setLocalizando] = useState(false)
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null)
@@ -519,12 +522,24 @@ function PassoRegiao({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         })
-        setLocalizando(false)
         if (!regiao) {
+          setLocalizando(false)
           setErroLocalizacao('Não conseguimos resolver sua cidade pelo Google Maps. Preencha manualmente.')
           return
         }
-        onLocalizacao(regiao)
+        // Só aceita a cidade se ela existir na lista de municípios do IBGE da UF.
+        const cidadesDaUf = await buscarCidadesDaUf(regiao.estado)
+        const alvo = normalizarTexto(regiao.cidade)
+        const nomeCanonico = cidadesDaUf.find((c) => normalizarTexto(c) === alvo)
+        setLocalizando(false)
+        if (nomeCanonico) {
+          onLocalizacao({ ...regiao, cidade: nomeCanonico })
+        } else {
+          onUf(regiao.estado)
+          setErroLocalizacao(
+            `Detectamos ${regiao.estado}, mas não conseguimos confirmar sua cidade automaticamente — selecione na lista abaixo.`,
+          )
+        }
       },
       () => {
         setLocalizando(false)
@@ -540,7 +555,7 @@ function PassoRegiao({
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">De onde você torce?</h1>
       <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
         Sua região ajuda a conectar você a torcedores e eventos por perto
-        {clube ? ` do ${clube.apelido || clube.nome}` : ''}. É opcional.
+        {clube ? ` do ${clube.apelido || clube.nome}` : ''}.
       </p>
 
       <div className="mt-5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
@@ -596,25 +611,17 @@ function PassoRegiao({
           <label htmlFor="cidade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Cidade
           </label>
-          <Input
-            id="cidade"
-            value={cidade}
-            onChange={(e) => onCidade(e.target.value)}
-            placeholder="Ex: São Paulo"
-          />
+          <ComboboxCidade uf={uf} value={cidade} onChange={onCidade} disabled={pending} />
         </div>
       </div>
 
-      <div className="mt-8 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onPular}
-          disabled={pending}
-          className="text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
-        >
-          Pular
-        </button>
-        <BotaoPrimario onClick={onContinuar} pending={pending} label="Continuar" />
+      <div className="mt-8">
+        <BotaoPrimario
+          onClick={onContinuar}
+          pending={pending}
+          disabled={!uf || !cidade}
+          label="Continuar"
+        />
       </div>
     </div>
   )

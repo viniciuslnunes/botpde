@@ -12,7 +12,7 @@ export type LocalizacaoOnboarding = {
   lng: number
 }
 
-function normalizarTexto(valor: string): string {
+export function normalizarTexto(valor: string): string {
   return valor
     .normalize('NFD')
     .replace(/\p{M}/gu, '')

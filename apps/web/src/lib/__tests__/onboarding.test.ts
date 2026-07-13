@@ -36,6 +36,12 @@ vi.mock('@/lib/tenant', () => ({
 }))
 // `setTenantContextSlug` usa cookies() do Next — indisponível fora de request.
 vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn() }))
+// Validação de cidade contra o IBGE — mockada para não bater na rede.
+const cidadePertenceUfFn = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/municipios-ibge', () => ({
+  cidadePertenceUf: cidadePertenceUfFn,
+  listarMunicipiosPorUf: vi.fn(),
+}))
 
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import { salvarClubeRegiao, solicitarVinculo, concluirComoTorcedor } from '@/app/onboarding/actions'
@@ -74,29 +80,56 @@ describe('getEstadoOnboarding', () => {
 })
 
 describe('salvarClubeRegiao', () => {
+  const inputBase = { afiliacaoId: UUID, uf: 'SP', cidade: 'São Paulo' }
+
   it('rejeita afiliacaoId não-uuid', async () => {
-    const r = await salvarClubeRegiao({ afiliacaoId: 'nope' })
+    const r = await salvarClubeRegiao({ ...inputBase, afiliacaoId: 'nope' })
     expect(r.errors?.afiliacaoId).toBeTruthy()
+    expect(afiliacaoFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('rejeita UF inválida', async () => {
+    const r = await salvarClubeRegiao({ ...inputBase, uf: 'XX' })
+    expect(r.errors?.uf).toBeTruthy()
+    expect(afiliacaoFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('rejeita cidade vazia', async () => {
+    const r = await salvarClubeRegiao({ ...inputBase, cidade: '' })
+    expect(r.errors?.cidade).toBeTruthy()
     expect(afiliacaoFindUnique).not.toHaveBeenCalled()
   })
 
   it('erra quando afiliacao não existe', async () => {
     afiliacaoFindUnique.mockResolvedValue(null)
-    const r = await salvarClubeRegiao({ afiliacaoId: UUID })
+    const r = await salvarClubeRegiao(inputBase)
     expect(r.errors?.afiliacaoId).toContain('Clube não encontrado')
   })
 
-  it('faz upsert com sucesso', async () => {
+  it('rejeita cidade que não pertence à UF (IBGE)', async () => {
     afiliacaoFindUnique.mockResolvedValue({ id: UUID })
+    cidadePertenceUfFn.mockResolvedValue(null)
+    const r = await salvarClubeRegiao({ ...inputBase, cidade: 'Curitiba' })
+    expect(r.errors?.cidade?.[0]).toContain('Selecione uma cidade válida')
+    expect(perfilUpsert).not.toHaveBeenCalled()
+  })
+
+  it('faz upsert com o nome canônico do IBGE', async () => {
+    afiliacaoFindUnique.mockResolvedValue({ id: UUID })
+    cidadePertenceUfFn.mockResolvedValue('São Paulo')
     perfilUpsert.mockResolvedValue({})
-    const r = await salvarClubeRegiao({ afiliacaoId: UUID, regiao: 'São Paulo - SP' })
+    const r = await salvarClubeRegiao({ ...inputBase, cidade: 'sao paulo' })
     expect(r.ok).toBe(true)
-    expect(perfilUpsert).toHaveBeenCalled()
+    expect(perfilUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ regiao: 'São Paulo - SP' }),
+      }),
+    )
   })
 
   it('exige login', async () => {
     authFn.mockResolvedValue(null)
-    const r = await salvarClubeRegiao({ afiliacaoId: UUID })
+    const r = await salvarClubeRegiao(inputBase)
     expect(r.message).toBeTruthy()
   })
 })
