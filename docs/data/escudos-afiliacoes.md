@@ -29,8 +29,9 @@ Relatório versionado: `packages/db/src/data/escudos-soccerwiki-report.json`
 
 1. **TheSportsDB** — seed original `seed:afiliacoes` (Série A–D curada).
 2. **Cloudinary** — migração de assets locais (`seed:migrate-escudos-cloudinary`).
-3. **Soccer Wiki** — scrape paginado Brasil
-   (`scripts/seed-escudos-soccerwiki.js`, offsets 0–350 passo 50, para em página vazia).
+3. **Soccer Wiki** — scrape paginado Brasil (`seed:escudos-soccerwiki.js`).
+4. **TheSportsDB** — índice Séries A–D + busca (`seed:escudos-thesportsdb.js`);
+   requer `THESPORTSDB_KEY` patrono para cobertura ampla.
 
 ### Lógica de casamento (estrita)
 
@@ -265,11 +266,17 @@ escudo — majoritariamente estaduais/Série D **ausentes** da listagem Wiki.
 **Entregue nesta rodada:**
 - [x] Paginação até offset 350 com parada automática em página vazia.
 - [x] +2 escudos Wiki (Portuguesa, Cabofriense via `AD Cabofriense`).
+- [x] Script `seed:escudos-thesportsdb` — índice das 4 ligas + `searchteams.php`
+  com casamento estrito (`escudos-thesportsdb-match.js`).
+- [x] Relatório `escudos-thesportsdb-report.json`.
+
+**Cobertura TheSportsDB:** a chave pública `3` retorna ~10 times/liga (~28 no índice).
+Para cobertura útil, defina `THESPORTSDB_KEY` (patrono) antes de rodar o seed.
+Com chave pública + busca: poucos matches adicionais (estaduais raramente na API).
 
 **Próximo (Fase D continuação):**
-1. **TheSportsDB por nome+UF** — re-rodar `seed:afiliacoes` só para `semEscudo`
-   (API gratuita, já usada no seed original).
-2. Aliases Wiki pontuais conforme `semMatchLista` (Anapolina, ASA, Icasa, Operário-PR…).
+1. Rodar `seed:escudos-thesportsdb` em produção com `THESPORTSDB_KEY` patrono.
+2. Aliases Wiki/API pontuais conforme relatórios (`semMatchLista`).
 3. Placeholder neutro no UI para clubes sem escudo (não inventar imagem).
 
 ### Fase E — Qualidade contínua

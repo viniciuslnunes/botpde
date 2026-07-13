@@ -77,6 +77,7 @@ export const ALIASES = {
   'agremiacao sportiva arapiraquense': 'asa',
   'associacao olimpica de itabaiana': 'itabaiana',
   'petrolina social futebol clube': 'petrolina',
+  'caxias futebol clube': 'caxias',
   'tuna luso brasileira': 'tuna luso',
 }
 

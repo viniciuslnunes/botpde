@@ -15,6 +15,7 @@ import {
   inferirUfDoNome,
 } from '../src/data/afiliacoes-normalize.js'
 import { scoreWikiAfiliacao } from '../src/data/escudos-wiki-match.js'
+import { casarAfiliacaoBusca } from '../src/data/escudos-thesportsdb-match.js'
 import { AFILIACOES_BRASIL } from '../src/data/afiliacoes-brasil.js'
 
 let passed = 0
@@ -200,6 +201,33 @@ ok('saoMesmoClube une Confiança × Associação Desportiva Confiança', () => {
     ),
     true,
   )
+})
+
+ok('casarAfiliacaoBusca casa clube brasileiro por chave', () => {
+  const match = casarAfiliacaoBusca(
+    { nome: 'Anapolina', estado: 'GO' },
+    [{
+      idTeam: '1',
+      strTeam: 'Anapolina',
+      strTeamBadge: 'https://cdn/badge.png',
+      strLocation: 'Anápolis, Goiás',
+      strCountry: 'Brazil',
+    }],
+  )
+  assert.ok(match)
+  assert.equal(match.fonte, 'busca')
+})
+
+ok('casarAfiliacaoBusca rejeita país errado', () => {
+  const match = casarAfiliacaoBusca(
+    { nome: 'Anapolina', estado: 'GO' },
+    [{
+      strTeam: 'Anapolina',
+      strTeamBadge: 'https://cdn/badge.png',
+      strCountry: 'Portugal',
+    }],
+  )
+  assert.equal(match, null)
 })
 
 // --- dataset: slugs únicos em toda a base curada ---

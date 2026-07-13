@@ -641,7 +641,8 @@ Detalhe operacional e **plano de progresso** da inteligência de casamento:
 
 - **Hospedagem**: Cloudinary `torcida/catalogo/escudos/<slug>.png` (PNG transparente).
 - **Scripts**: `seed:afiliacoes` (TheSportsDB), `seed:migrate-escudos-cloudinary`
-  (assets locais), `seed:escudos-soccerwiki` (Soccer Wiki, scrape offset 0–300).
+  (assets locais), `seed:escudos-soccerwiki` (Soccer Wiki), `seed:escudos-thesportsdb`
+  (TheSportsDB só para sem escudo).
 - **Casamento**: `inferirUfDoNome`, `saoMesmoClube`, `chaveGrupoClube`, bloqueio de
   homônimos, score ≥ 90, atribuição 1:1. Relatório versionado em
   `packages/db/src/data/escudos-soccerwiki-report.json`.
