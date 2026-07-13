@@ -72,8 +72,8 @@ com presença online.
 | `docs/knowledge/futebol-dados-publicos.md` | Fontes IBOPE, limitações, manutenção |
 | `ARCHITECTURE.md` §5.10 | Decisões fechadas no repo |
 
-**Regras de copy:** Top 50 → “inscritos digitais”; fora do Top 50 → “até X torcedores
-ou menos”. Nunca confundir inscritos em rede social com torcedores presenciais.
+**Regras de copy:** Top 50 → “inscritos digitais”; plataforma → contagem real;
+sem dado → “até X torcedores ou menos” (X = menor valor conhecido, dinâmico).
 Coleta mensual offline — **nunca** IBOPE em runtime.
 
 Agentes: `research-dominio` (atualizar knowledge), `data-model` (enum/campos),

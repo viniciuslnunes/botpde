@@ -6,9 +6,10 @@ import assert from 'node:assert/strict'
 import { chaveGrupoClube } from '../src/data/afiliacoes-normalize.js'
 import {
   resolverTorcedoresEstimados,
-  LIMITE_TORCEDORES_FORA_IBOPE,
+  calcularMenorValorEstimadosConhecido,
 } from '../src/data/torcedores-estimados.js'
-import { MENOR_TOTAL_IBOPE_PUBLICADO } from '../src/data/ibope-ranking-digital.js'
+
+const menorIbope = calcularMenorValorEstimadosConhecido()
 
 const casos = [
   {
@@ -27,7 +28,7 @@ const casos = [
     nome: '1° de Maio Esporte Clube',
     uf: 'PE',
     tipo: 'LIMITE_ATE',
-    valor: LIMITE_TORCEDORES_FORA_IBOPE,
+    valor: menorIbope,
   },
 ]
 
@@ -39,4 +40,7 @@ for (const c of casos) {
   if (c.minValor != null) assert.ok(r.valor >= c.minValor, `${c.nome}: min`)
 }
 
-console.log(`✓ ${casos.length} casos resolverTorcedoresEstimados`)
+assert.ok(menorIbope > 0, 'menor IBOPE > 0')
+assert.notEqual(menorIbope, 10_000, 'teto LIMITE não é mais 10 mil fixo')
+
+console.log(`✓ ${casos.length} casos resolverTorcedoresEstimados (menor IBOPE: ${menorIbope.toLocaleString('pt-BR')})`)

@@ -10,7 +10,12 @@ Todo clube em `Afiliacao` deve exibir uma estimativa **embasada** no card de onb
 | Tier | Quem | Valor | UI |
 |------|------|-------|-----|
 | **IBOPE_DIGITAL** | Top 50 monitorado pelo IBOPE Repucom | Total de **inscritos digitais** (5 redes) | `42,7 mi inscritos digitais` |
-| **LIMITE_ATE** | Fora do Top 50 | Teto **10.000** | `até 10 mil torcedores ou menos` |
+| **PLATAFORMA** | Clube com torcedores/sócios na plataforma | Contagem **real** aprovada | `142 torcedores na plataforma` |
+| **LIMITE_ATE** | Sem IBOPE nem contagem na plataforma | Teto = **menor valor conhecido** (IBOPE curado × menor clube na plataforma) | `até 2 mil torcedores ou menos` |
+
+> **Não há teto fixo de 10 mil.** O “10 mil” citado na pesquisa inicial era exemplo
+> ilustrativo. O teto acompanha a base: quando o menor dado publicado for 2 mil,
+> desconhecidos exibem “até 2 mil ou menos”.
 
 ## Fonte principal: IBOPE Repucom — Ranking Digital
 
@@ -38,15 +43,18 @@ Publicação mensal: [Rankings IBOPE Repucom](https://www.iboperepucom.com/br/ra
 
 **Botafogo-PB: 471.612 inscritos** (49º, Jun/2026). Clubes do Top 50 sem total exato na planilha recebem esse **piso** até a coleta mensal preencher o valor real.
 
-### Teto fora do Top 50
+### Teto fora do Top 50 (LIMITE_ATE)
 
-Clubes do catálogo nacional (~300+) que **não** entram no monitoramento IBOPE recebem:
+Clubes sem IBOPE e **sem** torcedores/sócios na plataforma recebem o **menor valor
+conhecido** entre:
 
-- `torcedoresEstimados = 10_000`
-- `torcedoresEstimadosTipo = LIMITE_ATE`
-- Copy: **“até 10 mil torcedores ou menos”**
+1. Menor total publicado no JSON IBOPE (`calcularMenorValorEstimadosConhecido()`)
+2. Menor clube com contagem real na plataforma (`getMenorContagemPlataformaGlobal()`)
 
-Referência de magnitude: ordem de grandeza mínima plausível para clubes amadores/regionais sem base digital mensurável — **não** confundir com o piso do Top 50 (~472 mil inscritos digitais).
+Copy: **“até X torcedores ou menos”**, onde X é esse mínimo dinâmico (nunca 10 mil fixo).
+
+Na UI (`getAfiliacoesParaOnboarding`), clubes com contagem real na plataforma
+sobrescrevem LIMITE_ATE e exibem tier **PLATAFORMA**.
 
 ## Arquivos
 

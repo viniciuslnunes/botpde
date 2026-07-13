@@ -59,8 +59,11 @@ export function ClubeOnboardingMeta({
   stats,
 }: Props) {
   const temEstimativa = torcedoresEstimados != null && torcedoresEstimados > 0
-  const temSocios = stats.sociosTotal > 0 || stats.sociosOnline > 0
-  const temTorcedores = stats.torcedoresTotal > 0 || stats.torcedoresOnline > 0
+  const estimativaPlataforma = torcedoresEstimadosTipo === 'PLATAFORMA'
+  const temSocios =
+    !estimativaPlataforma && (stats.sociosTotal > 0 || stats.sociosOnline > 0)
+  const temTorcedores =
+    !estimativaPlataforma && (stats.torcedoresTotal > 0 || stats.torcedoresOnline > 0)
 
   if (!temEstimativa && !temSocios && !temTorcedores) return null
 
@@ -68,7 +71,9 @@ export function ClubeOnboardingMeta({
     torcedoresEstimadosFonte ??
     (torcedoresEstimadosTipo === 'IBOPE_DIGITAL'
       ? 'Base digital oficial (5 redes) — IBOPE Repucom'
-      : 'Estimativa conservadora para clubes fora do Top 50 IBOPE')
+      : torcedoresEstimadosTipo === 'PLATAFORMA'
+        ? 'Contagem real na plataforma Torcida SaaS'
+        : 'Estimativa conservadora com base no menor valor conhecido na base curada')
 
   return (
     <div className="mt-1 flex w-full flex-col gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">

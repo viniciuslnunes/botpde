@@ -1,5 +1,6 @@
 import 'server-only'
-import { db } from '@torcida/db'
+import { cache } from 'react'
+import { db, calcularMenorValorEstimadosConhecido } from '@torcida/db'
 import { JANELA_ONLINE_MS } from '@/lib/presenca'
 
 export type StatsClubeOnboarding = {
@@ -143,4 +144,43 @@ export async function calcularStatsClubesOnboarding(
     })
   }
   return result
+}
+
+/**
+ * Menor contagem de torcedores/sócios por clube na plataforma (global, cacheada).
+ * Usa a mesma agregação do card de onboarding para consistência.
+ */
+export const getMenorContagemPlataformaGlobal = cache(async (): Promise<number | null> => {
+  const afiliacoes: { id: string }[] = await db.afiliacao.findMany({
+    select: { id: true },
+  })
+  if (afiliacoes.length === 0) return null
+
+  const stats = await calcularStatsClubesOnboarding(
+    afiliacoes.map((a) => ({ canonicalId: a.id, afiliacaoIds: [a.id] })),
+  )
+
+  let min: number | null = null
+  for (const s of stats.values()) {
+    const n =
+      s.torcedoresTotal > 0
+        ? s.torcedoresTotal
+        : s.sociosTotal > 0
+          ? s.sociosTotal
+          : 0
+    if (n > 0 && (min == null || n < min)) min = n
+  }
+  return min
+})
+
+/** Teto conservador para LIMITE_ATE: menor valor IBOPE curado × menor clube na plataforma. */
+export async function getTetoLimiteTorcedoresGlobal(): Promise<number> {
+  const [menorIbope, menorPlataforma] = await Promise.all([
+    Promise.resolve(calcularMenorValorEstimadosConhecido()),
+    getMenorContagemPlataformaGlobal(),
+  ])
+  if (menorPlataforma != null && menorPlataforma > 0) {
+    return Math.min(menorIbope, menorPlataforma)
+  }
+  return menorIbope
 }

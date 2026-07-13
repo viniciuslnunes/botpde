@@ -60,7 +60,8 @@ Dois tiers em `Afiliacao` (seed offline, nunca API em runtime):
 | Tier | Cobertura | Valor | UI no card |
 |------|-----------|-------|------------|
 | `IBOPE_DIGITAL` | Top 50 (total publicado ou integrante conhecido) | Inscritos reais | `67,5 mi inscritos digitais` |
-| `LIMITE_ATE` | Demais ~274 clubes do catálogo | Teto 10.000 | `até 10 mil torcedores ou menos` |
+| `PLATAFORMA` | Clube com usuários aprovados no SaaS | Contagem real | `142 torcedores na plataforma` |
+| `LIMITE_ATE` | Sem dado próprio | Menor valor conhecido (IBOPE × plataforma) | `até X torcedores ou menos` |
 
 **Presença na plataforma** (sócios/torcedores online) vem do sistema
 (`User.ultimoAcessoEm`, agregação por clube canônico) — separado da estimativa web.

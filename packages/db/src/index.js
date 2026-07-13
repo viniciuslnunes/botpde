@@ -101,3 +101,4 @@ export {
   saoMesmoClube,
   indiceAfiliacaoCanonica,
 } from './data/afiliacoes-normalize.js'
+export { calcularMenorValorEstimadosConhecido } from './data/torcedores-estimados.js'

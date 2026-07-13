@@ -60,7 +60,7 @@ async function main() {
   }
 
   console.log(
-    `\nTorcedores estimados — ${atualizados} atualizados (${ibope} IBOPE, ${limite} limite ≤10 mil)`,
+    `\nTorcedores estimados — ${atualizados} atualizados (${ibope} IBOPE, ${limite} limite dinâmico)`,
   )
   if (DRY_RUN) console.log('(dry-run — nada gravado)')
 }

@@ -663,8 +663,9 @@ inteligência de fontes: `docs/knowledge/futebol-dados-publicos.md`.
   `torcedoresEstimadosTipo` (`IBOPE_DIGITAL` | `LIMITE_ATE`).
 - **Tier IBOPE**: total publicado (~35 clubes com valor exato Jun/2026 + integrantes
   Top 50 sem total → piso 471.612 = menor publicado, Botafogo-PB 49º).
-- **Tier LIMITE_ATE**: clubes fora do Top 50 → teto **10.000**; copy
-  “até 10 mil torcedores ou menos” (estimativa conservadora, não ausência de torcida).
+- **Tier LIMITE_ATE**: clubes sem dado próprio → teto **dinâmico** (menor IBOPE curado
+  × menor clube na plataforma); copy “até X torcedores ou menos”. Tier **PLATAFORMA**
+  quando há contagem real no SaaS. **Não** usar 10 mil fixo.
 - **Dados da plataforma** (separados): sócios/torcedores + online via
   `User.ultimoAcessoEm` (heartbeat throttled no callback de sessão, janela 15 min),
   agregados por clube canônico (`saoMesmoClube`) em `onboarding-clube-stats.ts`.

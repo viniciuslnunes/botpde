@@ -52,7 +52,9 @@ responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
 - **Onboarding — passo Clube** (`/onboarding`, `ClubeOnboardingMeta`): card denso
   (escudo, nome, série, estimativa, sócios/torcedores online). Regras de copy:
   - Top 50 IBOPE → **“inscritos digitais”** (não “torcedores no Brasil”).
-  - Fora do Top 50 → **“até 10 mil torcedores ou menos”** (teto conservador).
+  - Com contagem na plataforma → **“X torcedores na plataforma”** (dado real).
+  - Sem IBOPE nem plataforma → **“até X torcedores ou menos”** (X = menor valor
+    conhecido na base — **não** 10 mil fixo).
   - Tooltip com fonte (`torcedoresEstimadosFonte`); ícone globo + sublinhado pontilhado.
   - Online: ponto verde + “N online”; ocultar linhas zeradas de plataforma.
   - Ver `docs/data/torcedores-estimados.md` e `docs/knowledge/futebol-dados-publicos.md`.
