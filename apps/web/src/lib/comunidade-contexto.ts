@@ -6,6 +6,7 @@ export type AfiliacaoComunidade = {
   id: string
   nome: string
   apelido: string | null
+  slug: string | null
 }
 
 export type ContextoComunidadePortal =
@@ -32,7 +33,7 @@ export const resolverContextoComunidade = cache(
       if (tenant.afiliacaoId) {
         afiliacao = await db.afiliacao.findUnique({
           where: { id: tenant.afiliacaoId },
-          select: { id: true, nome: true, apelido: true },
+          select: { id: true, nome: true, apelido: true, slug: true },
         })
       }
       return {
@@ -53,7 +54,7 @@ export const resolverContextoComunidade = cache(
 
     const afiliacao: AfiliacaoComunidade | null = await db.afiliacao.findUnique({
       where: { id: perfil.afiliacaoId },
-      select: { id: true, nome: true, apelido: true },
+      select: { id: true, nome: true, apelido: true, slug: true },
     })
     if (!afiliacao) return null
 

@@ -39,6 +39,8 @@ interface ComunidadeFeedShellProps {
   filtro?: 'descobrir' | 'seguindo'
   /** Clube do torcedor global (banner quando feed usa tenant proxy). */
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
+  /** Slug do clube (Afiliacao) para widgets Sofascore contextualizados. */
+  afiliacaoSlug?: string | null
 }
 
 function ComunicadosFallback() {
@@ -75,6 +77,7 @@ export function ComunidadeFeedShell({
   somentePublico = false,
   filtro = 'descobrir',
   clubeNacional = null,
+  afiliacaoSlug = null,
 }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
@@ -157,6 +160,7 @@ export function ComunidadeFeedShell({
             <ComunidadeAsideWidgets
               tenantId={tenant.id}
               afiliacaoId={tenant.afiliacaoId}
+              afiliacaoSlug={afiliacaoSlug}
               currentUserId={currentUser.id || undefined}
             />
           </Suspense>

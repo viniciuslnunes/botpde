@@ -1,6 +1,7 @@
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import { Users } from 'lucide-react'
+import { WidgetSection } from '@/components/sofascore/widget-section'
 
 type Props = {
   afiliacao: AfiliacaoComunidade
@@ -29,6 +30,8 @@ export async function ComunidadeNacionalShell({ afiliacao }: Props) {
           </div>
         </div>
       </div>
+
+      <WidgetSection contexto="clube" afiliacaoSlug={afiliacao.slug} limit={4} titulo="Sofascore" />
 
       {noticias.length > 0 ? (
         <section className="space-y-3">

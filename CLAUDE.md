@@ -87,6 +87,8 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Loja** — catálogo, sacola, checkout, cupons: `apps/web/src/app/portal/loja/`,
   `apps/web/src/app/admin/loja/`; regras em `packages/types/src/loja.js`;
   ver `docs/data/modulo-loja.md`.
+- **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
+  `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.

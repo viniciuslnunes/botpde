@@ -89,6 +89,7 @@ export default async function ComunidadePage({
         somentePublico={somentePublico}
         filtro={filtro}
         clubeNacional={ctx.afiliacao}
+        afiliacaoSlug={ctx.afiliacao?.slug ?? null}
       />
 
       <aside className="hidden xl:block">
