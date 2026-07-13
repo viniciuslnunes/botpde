@@ -16,11 +16,11 @@ a exibir o escudo de outro clube.
 
 | Métrica | Valor |
 |---|---|
-| Afiliações totais | 367 |
-| Com escudo | 112 |
-| Sem escudo | 255 |
-| Escudos via Soccer Wiki (rodada segura) | 87 |
-| Clubes raspados no Soccer Wiki (offset 0–300) | 246 |
+| Afiliações totais | 325 |
+| Com escudo | 139 |
+| Sem escudo | 186 |
+| Escudos via Soccer Wiki (Fases A+B+D parcial) | 120 |
+| Clubes raspados no Soccer Wiki | 246 (listagem completa até offset 300) |
 
 Relatório versionado: `packages/db/src/data/escudos-soccerwiki-report.json`
 (gerado por `seed:escudos-soccerwiki -- --report-only`).
@@ -30,12 +30,12 @@ Relatório versionado: `packages/db/src/data/escudos-soccerwiki-report.json`
 1. **TheSportsDB** — seed original `seed:afiliacoes` (Série A–D curada).
 2. **Cloudinary** — migração de assets locais (`seed:migrate-escudos-cloudinary`).
 3. **Soccer Wiki** — scrape paginado Brasil
-   (`scripts/seed-escudos-soccerwiki.js`, offsets 0–300, passo 50).
+   (`scripts/seed-escudos-soccerwiki.js`, offsets 0–350 passo 50, para em página vazia).
 
 ### Lógica de casamento (estrita)
 
-Implementada em `packages/db/src/data/afiliacoes-normalize.js` +
-`scripts/seed-escudos-soccerwiki.js`:
+Implementada em `packages/db/src/data/escudos-wiki-match.js` +
+`packages/db/src/data/afiliacoes-normalize.js` (`ALIASES`):
 
 - `inferirUfDoNome` — extrai UF de sufixos (`América-MG`, `Operário-MT`, `América RJ`).
 - `saoMesmoClube` / `chaveGrupoClube` — aliases e chave canônica nome+UF.
@@ -247,21 +247,30 @@ Exemplos onde o Wiki provavelmente tem o clube mas o nome diverge demais para sc
 Relatório de referência: `escudos-soccerwiki-report.json` → `semMatchLista` (255 itens);
 cruzamento manual com os 246 clubes do Wiki.
 
-### Fase C — Afiliações duplicadas
+### Fase C — Afiliações duplicadas ✅ (2026-07-13)
 
-Muitos itens em `semMatchLista` são **variantes de nome** do mesmo clube que já tem
-escudo na afiliação canônica (ex.: `Sport Club Internacional` vs `Internacional`).
-Rodar `db:repair-afiliacoes-torcidas` após novos aliases; considerar herdar
-`escudoUrl` da canônica no repair.
+- [x] **+26 aliases** em `ALIASES` para variantes longas (Paysandu Sport Club, Bangu
+  Atlético, Central Sport Club, Confiança AD, Portuguesa AA, Cabofriense, Icasa,
+  ASA, Caxias, Sergipe, Potiguar…).
+- [x] `db:repair-afiliacoes-torcidas` — **26 duplicatas fundidas**, **14 escudos**
+  propagados para a afiliação canônica (sem re-upload Cloudinary).
+- [x] Afiliações totais: 351 → **325** (menos ruído no `semMatchLista`).
+- [x] Testes `saoMesmoClube` para Paysandu, Bangu, Confiança.
 
-### Fase D — Cobertura fora do Soccer Wiki
+### Fase D — Cobertura fora do Soccer Wiki (em andamento)
 
-~255 clubes sem escudo incluem times de estaduais/Série D ausentes na listagem Wiki
-(offset 0–300). Opções (avaliar custo/benefício):
+Soccer Wiki esgotado (246 clubes; offset 350 vazio). Restam **186** afiliações sem
+escudo — majoritariamente estaduais/Série D **ausentes** da listagem Wiki.
 
-1. Paginar além do offset 300 no Soccer Wiki.
-2. Segunda fonte (Wikipedia Commons, TheSportsDB por nome+UF).
-3. Placeholder neutro no UI até curadoria manual (não inventar escudo).
+**Entregue nesta rodada:**
+- [x] Paginação até offset 350 com parada automática em página vazia.
+- [x] +2 escudos Wiki (Portuguesa, Cabofriense via `AD Cabofriense`).
+
+**Próximo (Fase D continuação):**
+1. **TheSportsDB por nome+UF** — re-rodar `seed:afiliacoes` só para `semEscudo`
+   (API gratuita, já usada no seed original).
+2. Aliases Wiki pontuais conforme `semMatchLista` (Anapolina, ASA, Icasa, Operário-PR…).
+3. Placeholder neutro no UI para clubes sem escudo (não inventar imagem).
 
 ### Fase E — Qualidade contínua
 

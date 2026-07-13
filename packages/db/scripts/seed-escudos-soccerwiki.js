@@ -2,8 +2,9 @@
  * Escudos de clubes (Afiliacao) via Soccer Wiki + Cloudinary.
  *
  * Varre https://pt-br.soccerwiki.org/country.php?countryId=BRA&action=clubs
- * (offset 0…300, passo 50), casa cada clube com Afiliacao sem escudoUrl e
- * hospeda o PNG (fundo transparente) em `torcida/catalogo/escudos/<slug>`.
+ * (offset 0…350, passo 50 — para quando a página vier vazia), casa cada clube
+ * com Afiliacao sem escudoUrl e hospeda o PNG (fundo transparente) em
+ * `torcida/catalogo/escudos/<slug>`.
  *
  *   pnpm --filter @torcida/db seed:escudos-soccerwiki
  *   pnpm --filter @torcida/db seed:escudos-soccerwiki -- --dry-run
@@ -31,7 +32,8 @@ loadEnvFiles()
 const __dir = dirname(fileURLToPath(import.meta.url))
 const DRY_RUN = process.argv.includes('--dry-run')
 const REPORT_ONLY = process.argv.includes('--report-only')
-const OFFSETS = [0, 50, 100, 150, 200, 250, 300]
+const WIKI_OFFSET_STEP = 50
+const WIKI_OFFSET_MAX = 350
 const WIKI_BASE = 'https://pt-br.soccerwiki.org/country.php?countryId=BRA&action=clubs'
 const DELAY_MS = 120
 
@@ -105,8 +107,12 @@ async function main() {
 
   /** @type {Array<{ nome: string, logoUrl: string, cidade: string|null }>} */
   const wikiClubes = []
-  for (const offset of OFFSETS) {
+  for (let offset = 0; offset <= WIKI_OFFSET_MAX; offset += WIKI_OFFSET_STEP) {
     const pagina = await scrapePagina(offset)
+    if (pagina.length === 0) {
+      console.log(`  offset ${offset}: fim da listagem`)
+      break
+    }
     wikiClubes.push(...pagina)
     console.log(`  offset ${offset}: ${pagina.length} clubes`)
     await sleep(DELAY_MS)

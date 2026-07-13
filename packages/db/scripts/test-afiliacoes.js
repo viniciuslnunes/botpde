@@ -172,6 +172,36 @@ ok('scoreWikiAfiliacao casa Grêmio × Grêmio Foot-Ball RS', () => {
   )
 })
 
+ok('saoMesmoClube une Paysandu × Paysandu Sport Club', () => {
+  assert.equal(
+    saoMesmoClube(
+      { nome: 'Paysandu', estado: 'PA' },
+      { nome: 'Paysandu Sport Club', estado: 'PA' },
+    ),
+    true,
+  )
+})
+
+ok('saoMesmoClube une Bangu × Bangu Atlético Clube', () => {
+  assert.equal(
+    saoMesmoClube(
+      { nome: 'Bangu', estado: 'RJ' },
+      { nome: 'Bangu Atlético Clube', estado: 'RJ' },
+    ),
+    true,
+  )
+})
+
+ok('saoMesmoClube une Confiança × Associação Desportiva Confiança', () => {
+  assert.equal(
+    saoMesmoClube(
+      { nome: 'Confiança', estado: 'SE' },
+      { nome: 'Associação Desportiva Confiança', estado: 'SE' },
+    ),
+    true,
+  )
+})
+
 // --- dataset: slugs únicos em toda a base curada ---
 ok('dataset gera slugs únicos para os 5 regiões inteiras', () => {
   const usados = new Set()
