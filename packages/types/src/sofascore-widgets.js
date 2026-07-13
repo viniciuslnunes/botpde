@@ -44,15 +44,17 @@ export const SOFASCORE_WIDGETS = [
   //   embedSrc: 'https://widgets.sofascore.com/embed/COLE_AQUI_A_URL_OFICIAL',
   // },
 
-  // Corinthians (Afiliacao.slug = 'corinthians-sp', seed AFILIACOES_BRASIL) — reservado
-  // para o piloto do módulo (torcida demo pde-gavioes-fiel). `ativo: false` até alguém
-  // gerar os embeds reais em https://widgets.sofascore.com e colar em `embedSrc`;
-  // depois é só trocar o placeholder e marcar `ativo: true`.
+  // Corinthians (Afiliacao.slug = 'sport-club-corinthians-paulista-sp', confirmado
+  // via query direta em produção — o nome curto "Corinthians" do seed
+  // AFILIACOES_BRASIL não é a fonte do dado real, que usa o nome oficial longo).
+  // Piloto do módulo (torcida demo Gaviões da Fiel). Fixtures e top players ficam
+  // `ativo: false` até alguém gerar os embeds reais em https://widgets.sofascore.com
+  // e colar em `embedSrc`; depois é só trocar o placeholder e marcar `ativo: true`.
   {
     id: 'corinthians-sp-fixtures',
     tipo: 'fixtures',
     titulo: 'Próximos jogos',
-    afiliacaoSlug: 'corinthians-sp',
+    afiliacaoSlug: 'sport-club-corinthians-paulista-sp',
     contextos: ['home', 'clube'],
     prioridade: 1,
     ativo: false,
@@ -62,9 +64,9 @@ export const SOFASCORE_WIDGETS = [
     id: 'corinthians-sp-standings',
     tipo: 'standings',
     titulo: 'Classificação',
-    afiliacaoSlug: 'corinthians-sp',
+    afiliacaoSlug: 'sport-club-corinthians-paulista-sp',
     competicaoSlug: 'brasileirao-serie-a-2026',
-    contextos: ['clube'],
+    contextos: ['home', 'clube'],
     prioridade: 2,
     ativo: true,
     // Embed oficial colado do painel Sofascore (torneio 83 / temporada 87678 —
@@ -79,7 +81,7 @@ export const SOFASCORE_WIDGETS = [
     id: 'corinthians-sp-top-players',
     tipo: 'topPlayers',
     titulo: 'Destaques do elenco',
-    afiliacaoSlug: 'corinthians-sp',
+    afiliacaoSlug: 'sport-club-corinthians-paulista-sp',
     contextos: ['clube', 'artigo'],
     prioridade: 3,
     ativo: false,
