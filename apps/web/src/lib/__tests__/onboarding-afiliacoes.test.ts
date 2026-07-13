@@ -137,40 +137,53 @@ describe('getAfiliacoesParaOnboarding', () => {
     )
   })
 
-  it('ordena clubes com escudo antes dos sem escudo', async () => {
+  it('ordena clubes por inscritos digitais decrescente', async () => {
     afiliacaoFindMany.mockResolvedValue([
       {
-        id: 'sem',
+        id: 'sem-dado',
         nome: 'ABC (RN)',
         apelido: 'ABC',
-        escudoUrl: null,
+        escudoUrl: 'https://res.cloudinary.com/demo/abc.png',
         cidade: 'Natal',
         estado: 'RN',
         serie: 'C',
-        torcedoresEstimados: null,
-        torcedoresEstimadosFonte: null,
-        torcedoresEstimadosTipo: null,
+        torcedoresEstimados: 471_612,
+        torcedoresEstimadosFonte: 'Fora do Top 50',
+        torcedoresEstimadosTipo: 'LIMITE_ATE',
         _count: { tenants: 0 },
       },
       {
-        id: 'com',
-        nome: 'Atlético-MG',
-        apelido: 'Galo',
-        escudoUrl: 'https://res.cloudinary.com/demo/atletico-mg.png',
-        cidade: 'Belo Horizonte',
-        estado: 'MG',
+        id: 'medio',
+        nome: 'Goiás (GO)',
+        apelido: 'Goiás',
+        escudoUrl: null,
+        cidade: 'Goiânia',
+        estado: 'GO',
+        serie: 'B',
+        torcedoresEstimados: 2_000_000,
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
+        _count: { tenants: 0 },
+      },
+      {
+        id: 'top',
+        nome: 'Flamengo (RJ)',
+        apelido: 'Flamengo',
+        escudoUrl: 'https://res.cloudinary.com/demo/flamengo.png',
+        cidade: 'Rio de Janeiro',
+        estado: 'RJ',
         serie: 'A',
-        torcedoresEstimados: null,
-        torcedoresEstimadosFonte: null,
-        torcedoresEstimadosTipo: null,
+        torcedoresEstimados: 30_000_000,
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
         _count: { tenants: 1 },
       },
     ])
 
     const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
-    const lista = await getAfiliacoesParaOnboarding('ordem-test')
+    const lista = await getAfiliacoesParaOnboarding('ordem-inscritos')
 
-    expect(lista.map((a) => a.id)).toEqual(['com', 'sem'])
+    expect(lista.map((a) => a.id)).toEqual(['top', 'medio', 'sem-dado'])
   })
 
   it('filtra por UF quando informada', async () => {
