@@ -21,7 +21,7 @@ const casos = [
     nome: 'Goiás',
     uf: 'GO',
     tipo: 'IBOPE_DIGITAL',
-    valor: MENOR_TOTAL_IBOPE_PUBLICADO,
+    minValor: 2_000_000,
   },
   {
     nome: '1° de Maio Esporte Clube',

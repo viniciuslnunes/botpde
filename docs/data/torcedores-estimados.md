@@ -71,11 +71,13 @@ pnpm --filter @torcida/db seed:torcedores-estimados -- --dry-run
 ## Evolução (coleta mensal)
 
 1. Baixar tabela/infográfico da edição do mês em iboperepucom.com
-2. Atualizar `IBOPE_RANKING_DIGITAL` com totais e `edicao`
-3. Revisar `CHAVES_IBOPE_TOP50_SEM_TOTAL` (clubes que entraram/saíram do Top 50)
-4. Rodar seed em staging → validar cards do onboarding → produção
+2. Montar JSON de entrada (ver `packages/db/src/data/ibope-ranking-input.example.json`)
+3. `pnpm --filter @torcida/db coleta:ibope-ranking -- --import=entrada.json`
+4. `pnpm --filter @torcida/db coleta:ibope-ranking -- --validate` (posições faltantes)
+5. Rodar seed em staging → validar cards do onboarding → produção
 
-Script futuro opcional: `coleta:ibope-ranking` (parse do infográfico PNG/PDF).
+Fonte editável: `packages/db/src/data/ibope-ranking-digital.json` (48+ clubes Jun/2026;
+posições 47 e 50 pendentes de coleta mensal).
 
 ## Limitações (transparência na UI)
 

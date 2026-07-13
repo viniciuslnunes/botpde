@@ -124,9 +124,13 @@ describe('getAfiliacoesParaOnboarding', () => {
     expect(afiliacaoFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          OR: [
-            { nome: { startsWith: 'co', mode: 'insensitive' } },
-            { apelido: { startsWith: 'co', mode: 'insensitive' } },
+          AND: [
+            {
+              OR: [
+                { nome: { startsWith: 'co', mode: 'insensitive' } },
+                { apelido: { startsWith: 'co', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
       }),
@@ -167,5 +171,18 @@ describe('getAfiliacoesParaOnboarding', () => {
     const lista = await getAfiliacoesParaOnboarding('ordem-test')
 
     expect(lista.map((a) => a.id)).toEqual(['com', 'sem'])
+  })
+
+  it('filtra por UF quando informada', async () => {
+    afiliacaoFindMany.mockResolvedValue([])
+
+    const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
+    await getAfiliacoesParaOnboarding(undefined, 'BA')
+
+    expect(afiliacaoFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: [{ estado: 'BA' }] },
+      }),
+    )
   })
 })

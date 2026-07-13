@@ -16,10 +16,13 @@ import { setTenantContextSlug } from '@/lib/tenant-context'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
-export async function buscarAfiliacoes(busca?: string): Promise<AfiliacaoOnboarding[]> {
+export async function buscarAfiliacoes(
+  busca?: string,
+  uf?: string,
+): Promise<AfiliacaoOnboarding[]> {
   const session = await auth()
   if (!session?.user?.id) return []
-  return getAfiliacoesParaOnboarding(busca)
+  return getAfiliacoesParaOnboarding(busca, uf)
 }
 
 export async function buscarTorcidas(afiliacaoId: string): Promise<TorcidaOnboarding[]> {

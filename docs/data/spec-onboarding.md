@@ -231,8 +231,9 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
 - **Fase 1 (MVP)**: hub `/onboarding` + clube/torcida + `PerfilTorcedor` + criação de
   `SaasMembro` + tela de pendência + **correção do gating feed sócio×torcedor**. Sem rivalidade.
 - **Fase 2**: `Rivalidade` + bloqueio sócio×sócio rival + passo de departamento.
-- **Fase 3**: coleta mensal IBOPE (completar Top 50), sugestões por região,
-  comunidade nacional do clube. Script futuro `coleta:ibope-ranking`.
+- **Fase 3**: coleta mensal IBOPE (`coleta:ibope-ranking` + `ibope-ranking-digital.json`),
+  sugestões por região (filtro UF no passo clube), comunidade nacional do clube
+  (torcedor global sem torcida na plataforma). Script: `pnpm --filter @torcida/db coleta:ibope-ranking`.
 
 ## 7. Riscos / pontos de atenção
 

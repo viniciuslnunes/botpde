@@ -68,15 +68,38 @@ export type EstadoOnboarding = {
   temMembro: boolean
 }
 
+export type RegiaoOnboarding = {
+  uf: string
+  total: number
+}
+
+/**
+ * UFs com clubes no catálogo (sugestão por região no passo Clube).
+ */
+export const getRegioesOnboarding = cache(async (): Promise<RegiaoOnboarding[]> => {
+  type GrupoUf = { estado: string | null; _count: { _all: number } }
+  const grupos: GrupoUf[] = await db.afiliacao.groupBy({
+    by: ['estado'],
+    where: { estado: { not: null } },
+    _count: { _all: true },
+  })
+  return grupos
+    .filter((g): g is GrupoUf & { estado: string } => g.estado != null && g.estado !== '')
+    .map((g) => ({ uf: g.estado, total: g._count._all }))
+    .sort((a, b) => a.uf.localeCompare(b.uf, 'pt-BR'))
+})
+
 /**
  * Lista de clubes (Afiliacao) para o passo de seleção do onboarding.
  * Ordena clubes com escudo primeiro (melhor visual do grid) e depois por nome.
  * Quando `busca` é informada, filtra clubes cujo **nome ou apelido começa**
  * com o termo (case-insensitive) — ex.: "co" → Corinthians, Coritiba.
+ * `uf` restringe por estado (sugestão regional).
  */
 export const getAfiliacoesParaOnboarding = cache(
-  async (busca?: string): Promise<AfiliacaoOnboarding[]> => {
+  async (busca?: string, uf?: string): Promise<AfiliacaoOnboarding[]> => {
     const termo = busca?.trim()
+    const estado = uf?.trim().toUpperCase() || undefined
     type AfiliacaoRow = {
       id: string
       nome: string
@@ -92,15 +115,21 @@ export const getAfiliacoesParaOnboarding = cache(
     }
     type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
 
+    const filtros = []
+    if (termo) {
+      filtros.push({
+        OR: [
+          { nome: { startsWith: termo, mode: 'insensitive' as const } },
+          { apelido: { startsWith: termo, mode: 'insensitive' as const } },
+        ],
+      })
+    }
+    if (estado) {
+      filtros.push({ estado })
+    }
+
     const afiliacoes: AfiliacaoRow[] = await db.afiliacao.findMany({
-      where: termo
-        ? {
-            OR: [
-              { nome: { startsWith: termo, mode: 'insensitive' } },
-              { apelido: { startsWith: termo, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
+      where: filtros.length > 0 ? { AND: filtros } : undefined,
       select: {
         id: true,
         nome: true,

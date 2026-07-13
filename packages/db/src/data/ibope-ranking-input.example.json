@@ -1,0 +1,13 @@
+{
+  "edicaoReferencia": "2026-07",
+  "clubes": [
+    {
+      "chave": "flamengo|rj",
+      "inscritos": 67554417,
+      "posicao": 1,
+      "edicao": "2026-07",
+      "_comentario": "Exemplo — substituir pelos totais da edição do mês"
+    }
+  ],
+  "top50SemTotal": []
+}

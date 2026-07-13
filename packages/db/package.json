@@ -17,6 +17,7 @@
     "seed:escudos-ogol": "node --use-system-ca scripts/seed-escudos-ogol.js",
     "seed:torcedores-estimados": "node scripts/seed-torcedores-estimados.js",
     "test:torcedores-estimados": "node scripts/test-torcedores-estimados.js",
+    "coleta:ibope-ranking": "node scripts/coleta-ibope-ranking.js",
     "seed:escudos-thesportsdb": "node --use-system-ca scripts/seed-escudos-thesportsdb.js",
     "coleta:ogol-clubes": "node --use-system-ca scripts/coleta-ogol-clubes.js",
     "seed:migrate-escudos-cloudinary": "node --use-system-ca scripts/migrate-escudos-cloudinary.js",

@@ -671,7 +671,9 @@ inteligência de fontes: `docs/knowledge/futebol-dados-publicos.md`.
 - **Scripts**: `seed:torcedores-estimados`, `test:torcedores-estimados`.
   Dados: `ibope-ranking-digital.js`, `torcedores-estimados.js` (`resolverTorcedoresEstimados`).
 - **Estado (2026-07-13)**: 318 afiliações seedadas (44 IBOPE, 274 limite ≤10 mil).
-- **Manutenção**: coleta mensal da tabela IBOPE → atualizar JSON → re-seed.
+- **Manutenção**: coleta mensal → `ibope-ranking-digital.json` via `coleta:ibope-ranking` → re-seed.
+- **Onboarding Fase 3**: filtro UF no passo clube; comunidade nacional para torcedor global
+  sem torcida na plataforma (`comunidade-nacional-shell.tsx`).
 
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.

@@ -1,12 +1,13 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { checarPodePublicarNoFeed } from '@/lib/authz'
-import { getActiveTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
 import { db } from '@torcida/db'
+import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
+import { ComunidadeNacionalShell } from './_components/comunidade-nacional-shell'
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
@@ -38,9 +39,14 @@ export default async function ComunidadePage({
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) redirect('/')
+  const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
+  if (!ctx) redirect('/')
 
+  if (ctx.modo === 'nacional') {
+    return <ComunidadeNacionalShell afiliacao={ctx.afiliacao} />
+  }
+
+  const tenant = ctx.tenant
   const currentUser = {
     id: session?.user?.id ?? '',
     nome: session?.user?.name ?? null,
@@ -82,6 +88,7 @@ export default async function ComunidadePage({
         bloqueioPublicacao={bloqueioPublicacao}
         somentePublico={somentePublico}
         filtro={filtro}
+        clubeNacional={ctx.afiliacao}
       />
 
       <aside className="hidden xl:block">

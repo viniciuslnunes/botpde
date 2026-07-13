@@ -35,6 +35,7 @@ pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
+pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.

@@ -18,7 +18,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - Testes: `pnpm --filter @torcida/web test` (Vitest). Cobrem RBAC, rate-limit,
   visibilidade, onboarding (afiliacoes, stats, format-contagem).
 - Dados offline: `pnpm --filter @torcida/db test:torcedores-estimados` após mudar
-  `ibope-ranking-digital.js` ou `torcedores-estimados.js`.
+  `ibope-ranking-digital.json` ou `torcedores-estimados.js`.
+- Coleta IBOPE: `pnpm --filter @torcida/db coleta:ibope-ranking -- --validate` antes do seed.
 - Não invente comandos: confirme scripts em `package.json` antes de rodar.
 
 ## Definition of Done (deste repo)
