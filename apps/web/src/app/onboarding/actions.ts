@@ -176,9 +176,12 @@ const solicitarVinculoSchema = z.object({
     .max(40)
     .optional()
     .transform((v) => v?.trim() || undefined),
+  // Obrigatória só para SOCIO — exigência aplicada no `.superRefine` abaixo.
+  // Torcedor da torcida entra sem comprovante (spec-onboarding §vínculo).
   imagemProva: z
     .string()
-    .url('Envie uma foto da carteirinha ou comprovante de vínculo'),
+    .url('Envie uma foto da carteirinha ou comprovante de vínculo')
+    .optional(),
   // Sem `.uuid()`: sede/departamento podem ter IDs não-UUID (dados legados/seed,
   // ex.: "sede-principal-pde"). A existência é validada contra o banco abaixo —
   // esse é o guard real; o formato UUID travava vínculos válidos.
@@ -193,6 +196,14 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   unidadeNaoListada: z.boolean().optional(),
+}).superRefine((data, ctx) => {
+  if (data.tipo === 'SOCIO' && !data.imagemProva) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['imagemProva'],
+      message: 'Envie uma foto da carteirinha ou comprovante de vínculo',
+    })
+  }
 })
 
 export type SolicitarVinculoInput = z.input<typeof solicitarVinculoSchema>

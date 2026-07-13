@@ -152,13 +152,19 @@ describe('solicitarVinculo — validação', () => {
     expect(r.message).toBeTruthy()
   })
 
-  it('cria SaasMembro + AuditLog e conclui onboarding (torcedor)', async () => {
+  it('rejeita SOCIO sem imagemProva (comprovante obrigatório só para sócio)', async () => {
+    const r = await solicitarVinculo({ tenantId: UUID, tipo: 'SOCIO', nome: 'Fulano da Silva' })
+    expect(r.errors?.imagemProva).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('cria SaasMembro + AuditLog e conclui onboarding (torcedor, sem comprovante)', async () => {
     tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([{ id: 's1' }])
     membroFindUnique.mockResolvedValue(null)
     membroCreate.mockResolvedValue({ id: 'novo' })
     await expect(
-      solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva', imagemProva: PROVA_URL }),
+      solicitarVinculo({ tenantId: UUID, tipo: 'TORCEDOR', nome: 'Fulano da Silva' }),
     ).rejects.toThrow('REDIRECT')
     expect(membroCreate).toHaveBeenCalled()
     expect(auditLogCreate).toHaveBeenCalledWith(

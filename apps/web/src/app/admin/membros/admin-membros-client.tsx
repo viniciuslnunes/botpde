@@ -3,10 +3,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { Users } from 'lucide-react'
+import { TriangleAlert, Users } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MemberActions } from '@/components/admin/member-actions'
+import { ComprovanteLightbox } from '@/components/admin/comprovante-lightbox'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export interface AdminMembroItem {
@@ -21,6 +22,16 @@ export interface AdminMembroItem {
   criadoEmLabel: string
   avatarUrl: string | null
   inicial: string
+  telefone?: string | null
+  idade?: number | null
+  /** Comprovante de vínculo (só sócio; dado RESTRITO — nunca cachear). */
+  imagemProva?: string | null
+  numeroAssociado?: string | null
+  /** True quando o usuário já é sócio aprovado em torcida rival (sem identificá-la). */
+  alertaRivalSocio?: boolean
+  /** Nº de solicitações (cadastro + recadastros) registradas no AuditLog. */
+  tentativas?: number
+  ultimoMotivoReprovacao?: string
 }
 
 interface AdminMembrosTableProps {
@@ -111,6 +122,29 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                       <p className="font-medium text-[rgb(var(--foreground))]">{membro.nome}</p>
                       {membro.discordTag && (
                         <p className="text-xs text-[rgb(var(--foreground-muted))]">{membro.discordTag}</p>
+                      )}
+                      {membro.alertaRivalSocio && (
+                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                          <TriangleAlert className="h-3 w-3 shrink-0" />
+                          Já é sócio aprovado em torcida rival
+                        </p>
+                      )}
+                      {membro.tentativas !== undefined && membro.tentativas > 1 && (
+                        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                          {membro.tentativas}ª tentativa
+                          {membro.ultimoMotivoReprovacao
+                            ? ` · reprovado antes: “${membro.ultimoMotivoReprovacao}”`
+                            : ' · reprovado anteriormente'}
+                        </p>
+                      )}
+                      {membro.imagemProva && (
+                        <div className="mt-0.5">
+                          <ComprovanteLightbox
+                            imagemUrl={membro.imagemProva}
+                            nome={membro.nome}
+                            numeroAssociado={membro.numeroAssociado ?? null}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>

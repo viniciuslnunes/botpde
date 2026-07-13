@@ -1163,7 +1163,8 @@ function PassoVinculo({
       onErro('Volte e selecione sua subsede ou ponto de encontro.')
       return
     }
-    if (!imagemProva) {
+    // Só o vínculo de sócio exige comprovação — torcedor entra direto.
+    if (tipo === 'SOCIO' && !imagemProva) {
       onErro('Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.')
       return
     }
@@ -1205,8 +1206,8 @@ function PassoVinculo({
     }
   }
 
-  if (modo === 'escolha') {
-    return (
+  const conteudo =
+    modo === 'escolha' ? (
       <div>
         <BotaoVoltar onClick={onVoltar} disabled={pending} />
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
@@ -1242,32 +1243,19 @@ function PassoVinculo({
           </p>
         )}
 
-        <div className="mt-6">
-          <BlocoImagemProva
-            imagemProva={imagemProva}
-            uploadPend={uploadPend}
-            erros={errosCampo.imagemProva}
-            onArquivo={onArquivo}
-          />
-          {!imagemProva && !uploadPend && (
-            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-              Envie um comprovante de vínculo para continuar como torcedor ou sócio da torcida.
-            </p>
-          )}
-        </div>
-
         <div className="mt-6 space-y-3">
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
-            disabled={pending || uploadPend || unidadePendente}
+            disabled={pending || unidadePendente}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
             <Users className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />
             <div>
               <p className="font-semibold text-[rgb(var(--foreground))]">Torcedor da torcida</p>
               <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Acesso à comunidade, eventos e novidades da torcida.
+                Entrada imediata, sem aprovação nem comprovante. Acesso à comunidade, eventos e
+                novidades da torcida.
               </p>
             </div>
           </button>
@@ -1282,18 +1270,16 @@ function PassoVinculo({
             <div>
               <p className="font-semibold text-[rgb(var(--foreground))]">Sócio</p>
               <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Carteirinha, benefícios e voz nas decisões. Requer aprovação.
+                Carteirinha, benefícios e voz nas decisões. Requer aprovação e comprovante de
+                vínculo.
               </p>
             </div>
           </button>
         </div>
       </div>
-    )
-  }
-
-  // Formulário de sócio
-  return (
-    <div>
+    ) : (
+      // Formulário de sócio
+      <div>
       <BotaoVoltar onClick={() => setModo('escolha')} disabled={pending} label="Voltar" />
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Solicitação de sócio</h1>
       <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
@@ -1355,12 +1341,22 @@ function PassoVinculo({
           </Campo>
         )}
 
-        <BlocoImagemProva
-          imagemProva={imagemProva}
-          uploadPend={uploadPend}
-          erros={errosCampo.imagemProva}
-          onArquivo={onArquivo}
-        />
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            Verificação de vínculo
+          </p>
+          <div className="mt-3">
+            <BlocoImagemProva
+              imagemProva={imagemProva}
+              uploadPend={uploadPend}
+              erros={errosCampo.imagemProva}
+              onArquivo={onArquivo}
+            />
+          </div>
+          <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+            Usado só para validar seu vínculo com a torcida; não fica visível a outros associados.
+          </p>
+        </div>
       </div>
 
       <div className="mt-8">
@@ -1371,7 +1367,21 @@ function PassoVinculo({
           label="Enviar solicitação"
         />
       </div>
-    </div>
+      </div>
+    )
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <m.div
+        key={modo}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={springSnappy}
+      >
+        {conteudo}
+      </m.div>
+    </AnimatePresence>
   )
 }
 

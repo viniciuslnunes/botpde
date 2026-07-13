@@ -1,8 +1,10 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
+import { PERMISSIONS } from '@torcida/types'
+import { assertPermission } from '@/lib/authz'
+import { tenantsAreRivais } from '@/lib/hierarquia'
 import { AdminMembrosTable, AdminMembrosTabs } from './admin-membros-client'
 import type { Metadata } from 'next'
 
@@ -35,8 +37,14 @@ export default async function MembrosPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; pagina?: string }>
 }) {
-  const tenant = await getTenantFromHost()
-  if (!tenant) redirect('/')
+  // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
+  // esconder o link no menu não basta, a URL direta precisa ser bloqueada.
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+  try {
+    ;({ tenant } = await assertPermission(PERMISSIONS.MEMBERS_VIEW))
+  } catch {
+    redirect('/admin')
+  }
 
   const params = await searchParams
   const statusFiltro = (params.status as StatusFilter) ?? 'TODOS'
@@ -76,6 +84,79 @@ export default async function MembrosPage({
   ])
 
   const totalPaginas = Math.ceil(total / porPagina)
+
+  // Alerta informativo: sócio (desta página) já aprovado como sócio em torcida
+  // rival. Select mínimo — nunca trazer nome/prova de outro tenant; o client
+  // recebe só um booleano, sem identificar a torcida rival.
+  const userIdsSocios = membros
+    .filter((m: (typeof membros)[number]) => m.tipo === 'SOCIO')
+    .map((m: (typeof membros)[number]) => m.userId)
+  let userIdsComRivalSocio = new Set<string>()
+  if (userIdsSocios.length > 0) {
+    const sociosOutrosTenants: { userId: string; tenantId: string }[] =
+      await db.saasMembro.findMany({
+        where: {
+          userId: { in: userIdsSocios },
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          tenantId: { not: tenant.id },
+        },
+        select: { userId: true, tenantId: true },
+      })
+    const outrosTenantIds = [...new Set(sociosOutrosTenants.map((s) => s.tenantId))]
+    const checagens = await Promise.all(
+      outrosTenantIds.map(
+        async (id) => [id, await tenantsAreRivais(tenant.id, id)] as const,
+      ),
+    )
+    const tenantsRivais = new Set(checagens.filter(([, rival]) => rival).map(([id]) => id))
+    userIdsComRivalSocio = new Set(
+      sociosOutrosTenants.filter((s) => tenantsRivais.has(s.tenantId)).map((s) => s.userId),
+    )
+  }
+
+  // Histórico de tentativas via AuditLog (sem mudar schema): conta solicitações
+  // e recupera o motivo da última reprovação para informar a decisão do admin.
+  const membroIds = membros.map((m: (typeof membros)[number]) => m.id)
+  type LogMembro = {
+    entidadeId: string | null
+    acao: string
+    detalhes: unknown
+    criadoEm: Date
+  }
+  const logsMembros: LogMembro[] =
+    membroIds.length > 0
+      ? await db.auditLog.findMany({
+          where: {
+            tenantId: tenant.id,
+            entidade: 'SaasMembro',
+            entidadeId: { in: membroIds },
+            acao: { in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'] },
+          },
+          orderBy: { criadoEm: 'desc' },
+          select: { entidadeId: true, acao: true, detalhes: true, criadoEm: true },
+        })
+      : []
+  const tentativasPorMembro = new Map<string, number>()
+  const motivoReprovacaoPorMembro = new Map<string, string>()
+  for (const log of logsMembros) {
+    if (!log.entidadeId) continue
+    if (log.acao === 'CADASTRO_SOLICITADO' || log.acao === 'RECADASTRO_SOLICITADO') {
+      tentativasPorMembro.set(log.entidadeId, (tentativasPorMembro.get(log.entidadeId) ?? 0) + 1)
+    }
+    // Logs em ordem decrescente — o primeiro MEMBRO_REPROVADO é o mais recente.
+    if (log.acao === 'MEMBRO_REPROVADO' && !motivoReprovacaoPorMembro.has(log.entidadeId)) {
+      const detalhes = log.detalhes
+      if (
+        detalhes &&
+        typeof detalhes === 'object' &&
+        'motivo' in detalhes &&
+        typeof (detalhes as { motivo: unknown }).motivo === 'string'
+      ) {
+        motivoReprovacaoPorMembro.set(log.entidadeId, (detalhes as { motivo: string }).motivo)
+      }
+    }
+  }
 
   const count: Record<string, number> = { PENDENTE: 0, APROVADO: 0, REPROVADO: 0 }
   for (const c of contagens) count[c.status] = c._count
@@ -146,6 +227,7 @@ export default async function MembrosPage({
         <AdminMembrosTable
           membros={membros.map((membro: (typeof membros)[number]) => {
             const badge = STATUS_BADGE[membro.status]
+            const isSocio = membro.tipo === 'SOCIO'
             return {
               id: membro.id,
               nome: membro.nome,
@@ -158,6 +240,14 @@ export default async function MembrosPage({
               criadoEmLabel: new Date(membro.criadoEm).toLocaleDateString('pt-BR'),
               avatarUrl: membro.user.avatarUrl,
               inicial: membro.nome.charAt(0).toUpperCase(),
+              telefone: membro.telefone,
+              idade: membro.idade,
+              // Prova de vínculo só existe/importa para sócio (dado RESTRITO).
+              imagemProva: isSocio ? membro.imagemProva : null,
+              numeroAssociado: isSocio ? membro.numeroAssociado : null,
+              alertaRivalSocio: isSocio && userIdsComRivalSocio.has(membro.userId),
+              tentativas: tentativasPorMembro.get(membro.id) ?? 1,
+              ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
             }
           })}
         />
