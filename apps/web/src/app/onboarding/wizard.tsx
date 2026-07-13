@@ -3,10 +3,11 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
+import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
@@ -17,7 +18,9 @@ import {
   buscarAfiliacoes,
   buscarTorcidas,
   buscarDepartamentos,
+  registrarInteresseUnidade,
 } from './actions'
+import { agruparSedesPorRegiao } from '@/lib/onboarding-unidade'
 import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
@@ -26,12 +29,13 @@ import type {
   RegiaoOnboarding,
 } from '@/lib/onboarding'
 
-type Passo = 'clube' | 'regiao' | 'torcida' | 'vinculo' | 'concluindo'
+type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
 const PASSOS_VISIVEIS: { key: Passo; label: string }[] = [
   { key: 'clube', label: 'Clube' },
   { key: 'regiao', label: 'Região' },
   { key: 'torcida', label: 'Torcida' },
+  { key: 'unidade', label: 'Unidade' },
   { key: 'vinculo', label: 'Vínculo' },
 ]
 
@@ -67,6 +71,8 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   const [uf, setUf] = useState('')
   const [cidade, setCidade] = useState('')
   const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(null)
+  const [unidadeId, setUnidadeId] = useState<string | null>(null)
+  const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
 
@@ -102,6 +108,15 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   // ── Passo 3: escolher torcida ou seguir como torcedor global ─────────────────
   function escolherTorcida(t: TorcidaOnboarding) {
     setTorcida(t)
+    setUnidadeId(null)
+    setUnidadeNaoListada(false)
+    limparErro()
+    irPara('unidade', 1)
+  }
+
+  function confirmarUnidade(sedeId: string | null, naoListada: boolean) {
+    setUnidadeId(sedeId)
+    setUnidadeNaoListada(naoListada)
     limparErro()
     irPara('vinculo', 1)
   }
@@ -204,6 +219,29 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
             </m.div>
           )}
 
+          {passo === 'unidade' && torcida && (
+            <m.div
+              key="unidade"
+              custom={slideDir}
+              variants={routePage}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={springGentle}
+            >
+              <PassoUnidade
+                torcida={torcida}
+                uf={uf}
+                cidade={cidade}
+                regiaoLabel={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
+                pending={pending}
+                onConfirmar={confirmarUnidade}
+                onVoltar={() => irPara('torcida', -1)}
+                onErro={setErro}
+              />
+            </m.div>
+          )}
+
           {passo === 'vinculo' && torcida && (
             <m.div
               key="vinculo"
@@ -217,7 +255,9 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               <PassoVinculo
                 torcida={torcida}
                 nomeInicial={nomeInicial}
-                onVoltar={() => irPara('torcida', -1)}
+                unidadeId={unidadeId}
+                unidadeNaoListada={unidadeNaoListada}
+                onVoltar={() => irPara('unidade', -1)}
                 onErro={setErro}
               />
             </m.div>
@@ -601,16 +641,208 @@ function PassoTorcida({
   )
 }
 
-// ─── Passo 4: Vínculo (torcedor da torcida ou sócio) ────────────────────────────
+// ─── Passo 4: Unidade territorial (subsede / PDE) ─────────────────────────────
+
+function PassoUnidade({
+  torcida,
+  uf,
+  cidade,
+  regiaoLabel,
+  pending,
+  onConfirmar,
+  onVoltar,
+  onErro,
+}: {
+  torcida: TorcidaOnboarding
+  uf: string
+  cidade: string
+  regiaoLabel?: string
+  pending: boolean
+  onConfirmar: (sedeId: string | null, naoListada: boolean) => void
+  onVoltar: () => void
+  onErro: (m: string | null) => void
+}) {
+  const [selecionada, setSelecionada] = useState<string | null>(null)
+  const [modoNaoListada, setModoNaoListada] = useState(false)
+  const [observacao, setObservacao] = useState('')
+  const [enviando, startEnvio] = useTransition()
+
+  const { recomendadas, outras } = agruparSedesPorRegiao(torcida.sedes, uf, cidade)
+  const temUnidades = torcida.sedes.length > 0
+
+  function selecionarUnidade(id: string) {
+    setModoNaoListada(false)
+    setSelecionada(id)
+  }
+
+  function avancarComUnidade() {
+    if (!selecionada) {
+      onErro('Selecione a subsede ou ponto de encontro onde você participa.')
+      return
+    }
+    onConfirmar(selecionada, false)
+  }
+
+  function avancarSemListagem() {
+    onErro(null)
+    startEnvio(async () => {
+      const res = await registrarInteresseUnidade({
+        tenantId: torcida.id,
+        regiao: regiaoLabel,
+        observacao: observacao || undefined,
+      })
+      if (res.message || res.errors) {
+        onErro(res.message ?? 'Não foi possível registrar seu interesse. Tente novamente.')
+        return
+      }
+      onConfirmar(null, true)
+    })
+  }
+
+  return (
+    <div>
+      <BotaoVoltar onClick={onVoltar} disabled={pending || enviando} />
+      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+        Onde você participa na {torcida.nome}?
+      </h1>
+      <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+        Informe a subsede ou ponto de encontro da sua região. Isso ajuda a mapear a estrutura
+        territorial da torcida com dados precisos.
+      </p>
+      {regiaoLabel && (
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+          Sua região informada: <span className="font-medium text-[rgb(var(--foreground))]">{regiaoLabel}</span>
+        </p>
+      )}
+
+      {!temUnidades ? (
+        <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Ainda não há subsedes ou pontos de encontro cadastrados para esta torcida na plataforma.
+        </div>
+      ) : (
+        <div className="mt-6 space-y-6">
+          {recomendadas.length > 0 && (
+            <ListaUnidades
+              titulo="Recomendadas para você"
+              subtitulo="Subsedes e pontos de encontro próximos da sua região, com a sede principal ao final"
+              sedes={recomendadas}
+              selecionada={selecionada}
+              onSelecionar={selecionarUnidade}
+            />
+          )}
+          {outras.length > 0 && (
+            <ListaUnidades
+              titulo="Outras unidades"
+              sedes={outras}
+              selecionada={selecionada}
+              onSelecionar={selecionarUnidade}
+            />
+          )}
+        </div>
+      )}
+
+      {selecionada && !modoNaoListada && (
+        <div className="mt-6">
+          <BotaoPrimario onClick={avancarComUnidade} pending={pending} label="Continuar" />
+        </div>
+      )}
+
+      <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-4">
+        <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+          Minha unidade não está listada
+        </p>
+        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+          A liderança da subsede ou ponto de encontro pode entrar em contato com nosso time para
+          cadastrar a unidade e comprovar o vínculo com a sede da torcida.
+        </p>
+        {!modoNaoListada ? (
+          <button
+            type="button"
+            onClick={() => {
+              setModoNaoListada(true)
+              setSelecionada(null)
+              onErro(null)
+            }}
+            className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
+          >
+            <Mail className="h-4 w-4" />
+            Solicitar cadastro da minha unidade
+          </button>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <Campo label="Conte mais sobre sua unidade (opcional)">
+              <Input
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                placeholder="Ex: Barril Zona Norte, embaixada em Campinas..."
+              />
+            </Campo>
+            <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+              Registramos sua solicitação para o time de desenvolvimento. Você pode seguir o
+              onboarding e informar a unidade depois, quando ela for validada.
+            </p>
+            <BotaoPrimario
+              onClick={avancarSemListagem}
+              pending={enviando}
+              label="Continuar sem unidade listada"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ListaUnidades({
+  titulo,
+  subtitulo,
+  sedes,
+  selecionada,
+  onSelecionar,
+}: {
+  titulo: string
+  subtitulo?: string
+  sedes: SedeOnboarding[]
+  selecionada: string | null
+  onSelecionar: (id: string) => void
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+        {titulo}
+      </p>
+      {subtitulo && (
+        <p className="mb-3 text-[10px] text-[rgb(var(--foreground-muted))]">{subtitulo}</p>
+      )}
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {sedes.map((s) => (
+          <li key={s.id}>
+            <UnidadeOnboardingCard
+              sede={s}
+              selecionada={selecionada === s.id}
+              onSelecionar={onSelecionar}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ─── Passo 5: Vínculo (torcedor da torcida ou sócio) ────────────────────────────
 
 function PassoVinculo({
   torcida,
   nomeInicial,
+  unidadeId,
+  unidadeNaoListada,
   onVoltar,
   onErro,
 }: {
   torcida: TorcidaOnboarding
   nomeInicial: string
+  unidadeId: string | null
+  unidadeNaoListada: boolean
   onVoltar: () => void
   onErro: (m: string | null) => void
 }) {
@@ -628,13 +860,11 @@ function PassoVinculo({
   const [imagemProva, setImagemProva] = useState<string | undefined>()
   const [uploadPend, setUploadPend] = useState(false)
 
-  // Vínculo territorial: quando a torcida tem mais de uma unidade ativa, o
-  // associado precisa escolher a sua (a Server Action exige isso e, sem o
-  // seletor, o fluxo travava silenciosamente — ver onboarding.ts).
-  const [unidadeId, setUnidadeId] = useState('')
-  const precisaEscolherUnidade = torcida.sedes.length > 1
-
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
+
+  const unidadeSelecionada = unidadeId
+    ? torcida.sedes.find((s) => s.id === unidadeId)
+    : null
 
   function abrirSocio() {
     onErro(null)
@@ -650,8 +880,8 @@ function PassoVinculo({
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
     setErrosCampo({})
-    if (precisaEscolherUnidade && !unidadeId) {
-      onErro('Selecione a unidade da torcida para continuar.')
+    if (!unidadeNaoListada && torcida.sedes.length > 1 && !unidadeId) {
+      onErro('Volte e selecione sua subsede ou ponto de encontro.')
       return
     }
     if (!imagemProva) {
@@ -669,7 +899,8 @@ function PassoVinculo({
         numeroAssociado: numeroAssociado || undefined,
         imagemProva,
         departamentoId: departamentoId || undefined,
-        sedeId: unidadeId || undefined,
+        sedeId: unidadeId ?? undefined,
+        unidadeNaoListada,
       })
       // Sucesso redireciona no servidor; se retornou, houve erro/validação.
       if (res?.errors) {
@@ -713,10 +944,23 @@ function PassoVinculo({
           </p>
         )}
 
-        {precisaEscolherUnidade && (
-          <div className="mt-6">
-            <SeletorUnidade sedes={torcida.sedes} value={unidadeId} onChange={setUnidadeId} />
-          </div>
+        {(unidadeSelecionada || unidadeNaoListada) && (
+          <p className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            {unidadeNaoListada ? (
+              <>
+                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span> cadastro
+                solicitado — seguiremos com seu vínculo enquanto validamos a subsede/PDE.
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span>{' '}
+                {unidadeSelecionada?.nome}
+                {unidadeSelecionada?.tipo
+                  ? ` (${TIPO_SEDE_LABEL[unidadeSelecionada.tipo] ?? unidadeSelecionada.tipo})`
+                  : ''}
+              </>
+            )}
+          </p>
         )}
 
         <div className="mt-6">

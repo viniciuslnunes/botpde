@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'res.cloudinary.com' },
       { protocol: 'https', hostname: 'gavioes.jetassets.com.br' },
       { protocol: 'https', hostname: 'www.lojagavioes.com.br' },
+      { protocol: 'https', hostname: 'maps.googleapis.com' },
     ],
   },
 }

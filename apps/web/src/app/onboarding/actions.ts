@@ -159,9 +159,68 @@ const solicitarVinculoSchema = z.object({
     .max(64)
     .optional()
     .or(z.literal('').transform(() => undefined)),
+  unidadeNaoListada: z.boolean().optional(),
 })
 
 export type SolicitarVinculoInput = z.input<typeof solicitarVinculoSchema>
+
+const interesseUnidadeSchema = z.object({
+  tenantId: z.string().uuid('Torcida inválida'),
+  regiao: z
+    .string()
+    .max(120)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  observacao: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+})
+
+/**
+ * Registra interesse em cadastrar subsede/PDE ausente no onboarding.
+ * A liderança local pode comprovar vínculo com a sede para inclusão na base.
+ */
+export async function registrarInteresseUnidade(input: {
+  tenantId: string
+  regiao?: string
+  observacao?: string
+}): Promise<OnboardingActionState> {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return { message: 'Você precisa estar logado.' }
+  }
+
+  const parsed = interesseUnidadeSchema.safeParse(input)
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  const tenant = await db.tenant.findFirst({
+    where: { id: parsed.data.tenantId, ativo: true },
+    select: { id: true, nome: true },
+  })
+  if (!tenant) {
+    return { message: 'Torcida não encontrada.' }
+  }
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'UNIDADE_CADASTRO_SOLICITADO',
+      entidade: 'Sede',
+      detalhes: {
+        regiao: parsed.data.regiao ?? null,
+        observacao: parsed.data.observacao ?? null,
+        origem: 'onboarding',
+      },
+    },
+  })
+
+  return { ok: true }
+}
 
 /**
  * Cria (ou reenvia, se REPROVADO) um SaasMembro PENDENTE no tenant escolhido,
@@ -213,10 +272,13 @@ export async function solicitarVinculo(
   if (sedesDoTenant.length === 1) {
     sedeId = sedesDoTenant[0].id
   } else if (sedesDoTenant.length > 1) {
-    if (!data.sedeId || !sedesDoTenant.some((s) => s.id === data.sedeId)) {
+    if (data.unidadeNaoListada) {
+      sedeId = undefined
+    } else if (!data.sedeId || !sedesDoTenant.some((s) => s.id === data.sedeId)) {
       return { errors: { sedeId: ['Selecione sua unidade'] } }
+    } else {
+      sedeId = data.sedeId
     }
-    sedeId = data.sedeId
   }
   dadosMembro.sedeId = sedeId
 

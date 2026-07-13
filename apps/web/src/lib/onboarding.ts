@@ -136,7 +136,14 @@ function compararClubesOnboarding(a: AfiliacaoOnboarding, b: AfiliacaoOnboarding
 export type SedeOnboarding = {
   id: string
   nome: string
-  tipo: string
+  tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade: string | null
+  estado: string | null
+  endereco: string | null
+  sedePaiId: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
 }
 
 export type TorcidaOnboarding = {
@@ -360,6 +367,18 @@ export const getTorcidasPorAfiliacao = cache(
       if (afiliacaoIds.length === 0) afiliacaoIds = [afiliacaoId]
     }
 
+    type SedeRow = {
+      id: string
+      nome: string
+      tipo: string
+      cidade: string | null
+      estado: string | null
+      endereco: string | null
+      sedeId: string | null
+      lat: number | null
+      lng: number | null
+      fotoUrl: string | null
+    }
     type TenantComContagem = {
       id: string
       nome: string
@@ -369,7 +388,7 @@ export const getTorcidasPorAfiliacao = cache(
       torcidaConhecidaId: string | null
       torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
-      sedes: SedeOnboarding[]
+      sedes: SedeRow[]
     }
     const tenants: TenantComContagem[] = await db.tenant.findMany({
       where: { afiliacaoId: { in: afiliacaoIds }, ativo: true },
@@ -384,7 +403,18 @@ export const getTorcidasPorAfiliacao = cache(
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
         sedes: {
           where: { ativa: true },
-          select: { id: true, nome: true, tipo: true },
+          select: {
+            id: true,
+            nome: true,
+            tipo: true,
+            cidade: true,
+            estado: true,
+            endereco: true,
+            sedeId: true,
+            lat: true,
+            lng: true,
+            fotoUrl: true,
+          },
           orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
         },
       },
@@ -410,7 +440,18 @@ export const getTorcidasPorAfiliacao = cache(
         logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
         corPrimaria: t.corPrimaria,
         membrosAprovados: t._count.membros,
-        sedes: t.sedes,
+        sedes: t.sedes.map((s) => ({
+          id: s.id,
+          nome: s.nome,
+          tipo: s.tipo as SedeOnboarding['tipo'],
+          cidade: s.cidade,
+          estado: s.estado,
+          endereco: s.endereco,
+          sedePaiId: s.sedeId,
+          lat: s.lat,
+          lng: s.lng,
+          fotoUrl: s.fotoUrl,
+        })),
         stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
       }))

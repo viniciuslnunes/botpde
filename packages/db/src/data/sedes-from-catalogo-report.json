@@ -1,0 +1,293 @@
+{
+  "geradoEm": "2026-07-13T05:53:31.552Z",
+  "torcidasBrasil": {
+    "total": 32,
+    "comMatchCatalogo": 25,
+    "comSede": 25,
+    "comSubsedes": 12,
+    "comEnderecoCompleto": 19,
+    "semSede": 7,
+    "slugsSemSede": [
+      "furia-caterva",
+      "torcida-jovem-avai",
+      "torcida-jovem-figueirense",
+      "trem-bala-fortaleza",
+      "esquadrao-tricolor-bahia",
+      "barra-brava-sport",
+      "inferno-verde-goias"
+    ],
+    "slugsSemMatchCatalogo": [
+      "furia-caterva",
+      "torcida-jovem-avai",
+      "torcida-jovem-figueirense",
+      "trem-bala-fortaleza",
+      "esquadrao-tricolor-bahia",
+      "barra-brava-sport",
+      "inferno-verde-goias"
+    ]
+  },
+  "catalogoScraper_clubesTorcidasBrasil": {
+    "total": 114,
+    "comSede": 114,
+    "comSubsedes": 54,
+    "comEnderecoCompleto": 73
+  },
+  "cruzamento": [
+    {
+      "slug": "pde-gavioes-fiel",
+      "nome": "Gaviões da Fiel",
+      "clube": "Corinthians",
+      "matchNome": "GAVIÕES DA FIEL TORCIDA",
+      "sede": "Rua Cristina Tomaz, 183 - Bom Retiro, São Paulo - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "camisa-12-corinthians",
+      "nome": "Camisa 12",
+      "clube": "Corinthians",
+      "matchNome": "FIEL TORCIDA JOVEM CAMISA 12",
+      "sede": "Paulo Andrighetti, 417 - Pari - São Paulo - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "pavilhao-nove",
+      "nome": "Pavilhão Nove",
+      "clube": "Corinthians",
+      "matchNome": "PAVILHÃO NOVE",
+      "sede": "Avenida dos Remédios 90, Vila dos Remédios, São Paulo",
+      "subsedes": null
+    },
+    {
+      "slug": "mancha-alviverde",
+      "nome": "Mancha Alviverde",
+      "clube": "Palmeiras",
+      "matchNome": "MANCHA ALVI-VERDE",
+      "sede": "Rua Turiassu, 1.777 - Perdizes, São Paulo - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "tup-palmeiras",
+      "nome": "TUP — Torcida Uniformizada do Palmeiras",
+      "clube": "Palmeiras",
+      "matchNome": "TORCIDA UNIFORMIZADA DO PALMEIRAS",
+      "sede": "Praça Luís Carlos de Mesquita, 52 Barra Funda - São Paulo - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "tti-sao-paulo",
+      "nome": "Torcida Tricolor Independente",
+      "clube": "São Paulo FC",
+      "matchNome": "TORCIDA TRICOLOR INDEPENDENTE",
+      "sede": "Rua 24 de Maio, 116, Sala 4, 1º andar, Centro, São Paulo - SP",
+      "subsedes": "Lados"
+    },
+    {
+      "slug": "dragoes-da-real",
+      "nome": "Dragões da Real",
+      "clube": "São Paulo FC",
+      "matchNome": "TORCIDA DRAGÕES DA REAL",
+      "sede": "Avenida Prestes Maia, 241, 2º andar, sala 206, Centro, São Paulo - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "torcida-jovem-santos",
+      "nome": "Torcida Jovem do Santos",
+      "clube": "Santos",
+      "matchNome": "SANGUE JOVEM SANTOS",
+      "sede": "Rua Tiradentes, 06, Vila Belmiro, Santos - SP",
+      "subsedes": "Núcleos"
+    },
+    {
+      "slug": "furia-independente-guarani",
+      "nome": "Fúria Independente",
+      "clube": "Guarani",
+      "matchNome": "TORCIDA FÚRIA INDEPENDENTE",
+      "sede": "Rua alaíde do nascimento, 875, Campinas - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "raca-tricolor-paulista",
+      "nome": "Raça Tricolor",
+      "clube": "Paulista",
+      "matchNome": "TORCIDA UNIFORMIZADA RAÇA TRICOLOR",
+      "sede": "Jundiaí - SP",
+      "subsedes": null
+    },
+    {
+      "slug": "torcida-jovem-flamengo",
+      "nome": "Torcida Jovem do Flamengo",
+      "clube": "Flamengo",
+      "matchNome": "TORCIDA FLA MANGUAÇA",
+      "sede": "Rua Ferreira Leite, 547 - Abolição, Rio de Janeiro - RJ",
+      "subsedes": "Botequins"
+    },
+    {
+      "slug": "raca-rubro-negra",
+      "nome": "Raça Rubro-Negra",
+      "clube": "Flamengo",
+      "matchNome": "RAÇA RUBRO-NEGRA",
+      "sede": "Rua Evaristo da Veiga, 47/408 - Centro - RJ",
+      "subsedes": "Regiões"
+    },
+    {
+      "slug": "forca-jovem-vasco",
+      "nome": "Força Jovem do Vasco",
+      "clube": "Vasco",
+      "matchNome": "FORÇA INDEPENDENTE DO VASCO",
+      "sede": "Rua General Almérico de Moura, 131, Vasco da Gama - RJ",
+      "subsedes": null
+    },
+    {
+      "slug": "young-flu",
+      "nome": "Young Flu",
+      "clube": "Fluminense",
+      "matchNome": "TORCIDA YOUNG FLU",
+      "sede": "Rua Sobral, 27, Méier - Rio de Janeiro - RJ",
+      "subsedes": "Núcleos"
+    },
+    {
+      "slug": "forca-flu",
+      "nome": "Força Flu",
+      "clube": "Fluminense",
+      "matchNome": "TORCIDA ORGANIZADA FORÇA FLU",
+      "sede": "Centro - RJ",
+      "subsedes": "Comandos"
+    },
+    {
+      "slug": "furia-jovem-botafogo",
+      "nome": "Fúria Jovem do Botafogo",
+      "clube": "Botafogo",
+      "matchNome": "FÚRIA JOVEM DO BOTAFOGO",
+      "sede": "Rua do Acre, 51, sala 304 - Centro - RJ",
+      "subsedes": "Canis"
+    },
+    {
+      "slug": "galoucura",
+      "nome": "Galoucura",
+      "clube": "Atlético-MG",
+      "matchNome": "GALÖ METAL TORCIDA ORGANIZADA",
+      "sede": "Caixa Postal: 2446 Cep: 30112-970 - Belo Horizonte - MG",
+      "subsedes": null
+    },
+    {
+      "slug": "mafia-azul",
+      "nome": "Máfia Azul",
+      "clube": "Cruzeiro",
+      "matchNome": "MÁFIA AZUL",
+      "sede": "Rua Timbiras, 2878, Barro Preto, Belo Horizonte - MG",
+      "subsedes": "Comandos"
+    },
+    {
+      "slug": "pavilhao-independente-cruzeiro",
+      "nome": "Pavilhão Independente",
+      "clube": "Cruzeiro",
+      "matchNome": "TORCIDA PAVILHÃO INDEPENDENTE",
+      "sede": "Belo Horizonte - MG",
+      "subsedes": null
+    },
+    {
+      "slug": "seita-verde",
+      "nome": "Seita Verde",
+      "clube": "América-MG",
+      "matchNome": "TORCIDA SEITA VERDE",
+      "sede": "Bairro Floresta - Belo Horizonte - MG",
+      "subsedes": null
+    },
+    {
+      "slug": "geral-do-gremio",
+      "nome": "Geral do Grêmio",
+      "clube": "Grêmio",
+      "matchNome": "TORCIDA JOVEM DO GRÊMIO",
+      "sede": "Avenida Carlos Barbosa, 1086, Porto Alegre - RS",
+      "subsedes": "Arrastões"
+    },
+    {
+      "slug": "torcida-jovem-gremio",
+      "nome": "Torcida Jovem do Grêmio",
+      "clube": "Grêmio",
+      "matchNome": "TORCIDA RASTA DO GRÊMIO",
+      "sede": "Imbé - RS",
+      "subsedes": null
+    },
+    {
+      "slug": "camisa-12-inter",
+      "nome": "Camisa 12",
+      "clube": "Internacional",
+      "matchNome": "TORCIDA ORGANIZADA CAMISA 12",
+      "sede": "Avenida Padre Cacique, 924, Loja 2, Porto Alegre - RS",
+      "subsedes": "Comandos"
+    },
+    {
+      "slug": "falange-grena-caxias",
+      "nome": "Falange Grená",
+      "clube": "Caxias",
+      "matchNome": "FORÇA INDEPENDENTE FALANGE GRENÁ",
+      "sede": "Rua Cristoforo Random, 171, Bairro Marechal Floriano, Caxias do Sul - RS",
+      "subsedes": "Comandos"
+    },
+    {
+      "slug": "imperio-alviverde",
+      "nome": "Império Alviverde",
+      "clube": "Coritiba",
+      "matchNome": "TORCIDA ORGANIZADA IMPÉRIO ALVIVERDE",
+      "sede": "Rua Mauá Caixa postal: 13526 - Curitiba",
+      "subsedes": "Comandos (Extintos)"
+    },
+    {
+      "slug": "furia-caterva",
+      "nome": "Fúria Caterva",
+      "clube": "Athletico-PR",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "torcida-jovem-avai",
+      "nome": "Torcida Jovem do Avaí",
+      "clube": "Avaí",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "torcida-jovem-figueirense",
+      "nome": "Torcida Jovem do Figueirense",
+      "clube": "Figueirense",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "trem-bala-fortaleza",
+      "nome": "Trem-Bala",
+      "clube": "Fortaleza",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "esquadrao-tricolor-bahia",
+      "nome": "Esquadrão Tricolor",
+      "clube": "Bahia",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "barra-brava-sport",
+      "nome": "Barra Brava",
+      "clube": "Sport",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    },
+    {
+      "slug": "inferno-verde-goias",
+      "nome": "Inferno Verde",
+      "clube": "Goiás",
+      "matchNome": null,
+      "sede": null,
+      "subsedes": null
+    }
+  ]
+}

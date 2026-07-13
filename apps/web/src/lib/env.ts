@@ -63,6 +63,8 @@ const clientSchema = z.object({
   // DSN do Sentry — não é segredo (só permite enviar eventos, não lê-los).
   // Ausente = SDK inicializa em no-op, sem lançar erro.
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  /** Street View Static API — opcional; cards de unidade degradam sem key */
+  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
 })
 
 // ── Validação ─────────────────────────────────────────────────────────────────
@@ -90,6 +92,7 @@ function validateEnv() {
       HOSTNAME: '0.0.0.0',
       NEXT_PUBLIC_API_URL: undefined,
       NEXT_PUBLIC_SENTRY_DSN: undefined,
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: undefined,
     }
   }
 
