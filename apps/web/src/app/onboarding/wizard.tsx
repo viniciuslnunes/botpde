@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
@@ -23,7 +23,7 @@ import {
 } from './actions'
 import { ComboboxCidade } from './combobox-cidade'
 import { agruparSedesPorRegiao, normalizarTexto } from '@/lib/onboarding-unidade'
-import { reverseGeocodeRegion, type GoogleMapsRegion } from '@/lib/google-maps'
+import { buildGoogleMapsUrl, reverseGeocodeRegion, type GoogleMapsRegion } from '@/lib/google-maps'
 import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
@@ -268,6 +268,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               <PassoVinculo
                 torcida={torcida}
                 nomeInicial={nomeInicial}
+                regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
                 onVoltar={() => irPara('unidade', -1)}
@@ -1108,9 +1109,30 @@ function ListaUnidades({
 
 // ─── Passo 5: Vínculo (torcedor da torcida ou sócio) ────────────────────────────
 
+/** Máscara progressiva de telefone BR: (XX) XXXX-XXXX ou (XX) XXXXX-XXXX. */
+function maskTelefone(raw: string): string {
+  const digitos = raw.replace(/\D/g, '').slice(0, 11)
+  if (digitos.length === 0) return ''
+  if (digitos.length <= 2) return `(${digitos}`
+  const ddd = digitos.slice(0, 2)
+  const resto = digitos.slice(2)
+  // 11 dígitos → celular (5+4); até 10 → fixo (4+4), formatando o que já foi digitado.
+  const corte = digitos.length > 10 ? 5 : 4
+  if (resto.length <= corte) return `(${ddd}) ${resto}`
+  return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`
+}
+
+/** Máscara progressiva de CEP: 00000-000. */
+function maskCep(raw: string): string {
+  const digitos = raw.replace(/\D/g, '').slice(0, 8)
+  if (digitos.length <= 5) return digitos
+  return `${digitos.slice(0, 5)}-${digitos.slice(5)}`
+}
+
 function PassoVinculo({
   torcida,
   nomeInicial,
+  regiao,
   unidadeId,
   unidadeNaoListada,
   onVoltar,
@@ -1118,6 +1140,7 @@ function PassoVinculo({
 }: {
   torcida: TorcidaOnboarding
   nomeInicial: string
+  regiao: string | undefined
   unidadeId: string | null
   unidadeNaoListada: boolean
   onVoltar: () => void
@@ -1131,13 +1154,21 @@ function PassoVinculo({
   const [nome, setNome] = useState(nomeInicial)
   const [idade, setIdade] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [cidade, setCidade] = useState('')
+  const [cep, setCep] = useState('')
+  const [numero, setNumero] = useState('')
+  const [bloco, setBloco] = useState('')
+  const [complemento, setComplemento] = useState('')
   const [numeroAssociado, setNumeroAssociado] = useState('')
+  const [anosSocio, setAnosSocio] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [imagemProva, setImagemProva] = useState<string | undefined>()
   const [uploadPend, setUploadPend] = useState(false)
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
+  // "Torcedor" é o departamento auxiliar criado ao aprovar torcedores — não faz
+  // sentido como opção de atuação para quem se candidata a sócio.
+  const departamentosSelecionaveis =
+    departamentos === null ? null : departamentos.filter((d) => d.nome !== 'Torcedor')
 
   const unidadeSelecionada = unidadeId
     ? torcida.sedes.find((s) => s.id === unidadeId)
@@ -1163,10 +1194,24 @@ function PassoVinculo({
       onErro('Volte e selecione sua subsede ou ponto de encontro.')
       return
     }
-    // Só o vínculo de sócio exige comprovação — torcedor entra direto.
-    if (tipo === 'SOCIO' && !imagemProva) {
-      onErro('Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.')
-      return
+    // Só o vínculo de sócio exige comprovação e os dados de associado — torcedor entra direto.
+    if (tipo === 'SOCIO') {
+      if (!imagemProva) {
+        onErro('Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.')
+        return
+      }
+      if (!numeroAssociado) {
+        onErro('Informe seu número de associado.')
+        return
+      }
+      if (!anosSocio) {
+        onErro('Informe há quantos anos é sócio da torcida.')
+        return
+      }
+      if (!cep) {
+        onErro('Informe seu CEP.')
+        return
+      }
     }
     startTransition(async () => {
       const res = await solicitarVinculo({
@@ -1175,8 +1220,13 @@ function PassoVinculo({
         nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
         idade: idade || undefined,
         telefone: telefone || undefined,
-        cidade: cidade || undefined,
+        cidade: regiao || undefined,
+        cep: cep || undefined,
+        numero: numero || undefined,
+        bloco: bloco || undefined,
+        complemento: complemento || undefined,
         numeroAssociado: numeroAssociado || undefined,
+        anosSocio: anosSocio || undefined,
         imagemProva,
         departamentoId: departamentoId || undefined,
         sedeId: unidadeId ?? undefined,
@@ -1224,24 +1274,11 @@ function PassoVinculo({
           </p>
         )}
 
-        {(unidadeSelecionada || unidadeNaoListada) && (
-          <p className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-            {unidadeNaoListada ? (
-              <>
-                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span> cadastro
-                solicitado — seguiremos com seu vínculo enquanto validamos a subsede/PDE.
-              </>
-            ) : (
-              <>
-                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span>{' '}
-                {unidadeSelecionada?.nome}
-                {unidadeSelecionada?.tipo
-                  ? ` (${TIPO_SEDE_LABEL[unidadeSelecionada.tipo] ?? unidadeSelecionada.tipo})`
-                  : ''}
-              </>
-            )}
-          </p>
-        )}
+        <UnidadeInfoBox
+          unidadeSelecionada={unidadeSelecionada}
+          unidadeNaoListada={unidadeNaoListada}
+          className="mt-4"
+        />
 
         <div className="mt-6 space-y-3">
           <button
@@ -1281,30 +1318,21 @@ function PassoVinculo({
       // Formulário de sócio
       <div>
       <BotaoVoltar onClick={() => setModo('escolha')} disabled={pending} label="Voltar" />
-      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Solicitação de sócio</h1>
-      <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Preencha seus dados. A liderança da {torcida.nome} vai analisar.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Solicitação de sócio</h1>
+          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            Preencha seus dados. A liderança da {torcida.nome} vai analisar.
+          </p>
+        </div>
+        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="md" />
+      </div>
 
       <div className="mt-6 space-y-4">
-        {(unidadeSelecionada || unidadeNaoListada) && (
-          <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-            {unidadeNaoListada ? (
-              <>
-                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span> cadastro
-                solicitado — seguiremos com seu vínculo enquanto validamos a subsede/PDE.
-              </>
-            ) : (
-              <>
-                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span>{' '}
-                {unidadeSelecionada?.nome}
-                {unidadeSelecionada?.tipo
-                  ? ` (${TIPO_SEDE_LABEL[unidadeSelecionada.tipo] ?? unidadeSelecionada.tipo})`
-                  : ''}
-              </>
-            )}
-          </p>
-        )}
+        <UnidadeInfoBox
+          unidadeSelecionada={unidadeSelecionada}
+          unidadeNaoListada={unidadeNaoListada}
+        />
 
         <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
           <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
@@ -1312,27 +1340,84 @@ function PassoVinculo({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Campo label="Idade" erros={errosCampo.idade}>
-            <Input type="number" min={10} max={120} value={idade} onChange={(e) => setIdade(e.target.value)} placeholder="Ex: 25" />
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={idade}
+              onChange={(e) => setIdade(e.target.value.replace(/\D/g, '').slice(0, 3))}
+              placeholder="Ex: 25"
+            />
           </Campo>
           <Campo label="Telefone / WhatsApp" erros={errosCampo.telefone}>
-            <Input type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" />
+            <Input
+              type="tel"
+              maxLength={16}
+              value={telefone}
+              onChange={(e) => setTelefone(maskTelefone(e.target.value))}
+              placeholder="(11) 99999-9999"
+            />
+          </Campo>
+        </div>
+
+        {regiao && (
+          <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            <span className="font-medium text-[rgb(var(--foreground))]">Região:</span> {regiao}
+          </p>
+        )}
+
+        <Campo label="CEP" obrigatorio erros={errosCampo.cep}>
+          <Input
+            inputMode="numeric"
+            maxLength={9}
+            value={cep}
+            onChange={(e) => setCep(maskCep(e.target.value))}
+            placeholder="00000-000"
+          />
+        </Campo>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Campo label="Número" erros={errosCampo.numero}>
+            <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ex: 120" />
+          </Campo>
+          <Campo label="Bloco" erros={errosCampo.bloco}>
+            <Input value={bloco} onChange={(e) => setBloco(e.target.value)} placeholder="Opcional" />
+          </Campo>
+          <Campo label="Complemento" erros={errosCampo.complemento}>
+            <Input
+              value={complemento}
+              onChange={(e) => setComplemento(e.target.value)}
+              placeholder="Opcional"
+            />
           </Campo>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Campo label="Cidade" erros={errosCampo.cidade}>
-            <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: São Paulo" />
+          <Campo label="Nº de associado" obrigatorio erros={errosCampo.numeroAssociado}>
+            <Input
+              inputMode="numeric"
+              maxLength={7}
+              value={numeroAssociado}
+              onChange={(e) => setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))}
+              placeholder="Até 7 dígitos"
+            />
           </Campo>
-          <Campo label="Nº de associado" erros={errosCampo.numeroAssociado}>
-            <Input value={numeroAssociado} onChange={(e) => setNumeroAssociado(e.target.value)} placeholder="Se já tiver" />
+          <Campo label="Há quantos anos é sócio" obrigatorio erros={errosCampo.anosSocio}>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={anosSocio}
+              onChange={(e) => setAnosSocio(e.target.value)}
+              placeholder="Ex: 3"
+            />
           </Campo>
         </div>
 
-        {departamentos !== null && departamentos.length > 0 && (
+        {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
           <Campo label="Departamento de atuação" erros={errosCampo.departamentoId}>
             <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
               <option value="">Selecione (opcional)</option>
-              {departamentos.map((d) => (
+              {departamentosSelecionaveis.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.nome}
                 </option>
@@ -1363,7 +1448,7 @@ function PassoVinculo({
         <BotaoPrimario
           onClick={() => enviar('SOCIO')}
           pending={pending || uploadPend}
-          disabled={!imagemProva}
+          disabled={!imagemProva || !numeroAssociado || !anosSocio || !cep}
           label="Enviar solicitação"
         />
       </div>
@@ -1391,6 +1476,52 @@ const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'Ponto de encontro',
+}
+
+/** Info-box da unidade escolhida (ou pendente de cadastro), com link para o mapa. */
+function UnidadeInfoBox({
+  unidadeSelecionada,
+  unidadeNaoListada,
+  className,
+}: {
+  unidadeSelecionada: SedeOnboarding | null | undefined
+  unidadeNaoListada: boolean
+  className?: string
+}) {
+  if (!unidadeSelecionada && !unidadeNaoListada) return null
+  const mapsUrl = unidadeSelecionada ? buildGoogleMapsUrl(unidadeSelecionada) : null
+
+  return (
+    <p
+      className={`rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] ${className ?? ''}`}
+    >
+      {unidadeNaoListada ? (
+        <>
+          <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span> cadastro
+          solicitado — seguiremos com seu vínculo enquanto validamos a subsede/PDE.
+        </>
+      ) : (
+        <>
+          <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span>{' '}
+          {unidadeSelecionada?.nome}
+          {unidadeSelecionada?.tipo
+            ? ` (${TIPO_SEDE_LABEL[unidadeSelecionada.tipo] ?? unidadeSelecionada.tipo})`
+            : ''}
+          {mapsUrl && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Ver no mapa
+            </a>
+          )}
+        </>
+      )}
+    </p>
+  )
 }
 
 function BlocoImagemProva({

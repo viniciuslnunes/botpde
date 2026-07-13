@@ -348,6 +348,11 @@ model SaasMembro {
   telefone        String?
   cidade          String?
   numeroAssociado String?      @map("numero_associado")
+  anosSocio       Int?         @map("anos_socio")
+  cep             String?      @map("cep")
+  numero          String?      @map("numero")
+  bloco           String?      @map("bloco")
+  complemento     String?      @map("complemento")
   imagemProva     String?      @map("imagem_prova")
   status          StatusMembro @default(PENDENTE)
 

@@ -245,6 +245,7 @@ export default async function MembrosPage({
               // Prova de vínculo só existe/importa para sócio (dado RESTRITO).
               imagemProva: isSocio ? membro.imagemProva : null,
               numeroAssociado: isSocio ? membro.numeroAssociado : null,
+              anosSocio: isSocio ? membro.anosSocio : null,
               alertaRivalSocio: isSocio && userIdsComRivalSocio.has(membro.userId),
               tentativas: tentativasPorMembro.get(membro.id) ?? 1,
               ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),

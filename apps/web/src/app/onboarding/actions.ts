@@ -165,17 +165,49 @@ const solicitarVinculoSchema = z.object({
     .string()
     .max(20)
     .optional()
-    .transform((v) => v?.trim() || undefined),
+    .transform((v) => v?.trim() || undefined)
+    .refine((v) => v === undefined || /^\(\d{2}\) \d{4,5}-\d{4}$/.test(v), 'Telefone inválido'),
   cidade: z
     .string()
     .max(60)
     .optional()
     .transform((v) => v?.trim() || undefined),
-  numeroAssociado: z
+  // Obrigatório só para SOCIO (checado no `.superRefine` abaixo).
+  cep: z
     .string()
-    .max(40)
+    .trim()
+    .regex(/^\d{5}-?\d{3}$/, 'CEP inválido')
+    .optional(),
+  numero: z
+    .string()
+    .max(60)
     .optional()
     .transform((v) => v?.trim() || undefined),
+  bloco: z
+    .string()
+    .max(60)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  complemento: z
+    .string()
+    .max(60)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  // Obrigatório só para SOCIO (checado no `.superRefine` abaixo). Só dígitos —
+  // nenhuma torcida na base passa de 6 dígitos hoje; 7 dá folga sem abrir mão
+  // do formato numérico que o funil de aprovação usa para conferência.
+  numeroAssociado: z
+    .string()
+    .trim()
+    .max(7, 'Máximo 7 dígitos')
+    .regex(/^\d*$/, 'Use só números')
+    .optional()
+    .transform((v) => v || undefined),
+  // Obrigatório só para SOCIO — exigência aplicada no `.superRefine` abaixo.
+  anosSocio: z
+    .union([z.string(), z.number(), z.undefined()])
+    .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
+    .pipe(z.number().min(0, 'Valor inválido').max(100, 'Valor inválido').optional()),
   // Obrigatória só para SOCIO — exigência aplicada no `.superRefine` abaixo.
   // Torcedor da torcida entra sem comprovante (spec-onboarding §vínculo).
   imagemProva: z
@@ -197,11 +229,33 @@ const solicitarVinculoSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
   unidadeNaoListada: z.boolean().optional(),
 }).superRefine((data, ctx) => {
-  if (data.tipo === 'SOCIO' && !data.imagemProva) {
+  if (data.tipo !== 'SOCIO') return
+  if (!data.imagemProva) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['imagemProva'],
       message: 'Envie uma foto da carteirinha ou comprovante de vínculo',
+    })
+  }
+  if (!data.numeroAssociado) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['numeroAssociado'],
+      message: 'Informe seu número de associado',
+    })
+  }
+  if (data.anosSocio === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['anosSocio'],
+      message: 'Informe há quantos anos é sócio',
+    })
+  }
+  if (!data.cep) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['cep'],
+      message: 'Informe seu CEP',
     })
   }
 })
@@ -406,7 +460,12 @@ export async function solicitarVinculo(
     idade: data.idade,
     telefone: data.telefone,
     cidade: data.cidade,
+    cep: data.cep,
+    numero: data.numero,
+    bloco: data.bloco,
+    complemento: data.complemento,
     numeroAssociado: data.numeroAssociado,
+    anosSocio: data.anosSocio,
     imagemProva: data.imagemProva,
     sedeId: undefined as string | undefined,
   }

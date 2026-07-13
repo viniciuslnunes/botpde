@@ -27,6 +27,7 @@ export interface AdminMembroItem {
   /** Comprovante de vínculo (só sócio; dado RESTRITO — nunca cachear). */
   imagemProva?: string | null
   numeroAssociado?: string | null
+  anosSocio?: number | null
   /** True quando o usuário já é sócio aprovado em torcida rival (sem identificá-la). */
   alertaRivalSocio?: boolean
   /** Nº de solicitações (cadastro + recadastros) registradas no AuditLog. */
@@ -143,6 +144,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                             imagemUrl={membro.imagemProva}
                             nome={membro.nome}
                             numeroAssociado={membro.numeroAssociado ?? null}
+                            anosSocio={membro.anosSocio ?? null}
                           />
                         </div>
                       )}

@@ -158,6 +158,46 @@ describe('solicitarVinculo — validação', () => {
     expect(membroCreate).not.toHaveBeenCalled()
   })
 
+  it('rejeita SOCIO sem numeroAssociado', async () => {
+    const r = await solicitarVinculo({ ...vinculoBase, tipo: 'SOCIO', anosSocio: 3, cep: '01310-100' })
+    expect(r.errors?.numeroAssociado).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejeita SOCIO sem anosSocio', async () => {
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      numeroAssociado: '123456',
+      cep: '01310-100',
+    })
+    expect(r.errors?.anosSocio).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejeita SOCIO sem cep', async () => {
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      numeroAssociado: '123456',
+      anosSocio: 3,
+    })
+    expect(r.errors?.cep).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejeita numeroAssociado com mais de 7 dígitos ou não numérico', async () => {
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      anosSocio: 3,
+      cep: '01310-100',
+      numeroAssociado: '12345678',
+    })
+    expect(r.errors?.numeroAssociado).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
   it('cria SaasMembro + AuditLog e conclui onboarding (torcedor, sem comprovante)', async () => {
     tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([{ id: 's1' }])
@@ -186,6 +226,9 @@ describe('solicitarVinculo — validação', () => {
         nome: 'Fulano da Silva',
         departamentoId: UUID2,
         imagemProva: PROVA_URL,
+        numeroAssociado: '123456',
+        anosSocio: 3,
+        cep: '01310-100',
       }),
     ).rejects.toThrow('REDIRECT')
     expect(userDepartamentoUpsert).toHaveBeenCalled()

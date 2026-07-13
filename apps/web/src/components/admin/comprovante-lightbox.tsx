@@ -12,10 +12,12 @@ export function ComprovanteLightbox({
   imagemUrl,
   nome,
   numeroAssociado,
+  anosSocio,
 }: {
   imagemUrl: string
   nome: string
   numeroAssociado: string | null
+  anosSocio?: number | null
 }) {
   const [aberto, setAberto] = useState(false)
   const [carregou, setCarregou] = useState(false)
@@ -51,6 +53,7 @@ export function ComprovanteLightbox({
                 </p>
                 <p className="text-xs text-[rgb(var(--foreground-muted))]">
                   Nº de associado: {numeroAssociado ?? 'não informado'}
+                  {anosSocio != null && ` · Sócio há ${anosSocio} ano${anosSocio === 1 ? '' : 's'}`}
                 </p>
               </div>
               <button
