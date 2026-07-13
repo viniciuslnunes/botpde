@@ -183,7 +183,43 @@ describe('getAfiliacoesParaOnboarding', () => {
     const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
     const lista = await getAfiliacoesParaOnboarding('ordem-inscritos')
 
-    expect(lista.map((a) => a.id)).toEqual(['top', 'medio', 'sem-dado'])
+    expect(lista.map((a) => a.id)).toEqual(['top', 'sem-dado', 'medio'])
+  })
+
+  it('coloca clubes sem escudo após os que têm imagem', async () => {
+    afiliacaoFindMany.mockResolvedValue([
+      {
+        id: 'sem-escudo-top',
+        nome: 'Flamengo (RJ)',
+        apelido: 'Flamengo',
+        escudoUrl: null,
+        cidade: 'Rio de Janeiro',
+        estado: 'RJ',
+        serie: 'A',
+        torcedoresEstimados: 30_000_000,
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
+        _count: { tenants: 1 },
+      },
+      {
+        id: 'com-escudo-menor',
+        nome: 'Goiás (GO)',
+        apelido: 'Goiás',
+        escudoUrl: 'https://res.cloudinary.com/demo/goias.png',
+        cidade: 'Goiânia',
+        estado: 'GO',
+        serie: 'B',
+        torcedoresEstimados: 2_000_000,
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
+        _count: { tenants: 0 },
+      },
+    ])
+
+    const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
+    const lista = await getAfiliacoesParaOnboarding('ordem-escudo')
+
+    expect(lista.map((a) => a.id)).toEqual(['com-escudo-menor', 'sem-escudo-top'])
   })
 
   it('filtra por UF quando informada', async () => {

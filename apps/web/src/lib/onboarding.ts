@@ -91,9 +91,17 @@ function valorOrdenacaoInscritosDigitais(a: AfiliacaoOnboarding): number {
   return a.torcedoresEstimados ?? 0
 }
 
-function compararClubesPorInscritosDigitais(a: AfiliacaoOnboarding, b: AfiliacaoOnboarding): number {
-  const diff = valorOrdenacaoInscritosDigitais(b) - valorOrdenacaoInscritosDigitais(a)
-  if (diff !== 0) return diff
+function pesoEscudoOnboarding(a: AfiliacaoOnboarding): number {
+  return a.escudoUrl ? 0 : 1
+}
+
+function compararClubesOnboarding(a: AfiliacaoOnboarding, b: AfiliacaoOnboarding): number {
+  const diffEscudo = pesoEscudoOnboarding(a) - pesoEscudoOnboarding(b)
+  if (diffEscudo !== 0) return diffEscudo
+
+  const diffInscritos = valorOrdenacaoInscritosDigitais(b) - valorOrdenacaoInscritosDigitais(a)
+  if (diffInscritos !== 0) return diffInscritos
+
   return a.nome.localeCompare(b.nome, 'pt-BR')
 }
 export type SedeOnboarding = {
@@ -152,8 +160,9 @@ export const getRegioesOnboarding = cache(async (): Promise<RegiaoOnboarding[]> 
 
 /**
  * Lista de clubes (Afiliacao) para o passo de seleção do onboarding.
- * Ordena do maior para o menor número de inscritos digitais (IBOPE/plataforma);
- * clubes sem dado estimado ficam por último. Desempate por nome.
+ * Ordena clubes com escudo primeiro; depois do maior para o menor número de
+ * inscritos digitais (IBOPE/plataforma); sem imagem e sem dado estimado ficam
+ * por último. Desempate por nome.
  * Quando `busca` é informada, filtra clubes cujo **nome ou apelido começa**
  * com o termo (case-insensitive) — ex.: "co" → Corinthians, Coritiba.
  * `uf` restringe por estado (sugestão regional).
@@ -291,7 +300,7 @@ export const getAfiliacoesParaOnboarding = cache(
           stats: afiliacao.stats,
         }
       })
-      .sort(compararClubesPorInscritosDigitais)
+      .sort(compararClubesOnboarding)
   },
 )
 
