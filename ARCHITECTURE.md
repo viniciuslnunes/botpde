@@ -645,8 +645,8 @@ Detalhe operacional e **plano de progresso** da inteligência de casamento:
 - **Casamento**: `inferirUfDoNome`, `saoMesmoClube`, `chaveGrupoClube`, bloqueio de
   homônimos, score ≥ 90, atribuição 1:1. Relatório versionado em
   `packages/db/src/data/escudos-soccerwiki-report.json`.
-- **Estado (2026-07-13)**: 112/367 com escudo; 87 novos via Wiki na rodada estrita;
-  255 pendentes (aliases, duplicatas, clubes fora da listagem Wiki).
+- **Estado (2026-07-13)**: 137/351 com escudo após Fase B (+31 Wiki, dedup repair);
+  214 pendentes. Módulo `escudos-wiki-match.js` com `WIKI_UF_POR_NOME`.
 - **Regra de produto**: escudo errado é pior que vazio — matching conservador.
 
 ## 6. Itens em aberto (aguardando decisão)

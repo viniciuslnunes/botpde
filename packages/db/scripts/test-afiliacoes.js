@@ -12,7 +12,9 @@ import {
   casarClube,
   saoMesmoClube,
   chaveGrupoClube,
+  inferirUfDoNome,
 } from '../src/data/afiliacoes-normalize.js'
+import { scoreWikiAfiliacao } from '../src/data/escudos-wiki-match.js'
 import { AFILIACOES_BRASIL } from '../src/data/afiliacoes-brasil.js'
 
 let passed = 0
@@ -111,6 +113,63 @@ ok('casarClube casa São Paulo FC → São Paulo (sufixo FC)', () => {
 ok('casarClube retorna null sem match (degradação graciosa)', () => {
   const idx = indexarLiga(FIXTURE, 'A')
   assert.equal(casarClube({ nome: 'Clube Inexistente XYZ' }, idx), null)
+})
+
+ok('saoMesmoClube une CAP × nome longo do catálogo', () => {
+  assert.equal(
+    saoMesmoClube(
+      { nome: 'Athletico Paranaense', estado: 'PR' },
+      { nome: 'Clube Atlético Paranaense', estado: 'PR' },
+    ),
+    true,
+  )
+})
+
+ok('inferirUfDoNome não confunde Ceará SC com Santa Catarina', () => {
+  assert.equal(inferirUfDoNome('Ceará SC'), null)
+  assert.equal(inferirUfDoNome('Atlético-MG'), 'MG')
+})
+
+ok('scoreWikiAfiliacao casa Botafogo FR × Botafogo RJ', () => {
+  assert.equal(
+    scoreWikiAfiliacao({ nome: 'Botafogo FR' }, { nome: 'Botafogo', estado: 'RJ' }),
+    100,
+  )
+  assert.equal(
+    scoreWikiAfiliacao({ nome: 'Botafogo FR' }, { nome: 'Botafogo', estado: 'PB' }),
+    0,
+  )
+})
+
+ok('scoreWikiAfiliacao casa Sport Recife × Sport PE', () => {
+  assert.equal(
+    scoreWikiAfiliacao({ nome: 'Sport Recife' }, { nome: 'Sport', estado: 'PE' }),
+    100,
+  )
+  assert.equal(
+    scoreWikiAfiliacao(
+      { nome: 'Sport Recife' },
+      { nome: 'Sport Club São Paulo', estado: 'RS' },
+    ),
+    0,
+  )
+})
+
+ok('scoreWikiAfiliacao casa Ceará SC × Ceará CE', () => {
+  assert.equal(
+    scoreWikiAfiliacao({ nome: 'Ceará SC' }, { nome: 'Ceará', estado: 'CE' }),
+    100,
+  )
+})
+
+ok('scoreWikiAfiliacao casa Grêmio × Grêmio Foot-Ball RS', () => {
+  assert.equal(
+    scoreWikiAfiliacao(
+      { nome: 'Grêmio' },
+      { nome: 'Grêmio Foot-Ball Porto Alegrense', estado: 'RS' },
+    ),
+    100,
+  )
 })
 
 // --- dataset: slugs únicos em toda a base curada ---

@@ -37,12 +37,28 @@ export const ALIASES = {
   'sao paulo futebol clube': 'sao paulo',
   'clube de regatas do flamengo': 'flamengo',
   'fluminense football club': 'fluminense',
+  'clube atletico paranaense': 'athletico paranaense',
+  'gremio foot ball porto alegrense': 'gremio',
+  'sociedade esportiva palmeiras': 'palmeiras',
+  'sport club do recife': 'sport',
+  'club de regatas vasco da gama': 'vasco da gama',
+  'centro sportivo alagoano': 'csa',
+  'associacao portuguesa de desportos': 'portuguesa',
+  'operario ferroviario esporte clube': 'operario',
+  'operario pr': 'operario',
+  'operario-pr': 'operario',
+  'clube de regatas brasil': 'brasil',
+  'ceara sporting club': 'ceara',
+  'asociacao atletica anapolina': 'anapolina',
 }
 
 const SUFIXOS_UF = new Set([
   'ac','al','am','ap','ba','ce','df','es','go','ma','mg','ms','mt','pa','pb',
   'pe','pi','pr','rj','rn','ro','rr','rs','sc','se','sp','to',
 ])
+
+/** Siglas que também são sufixo de clube (SC, EC…) — não inferir UF pelo último token. */
+const UF_AMBIGUOS_SUFIXO_CLUBE = new Set(['sc', 'ac', 'fc', 'ec', 'cf'])
 
 const PALAVRAS_RUIDO = new Set([
   'fc','ec','cf','ac','sc','fbc','afc','clube','club','futebol','esporte',
@@ -142,7 +158,7 @@ export function inferirUfDoNome(nome) {
   }
   const tokens = normalizeNome(raw).split(' ')
   const last = tokens[tokens.length - 1]
-  if (SUFIXOS_UF.has(last)) return last.toUpperCase()
+  if (SUFIXOS_UF.has(last) && !UF_AMBIGUOS_SUFIXO_CLUBE.has(last)) return last.toUpperCase()
   return null
 }
 

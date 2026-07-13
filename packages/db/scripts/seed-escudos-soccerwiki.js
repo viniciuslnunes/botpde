@@ -16,14 +16,6 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
 import {
-  normalizeNome,
-  chaveMatch,
-  chaveGrupoClube,
-  saoMesmoClube,
-  gerarSlugUnico,
-  inferirUfDoNome,
-} from '../src/data/afiliacoes-normalize.js'
-import {
   loadEnvFiles,
   getCloudinaryConfig,
   uploadImageUrl,
@@ -31,6 +23,8 @@ import {
   FOLDER_ESCUDOS,
   MONOREPO_ROOT,
 } from './lib/cloudinary-admin.js'
+import { gerarSlugUnico } from '../src/data/afiliacoes-normalize.js'
+import { scoreWikiAfiliacao } from '../src/data/escudos-wiki-match.js'
 
 loadEnvFiles()
 
@@ -41,103 +35,10 @@ const OFFSETS = [0, 50, 100, 150, 200, 250, 300]
 const WIKI_BASE = 'https://pt-br.soccerwiki.org/country.php?countryId=BRA&action=clubs'
 const DELAY_MS = 120
 
-/** Aliases de nomes no Soccer Wiki → nome curto do diretório. */
-const WIKI_ALIASES = {
-  'cr flamengo': 'flamengo',
-  'regatas flamengo': 'flamengo',
-  'clube de regatas flamengo': 'flamengo',
-  'botafogo fr': 'botafogo',
-  'botafogo de futebol e regatas': 'botafogo',
-  'sc internacional': 'internacional',
-  'sport club internacional': 'internacional',
-  'rb bragantino': 'bragantino',
-  'red bull bragantino': 'bragantino',
-  'ec bahia': 'bahia',
-  'ec vitoria': 'vitoria',
-  'cruzeiro ec': 'cruzeiro',
-  'atletico mineiro': 'atletico mineiro',
-  'athletico paranaense': 'athletico paranaense',
-  'clube do remo': 'remo',
-  'america mineiro': 'america mineiro',
-  'america de natal': 'america de natal',
-  'ceara sc': 'ceara',
-  'fortaleza ec': 'fortaleza',
-  'cuiaba ec': 'cuiaba',
-  'guarani fc': 'guarani',
-  'avai fc': 'avai',
-  'santos fc': 'santos',
-  'mirassol fc': 'mirassol',
-  'sport recife': 'sport',
-  'clube de regatas brasil': 'brasil',
-  'ponte preta': 'ponte preta',
-  'atletico goianiense': 'atletico goianiense',
-  'gremio novorizontino': 'novorizontino',
-  'londrina ec': 'londrina',
-  'botafogo pb': 'botafogo',
-  'botafogo sp': 'botafogo',
-  'operario ferroviario ec': 'operario',
-  'joinville ec': 'joinville',
-  'criciuma ec': 'criciuma',
-  'chapecoense af': 'chapecoense',
-  'figueirense': 'figueirense',
-  'paysandu sc': 'paysandu',
-  'parana clube': 'parana',
-  'sao bernardo fc': 'sao bernardo',
-}
-
 const db = new PrismaClient()
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
-}
-
-/** @param {string} nome */
-function chaveWiki(nome) {
-  const nm = normalizeNome(nome)
-  const alias = WIKI_ALIASES[nm]
-  return alias ? chaveMatch(alias) : chaveMatch(nome)
-}
-
-/** Tokens genéricos — não contam para casamento parcial. */
-const TOKENS_GENERICOS = new Set([
-  'sport', 'sports', 'clube', 'club', 'futebol', 'esporte', 'esportivo',
-  'atletico', 'athletico', 'associacao', 'recreativo', 'regatas', 'football',
-])
-
-/** Nomes que existem em vários estados — exige UF explícita no wiki. */
-const CHAVES_HOMONIMAS = new Set([
-  'america', 'operario', 'botafogo', 'vitoria', 'atletico', 'gremio', 'sport',
-  'paulista', 'portuguesa', 'internacional', 'nautico', 'juventude',
-])
-
-/**
- * @param {{ nome: string, cidade?: string|null }} wiki
- * @param {{ nome: string, estado: string|null }} afiliacao
- * @returns {number} 0 = sem match; maior = melhor
- */
-function scoreWikiAfiliacao(wiki, afiliacao) {
-  const ufWiki = inferirUfDoNome(wiki.nome)
-  const ufAf = afiliacao.estado?.toUpperCase() ?? null
-
-  if (ufWiki && ufAf && ufWiki !== ufAf) return 0
-
-  const refWiki = { nome: wiki.nome, estado: ufWiki ?? ufAf }
-  if (ufWiki && ufAf && saoMesmoClube(refWiki, afiliacao)) return 100
-
-  const kw = chaveWiki(wiki.nome)
-  const ka = chaveMatch(afiliacao.nome)
-  const grupoA = chaveGrupoClube(afiliacao.nome, afiliacao.estado)
-  const grupoW = chaveGrupoClube(wiki.nome, ufWiki ?? ufAf ?? '')
-
-  if (ufWiki && ufAf && grupoA === grupoW) return 95
-  if (kw === ka) {
-    const homonimo = CHAVES_HOMONIMAS.has(kw) || CHAVES_HOMONIMAS.has(kw.split(' ')[0] ?? '')
-    if (homonimo && (!ufWiki || !ufAf || ufWiki !== ufAf)) return 0
-    if (!ufWiki || !ufAf || ufWiki === ufAf) return 90
-    return 0
-  }
-
-  return 0
 }
 
 /**
