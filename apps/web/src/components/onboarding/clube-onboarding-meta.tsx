@@ -37,10 +37,8 @@ function ContagemComOnline({ total, online }: { total: number; online: number })
 }
 
 function LinhaPlataforma({ rotulo, total, online }: { rotulo: string; total: number; online: number }) {
-  if (total <= 0 && online <= 0) return null
-
   return (
-    <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
+    <span className="min-h-[14px] text-[10px] text-[rgb(var(--foreground-muted))]">
       {rotulo}{' '}
       <span className="text-[rgb(var(--foreground))]">
         <ContagemComOnline total={total} online={online} />
@@ -59,13 +57,8 @@ export function ClubeOnboardingMeta({
   stats,
 }: Props) {
   const temEstimativa = torcedoresEstimados != null && torcedoresEstimados > 0
-  const estimativaPlataforma = torcedoresEstimadosTipo === 'PLATAFORMA'
-  const temSocios =
-    !estimativaPlataforma && (stats.sociosTotal > 0 || stats.sociosOnline > 0)
-  const temTorcedores =
-    !estimativaPlataforma && (stats.torcedoresTotal > 0 || stats.torcedoresOnline > 0)
 
-  if (!temEstimativa && !temSocios && !temTorcedores) return null
+  if (!temEstimativa) return null
 
   const tooltipEstimativa =
     torcedoresEstimadosFonte ??
@@ -76,18 +69,16 @@ export function ClubeOnboardingMeta({
         : 'Estimativa conservadora com base no menor valor conhecido na base curada')
 
   return (
-    <div className="mt-1 flex w-full flex-col gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">
-      {temEstimativa && (
-        <span
-          className="inline-flex items-center justify-center gap-1 text-[10px] text-[rgb(var(--foreground-muted))]"
-          title={tooltipEstimativa}
-        >
-          <Globe className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
-          <span className="underline decoration-dotted decoration-[rgb(var(--foreground-muted)_/_0.45)] underline-offset-2">
-            {formatTorcedoresEstimados(torcedoresEstimados!, torcedoresEstimadosTipo)}
-          </span>
+    <div className="mt-auto flex w-full min-h-[52px] flex-col justify-end gap-1 border-t border-[rgb(var(--border)_/_0.6)] pt-2">
+      <span
+        className="inline-flex min-h-[14px] items-center justify-center gap-1 text-[10px] text-[rgb(var(--foreground-muted))]"
+        title={tooltipEstimativa}
+      >
+        <Globe className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+        <span className="underline decoration-dotted decoration-[rgb(var(--foreground-muted)_/_0.45)] underline-offset-2">
+          {formatTorcedoresEstimados(torcedoresEstimados!, torcedoresEstimadosTipo)}
         </span>
-      )}
+      </span>
       <LinhaPlataforma rotulo="Sócios" total={stats.sociosTotal} online={stats.sociosOnline} />
       <LinhaPlataforma
         rotulo="Torcedores"
