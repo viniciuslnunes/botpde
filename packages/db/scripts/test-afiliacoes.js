@@ -10,6 +10,8 @@ import {
   gerarSlugUnico,
   indexarLiga,
   casarClube,
+  saoMesmoClube,
+  chaveGrupoClube,
 } from '../src/data/afiliacoes-normalize.js'
 import { AFILIACOES_BRASIL } from '../src/data/afiliacoes-brasil.js'
 
@@ -33,6 +35,21 @@ ok('chaveMatch remove sufixo UF e ruído (FC/EC/de)', () => {
   assert.equal(chaveMatch('Athletico-PR'), 'athletico')
   // token distintivo "atletico" preservado
   assert.equal(chaveMatch('Atlético-MG'), 'atletico')
+})
+
+ok('saoMesmoClube une Corinthians × nome completo do catálogo', () => {
+  assert.equal(
+    saoMesmoClube(
+      { nome: 'Corinthians', estado: 'SP' },
+      { nome: 'Sport Club Corinthians Paulista', estado: 'SP' },
+    ),
+    true,
+  )
+  assert.equal(chaveGrupoClube('Corinthians', 'SP'), chaveGrupoClube('Sport Club Corinthians Paulista', 'SP'))
+  assert.equal(
+    saoMesmoClube({ nome: 'Corinthians', estado: 'SP' }, { nome: 'Vitória', estado: 'BA' }),
+    false,
+  )
 })
 
 // --- unicidade de slug em colisão ---

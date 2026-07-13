@@ -29,6 +29,14 @@ export const ALIASES = {
   'america rn': 'america de natal',
   'bragantino': 'red bull bragantino',
   'vasco': 'vasco da gama',
+  // Nomes completos do catálogo organizadasbrasil.com → nome curto do diretório
+  'sport club corinthians paulista': 'corinthians',
+  'sport club internacional': 'internacional',
+  'botafogo de futebol e regatas': 'botafogo',
+  'red bull bragantino': 'bragantino',
+  'sao paulo futebol clube': 'sao paulo',
+  'clube de regatas do flamengo': 'flamengo',
+  'fluminense football club': 'fluminense',
 }
 
 const SUFIXOS_UF = new Set([
@@ -142,4 +150,57 @@ export function gerarSlugUnico(nome, estado, usados) {
   }
   usados.add(slug)
   return slug
+}
+
+/**
+ * Chave canônica de casamento de clube (nome + UF), com ALIASES do diretório/catálogo.
+ * @param {string} nome
+ * @param {string | null | undefined} uf
+ * @returns {string}
+ */
+export function chaveGrupoClube(nome, uf) {
+  const nm = normalizeNome(nome ?? '')
+  const alias = ALIASES[nm]
+  const chave = alias ? chaveMatch(alias) : chaveMatch(nome ?? '')
+  return `${chave}|${normalizeNome(uf ?? '')}`
+}
+
+/**
+ * Dois clubes são o mesmo time (mesma UF) para onboarding e seeds.
+ * Usa ALIASES + chaveMatch — sem overlap parcial de tokens (evita Paulista × Corinthians).
+ * @param {{ nome: string, estado?: string | null }} a
+ * @param {{ nome: string, estado?: string | null }} b
+ * @returns {boolean}
+ */
+export function saoMesmoClube(a, b) {
+  if (normalizeNome(a.estado ?? '') !== normalizeNome(b.estado ?? '')) return false
+  if (chaveGrupoClube(a.nome, a.estado) === chaveGrupoClube(b.nome, b.estado)) return true
+  return chaveMatch(a.nome) === chaveMatch(b.nome)
+}
+
+/**
+ * Escolhe a Afiliacao canônica de um grupo (mais tenants → escudo → apelido).
+ * @param {Array<{ _count?: { tenants: number }, escudoUrl?: string | null, apelido?: string | null }>} candidatos
+ * @returns {number} índice do canônico
+ */
+export function indiceAfiliacaoCanonica(candidatos) {
+  let best = 0
+  for (let i = 1; i < candidatos.length; i += 1) {
+    const c = candidatos[i]
+    const b = candidatos[best]
+    const ct = c._count?.tenants ?? 0
+    const bt = b._count?.tenants ?? 0
+    if (ct > bt) {
+      best = i
+      continue
+    }
+    if (ct < bt) continue
+    if (c.escudoUrl && !b.escudoUrl) {
+      best = i
+      continue
+    }
+    if (!c.escudoUrl && b.escudoUrl) continue
+    if (c.apelido && !b.apelido) best = i
+  }
+  return best
 }

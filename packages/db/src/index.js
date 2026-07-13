@@ -94,3 +94,10 @@ export async function disconnectAll() {
 }
 
 export * from '@prisma/client'
+export {
+  normalizeNome,
+  chaveMatch,
+  chaveGrupoClube,
+  saoMesmoClube,
+  indiceAfiliacaoCanonica,
+} from './data/afiliacoes-normalize.js'

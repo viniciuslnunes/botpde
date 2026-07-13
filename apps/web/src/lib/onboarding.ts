@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { db } from '@torcida/db'
+import { db, saoMesmoClube, indiceAfiliacaoCanonica } from '@torcida/db'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
 
 export type SerieCampeonato = 'A' | 'B' | 'C' | 'D' | 'ESTADUAL' | 'OUTRA'
@@ -83,23 +83,21 @@ export const getAfiliacoesParaOnboarding = cache(
       orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
     })
 
-    // Bancos que receberam a versão antiga do seed podem ter duplicatas por
-    // nome+UF. Mostra uma só opção e prioriza a que está ligada a tenants,
-    // evitando selecionar uma cópia de Corinthians sem Gaviões/Camisa 12.
-    const unicas = new Map<string, AfiliacaoComVinculos>()
+    // Duplicatas por nome literal OU pelo mesmo clube (ex.: Corinthians ×
+    // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo.
+    const unicas: AfiliacaoComVinculos[] = []
     for (const afiliacao of afiliacoes) {
-      const chave = `${afiliacao.nome.trim().toLocaleLowerCase('pt-BR')}|${afiliacao.estado ?? ''}`
-      const atual = unicas.get(chave)
-      const deveSubstituir =
-        !atual
-        || afiliacao._count.tenants > atual._count.tenants
-        || (afiliacao._count.tenants === atual._count.tenants
-          && Boolean(afiliacao.escudoUrl)
-          && !atual.escudoUrl)
-      if (deveSubstituir) unicas.set(chave, afiliacao)
+      const idxGrupo = unicas.findIndex((u) => saoMesmoClube(u, afiliacao))
+      if (idxGrupo === -1) {
+        unicas.push(afiliacao)
+        continue
+      }
+      const grupo = [unicas[idxGrupo], afiliacao]
+      const canonIdx = indiceAfiliacaoCanonica(grupo)
+      unicas[idxGrupo] = grupo[canonIdx]
     }
 
-    return [...unicas.values()].map((afiliacao) => ({
+    return unicas.map((afiliacao) => ({
       id: afiliacao.id,
       nome: afiliacao.nome,
       apelido: afiliacao.apelido,
@@ -122,19 +120,19 @@ export const getTorcidasPorAfiliacao = cache(
         select: { nome: true, estado: true },
       })
 
-    // Compatibilidade com bancos afetados pelo seed antigo: procura todos os
-    // IDs do mesmo clube para que um PerfilTorcedor salvo na cópia sem Tenant
-    // ainda encontre Gaviões, Camisa 12, Pavilhão Nove etc.
+    // Mesmo clube pode ter várias Afiliacao (seed catálogo × diretório).
+    // Agrupa por saoMesmoClube para listar todas as torcidas do time.
     let afiliacaoIds = [afiliacaoId]
-    if (afiliacaoSelecionada) {
-      const equivalentes: { id: string }[] = await db.afiliacao.findMany({
-        where: {
-          nome: { equals: afiliacaoSelecionada.nome, mode: 'insensitive' },
-          estado: afiliacaoSelecionada.estado,
-        },
-        select: { id: true },
-      })
-      afiliacaoIds = equivalentes.map((a) => a.id)
+    if (afiliacaoSelecionada?.estado) {
+      const doEstado: { id: string; nome: string; estado: string | null }[] =
+        await db.afiliacao.findMany({
+          where: { estado: afiliacaoSelecionada.estado },
+          select: { id: true, nome: true, estado: true },
+        })
+      afiliacaoIds = doEstado
+        .filter((a) => saoMesmoClube(afiliacaoSelecionada, a))
+        .map((a) => a.id)
+      if (afiliacaoIds.length === 0) afiliacaoIds = [afiliacaoId]
     }
 
     type TenantComContagem = {
@@ -143,6 +141,8 @@ export const getTorcidasPorAfiliacao = cache(
       slug: string
       logoUrl: string | null
       corPrimaria: string
+      torcidaConhecidaId: string | null
+      torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
       sedes: SedeOnboarding[]
     }
@@ -154,6 +154,8 @@ export const getTorcidasPorAfiliacao = cache(
         slug: true,
         logoUrl: true,
         corPrimaria: true,
+        torcidaConhecidaId: true,
+        torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
         sedes: {
           where: { ativa: true },
@@ -163,11 +165,21 @@ export const getTorcidasPorAfiliacao = cache(
       },
       orderBy: { nome: 'asc' },
     })
-    return tenants.map((t: TenantComContagem) => ({
+
+    // Dedup: mesmo catálogo ou slug âncora duplicado (ex.: Camisa 12).
+    const vistos = new Set<string>()
+    const unicos = tenants.filter((t) => {
+      const chave = t.torcidaConhecidaId ?? t.slug
+      if (vistos.has(chave)) return false
+      vistos.add(chave)
+      return true
+    })
+
+    return unicos.map((t: TenantComContagem) => ({
       id: t.id,
-      nome: t.nome,
+      nome: t.torcidaConhecida?.titulo ?? t.nome,
       slug: t.slug,
-      logoUrl: t.logoUrl,
+      logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
       corPrimaria: t.corPrimaria,
       membrosAprovados: t._count.membros,
       sedes: t.sedes,

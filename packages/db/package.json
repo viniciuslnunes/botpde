@@ -19,6 +19,7 @@
     "seed:torcidas-conhecidas": "node --use-system-ca scripts/seed-torcidas-conhecidas.js",
     "scrape:organizadas": "node --use-system-ca scripts/scrape-organizadas.mjs",
     "test:afiliacoes": "node scripts/test-afiliacoes.js",
+    "db:repair-afiliacoes-torcidas": "node scripts/repair-afiliacoes-torcidas.js",
     "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js"
   },
   "dependencies": {

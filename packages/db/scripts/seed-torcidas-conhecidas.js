@@ -22,7 +22,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { TORCIDAS_CONHECIDAS, TORCIDAS_CONHECIDAS_META } from '../src/data/torcidas-conhecidas.js'
-import { normalizeNome, chaveMatch, gerarSlugUnico } from '../src/data/afiliacoes-normalize.js'
+import { normalizeNome, chaveMatch, gerarSlugUnico, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
 import {
   loadEnvFiles,
   getCloudinaryConfig,
@@ -205,6 +205,14 @@ async function main() {
       const kClube = chaveClube(torcida.clubeNomeOriginal, torcida.uf)
       afiliacaoId = afiliacaoPorChave.get(kClube) ?? null
       if (!afiliacaoId) {
+        const clubeRef = { nome: torcida.clubeNomeOriginal, estado: torcida.uf }
+        const existente = afiliacoes.find((a) => saoMesmoClube(clubeRef, a))
+        if (existente) {
+          afiliacaoId = existente.id
+          afiliacaoPorChave.set(kClube, afiliacaoId)
+        }
+      }
+      if (!afiliacaoId) {
         clubesCriados += 1
         const slugClube = gerarSlugUnico(torcida.clubeNomeOriginal, torcida.uf, slugsClube)
         if (DRY_RUN) {
@@ -225,8 +233,6 @@ async function main() {
         afiliacaoPorChave.set(kClube, afiliacaoId)
       }
     }
-
-    // ── Slug da torcida (reusa o existente por nome|UF|clube) ─────────────────
     const chaveTorcida = chave(torcida.nome, torcida.uf, torcida.clubeNomeOriginal)
     const slug = slugTorcidaPorChave.get(chaveTorcida)
       ?? gerarSlugUnico(torcida.nome, torcida.uf, slugsTorcida)
