@@ -58,6 +58,9 @@ algoritmo endurecido antes da segunda rodada.
 pnpm --filter @torcida/db seed:escudos-soccerwiki -- --report-only
 pnpm --filter @torcida/db seed:escudos-soccerwiki -- --dry-run
 pnpm --filter @torcida/db seed:escudos-soccerwiki
+pnpm --filter @torcida/db seed:escudos-thesportsdb -- --report-only
+pnpm --filter @torcida/db seed:escudos-thesportsdb -- --sem-busca
+pnpm --filter @torcida/db seed:escudos-thesportsdb
 pnpm --filter @torcida/db db:repair-afiliacoes-torcidas   # funde duplicatas de clube
 pnpm --filter @torcida/db test:afiliacoes
 ```
