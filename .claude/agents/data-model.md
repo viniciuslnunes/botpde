@@ -16,7 +16,8 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 - Schema: `packages/db/prisma/schema.prisma` (43 models, prefixo `saas_`; tabelas
   legadas do bot sem prefixo).
 - Docs: `ARCHITECTURE.md` §2.2, `docs/data/entidades-novas.md`, `docs/data/modulo-salas.md`
-  (módulo Salas/Meet) e `docs/data/modulo-loja.md` (módulo Loja).
+  (módulo Salas/Meet), `docs/data/modulo-loja.md` (módulo Loja) e
+  `docs/data/escudos-afiliacoes.md` (pipeline e plano de escudos de `Afiliacao`).
 - Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).
 - O projeto usa **`db push`** (não há pasta de migrations). Mudança de schema é
   sincronizada, não versionada em migration files.

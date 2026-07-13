@@ -7,7 +7,9 @@
 > `organizadasbrasil.com`, semeado em `TorcidaConhecida` via
 > `seed:torcidas-conhecidas` (logos no Cloudinary `torcida/catalogo/logos`) e
 > provisionado como **tenants vazios** via `seed:torcidas-tenants` (sem
-> presidente — transferência no super-admin). Ver `ARCHITECTURE.md` §5.8. Este
+> presidente — transferência no super-admin). **Escudos de clubes** (`Afiliacao`):
+> pipeline Soccer Wiki + Cloudinary — ver `docs/data/escudos-afiliacoes.md` e
+> `ARCHITECTURE.md` §5.9 (112/367 com escudo em 2026-07-13). Ver `ARCHITECTURE.md` §5.8.
 > `.md` segue como visão editorial (negrito = principal, notas de homônimos/backlog);
 > o catálogo + tenants são o dado navegável no onboarding.
 
@@ -222,3 +224,5 @@
 4. **Backlog**: catalogar AP/RR/RO/AC/TO e MS; validar quais torcidas seguem
    ativas (várias foram dissolvidas ou banidas judicialmente pós-Lei Geral do
    Esporte).
+5. **Escudos dos clubes**: cobertura parcial — plano em
+   `docs/data/escudos-afiliacoes.md` (Soccer Wiki, matching conservador por UF).

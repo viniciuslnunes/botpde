@@ -38,6 +38,9 @@ enquetes via LiveKit/WebRTC (permissão `MEETINGS_HOST`). Ver `docs/data/modulo-
    de padrões de rivalidade/confronto — base de conhecimento expandida do agente
    `aliancas-torcidas`. **Guarda ética:** esses dados existem só para segurança,
    prevenção e moderação; nunca para facilitar, ranquear ou glorificar conflito.
+6. **Escudos de clubes (`Afiliacao`)** — inteligência de casamento clube ↔ imagem
+   (Soccer Wiki + aliases + dedup). Fase A entregue; fases B–E em
+   `docs/data/escudos-afiliacoes.md`.
 
 **Resultado:** utilidade, engajamento e inteligência operacional.
 
@@ -46,4 +49,5 @@ enquetes via LiveKit/WebRTC (permissão `MEETINGS_HOST`). Ver `docs/data/modulo-
 A. Fundamentos de autorização · B. Territorialidade · C. Comunicados oficiais ·
 D. Eventos e mobilização · E. Experiência do associado · F. API compartilhada (tRPC) ·
 G. Convergência bot ↔ web · **H. Alianças** 🆕 · **I. Informação do nicho** 🆕 ·
-**J. Importação de base** 🆕 · **K. Salas de vídeo (Meet)** ✅ entregue.
+**J. Importação de base** 🆕 · **K. Salas de vídeo (Meet)** ✅ entregue ·
+**L. Escudos de clubes** 🔄 fase A entregue (`docs/data/escudos-afiliacoes.md`).

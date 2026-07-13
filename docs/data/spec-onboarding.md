@@ -202,8 +202,11 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
 - Script `seed:afiliacoes` popula `Afiliacao` a partir de `diretorio-nacional.md`
   (nome, apelido, cidade, estado, série, slug, escudoUrl local).
 - Escudos: coletar via API gratuita (ex.: TheSportsDB) **na etapa de seed**, baixar e
-  versionar em `apps/web/public/escudos/<slug>.*` (ou Cloudinary). Nunca depender da
+  hospedar no Cloudinary (`torcida/catalogo/escudos/<slug>`). Nunca depender da
   API em runtime; gate `isXConfigured()` se usar serviço externo.
+- **Soccer Wiki** (2026-07-13): `seed:escudos-soccerwiki` — scrape Brasil offset
+  0–300, casamento estrito por UF/homônimos, relatório em
+  `escudos-soccerwiki-report.json`. Plano: `docs/data/escudos-afiliacoes.md`.
 - Torcidas que ainda não aderiram aparecem como referência (aproveita
   `Sede.sedeReferenciaNome/Slug`).
 

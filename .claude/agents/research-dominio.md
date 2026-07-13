@@ -37,6 +37,8 @@ web para o que ela não cobre:
   de integrantes, responsabilidade objetiva, banimento), torcida única em SP,
   LGPD.
 - `glossario.md` — vocabulário do nicho.
+- `diretorio-nacional.md` — mapa clube → torcidas; escudos parciais (ver
+  `docs/data/escudos-afiliacoes.md`).
 - Alianças/rivalidades são do agente `aliancas-torcidas` (`aliancas.md`).
 
 **Você é co-mantenedor desta base**: quando uma pesquisa sua produzir fato novo

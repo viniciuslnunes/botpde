@@ -129,6 +129,24 @@ export function casarClube(clube, indice) {
 }
 
 /**
+ * Extrai UF do sufixo do nome (ex.: "América-MG", "Operário-MT", "América RJ").
+ * @param {string} nome
+ * @returns {string | null} sigla em maiúsculas
+ */
+export function inferirUfDoNome(nome) {
+  const raw = String(nome ?? '').trim()
+  const hyphen = raw.match(/[-–]\s*([A-Za-z]{2})\s*$/)
+  if (hyphen) {
+    const uf = hyphen[1].toLowerCase()
+    if (SUFIXOS_UF.has(uf)) return uf.toUpperCase()
+  }
+  const tokens = normalizeNome(raw).split(' ')
+  const last = tokens[tokens.length - 1]
+  if (SUFIXOS_UF.has(last)) return last.toUpperCase()
+  return null
+}
+
+/**
  * Gera slug a partir de nome + UF, garantindo UNICIDADE contra um Set de
  * slugs já usados (mutado). Sufixo incremental em colisão.
  * @param {string} nome

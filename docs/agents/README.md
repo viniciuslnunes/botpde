@@ -53,6 +53,14 @@ As Fases 1–5 de otimização web estão documentadas em `ARCHITECTURE.md` §5.
 
 Não há “Fase 6 grátis” planejada — ganhos adicionais exigem mudança arquitetural.
 
+## Escudos de clubes (`Afiliacao`) — plano em andamento
+
+Inteligência de casamento clube ↔ imagem para o onboarding. **Fase A entregue**
+(2026-07-13): script Soccer Wiki + matching estrito + 87 escudos seguros.
+Próximas fases: aliases de nomes longos, herança em duplicatas, fontes além do Wiki.
+Ver `docs/data/escudos-afiliacoes.md` e `ARCHITECTURE.md` §5.9.
+Agentes: `data-model`, `research-dominio`, `implementation`, `qa-verification`.
+
 ## Princípios
 
 - Não implementar antes de o plano estar fechado e aprovado.

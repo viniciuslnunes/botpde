@@ -1,0 +1,875 @@
+{
+  "geradoEm": "2026-07-13T02:51:21.463Z",
+  "wikiTotal": 246,
+  "semEscudoAntes": 342,
+  "mapeados": 87,
+  "semMatch": 255,
+  "pares": [
+    {
+      "clube": "América Futebol Clube",
+      "uf": "RJ",
+      "wiki": "América RJ",
+      "slug": "america-futebol-clube-rj",
+      "score": 100
+    },
+    {
+      "clube": "Boavista",
+      "uf": "RJ",
+      "wiki": "Boavista RJ",
+      "slug": "boavista-rj",
+      "score": 100
+    },
+    {
+      "clube": "ABC",
+      "uf": "RN",
+      "wiki": "ABC FC",
+      "slug": "abc-rn",
+      "score": 90
+    },
+    {
+      "clube": "Alecrim",
+      "uf": "RN",
+      "wiki": "Alecrim FC",
+      "slug": "alecrim-rn",
+      "score": 90
+    },
+    {
+      "clube": "Americano",
+      "uf": "RJ",
+      "wiki": "Americano FC",
+      "slug": "americano-rj",
+      "score": 90
+    },
+    {
+      "clube": "Araxá Esporte Clube",
+      "uf": "MG",
+      "wiki": "Araxá EC",
+      "slug": "araxa-esporte-clube-mg",
+      "score": 90
+    },
+    {
+      "clube": "ASA",
+      "uf": "AL",
+      "wiki": "ASA",
+      "slug": "asa-al",
+      "score": 90
+    },
+    {
+      "clube": "Auto Esporte",
+      "uf": "PB",
+      "wiki": "Auto Esporte Clube",
+      "slug": "auto-esporte-pb",
+      "score": 90
+    },
+    {
+      "clube": "Barretos Esporte Clube",
+      "uf": "SP",
+      "wiki": "Barretos EC",
+      "slug": "barretos-esporte-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Batatais Futebol Clube",
+      "uf": "SP",
+      "wiki": "Batatais FC",
+      "slug": "batatais-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Bonsucesso Futebol Clube",
+      "uf": "RJ",
+      "wiki": "Bonsucesso FC",
+      "slug": "bonsucesso-futebol-clube-rj",
+      "score": 90
+    },
+    {
+      "clube": "Brasil de Pelotas",
+      "uf": "RS",
+      "wiki": "Brasil de Pelotas",
+      "slug": "brasil-de-pelotas-rs",
+      "score": 90
+    },
+    {
+      "clube": "Brasiliense",
+      "uf": "DF",
+      "wiki": "Brasiliense",
+      "slug": "brasiliense-df",
+      "score": 90
+    },
+    {
+      "clube": "Campinense",
+      "uf": "PB",
+      "wiki": "Campinense Clube",
+      "slug": "campinense-pb",
+      "score": 90
+    },
+    {
+      "clube": "Cascavel",
+      "uf": "PR",
+      "wiki": "FC Cascavel",
+      "slug": "cascavel-pr",
+      "score": 90
+    },
+    {
+      "clube": "Castanhal",
+      "uf": "PA",
+      "wiki": "Castanhal EC",
+      "slug": "castanhal-pa",
+      "score": 90
+    },
+    {
+      "clube": "Ceilândia EC",
+      "uf": "DF",
+      "wiki": "Ceilândia EC",
+      "slug": "ceilandia-ec-df",
+      "score": 90
+    },
+    {
+      "clube": "Ceres Futebol Clube",
+      "uf": "RJ",
+      "wiki": "Ceres FC",
+      "slug": "ceres-futebol-clube-rj",
+      "score": 90
+    },
+    {
+      "clube": "Clube Esportivo Sete de Setembro",
+      "uf": "MS",
+      "wiki": "Sete de Setembro",
+      "slug": "clube-esportivo-sete-de-setembro-ms",
+      "score": 90
+    },
+    {
+      "clube": "Comercial-SP",
+      "uf": "SP",
+      "wiki": "EC Comercial",
+      "slug": "comercial-sp-sp",
+      "score": 90
+    },
+    {
+      "clube": "Coritiba",
+      "uf": "PR",
+      "wiki": "Coritiba",
+      "slug": "coritiba-pr",
+      "score": 90
+    },
+    {
+      "clube": "Corumbaense Futebol Clube",
+      "uf": "MS",
+      "wiki": "Corumbaense FC",
+      "slug": "corumbaense-futebol-clube-ms",
+      "score": 90
+    },
+    {
+      "clube": "Cruzeiro Esporte Clube",
+      "uf": "PB",
+      "wiki": "Cruzeiro EC",
+      "slug": "cruzeiro-esporte-clube-pb",
+      "score": 90
+    },
+    {
+      "clube": "Duque de Caxias",
+      "uf": "RJ",
+      "wiki": "Duque de Caxias",
+      "slug": "duque-de-caxias-rj",
+      "score": 90
+    },
+    {
+      "clube": "Esporte Clube Água Santa",
+      "uf": "SP",
+      "wiki": "EC Água Santa",
+      "slug": "esporte-clube-agua-santa-sp",
+      "score": 90
+    },
+    {
+      "clube": "Esporte Clube Noroeste",
+      "uf": "SP",
+      "wiki": "EC Noroeste",
+      "slug": "esporte-clube-noroeste-sp",
+      "score": 90
+    },
+    {
+      "clube": "Esporte Clube Taubaté",
+      "uf": "SP",
+      "wiki": "EC Taubaté",
+      "slug": "esporte-clube-taubate-sp",
+      "score": 90
+    },
+    {
+      "clube": "Esporte Clube XV de Piracicaba",
+      "uf": "SP",
+      "wiki": "XV de Piracicaba",
+      "slug": "esporte-clube-xv-de-piracicaba-sp",
+      "score": 90
+    },
+    {
+      "clube": "Esporte Clube Ypiranga",
+      "uf": "BA",
+      "wiki": "Ypiranga FC",
+      "slug": "esporte-clube-ypiranga-ba",
+      "score": 90
+    },
+    {
+      "clube": "Estrela do Norte",
+      "uf": "ES",
+      "wiki": "Estrela do Norte",
+      "slug": "estrela-do-norte-es",
+      "score": 90
+    },
+    {
+      "clube": "Flamengo",
+      "uf": "RJ",
+      "wiki": "CR Flamengo",
+      "slug": "flamengo-rj",
+      "score": 90
+    },
+    {
+      "clube": "Fluminense",
+      "uf": "RJ",
+      "wiki": "Fluminense",
+      "slug": "fluminense-rj",
+      "score": 90
+    },
+    {
+      "clube": "Fluminense de Feira",
+      "uf": "BA",
+      "wiki": "Fluminense de Feira",
+      "slug": "fluminense-de-feira-ba",
+      "score": 90
+    },
+    {
+      "clube": "Gama",
+      "uf": "DF",
+      "wiki": "SE Gama",
+      "slug": "gama-df",
+      "score": 90
+    },
+    {
+      "clube": "Goiás",
+      "uf": "GO",
+      "wiki": "Goiás",
+      "slug": "goias-go",
+      "score": 90
+    },
+    {
+      "clube": "Goytacaz Futebol Clube",
+      "uf": "RJ",
+      "wiki": "Goytacaz FC",
+      "slug": "goytacaz-futebol-clube-rj",
+      "score": 90
+    },
+    {
+      "clube": "Guarani",
+      "uf": "SP",
+      "wiki": "Guarani FC",
+      "slug": "guarani-sp",
+      "score": 90
+    },
+    {
+      "clube": "Guarany de Sobral",
+      "uf": "CE",
+      "wiki": "Guarany de Sobral",
+      "slug": "guarany-de-sobral-ce",
+      "score": 90
+    },
+    {
+      "clube": "Guaratinguetá Esporte Clube",
+      "uf": "SP",
+      "wiki": "Guaratinguetá",
+      "slug": "guaratingueta-esporte-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Hercílio Luz",
+      "uf": "SC",
+      "wiki": "Hercílio Luz",
+      "slug": "hercilio-luz-sc",
+      "score": 90
+    },
+    {
+      "clube": "Horizonte Futebol Clube",
+      "uf": "CE",
+      "wiki": "Horizonte FC",
+      "slug": "horizonte-futebol-clube-ce",
+      "score": 90
+    },
+    {
+      "clube": "Icasa",
+      "uf": "CE",
+      "wiki": "Icasa",
+      "slug": "icasa-ce",
+      "score": 90
+    },
+    {
+      "clube": "Independente Futebol Clube",
+      "uf": "SP",
+      "wiki": "Independente FC",
+      "slug": "independente-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Ipatinga",
+      "uf": "MG",
+      "wiki": "Ipatinga FC",
+      "slug": "ipatinga-mg",
+      "score": 90
+    },
+    {
+      "clube": "Itapipoca Esporte Clube",
+      "uf": "CE",
+      "wiki": "Itapipoca EC",
+      "slug": "itapipoca-esporte-clube-ce",
+      "score": 90
+    },
+    {
+      "clube": "Ituano Futebol Clube",
+      "uf": "SP",
+      "wiki": "Ituano FC",
+      "slug": "ituano-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Itumbiara",
+      "uf": "GO",
+      "wiki": "Itumbiara EC",
+      "slug": "itumbiara-go",
+      "score": 90
+    },
+    {
+      "clube": "Joinville",
+      "uf": "SC",
+      "wiki": "Joinville EC",
+      "slug": "joinville-sc",
+      "score": 90
+    },
+    {
+      "clube": "Londrina",
+      "uf": "PR",
+      "wiki": "Londrina EC",
+      "slug": "londrina-pr",
+      "score": 90
+    },
+    {
+      "clube": "Macaé",
+      "uf": "RJ",
+      "wiki": "Macaé Esporte FC",
+      "slug": "macae-rj",
+      "score": 90
+    },
+    {
+      "clube": "Madureira",
+      "uf": "RJ",
+      "wiki": "Madureira EC",
+      "slug": "madureira-rj",
+      "score": 90
+    },
+    {
+      "clube": "Maringá",
+      "uf": "PR",
+      "wiki": "Maringá FC",
+      "slug": "maringa-pr",
+      "score": 90
+    },
+    {
+      "clube": "Mirassol Futebol Clube",
+      "uf": "SP",
+      "wiki": "Mirassol FC",
+      "slug": "mirassol-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Mixto",
+      "uf": "MT",
+      "wiki": "Mixto EC",
+      "slug": "mixto-mt",
+      "score": 90
+    },
+    {
+      "clube": "Mogi Mirim Esporte Clube",
+      "uf": "SP",
+      "wiki": "Mogi Mirim EC",
+      "slug": "mogi-mirim-esporte-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Moto Club",
+      "uf": "MA",
+      "wiki": "Moto Club",
+      "slug": "moto-club-ma",
+      "score": 90
+    },
+    {
+      "clube": "Nacional-AM",
+      "uf": "AM",
+      "wiki": "Nacional EC",
+      "slug": "nacional-am-am",
+      "score": 90
+    },
+    {
+      "clube": "Nova Iguaçu",
+      "uf": "RJ",
+      "wiki": "Nova Iguaçu",
+      "slug": "nova-iguacu-rj",
+      "score": 90
+    },
+    {
+      "clube": "Novo Hamburgo",
+      "uf": "RS",
+      "wiki": "EC Novo Hamburgo",
+      "slug": "novo-hamburgo-rs",
+      "score": 90
+    },
+    {
+      "clube": "Palmeiras",
+      "uf": "SP",
+      "wiki": "Palmeiras",
+      "slug": "palmeiras-sp",
+      "score": 90
+    },
+    {
+      "clube": "Paraná Clube",
+      "uf": "PR",
+      "wiki": "Paraná Clube",
+      "slug": "parana-clube-pr",
+      "score": 90
+    },
+    {
+      "clube": "Pelotas",
+      "uf": "RS",
+      "wiki": "EC Pelotas",
+      "slug": "pelotas-rs",
+      "score": 90
+    },
+    {
+      "clube": "Ponte Preta",
+      "uf": "SP",
+      "wiki": "Ponte Preta",
+      "slug": "ponte-preta-sp",
+      "score": 90
+    },
+    {
+      "clube": "Remo",
+      "uf": "PA",
+      "wiki": "Clube do Remo",
+      "slug": "remo-pa",
+      "score": 90
+    },
+    {
+      "clube": "Resende",
+      "uf": "RJ",
+      "wiki": "Resende FC",
+      "slug": "resende-rj",
+      "score": 90
+    },
+    {
+      "clube": "Rio Branco-ES",
+      "uf": "ES",
+      "wiki": "Rio Branco FC",
+      "slug": "rio-branco-es-es",
+      "score": 90
+    },
+    {
+      "clube": "Rio Preto Esporte Clube",
+      "uf": "SP",
+      "wiki": "Rio Preto EC",
+      "slug": "rio-preto-esporte-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Sampaio Corrêa",
+      "uf": "MA",
+      "wiki": "Sampaio Corrêa",
+      "slug": "sampaio-correa-ma",
+      "score": 90
+    },
+    {
+      "clube": "Santa Cruz",
+      "uf": "PE",
+      "wiki": "Santa Cruz",
+      "slug": "santa-cruz-pe",
+      "score": 90
+    },
+    {
+      "clube": "Santo André",
+      "uf": "SP",
+      "wiki": "EC Santo André",
+      "slug": "santo-andre-sp",
+      "score": 90
+    },
+    {
+      "clube": "Santos",
+      "uf": "SP",
+      "wiki": "Santos FC",
+      "slug": "santos-sp",
+      "score": 90
+    },
+    {
+      "clube": "São Bento",
+      "uf": "SP",
+      "wiki": "EC São Bento",
+      "slug": "sao-bento-sp",
+      "score": 90
+    },
+    {
+      "clube": "São Bernardo Futebol Clube",
+      "uf": "SP",
+      "wiki": "São Bernardo FC",
+      "slug": "sao-bernardo-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "São Caetano",
+      "uf": "SP",
+      "wiki": "São Caetano",
+      "slug": "sao-caetano-sp",
+      "score": 90
+    },
+    {
+      "clube": "São Carlos Futebol Clube",
+      "uf": "SP",
+      "wiki": "São Carlos FC",
+      "slug": "sao-carlos-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "São José-RS",
+      "uf": "RS",
+      "wiki": "São José EC",
+      "slug": "sao-jose-rs-rs",
+      "score": 90
+    },
+    {
+      "clube": "São Paulo FC",
+      "uf": "SP",
+      "wiki": "São Paulo FC",
+      "slug": "sao-paulo-fc-sp",
+      "score": 90
+    },
+    {
+      "clube": "São Raimundo-AM",
+      "uf": "AM",
+      "wiki": "São Raimundo EC",
+      "slug": "sao-raimundo-am-am",
+      "score": 90
+    },
+    {
+      "clube": "Sertãozinho Futebol Clube",
+      "uf": "SP",
+      "wiki": "Sertãozinho FC",
+      "slug": "sertaozinho-futebol-clube-sp",
+      "score": 90
+    },
+    {
+      "clube": "Sobradinho",
+      "uf": "DF",
+      "wiki": "Sobradinho EC",
+      "slug": "sobradinho-df",
+      "score": 90
+    },
+    {
+      "clube": "Sousa",
+      "uf": "PB",
+      "wiki": "Sousa EC",
+      "slug": "sousa-pb",
+      "score": 90
+    },
+    {
+      "clube": "Treze",
+      "uf": "PB",
+      "wiki": "Treze FC",
+      "slug": "treze-pb",
+      "score": 90
+    },
+    {
+      "clube": "Tupi",
+      "uf": "MG",
+      "wiki": "Tupi FC",
+      "slug": "tupi-mg",
+      "score": 90
+    },
+    {
+      "clube": "URT",
+      "uf": "MG",
+      "wiki": "URT",
+      "slug": "urt-mg",
+      "score": 90
+    },
+    {
+      "clube": "Vila Nova",
+      "uf": "GO",
+      "wiki": "Vila Nova",
+      "slug": "vila-nova-go",
+      "score": 90
+    },
+    {
+      "clube": "Volta Redonda",
+      "uf": "RJ",
+      "wiki": "Volta Redonda FC",
+      "slug": "volta-redonda-rj",
+      "score": 90
+    },
+    {
+      "clube": "Ypiranga Clube",
+      "uf": "AP",
+      "wiki": "EC Ypiranga",
+      "slug": "ypiranga-clube-ap",
+      "score": 90
+    }
+  ],
+  "semMatchLista": [
+    "4 de Julho (PI)",
+    "Agremiação Sportiva Arapiraquense (AL)",
+    "Alagoinhas Atlético Clube (BA)",
+    "Alfenense Futebol Clube (MG)",
+    "América-AM (AM)",
+    "América Futebol Clube (SP)",
+    "América Futebol Clube de Natal (RN)",
+    "America Futebol Clube de Teófilo Ottoni (MG)",
+    "América-PE (PE)",
+    "América-RN (RN)",
+    "Anapolina (GO)",
+    "Aracati Esporte Clube (CE)",
+    "Araguaína Futebol e Regatas (TO)",
+    "Asociação Atlética Anapolina (GO)",
+    "Associação Atlética Batel (PR)",
+    "Associação Atlética caldense (MG)",
+    "Associação Atlética Coruripe (AL)",
+    "Associação Atlética Flamengo (SP)",
+    "Associação Atlética Francana (SP)",
+    "Associação Atlética Internacional de Limeira (SP)",
+    "Associação Atletica Luziânia (DF)",
+    "Associação Atlética Ponte Preta (SP)",
+    "Associação Atlética Portuguesa (SP)",
+    "Associação Atlética São Mateus (ES)",
+    "Associacao Cultural e Desportiva Potiguar (RN)",
+    "Associação Cultural Esporte Clube Baraúnas (RN)",
+    "Associação Desportiva Atlética do Paraná - ADAP (PR)",
+    "Associação Desportiva Cabense (PE)",
+    "Associação Desportiva Cabofriense (RJ)",
+    "Associação Desportiva Recreativa Cultural Icasa (CE)",
+    "Associação Desportiva São Benedito (CE)",
+    "Associação Desportiva São Caetano (SP)",
+    "Associação Esportiva Araçatuba (SP)",
+    "Associação Esportiva Catuense (BA)",
+    "Associação Esportiva Velo Clube (SP)",
+    "Associação Ferroviária de Esportes (SP)",
+    "Associação Olímpica de Itabaiana (SE)",
+    "Associação Portuguesa de Desportos (SP)",
+    "Associação Sportiva Sociedade Unida (RN)",
+    "Associação Trairiense de Futebol (CE)",
+    "Atlético Cajazeirense (PB)",
+    "Atlético Clube Corintians (RN)",
+    "Atlético Clube de Paranavaí (PR)",
+    "Atlético de Alagoinhas (BA)",
+    "Atlético de Ibirama (SC)",
+    "Atlético-GO (GO)",
+    "Atlético-MG (MG)",
+    "Atlético Rio Negro Clube (AM)",
+    "Atlético Roraima Clube (RR)",
+    "Bacabal (MA)",
+    "Bangu (RJ)",
+    "Bangu Atlético Clube (RJ)",
+    "Baraúnas (RN)",
+    "Barra do Garças Futebol Clube (MT)",
+    "Blumenal Esporte Clube (SC)",
+    "Boavista Sport Clube (RJ)",
+    "Botafogo (RJ)",
+    "Brasiliense Futebol Clube de Taguatinga (DF)",
+    "Cabofriense (RJ)",
+    "Cametá (PA)",
+    "Cametá Sport Club (PA)",
+    "Campinas Futebol Clube (SP)",
+    "Campo Grande Atlético Clube (RJ)",
+    "Cascavel Clube Recreativo (PR)",
+    "Caucaia Esporte Clube (CE)",
+    "Caxias Futebol Clube (SC)",
+    "Ceará (CE)",
+    "Ceilandense (DF)",
+    "Central (PE)",
+    "Central Sport Club (PE)",
+    "Centro Sportivo Alagoano (AL)",
+    "Cia Norte (PR)",
+    "Club de Regatas Vasco da Gama (RJ)",
+    "Clube Atlético Bragantino (SP)",
+    "Clube Atlético Colatinense (ES)",
+    "Clube Atlético do Porto (PE)",
+    "Clube Atlético Juventus (SP)",
+    "Clube Atlético Lages (SC)",
+    "Clube Atlético Lemense (SP)",
+    "Clube Atlético Linense (SP)",
+    "Clube Atlético Metropolitano (SC)",
+    "Clube Atlético Paranaense (PR)",
+    "Clube Atlético Penapolense (SP)",
+    "Clube Atlético Sorocaba (SP)",
+    "Clube Atlético Taboão da Serra (SP)",
+    "Clube Atlético Taquaritinga (SP)",
+    "Clube Atlético Tricordiano (MG)",
+    "Clube Atlético Tubarão (SC)",
+    "Clube Atlético Votuporanguense (SP)",
+    "Clube de Regatas Brasil (AL)",
+    "Clube Esportivo de Bento Gonçalves (RS)",
+    "Clube Esportivo Naviraiense (MS)",
+    "Clube Náutico Capiberibe (PE)",
+    "Clube Náutico Marcílio Dias (SC)",
+    "Clube Recreativo e Atlético Catalano (GO)",
+    "Club Sportivo Sergipe (SE)",
+    "Colo Colo Futebol e Regatas (BA)",
+    "Confiança (SE)",
+    "Cotia Futebol Clube (SP)",
+    "Crato (CE)",
+    "CSA (AL)",
+    "Democrata (MG)",
+    "Desportiva Ferroviária (ES)",
+    "ECPP Vitória da Conquista (BA)",
+    "Esporte Clube Águia Negra (MS)",
+    "Esporte Clube Internacional de Santa Maria (RS)",
+    "Esporte Clube Limoeiro (CE)",
+    "Esporte Clube Mamoré (MG)",
+    "Esporte Clube Rio Verde (GO)",
+    "Esporte Clube XV de Novembro (SP)",
+    "Esporte de Patos (PB)",
+    "Estanciano Esporte Clube (SE)",
+    "Fast Clube (AM)",
+    "Ferroviário (CE)",
+    "Ferroviário Atlético Clube (CE)",
+    "Ferroviário Esporte Clube do Cabo (PE)",
+    "Fluminense Football Club (RJ)",
+    "Formiga Esporte Clube (MG)",
+    "Formosa Esporte Clube (GO)",
+    "Francisco Beltrão Futebol Clube (PR)",
+    "Friburguense (RJ)",
+    "Friburguense Atlético Clube (RJ)",
+    "Funorte Esporte Clube (MG)",
+    "Goianésia Esporte Clube (GO)",
+    "Grêmio (RS)",
+    "Gremio Atlético Farroupilha (RS)",
+    "Grêmio Catanduvense de Futebol (SP)",
+    "Grêmio Esportivo Brasil (RS)",
+    "Grêmio Esportivo Juventus (SC)",
+    "Grêmio Esportivo Osasco (SP)",
+    "Grêmio Foot-Ball Porto Alegrense (RS)",
+    "Grêmio Maringá (PR)",
+    "Grêmio Novorizontino (SP)",
+    "Guarani da Palhoça (SC)",
+    "Guarani Esporte Clube (MG)",
+    "Guarany Futebol Clube de Camaquã (RS)",
+    "Guarany Sporting Club de Sobral (CE)",
+    "Imperatriz (MA)",
+    "Inhumas Futebol Clube (GO)",
+    "Internacional (RS)",
+    "Internacional de Lages (SC)",
+    "Internacional Esporte Clube (PR)",
+    "Ipanema Atletico clube (AL)",
+    "Iraty (PR)",
+    "Iraty Sport Club (PR)",
+    "Itabaiana (SE)",
+    "Itabuna (BA)",
+    "Itapajé Futebol Clube (CE)",
+    "Itaperuna Esporte Clube (RJ)",
+    "Ituiutaba Futebol Clube (MG)",
+    "Jabaquara Atlético clube (SP)",
+    "Jaboticabal Atlético (SP)",
+    "Ji-Paraná Futebol Clube (RO)",
+    "Juventude (RS)",
+    "Juventude Esporte Clube (TO)",
+    "Juventus (SP)",
+    "Lagarto Futebol Clube (SE)",
+    "Linhares Futebol Clube (ES)",
+    "Maracanã Esporte Clube (CE)",
+    "Maranhão AC (MA)",
+    "Maranhão Atlético Clube (MA)",
+    "Marcílio Dias (SC)",
+    "Marilia Atlético Clube (SP)",
+    "Metropolitano (SC)",
+    "Morrinhos Futebol Clube (GO)",
+    "Moto Club de São Luís (MA)",
+    "Nacional Atlético Clube (PB)",
+    "Nacional de Patos (PB)",
+    "Náutico (PE)",
+    "Olaria (RJ)",
+    "Olaria Atlético Clube (RJ)",
+    "Olinda Futebol Clube (PE)",
+    "Operário de Varzea Grande (MT)",
+    "Operário Ferroviário Esporte Clube (PR)",
+    "Operário Futebol Clube (MS)",
+    "Operário-PR (PR)",
+    "Operário-VG (MT)",
+    "Palmas Futebol e Regatas (TO)",
+    "Parnahyba (PI)",
+    "Parnahyba Sport Club (PI)",
+    "Paulista (SP)",
+    "Paulista Futebol Clube (SP)",
+    "Paysandu (PA)",
+    "Paysandu Sport Club (PA)",
+    "Pesqueira Futebol Clube (PE)",
+    "Petrolina (PE)",
+    "Petrolina Social Futebol Clube (PE)",
+    "Poços de Caldas Futebol Clube (MG)",
+    "Porto (PE)",
+    "Portuguesa (SP)",
+    "Potiguar (RN)",
+    "Quatro de Julho Esporte Clube (PI)",
+    "Quixadá Futebol Clube (CE)",
+    "Rio Branco Atlético Clube (ES)",
+    "Rio Branco Esporte Clube (SP)",
+    "Rio Branco Football Club (AC)",
+    "Rio Branco-PR (PR)",
+    "Rio Branco Sport Club (PR)",
+    "Rio Claro Futebol Clube (SP)",
+    "Rio Negro (AM)",
+    "River Atlético Clube (PI)",
+    "River-PI (PI)",
+    "Salgueiro (PE)",
+    "Salgueiro Atlético Clube (PE)",
+    "Santa Cruz-RN (RN)",
+    "São Cristóvão (RJ)",
+    "São Cristovão Futebol e Regatas (RJ)",
+    "São José-SP (SP)",
+    "São Raimundo-PA (PA)",
+    "Sergipe (SE)",
+    "Serra (ES)",
+    "Serrano-BA (BA)",
+    "Serrano Sport Club (BA)",
+    "Social Futebol Clube (MG)",
+    "Sociedade Atletico Ceilandense (DF)",
+    "Sociedade Desportiva Serra Futebol Clube (ES)",
+    "Sociedade Esportiva Gama (DF)",
+    "Sociedade Esportiva Palmeiras (SP)",
+    "Sociedade Esportiva Recreativa Caxias do Sul (RS)",
+    "Sociedade Esportiva River Plate (SE)",
+    "Sociedade Esportiva Vila Aurora (MT)",
+    "Sociedade Esportiva Ypiranga Futebol Clube (PE)",
+    "Sociedade Imperatriz de Desportos (MA)",
+    "Sport (PE)",
+    "Sport Club do Recife (PE)",
+    "Sport Clube Corinthians Alagoano (AL)",
+    "Sport Clube Santa Cruz (RN)",
+    "Sport Club Genus de Porto Velho (RO)",
+    "Sport Club Internacional (RS)",
+    "Sport Club Juiz de Fora (MG)",
+    "Sport Club São José Ltda (PR)",
+    "Sport Club São Paulo (RS)",
+    "Sport Club Ulbra (RS)",
+    "Toledo Colônia Work (PR)",
+    "Tubarão (SC)",
+    "Tuna Luso (PA)",
+    "Tuna Luso Brasileira (PA)",
+    "Tupí Futebol Clube (SP)",
+    "Uberaba Sporte Clube (MG)",
+    "Uberlândia (MG)",
+    "União (MT)",
+    "União Barbarense Futebol Clube (SP)",
+    "União Futebol Clube (SP)",
+    "União Futebol Clube (AL)",
+    "União Recreativa dos Trabalhadores (MG)",
+    "União São João de Araras (SP)",
+    "Valeriodoce Esporte Clube (MG)",
+    "Vasco (RJ)",
+    "Viçosa Esporte Clube (CE)",
+    "Villa Nova (MG)",
+    "Villa Nova Atlético Clube (MG)",
+    "Vitória (BA)",
+    "Vitória da Conquista (BA)",
+    "Vitória-ES (ES)",
+    "Votoraty Futebol Clube (SP)"
+  ]
+}

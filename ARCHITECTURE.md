@@ -633,6 +633,22 @@ aderir.
   subsedes/PDEs individuais do catálogo, alianças em massa, curadoria
   ativa/extinta, fluxo self-service "reivindicar torcida".
 
+### 5.9 Escudos de `Afiliacao` — pipeline Soccer Wiki (2026-07-13)
+
+Preenchimento de `Afiliacao.escudoUrl` para o grid de clubes no onboarding.
+Detalhe operacional e **plano de progresso** da inteligência de casamento:
+`docs/data/escudos-afiliacoes.md`.
+
+- **Hospedagem**: Cloudinary `torcida/catalogo/escudos/<slug>.png` (PNG transparente).
+- **Scripts**: `seed:afiliacoes` (TheSportsDB), `seed:migrate-escudos-cloudinary`
+  (assets locais), `seed:escudos-soccerwiki` (Soccer Wiki, scrape offset 0–300).
+- **Casamento**: `inferirUfDoNome`, `saoMesmoClube`, `chaveGrupoClube`, bloqueio de
+  homônimos, score ≥ 90, atribuição 1:1. Relatório versionado em
+  `packages/db/src/data/escudos-soccerwiki-report.json`.
+- **Estado (2026-07-13)**: 112/367 com escudo; 87 novos via Wiki na rodada estrita;
+  255 pendentes (aliases, duplicatas, clubes fora da listagem Wiki).
+- **Regra de produto**: escudo errado é pior que vazio — matching conservador.
+
 ## 6. Itens em aberto (aguardando decisão)
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.

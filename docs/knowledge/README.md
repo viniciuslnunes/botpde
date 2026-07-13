@@ -16,6 +16,9 @@
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
 
+**Dados operacionais relacionados** (fora de `knowledge/`): escudos de clubes
+(`Afiliacao`) — `docs/data/escudos-afiliacoes.md` (plano Soccer Wiki + Cloudinary).
+
 ## Protocolo de manutenção
 
 1. **Fonte + data em tudo.** Prefira imprensa estabelecida (ge/Globo, Lance!,
