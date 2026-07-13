@@ -2,8 +2,9 @@
 
 > **Inteligência de casamento clube ↔ imagem** para o onboarding (grid de escudos).
 > Fonte editorial: `docs/knowledge/diretorio-nacional.md`; decisão arquitetural:
-> `ARCHITECTURE.md` §5.9. Agentes: `data-model` (modelo/slug), `research-dominio`
-> (fontes e homônimos), `implementation` (scripts).
+> `ARCHITECTURE.md` §5.9. Metadados numéricos do card (inscritos digitais, stats
+> da plataforma): `docs/data/torcedores-estimados.md`. Agentes: `data-model`
+> (modelo/slug), `research-dominio` (fontes e homônimos), `implementation` (scripts).
 
 ## Objetivo
 

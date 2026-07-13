@@ -3,6 +3,7 @@ import { db, saoMesmoClube, indiceAfiliacaoCanonica } from '@torcida/db'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
 import {
   calcularStatsClubesOnboarding,
+  getTetoLimiteTorcedoresGlobal,
   type StatsClubeOnboarding,
 } from '@/lib/onboarding-clube-stats'
 
@@ -17,8 +18,59 @@ const STATS_VAZIAS: StatsClubeOnboarding = {
   torcedoresOnline: 0,
 }
 
+/** Preferência dado real da plataforma sobre teto LIMITE_ATE genérico no card. */
+function aplicarEstimativaRealNoCard(
+  row: {
+    torcedoresEstimados: number | null
+    torcedoresEstimadosFonte: string | null
+    torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
+  },
+  stats: StatsClubeOnboarding,
+  tetoLimiteGlobal: number,
+): {
+  torcedoresEstimados: number | null
+  torcedoresEstimadosFonte: string | null
+  torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
+} {
+  if (row.torcedoresEstimadosTipo === 'IBOPE_DIGITAL') return row
+
+  const realPlataforma =
+    stats.torcedoresTotal > 0
+      ? stats.torcedoresTotal
+      : stats.sociosTotal > 0
+        ? stats.sociosTotal
+        : null
+
+  if (realPlataforma != null && realPlataforma > 0) {
+    return {
+      torcedoresEstimados: realPlataforma,
+      torcedoresEstimadosFonte:
+        'Contagem real de torcedores e sócios aprovados na plataforma Torcida SaaS',
+      torcedoresEstimadosTipo: 'PLATAFORMA',
+    }
+  }
+
+  if (row.torcedoresEstimadosTipo === 'LIMITE_ATE') {
+    return {
+      torcedoresEstimados: tetoLimiteGlobal,
+      torcedoresEstimadosFonte:
+        `Estimativa conservadora: menor valor conhecido na base (IBOPE + plataforma); ` +
+        `até ${tetoLimiteGlobal.toLocaleString('pt-BR')} torcedores ou menos`,
+      torcedoresEstimadosTipo: 'LIMITE_ATE',
+    }
+  }
+
+  return row
+}
+
+async function resolverTetoLimiteGlobal(): Promise<number> {
+  return getTetoLimiteTorcedoresGlobal()
+}
+
 // ─── Tipos de retorno explícitos (a inferência do Prisma quebra silenciosamente
 // neste schema — ver ARCHITECTURE.md §5.2). ─────────────────────────────────────
+
+export type TorcedoresEstimadosTipo = 'IBOPE_DIGITAL' | 'LIMITE_ATE' | 'PLATAFORMA'
 
 export type AfiliacaoOnboarding = {
   id: string
@@ -30,6 +82,7 @@ export type AfiliacaoOnboarding = {
   serie: SerieCampeonato | null
   torcedoresEstimados: number | null
   torcedoresEstimadosFonte: string | null
+  torcedoresEstimadosTipo: TorcedoresEstimadosTipo | null
   stats: StatsClubeOnboarding
 }
 export type SedeOnboarding = {
@@ -65,15 +118,38 @@ export type EstadoOnboarding = {
   temMembro: boolean
 }
 
+export type RegiaoOnboarding = {
+  uf: string
+  total: number
+}
+
+/**
+ * UFs com clubes no catálogo (sugestão por região no passo Clube).
+ */
+export const getRegioesOnboarding = cache(async (): Promise<RegiaoOnboarding[]> => {
+  type GrupoUf = { estado: string | null; _count: { _all: number } }
+  const grupos: GrupoUf[] = await db.afiliacao.groupBy({
+    by: ['estado'],
+    where: { estado: { not: null } },
+    _count: { _all: true },
+  })
+  return grupos
+    .filter((g): g is GrupoUf & { estado: string } => g.estado != null && g.estado !== '')
+    .map((g) => ({ uf: g.estado, total: g._count._all }))
+    .sort((a, b) => a.uf.localeCompare(b.uf, 'pt-BR'))
+})
+
 /**
  * Lista de clubes (Afiliacao) para o passo de seleção do onboarding.
  * Ordena clubes com escudo primeiro (melhor visual do grid) e depois por nome.
  * Quando `busca` é informada, filtra clubes cujo **nome ou apelido começa**
  * com o termo (case-insensitive) — ex.: "co" → Corinthians, Coritiba.
+ * `uf` restringe por estado (sugestão regional).
  */
 export const getAfiliacoesParaOnboarding = cache(
-  async (busca?: string): Promise<AfiliacaoOnboarding[]> => {
+  async (busca?: string, uf?: string): Promise<AfiliacaoOnboarding[]> => {
     const termo = busca?.trim()
+    const estado = uf?.trim().toUpperCase() || undefined
     type AfiliacaoRow = {
       id: string
       nome: string
@@ -84,19 +160,26 @@ export const getAfiliacoesParaOnboarding = cache(
       serie: SerieCampeonato | null
       torcedoresEstimados: number | null
       torcedoresEstimadosFonte: string | null
+      torcedoresEstimadosTipo: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
       _count: { tenants: number }
     }
     type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
 
+    const filtros = []
+    if (termo) {
+      filtros.push({
+        OR: [
+          { nome: { startsWith: termo, mode: 'insensitive' as const } },
+          { apelido: { startsWith: termo, mode: 'insensitive' as const } },
+        ],
+      })
+    }
+    if (estado) {
+      filtros.push({ estado })
+    }
+
     const afiliacoes: AfiliacaoRow[] = await db.afiliacao.findMany({
-      where: termo
-        ? {
-            OR: [
-              { nome: { startsWith: termo, mode: 'insensitive' } },
-              { apelido: { startsWith: termo, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
+      where: filtros.length > 0 ? { AND: filtros } : undefined,
       select: {
         id: true,
         nome: true,
@@ -107,6 +190,7 @@ export const getAfiliacoesParaOnboarding = cache(
         serie: true,
         torcedoresEstimados: true,
         torcedoresEstimadosFonte: true,
+        torcedoresEstimadosTipo: true,
         _count: { select: { tenants: true } },
       },
       orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
@@ -136,11 +220,16 @@ export const getAfiliacoesParaOnboarding = cache(
         canon.torcedoresEstimadosFonte ??
         grupo.find((g) => g.torcedoresEstimadosFonte)?.torcedoresEstimadosFonte ??
         null
+      const torcedoresEstimadosTipo =
+        canon.torcedoresEstimadosTipo ??
+        grupo.find((g) => g.torcedoresEstimadosTipo)?.torcedoresEstimadosTipo ??
+        null
       unicas[idxGrupo] = {
         ...canon,
         escudoUrl,
         torcedoresEstimados,
         torcedoresEstimadosFonte,
+        torcedoresEstimadosTipo,
         idsGrupo: existente.idsGrupo,
       }
     }
@@ -149,19 +238,47 @@ export const getAfiliacoesParaOnboarding = cache(
       unicas.map((u) => ({ canonicalId: u.id, afiliacaoIds: u.idsGrupo })),
     )
 
-    return unicas
-      .map((afiliacao) => ({
-        id: afiliacao.id,
-        nome: afiliacao.nome,
-        apelido: afiliacao.apelido,
-        escudoUrl: afiliacao.escudoUrl,
-        cidade: afiliacao.cidade,
-        estado: afiliacao.estado,
-        serie: afiliacao.serie,
-        torcedoresEstimados: afiliacao.torcedoresEstimados,
-        torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
-        stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
-      }))
+    const tetoLimiteGlobal = await resolverTetoLimiteGlobal()
+
+    const baseRows = unicas.map((afiliacao) => ({
+      id: afiliacao.id,
+      nome: afiliacao.nome,
+      apelido: afiliacao.apelido,
+      escudoUrl: afiliacao.escudoUrl,
+      cidade: afiliacao.cidade,
+      estado: afiliacao.estado,
+      serie: afiliacao.serie,
+      torcedoresEstimados: afiliacao.torcedoresEstimados,
+      torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+      torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
+      stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
+    }))
+
+    return baseRows
+      .map((afiliacao) => {
+        const estimativa = aplicarEstimativaRealNoCard(
+          {
+            torcedoresEstimados: afiliacao.torcedoresEstimados,
+            torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+            torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
+          },
+          afiliacao.stats,
+          tetoLimiteGlobal,
+        )
+        return {
+          id: afiliacao.id,
+          nome: afiliacao.nome,
+          apelido: afiliacao.apelido,
+          escudoUrl: afiliacao.escudoUrl,
+          cidade: afiliacao.cidade,
+          estado: afiliacao.estado,
+          serie: afiliacao.serie,
+          torcedoresEstimados: estimativa.torcedoresEstimados,
+          torcedoresEstimadosFonte: estimativa.torcedoresEstimadosFonte,
+          torcedoresEstimadosTipo: estimativa.torcedoresEstimadosTipo,
+          stats: afiliacao.stats,
+        }
+      })
       .sort((a, b) => {
         const comEscudo = (x: AfiliacaoOnboarding) => (x.escudoUrl ? 0 : 1)
         const diff = comEscudo(a) - comEscudo(b)

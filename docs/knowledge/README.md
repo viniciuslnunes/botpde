@@ -15,9 +15,14 @@
 | [`cultura-ideologia.md`](cultura-ideologia.md) | Origem, gerações, escolas de samba, política e valores | `ux-review`, `news-curator`, `product-strategy` |
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
+| [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital, limitações inscritos vs torcedores | `research-dominio`, `product-strategy`, `ux-review` |
 
-**Dados operacionais relacionados** (fora de `knowledge/`): escudos de clubes
-(`Afiliacao`) — `docs/data/escudos-afiliacoes.md` (plano Soccer Wiki + Cloudinary).
+**Dados operacionais relacionados** (fora de `knowledge/`):
+
+| Doc | Conteúdo |
+|-----|----------|
+| [`docs/data/escudos-afiliacoes.md`](../data/escudos-afiliacoes.md) | Escudos de `Afiliacao` (Soccer Wiki, Ogol, Cloudinary) |
+| [`docs/data/torcedores-estimados.md`](../data/torcedores-estimados.md) | Base digital IBOPE + teto conservador no onboarding |
 
 ## Protocolo de manutenção
 

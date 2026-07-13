@@ -22,6 +22,7 @@ import type {
   TorcidaOnboarding,
   DepartamentoOnboarding,
   SedeOnboarding,
+  RegiaoOnboarding,
 } from '@/lib/onboarding'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'vinculo' | 'concluindo'
@@ -44,11 +45,12 @@ const SERIE_LABEL: Record<string, string> = {
 
 type Props = {
   afiliacoesIniciais: AfiliacaoOnboarding[]
+  regioes: RegiaoOnboarding[]
   ufs: string[]
   nomeInicial: string
 }
 
-export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props) {
+export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial }: Props) {
   const [passo, setPasso] = useState<Passo>('clube')
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
@@ -149,6 +151,7 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
             >
               <PassoClube
                 afiliacoesIniciais={afiliacoesIniciais}
+                regioes={regioes}
                 onSelecionar={selecionarClube}
               />
             </m.div>
@@ -284,29 +287,77 @@ function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
 
 function PassoClube({
   afiliacoesIniciais,
+  regioes,
   onSelecionar,
 }: {
   afiliacoesIniciais: AfiliacaoOnboarding[]
+  regioes: RegiaoOnboarding[]
   onSelecionar: (a: AfiliacaoOnboarding) => void
 }) {
   const [busca, setBusca] = useState('')
+  const [ufFiltro, setUfFiltro] = useState('')
   const [lista, setLista] = useState(afiliacoesIniciais)
   const [buscando, startBusca] = useTransition()
 
-  function onBusca(valor: string) {
-    setBusca(valor)
+  function recarregar(valor: string, uf: string) {
     startBusca(async () => {
-      const res = await buscarAfiliacoes(valor)
+      const res = await buscarAfiliacoes(valor || undefined, uf || undefined)
       setLista(res)
     })
   }
+
+  function onBusca(valor: string) {
+    setBusca(valor)
+    recarregar(valor, ufFiltro)
+  }
+
+  function onUfFiltro(uf: string) {
+    const prox = ufFiltro === uf ? '' : uf
+    setUfFiltro(prox)
+    recarregar(busca, prox)
+  }
+
+  const tituloGrid =
+    ufFiltro && !busca
+      ? `Clubes em ${ufFiltro}`
+      : busca
+        ? `Resultados para "${busca}"`
+        : null
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Qual clube você torce?</h1>
       <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Escolha o time do seu coração. É só um clique.
+        Escolha o time do seu coração. Filtre por estado ou busque pelo nome.
       </p>
+
+      {regioes.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Sugestões por região
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {regioes.map((r) => {
+              const ativo = ufFiltro === r.uf
+              return (
+                <button
+                  key={r.uf}
+                  type="button"
+                  onClick={() => onUfFiltro(r.uf)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    ativo
+                      ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
+                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--color-primary))]/50'
+                  }`}
+                >
+                  {r.uf}
+                  <span className="ml-1 opacity-70">({r.total})</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="relative mt-5">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
@@ -325,10 +376,15 @@ function PassoClube({
         </div>
       ) : lista.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-[rgb(var(--border))] p-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhum clube encontrado para &quot;{busca}&quot;. Tente outro nome.
+          Nenhum clube encontrado
+          {busca ? ` para "${busca}"` : ufFiltro ? ` em ${ufFiltro}` : ''}. Tente outro filtro ou nome.
         </div>
       ) : (
-        <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <>
+          {tituloGrid && (
+            <p className="mt-5 text-sm font-medium text-[rgb(var(--foreground-muted))]">{tituloGrid}</p>
+          )}
+          <ul className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${tituloGrid ? 'mt-3' : 'mt-5'}`}>
           {lista.map((a) => (
             <li key={a.id}>
               <button
@@ -357,12 +413,14 @@ function PassoClube({
                 <ClubeOnboardingMeta
                   torcedoresEstimados={a.torcedoresEstimados}
                   torcedoresEstimadosFonte={a.torcedoresEstimadosFonte}
+                  torcedoresEstimadosTipo={a.torcedoresEstimadosTipo}
                   stats={a.stats}
                 />
               </button>
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   )

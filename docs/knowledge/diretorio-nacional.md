@@ -9,7 +9,10 @@
 > provisionado como **tenants vazios** via `seed:torcidas-tenants` (sem
 > presidente — transferência no super-admin). **Escudos de clubes** (`Afiliacao`):
 > pipeline Soccer Wiki + Cloudinary — ver `docs/data/escudos-afiliacoes.md` e
-> `ARCHITECTURE.md` §5.9 (112/367 com escudo em 2026-07-13). Ver `ARCHITECTURE.md` §5.8.
+> `ARCHITECTURE.md` §5.9 (255/325 com escudo em 2026-07-13). **Estimativa de base
+> digital** no card do onboarding: IBOPE Top 50 + teto 10 mil — ver
+> `docs/data/torcedores-estimados.md`, `ARCHITECTURE.md` §5.10. Tenants vazios:
+> `ARCHITECTURE.md` §5.8.
 > `.md` segue como visão editorial (negrito = principal, notas de homônimos/backlog);
 > o catálogo + tenants são o dado navegável no onboarding.
 

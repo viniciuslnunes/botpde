@@ -16,8 +16,9 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
 - Schema: `packages/db/prisma/schema.prisma` (43 models, prefixo `saas_`; tabelas
   legadas do bot sem prefixo).
 - Docs: `ARCHITECTURE.md` §2.2, `docs/data/entidades-novas.md`, `docs/data/modulo-salas.md`
-  (módulo Salas/Meet), `docs/data/modulo-loja.md` (módulo Loja) e
-  `docs/data/escudos-afiliacoes.md` (pipeline e plano de escudos de `Afiliacao`).
+  (módulo Salas/Meet), `docs/data/modulo-loja.md` (módulo Loja),
+  `docs/data/escudos-afiliacoes.md` (pipeline de escudos de `Afiliacao`) e
+  `docs/data/torcedores-estimados.md` (base digital IBOPE + enum `TorcedoresEstimadosTipo`).
 - Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).
 - O projeto usa **`db push`** (não há pasta de migrations). Mudança de schema é
   sincronizada, não versionada em migration files.
@@ -56,6 +57,11 @@ nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/
 - `torcidas-brasil.md` — nem todo tenant é associação com mensalidade (barra
   brava = livre adesão): campos de cadastro/mensalidade devem ser opcionais no
   modelo, não invariantes.
+- `Afiliacao` global (onboarding): além de `escudoUrl`/`serie`, campos
+  `torcedoresEstimados`, `torcedoresEstimadosFonte`, `torcedoresEstimadosTipo`
+  (`IBOPE_DIGITAL` | `LIMITE_ATE`) — dados de seed offline, não runtime.
+  Ver `docs/data/torcedores-estimados.md`. `User.ultimoAcessoEm` para presença
+  “online” (separado da estimativa IBOPE).
 - `aliancas.md` — aliança é relação curada torcida↔torcida (tenant raiz ↔
   tenant raiz), opt-in, simétrica na leitura; rivalidade NÃO vira entidade de
   produto — no máximo lista de supressão para recomendações.

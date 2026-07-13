@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { getAfiliacoesParaOnboarding, getEstadoOnboarding } from '@/lib/onboarding'
+import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
 import { OnboardingWizard } from './wizard'
 
@@ -32,11 +32,15 @@ export default async function OnboardingPage() {
     redirect('/auth/contexto')
   }
 
-  const afiliacoesIniciais = await getAfiliacoesParaOnboarding()
+  const [afiliacoesIniciais, regioes] = await Promise.all([
+    getAfiliacoesParaOnboarding(),
+    getRegioesOnboarding(),
+  ])
 
   return (
     <OnboardingWizard
       afiliacoesIniciais={afiliacoesIniciais}
+      regioes={regioes}
       ufs={UFS}
       nomeInicial={session.user.name ?? ''}
     />

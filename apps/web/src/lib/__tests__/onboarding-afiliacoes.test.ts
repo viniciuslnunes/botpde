@@ -50,7 +50,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         estado: 'SP',
         serie: 'A',
         torcedoresEstimados: 30_000_000,
-        torcedoresEstimadosFonte: 'Wikipedia PT',
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
         _count: { tenants: 0 },
       },
       {
@@ -63,6 +64,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 2 },
       },
     ])
@@ -87,6 +89,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 3 },
       },
       {
@@ -98,7 +101,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         estado: 'SP',
         serie: 'A',
         torcedoresEstimados: 30_000_000,
-        torcedoresEstimadosFonte: 'Wikipedia PT',
+        torcedoresEstimadosFonte: 'IBOPE Repucom',
+        torcedoresEstimadosTipo: 'IBOPE_DIGITAL',
         _count: { tenants: 0 },
       },
     ])
@@ -120,9 +124,13 @@ describe('getAfiliacoesParaOnboarding', () => {
     expect(afiliacaoFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          OR: [
-            { nome: { startsWith: 'co', mode: 'insensitive' } },
-            { apelido: { startsWith: 'co', mode: 'insensitive' } },
+          AND: [
+            {
+              OR: [
+                { nome: { startsWith: 'co', mode: 'insensitive' } },
+                { apelido: { startsWith: 'co', mode: 'insensitive' } },
+              ],
+            },
           ],
         },
       }),
@@ -141,6 +149,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'C',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 0 },
       },
       {
@@ -153,6 +162,7 @@ describe('getAfiliacoesParaOnboarding', () => {
         serie: 'A',
         torcedoresEstimados: null,
         torcedoresEstimadosFonte: null,
+        torcedoresEstimadosTipo: null,
         _count: { tenants: 1 },
       },
     ])
@@ -161,5 +171,18 @@ describe('getAfiliacoesParaOnboarding', () => {
     const lista = await getAfiliacoesParaOnboarding('ordem-test')
 
     expect(lista.map((a) => a.id)).toEqual(['com', 'sem'])
+  })
+
+  it('filtra por UF quando informada', async () => {
+    afiliacaoFindMany.mockResolvedValue([])
+
+    const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
+    await getAfiliacoesParaOnboarding(undefined, 'BA')
+
+    expect(afiliacaoFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { AND: [{ estado: 'BA' }] },
+      }),
+    )
   })
 })

@@ -72,6 +72,20 @@
 - **Escola de samba da torcida** — braço carnavalesco (Gaviões, Mancha,
   Camisa 12, TUP); envolve **barracão**, **carnavalesco**, **alas**.
 
+## Dados públicos e onboarding (card de clube)
+
+- **Inscritos digitais** — soma de seguidores/inscritos nos perfis **oficiais**
+  do clube em redes (IBOPE Repucom, Top 50). Copy do produto: “X inscritos
+  digitais”. **Não** significa torcedores presenciais nem deduplica pessoas.
+- **Base digital** — presença do clube nas redes; no produto, tier `IBOPE_DIGITAL`
+  (Top 50) vs `LIMITE_ATE` (fora do ranking, teto conservador).
+- **Torcedores estimados** — rótulo genérico na UI para clubes fora do Top 50:
+  “até 10 mil torcedores ou menos” (estimativa conservadora, não dado IBOPE).
+- **Online (plataforma)** — usuários com sessão ativa na janela de presença
+  (`ultimoAcessoEm`); dado **próprio** do SaaS, separado de inscritos digitais.
+
+Ver `docs/knowledge/futebol-dados-publicos.md` e `docs/data/torcedores-estimados.md`.
+
 ## Uso no produto
 
 - Copy do portal fala com o **associado** ("sua torcida", "sua sede", "próxima

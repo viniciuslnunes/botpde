@@ -15,8 +15,11 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 ## Como verificar
 - Typecheck/lint: `pnpm --filter @torcida/web lint` e o build de tipos do CI
   (`tsc --noEmit`) devem passar.
-- Testes: `pnpm --filter @torcida/web test` (Vitest). Cobrem hoje RBAC, rate-limit e
-  visibilidade cross-tenant.
+- Testes: `pnpm --filter @torcida/web test` (Vitest). Cobrem RBAC, rate-limit,
+  visibilidade, onboarding (afiliacoes, stats, format-contagem).
+- Dados offline: `pnpm --filter @torcida/db test:torcedores-estimados` após mudar
+  `ibope-ranking-digital.json` ou `torcedores-estimados.js`.
+- Coleta IBOPE: `pnpm --filter @torcida/db coleta:ibope-ranking -- --validate` antes do seed.
 - Não invente comandos: confirme scripts em `package.json` antes de rodar.
 
 ## Definition of Done (deste repo)
@@ -52,6 +55,9 @@ Em mudanças que tocam membros/cadastro, verifique também:
 - Performance (quando a mudança toca portal/feed/mensagens): rodar ou revisar
   `apps/web/e2e/nav-latency.portal.spec.ts` se disponível; conferir que não há
   waterfall client desnecessário (SSR + API duplicada) nem `setInterval` cru.
+- Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
+  (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
+  inscritos digitais com torcedores presenciais.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

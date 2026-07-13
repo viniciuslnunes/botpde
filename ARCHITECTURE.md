@@ -651,7 +651,31 @@ Detalhe operacional e **plano de progresso** da inteligência de casamento:
 - **Regra de produto**: escudo errado é pior que vazio — matching conservador;
   placeholder neutro no grid (`EscudoClube`) quando sem `escudoUrl`.
 
-## 6. Itens em aberto (aguardando decisão)
+### 5.10 Estimativa de torcedores / base digital (2026-07-13)
+
+Metadados no card de clube do onboarding (`ClubeOnboardingMeta`): estimativa
+pública + contagens da plataforma. Detalhe: `docs/data/torcedores-estimados.md`;
+inteligência de fontes: `docs/knowledge/futebol-dados-publicos.md`.
+
+- **Fonte Top 50**: IBOPE Repucom — Ranking Digital (soma inscritos oficiais em
+  Facebook, X, Instagram, YouTube, TikTok). **Offline only** — nunca em runtime.
+- **Campos `Afiliacao`**: `torcedoresEstimados`, `torcedoresEstimadosFonte`,
+  `torcedoresEstimadosTipo` (`IBOPE_DIGITAL` | `LIMITE_ATE`).
+- **Tier IBOPE**: total publicado (~35 clubes com valor exato Jun/2026 + integrantes
+  Top 50 sem total → piso 471.612 = menor publicado, Botafogo-PB 49º).
+- **Tier LIMITE_ATE**: clubes sem dado próprio → teto **dinâmico** (menor IBOPE curado
+  × menor clube na plataforma); copy “até X torcedores ou menos”. Tier **PLATAFORMA**
+  quando há contagem real no SaaS. **Não** usar 10 mil fixo.
+- **Dados da plataforma** (separados): sócios/torcedores + online via
+  `User.ultimoAcessoEm` (heartbeat throttled no callback de sessão, janela 15 min),
+  agregados por clube canônico (`saoMesmoClube`) em `onboarding-clube-stats.ts`.
+- **Scripts**: `seed:torcedores-estimados`, `test:torcedores-estimados`.
+  Dados: `ibope-ranking-digital.js`, `torcedores-estimados.js` (`resolverTorcedoresEstimados`).
+- **Estado (2026-07-13)**: 318 afiliações seedadas (44 IBOPE, 274 limite ≤10 mil).
+- **Manutenção**: coleta mensal → `ibope-ranking-digital.json` via `coleta:ibope-ranking` → re-seed.
+- **Onboarding Fase 3**: filtro UF no passo clube; comunidade nacional para torcedor global
+  sem torcida na plataforma (`comunidade-nacional-shell.tsx`).
+
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
 - ~~**Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)**~~

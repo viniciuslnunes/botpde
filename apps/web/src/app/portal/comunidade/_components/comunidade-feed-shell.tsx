@@ -37,6 +37,8 @@ interface ComunidadeFeedShellProps {
   bloqueioPublicacao?: string | null
   somentePublico?: boolean
   filtro?: 'descobrir' | 'seguindo'
+  /** Clube do torcedor global (banner quando feed usa tenant proxy). */
+  clubeNacional?: { id: string; nome: string; apelido: string | null } | null
 }
 
 function ComunicadosFallback() {
@@ -72,6 +74,7 @@ export function ComunidadeFeedShell({
   bloqueioPublicacao = null,
   somentePublico = false,
   filtro = 'descobrir',
+  clubeNacional = null,
 }: ComunidadeFeedShellProps) {
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
@@ -161,6 +164,16 @@ export function ComunidadeFeedShell({
       </aside>
 
       <main className="min-w-0 space-y-4">
+        {clubeNacional && somentePublico && (
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Feed da comunidade nacional de{' '}
+            <strong className="text-[rgb(var(--foreground))]">
+              {clubeNacional.apelido || clubeNacional.nome}
+            </strong>
+            . Publicações públicas das torcidas do clube na plataforma.
+          </div>
+        )}
+
         <div className="sticky top-14 z-20 -mx-4 min-w-0 space-y-3 overflow-x-clip bg-[rgb(var(--background-subtle))]/90 px-4 pb-2 pt-1 backdrop-blur-md lg:top-16 lg:mx-0 lg:px-0">
           <ComunidadeSearchBar />
           <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
