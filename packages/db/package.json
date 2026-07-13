@@ -15,6 +15,7 @@
     "seed:afiliacoes": "node --use-system-ca scripts/seed-afiliacoes.js",
     "seed:migrate-escudos-cloudinary": "node --use-system-ca scripts/migrate-escudos-cloudinary.js",
     "seed:torcidas-nacional": "node scripts/seed-torcidas-nacional.js",
+    "seed:torcidas-tenants": "node scripts/seed-torcidas-tenants.js",
     "seed:torcidas-conhecidas": "node --use-system-ca scripts/seed-torcidas-conhecidas.js",
     "scrape:organizadas": "node --use-system-ca scripts/scrape-organizadas.mjs",
     "test:afiliacoes": "node scripts/test-afiliacoes.js",

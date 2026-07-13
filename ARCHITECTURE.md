@@ -594,10 +594,11 @@ NextAuth/Next.js.
 
 ### 5.8 Catálogo nacional de torcidas conhecidas — `TorcidaConhecida` (2026-07-12)
 
-Terceiro catálogo do onboarding, ao lado de `Afiliacao` (clubes) e `Tenant`
-(torcidas reais na plataforma). `TorcidaConhecida` é uma **referência global**
-(não multi-tenant, como `Afiliacao`) de organizadas conhecidas do Brasil que
-**ainda não são tenants** — para descoberta e reconhecimento no onboarding.
+Catálogo global (não multi-tenant, como `Afiliacao`) de organizadas conhecidas do
+Brasil. A partir de 2026-07-13, cada entrada **vira também um `Tenant` vazio**
+(provisionado por seed) — a plataforma já “conhece” a torcida antes do
+presidente assumir; o super-admin transfere o cargo owner quando a diretoria
+aderir.
 
 - **Fonte de dados**: scraper determinístico de `organizadasbrasil.com`
   (`packages/db/scripts/scrape-organizadas.mjs`, 27 estados) grava o dataset
@@ -606,22 +607,31 @@ Terceiro catálogo do onboarding, ao lado de `Afiliacao` (clubes) e `Tenant`
   Fonte colaborativa → **referência a confirmar** (datas/grafias variam; há
   extintas/renomeadas/banidas). `fundacao` é texto livre; flag `ativa` para
   curadoria futura. Perfis âncora e relações seguem em `docs/knowledge/`.
-- **Pipeline** (reusa o de `seed-afiliacoes`): `seed:torcidas-conhecidas`
-  (`scripts/seed-torcidas-conhecidas.js`) faz upsert idempotente por slug,
-  resolve/cria a `Afiliacao` do clube por `normalizeNome(nome)|UF`, e hospeda os
-  logos no Cloudinary `torcida/catalogo/logos/<slug>` (`FOLDER_LOGOS`), pull da
-  URL remota. **Não confundir** com `seed:torcidas-nacional`, que cria Tenants.
+- **Pipeline catálogo**: `seed:torcidas-conhecidas`
+  (`scripts/seed-torcidas-conhecidas.js`) — upsert idempotente por slug,
+  resolve/cria a `Afiliacao` do clube, logos no Cloudinary
+  `torcida/catalogo/logos/<slug>`. **Não confundir** com `seed:torcidas-nacional`
+  (dataset curado `torcidas-brasil.js`, ~30 âncoras) nem com
+  `seed:torcidas-tenants` (cria os 546 tenants a partir do catálogo no banco).
+- **Pipeline tenants**: `seed:torcidas-tenants`
+  (`scripts/seed-torcidas-tenants.js`) lê `TorcidaConhecida` com clube
+  resolvido, cria/atualiza `Tenant` + cargos de sistema + `Sede` principal,
+  linkando `Tenant.torcidaConhecidaId` (único). Idempotente; reutiliza tenants
+  existentes (ex.: `pde-gavioes-fiel`) por nome+afiliacao normalizados. Sem
+  owner — transferível via super-admin (`transferirOwnerAction`).
 - **Modelo**: `TorcidaConhecida` (`@@map("saas_torcidas_conhecidas")`) com
-  relação opcional a `Afiliacao` (`SetNull`). `PerfilTorcedor.torcidaConhecidaId`
-  registra qual organizada o usuário reconhece no onboarding (base para
-  matching/recrutamento futuro).
-- **Onboarding**: `getTorcidasConhecidasPorAfiliacao` (em `lib/onboarding.ts`)
-  lista as conhecidas do clube, **excluindo** as que já têm tenant ativo com nome
-  equivalente (dedup por nome normalizado). O passo "torcida" mostra uma seção
-  informativa; selecionar uma conclui como torcedor global gravando o vínculo.
+  relação opcional a `Afiliacao`. `Tenant.torcidaConhecidaId` liga tenant aos
+  dados ricos do catálogo (fundação, lema, sede, logo). `PerfilTorcedor.torcidaConhecidaId`
+  permanece no schema para matching futuro, mas o onboarding não grava mais
+  (torcidas são tenants reais).
+- **Onboarding**: `getTorcidasPorAfiliacao` lista tenants ativos do clube; o
+  usuário solicita entrada (fica `PENDENTE` até liderança/presidente aprovar).
+  Subsede/PDE ativa antes do presidente: `Sede.tenantId` opcional no modelo.
+- **Super-admin**: `/super-admin/torcidas` — seletor buscável para transferir
+  owner, destacando torcidas sem presidente.
 - **Fora de escopo (fase 2)**: notificar "sua torcida entrou na plataforma",
-  claim de `TorcidaConhecida` por um tenant (`Tenant.torcidaConhecidaId`),
-  curadoria ativa/extinta, e aliança/rivalidade inferida do catálogo.
+  subsedes/PDEs individuais do catálogo, alianças em massa, curadoria
+  ativa/extinta, fluxo self-service "reivindicar torcida".
 
 ## 6. Itens em aberto (aguardando decisão)
 

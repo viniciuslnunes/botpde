@@ -7,11 +7,9 @@ import { z } from 'zod'
 import {
   getAfiliacoesParaOnboarding,
   getTorcidasPorAfiliacao,
-  getTorcidasConhecidasPorAfiliacao,
   getDepartamentosDoTenant,
   type AfiliacaoOnboarding,
   type TorcidaOnboarding,
-  type TorcidaConhecidaOnboarding,
   type DepartamentoOnboarding,
 } from '@/lib/onboarding'
 import { setTenantContextSlug } from '@/lib/tenant-context'
@@ -29,15 +27,6 @@ export async function buscarTorcidas(afiliacaoId: string): Promise<TorcidaOnboar
   if (!session?.user?.id) return []
   if (!z.string().uuid().safeParse(afiliacaoId).success) return []
   return getTorcidasPorAfiliacao(afiliacaoId)
-}
-
-export async function buscarTorcidasConhecidas(
-  afiliacaoId: string,
-): Promise<TorcidaConhecidaOnboarding[]> {
-  const session = await auth()
-  if (!session?.user?.id) return []
-  if (!z.string().uuid().safeParse(afiliacaoId).success) return []
-  return getTorcidasConhecidasPorAfiliacao(afiliacaoId)
 }
 
 export async function buscarDepartamentos(
@@ -109,32 +98,18 @@ export async function salvarClubeRegiao(input: {
 
 /**
  * Marca o onboarding como concluído para um torcedor global (não pertence a
- * nenhuma torcida da plataforma). Opcionalmente registra a organizada conhecida
- * (catálogo nacional) com a qual o torcedor se identifica. Redireciona para a
- * comunidade.
+ * nenhuma torcida da plataforma). Redireciona para a comunidade.
  */
-export async function concluirComoTorcedor(
-  torcidaConhecidaId?: string,
-): Promise<OnboardingActionState> {
+export async function concluirComoTorcedor(): Promise<OnboardingActionState> {
   const session = await auth()
   if (!session?.user?.id) {
     return { message: 'Você precisa estar logado.' }
   }
 
-  const parsed = z.string().uuid().optional().safeParse(torcidaConhecidaId)
-  const conhecidaId = parsed.success ? parsed.data : undefined
-
   await db.perfilTorcedor.upsert({
     where: { userId: session.user.id },
-    create: {
-      userId: session.user.id,
-      onboardingConcluidoEm: new Date(),
-      ...(conhecidaId ? { torcidaConhecidaId: conhecidaId } : {}),
-    },
-    update: {
-      onboardingConcluidoEm: new Date(),
-      ...(conhecidaId ? { torcidaConhecidaId: conhecidaId } : {}),
-    },
+    create: { userId: session.user.id, onboardingConcluidoEm: new Date() },
+    update: { onboardingConcluidoEm: new Date() },
   })
 
   redirect('/portal/comunidade')

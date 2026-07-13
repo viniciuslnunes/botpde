@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
+import { SYSTEM_ROLES } from '@torcida/types'
 import { env, isProd, superAdminEmails } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 
@@ -109,6 +110,11 @@ export type TorcidaOpcao = {
   corPrimaria: string
 }
 
+export type TorcidaTransferencia = TorcidaOpcao & {
+  temOwner: boolean
+  ownerEmail: string | null
+}
+
 /** Lista enxuta para seletores de super-admin. */
 export async function listarTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
   const torcidas: TorcidaOpcao[] = await db.tenant.findMany({
@@ -117,4 +123,35 @@ export async function listarTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
     orderBy: { nome: 'asc' },
   })
   return torcidas
+}
+
+/** Torcidas ativas com indicação de owner — para transferência no super-admin. */
+export async function listarTorcidasParaTransferencia(): Promise<TorcidaTransferencia[]> {
+  const [tenants, owners]: [
+    TorcidaOpcao[],
+    { tenantId: string; user: { email: string | null } }[],
+  ] = await Promise.all([
+    db.tenant.findMany({
+      where: { ativo: true },
+      select: { id: true, slug: true, nome: true, corPrimaria: true },
+      orderBy: { nome: 'asc' },
+    }),
+    db.userRole.findMany({
+      where: { role: { nome: SYSTEM_ROLES.OWNER, isSystem: true } },
+      select: { tenantId: true, user: { select: { email: true } } },
+    }),
+  ])
+
+  const ownerPorTenant = new Map<string, string>()
+  for (const o of owners) {
+    if (o.user.email && !ownerPorTenant.has(o.tenantId)) {
+      ownerPorTenant.set(o.tenantId, o.user.email)
+    }
+  }
+
+  return tenants.map((t) => ({
+    ...t,
+    temOwner: ownerPorTenant.has(t.id),
+    ownerEmail: ownerPorTenant.get(t.id) ?? null,
+  }))
 }

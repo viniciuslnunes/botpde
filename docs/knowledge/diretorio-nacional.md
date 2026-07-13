@@ -4,10 +4,12 @@
 > catálogo completo em `packages/db/src/data/torcidas-conhecidas.js` (546
 > registros com nome, clube, fundação, sede, sub-sedes, lema, site, cidade/UF e
 > logo), gerado por `scripts/scrape-organizadas.mjs` a partir do
-> `organizadasbrasil.com` e semeado em `TorcidaConhecida` via
-> `seed:torcidas-conhecidas` (logos no Cloudinary `torcida/catalogo/logos`).
-> Ver `ARCHITECTURE.md` §5.8. Este `.md` segue como visão editorial (negrito =
-> principal, notas de homônimos/backlog); o dataset é o dado navegável no produto.
+> `organizadasbrasil.com`, semeado em `TorcidaConhecida` via
+> `seed:torcidas-conhecidas` (logos no Cloudinary `torcida/catalogo/logos`) e
+> provisionado como **tenants vazios** via `seed:torcidas-tenants` (sem
+> presidente — transferência no super-admin). Ver `ARCHITECTURE.md` §5.8. Este
+> `.md` segue como visão editorial (negrito = principal, notas de homônimos/backlog);
+> o catálogo + tenants são o dado navegável no onboarding.
 
 > Mapa amplo (não exaustivo) das torcidas organizadas do Brasil por
 > região → estado → clube. Uso: reconhecer a torcida de um tenant, sugerir a

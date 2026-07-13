@@ -1,0 +1,143 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { useActionState, useEffect } from 'react'
+import { useFormStatus } from 'react-dom'
+import { Loader2, Search, UserCheck, UserX } from 'lucide-react'
+import { transferirOwnerAction, type TransferirOwnerState } from './actions'
+import type { TorcidaTransferencia } from '@/lib/tenant-context'
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+    >
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+      {pending ? 'Transferindo…' : 'Transferir propriedade'}
+    </button>
+  )
+}
+
+export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransferencia[] }) {
+  const [busca, setBusca] = useState('')
+  const [tenantId, setTenantId] = useState('')
+  const [state, action] = useActionState<TransferirOwnerState, FormData>(transferirOwnerAction, {})
+
+  const semOwner = useMemo(() => torcidas.filter((t) => !t.temOwner).length, [torcidas])
+
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase('pt-BR')
+    if (!termo) return torcidas
+    return torcidas.filter(
+      (t) =>
+        t.nome.toLocaleLowerCase('pt-BR').includes(termo)
+        || t.slug.toLocaleLowerCase('pt-BR').includes(termo),
+    )
+  }, [busca, torcidas])
+
+  const selecionada = torcidas.find((t) => t.id === tenantId) ?? null
+
+  useEffect(() => {
+    if (state.success) {
+      window.location.reload()
+    }
+  }, [state.success])
+
+  return (
+    <div className="mt-4 space-y-4">
+      <p className="text-xs text-zinc-500">
+        {semOwner} torcida(s) sem presidente — selecione abaixo e informe o e-mail (a pessoa precisa
+        ter conta na plataforma).
+      </p>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+        <input
+          type="search"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar por nome ou slug…"
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+          aria-label="Buscar torcida"
+        />
+      </div>
+
+      <div className="max-h-56 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950">
+        {filtradas.length === 0 ? (
+          <p className="p-4 text-center text-xs text-zinc-500">Nenhuma torcida encontrada.</p>
+        ) : (
+          <ul className="divide-y divide-zinc-800">
+            {filtradas.map((t) => {
+              const ativa = t.id === tenantId
+              return (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => setTenantId(t.id)}
+                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-zinc-900 ${
+                      ativa ? 'bg-violet-950/50' : ''
+                    }`}
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: t.corPrimaria }}
+                    >
+                      {t.nome.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-zinc-200">{t.nome}</span>
+                      <span className="block truncate font-mono text-[11px] text-zinc-500">{t.slug}</span>
+                    </span>
+                    {t.temOwner ? (
+                      <span className="shrink-0 truncate text-[11px] text-zinc-400" title={t.ownerEmail ?? ''}>
+                        {t.ownerEmail}
+                      </span>
+                    ) : (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-950/60 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                        <UserX className="h-3 w-3" />
+                        Sem presidente
+                      </span>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {selecionada && (
+        <form action={action} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <input type="hidden" name="tenantId" value={selecionada.id} />
+          <p className="text-sm text-zinc-300">
+            Transferir <strong className="text-zinc-100">{selecionada.nome}</strong>
+            {selecionada.temOwner && selecionada.ownerEmail && (
+              <span className="text-zinc-500"> (owner atual: {selecionada.ownerEmail})</span>
+            )}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="min-w-0 flex-1">
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="E-mail do presidente"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              />
+              {state.errors?.email?.[0] && (
+                <p className="mt-1 text-xs text-red-400">{state.errors.email[0]}</p>
+              )}
+              {state.message && !state.success && (
+                <p className="mt-1 text-xs text-red-400">{state.message}</p>
+              )}
+            </div>
+            <SubmitButton />
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}

@@ -176,67 +176,6 @@ export const getTorcidasPorAfiliacao = cache(
   },
 )
 
-export type TorcidaConhecidaOnboarding = {
-  id: string
-  nome: string
-  titulo: string | null
-  logoUrl: string | null
-  fundacao: string | null
-  lema: string | null
-  cidade: string | null
-  uf: string | null
-  siteOficial: string | null
-}
-
-/**
- * Normalização local de nomes (acentos, caixa, pontuação) para comparar
- * TorcidaConhecida × Tenant. Espelha `normalizeNome` de
- * `packages/db/src/data/afiliacoes-normalize.js` (não exportado por `@torcida/db`).
- */
-function normalizarNomeTorcida(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
-
-/**
- * Torcidas organizadas conhecidas (catálogo nacional) de um clube, para a seção
- * informativa do onboarding. Exclui as que já estão na plataforma como Tenant
- * ativo do mesmo clube (comparação por nome normalizado).
- */
-export const getTorcidasConhecidasPorAfiliacao = cache(
-  async (afiliacaoId: string): Promise<TorcidaConhecidaOnboarding[]> => {
-    const [conhecidas, tenants]: [TorcidaConhecidaOnboarding[], { nome: string }[]] =
-      await Promise.all([
-        db.torcidaConhecida.findMany({
-          where: { afiliacaoId, ativa: true },
-          select: {
-            id: true,
-            nome: true,
-            titulo: true,
-            logoUrl: true,
-            fundacao: true,
-            lema: true,
-            cidade: true,
-            uf: true,
-            siteOficial: true,
-          },
-          orderBy: { nome: 'asc' },
-        }),
-        db.tenant.findMany({
-          where: { afiliacaoId, ativo: true },
-          select: { nome: true },
-        }),
-      ])
-
-    const nomesTenants = new Set(tenants.map((t) => normalizarNomeTorcida(t.nome)))
-    return conhecidas.filter((c) => !nomesTenants.has(normalizarNomeTorcida(c.nome)))
-  },
-)
-
 /**
  * Departamentos de um tenant, para o passo de sócio.
  */

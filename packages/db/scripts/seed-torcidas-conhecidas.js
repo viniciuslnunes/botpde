@@ -10,6 +10,8 @@
  *
  * NÃO confundir com `seed-torcidas-nacional.js`, que cria Tenants (torcidas
  * reais, associáveis) — este aqui só popula o catálogo de referência.
+ * Depois rode `seed:torcidas-tenants` para criar os tenants vazios a partir
+ * do catálogo já no banco.
  *
  * REQUER REDE — roda na máquina do usuário, não no sandbox de CI:
  *   pnpm --filter @torcida/db seed:torcidas-conhecidas

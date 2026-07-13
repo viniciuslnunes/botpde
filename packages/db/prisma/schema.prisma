@@ -110,6 +110,11 @@ model Tenant {
   afiliacaoId String?     @map("afiliacao_id")
   afiliacao   Afiliacao?  @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
 
+  // Vínculo opcional ao catálogo nacional (dados ricos: fundação, lema, sede, site).
+  // Tenants pré-criados a partir de TorcidaConhecida referenciam a origem aqui.
+  torcidaConhecidaId String?           @unique @map("torcida_conhecida_id")
+  torcidaConhecida   TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
+
   membros           SaasMembro[]
   socios            SaasSocio[]
   produtos          SaasProduto[]
@@ -826,6 +831,7 @@ model TorcidaConhecida {
 
   afiliacao Afiliacao?       @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
   perfis    PerfilTorcedor[]
+  tenant    Tenant?
 
   @@index([afiliacaoId])
   @@map("saas_torcidas_conhecidas")

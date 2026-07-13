@@ -3,11 +3,11 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
+import { isSuperAdminEmail, listarTorcidasParaSelecao, listarTorcidasParaTransferencia } from '@/lib/tenant-context'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
 import { ArrowRight, Building2, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
-import { TransferirOwnerForm } from './transferir-owner-form'
+import { TransferirOwnerPainel } from './transferir-owner-painel'
 
 export const metadata: Metadata = { title: 'Torcidas — Super Admin' }
 
@@ -18,13 +18,14 @@ export default async function TorcidasPage() {
     redirect('/')
   }
 
-  const [torcidas, tenantAtual, totalTenants] = await Promise.all([
+  const [torcidas, torcidasTransferencia, tenantAtual, totalTenants] = await Promise.all([
     listarTorcidasParaSelecao(),
+    listarTorcidasParaTransferencia(),
     getTenantFromHost(),
     db.tenant.count({ where: { ativo: true } }),
   ])
 
-  const semProvisionamento = totalTenants <= 1
+  const semProvisionamento = totalTenants <= 5
 
   return (
     <div className="space-y-8">
@@ -78,12 +79,12 @@ export default async function TorcidasPage() {
         <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-4 text-sm text-amber-200">
           <p className="font-semibold">Provisionar torcidas no banco</p>
           <p className="mt-1 text-amber-300/90">
-            Rode o seed nacional para criar Camisa 12, Pavilhão Nove, Mancha Alviverde, etc.:
+            Popule o catálogo nacional e crie os tenants vazios (sem presidente) a partir dele:
           </p>
           <code className="mt-2 block rounded bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
-            pnpm --filter @torcida/db seed:afiliacoes
+            pnpm --filter @torcida/db seed:torcidas-conhecidas
             <br />
-            pnpm --filter @torcida/db seed:torcidas-nacional
+            pnpm --filter @torcida/db seed:torcidas-tenants
           </code>
         </div>
       )}
@@ -103,22 +104,14 @@ export default async function TorcidasPage() {
         </ul>
       </div>
 
-      <details className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+      <details className="rounded-xl border border-zinc-800 bg-zinc-900 p-4" open>
         <summary className="cursor-pointer text-sm font-medium text-zinc-300">
           Transferir propriedade (presidente)
         </summary>
         <p className="mt-2 text-xs text-zinc-500">
           Quando a diretoria estiver pronta, transfira o cargo owner para o e-mail do presidente.
         </p>
-        {torcidas.slice(0, 5).map((t) => (
-          <div key={t.id} className="mt-4 border-t border-zinc-800 pt-4 first:mt-2">
-            <p className="mb-2 text-xs font-medium text-zinc-400">{t.nome}</p>
-            <TransferirOwnerForm tenantId={t.id} ownerAtual={null} />
-          </div>
-        ))}
-        {torcidas.length > 5 && (
-          <p className="mt-2 text-xs text-zinc-600">+ {torcidas.length - 5} torcidas (use o admin de cada uma).</p>
-        )}
+        <TransferirOwnerPainel torcidas={torcidasTransferencia} />
       </details>
     </div>
   )
