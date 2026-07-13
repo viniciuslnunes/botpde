@@ -4,7 +4,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     // Espelha o alias "@/*" do tsconfig para os testes
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      'server-only': fileURLToPath(new URL('./src/test/server-only-stub.ts', import.meta.url)),
+    },
   },
   test: {
     environment: 'node',

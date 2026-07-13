@@ -15,6 +15,7 @@
     "seed:afiliacoes": "node --use-system-ca scripts/seed-afiliacoes.js",
     "seed:escudos-soccerwiki": "node --use-system-ca scripts/seed-escudos-soccerwiki.js",
     "seed:escudos-ogol": "node --use-system-ca scripts/seed-escudos-ogol.js",
+    "seed:torcedores-estimados": "node scripts/seed-torcedores-estimados.js",
     "seed:escudos-thesportsdb": "node --use-system-ca scripts/seed-escudos-thesportsdb.js",
     "coleta:ogol-clubes": "node --use-system-ca scripts/coleta-ogol-clubes.js",
     "seed:migrate-escudos-cloudinary": "node --use-system-ca scripts/migrate-escudos-cloudinary.js",

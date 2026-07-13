@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
+import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
@@ -353,6 +354,11 @@ function PassoClube({
                     {SERIE_LABEL[a.serie] ?? a.serie}
                   </span>
                 )}
+                <ClubeOnboardingMeta
+                  torcedoresEstimados={a.torcedoresEstimados}
+                  torcedoresEstimadosFonte={a.torcedoresEstimadosFonte}
+                  stats={a.stats}
+                />
               </button>
             </li>
           ))}

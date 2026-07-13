@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { inicialClubeEscudo } from '@/components/onboarding/escudo-clube'
 
 const afiliacaoFindMany = vi.hoisted(() => vi.fn())
+const saasMembroFindMany = vi.hoisted(() => vi.fn())
+const perfilTorcedorFindMany = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/tenant', () => ({
   torcidaAcessivelNoHost: () => true,
@@ -13,6 +15,8 @@ vi.mock('@torcida/db', async (importOriginal) => {
     ...actual,
     db: {
       afiliacao: { findMany: afiliacaoFindMany },
+      saasMembro: { findMany: saasMembroFindMany },
+      perfilTorcedor: { findMany: perfilTorcedorFindMany },
     },
   }
 })
@@ -31,6 +35,8 @@ describe('getAfiliacoesParaOnboarding', () => {
   beforeEach(() => {
     vi.resetModules()
     afiliacaoFindMany.mockReset()
+    saasMembroFindMany.mockResolvedValue([])
+    perfilTorcedorFindMany.mockResolvedValue([])
   })
 
   it('deduplica clubes e herda escudoUrl de duplicata do grupo', async () => {
@@ -43,6 +49,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'São Paulo',
         estado: 'SP',
         serie: 'A',
+        torcedoresEstimados: 30_000_000,
+        torcedoresEstimadosFonte: 'Wikipedia PT',
         _count: { tenants: 0 },
       },
       {
@@ -53,6 +61,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'São Paulo',
         estado: 'SP',
         serie: 'A',
+        torcedoresEstimados: null,
+        torcedoresEstimadosFonte: null,
         _count: { tenants: 2 },
       },
     ])
@@ -75,6 +85,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'São Paulo',
         estado: 'SP',
         serie: 'A',
+        torcedoresEstimados: null,
+        torcedoresEstimadosFonte: null,
         _count: { tenants: 3 },
       },
       {
@@ -85,6 +97,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'São Paulo',
         estado: 'SP',
         serie: 'A',
+        torcedoresEstimados: 30_000_000,
+        torcedoresEstimadosFonte: 'Wikipedia PT',
         _count: { tenants: 0 },
       },
     ])
@@ -97,6 +111,24 @@ describe('getAfiliacoesParaOnboarding', () => {
     expect(lista[0]?.escudoUrl).toBe('https://res.cloudinary.com/demo/corinthians.png')
   })
 
+  it('filtra por prefixo do nome ou apelido (startsWith)', async () => {
+    afiliacaoFindMany.mockResolvedValue([])
+
+    const { getAfiliacoesParaOnboarding } = await import('@/lib/onboarding')
+    await getAfiliacoesParaOnboarding('co')
+
+    expect(afiliacaoFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { nome: { startsWith: 'co', mode: 'insensitive' } },
+            { apelido: { startsWith: 'co', mode: 'insensitive' } },
+          ],
+        },
+      }),
+    )
+  })
+
   it('ordena clubes com escudo antes dos sem escudo', async () => {
     afiliacaoFindMany.mockResolvedValue([
       {
@@ -107,6 +139,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'Natal',
         estado: 'RN',
         serie: 'C',
+        torcedoresEstimados: null,
+        torcedoresEstimadosFonte: null,
         _count: { tenants: 0 },
       },
       {
@@ -117,6 +151,8 @@ describe('getAfiliacoesParaOnboarding', () => {
         cidade: 'Belo Horizonte',
         estado: 'MG',
         serie: 'A',
+        torcedoresEstimados: null,
+        torcedoresEstimadosFonte: null,
         _count: { tenants: 1 },
       },
     ])

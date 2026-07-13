@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest'
+import {
+  formatContagem,
+  formatTorcedoresEstimados,
+  formatTotalComOnline,
+} from '@/lib/format-contagem'
+
+describe('formatContagem', () => {
+  it('formata milhões', () => {
+    expect(formatContagem(42_665_518)).toBe('42,7 mi')
+    expect(formatContagem(30_000_000)).toBe('30 mi')
+  })
+
+  it('formata milhares', () => {
+    expect(formatContagem(1_200)).toBe('1,2 mil')
+    expect(formatContagem(15_000)).toBe('15 mil')
+  })
+
+  it('formata números pequenos', () => {
+    expect(formatContagem(142)).toBe('142')
+    expect(formatContagem(0)).toBe('0')
+  })
+})
+
+describe('formatTorcedoresEstimados', () => {
+  it('prefixa estimativa', () => {
+    expect(formatTorcedoresEstimados(30_000_000)).toBe('~30 mi torcedores')
+  })
+})
+
+describe('formatTotalComOnline', () => {
+  it('mostra online quando > 0', () => {
+    expect(formatTotalComOnline(142, 12)).toBe('142 · 12 online')
+  })
+
+  it('omite online quando zero', () => {
+    expect(formatTotalComOnline(142, 0)).toBe('142')
+  })
+})

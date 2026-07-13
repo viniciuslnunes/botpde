@@ -7,6 +7,7 @@ import { db } from '@torcida/db'
 import { env, isProd } from '@/lib/env'
 import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
 import { resolveSharedCookieDomain } from '@/lib/session-cookie'
+import { registrarUltimoAcesso } from '@/lib/presenca'
 
 // Cookie compartilhado entre subdomínios só quando o host público = ROOT_DOMAIN.
 const cookieDomain = resolveSharedCookieDomain()
@@ -111,6 +112,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (token.sub) {
         session.user.id = token.sub
+        void registrarUltimoAcesso(token.sub).catch((err) => {
+          console.error('[auth] registrarUltimoAcesso:', err)
+        })
       }
       return session
     },

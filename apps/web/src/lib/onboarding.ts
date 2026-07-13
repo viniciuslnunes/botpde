@@ -1,8 +1,21 @@
 import { cache } from 'react'
 import { db, saoMesmoClube, indiceAfiliacaoCanonica } from '@torcida/db'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
+import {
+  calcularStatsClubesOnboarding,
+  type StatsClubeOnboarding,
+} from '@/lib/onboarding-clube-stats'
+
+export type { StatsClubeOnboarding }
 
 export type SerieCampeonato = 'A' | 'B' | 'C' | 'D' | 'ESTADUAL' | 'OUTRA'
+
+const STATS_VAZIAS: StatsClubeOnboarding = {
+  sociosTotal: 0,
+  sociosOnline: 0,
+  torcedoresTotal: 0,
+  torcedoresOnline: 0,
+}
 
 // ─── Tipos de retorno explícitos (a inferência do Prisma quebra silenciosamente
 // neste schema — ver ARCHITECTURE.md §5.2). ─────────────────────────────────────
@@ -15,8 +28,10 @@ export type AfiliacaoOnboarding = {
   cidade: string | null
   estado: string | null
   serie: SerieCampeonato | null
+  torcedoresEstimados: number | null
+  torcedoresEstimadosFonte: string | null
+  stats: StatsClubeOnboarding
 }
-
 export type SedeOnboarding = {
   id: string
   nome: string
@@ -53,20 +68,32 @@ export type EstadoOnboarding = {
 /**
  * Lista de clubes (Afiliacao) para o passo de seleção do onboarding.
  * Ordena clubes com escudo primeiro (melhor visual do grid) e depois por nome.
- * Quando `busca` é informada, filtra por nome ou apelido (case-insensitive).
+ * Quando `busca` é informada, filtra clubes cujo **nome ou apelido começa**
+ * com o termo (case-insensitive) — ex.: "co" → Corinthians, Coritiba.
  */
 export const getAfiliacoesParaOnboarding = cache(
   async (busca?: string): Promise<AfiliacaoOnboarding[]> => {
     const termo = busca?.trim()
-    type AfiliacaoComVinculos = AfiliacaoOnboarding & {
+    type AfiliacaoRow = {
+      id: string
+      nome: string
+      apelido: string | null
+      escudoUrl: string | null
+      cidade: string | null
+      estado: string | null
+      serie: SerieCampeonato | null
+      torcedoresEstimados: number | null
+      torcedoresEstimadosFonte: string | null
       _count: { tenants: number }
     }
-    const afiliacoes: AfiliacaoComVinculos[] = await db.afiliacao.findMany({
+    type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
+
+    const afiliacoes: AfiliacaoRow[] = await db.afiliacao.findMany({
       where: termo
         ? {
             OR: [
-              { nome: { contains: termo, mode: 'insensitive' } },
-              { apelido: { contains: termo, mode: 'insensitive' } },
+              { nome: { startsWith: termo, mode: 'insensitive' } },
+              { apelido: { startsWith: termo, mode: 'insensitive' } },
             ],
           }
         : undefined,
@@ -78,6 +105,8 @@ export const getAfiliacoesParaOnboarding = cache(
         cidade: true,
         estado: true,
         serie: true,
+        torcedoresEstimados: true,
+        torcedoresEstimadosFonte: true,
         _count: { select: { tenants: true } },
       },
       orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
@@ -86,19 +115,39 @@ export const getAfiliacoesParaOnboarding = cache(
     // Duplicatas por nome literal OU pelo mesmo clube (ex.: Corinthians ×
     // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo;
     // herda escudoUrl de qualquer duplicata do grupo (Fase E).
-    const unicas: AfiliacaoComVinculos[] = []
+    const unicas: AfiliacaoDedup[] = []
     for (const afiliacao of afiliacoes) {
       const idxGrupo = unicas.findIndex((u) => saoMesmoClube(u, afiliacao))
       if (idxGrupo === -1) {
-        unicas.push(afiliacao)
+        unicas.push({ ...afiliacao, idsGrupo: [afiliacao.id] })
         continue
       }
-      const grupo = [unicas[idxGrupo], afiliacao]
+      const existente = unicas[idxGrupo]!
+      existente.idsGrupo.push(afiliacao.id)
+      const grupo = [existente, afiliacao]
       const canonIdx = indiceAfiliacaoCanonica(grupo)
-      const canon = grupo[canonIdx]
+      const canon = grupo[canonIdx]!
       const escudoUrl = canon.escudoUrl ?? grupo.find((g) => g.escudoUrl)?.escudoUrl ?? null
-      unicas[idxGrupo] = { ...canon, escudoUrl }
+      const torcedoresEstimados =
+        canon.torcedoresEstimados ??
+        grupo.find((g) => g.torcedoresEstimados != null)?.torcedoresEstimados ??
+        null
+      const torcedoresEstimadosFonte =
+        canon.torcedoresEstimadosFonte ??
+        grupo.find((g) => g.torcedoresEstimadosFonte)?.torcedoresEstimadosFonte ??
+        null
+      unicas[idxGrupo] = {
+        ...canon,
+        escudoUrl,
+        torcedoresEstimados,
+        torcedoresEstimadosFonte,
+        idsGrupo: existente.idsGrupo,
+      }
     }
+
+    const statsMap = await calcularStatsClubesOnboarding(
+      unicas.map((u) => ({ canonicalId: u.id, afiliacaoIds: u.idsGrupo })),
+    )
 
     return unicas
       .map((afiliacao) => ({
@@ -109,6 +158,9 @@ export const getAfiliacoesParaOnboarding = cache(
         cidade: afiliacao.cidade,
         estado: afiliacao.estado,
         serie: afiliacao.serie,
+        torcedoresEstimados: afiliacao.torcedoresEstimados,
+        torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+        stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
       }))
       .sort((a, b) => {
         const comEscudo = (x: AfiliacaoOnboarding) => (x.escudoUrl ? 0 : 1)

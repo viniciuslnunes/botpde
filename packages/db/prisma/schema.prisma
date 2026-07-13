@@ -174,6 +174,8 @@ model User {
   // Nunca preenchido para contas só-OAuth (Discord/Google).
   senhaHash    String?   @map("senha_hash")
   consentidoEm DateTime? @map("consentido_em")
+  /// Última atividade na plataforma (heartbeat throttled) — base de "online" no onboarding.
+  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
 
   userRoles            UserRole[]
   userPermissions      UserPermission[]
@@ -794,6 +796,9 @@ model Afiliacao {
   cidade         String?
   estado         String?
   apiExternalId  String?           @map("api_external_id")
+  /// Estimativa pública de torcedores (seed offline — nunca API em runtime).
+  torcedoresEstimados      Int?    @map("torcedores_estimados")
+  torcedoresEstimadosFonte String? @map("torcedores_estimados_fonte")
   criadoEm       DateTime          @default(now()) @map("criado_em")
 
   tenants            Tenant[]
