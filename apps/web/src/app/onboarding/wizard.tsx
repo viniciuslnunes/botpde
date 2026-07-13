@@ -397,7 +397,7 @@ function PassoClube({
                   apelido={a.apelido}
                   escudoUrl={a.escudoUrl}
                 />
-                <span className="text-xs font-semibold text-[rgb(var(--foreground))] line-clamp-2">
+                <span className="text-xs font-semibold uppercase text-[rgb(var(--foreground))] line-clamp-2">
                   {a.nome}
                 </span>
                 {(a.apelido || a.estado) && (
