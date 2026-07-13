@@ -865,6 +865,8 @@ function PassoVinculo({
   const unidadeSelecionada = unidadeId
     ? torcida.sedes.find((s) => s.id === unidadeId)
     : null
+  const unidadePendente =
+    !unidadeNaoListada && torcida.sedes.length > 1 && !unidadeId
 
   function abrirSocio() {
     onErro(null)
@@ -880,7 +882,7 @@ function PassoVinculo({
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
     setErrosCampo({})
-    if (!unidadeNaoListada && torcida.sedes.length > 1 && !unidadeId) {
+    if (unidadePendente) {
       onErro('Volte e selecione sua subsede ou ponto de encontro.')
       return
     }
@@ -981,7 +983,7 @@ function PassoVinculo({
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
-            disabled={pending || uploadPend || (precisaEscolherUnidade && !unidadeId)}
+            disabled={pending || uploadPend || unidadePendente}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
             <Users className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />
@@ -1022,10 +1024,23 @@ function PassoVinculo({
       </p>
 
       <div className="mt-6 space-y-4">
-        {precisaEscolherUnidade && (
-          <Campo label="Unidade da torcida" obrigatorio erros={errosCampo.sedeId}>
-            <SeletorUnidade sedes={torcida.sedes} value={unidadeId} onChange={setUnidadeId} semLabel />
-          </Campo>
+        {(unidadeSelecionada || unidadeNaoListada) && (
+          <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            {unidadeNaoListada ? (
+              <>
+                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span> cadastro
+                solicitado — seguiremos com seu vínculo enquanto validamos a subsede/PDE.
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-[rgb(var(--foreground))]">Unidade:</span>{' '}
+                {unidadeSelecionada?.nome}
+                {unidadeSelecionada?.tipo
+                  ? ` (${TIPO_SEDE_LABEL[unidadeSelecionada.tipo] ?? unidadeSelecionada.tipo})`
+                  : ''}
+              </>
+            )}
+          </p>
         )}
 
         <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
@@ -1089,37 +1104,6 @@ const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'Ponto de encontro',
-}
-
-function SeletorUnidade({
-  sedes,
-  value,
-  onChange,
-  semLabel,
-}: {
-  sedes: SedeOnboarding[]
-  value: string
-  onChange: (v: string) => void
-  semLabel?: boolean
-}) {
-  return (
-    <div>
-      {!semLabel && (
-        <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Qual unidade você frequenta?
-        </span>
-      )}
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Selecione sua unidade</option>
-        {sedes.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.nome}
-            {TIPO_SEDE_LABEL[s.tipo] ? ` · ${TIPO_SEDE_LABEL[s.tipo]}` : ''}
-          </option>
-        ))}
-      </Select>
-    </div>
-  )
 }
 
 function BlocoImagemProva({
