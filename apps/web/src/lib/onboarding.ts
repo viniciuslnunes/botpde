@@ -6,9 +6,13 @@ import {
   getTetoLimiteTorcedoresGlobal,
   type StatsClubeOnboarding,
 } from '@/lib/onboarding-clube-stats'
+import {
+  calcularStatsTorcidasOnboarding,
+  type StatsTorcidaOnboarding,
+} from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
 
-export type { StatsClubeOnboarding }
+export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
 export type SerieCampeonato = 'A' | 'B' | 'C' | 'D' | 'ESTADUAL' | 'OUTRA'
 
@@ -95,6 +99,31 @@ function pesoEscudoOnboarding(a: AfiliacaoOnboarding): number {
   return a.escudoUrl ? 0 : 1
 }
 
+const STATS_TORCIDA_VAZIAS: StatsTorcidaOnboarding = {
+  sociosTotal: 0,
+  sociosOnline: 0,
+  torcedoresTotal: 0,
+  torcedoresOnline: 0,
+}
+
+function pesoLogoTorcida(t: TorcidaOnboarding): number {
+  return t.logoUrl ? 0 : 1
+}
+
+function valorOrdenacaoMembrosTorcida(t: TorcidaOnboarding): number {
+  return t.stats.sociosTotal + t.stats.torcedoresTotal
+}
+
+function compararTorcidasOnboarding(a: TorcidaOnboarding, b: TorcidaOnboarding): number {
+  const diffLogo = pesoLogoTorcida(a) - pesoLogoTorcida(b)
+  if (diffLogo !== 0) return diffLogo
+
+  const diffMembros = valorOrdenacaoMembrosTorcida(b) - valorOrdenacaoMembrosTorcida(a)
+  if (diffMembros !== 0) return diffMembros
+
+  return a.nome.localeCompare(b.nome, 'pt-BR')
+}
+
 function compararClubesOnboarding(a: AfiliacaoOnboarding, b: AfiliacaoOnboarding): number {
   const diffEscudo = pesoEscudoOnboarding(a) - pesoEscudoOnboarding(b)
   if (diffEscudo !== 0) return diffEscudo
@@ -118,6 +147,7 @@ export type TorcidaOnboarding = {
   corPrimaria: string
   membrosAprovados: number
   sedes: SedeOnboarding[]
+  stats: StatsTorcidaOnboarding
   /** Se o portal desta torcida está neste host (subdomínio ou TENANT_SLUG). */
   acessivelNoHost: boolean
 }
@@ -370,16 +400,21 @@ export const getTorcidasPorAfiliacao = cache(
       return true
     })
 
-    return unicos.map((t: TenantComContagem) => ({
-      id: t.id,
-      nome: t.torcidaConhecida?.titulo ?? t.nome,
-      slug: t.slug,
-      logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
-      corPrimaria: t.corPrimaria,
-      membrosAprovados: t._count.membros,
-      sedes: t.sedes,
-      acessivelNoHost: torcidaAcessivelNoHost(t.slug),
-    }))
+    const statsMap = await calcularStatsTorcidasOnboarding(unicos.map((t) => t.id))
+
+    return unicos
+      .map((t: TenantComContagem) => ({
+        id: t.id,
+        nome: t.torcidaConhecida?.titulo ?? t.nome,
+        slug: t.slug,
+        logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
+        corPrimaria: t.corPrimaria,
+        membrosAprovados: t._count.membros,
+        sedes: t.sedes,
+        stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
+        acessivelNoHost: torcidaAcessivelNoHost(t.slug),
+      }))
+      .sort(compararTorcidasOnboarding)
   },
 )
 

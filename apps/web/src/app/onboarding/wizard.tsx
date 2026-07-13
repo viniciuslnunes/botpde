@@ -6,6 +6,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
+import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
@@ -559,11 +560,8 @@ function PassoTorcida({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-[rgb(var(--foreground))]">{t.nome}</p>
-                  <p className="flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
-                    <Users className="h-3 w-3" />
-                    {t.membrosAprovados} {t.membrosAprovados === 1 ? 'membro' : 'membros'}
-                  </p>
+                  <p className="truncate font-semibold uppercase text-[rgb(var(--foreground))]">{t.nome}</p>
+                  <TorcidaOnboardingMeta stats={t.stats} />
                   {!t.acessivelNoHost && (
                     <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
                       Portal em outro endereço — solicitação válida, aprovação na torcida escolhida.
