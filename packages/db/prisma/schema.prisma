@@ -791,13 +791,44 @@ model Afiliacao {
   apiExternalId  String?           @map("api_external_id")
   criadoEm       DateTime          @default(now()) @map("criado_em")
 
-  tenants     Tenant[]
-  noticias    Noticia[]
-  torcedores  PerfilTorcedor[]
-  rivalClubeA RivalidadeClube[] @relation("RivalClubeA")
-  rivalClubeB RivalidadeClube[] @relation("RivalClubeB")
+  tenants            Tenant[]
+  noticias           Noticia[]
+  torcedores         PerfilTorcedor[]
+  rivalClubeA        RivalidadeClube[]  @relation("RivalClubeA")
+  rivalClubeB        RivalidadeClube[]  @relation("RivalClubeB")
+  torcidasConhecidas TorcidaConhecida[]
 
   @@map("saas_afiliacoes")
+}
+
+/// Catálogo nacional de torcidas organizadas conhecidas (fora da plataforma).
+/// Dataset gerado por scraper (`src/data/torcidas-conhecidas.js`); usado no
+/// onboarding como referência informativa por clube (Afiliacao).
+model TorcidaConhecida {
+  id                String   @id @default(uuid())
+  nome              String   // nome completo (fiel à fonte)
+  titulo            String?  // versão curta/legível p/ exibição (sem prefixo)
+  slug              String   @unique
+  afiliacaoId       String?  @map("afiliacao_id")
+  clubeNomeOriginal String?  @map("clube_nome_original")
+  fundacao          String?
+  sede              String?
+  subsedes          String?
+  lema              String?
+  siteOficial       String?  @map("site_oficial")
+  cidade            String?
+  uf                String?
+  logoUrl           String?  @map("logo_url")
+  fonteUrl          String?  @map("fonte_url")
+  ativa             Boolean  @default(true)
+  criadoEm          DateTime @default(now()) @map("criado_em")
+  atualizadoEm      DateTime @updatedAt @map("atualizado_em")
+
+  afiliacao Afiliacao?       @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+  perfis    PerfilTorcedor[]
+
+  @@index([afiliacaoId])
+  @@map("saas_torcidas_conhecidas")
 }
 
 enum SerieCampeonato {
@@ -815,16 +846,19 @@ model PerfilTorcedor {
   id                    String    @id @default(uuid())
   userId                String    @unique @map("user_id")
   afiliacaoId           String?   @map("afiliacao_id") // clube que torce
+  torcidaConhecidaId    String?   @map("torcida_conhecida_id") // organizada conhecida (fora da plataforma)
   regiao                String?   // cidade/estado do torcedor
   bio                   String?
   onboardingConcluidoEm DateTime? @map("onboarding_concluido_em")
   criadoEm              DateTime  @default(now()) @map("criado_em")
   atualizadoEm          DateTime  @updatedAt @map("atualizado_em")
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  afiliacao Afiliacao? @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  afiliacao        Afiliacao?        @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+  torcidaConhecida TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
 
   @@index([afiliacaoId])
+  @@index([torcidaConhecidaId])
   @@map("saas_perfis_torcedor")
 }
 

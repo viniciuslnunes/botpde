@@ -6,18 +6,26 @@ import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera } from 'lucide-react'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
+import {
+  routePage,
+  springGentle,
+  springSnappy,
+  staggerContainer,
+  staggerItem,
+} from '@/lib/motion-presets'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
   solicitarVinculo,
   buscarAfiliacoes,
   buscarTorcidas,
+  buscarTorcidasConhecidas,
   buscarDepartamentos,
 } from './actions'
 import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
+  TorcidaConhecidaOnboarding,
   DepartamentoOnboarding,
   SedeOnboarding,
 } from '@/lib/onboarding'
@@ -78,6 +86,7 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
 
   // ── Passo 2 → 3: persiste clube + região, carrega torcidas ───────────────────
   const [torcidas, setTorcidas] = useState<TorcidaOnboarding[] | null>(null)
+  const [conhecidas, setConhecidas] = useState<TorcidaConhecidaOnboarding[]>([])
   function avancarDaRegiao(pular: boolean) {
     if (!clube) return
     const regiao = pular ? undefined : [cidade.trim(), uf].filter(Boolean).join(' - ') || undefined
@@ -87,8 +96,12 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
         setErro(res.message ?? 'Não foi possível salvar. Tente novamente.')
         return
       }
-      const lista = await buscarTorcidas(clube.id)
+      const [lista, listaConhecidas] = await Promise.all([
+        buscarTorcidas(clube.id),
+        buscarTorcidasConhecidas(clube.id),
+      ])
       setTorcidas(lista)
+      setConhecidas(listaConhecidas)
       limparErro()
       irPara('torcida', 1)
     })
@@ -106,6 +119,21 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
     irPara('concluindo', 1)
     startTransition(async () => {
       const res = await concluirComoTorcedor()
+      // Se retornou (não redirecionou), houve erro.
+      if (res?.message) {
+        setErro(res.message)
+        irPara('torcida', -1)
+      }
+    })
+  }
+
+  // Torcedor que se identifica com uma organizada conhecida (fora da plataforma):
+  // conclui como torcedor global registrando a referência no perfil.
+  function escolherConhecida(id: string) {
+    setErro(null)
+    irPara('concluindo', 1)
+    startTransition(async () => {
+      const res = await concluirComoTorcedor(id)
       // Se retornou (não redirecionou), houve erro.
       if (res?.message) {
         setErro(res.message)
@@ -190,8 +218,10 @@ export function OnboardingWizard({ afiliacoesIniciais, ufs, nomeInicial }: Props
               <PassoTorcida
                 clube={clube}
                 torcidas={torcidas ?? []}
+                conhecidas={conhecidas}
                 pending={pending}
                 onEscolher={escolherTorcida}
+                onEscolherConhecida={escolherConhecida}
                 onTorcedorGlobal={seguirComoTorcedorGlobal}
                 onVoltar={() => irPara('regiao', -1)}
               />
@@ -460,15 +490,19 @@ function PassoRegiao({
 function PassoTorcida({
   clube,
   torcidas,
+  conhecidas,
   pending,
   onEscolher,
+  onEscolherConhecida,
   onTorcedorGlobal,
   onVoltar,
 }: {
   clube: AfiliacaoOnboarding | null
   torcidas: TorcidaOnboarding[]
+  conhecidas: TorcidaConhecidaOnboarding[]
   pending: boolean
   onEscolher: (t: TorcidaOnboarding) => void
+  onEscolherConhecida: (id: string) => void
   onTorcedorGlobal: () => void
   onVoltar: () => void
 }) {
@@ -552,6 +586,75 @@ function PassoTorcida({
           </p>
         </div>
       </button>
+
+      {conhecidas.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            Organizadas conhecidas do seu clube
+          </h2>
+          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+            Ainda não estão na plataforma. Se a sua está aqui, siga como torcedor —
+            avisaremos quando ela chegar.
+          </p>
+          <m.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="mt-4 space-y-3"
+          >
+            {conhecidas.map((c) => (
+              <m.li key={c.id} variants={staggerItem}>
+                <button
+                  type="button"
+                  onClick={() => onEscolherConhecida(c.id)}
+                  disabled={pending}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+                >
+                  <LogoTorcidaConhecida torcida={c} />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate font-semibold text-[rgb(var(--foreground))]"
+                      title={c.nome}
+                    >
+                      {c.titulo ?? c.nome}
+                    </p>
+                    {(c.fundacao || c.lema) && (
+                      <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                        {[c.fundacao ? `Fundada em ${c.fundacao}` : null, c.lema ? `"${c.lema}"` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                </button>
+              </m.li>
+            ))}
+          </m.ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LogoTorcidaConhecida({ torcida }: { torcida: TorcidaConhecidaOnboarding }) {
+  const [imagemFalhou, setImagemFalhou] = useState(false)
+
+  if (torcida.logoUrl && !imagemFalhou) {
+    return (
+      <Image
+        src={torcida.logoUrl}
+        alt={torcida.nome}
+        width={44}
+        height={44}
+        className="h-11 w-11 shrink-0 rounded-full object-cover"
+        onError={() => setImagemFalhou(true)}
+      />
+    )
+  }
+  return (
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-sm font-bold text-[rgb(var(--foreground-muted))]">
+      {torcida.nome.charAt(0).toUpperCase()}
     </div>
   )
 }

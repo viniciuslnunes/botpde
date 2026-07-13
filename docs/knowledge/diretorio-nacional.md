@@ -1,5 +1,14 @@
 # Diretório nacional — clubes e suas torcidas organizadas
 
+> **Dataset estruturado (fonte da verdade):** este resumo curado convive com o
+> catálogo completo em `packages/db/src/data/torcidas-conhecidas.js` (546
+> registros com nome, clube, fundação, sede, sub-sedes, lema, site, cidade/UF e
+> logo), gerado por `scripts/scrape-organizadas.mjs` a partir do
+> `organizadasbrasil.com` e semeado em `TorcidaConhecida` via
+> `seed:torcidas-conhecidas` (logos no Cloudinary `torcida/catalogo/logos`).
+> Ver `ARCHITECTURE.md` §5.8. Este `.md` segue como visão editorial (negrito =
+> principal, notas de homônimos/backlog); o dataset é o dado navegável no produto.
+
 > Mapa amplo (não exaustivo) das torcidas organizadas do Brasil por
 > região → estado → clube. Uso: reconhecer a torcida de um tenant, sugerir a
 > afiliação certa no onboarding, e dar contexto às recomendações de aliança.

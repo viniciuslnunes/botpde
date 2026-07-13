@@ -592,6 +592,37 @@ exige o domínio real). `.env.local` agora documenta isso inline. Se voltar a
 acontecer: suspeitar primeiro de `ROOT_DOMAIN` antes de investigar
 NextAuth/Next.js.
 
+### 5.8 Catálogo nacional de torcidas conhecidas — `TorcidaConhecida` (2026-07-12)
+
+Terceiro catálogo do onboarding, ao lado de `Afiliacao` (clubes) e `Tenant`
+(torcidas reais na plataforma). `TorcidaConhecida` é uma **referência global**
+(não multi-tenant, como `Afiliacao`) de organizadas conhecidas do Brasil que
+**ainda não são tenants** — para descoberta e reconhecimento no onboarding.
+
+- **Fonte de dados**: scraper determinístico de `organizadasbrasil.com`
+  (`packages/db/scripts/scrape-organizadas.mjs`, 27 estados) grava o dataset
+  versionado `packages/db/src/data/torcidas-conhecidas.js` (546 registros:
+  nome, clube, fundação, sede, sub-sedes, lema, site, cidade/UF, logo, fonte).
+  Fonte colaborativa → **referência a confirmar** (datas/grafias variam; há
+  extintas/renomeadas/banidas). `fundacao` é texto livre; flag `ativa` para
+  curadoria futura. Perfis âncora e relações seguem em `docs/knowledge/`.
+- **Pipeline** (reusa o de `seed-afiliacoes`): `seed:torcidas-conhecidas`
+  (`scripts/seed-torcidas-conhecidas.js`) faz upsert idempotente por slug,
+  resolve/cria a `Afiliacao` do clube por `normalizeNome(nome)|UF`, e hospeda os
+  logos no Cloudinary `torcida/catalogo/logos/<slug>` (`FOLDER_LOGOS`), pull da
+  URL remota. **Não confundir** com `seed:torcidas-nacional`, que cria Tenants.
+- **Modelo**: `TorcidaConhecida` (`@@map("saas_torcidas_conhecidas")`) com
+  relação opcional a `Afiliacao` (`SetNull`). `PerfilTorcedor.torcidaConhecidaId`
+  registra qual organizada o usuário reconhece no onboarding (base para
+  matching/recrutamento futuro).
+- **Onboarding**: `getTorcidasConhecidasPorAfiliacao` (em `lib/onboarding.ts`)
+  lista as conhecidas do clube, **excluindo** as que já têm tenant ativo com nome
+  equivalente (dedup por nome normalizado). O passo "torcida" mostra uma seção
+  informativa; selecionar uma conclui como torcedor global gravando o vínculo.
+- **Fora de escopo (fase 2)**: notificar "sua torcida entrou na plataforma",
+  claim de `TorcidaConhecida` por um tenant (`Tenant.torcidaConhecidaId`),
+  curadoria ativa/extinta, e aliança/rivalidade inferida do catálogo.
+
 ## 6. Itens em aberto (aguardando decisão)
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.

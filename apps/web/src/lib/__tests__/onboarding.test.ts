@@ -9,6 +9,8 @@ const membroUpdate = vi.hoisted(() => vi.fn())
 const afiliacaoFindUnique = vi.hoisted(() => vi.fn())
 const perfilUpsert = vi.hoisted(() => vi.fn())
 const tenantFindFirst = vi.hoisted(() => vi.fn())
+const tenantFindMany = vi.hoisted(() => vi.fn())
+const torcidaConhecidaFindMany = vi.hoisted(() => vi.fn())
 const sedeFindMany = vi.hoisted(() => vi.fn())
 const departamentoFindFirst = vi.hoisted(() => vi.fn())
 const userDepartamentoUpsert = vi.hoisted(() => vi.fn())
@@ -21,7 +23,8 @@ vi.mock('@torcida/db', () => ({
     perfilTorcedor: { findUnique: perfilFindUnique, upsert: perfilUpsert },
     saasMembro: { findFirst: membroFindFirst, findUnique: membroFindUnique, create: membroCreate, update: membroUpdate },
     afiliacao: { findUnique: afiliacaoFindUnique },
-    tenant: { findFirst: tenantFindFirst },
+    tenant: { findFirst: tenantFindFirst, findMany: tenantFindMany },
+    torcidaConhecida: { findMany: torcidaConhecidaFindMany },
     sede: { findMany: sedeFindMany },
     departamento: { findFirst: departamentoFindFirst },
     userDepartamento: { upsert: userDepartamentoUpsert },
@@ -33,8 +36,10 @@ vi.mock('next/navigation', () => ({ redirect: redirectFn }))
 vi.mock('@/lib/tenant', () => ({
   buildPortalUrl: (slug: string) => `/portal/comunidade?torcida=${slug}`,
 }))
+// `setTenantContextSlug` usa cookies() do Next — indisponível fora de request.
+vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn() }))
 
-import { getEstadoOnboarding } from '@/lib/onboarding'
+import { getEstadoOnboarding, getTorcidasConhecidasPorAfiliacao } from '@/lib/onboarding'
 import { salvarClubeRegiao, solicitarVinculo, concluirComoTorcedor } from '@/app/onboarding/actions'
 
 const UUID = '11111111-1111-4111-8111-111111111111'
@@ -67,6 +72,40 @@ describe('getEstadoOnboarding', () => {
     const r = await getEstadoOnboarding('u1')
     expect(r.temMembro).toBe(true)
     expect(r.perfil).toBeNull()
+  })
+})
+
+describe('getTorcidasConhecidasPorAfiliacao', () => {
+  const conhecidaBase = {
+    titulo: null,
+    logoUrl: null,
+    fundacao: null,
+    lema: null,
+    cidade: null,
+    uf: 'SP',
+    siteOficial: null,
+  }
+
+  it('retorna as conhecidas do clube ordenadas', async () => {
+    torcidaConhecidaFindMany.mockResolvedValue([
+      { id: 'c1', nome: 'Dragões da Real', ...conhecidaBase },
+      { id: 'c2', nome: 'Independente', ...conhecidaBase },
+    ])
+    tenantFindMany.mockResolvedValue([])
+    const r = await getTorcidasConhecidasPorAfiliacao(UUID)
+    expect(r).toHaveLength(2)
+    expect(r[0]).toMatchObject({ id: 'c1', nome: 'Dragões da Real', uf: 'SP' })
+  })
+
+  it('exclui conhecida com nome equivalente a um Tenant ativo do clube', async () => {
+    torcidaConhecidaFindMany.mockResolvedValue([
+      { id: 'c1', nome: 'GAVIÕES DA FIEL', ...conhecidaBase },
+      { id: 'c2', nome: 'Pavilhão Nove', ...conhecidaBase },
+    ])
+    tenantFindMany.mockResolvedValue([{ nome: 'Gaviões da Fiel' }])
+    const r = await getTorcidasConhecidasPorAfiliacao(UUID)
+    expect(r).toHaveLength(1)
+    expect(r[0].id).toBe('c2')
   })
 })
 
@@ -162,6 +201,31 @@ describe('concluirComoTorcedor', () => {
   it('faz upsert e redireciona', async () => {
     perfilUpsert.mockResolvedValue({})
     await expect(concluirComoTorcedor()).rejects.toThrow('REDIRECT')
-    expect(perfilUpsert).toHaveBeenCalled()
+    expect(perfilUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.not.objectContaining({ torcidaConhecidaId: expect.anything() }),
+      }),
+    )
+  })
+
+  it('grava torcidaConhecidaId quando informado', async () => {
+    perfilUpsert.mockResolvedValue({})
+    await expect(concluirComoTorcedor(UUID2)).rejects.toThrow('REDIRECT')
+    expect(perfilUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ torcidaConhecidaId: UUID2 }),
+        update: expect.objectContaining({ torcidaConhecidaId: UUID2 }),
+      }),
+    )
+  })
+
+  it('ignora torcidaConhecidaId inválido (não-uuid)', async () => {
+    perfilUpsert.mockResolvedValue({})
+    await expect(concluirComoTorcedor('nope')).rejects.toThrow('REDIRECT')
+    expect(perfilUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.not.objectContaining({ torcidaConhecidaId: expect.anything() }),
+      }),
+    )
   })
 })
