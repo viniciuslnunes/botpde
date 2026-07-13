@@ -10,7 +10,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissions.js'
-import { normalizeNome, chaveMatch } from '../src/data/afiliacoes-normalize.js'
+import { normalizeNome, chaveMatch, saoMesmoClube } from '../src/data/afiliacoes-normalize.js'
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
 
 const DRY_RUN = process.argv.includes('--dry-run')
@@ -92,25 +92,21 @@ function nomesEquivalentes(a, b) {
  * @param {boolean} dryRun
  */
 async function limparDuplicatasCatalogo(dryRun) {
-  /** @param {string|null|undefined} nome @param {string|null|undefined} uf */
-  function chaveClube(nome, uf) {
-    return `${chaveMatch(nome ?? '')}|${normalizeNome(uf ?? '')}`
-  }
-
   const afiliacoes = await db.afiliacao.findMany({ select: { id: true, nome: true, estado: true } })
-  /** @type {Map<string, Set<string>>} chave clube|uf → ids equivalentes */
-  const grupoAfiliacao = new Map()
+  /** @type {AfiliacaoRow[][]} */
+  const grupos = []
+  const usados = new Set()
   for (const a of afiliacoes) {
-    const chave = chaveClube(a.nome, a.estado)
-    const set = grupoAfiliacao.get(chave) ?? new Set()
-    set.add(a.id)
-    grupoAfiliacao.set(chave, set)
+    if (usados.has(a.id)) continue
+    const grupo = afiliacoes.filter((b) => !usados.has(b.id) && saoMesmoClube(a, b))
+    for (const g of grupo) usados.add(g.id)
+    grupos.push(grupo)
   }
   /** @param {string|null} id */
   function idsEquivalentes(id) {
     if (!id) return new Set()
-    for (const set of grupoAfiliacao.values()) {
-      if (set.has(id)) return set
+    for (const grupo of grupos) {
+      if (grupo.some((a) => a.id === id)) return new Set(grupo.map((a) => a.id))
     }
     return new Set([id])
   }

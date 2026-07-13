@@ -1,0 +1,52 @@
+{
+  "geradoEm": "2026-07-13T04:01:57.157Z",
+  "totais": {
+    "afiliacoes": 318,
+    "torcidasCatalogo": 546,
+    "tenantsAtivos": 562,
+    "clubesComTenant": 292,
+    "comEscudo": 250,
+    "semEscudo": 68
+  },
+  "problemas": {
+    "duplicatasAfiliacao": 0,
+    "semEstado": 0,
+    "catalogoSemClube": 0,
+    "catalogoClubeSuspeito": 0,
+    "tenantAfiliacaoDivergente": 0,
+    "tenantsSemClube": 1,
+    "tenantsDuplicadosCatalogo": 0,
+    "perfisEmAfiliacaoNaoCanonica": 0,
+    "clubesComCatalogoSemTenant": 0,
+    "orfaosComIrmaAtiva": 0
+  },
+  "duplicatasAfiliacao": [],
+  "semEstado": [],
+  "catalogoSemClube": [],
+  "catalogoClubeSuspeito": [],
+  "tenantAfiliacaoDivergente": [],
+  "tenantsSemClube": [
+    "subsede-zona-sul-teste (Subsede Zona Sul (teste))"
+  ],
+  "tenantsDuplicadosCatalogo": [],
+  "divergenciaAgrupamento": [],
+  "clubesComCatalogoSemTenant": [],
+  "orfaosComIrmaAtiva": [],
+  "amostraClubesComTorcida": [
+    "Cruzeiro (MG): 10 torcida(s) — cru-chopp-santa-tereza-mg, mafia-azul, mancha-azul-mg, motozeiros-torcida-e-motoclube-mg, pavilhao-independente-cruzeiro…",
+    "Club de Regatas Vasco da Gama (RJ): 10 torcida(s) — forca-independente-do-vasco-rj, forca-jovem-vasco, ira-jovem-vasco-rj, mancha-negra-do-vasco-rj, super-jovem-vasco-rj…",
+    "Clube Atlético Mineiro (MG): 9 torcida(s) — dragoes-f-a-o-forca-atleticana-de-ocupacao-mg, galo-metal-torcida-organizada-mg, galoucura, torcida-candangalo-mg, torcida-esquadrao-atleticano-mg…",
+    "Clube de Regatas Flamengo (RJ): 9 torcida(s) — fla-roots-rj, imperio-rubro-negro-rj, paixao-rubro-negra-rj, raca-rubro-negra, torcida-fla-manguaca-rj…",
+    "Sport Club do Recife (PE): 8 torcida(s) — barra-brava-sport, leoes-da-ilha-pe, torcida-comando-rasta-pe, torcida-gang-da-ilha-pe, torcida-jovem-do-sport-pe…",
+    "Paysandu Sport Club (PA): 8 torcida(s) — faccao-jovem-do-paysandu-pa, forca-jovem-paysandu-pa, metal-bicolor-pa, movimento-uniformizado-bobicolor-pa, torcida-organizada-furia-bicolor-pa…",
+    "Grêmio (RS): 8 torcida(s) — geral-do-gremio, super-raca-gremista-rs, torcida-independente-mafia-tricolor-rs, torcida-jovem-do-gremio-rs, torcida-jovem-gremio…",
+    "Remo (PA): 8 torcida(s) — imperio-azul-pa, leoes-da-real-pa, remo-chopp-futebol-e-samba-pa, torcida-organizada-pavilhao-6-pa, torcida-organizada-remista-pa…",
+    "São Paulo FC (SP): 7 torcida(s) — dragoes-da-real, metal-tricolor-sp, torcida-falange-tricolor-sp, torcida-organizada-tricolor-chopp-sp, torcida-os-implacaveis-sp…",
+    "Sociedade Esportiva Palmeiras (SP): 7 torcida(s) — mancha-alviverde, mancha-alvi-verde-sp, torcida-academicos-da-savoia-sp, torcida-organizada-rasta-alvi-verde-sp, torcida-pork-s-alviverde-sp…",
+    "Santa Cruz (PE): 7 torcida(s) — movimento-coral-rasta-pe, torcida-alcoolizada-santa-chopp-pe, torcida-garra-coral-pe, torcida-imperio-coral-pe, torcida-organizada-inferno-coral-pe…",
+    "Corinthians (SP): 6 torcida(s) — camisa-12-corinthians, estopim-da-fiel-sp, pavilhao-nove, pde-gavioes-fiel, torcida-fiel-macabra-sp…",
+    "Ceará Sporting Clube (CE): 6 torcida(s) — cangaceiros-alvinegros-ce, furia-jovem-do-ceara-ce, movimento-organizado-forca-independente-ce, torcida-alcoolizada-ceara-chopp-ce, torcida-ceara-gospel-ce…",
+    "Fluminense Football Club (RJ): 6 torcida(s) — forca-flu, torcida-fiel-tricolor-rj, torcida-garra-tricolor-rj, torcida-organizada-flu-bar-rj, torcida-organizada-flunitor-rj…",
+    "Botafogo de Futebol e Regatas (RJ): 6 torcida(s) — furia-jovem-botafogo, furia-jovem-do-botafogo-rj, movimento-mancha-alvinegra-rj, torcida-botachopp-rj, torcida-fogoro-rj…"
+  ]
+}

@@ -205,6 +205,19 @@ ok('saoMesmoClube une Confiança × Associação Desportiva Confiança', () => {
   )
 })
 
+ok('saoMesmoClube une nome curto do diretório × nome longo do catálogo', () => {
+  const pares = [
+    ['Flamengo', 'Clube de Regatas Flamengo', 'RJ'],
+    ['Coritiba', 'Coritiba Foot Ball Club', 'PR'],
+    ['Ceará', 'Ceará Sporting Clube', 'CE'],
+    ['Náutico', 'Clube Náutico Capiberibe', 'PE'],
+    ['CRB', 'Clube de Regatas Brasil', 'AL'],
+  ]
+  for (const [curto, longo, uf] of pares) {
+    assert.equal(saoMesmoClube({ nome: curto, estado: uf }, { nome: longo, estado: uf }), true, `${curto} × ${longo}`)
+  }
+})
+
 ok('casarAfiliacaoBusca casa clube brasileiro por chave', () => {
   const match = casarAfiliacaoBusca(
     { nome: 'Anapolina', estado: 'GO' },

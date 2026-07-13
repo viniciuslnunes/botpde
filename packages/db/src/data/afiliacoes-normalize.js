@@ -36,9 +36,14 @@ export const ALIASES = {
   'red bull bragantino': 'bragantino',
   'sao paulo futebol clube': 'sao paulo',
   'clube de regatas do flamengo': 'flamengo',
+  'clube de regatas flamengo': 'flamengo',
   'fluminense football club': 'fluminense',
   'clube atletico paranaense': 'athletico paranaense',
   'gremio foot ball porto alegrense': 'gremio',
+  'coritiba foot ball club': 'coritiba',
+  'ceara sporting clube': 'ceara',
+  'clube nautico capiberibe': 'nautico',
+  'nautico capibaribe': 'nautico',
   'sociedade esportiva palmeiras': 'palmeiras',
   'sport club do recife': 'sport',
   'club de regatas vasco da gama': 'vasco da gama',
@@ -47,7 +52,7 @@ export const ALIASES = {
   'operario ferroviario esporte clube': 'operario',
   'operario pr': 'operario',
   'operario-pr': 'operario',
-  'clube de regatas brasil': 'brasil',
+  'clube de regatas brasil': 'crb',
   'ceara sporting club': 'ceara',
   'asociacao atletica anapolina': 'anapolina',
   // Fase C — variantes longas do catálogo (mesmo clube/UF)
@@ -79,6 +84,8 @@ export const ALIASES = {
   'petrolina social futebol clube': 'petrolina',
   'caxias futebol clube': 'caxias',
   'tuna luso brasileira': 'tuna luso',
+  'brasiliense futebol clube de taguatinga': 'brasiliense',
+  'gremio esportivo brasil': 'brasil de pelotas',
 }
 
 const SUFIXOS_UF = new Set([
