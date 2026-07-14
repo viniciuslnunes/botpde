@@ -113,10 +113,15 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
  * níveis de hierarquia.
  */
 async function getAncestorTenantIdsImpl(tenantId: string): Promise<string[]> {
-  const sede: SedeNode | null = await db.sede.findFirst({
-    where: { tenantId },
-    select: { id: true, tenantId: true, sedeId: true },
-  })
+  const sede: SedeNode | null =
+    (await db.sede.findFirst({
+      where: { tenantId, tipo: 'SEDE' },
+      select: { id: true, tenantId: true, sedeId: true },
+    })) ??
+    (await db.sede.findFirst({
+      where: { tenantId },
+      select: { id: true, tenantId: true, sedeId: true },
+    }))
   if (!sede) return []
 
   return ancestorTenantIds(sede)
@@ -136,10 +141,15 @@ export const getAncestorTenantIds = cache(async (tenantId: string): Promise<stri
  * agregar afiliados da torcida inteira. Retorna [] se o tenant não tem Sede.
  */
 async function getDescendantTenantIdsImpl(tenantId: string): Promise<string[]> {
-  const sede: SedeNode | null = await db.sede.findFirst({
-    where: { tenantId },
-    select: { id: true, tenantId: true, sedeId: true },
-  })
+  const sede: SedeNode | null =
+    (await db.sede.findFirst({
+      where: { tenantId, tipo: 'SEDE' },
+      select: { id: true, tenantId: true, sedeId: true },
+    })) ??
+    (await db.sede.findFirst({
+      where: { tenantId },
+      select: { id: true, tenantId: true, sedeId: true },
+    }))
   if (!sede) return []
 
   return descendantTenantIds(sede.id)
@@ -357,10 +367,16 @@ export async function getTenantHierarquia(tenantId: string): Promise<{
   ancestral: TenantHierarquiaNode | null
   descendentes: TenantHierarquiaNode[]
 }> {
-  const sede: SedeNode | null = await db.sede.findFirst({
-    where: { tenantId },
-    select: { id: true, tenantId: true, sedeId: true },
-  })
+  // Preferir a Sede raiz (tipo SEDE) — evita pegar PDE co-tenant.
+  const sede: SedeNode | null =
+    (await db.sede.findFirst({
+      where: { tenantId, tipo: 'SEDE' },
+      select: { id: true, tenantId: true, sedeId: true },
+    })) ??
+    (await db.sede.findFirst({
+      where: { tenantId },
+      select: { id: true, tenantId: true, sedeId: true },
+    }))
   if (!sede) return { ancestral: null, descendentes: [] }
 
   const [ancestraisIds, descendentesIds] = await Promise.all([
@@ -412,4 +428,124 @@ export async function getTenantHierarquia(tenantId: string): Promise<{
     ancestral: ancestral ? toNode(ancestral) : null,
     descendentes: descendentes.map(toNode),
   }
+}
+
+/** Nó da worktree da Visão da torcida (Sede intra-tenant + Tenants filhos). */
+export interface TorcidaWorktreeNode {
+  /** Chave estável para React / map (sedeId ou `tenant:${id}`). */
+  key: string
+  /** Sede local (Caso A) — null quando o nó é só Tenant filho promovido. */
+  sedeId: string | null
+  /** Tenant dono desta unidade (próprio ou filho). */
+  tenantId: string
+  nome: string
+  tipo: string
+  cidade: string | null
+  ativa: boolean
+  /** Profundidade na árvore (0 = raiz SEDE). */
+  depth: number
+  /** Origem: sede do mesmo tenant vs tenant descendente na hierarquia. */
+  origem: 'sede' | 'tenant'
+}
+
+interface SedeWorktreeRow {
+  id: string
+  nome: string
+  tipo: string
+  cidade: string | null
+  ativa: boolean
+  sedeId: string | null
+  tenantId: string | null
+}
+
+/**
+ * Worktree híbrida da torcida para o console do Presidente:
+ * 1. Todas as Sede ativas do tenant (ligadas por sedeId) — Caso A / onboarding.
+ * 2. Tenants descendentes (Caso B / promoção) anexados sob a SEDE raiz.
+ *
+ * Ordem: DFS pré-ordem a partir da raiz tipo SEDE (ou primeira sede sem pai).
+ */
+export async function getTorcidaWorktree(tenantId: string): Promise<TorcidaWorktreeNode[]> {
+  const sedes: SedeWorktreeRow[] = await db.sede.findMany({
+    where: { tenantId, ativa: true },
+    select: {
+      id: true,
+      nome: true,
+      tipo: true,
+      cidade: true,
+      ativa: true,
+      sedeId: true,
+      tenantId: true,
+    },
+    orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+  })
+
+  const idsNoTenant = new Set(sedes.map((s) => s.id))
+  const filhosPorPai = new Map<string | null, SedeWorktreeRow[]>()
+  for (const s of sedes) {
+    const paiKey =
+      s.sedeId && idsNoTenant.has(s.sedeId) ? s.sedeId : null
+    const lista = filhosPorPai.get(paiKey) ?? []
+    lista.push(s)
+    filhosPorPai.set(paiKey, lista)
+  }
+
+  const raizPreferida =
+    sedes.find((s) => s.tipo === 'SEDE' && !s.sedeId) ??
+    sedes.find((s) => s.tipo === 'SEDE') ??
+    sedes.find((s) => !s.sedeId || !idsNoTenant.has(s.sedeId ?? '')) ??
+    null
+
+  const nodes: TorcidaWorktreeNode[] = []
+  const visitados = new Set<string>()
+
+  function walkSede(sede: SedeWorktreeRow, depth: number) {
+    if (visitados.has(sede.id)) return
+    visitados.add(sede.id)
+    nodes.push({
+      key: `sede:${sede.id}`,
+      sedeId: sede.id,
+      tenantId,
+      nome: sede.nome,
+      tipo: sede.tipo,
+      cidade: sede.cidade,
+      ativa: sede.ativa,
+      depth,
+      origem: 'sede',
+    })
+    const filhos = filhosPorPai.get(sede.id) ?? []
+    for (const filho of filhos) walkSede(filho, depth + 1)
+  }
+
+  if (raizPreferida) {
+    walkSede(raizPreferida, 0)
+    // Órfãos / raízes alternativas (ex.: várias SEDE sem pai) — anexa ao fim depth 0.
+    for (const s of sedes) {
+      if (!visitados.has(s.id) && (!s.sedeId || !idsNoTenant.has(s.sedeId))) {
+        walkSede(s, 0)
+      }
+    }
+    for (const s of sedes) {
+      if (!visitados.has(s.id)) walkSede(s, 1)
+    }
+  }
+
+  // Caso B: Tenants filhos via árvore de Sede (promovidos).
+  const { descendentes } = await getTenantHierarquia(tenantId)
+  const tenantFilhos = descendentes.filter((d) => d.tenantId !== tenantId)
+  for (const d of tenantFilhos) {
+    nodes.push({
+      key: `tenant:${d.tenantId}`,
+      sedeId: null,
+      tenantId: d.tenantId,
+      nome: d.nome,
+      tipo: d.tipo,
+      cidade: d.cidade,
+      ativa: d.ativa,
+      depth: 1,
+      origem: 'tenant',
+    })
+  }
+
+  return nodes
 }

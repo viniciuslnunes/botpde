@@ -702,6 +702,7 @@ interface Departamento {
   nome: string
   cor: string
   permissions: string[]
+  permissionsGestor: string[]
   moduloPortal: string | null
   slug: string
 }
@@ -730,6 +731,7 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
               initialNome={departamento.nome}
               initialCor={departamento.cor}
               initialPermissions={departamento.permissions}
+              initialPermissionsGestor={departamento.permissionsGestor}
               initialModulo={departamento.moduloPortal}
               onCancel={() => setEditandoId(null)}
               onSubmit={(fd) => {
@@ -793,15 +795,18 @@ function DepartamentoRow({
   onDelete: () => void
   pending: boolean
 }) {
+  const organizacional =
+    departamento.permissions.length === 0 && departamento.permissionsGestor.length === 0
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
       <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: departamento.cor }} />
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
         <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
         <span className="text-xs text-[rgb(var(--foreground-muted))]">
-          {departamento.permissions.length === 0
-            ? 'Sem permissões'
-            : `${departamento.permissions.length} permiss${departamento.permissions.length === 1 ? 'ão' : 'ões'}`}
+          {organizacional
+            ? 'Organizacional — não concede acesso'
+            : `membro ${departamento.permissions.length} · gestor+ ${departamento.permissionsGestor.length}`}
         </span>
         {departamento.moduloPortal && (
           <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
@@ -833,6 +838,7 @@ function DepartamentoForm({
   initialNome = '',
   initialCor = '#6b7280',
   initialPermissions = [],
+  initialPermissionsGestor = [],
   initialModulo = null,
   onCancel,
   onSubmit,
@@ -841,6 +847,7 @@ function DepartamentoForm({
   initialNome?: string
   initialCor?: string
   initialPermissions?: string[]
+  initialPermissionsGestor?: string[]
   initialModulo?: string | null
   onCancel: () => void
   onSubmit: (fd: FormData) => void
@@ -848,67 +855,101 @@ function DepartamentoForm({
 }) {
   const [cor, setCor] = useState(initialCor)
   const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
+  const [selectedGestor, setSelectedGestor] = useState<Set<string>>(
+    new Set(initialPermissionsGestor),
+  )
 
   const isEdit = initialNome !== ''
-  const initial = new Set(initialPermissions)
 
-  // Diff em relação ao estado original (só relevante na edição — na criação
-  // tudo é novo por definição, sem destaque, como no RoleForm)
-  const added = isEdit ? [...selected].filter((p) => !initial.has(p)) : []
-  const removed = isEdit ? [...initial].filter((p) => !selected.has(p)) : []
-
-  function toggle(key: string) {
+  function toggleMembro(key: string) {
     setSelected((prev) => {
       const prevArr = [...prev]
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      // Cascata: marcar não-base puxa a base do grupo; desmarcar a base
-      // derruba as irmãs (mesma regra aplicada no servidor)
       return new Set(applyPermissionCascade(prevArr, [...next]))
     })
   }
 
-  /** Contadores de mudança por grupo, para o badge no cabeçalho (edição) */
-  function groupChanges(groupKeys: readonly string[]) {
-    return {
-      added: added.filter((p) => groupKeys.includes(p)).length,
-      removed: removed.filter((p) => groupKeys.includes(p)).length,
-    }
+  function toggleGestor(key: string) {
+    setSelectedGestor((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      // Cascata considera bases do membro + seleção gestor; remove o que já é membro.
+      const cascaded = applyPermissionCascade([...selected], [...selected, ...next])
+      return new Set(cascaded.filter((p) => !selected.has(p)))
+    })
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-
-    // Confirmação com resumo das mudanças de permissão antes de gravar
-    if (isEdit && (added.length > 0 || removed.length > 0)) {
-      const linhas = [
-        ...added.map((p) => `  + ${permissionLabel(p)}`),
-        ...removed.map((p) => `  − ${permissionLabel(p)}`),
-      ]
-      if (!confirm(`Salvar as alterações do departamento "${initialNome}"?\n\n${linhas.join('\n')}`)) return
-    }
-
     const fd = new FormData(e.currentTarget)
-    // Injeta as permissões selecionadas manualmente (checkboxes podem ser perdidos)
     fd.delete('permissions')
+    fd.delete('permissionsGestor')
     for (const p of selected) fd.append('permissions', p)
+    for (const p of selectedGestor) fd.append('permissionsGestor', p)
     onSubmit(fd)
   }
 
-  /** Estilo do item conforme estado: selecionado / adicionado / removido / neutro */
-  function itemClass(key: string): string {
+  function itemClass(key: string, set: Set<string>): string {
     const base = 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors'
-    if (isEdit && added.includes(key)) {
-      return `${base} border-green-400 bg-green-50 text-[rgb(var(--foreground))] dark:border-green-700 dark:bg-green-950`
-    }
-    if (isEdit && removed.includes(key)) {
-      return `${base} border-red-300 bg-red-50 text-[rgb(var(--foreground-muted))] dark:border-red-800 dark:bg-red-950`
-    }
-    if (selected.has(key)) {
+    if (set.has(key)) {
       return `${base} border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]`
     }
     return `${base} border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]`
+  }
+
+  function renderGroups(
+    set: Set<string>,
+    onToggle: (key: string) => void,
+    excludeKeys?: Set<string>,
+  ) {
+    return (
+      <div className="space-y-3">
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              {group.label}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {group.items
+                .filter((item) => !excludeKeys?.has(item.key))
+                .map((item) => {
+                  const isBase = group.base === item.key
+                  return (
+                    <label key={item.key} className={itemClass(item.key, set)}>
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={set.has(item.key)}
+                        onChange={() => onToggle(item.key)}
+                      />
+                      <span
+                        className={[
+                          'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                          set.has(item.key)
+                            ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                            : 'border-[rgb(var(--border-strong))]',
+                        ].join(' ')}
+                      >
+                        {set.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+                      </span>
+                      <span>{item.label}</span>
+                      {isBase && (
+                        <Eye
+                          className="ml-auto h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]"
+                          aria-label="Permissão base do grupo"
+                        />
+                      )}
+                    </label>
+                  )
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -939,7 +980,6 @@ function DepartamentoForm({
         </div>
       </div>
 
-      {/* Módulo de portal */}
       <div>
         <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Módulo do portal
@@ -961,75 +1001,33 @@ function DepartamentoForm({
         </select>
       </div>
 
-      {/* Nota: departamento pode ter zero permissões (uso só organizacional) */}
-      {selected.size === 0 && (
+      {selected.size === 0 && selectedGestor.size === 0 && (
         <p className="text-xs text-[rgb(var(--foreground-muted))]">
-          Sem permissões: o departamento serve só para organização/escopo.
+          Organizacional: sem permissões o departamento não concede acesso — só agrupa pessoas.
         </p>
       )}
 
-      {/* Permissões */}
       <div>
-        <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">Permissões</p>
-        <div className="space-y-3">
-          {PERMISSION_GROUPS.map((group) => {
-            const groupKeys = group.items.map((i) => i.key)
-            const changes = groupChanges(groupKeys)
-            return (
-              <div key={group.label}>
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                  {group.label}
-                  {changes.added > 0 && (
-                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900 dark:text-green-300">
-                      +{changes.added}
-                    </span>
-                  )}
-                  {changes.removed > 0 && (
-                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900 dark:text-red-300">
-                      −{changes.removed}
-                    </span>
-                  )}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                  {group.items.map((item) => {
-                    const isBase = group.base === item.key
-                    return (
-                      <label key={item.key} className={itemClass(item.key)}>
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={selected.has(item.key)}
-                          onChange={() => toggle(item.key)}
-                        />
-                        <span
-                          className={[
-                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                            selected.has(item.key)
-                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                              : 'border-[rgb(var(--border-strong))]',
-                          ].join(' ')}
-                        >
-                          {selected.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
-                        </span>
-                        <span className={isEdit && removed.includes(item.key) ? 'line-through opacity-70' : ''}>
-                          {item.label}
-                        </span>
-                        {isBase && (
-                          <Eye
-                            className="ml-auto h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]"
-                            aria-label="Permissão base do grupo — exigida pelas demais"
-                          />
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <p className="mt-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          {selected.size} permiss{selected.size === 1 ? 'ão' : 'ões'} selecionada{selected.size === 1 ? '' : 's'}
+        <p className="mb-1 text-xs font-medium text-[rgb(var(--foreground))]">Permissões do membro</p>
+        <p className="mb-2 text-xs text-[rgb(var(--foreground-muted))]">
+          Quem é só membro vê / age de forma leve com estas permissões.
+        </p>
+        {renderGroups(selected, toggleMembro)}
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+          {selected.size} permiss{selected.size === 1 ? 'ão' : 'ões'} de membro
+        </p>
+      </div>
+
+      <div>
+        <p className="mb-1 text-xs font-medium text-[rgb(var(--foreground))]">
+          Permissões do gestor (a mais)
+        </p>
+        <p className="mb-2 text-xs text-[rgb(var(--foreground-muted))]">
+          Somam-se às do membro. Gestores também podem incluir/remover membros do departamento.
+        </p>
+        {renderGroups(selectedGestor, toggleGestor, selected)}
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+          {selectedGestor.size} permiss{selectedGestor.size === 1 ? 'ão' : 'ões'} exclusivas do gestor
         </p>
       </div>
 
@@ -1040,7 +1038,7 @@ function DepartamentoForm({
           className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          {initialNome ? 'Salvar' : 'Criar departamento'}
+          {isEdit ? 'Salvar' : 'Criar departamento'}
         </button>
         <button
           type="button"

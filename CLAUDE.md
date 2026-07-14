@@ -80,13 +80,15 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - `packages/db/prisma/schema.prisma` — modelo de dados.
 - `packages/types/src/permissions.js` — permissões, cargos de sistema, efetivas.
 - `packages/types/src/visibility.js` — sensibilidade e visibilidade cross-tenant.
-- `apps/web/src/lib/authz.ts` — `assertPermission`.
-- `apps/web/src/lib/hierarquia.ts` — relação entre tenants na árvore de Sede.
+- `apps/web/src/lib/authz.ts` — `assertPermission` / `assertPresidenteGlobal` / `assertAnyPermission`.
+- `apps/web/src/lib/hierarquia.ts` — relação entre tenants + `getTorcidaWorktree`.
 - `apps/web/src/lib/salas.ts`, `salas-api.ts`, `livekit.ts` — núcleo do módulo Salas (Meet);
   ver `docs/data/modulo-salas.md`.
 - **Loja** — catálogo, sacola, checkout, cupons: `apps/web/src/app/portal/loja/`,
   `apps/web/src/app/admin/loja/`; regras em `packages/types/src/loja.js`;
   ver `docs/data/modulo-loja.md`.
+- **Departamentos / governo** — RBAC por depto + worktree da Visão da torcida:
+  `docs/data/modulo-departamentos.md`; seed `packages/db/scripts/seed-departamentos.js`.
 - **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
   `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),

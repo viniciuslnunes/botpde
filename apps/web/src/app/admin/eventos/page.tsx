@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { assertPermission } from '@/lib/authz'
+import { assertAnyPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import { CriarEventoForm } from '@/components/admin/evento-forms'
@@ -42,7 +42,7 @@ function serializarEvento(
 
 export default async function AdminEventosPage() {
   try {
-    await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+    await assertAnyPermission([PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE])
   } catch {
     redirect('/admin')
   }

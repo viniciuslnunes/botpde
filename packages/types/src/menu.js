@@ -13,7 +13,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'torcida', label: 'Visão da torcida', href: '/admin/torcida', permissao: PERMISSIONS.TORCIDA_GLOBAL_VIEW },
   { id: 'membros', label: 'Membros', href: '/admin/membros', permissao: PERMISSIONS.MEMBERS_VIEW },
   { id: 'socios', label: 'Sócios', href: '/admin/socios', permissao: PERMISSIONS.MEMBERS_VIEW },
-  { id: 'eventos', label: 'Eventos', href: '/admin/eventos', permissao: PERMISSIONS.EVENTS_MANAGE },
+  { id: 'eventos', label: 'Eventos', href: '/admin/eventos', permissao: [PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE] },
   { id: 'sedes', label: 'Sedes', href: '/admin/sedes', permissao: PERMISSIONS.SEDES_MANAGE },
   { id: 'hierarquia', label: 'Hierarquia', href: '/admin/hierarquia', permissao: PERMISSIONS.SEDES_MANAGE },
   { id: 'loja', label: 'Loja', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
@@ -31,11 +31,19 @@ export const ADMIN_MENU = /** @type {const} */ ([
  * Usar sempre no servidor — nunca confiar em filtragem feita só no cliente,
  * já que o menu não é controle de acesso, só affordance visual.
  *
- * @param {readonly {id: string, label: string, href: string, permissao: string | null}[]} menu
+ * `permissao` pode ser string ou array (OR — ex.: eventos aceita CREATE ou MANAGE).
+ *
+ * @param {readonly {id: string, label: string, href: string, permissao: string | readonly string[] | null}[]} menu
  * @param {string[]} effectivePermissions
  */
 export function filterMenuByPermissions(menu, effectivePermissions) {
-  return menu.filter((item) => item.permissao === null || hasPermission(effectivePermissions, item.permissao))
+  return menu.filter((item) => {
+    if (item.permissao === null) return true
+    if (Array.isArray(item.permissao)) {
+      return item.permissao.some((p) => hasPermission(effectivePermissions, p))
+    }
+    return hasPermission(effectivePermissions, item.permissao)
+  })
 }
 
 /**
@@ -47,5 +55,11 @@ export function filterMenuByPermissions(menu, effectivePermissions) {
  * @param {string[]} effectivePermissions
  */
 export function hasAdminAreaAccess(effectivePermissions) {
-  return ADMIN_MENU.some((item) => item.permissao !== null && hasPermission(effectivePermissions, item.permissao))
+  return ADMIN_MENU.some((item) => {
+    if (item.permissao === null) return false
+    if (Array.isArray(item.permissao)) {
+      return item.permissao.some((p) => hasPermission(effectivePermissions, p))
+    }
+    return hasPermission(effectivePermissions, item.permissao)
+  })
 }

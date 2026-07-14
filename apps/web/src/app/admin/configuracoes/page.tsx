@@ -33,7 +33,7 @@ export default async function ConfiguracoesPage() {
   // Tipo da Sede do tenant — contextualiza rótulos de cargos de sistema
   // (Presidente na Sede principal, Liderança em subsedes/PDEs).
   const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id },
+    where: { tenantId: tenant.id, tipo: 'SEDE' },
     select: { tipo: true },
   })
   const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
@@ -108,7 +108,7 @@ export default async function ConfiguracoesPage() {
       id: 'departamentos',
       icon: Users2,
       title: 'Departamentos',
-      description: 'Agrupamentos que concedem acesso a funcionalidades. Membros recebem as permissões do departamento; gestores administram a área.',
+      description: 'Agrupamentos que concedem acesso. Membros recebem as permissões de equipe; gestores recebem as extras e administram a área.',
       ownerOnly: false,
     },
   ]

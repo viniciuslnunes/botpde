@@ -3,10 +3,14 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { DEPARTAMENTO_MODULOS, DEPARTAMENTO_MODULO_ROTA } from '@torcida/types'
+import {
+  DEPARTAMENTO_MODULOS,
+  DEPARTAMENTO_MODULO_ROTA,
+  DEPARTAMENTO_MODULO_ADMIN_ROTA,
+} from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { ArrowRight, Briefcase, Clock, Shield } from 'lucide-react'
+import { ArrowRight, Briefcase, Clock, Eye, Shield } from 'lucide-react'
 
 /** Tipos explícitos — a inferência do Prisma quebra neste schema (ARCHITECTURE.md §5.2). */
 interface DepartamentoHubLite {
@@ -16,6 +20,7 @@ interface DepartamentoHubLite {
     slug: string
     cor: string
     permissions: string[]
+    permissionsGestor: string[]
     moduloPortal: string | null
     ordem: number
   }
@@ -31,6 +36,11 @@ const MODULO_LABEL = new Map<string, string>(
 function rotaDoModulo(moduloPortal: string | null) {
   if (!moduloPortal || !(moduloPortal in DEPARTAMENTO_MODULO_ROTA)) return null
   return DEPARTAMENTO_MODULO_ROTA[moduloPortal as keyof typeof DEPARTAMENTO_MODULO_ROTA]
+}
+
+function rotaAdminDoModulo(moduloPortal: string | null): string | null {
+  if (!moduloPortal || !(moduloPortal in DEPARTAMENTO_MODULO_ADMIN_ROTA)) return null
+  return DEPARTAMENTO_MODULO_ADMIN_ROTA[moduloPortal as keyof typeof DEPARTAMENTO_MODULO_ADMIN_ROTA]
 }
 
 export function DepartamentosFallback() {
@@ -62,6 +72,7 @@ export async function DepartamentosSection() {
               slug: true,
               cor: true,
               permissions: true,
+              permissionsGestor: true,
               moduloPortal: true,
               ordem: true,
             },
@@ -93,8 +104,12 @@ export async function DepartamentosSection() {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {departamentos.map((depto, index) => {
         const rota = rotaDoModulo(depto.moduloPortal)
+        const adminHref = rotaAdminDoModulo(depto.moduloPortal)
         const moduloLabel = depto.moduloPortal ? MODULO_LABEL.get(depto.moduloPortal) : null
         const isGestor = gestorIds.has(depto.id)
+        const organizacional =
+          depto.permissions.length === 0 && depto.permissionsGestor.length === 0
+        const podeAbrirModulo = Boolean(rota?.disponivel && rota.href && !organizacional)
 
         return (
           <MotionReveal key={depto.id} index={index}>
@@ -111,22 +126,30 @@ export async function DepartamentosSection() {
                     {depto.nome}
                   </h2>
                   <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                    {moduloLabel ? `Acesso a ${moduloLabel}` : 'Sem módulo vinculado'}
-                    {depto.permissions.length > 0 &&
-                      ` · ${depto.permissions.length} ${depto.permissions.length === 1 ? 'permissão' : 'permissões'}`}
+                    {organizacional
+                      ? 'Organizacional — sem ações de acesso'
+                      : moduloLabel
+                        ? `Acesso a ${moduloLabel}`
+                        : 'Sem módulo vinculado'}
+                    {isGestor ? ' · gestor' : ' · membro'}
                   </p>
                 </div>
               </div>
 
               <div className="mt-auto flex items-center gap-2 pt-4">
-                {rota?.disponivel && rota.href ? (
+                {podeAbrirModulo ? (
                   <Link
-                    href={rota.href}
+                    href={rota!.href!}
                     className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
                   >
                     Abrir módulo
                     <ArrowRight className="h-4 w-4" />
                   </Link>
+                ) : organizacional ? (
+                  <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))]">
+                    <Eye className="h-4 w-4" />
+                    Só organização
+                  </span>
                 ) : (
                   <span className="inline-flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))]">
                     <Clock className="h-4 w-4" />
@@ -135,7 +158,7 @@ export async function DepartamentosSection() {
                 )}
                 {isGestor && (
                   <Link
-                    href="/admin"
+                    href={adminHref ?? '/admin'}
                     prefetch={false}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >

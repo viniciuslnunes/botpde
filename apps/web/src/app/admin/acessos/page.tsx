@@ -29,6 +29,8 @@ interface DepartamentoLite {
   nome: string
   cor: string
   permissions: string[]
+  permissionsGestor: string[]
+  slug: string
 }
 interface UserRoleLite {
   userId: string
@@ -61,11 +63,15 @@ export default async function AcessosPage() {
     orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
     select: { id: true, nome: true, cor: true, isSystem: true, permissions: true },
   })
-  const departamentos: DepartamentoLite[] = await db.departamento.findMany({
+  const departamentosRaw: DepartamentoLite[] = await db.departamento.findMany({
     where: { tenantId: tenant.id },
     orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    select: { id: true, nome: true, cor: true, permissions: true },
+    select: { id: true, nome: true, cor: true, permissions: true, permissionsGestor: true, slug: true },
   })
+  // Blindagem: Sócio/Torcedor não são departamentos (são tipos de membro).
+  const departamentos = departamentosRaw.filter(
+    (d) => d.slug !== 'socio' && d.slug !== 'torcedor' && d.nome !== 'Sócio' && d.nome !== 'Torcedor',
+  )
   const usuarios: UsuarioBasico[] = await db.user.findMany({
     where: {
       OR: [
@@ -98,7 +104,7 @@ export default async function AcessosPage() {
   // Tipo da Sede do tenant — contextualiza rótulos de cargos de sistema
   // (Presidente na Sede principal, Liderança em subsedes/PDEs).
   const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id },
+    where: { tenantId: tenant.id, tipo: 'SEDE' },
     select: { tipo: true },
   })
   const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'

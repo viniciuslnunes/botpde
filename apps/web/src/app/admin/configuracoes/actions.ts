@@ -324,11 +324,16 @@ export async function criarDepartamento(formData: FormData) {
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
   const permissionsRaw = formData.getAll('permissions') as string[]
+  const permissionsGestorRaw = formData.getAll('permissionsGestor') as string[]
   const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
 
   const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
+  const permissionsGestor = sanitizeDepartamentoPermissions([
+    ...permissions,
+    ...permissionsGestorRaw,
+  ]).filter((p) => !permissions.includes(p))
 
   const existing = await db.departamento.findFirst({
     where: { tenantId: tenant.id, nome },
@@ -338,7 +343,15 @@ export async function criarDepartamento(formData: FormData) {
   const slug = await gerarSlugUnico(tenant.id, nome)
 
   await db.departamento.create({
-    data: { tenantId: tenant.id, nome, cor, slug, moduloPortal, permissions },
+    data: {
+      tenantId: tenant.id,
+      nome,
+      cor,
+      slug,
+      moduloPortal,
+      permissions,
+      permissionsGestor,
+    },
   })
 
   await db.auditLog.create({
@@ -346,7 +359,7 @@ export async function criarDepartamento(formData: FormData) {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'DEPARTAMENTO_CRIADO',
-      detalhes: { nome, cor, slug, moduloPortal, permissions },
+      detalhes: { nome, cor, slug, moduloPortal, permissions, permissionsGestor },
     },
   })
 
@@ -365,11 +378,16 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
   const permissionsRaw = formData.getAll('permissions') as string[]
+  const permissionsGestorRaw = formData.getAll('permissionsGestor') as string[]
   const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
 
   const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
+  const permissionsGestor = sanitizeDepartamentoPermissions([
+    ...permissions,
+    ...permissionsGestorRaw,
+  ]).filter((p) => !permissions.includes(p))
 
   // Regenera o slug só quando o nome mudou — mantém URLs/referências estáveis
   const slug =
@@ -379,7 +397,7 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
 
   await db.departamento.update({
     where: { id: departamentoId },
-    data: { nome, cor, slug, moduloPortal, permissions },
+    data: { nome, cor, slug, moduloPortal, permissions, permissionsGestor },
   })
 
   await db.auditLog.create({
@@ -395,18 +413,27 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
         slug,
         moduloPortal,
         permissions,
+        permissionsGestor,
         permissoesAntes: departamento.permissions,
+        permissoesGestorAntes: departamento.permissionsGestor,
       },
     },
   })
 
-  // Mudar as permissões do departamento muda as efetivas de todos os membros
-  const membros: MembroDepartamentoLite[] = await db.userDepartamento.findMany({
-    where: { departamentoId },
-    select: { userId: true },
-  })
-  for (const membro of membros) {
-    invalidatePermissionsCache(membro.userId, tenant.id)
+  // Mudar as permissões do departamento muda as efetivas de membros e gestores
+  const [membros, gestores]: [MembroDepartamentoLite[], MembroDepartamentoLite[]] = await Promise.all([
+    db.userDepartamento.findMany({
+      where: { departamentoId },
+      select: { userId: true },
+    }),
+    db.departamentoGestor.findMany({
+      where: { departamentoId },
+      select: { userId: true },
+    }),
+  ])
+  const afetados = new Set([...membros, ...gestores].map((m) => m.userId))
+  for (const userId of afetados) {
+    invalidatePermissionsCache(userId, tenant.id)
   }
 
   revalidatePath('/admin/configuracoes')

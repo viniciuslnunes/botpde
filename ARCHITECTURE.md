@@ -177,20 +177,27 @@ flowchart LR
 ### 3.2b Controle de acesso — Departamentos, Perfis e Permissões
 
 > Inspirado em cargos do Discord + revisão de um sistema de controle de
-> acesso corporativo de referência (perfis, permissões em árvore,
-> concessão/revogação em lote por "contrato"). Decisões fechadas em
-> 2026-07-01.
+> acesso corporativo de referência. Atualizado 2026-07-14: departamento
+> **concede** permissões; membro ≠ gestor.
 
 Dois eixos independentes, escopados por tenant (contrato = sede/subsede/pde):
 
-- **Departamento** (`Departamento` model, novo) — agrupamento
-  organizacional (Diretoria, Dpto. Financeiro, Sócio, Torcedor...). **Não
-  concede permissão nenhuma** — é rótulo/escopo. Lista plana por tenant no
-  MVP (sem sub-departamento).
-- **Perfil** (`Role`, já existia) — agrupamento de permissões
-  (`permissions: String[]`). Quem concede acesso de fato.
-- **Permissões adicionais** (`UserPermission`, já existia) — override
-  pontual por usuário (`granted: true/false`), além do que os perfis dão.
+- **Departamento** (`Departamento`) — unidade de acesso **e** agrupamento
+  organizacional (Diretoria, Financeiro, Comunicação…). Carrega
+  `permissions[]` (membro/equipe) e `permissionsGestor[]` (a mais, para quem
+  é gestor). Sócio/Torcedor **não** são departamento — são `SaasMembro.tipo`.
+  Lista plana por tenant no MVP.
+- **Perfil** (`Role`) — agrupamento transversal de permissões
+  (`permissions: String[]`).
+- **Permissões adicionais** (`UserPermission`) — override pontual
+  (`granted: true/false`).
+
+```
+efetivas = ∪ Role.permissions
+         ∪ (membro ? Departamento.permissions : [])
+         ∪ (gestor ? Departamento.permissionsGestor : [])
+         ± UserPermission overrides
+```
 
 ```mermaid
 flowchart LR
@@ -200,26 +207,19 @@ flowchart LR
     Departamento -->|N gestores| DepartamentoGestor --> User
 ```
 
-Um usuário pode estar em vários departamentos e ter vários perfis ao mesmo
-tempo (multi-role, já suportado pelo schema via `UserRole` many-to-many).
-`packages/types/src/permissions.js` já calcula permissão efetiva como
-`perfis ∪ overrides` (`calculateEffectivePermissions`) — praticamente
-idêntico ao padrão perfil+permissão-adicional do sistema de referência.
+**Gestão delegada** (`DepartamentoGestor` + `canManageDepartamento`): quem tem
+`ROLES_MANAGE` gerencia tudo; gestor de um departamento pode incluir/remover
+membros **daquele** departamento (`adicionarMembroDepartamento` /
+`removerMembroDepartamento` em `/admin/acessos/actions`).
 
-**Gestão delegada de departamento** (`DepartamentoGestor`, novo): quem tem
-`ROLES_MANAGE` (dono/admin do tenant) sempre gerencia tudo. Além disso,
-qualquer usuário pode ser marcado como gestor de um departamento
-específico sem precisar virar admin geral — cobre o caso "presidente da
-sede gerencia tudo, liderança de um departamento na subsede/pde gerencia
-só aquele departamento". Função helper: `canManageDepartamento()` em
-`packages/types/src/permissions.js`.
+**UI**: `/admin/acessos` (perfis, membro/gestor por departamento, matriz com
+origem); `/admin/configuracoes` (CRUD de departamento com as duas listas);
+hub `/portal/departamentos`.
 
-**Ainda não implementado (próximo passo)**: UI de atribuição de
-perfis/departamentos/permissões adicionais por usuário (hoje só existe
-CRUD de perfil em `/admin/configuracoes`, sem tela de atribuição —
-equivalente à página "Controle de Acesso de Usuário" do sistema de
-referência, incluindo fluxo de concessão/revogação em lote).
-
+**Visão da torcida** (`/admin/torcida`): worktree híbrida = árvore de `Sede`
+do tenant (onboarding) + Tenants filhos quando existentes; KPIs por
+`SaasMembro.sedeId`. Gate: `TORCIDA_GLOBAL_VIEW` + Sede `tipo: SEDE`.
+Ver `docs/data/modulo-departamentos.md`.
 ### 3.3 Unificação bot ↔ web
 
 - Bot para de falar Postgres cru via `pg` e passa a usar `@torcida/db`

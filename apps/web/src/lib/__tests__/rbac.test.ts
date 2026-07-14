@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   calculateEffectivePermissions,
+  canManageDepartamento,
   DEPARTAMENTO_MODULO_ROTA,
   DEPARTAMENTO_MODULOS,
+  filterMenuByPermissions,
   hasPermission,
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
@@ -164,5 +166,27 @@ describe('DEPARTAMENTO_MODULO_ROTA (hub do portal)', () => {
         expect(rota.href).toBeNull()
       }
     }
+  })
+})
+
+describe('canManageDepartamento', () => {
+  it('ROLES_MANAGE sempre pode gerir qualquer departamento', () => {
+    expect(canManageDepartamento([PERMISSIONS.ROLES_MANAGE], [], 'depto-x')).toBe(true)
+  })
+
+  it('gestor listado só do próprio departamento pode gerir', () => {
+    expect(canManageDepartamento([], ['depto-a'], 'depto-a')).toBe(true)
+    expect(canManageDepartamento([], ['depto-a'], 'depto-b')).toBe(false)
+  })
+})
+
+describe('filterMenuByPermissions com OR', () => {
+  it('item com array de permissões aparece se tiver qualquer uma', () => {
+    const menu = [
+      { id: 'eventos', label: 'Eventos', href: '/admin/eventos', permissao: [PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE] },
+    ]
+    expect(filterMenuByPermissions(menu, [PERMISSIONS.EVENTS_CREATE])).toHaveLength(1)
+    expect(filterMenuByPermissions(menu, [PERMISSIONS.EVENTS_MANAGE])).toHaveLength(1)
+    expect(filterMenuByPermissions(menu, [PERMISSIONS.MEMBERS_VIEW])).toHaveLength(0)
   })
 })

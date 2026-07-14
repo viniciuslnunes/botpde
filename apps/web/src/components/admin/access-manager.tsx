@@ -2,7 +2,12 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Loader2, Check, X, Pencil, ShieldCheck, UserRound } from 'lucide-react'
-import { PERMISSION_GROUPS, calculateEffectivePermissions, applyPermissionCascade, rotuloCargoSistema } from '@torcida/types'
+import {
+  PERMISSION_GROUPS,
+  calculateEffectivePermissions,
+  applyPermissionCascade,
+  rotuloCargoSistema,
+} from '@torcida/types'
 import { salvarAcessoUsuario } from '@/app/admin/acessos/actions'
 
 interface RoleOpt {
@@ -18,6 +23,7 @@ interface DepartamentoOpt {
   nome: string
   cor: string
   permissions: string[]
+  permissionsGestor: string[]
 }
 
 interface UsuarioAcesso {
@@ -42,6 +48,10 @@ interface AccessManagerProps {
 /** Rótulo de exibição de um perfil: cargos de sistema ganham o rótulo PT contextual. */
 function roleLabel(role: RoleOpt, tipoSede: string): string {
   return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
+}
+
+function permsDoDepartamento(depto: DepartamentoOpt, isGestor: boolean): string[] {
+  return isGestor ? [...depto.permissions, ...depto.permissionsGestor] : [...depto.permissions]
 }
 
 export function AccessManager({ usuarios, roles, departamentos, tipoSede }: AccessManagerProps) {
@@ -88,13 +98,13 @@ function contarPermissoesAdicionais(
   roles: RoleOpt[],
   departamentos: DepartamentoOpt[],
 ): number {
-  // Coberto = o que já vem dos perfis E dos departamentos do usuário —
-  // só conta como "adicional" a concessão que nenhum dos dois explica
   const coberto = new Set([
     ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
     ...departamentos
       .filter((d) => usuario.departamentoIds.includes(d.id))
-      .flatMap((d) => d.permissions),
+      .flatMap((d) =>
+        permsDoDepartamento(d, usuario.gestorDepartamentoIds.includes(d.id)),
+      ),
   ])
   return usuario.permissoesAdicionais.filter(
     (p) => p.granted && !coberto.has(p.permission),
@@ -148,18 +158,22 @@ function UsuarioAcessoRow({
               ))
             )}
 
-            {deptos.map((d) => (
-              <span
-                key={d.id}
-                className="flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs text-[rgb(var(--foreground-muted))]"
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.cor }} />
-                {d.nome}
-                {usuario.gestorDepartamentoIds.includes(d.id) && (
-                  <ShieldCheck className="h-3 w-3 text-[rgb(var(--primary))]" />
-                )}
-              </span>
-            ))}
+            {deptos.map((d) => {
+              const isGestor = usuario.gestorDepartamentoIds.includes(d.id)
+              return (
+                <span
+                  key={d.id}
+                  className="flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs text-[rgb(var(--foreground-muted))]"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.cor }} />
+                  {d.nome}
+                  <span className="ml-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    {isGestor ? 'gestor' : 'membro'}
+                  </span>
+                  {isGestor && <ShieldCheck className="h-3 w-3 text-[rgb(var(--primary))]" />}
+                </span>
+              )
+            })}
 
             {extras > 0 && (
               <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
@@ -195,19 +209,34 @@ function AccessEditForm({
 }) {
   const [pending, startTransition] = useTransition()
   const [perfilIds, setPerfilIds] = useState<Set<string>>(new Set(usuario.perfilIds))
-  const [departamentoIds, setDepartamentoIds] = useState<Set<string>>(new Set(usuario.departamentoIds))
+  const [departamentoIds, setDepartamentoIds] = useState<Set<string>>(
+    new Set(usuario.departamentoIds),
+  )
   const [gestorIds, setGestorIds] = useState<Set<string>>(new Set(usuario.gestorDepartamentoIds))
 
+  const coberturaBase = useMemo(() => {
+    const viaPerfil = new Set(
+      roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
+    )
+    const viaDepto = new Set(
+      departamentos
+        .filter((d) => departamentoIds.has(d.id))
+        .flatMap((d) => permsDoDepartamento(d, gestorIds.has(d.id))),
+    )
+    return { viaPerfil, viaDepto }
+  }, [roles, departamentos, perfilIds, departamentoIds, gestorIds])
+
   const permissoesEfetivasIniciais = useMemo(() => {
-    // Base = união das permissões dos perfis E dos departamentos do usuário
     const rolePermissions = [
       ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
       ...departamentos
         .filter((d) => usuario.departamentoIds.includes(d.id))
-        .flatMap((d) => d.permissions),
+        .flatMap((d) =>
+          permsDoDepartamento(d, usuario.gestorDepartamentoIds.includes(d.id)),
+        ),
     ]
     return calculateEffectivePermissions(rolePermissions, usuario.permissoesAdicionais)
-  }, [roles, departamentos, usuario.perfilIds, usuario.departamentoIds, usuario.permissoesAdicionais])
+  }, [roles, departamentos, usuario])
 
   const [permissoes, setPermissoes] = useState<Set<string>>(new Set(permissoesEfetivasIniciais))
 
@@ -225,52 +254,75 @@ function AccessEditForm({
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      // Cascata de dependência: marcar não-base puxa a base do grupo,
-      // desmarcar a base derruba as irmãs (mesma regra dos perfis)
       return new Set(applyPermissionCascade([...prev], [...next]))
     })
   }
 
-  function toggleDepartamento(id: string) {
-    const selecionando = !departamentoIds.has(id)
-    const proximosDepartamentos = new Set(departamentoIds)
-    if (selecionando) proximosDepartamentos.add(id)
-    else proximosDepartamentos.delete(id)
-    setDepartamentoIds(proximosDepartamentos)
-
-    // Desmarcar o departamento remove a gestão dele também
-    if (!selecionando) {
-      setGestorIds((prev) => {
-        if (!prev.has(id)) return prev
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-    }
-
-    // Recalcula a cobertura nas permissões efetivas exibidas: marcar o
-    // departamento passa a conceder as permissões dele; desmarcar remove
-    // as que nenhum perfil, outro departamento ou concessão extra explica
-    const depto = departamentos.find((d) => d.id === id)
-    if (!depto || depto.permissions.length === 0) return
+  function syncPermissoesComDeptos(
+    nextDeptos: Set<string>,
+    nextGestores: Set<string>,
+  ) {
+    const cov = new Set([
+      ...roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
+      ...departamentos
+        .filter((d) => nextDeptos.has(d.id))
+        .flatMap((d) => permsDoDepartamento(d, nextGestores.has(d.id))),
+      ...usuario.permissoesAdicionais.filter((o) => o.granted).map((o) => o.permission),
+    ])
     setPermissoes((prev) => {
       const next = new Set(prev)
-      if (selecionando) {
-        for (const p of depto.permissions) next.add(p)
-      } else {
-        const aindaCoberto = new Set([
-          ...roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
-          ...departamentos
-            .filter((d) => proximosDepartamentos.has(d.id))
-            .flatMap((d) => d.permissions),
-          ...usuario.permissoesAdicionais.filter((o) => o.granted).map((o) => o.permission),
-        ])
-        for (const p of depto.permissions) {
-          if (!aindaCoberto.has(p)) next.delete(p)
-        }
+      const todasDepto = new Set(
+        departamentos.flatMap((d) => permsDoDepartamento(d, true)),
+      )
+      for (const p of todasDepto) {
+        if (cov.has(p)) next.add(p)
+        else next.delete(p)
       }
+      for (const p of cov) next.add(p)
       return next
     })
+  }
+
+  function setMembroDepartamento(id: string, ativo: boolean) {
+    const nextDeptos = new Set(departamentoIds)
+    const nextGestores = new Set(gestorIds)
+    if (ativo) nextDeptos.add(id)
+    else {
+      nextDeptos.delete(id)
+      nextGestores.delete(id)
+    }
+    setDepartamentoIds(nextDeptos)
+    setGestorIds(nextGestores)
+    syncPermissoesComDeptos(nextDeptos, nextGestores)
+  }
+
+  function setGestorDepartamento(id: string, ativo: boolean) {
+    const nextDeptos = new Set(departamentoIds)
+    const nextGestores = new Set(gestorIds)
+    if (ativo) {
+      nextDeptos.add(id)
+      nextGestores.add(id)
+    } else {
+      nextGestores.delete(id)
+    }
+    setDepartamentoIds(nextDeptos)
+    setGestorIds(nextGestores)
+    syncPermissoesComDeptos(nextDeptos, nextGestores)
+  }
+
+  function origemBadge(permission: string): string | null {
+    if (coberturaBase.viaPerfil.has(permission) && coberturaBase.viaDepto.has(permission)) {
+      return 'perfil+depto'
+    }
+    if (coberturaBase.viaPerfil.has(permission)) return 'via perfil'
+    if (coberturaBase.viaDepto.has(permission)) return 'via depto'
+    if (permissoes.has(permission) && !coberturaBase.viaPerfil.has(permission) && !coberturaBase.viaDepto.has(permission)) {
+      return 'extra'
+    }
+    if (!permissoes.has(permission) && (coberturaBase.viaPerfil.has(permission) || coberturaBase.viaDepto.has(permission))) {
+      return 'revogada'
+    }
+    return null
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -299,7 +351,6 @@ function AccessEditForm({
         <p className="text-xs text-[rgb(var(--foreground-muted))]">{usuario.email}</p>
       </div>
 
-      {/* Perfis */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           Perfis
@@ -328,65 +379,80 @@ function AccessEditForm({
         </div>
       </div>
 
-      {/* Departamentos */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           Departamentos
+        </p>
+        <p className="mb-2 text-xs text-[rgb(var(--foreground-muted))]">
+          Membro = vê/age com as permissões da equipe. Gestor = age a mais e pode incluir/remover
+          membros deste departamento.
         </p>
         <div className="space-y-1.5">
           {departamentos.map((depto) => {
-            const selecionado = departamentoIds.has(depto.id)
+            const isMembro = departamentoIds.has(depto.id)
+            const isGestor = gestorIds.has(depto.id)
+            const organizacional =
+              depto.permissions.length === 0 && depto.permissionsGestor.length === 0
             return (
               <div
                 key={depto.id}
                 className={[
-                  'flex items-center gap-3 rounded-lg border px-3 py-2 text-xs transition-colors',
-                  selecionado
+                  'flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                  isMembro
                     ? 'border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)]'
                     : 'border-[rgb(var(--border))]',
                 ].join(' ')}
               >
-                <label className="flex flex-1 cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={selecionado}
-                    onChange={() => toggleDepartamento(depto.id)}
-                  />
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: depto.cor }} />
-                  <span className="text-[rgb(var(--foreground))]">{depto.nome}</span>
-                </label>
-
-                <label
-                  className={[
-                    'flex cursor-pointer items-center gap-1.5 text-[rgb(var(--foreground-muted))]',
-                    !selecionado && 'pointer-events-none opacity-40',
-                  ].join(' ')}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    disabled={!selecionado}
-                    checked={gestorIds.has(depto.id)}
-                    onChange={() => toggleSet(setGestorIds, depto.id)}
-                  />
-                  <ShieldCheck className={['h-3.5 w-3.5', gestorIds.has(depto.id) && 'text-[rgb(var(--primary))]'].join(' ')} />
-                  gestor
-                </label>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: depto.cor }} />
+                <span className="min-w-0 flex-1 font-medium text-[rgb(var(--foreground))]">
+                  {depto.nome}
+                  {organizacional && (
+                    <span className="ml-1.5 font-normal text-[rgb(var(--foreground-muted))]">
+                      · organizacional
+                    </span>
+                  )}
+                </span>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMembroDepartamento(depto.id, !isMembro)}
+                    className={[
+                      'rounded-md px-2 py-1 text-[11px] font-semibold transition-colors',
+                      isMembro
+                        ? 'bg-[rgb(var(--primary))] text-white'
+                        : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                    ].join(' ')}
+                  >
+                    Membro
+                  </button>
+                  <button
+                    type="button"
+                    title="Gestor: gerencia a área e a equipe do departamento"
+                    onClick={() => setGestorDepartamento(depto.id, !isGestor)}
+                    className={[
+                      'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors',
+                      isGestor
+                        ? 'bg-[rgb(var(--primary))] text-white'
+                        : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                    ].join(' ')}
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    Gestor
+                  </button>
+                </div>
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Permissões adicionais */}
       <div>
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           Permissões efetivas
         </p>
         <p className="mb-2 text-xs text-[rgb(var(--foreground-muted))]">
-          Marcadas aqui = a pessoa terá acesso, seja pelo perfil ou como concessão extra pontual.
-          Desmarcar uma permissão que o perfil concede cria uma revogação específica para este usuário.
+          Marcadas = a pessoa terá acesso. Badges mostram a origem. Desmarcar o que perfil/depto
+          concede cria uma revogação específica.
         </p>
         <div className="space-y-3">
           {PERMISSION_GROUPS.map((group) => (
@@ -394,36 +460,44 @@ function AccessEditForm({
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 {group.label}
               </p>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                {group.items.map((item) => (
-                  <label
-                    key={item.key}
-                    className={[
-                      'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors',
-                      permissoes.has(item.key)
-                        ? 'border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
-                        : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
-                    ].join(' ')}
-                  >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={permissoes.has(item.key)}
-                      onChange={() => togglePermissao(item.key)}
-                    />
-                    <span
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                {group.items.map((item) => {
+                  const badge = origemBadge(item.key)
+                  return (
+                    <label
+                      key={item.key}
                       className={[
-                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                        'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors',
                         permissoes.has(item.key)
-                          ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                          : 'border-[rgb(var(--border-strong))]',
+                          ? 'border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
+                          : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
                       ].join(' ')}
                     >
-                      {permissoes.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
-                    </span>
-                    {item.label}
-                  </label>
-                ))}
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={permissoes.has(item.key)}
+                        onChange={() => togglePermissao(item.key)}
+                      />
+                      <span
+                        className={[
+                          'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                          permissoes.has(item.key)
+                            ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                            : 'border-[rgb(var(--border-strong))]',
+                        ].join(' ')}
+                      >
+                        {permissoes.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+                      </span>
+                      <span className="min-w-0 flex-1">{item.label}</span>
+                      {badge && (
+                        <span className="shrink-0 rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
+                          {badge}
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
               </div>
             </div>
           ))}

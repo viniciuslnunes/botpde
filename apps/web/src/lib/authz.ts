@@ -71,6 +71,30 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
 }
 
 /**
+ * Igual a `assertPermission`, mas aceita qualquer uma de várias permissões (OR).
+ * Usado em rotas cujo menu usa array (ex.: Eventos = CREATE || MANAGE).
+ */
+export async function assertAnyPermission(permissions: string[]): Promise<AuthzResult> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) throw new Error('Não autorizado')
+
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant }
+  }
+
+  const { rolePermissions, overrides }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
+    await getUserPermissionsInTenant(session.user.id, tenant.id)
+  const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
+
+  if (!permissions.some((p) => hasPermission(effective, p))) throw new Error('Sem permissão')
+
+  return { session, tenant }
+}
+
+/**
  * Console global de leitura do Presidente (/admin/torcida): exige a permissão
  * TORCIDA_GLOBAL_VIEW (Presidente/Vice) E que o tenant atual seja a Sede
  * principal (tipo SEDE). Liderança de subsede/PDE tem owner com '*', mas não
@@ -93,11 +117,13 @@ export async function assertPresidenteGlobal(): Promise<AuthzResult> {
 
   if (!hasPermission(effective, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) throw new Error('Sem permissão')
 
-  const sede: { tipo: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id },
-    select: { tipo: true },
+  // Busca explícita por tipo SEDE — findFirst sem filtro pode pegar PDE
+  // co-tenant se a ordem do banco favorecer uma unidade territorial.
+  const sede: { id: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id, tipo: 'SEDE' },
+    select: { id: true },
   })
-  if (sede?.tipo !== 'SEDE') throw new Error('Sem permissão')
+  if (!sede) throw new Error('Sem permissão')
 
   return { session, tenant }
 }

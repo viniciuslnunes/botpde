@@ -177,11 +177,11 @@ export async function getActiveTenant(
 
 /**
  * Busca a base de permissões do usuário no tenant: permissões dos perfis (roles)
- * unidas às permissões dos departamentos do usuário, além dos overrides pontuais.
- * A chave `rolePermissions` do retorno contém perfis ∪ departamentos.
+ * unidas às dos departamentos (membro e, se gestor, também permissionsGestor),
+ * além dos overrides pontuais. A chave `rolePermissions` contém essa união.
  */
 async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
-  const [userRoles, userPermissions, userDepartamentos] = await Promise.all([
+  const [userRoles, userPermissions, userDepartamentos, gestaoDepartamentos] = await Promise.all([
     db.userRole.findMany({
       where: { userId, tenantId },
       include: { role: true },
@@ -193,14 +193,41 @@ async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
       where: { userId, tenantId },
       include: { departamento: true },
     }),
+    db.departamentoGestor.findMany({
+      where: { userId, departamento: { tenantId } },
+      include: { departamento: true },
+    }),
   ])
 
   const rolePermissions = userRoles.flatMap(
     (ur: { role: { permissions: string[] } }) => ur.role.permissions,
   )
-  const departamentoPermissions: string[] = userDepartamentos.flatMap(
-    (ud: { departamento: { permissions: string[] } }) => ud.departamento.permissions,
+
+  const gestorIds = new Set(
+    gestaoDepartamentos.map((g: { departamentoId: string }) => g.departamentoId),
   )
+
+  const departamentoPermissions: string[] = []
+  for (const ud of userDepartamentos as Array<{
+    departamentoId: string
+    departamento: { permissions: string[]; permissionsGestor: string[] }
+  }>) {
+    departamentoPermissions.push(...ud.departamento.permissions)
+    if (gestorIds.has(ud.departamentoId)) {
+      departamentoPermissions.push(...ud.departamento.permissionsGestor)
+    }
+  }
+  // Gestor sem UserDepartamento (legado): ainda assim recebe perms do depto.
+  for (const g of gestaoDepartamentos as Array<{
+    departamentoId: string
+    departamento: { permissions: string[]; permissionsGestor: string[] }
+  }>) {
+    if (userDepartamentos.some((ud: { departamentoId: string }) => ud.departamentoId === g.departamentoId)) {
+      continue
+    }
+    departamentoPermissions.push(...g.departamento.permissions, ...g.departamento.permissionsGestor)
+  }
+
   const basePermissions: string[] = [...rolePermissions, ...departamentoPermissions]
 
   return {

@@ -290,7 +290,11 @@ model Departamento {
   nome         String
   slug         String   @default("")
   moduloPortal String?  @map("modulo_portal")
+  /// Permissões do membro da equipe (ver / agir leve).
   permissions  String[] @default([])
+  /// Permissões adicionais do gestor (gerir a área). Composição:
+  /// membro → permissions; gestor → permissions ∪ permissionsGestor.
+  permissionsGestor String[] @default([]) @map("permissions_gestor")
   cor          String   @default("#6b7280")
   ordem        Int      @default(0)
   criadoEm     DateTime @default(now()) @map("criado_em")

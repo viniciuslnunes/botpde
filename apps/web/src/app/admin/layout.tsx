@@ -46,11 +46,11 @@ export default async function AdminLayout({
   // o item some (e a rota bloqueia via assertPresidenteGlobal). Super-admin vê sempre.
   let exibirConsoleTorcida = isSuperAdmin
   if (!isSuperAdmin && hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) {
-    const sede: { tipo: string } | null = await db.sede.findFirst({
-      where: { tenantId: tenant.id },
-      select: { tipo: true },
+    const sede: { id: string } | null = await db.sede.findFirst({
+      where: { tenantId: tenant.id, tipo: 'SEDE' },
+      select: { id: true },
     })
-    exibirConsoleTorcida = sede?.tipo === 'SEDE'
+    exibirConsoleTorcida = sede !== null
   }
 
   const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)

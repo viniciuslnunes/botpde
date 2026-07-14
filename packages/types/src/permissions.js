@@ -217,6 +217,20 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
 })
 
 /**
+ * Rota admin correspondente ao módulo (atalho "Administrar" do hub).
+ * null = sem área admin dedicada ainda.
+ */
+export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
+  eventos: '/admin/eventos',
+  loja: '/admin/loja',
+  comunidade: '/admin/comunidade',
+  sedes: '/admin/sedes',
+  membros: '/admin/membros',
+  financeiro: null,
+  patrimonio: null,
+})
+
+/**
  * Normaliza o nome de um departamento para um slug ASCII kebab-case:
  * minúsculas, sem acentos, não-alfanumérico vira '-', hifens colapsados
  * e aparados. Pode retornar '' se o nome não tiver caracteres úteis.
