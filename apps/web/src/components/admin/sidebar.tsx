@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
+  Building2,
   Users,
   CreditCard,
   Handshake,
@@ -29,6 +30,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 /** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */
 const ICON_BY_ID: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
+  torcida: Building2,
   membros: Users,
   socios: CreditCard,
   eventos: Calendar,

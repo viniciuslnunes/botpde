@@ -6,7 +6,7 @@ import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '@torcida/types'
+import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS, podeTerVice } from '@torcida/types'
 
 const schema = z.object({
   slug: z
@@ -79,9 +79,19 @@ export async function criarTenantInicial(
       tx.role.create({
         data: {
           tenantId: t.id,
+          nome: SYSTEM_ROLES.VICE,
+          cor: '#0ea5e9',
+          ordem: 1,
+          permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
+          isSystem: true,
+        },
+      }),
+      tx.role.create({
+        data: {
+          tenantId: t.id,
           nome: SYSTEM_ROLES.ADMIN,
           cor: '#2563eb',
-          ordem: 1,
+          ordem: 2,
           permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
           isSystem: true,
         },
@@ -91,7 +101,7 @@ export async function criarTenantInicial(
           tenantId: t.id,
           nome: SYSTEM_ROLES.MEMBER,
           cor: '#6b7280',
-          ordem: 2,
+          ordem: 3,
           permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER],
           isSystem: true,
         },
@@ -164,14 +174,25 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
   let ownerRole = roleMap[SYSTEM_ROLES.OWNER]
   let rolesCriadas: string[] = []
 
-  // Cria apenas as roles que ainda não existem
-  if (!ownerRole) {
-    const toCreate = [
-      { nome: SYSTEM_ROLES.OWNER, cor: '#7c3aed', ordem: 0, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER] },
-      { nome: SYSTEM_ROLES.ADMIN, cor: '#2563eb', ordem: 1, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN] },
-      { nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 2, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER] },
-    ].filter((r) => !roleMap[r.nome])
+  // Vice-presidente só existe no tenant da Sede principal (tipo SEDE);
+  // subsedes/PDEs promovidas não têm vice. Sem Sede → trata como não-SEDE.
+  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId },
+    select: { tipo: true },
+  })
+  const isSedePrincipal = podeTerVice(sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO')
 
+  // Cria apenas as roles que ainda não existem
+  const toCreate = [
+    { nome: SYSTEM_ROLES.OWNER, cor: '#7c3aed', ordem: 0, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER] },
+    ...(isSedePrincipal
+      ? [{ nome: SYSTEM_ROLES.VICE, cor: '#0ea5e9', ordem: 1, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE] }]
+      : []),
+    { nome: SYSTEM_ROLES.ADMIN, cor: '#2563eb', ordem: 2, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN] },
+    { nome: SYSTEM_ROLES.MEMBER, cor: '#6b7280', ordem: 3, permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER] },
+  ].filter((r) => !roleMap[r.nome])
+
+  if (toCreate.length > 0) {
     const created = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       return Promise.all(
         toCreate.map((r) =>

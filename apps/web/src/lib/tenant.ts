@@ -175,8 +175,13 @@ export async function getActiveTenant(
   return null
 }
 
+/**
+ * Busca a base de permissões do usuário no tenant: permissões dos perfis (roles)
+ * unidas às permissões dos departamentos do usuário, além dos overrides pontuais.
+ * A chave `rolePermissions` do retorno contém perfis ∪ departamentos.
+ */
 async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
-  const [userRoles, userPermissions] = await Promise.all([
+  const [userRoles, userPermissions, userDepartamentos] = await Promise.all([
     db.userRole.findMany({
       where: { userId, tenantId },
       include: { role: true },
@@ -184,14 +189,22 @@ async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
     db.userPermission.findMany({
       where: { userId, tenantId },
     }),
+    db.userDepartamento.findMany({
+      where: { userId, tenantId },
+      include: { departamento: true },
+    }),
   ])
 
   const rolePermissions = userRoles.flatMap(
     (ur: { role: { permissions: string[] } }) => ur.role.permissions,
   )
+  const departamentoPermissions: string[] = userDepartamentos.flatMap(
+    (ud: { departamento: { permissions: string[] } }) => ud.departamento.permissions,
+  )
+  const basePermissions: string[] = [...rolePermissions, ...departamentoPermissions]
 
   return {
-    rolePermissions,
+    rolePermissions: basePermissions,
     overrides: userPermissions.map((up: { permission: string; granted: boolean }) => ({
       permission: up.permission,
       granted: up.granted,

@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EditarSedeForm } from '@/components/admin/sede-forms'
@@ -15,6 +17,13 @@ export default async function EditarSedePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+
+  try {
+    await assertPermission(PERMISSIONS.SEDES_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id || !tenant) redirect('/portal')
 

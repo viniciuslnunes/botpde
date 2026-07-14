@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
 import { CheckInButton } from './checkin-button'
@@ -18,6 +20,13 @@ export default async function EditarEventoPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+
+  try {
+    await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id || !tenant) redirect('/portal')
 

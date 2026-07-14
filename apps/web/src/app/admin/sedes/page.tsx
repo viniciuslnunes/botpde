@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
 import { db, type Sede } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CriarSedeForm, ToggleSedeButton } from '@/components/admin/sede-forms'
@@ -32,6 +34,12 @@ const tipoCor: Record<string, string> = {
 }
 
 export default async function AdminSedesPage() {
+  try {
+    await assertPermission(PERMISSIONS.SEDES_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id || !tenant) redirect('/portal')
 

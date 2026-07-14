@@ -131,6 +131,29 @@ export const getAncestorTenantIds = cache(async (tenantId: string): Promise<stri
 })
 
 /**
+ * IDs de tenant de TODOS os descendentes na árvore de Sede (subsedes/PDEs,
+ * recursivo). Usado pelo console global do Presidente (/admin/torcida) para
+ * agregar afiliados da torcida inteira. Retorna [] se o tenant não tem Sede.
+ */
+async function getDescendantTenantIdsImpl(tenantId: string): Promise<string[]> {
+  const sede: SedeNode | null = await db.sede.findFirst({
+    where: { tenantId },
+    select: { id: true, tenantId: true, sedeId: true },
+  })
+  if (!sede) return []
+
+  return descendantTenantIds(sede.id)
+}
+
+export const getDescendantTenantIds = cache(async (tenantId: string): Promise<string[]> => {
+  return unstable_cache(
+    () => getDescendantTenantIdsImpl(tenantId),
+    ['descendant-tenants', tenantId],
+    { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(tenantId)] },
+  )()
+})
+
+/**
  * IDs de tenants com aliança ATIVA em relação ao tenant indicado.
  */
 async function getAlliedTenantIdsImpl(tenantId: string): Promise<string[]> {

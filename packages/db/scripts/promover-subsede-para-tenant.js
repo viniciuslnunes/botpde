@@ -26,6 +26,8 @@ const db = new PrismaClient()
 const slugPrincipal = process.argv[2] ?? 'pde-gavioes-fiel'
 const NOVO_SLUG = 'subsede-zona-sul-teste'
 
+// Subsede/PDE promovida NÃO tem vice — Vice-presidente existe só no tenant
+// da Sede principal (tipo SEDE). Aqui só owner/admin/member.
 const SYSTEM_ROLE_DEFAULTS = {
   [SYSTEM_ROLES.OWNER]: { cor: '#2563eb', ordem: 0 },
   [SYSTEM_ROLES.ADMIN]: { cor: '#0891b2', ordem: 1 },
@@ -64,7 +66,7 @@ async function main() {
     console.log(`ℹ️  Sede já pertence ao novo tenant.`)
   }
 
-  for (const nomeRole of Object.values(SYSTEM_ROLES)) {
+  for (const nomeRole of Object.keys(SYSTEM_ROLE_DEFAULTS)) {
     await db.role.upsert({
       where: { tenantId_nome: { tenantId: novoTenant.id, nome: nomeRole } },
       update: {},

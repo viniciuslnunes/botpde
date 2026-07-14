@@ -70,6 +70,38 @@ export async function assertPermission(permission: string): Promise<AuthzResult>
   return { session, tenant }
 }
 
+/**
+ * Console global de leitura do Presidente (/admin/torcida): exige a permissão
+ * TORCIDA_GLOBAL_VIEW (Presidente/Vice) E que o tenant atual seja a Sede
+ * principal (tipo SEDE). Liderança de subsede/PDE tem owner com '*', mas não
+ * passa aqui — o console é exclusivo do topo da árvore.
+ */
+export async function assertPresidenteGlobal(): Promise<AuthzResult> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  const tenant = await resolvePortalTenant(session)
+  if (!tenant) throw new Error('Não autorizado')
+
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant }
+  }
+
+  const { rolePermissions, overrides }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
+    await getUserPermissionsInTenant(session.user.id, tenant.id)
+  const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
+
+  if (!hasPermission(effective, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) throw new Error('Sem permissão')
+
+  const sede: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id },
+    select: { tipo: true },
+  })
+  if (sede?.tipo !== 'SEDE') throw new Error('Sem permissão')
+
+  return { session, tenant }
+}
+
 /** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */
 export async function assertStoreView(): Promise<AuthzResult> {
   const session = await auth()

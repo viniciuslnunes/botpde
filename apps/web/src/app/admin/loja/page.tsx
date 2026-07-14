@@ -1,5 +1,7 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CriarProdutoForm } from '@/components/admin/produto-forms'
@@ -47,6 +49,12 @@ function serializarProduto(p: {
 }
 
 export default async function AdminLojaPage() {
+  try {
+    await assertPermission(PERMISSIONS.STORE_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 

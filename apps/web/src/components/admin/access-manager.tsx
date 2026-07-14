@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Loader2, Check, X, Pencil, ShieldCheck, UserRound } from 'lucide-react'
-import { PERMISSION_GROUPS, calculateEffectivePermissions, applyPermissionCascade } from '@torcida/types'
+import { PERMISSION_GROUPS, calculateEffectivePermissions, applyPermissionCascade, rotuloCargoSistema } from '@torcida/types'
 import { salvarAcessoUsuario } from '@/app/admin/acessos/actions'
 
 interface RoleOpt {
@@ -17,6 +17,7 @@ interface DepartamentoOpt {
   id: string
   nome: string
   cor: string
+  permissions: string[]
 }
 
 interface UsuarioAcesso {
@@ -34,9 +35,16 @@ interface AccessManagerProps {
   usuarios: UsuarioAcesso[]
   roles: RoleOpt[]
   departamentos: DepartamentoOpt[]
+  /** TipoSede do tenant — contextualiza rótulos de cargos de sistema (Presidente/Liderança) */
+  tipoSede: string
 }
 
-export function AccessManager({ usuarios, roles, departamentos }: AccessManagerProps) {
+/** Rótulo de exibição de um perfil: cargos de sistema ganham o rótulo PT contextual. */
+function roleLabel(role: RoleOpt, tipoSede: string): string {
+  return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
+}
+
+export function AccessManager({ usuarios, roles, departamentos, tipoSede }: AccessManagerProps) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
 
   if (usuarios.length === 0) {
@@ -57,6 +65,7 @@ export function AccessManager({ usuarios, roles, departamentos }: AccessManagerP
             usuario={usuario}
             roles={roles}
             departamentos={departamentos}
+            tipoSede={tipoSede}
             onClose={() => setEditandoId(null)}
           />
         ) : (
@@ -65,6 +74,7 @@ export function AccessManager({ usuarios, roles, departamentos }: AccessManagerP
             usuario={usuario}
             roles={roles}
             departamentos={departamentos}
+            tipoSede={tipoSede}
             onEdit={() => setEditandoId(usuario.id)}
           />
         ),
@@ -73,12 +83,21 @@ export function AccessManager({ usuarios, roles, departamentos }: AccessManagerP
   )
 }
 
-function contarPermissoesAdicionais(usuario: UsuarioAcesso, roles: RoleOpt[]): number {
-  const cobertoPorPerfis = new Set(
-    roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
-  )
+function contarPermissoesAdicionais(
+  usuario: UsuarioAcesso,
+  roles: RoleOpt[],
+  departamentos: DepartamentoOpt[],
+): number {
+  // Coberto = o que já vem dos perfis E dos departamentos do usuário —
+  // só conta como "adicional" a concessão que nenhum dos dois explica
+  const coberto = new Set([
+    ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
+    ...departamentos
+      .filter((d) => usuario.departamentoIds.includes(d.id))
+      .flatMap((d) => d.permissions),
+  ])
   return usuario.permissoesAdicionais.filter(
-    (p) => p.granted && !cobertoPorPerfis.has(p.permission),
+    (p) => p.granted && !coberto.has(p.permission),
   ).length
 }
 
@@ -86,16 +105,18 @@ function UsuarioAcessoRow({
   usuario,
   roles,
   departamentos,
+  tipoSede,
   onEdit,
 }: {
   usuario: UsuarioAcesso
   roles: RoleOpt[]
   departamentos: DepartamentoOpt[]
+  tipoSede: string
   onEdit: () => void
 }) {
   const perfis = roles.filter((r) => usuario.perfilIds.includes(r.id))
   const deptos = departamentos.filter((d) => usuario.departamentoIds.includes(d.id))
-  const extras = contarPermissoesAdicionais(usuario, roles)
+  const extras = contarPermissoesAdicionais(usuario, roles, departamentos)
 
   return (
     <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
@@ -122,7 +143,7 @@ function UsuarioAcessoRow({
                   className="flex items-center gap-1 rounded-full border border-[rgb(var(--border))] px-2 py-0.5 text-xs text-[rgb(var(--foreground))]"
                 >
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.cor }} />
-                  {p.nome}
+                  {roleLabel(p, tipoSede)}
                 </span>
               ))
             )}
@@ -163,11 +184,13 @@ function AccessEditForm({
   usuario,
   roles,
   departamentos,
+  tipoSede,
   onClose,
 }: {
   usuario: UsuarioAcesso
   roles: RoleOpt[]
   departamentos: DepartamentoOpt[]
+  tipoSede: string
   onClose: () => void
 }) {
   const [pending, startTransition] = useTransition()
@@ -176,11 +199,15 @@ function AccessEditForm({
   const [gestorIds, setGestorIds] = useState<Set<string>>(new Set(usuario.gestorDepartamentoIds))
 
   const permissoesEfetivasIniciais = useMemo(() => {
-    const rolePermissions = roles
-      .filter((r) => usuario.perfilIds.includes(r.id))
-      .flatMap((r) => r.permissions)
+    // Base = união das permissões dos perfis E dos departamentos do usuário
+    const rolePermissions = [
+      ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
+      ...departamentos
+        .filter((d) => usuario.departamentoIds.includes(d.id))
+        .flatMap((d) => d.permissions),
+    ]
     return calculateEffectivePermissions(rolePermissions, usuario.permissoesAdicionais)
-  }, [roles, usuario.perfilIds, usuario.permissoesAdicionais])
+  }, [roles, departamentos, usuario.perfilIds, usuario.departamentoIds, usuario.permissoesAdicionais])
 
   const [permissoes, setPermissoes] = useState<Set<string>>(new Set(permissoesEfetivasIniciais))
 
@@ -205,12 +232,43 @@ function AccessEditForm({
   }
 
   function toggleDepartamento(id: string) {
-    toggleSet(setDepartamentoIds, id)
+    const selecionando = !departamentoIds.has(id)
+    const proximosDepartamentos = new Set(departamentoIds)
+    if (selecionando) proximosDepartamentos.add(id)
+    else proximosDepartamentos.delete(id)
+    setDepartamentoIds(proximosDepartamentos)
+
     // Desmarcar o departamento remove a gestão dele também
-    setGestorIds((prev) => {
-      if (!prev.has(id)) return prev
+    if (!selecionando) {
+      setGestorIds((prev) => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+
+    // Recalcula a cobertura nas permissões efetivas exibidas: marcar o
+    // departamento passa a conceder as permissões dele; desmarcar remove
+    // as que nenhum perfil, outro departamento ou concessão extra explica
+    const depto = departamentos.find((d) => d.id === id)
+    if (!depto || depto.permissions.length === 0) return
+    setPermissoes((prev) => {
       const next = new Set(prev)
-      next.delete(id)
+      if (selecionando) {
+        for (const p of depto.permissions) next.add(p)
+      } else {
+        const aindaCoberto = new Set([
+          ...roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
+          ...departamentos
+            .filter((d) => proximosDepartamentos.has(d.id))
+            .flatMap((d) => d.permissions),
+          ...usuario.permissoesAdicionais.filter((o) => o.granted).map((o) => o.permission),
+        ])
+        for (const p of depto.permissions) {
+          if (!aindaCoberto.has(p)) next.delete(p)
+        }
+      }
       return next
     })
   }
@@ -264,7 +322,7 @@ function AccessEditForm({
                 onChange={() => toggleSet(setPerfilIds, role.id)}
               />
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: role.cor }} />
-              {role.nome}
+              {roleLabel(role, tipoSede)}
             </label>
           ))}
         </div>

@@ -30,6 +30,14 @@ export default async function ConfiguracoesPage() {
   })
   const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
 
+  // Tipo da Sede do tenant — contextualiza rótulos de cargos de sistema
+  // (Presidente na Sede principal, Liderança em subsedes/PDEs).
+  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id },
+    select: { tipo: true },
+  })
+  const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
+
   interface AfiliacaoOption {
     id: string
     nome: string
@@ -100,7 +108,7 @@ export default async function ConfiguracoesPage() {
       id: 'departamentos',
       icon: Users2,
       title: 'Departamentos',
-      description: 'Agrupamentos organizacionais (Diretoria, Sócio, Torcedor...) — não concedem permissão, servem para organizar e escopar gestão',
+      description: 'Agrupamentos que concedem acesso a funcionalidades. Membros recebem as permissões do departamento; gestores administram a área.',
       ownerOnly: false,
     },
   ]
@@ -173,7 +181,7 @@ export default async function ConfiguracoesPage() {
                   ) : section.id === 'afiliacao' ? (
                     <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
                   ) : section.id === 'cargos' ? (
-                    <RolesManager roles={roles} />
+                    <RolesManager roles={roles} tipoSede={tipoSede} />
                   ) : section.id === 'departamentos' ? (
                     <DepartamentosManager departamentos={departamentos} />
                   ) : null}

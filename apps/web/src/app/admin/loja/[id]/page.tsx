@@ -1,5 +1,7 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { EditarProdutoForm } from '@/components/admin/produto-forms'
@@ -19,6 +21,13 @@ function formatarData(data: Date) {
 
 export default async function EditarProdutoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+
+  try {
+    await assertPermission(PERMISSIONS.STORE_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 

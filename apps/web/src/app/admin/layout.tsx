@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { db } from '@torcida/db'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
@@ -9,6 +10,8 @@ import {
   calculateEffectivePermissions,
   filterMenuByPermissions,
   hasAdminAreaAccess,
+  hasPermission,
+  PERMISSIONS,
 } from '@torcida/types'
 import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
 
@@ -38,14 +41,27 @@ export default async function AdminLayout({
     redirect('/portal')
   }
 
-  const menuItems = isSuperAdmin
-    ? ADMIN_MENU.map((item) => ({
-        id: item.id,
-        label: item.label,
-        href: item.href,
-        ...('exact' in item && item.exact ? { exact: true as const } : {}),
-      }))
-    : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
+  // 'Visão da torcida' é o console global do Presidente — só existe na Sede
+  // principal. Liderança de subsede/PDE tem a permissão via owner ('*'), mas
+  // o item some (e a rota bloqueia via assertPresidenteGlobal). Super-admin vê sempre.
+  let exibirConsoleTorcida = isSuperAdmin
+  if (!isSuperAdmin && hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) {
+    const sede: { tipo: string } | null = await db.sede.findFirst({
+      where: { tenantId: tenant.id },
+      select: { tipo: true },
+    })
+    exibirConsoleTorcida = sede?.tipo === 'SEDE'
+  }
+
+  const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
+  const menuItems = menuBase
+    .filter((item) => item.id !== 'torcida' || exibirConsoleTorcida)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      href: item.href,
+      ...('exact' in item && item.exact ? { exact: true as const } : {}),
+    }))
 
   const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
 

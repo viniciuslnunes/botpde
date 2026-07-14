@@ -60,6 +60,10 @@ export const PERMISSIONS = /** @type {const} */ ({
 
   // Canais institucionais e comunidades temáticas (M3 mensageria)
   CHANNELS_MANAGE: 'channels:manage',
+
+  // Console global de leitura do Presidente — visão consolidada da torcida
+  // inteira (Sede + subsedes/PDEs). Só Presidente e Vice; admin comum não tem.
+  TORCIDA_GLOBAL_VIEW: 'torcida:global_view',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -128,6 +132,11 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [{ key: PERMISSIONS.ALLIANCES_MANAGE, label: 'Gerenciar alianças entre torcidas' }],
   },
   {
+    label: 'Presidência',
+    base: null,
+    items: [{ key: PERMISSIONS.TORCIDA_GLOBAL_VIEW, label: 'Ver painel global da torcida' }],
+  },
+  {
     label: 'Outros',
     base: null,
     items: [
@@ -177,20 +186,79 @@ export function applyPermissionCascade(prevSelected, nextSelected) {
 }
 
 /**
+ * Módulos de portal que um departamento pode abrir para seus membros.
+ * O `key` é o slug estável gravado em `Departamento.moduloPortal`;
+ * o `label` é o texto exibido nas UIs de admin.
+ */
+export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
+  { key: 'eventos', label: 'Eventos' },
+  { key: 'loja', label: 'Loja / Materiais' },
+  { key: 'comunidade', label: 'Comunidade e comunicados' },
+  { key: 'sedes', label: 'Sedes e subsedes' },
+  { key: 'financeiro', label: 'Financeiro' },
+  { key: 'patrimonio', label: 'Patrimônio' },
+  { key: 'membros', label: 'Membros' },
+])
+
+/**
+ * Rota de destino no app para cada módulo de `DEPARTAMENTO_MODULOS`.
+ * O hub de departamentos do portal NÃO reimplementa gestão — só direciona
+ * para o módulo existente; `disponivel: false` = módulo ainda não lançado
+ * (a UI mostra "Em breve" em vez de link).
+ */
+export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
+  eventos: { href: '/portal/eventos', disponivel: true },
+  loja: { href: '/portal/loja', disponivel: true },
+  comunidade: { href: '/portal/comunidade', disponivel: true },
+  sedes: { href: '/portal/sedes', disponivel: true },
+  membros: { href: '/admin/membros', disponivel: true },
+  financeiro: { href: null, disponivel: false },
+  patrimonio: { href: null, disponivel: false },
+})
+
+/**
+ * Normaliza o nome de um departamento para um slug ASCII kebab-case:
+ * minúsculas, sem acentos, não-alfanumérico vira '-', hifens colapsados
+ * e aparados. Pode retornar '' se o nome não tiver caracteres úteis.
+ *
+ * @param {string} nome
+ * @returns {string}
+ */
+export function slugifyDepartamento(nome) {
+  return nome
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/**
  * Cargos reservados do sistema — não podem ser editados ou removidos.
  */
 export const SYSTEM_ROLES = /** @type {const} */ ({
   OWNER: 'owner',
   ADMIN: 'admin',
+  VICE: 'vice',
   MEMBER: 'member',
 })
+
+/**
+ * Regra de governança: uma torcida admite no máximo 2 vice-presidentes.
+ */
+export const MAX_VICE_PRESIDENTES = 2
 
 /**
  * Permissões padrão por cargo do sistema.
  */
 export const SYSTEM_ROLE_PERMISSIONS = {
   [SYSTEM_ROLES.OWNER]: ALL_PERMISSIONS,
+  // Admin comum NÃO tem visão global da torcida — só Presidente (owner) e Vice.
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
+    (p) => p !== PERMISSIONS.SETTINGS_MANAGE && p !== PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+  ),
+  [SYSTEM_ROLES.VICE]: ALL_PERMISSIONS.filter(
     (p) => p !== PERMISSIONS.SETTINGS_MANAGE,
   ),
   [SYSTEM_ROLES.MEMBER]: [
@@ -252,4 +320,48 @@ export function hasPermission(effectivePermissions, permission) {
 export function canManageDepartamento(effectivePermissions, gestorDepartamentoIds, departamentoId) {
   if (hasPermission(effectivePermissions, PERMISSIONS.ROLES_MANAGE)) return true
   return gestorDepartamentoIds.includes(departamentoId)
+}
+
+/**
+ * Governança: Vice-presidente só existe no tenant da Sede principal (tipo SEDE).
+ *
+ * @param {string} tipoSede - TipoSede ('SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO')
+ * @returns {boolean}
+ */
+export function podeTerVice(tipoSede) {
+  return tipoSede === 'SEDE'
+}
+
+/**
+ * Rótulo do cargo máximo do tenant: 'Presidente' na Sede principal,
+ * 'Liderança' em subsedes/PDEs.
+ *
+ * @param {string} tipoSede - TipoSede ('SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO')
+ * @returns {string}
+ */
+export function rotuloCargoMaximo(tipoSede) {
+  return tipoSede === 'SEDE' ? 'Presidente' : 'Liderança'
+}
+
+/**
+ * Rótulo PT-BR de um cargo de sistema, contextualizado pelo tipo da Sede.
+ * Cargos não mapeados retornam o próprio nome.
+ *
+ * @param {string} nome - nome interno do cargo de sistema ('owner', 'vice', ...)
+ * @param {string} tipoSede - TipoSede ('SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO')
+ * @returns {string}
+ */
+export function rotuloCargoSistema(nome, tipoSede) {
+  switch (nome) {
+    case SYSTEM_ROLES.OWNER:
+      return rotuloCargoMaximo(tipoSede)
+    case SYSTEM_ROLES.VICE:
+      return 'Vice-presidente'
+    case SYSTEM_ROLES.ADMIN:
+      return 'Administrador'
+    case SYSTEM_ROLES.MEMBER:
+      return 'Membro'
+    default:
+      return nome
+  }
 }

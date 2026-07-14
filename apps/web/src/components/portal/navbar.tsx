@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
+  Briefcase,
   CreditCard,
   Calendar,
   ShoppingBag,
@@ -34,11 +35,20 @@ const navLinks = [
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
 
+/** Só entra na navegação para quem atua em ≥1 departamento (prop do layout). */
+const departamentosLink = {
+  href: '/portal/departamentos',
+  label: 'Departamentos',
+  icon: Briefcase,
+  prefetch: 'hover' as const,
+}
+
 interface PortalNavbarProps {
   userName: string | null
   userAvatar: string | null
   tenantNome: string
   tenantCor: string
+  temDepartamentos?: boolean
 }
 
 export function PortalNavbar({
@@ -46,6 +56,7 @@ export function PortalNavbar({
   userAvatar,
   tenantNome,
   tenantCor,
+  temDepartamentos = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const { unreadMessages, isAdmin, notifications } = useNavbarContext()
@@ -53,6 +64,7 @@ export function PortalNavbar({
   const [userDropOpen, setUserDropOpen] = useState(false)
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
+  const links = temDepartamentos ? [...navLinks, departamentosLink] : [...navLinks]
 
   function isActive(href: string) {
     return pathname.startsWith(href)
@@ -94,7 +106,7 @@ export function PortalNavbar({
           </PortalNavLink>
 
           <nav className="hidden min-w-0 flex-1 items-center gap-1 lg:flex">
-            {navLinks.map((link) => {
+            {links.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
               return (
@@ -260,7 +272,7 @@ export function PortalNavbar({
                   </span>
                 )}
               </PortalNavLink>
-              {navLinks.map((link) => {
+              {links.map((link) => {
                 const Icon = link.icon
                 const active = isActive(link.href)
                 return (

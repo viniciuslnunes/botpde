@@ -2,6 +2,8 @@ import Image from 'next/image'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import { CreditCard, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { EmitirCarteirinhaForm, SocioActions } from '@/components/admin/socio-forms'
@@ -24,6 +26,12 @@ export default async function SociosPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>
 }) {
+  try {
+    await assertPermission(PERMISSIONS.MEMBERS_VIEW)
+  } catch {
+    redirect('/admin')
+  }
+
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 

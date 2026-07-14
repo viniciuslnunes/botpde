@@ -8,6 +8,9 @@ import { PERMISSIONS, hasPermission } from './permissions.js'
  */
 export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'dashboard', label: 'Dashboard', href: '/admin', permissao: null, exact: true },
+  // Console global de leitura do Presidente/Vice — além da permissão, o layout
+  // só exibe o item quando o tenant é a Sede principal (tipo SEDE).
+  { id: 'torcida', label: 'Visão da torcida', href: '/admin/torcida', permissao: PERMISSIONS.TORCIDA_GLOBAL_VIEW },
   { id: 'membros', label: 'Membros', href: '/admin/membros', permissao: PERMISSIONS.MEMBERS_VIEW },
   { id: 'socios', label: 'Sócios', href: '/admin/socios', permissao: PERMISSIONS.MEMBERS_VIEW },
   { id: 'eventos', label: 'Eventos', href: '/admin/eventos', permissao: PERMISSIONS.EVENTS_MANAGE },

@@ -276,8 +276,10 @@ model UserPermission {
 }
 
 // ─── DEPARTAMENTOS ────────────────────────────────────────────────────────────
-// Agrupamento organizacional (Diretoria, Dpto. Financeiro, Sócio, Torcedor...),
-// independente de Perfil. Departamento NÃO concede permissão — é rótulo/escopo.
+// Agrupamento organizacional (Diretoria, Financeiro, Comunicação…),
+// independente de Perfil. Departamento é unidade de acesso: suas `permissions`
+// somam-se às dos perfis do usuário na composição de permissões efetivas.
+// Sócio/Torcedor NÃO são departamentos — são tipos de membro / entidades próprias.
 // Lista plana por tenant (sem sub-departamento no MVP).
 
 model Departamento {
@@ -285,15 +287,19 @@ model Departamento {
   tenantId String @map("tenant_id")
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  nome     String
-  cor      String   @default("#6b7280")
-  ordem    Int      @default(0)
-  criadoEm DateTime @default(now()) @map("criado_em")
+  nome         String
+  slug         String   @default("")
+  moduloPortal String?  @map("modulo_portal")
+  permissions  String[] @default([])
+  cor          String   @default("#6b7280")
+  ordem        Int      @default(0)
+  criadoEm     DateTime @default(now()) @map("criado_em")
 
   membros  UserDepartamento[]
   gestores DepartamentoGestor[]
 
   @@unique([tenantId, nome])
+  @@unique([tenantId, slug])
   @@map("saas_departamentos")
 }
 

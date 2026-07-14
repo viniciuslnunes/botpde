@@ -1,5 +1,5 @@
 /**
- * Repara os cargos de sistema (owner/admin/member) de todos os tenants.
+ * Repara os cargos de sistema (owner/vice/admin/member) de todos os tenants.
  *
  * Contexto: até 2026-07-02, o wizard de criação de tenant
  * (apps/web/src/app/super-admin/setup/actions.ts) semeava esses cargos com
@@ -25,8 +25,9 @@ const dryRun = process.argv.includes('--dry-run')
 
 const SYSTEM_ROLE_DEFAULTS = {
   [SYSTEM_ROLES.OWNER]: { cor: '#7c3aed', ordem: 0 },
-  [SYSTEM_ROLES.ADMIN]: { cor: '#2563eb', ordem: 1 },
-  [SYSTEM_ROLES.MEMBER]: { cor: '#6b7280', ordem: 2 },
+  [SYSTEM_ROLES.VICE]: { cor: '#0ea5e9', ordem: 1 },
+  [SYSTEM_ROLES.ADMIN]: { cor: '#2563eb', ordem: 2 },
+  [SYSTEM_ROLES.MEMBER]: { cor: '#6b7280', ordem: 3 },
 }
 
 function sameSet(a, b) {
@@ -54,6 +55,15 @@ async function main() {
       })
 
       if (!role) {
+        // Vice-presidente só existe no tenant da Sede principal (tipo SEDE) —
+        // não recria vice em subsedes/PDEs (sem Sede → trata como não-SEDE).
+        if (nomeRole === SYSTEM_ROLES.VICE) {
+          const sede = await db.sede.findFirst({
+            where: { tenantId: tenant.id },
+            select: { tipo: true },
+          })
+          if (sede?.tipo !== 'SEDE') continue
+        }
         console.log(`  [criar] ${tenant.slug} — cargo '${nomeRole}' não existia`)
         criados++
         if (!dryRun) {

@@ -1,5 +1,7 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Inbox } from 'lucide-react'
@@ -47,6 +49,12 @@ const STATUS_BADGE: Record<ImportacaoLite['status'], { label: string; className:
 }
 
 export default async function ImportarMembrosPage() {
+  try {
+    await assertPermission(PERMISSIONS.MEMBERS_VIEW)
+  } catch {
+    redirect('/admin')
+  }
+
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 

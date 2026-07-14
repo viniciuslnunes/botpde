@@ -24,6 +24,12 @@ const SYSTEM_ROLE_DEFS = [
     permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER],
   },
   {
+    nome: SYSTEM_ROLES.VICE,
+    cor: '#0ea5e9',
+    ordem: 95,
+    permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
+  },
+  {
     nome: SYSTEM_ROLES.ADMIN,
     cor: '#3b82f6',
     ordem: 90,

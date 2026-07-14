@@ -28,6 +28,7 @@ interface DepartamentoLite {
   id: string
   nome: string
   cor: string
+  permissions: string[]
 }
 interface UserRoleLite {
   userId: string
@@ -63,7 +64,7 @@ export default async function AcessosPage() {
   const departamentos: DepartamentoLite[] = await db.departamento.findMany({
     where: { tenantId: tenant.id },
     orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    select: { id: true, nome: true, cor: true },
+    select: { id: true, nome: true, cor: true, permissions: true },
   })
   const usuarios: UsuarioBasico[] = await db.user.findMany({
     where: {
@@ -93,6 +94,14 @@ export default async function AcessosPage() {
     where: { departamento: { tenantId: tenant.id } },
     select: { userId: true, departamentoId: true },
   })
+
+  // Tipo da Sede do tenant — contextualiza rótulos de cargos de sistema
+  // (Presidente na Sede principal, Liderança em subsedes/PDEs).
+  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id },
+    select: { tipo: true },
+  })
+  const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
 
   const usuariosFormatados = usuarios.map((u) => ({
     id: u.id,
@@ -128,7 +137,7 @@ export default async function AcessosPage() {
               Crie ao menos um cargo ou departamento em Configurações antes de atribuir acesso.
             </p>
           ) : (
-            <AccessManager usuarios={usuariosFormatados} roles={roles} departamentos={departamentos} />
+            <AccessManager usuarios={usuariosFormatados} roles={roles} departamentos={departamentos} tipoSede={tipoSede} />
           )}
         </div>
       </div>

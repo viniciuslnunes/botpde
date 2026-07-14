@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { db, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidatePermissionsCache } from '@/lib/tenant'
-import { ALL_PERMISSIONS, PERMISSIONS, applyPermissionCascade } from '@torcida/types'
+import {
+  ALL_PERMISSIONS,
+  MAX_VICE_PRESIDENTES,
+  PERMISSIONS,
+  SYSTEM_ROLES,
+  applyPermissionCascade,
+  podeTerVice,
+} from '@torcida/types'
 
 const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
 
@@ -13,10 +20,13 @@ const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
 // Prisma silenciosamente (vira `unknown`/implicit any sem anotação).
 interface RoleLite {
   id: string
+  nome: string
+  isSystem: boolean
   permissions: string[]
 }
 interface DepartamentoLite {
   id: string
+  permissions: string[]
 }
 interface UserRoleLite {
   roleId: string
@@ -60,11 +70,11 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
   const rolesTenant: RoleLite[] = await db.role.findMany({
     where: { tenantId: tenant.id },
-    select: { id: true, permissions: true },
+    select: { id: true, nome: true, isSystem: true, permissions: true },
   })
   const departamentosTenant: DepartamentoLite[] = await db.departamento.findMany({
     where: { tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, permissions: true },
   })
   const userRolesAtuais: UserRoleLite[] = await db.userRole.findMany({
     where: { userId, tenantId: tenant.id },
@@ -83,6 +93,30 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     select: { departamentoId: true },
   })
 
+  // Governança: no máximo MAX_VICE_PRESIDENTES vice-presidentes por torcida.
+  // Conta os OUTROS usuários que já têm o cargo de sistema 'vice' antes de
+  // conceder — atribuir vice a quem já é vice não conta duas vezes.
+  const viceRole: RoleLite | undefined = rolesTenant.find(
+    (r) => r.isSystem && r.nome === SYSTEM_ROLES.VICE,
+  )
+  if (viceRole && perfilIds.has(viceRole.id)) {
+    // Vice-presidente só existe no tenant da Sede principal (tipo SEDE).
+    // Sem Sede cadastrada → trata como não-SEDE por segurança.
+    const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
+      where: { tenantId: tenant.id },
+      select: { tipo: true },
+    })
+    if (!podeTerVice(sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO')) {
+      throw new Error('Vice-presidente existe apenas na Sede principal da torcida.')
+    }
+    const outrosVices: number = await db.userRole.count({
+      where: { tenantId: tenant.id, roleId: viceRole.id, userId: { not: userId } },
+    })
+    if (outrosVices >= MAX_VICE_PRESIDENTES) {
+      throw new Error(`Limite de ${MAX_VICE_PRESIDENTES} vice-presidentes já atingido nesta torcida.`)
+    }
+  }
+
   const validRoleIds = new Set(rolesTenant.map((r) => r.id))
   const validDepartamentoIds = new Set(departamentosTenant.map((d) => d.id))
 
@@ -90,10 +124,17 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const departamentoIdsAtuais = new Set(userDepartamentosAtuais.map((d) => d.departamentoId))
   const gestorIdsAtuais = new Set(gestorAtuais.map((g) => g.departamentoId))
 
-  // Permissões efetivamente concedidas pelos perfis SELECIONADOS no formulário
-  const cobertoPorPerfis = new Set<string>()
+  // Permissões efetivamente concedidas pelos perfis E departamentos
+  // SELECIONADOS no formulário — o que um departamento concede não deve
+  // virar override redundante
+  const cobertoPorPerfisEDeptos = new Set<string>()
   for (const role of rolesTenant) {
-    if (perfilIds.has(role.id)) role.permissions.forEach((p) => cobertoPorPerfis.add(p))
+    if (perfilIds.has(role.id)) role.permissions.forEach((p) => cobertoPorPerfisEDeptos.add(p))
+  }
+  for (const depto of departamentosTenant) {
+    if (departamentoIds.has(depto.id)) {
+      depto.permissions.forEach((p) => cobertoPorPerfisEDeptos.add(p))
+    }
   }
 
   const overridesAtuais = new Map(userPermissionsAtuais.map((p) => [p.permission, p.granted]))
@@ -136,7 +177,7 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
     // ── Permissões adicionais (diff contra o estado efetivo desejado) ──
     for (const permission of ALL_PERMISSIONS) {
       const desejaConceder = permissoesEfetivas.has(permission)
-      const coberto = cobertoPorPerfis.has(permission)
+      const coberto = cobertoPorPerfisEDeptos.has(permission)
       const overrideAtual = overridesAtuais.get(permission)
 
       if (desejaConceder === coberto) {

@@ -1,5 +1,7 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { assertPermission } from '@/lib/authz'
+import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { criarCategoriaForm, excluirCategoriaForm } from '../actions'
@@ -9,6 +11,12 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Categorias — Loja Admin' }
 
 export default async function AdminCategoriasPage() {
+  try {
+    await assertPermission(PERMISSIONS.STORE_MANAGE)
+  } catch {
+    redirect('/admin')
+  }
+
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 

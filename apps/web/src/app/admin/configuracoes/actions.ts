@@ -3,8 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
-import { invalidateTenantCache } from '@/lib/tenant'
-import { ALL_PERMISSIONS, applyPermissionCascade, PERMISSIONS } from '@torcida/types'
+import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
+import {
+  ALL_PERMISSIONS,
+  applyPermissionCascade,
+  DEPARTAMENTO_MODULOS,
+  PERMISSIONS,
+  slugifyDepartamento,
+} from '@torcida/types'
 import { z } from 'zod'
 
 /**
@@ -256,24 +262,83 @@ export async function excluirRole(roleId: string) {
 }
 
 // ── Departamentos ─────────────────────────────────────────────────────────────
-// Agrupamento organizacional (Diretoria, Dpto. Financeiro, Sócio...), separado
-// de cargo/perfil — ver ARCHITECTURE.md seção 3.2b.
+// Unidade de acesso: além do agrupamento organizacional (Diretoria, Financeiro,
+// Sócio...), o departamento concede permissões aos seus membros — ver
+// ARCHITECTURE.md seção 3.2b.
+
+/**
+ * Sanitiza a lista de permissões vinda do formulário de departamento:
+ * descarta códigos fora do vocabulário canônico e aplica a cascata de
+ * dependência (base do grupo). Diferente do cargo, um departamento PODE
+ * ter zero permissões (uso apenas organizacional/escopo de gestão).
+ */
+function sanitizeDepartamentoPermissions(raw: string[]): string[] {
+  const canonical: readonly string[] = ALL_PERMISSIONS
+  const valid = raw.filter((p) => canonical.includes(p))
+  const cascaded: string[] = applyPermissionCascade([], valid)
+  return cascaded
+}
+
+/** Lê e valida o módulo de portal do formulário — fora do vocabulário vira null. */
+function parseModuloPortal(formData: FormData): string | null {
+  const raw = String(formData.get('moduloPortal') ?? '').trim()
+  if (!raw) return null
+  return DEPARTAMENTO_MODULOS.some((m) => m.key === raw) ? raw : null
+}
+
+/**
+ * Gera um slug único por tenant a partir do nome do departamento,
+ * anexando sufixo numérico (-2, -3...) em caso de colisão.
+ */
+async function gerarSlugUnico(
+  tenantId: string,
+  nome: string,
+  ignorarId?: string,
+): Promise<string> {
+  const base = slugifyDepartamento(nome) || 'departamento'
+  let slug = base
+  let sufixo = 2
+  // Loop limitado na prática: colide só se já existirem N departamentos homônimos
+  for (;;) {
+    const existente: { id: string } | null = await db.departamento.findFirst({
+      where: {
+        tenantId,
+        slug,
+        ...(ignorarId ? { NOT: { id: ignorarId } } : {}),
+      },
+      select: { id: true },
+    })
+    if (!existente) return slug
+    slug = `${base}-${sufixo}`
+    sufixo += 1
+  }
+}
+
+interface MembroDepartamentoLite {
+  userId: string
+}
 
 export async function criarDepartamento(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const permissionsRaw = formData.getAll('permissions') as string[]
+  const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
+
+  const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
 
   const existing = await db.departamento.findFirst({
     where: { tenantId: tenant.id, nome },
   })
   if (existing) throw new Error('Já existe um departamento com este nome')
 
+  const slug = await gerarSlugUnico(tenant.id, nome)
+
   await db.departamento.create({
-    data: { tenantId: tenant.id, nome, cor },
+    data: { tenantId: tenant.id, nome, cor, slug, moduloPortal, permissions },
   })
 
   await db.auditLog.create({
@@ -281,7 +346,7 @@ export async function criarDepartamento(formData: FormData) {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'DEPARTAMENTO_CRIADO',
-      detalhes: { nome, cor },
+      detalhes: { nome, cor, slug, moduloPortal, permissions },
     },
   })
 
@@ -299,12 +364,22 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const permissionsRaw = formData.getAll('permissions') as string[]
+  const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
 
+  const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
+
+  // Regenera o slug só quando o nome mudou — mantém URLs/referências estáveis
+  const slug =
+    nome === departamento.nome
+      ? departamento.slug
+      : await gerarSlugUnico(tenant.id, nome, departamentoId)
+
   await db.departamento.update({
     where: { id: departamentoId },
-    data: { nome, cor },
+    data: { nome, cor, slug, moduloPortal, permissions },
   })
 
   await db.auditLog.create({
@@ -314,9 +389,25 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
       acao: 'DEPARTAMENTO_ATUALIZADO',
       entidade: 'Departamento',
       entidadeId: departamentoId,
-      detalhes: { nome, cor },
+      detalhes: {
+        nome,
+        cor,
+        slug,
+        moduloPortal,
+        permissions,
+        permissoesAntes: departamento.permissions,
+      },
     },
   })
+
+  // Mudar as permissões do departamento muda as efetivas de todos os membros
+  const membros: MembroDepartamentoLite[] = await db.userDepartamento.findMany({
+    where: { departamentoId },
+    select: { userId: true },
+  })
+  for (const membro of membros) {
+    invalidatePermissionsCache(membro.userId, tenant.id)
+  }
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/acessos')
@@ -330,7 +421,17 @@ export async function excluirDepartamento(departamentoId: string) {
   })
   if (!departamento) throw new Error('Departamento não encontrado')
 
+  // Membros perdem as permissões concedidas pelo departamento — capturar antes do delete
+  const membros: MembroDepartamentoLite[] = await db.userDepartamento.findMany({
+    where: { departamentoId },
+    select: { userId: true },
+  })
+
   await db.departamento.delete({ where: { id: departamentoId } })
+
+  for (const membro of membros) {
+    invalidatePermissionsCache(membro.userId, tenant.id)
+  }
 
   await db.auditLog.create({
     data: {

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, Eye } from 'lucide-react'
-import { PERMISSION_GROUPS, applyPermissionCascade } from '@torcida/types'
+import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema } from '@torcida/types'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
@@ -256,6 +256,8 @@ interface Role {
 
 interface RolesManagerProps {
   roles: Role[]
+  /** TipoSede do tenant — contextualiza rótulos de cargos de sistema (Presidente/Liderança) */
+  tipoSede: string
 }
 
 /** Label amigável de uma permissão (fallback pro próprio código). */
@@ -267,7 +269,7 @@ function permissionLabel(key: string): string {
   return key
 }
 
-export function RolesManager({ roles }: RolesManagerProps) {
+export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
   const [criando, setCriando] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -351,6 +353,7 @@ export function RolesManager({ roles }: RolesManagerProps) {
             <RoleRow
               key={role.id}
               role={role}
+              tipoSede={tipoSede}
               disabled={editando}
               onEdit={() => {
                 setErro(null)
@@ -401,12 +404,15 @@ export function RolesManager({ roles }: RolesManagerProps) {
 
 function RoleRow({
   role,
+  tipoSede,
   disabled,
   onEdit,
   onDelete,
   pending,
 }: {
   role: Role
+  /** TipoSede do tenant — contextualiza o rótulo dos cargos de sistema */
+  tipoSede: string
   /** Outro cargo está em edição/criação — desabilita interações desta linha */
   disabled: boolean
   onEdit: () => void
@@ -428,7 +434,9 @@ function RoleRow({
 
       {/* Nome + badges */}
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
-        <span className="font-medium text-[rgb(var(--foreground))]">{role.nome}</span>
+        <span className="font-medium text-[rgb(var(--foreground))]">
+          {role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome}
+        </span>
         {role.isSystem && (
           <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs text-[rgb(var(--foreground-muted))]">
             <Shield className="h-3 w-3" /> Sistema
@@ -685,13 +693,22 @@ function RoleForm({
 }
 
 // ── Departamentos ────────────────────────────────────────────────────────────
-// Agrupamento organizacional (Diretoria, Dpto. Financeiro, Sócio...), sem
-// permissões próprias — quem concede acesso é o Perfil (Role) acima.
+// Unidade de acesso: além do agrupamento organizacional (Diretoria, Financeiro,
+// Sócio...), o departamento concede permissões aos seus membros e pode abrir
+// um módulo do portal.
 
 interface Departamento {
   id: string
   nome: string
   cor: string
+  permissions: string[]
+  moduloPortal: string | null
+  slug: string
+}
+
+/** Label do módulo de portal (fallback pro próprio slug). */
+function moduloPortalLabel(key: string): string {
+  return DEPARTAMENTO_MODULOS.find((m) => m.key === key)?.label ?? key
 }
 
 interface DepartamentosManagerProps {
@@ -712,6 +729,8 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
               key={departamento.id}
               initialNome={departamento.nome}
               initialCor={departamento.cor}
+              initialPermissions={departamento.permissions}
+              initialModulo={departamento.moduloPortal}
               onCancel={() => setEditandoId(null)}
               onSubmit={(fd) => {
                 startTransition(async () => {
@@ -777,7 +796,19 @@ function DepartamentoRow({
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
       <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: departamento.cor }} />
-      <span className="flex-1 font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
+      <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
+        <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
+        <span className="text-xs text-[rgb(var(--foreground-muted))]">
+          {departamento.permissions.length === 0
+            ? 'Sem permissões'
+            : `${departamento.permissions.length} permiss${departamento.permissions.length === 1 ? 'ão' : 'ões'}`}
+        </span>
+        {departamento.moduloPortal && (
+          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+            {moduloPortalLabel(departamento.moduloPortal)}
+          </span>
+        )}
+      </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={onEdit}
@@ -801,21 +832,83 @@ function DepartamentoRow({
 function DepartamentoForm({
   initialNome = '',
   initialCor = '#6b7280',
+  initialPermissions = [],
+  initialModulo = null,
   onCancel,
   onSubmit,
   pending,
 }: {
   initialNome?: string
   initialCor?: string
+  initialPermissions?: string[]
+  initialModulo?: string | null
   onCancel: () => void
   onSubmit: (fd: FormData) => void
   pending: boolean
 }) {
   const [cor, setCor] = useState(initialCor)
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
+
+  const isEdit = initialNome !== ''
+  const initial = new Set(initialPermissions)
+
+  // Diff em relação ao estado original (só relevante na edição — na criação
+  // tudo é novo por definição, sem destaque, como no RoleForm)
+  const added = isEdit ? [...selected].filter((p) => !initial.has(p)) : []
+  const removed = isEdit ? [...initial].filter((p) => !selected.has(p)) : []
+
+  function toggle(key: string) {
+    setSelected((prev) => {
+      const prevArr = [...prev]
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      // Cascata: marcar não-base puxa a base do grupo; desmarcar a base
+      // derruba as irmãs (mesma regra aplicada no servidor)
+      return new Set(applyPermissionCascade(prevArr, [...next]))
+    })
+  }
+
+  /** Contadores de mudança por grupo, para o badge no cabeçalho (edição) */
+  function groupChanges(groupKeys: readonly string[]) {
+    return {
+      added: added.filter((p) => groupKeys.includes(p)).length,
+      removed: removed.filter((p) => groupKeys.includes(p)).length,
+    }
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    onSubmit(new FormData(e.currentTarget))
+
+    // Confirmação com resumo das mudanças de permissão antes de gravar
+    if (isEdit && (added.length > 0 || removed.length > 0)) {
+      const linhas = [
+        ...added.map((p) => `  + ${permissionLabel(p)}`),
+        ...removed.map((p) => `  − ${permissionLabel(p)}`),
+      ]
+      if (!confirm(`Salvar as alterações do departamento "${initialNome}"?\n\n${linhas.join('\n')}`)) return
+    }
+
+    const fd = new FormData(e.currentTarget)
+    // Injeta as permissões selecionadas manualmente (checkboxes podem ser perdidos)
+    fd.delete('permissions')
+    for (const p of selected) fd.append('permissions', p)
+    onSubmit(fd)
+  }
+
+  /** Estilo do item conforme estado: selecionado / adicionado / removido / neutro */
+  function itemClass(key: string): string {
+    const base = 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors'
+    if (isEdit && added.includes(key)) {
+      return `${base} border-green-400 bg-green-50 text-[rgb(var(--foreground))] dark:border-green-700 dark:bg-green-950`
+    }
+    if (isEdit && removed.includes(key)) {
+      return `${base} border-red-300 bg-red-50 text-[rgb(var(--foreground-muted))] dark:border-red-800 dark:bg-red-950`
+    }
+    if (selected.has(key)) {
+      return `${base} border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]`
+    }
+    return `${base} border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]`
   }
 
   return (
@@ -844,6 +937,100 @@ function DepartamentoForm({
             <input type="hidden" name="cor" value={cor} />
           </div>
         </div>
+      </div>
+
+      {/* Módulo de portal */}
+      <div>
+        <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Módulo do portal
+        </label>
+        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          Área do portal que os membros deste departamento passam a acessar.
+        </p>
+        <select
+          name="moduloPortal"
+          defaultValue={initialModulo ?? ''}
+          className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+        >
+          <option value="">Nenhum / apenas organizacional</option>
+          {DEPARTAMENTO_MODULOS.map((modulo) => (
+            <option key={modulo.key} value={modulo.key}>
+              {modulo.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Nota: departamento pode ter zero permissões (uso só organizacional) */}
+      {selected.size === 0 && (
+        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+          Sem permissões: o departamento serve só para organização/escopo.
+        </p>
+      )}
+
+      {/* Permissões */}
+      <div>
+        <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">Permissões</p>
+        <div className="space-y-3">
+          {PERMISSION_GROUPS.map((group) => {
+            const groupKeys = group.items.map((i) => i.key)
+            const changes = groupChanges(groupKeys)
+            return (
+              <div key={group.label}>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  {group.label}
+                  {changes.added > 0 && (
+                    <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900 dark:text-green-300">
+                      +{changes.added}
+                    </span>
+                  )}
+                  {changes.removed > 0 && (
+                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900 dark:text-red-300">
+                      −{changes.removed}
+                    </span>
+                  )}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {group.items.map((item) => {
+                    const isBase = group.base === item.key
+                    return (
+                      <label key={item.key} className={itemClass(item.key)}>
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={selected.has(item.key)}
+                          onChange={() => toggle(item.key)}
+                        />
+                        <span
+                          className={[
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                            selected.has(item.key)
+                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                              : 'border-[rgb(var(--border-strong))]',
+                          ].join(' ')}
+                        >
+                          {selected.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+                        </span>
+                        <span className={isEdit && removed.includes(item.key) ? 'line-through opacity-70' : ''}>
+                          {item.label}
+                        </span>
+                        {isBase && (
+                          <Eye
+                            className="ml-auto h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]"
+                            aria-label="Permissão base do grupo — exigida pelas demais"
+                          />
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          {selected.size} permiss{selected.size === 1 ? 'ão' : 'ões'} selecionada{selected.size === 1 ? '' : 's'}
+        </p>
       </div>
 
       <div className="flex gap-2">
