@@ -1165,10 +1165,12 @@ function PassoVinculo({
   const [uploadPend, setUploadPend] = useState(false)
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
-  // "Torcedor" é o departamento auxiliar criado ao aprovar torcedores — não faz
-  // sentido como opção de atuação para quem se candidata a sócio.
+  // Filtra residuais "Sócio"/"Torcedor" se ainda existirem no tenant (legado
+  // de aprovações antigas) — tipo de membro não é departamento.
   const departamentosSelecionaveis =
-    departamentos === null ? null : departamentos.filter((d) => d.nome !== 'Torcedor')
+    departamentos === null
+      ? null
+      : departamentos.filter((d) => d.nome !== 'Torcedor' && d.nome !== 'Sócio')
 
   const unidadeSelecionada = unidadeId
     ? torcida.sedes.find((s) => s.id === unidadeId)

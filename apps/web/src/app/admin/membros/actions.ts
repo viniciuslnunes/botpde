@@ -5,43 +5,25 @@ import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 
-/** Nome do departamento padrão por tipo de membro — criado sob demanda no tenant. */
-const DEPARTAMENTO_PADRAO_POR_TIPO: Record<'SOCIO' | 'TORCEDOR', string> = {
-  SOCIO: 'Sócio',
-  TORCEDOR: 'Torcedor',
-}
-
 /**
  * Concede acesso básico ao portal quando um membro é aprovado:
- * - Role de sistema 'member' (se ainda não tiver)
- * - Departamento correspondente ao tipo (SOCIO/TORCEDOR), criado sob demanda
+ * Role de sistema 'member' (se ainda não tiver).
  * Idempotente: seguro chamar mais de uma vez para o mesmo usuário/tenant.
+ *
+ * Sócio/Torcedor NÃO são departamentos (ver schema Departamento) — o tipo
+ * vive em SaasMembro.tipo; departamentos reais (Financeiro, Comunicação…)
+ * são atribuídos depois pelo admin.
  */
-async function concederAcessoBasico(tenantId: string, userId: string, tipoMembro: 'SOCIO' | 'TORCEDOR') {
+async function concederAcessoBasico(tenantId: string, userId: string) {
   const memberRole = await db.role.findFirst({
     where: { tenantId, nome: 'member', isSystem: true },
   })
 
-  if (memberRole) {
-    await db.userRole.upsert({
-      where: { userId_tenantId_roleId: { userId, tenantId, roleId: memberRole.id } },
-      create: { userId, tenantId, roleId: memberRole.id },
-      update: {},
-    })
-  }
+  if (!memberRole) return
 
-  const nomeDepartamento = DEPARTAMENTO_PADRAO_POR_TIPO[tipoMembro]
-  const departamento = await db.departamento.upsert({
-    where: { tenantId_nome: { tenantId, nome: nomeDepartamento } },
-    create: { tenantId, nome: nomeDepartamento },
-    update: {},
-  })
-
-  await db.userDepartamento.upsert({
-    where: {
-      userId_tenantId_departamentoId: { userId, tenantId, departamentoId: departamento.id },
-    },
-    create: { userId, tenantId, departamentoId: departamento.id },
+  await db.userRole.upsert({
+    where: { userId_tenantId_roleId: { userId, tenantId, roleId: memberRole.id } },
+    create: { userId, tenantId, roleId: memberRole.id },
     update: {},
   })
 }
@@ -59,7 +41,7 @@ export async function aprovarMembro(membroId: string) {
     },
   })
 
-  await concederAcessoBasico(tenant.id, membro.userId, membro.tipo)
+  await concederAcessoBasico(tenant.id, membro.userId)
 
   await db.auditLog.create({
     data: {
