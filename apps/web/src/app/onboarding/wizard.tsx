@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
@@ -285,6 +285,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               transition={springGentle}
             >
               <PassoVinculo
+                clube={clube}
                 torcida={torcida}
                 nomeInicial={nomeInicial}
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
@@ -725,19 +726,25 @@ function PassoTorcida({
         disabled={pending}
         className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[rgb(var(--border))] p-4 text-left transition-all hover:bg-[rgb(var(--surface))] disabled:opacity-50"
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))]">
-          {pending ? (
+        {pending ? (
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))]">
             <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
-          ) : (
-            <Users className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-          )}
-        </div>
+          </div>
+        ) : (
+          <EscudoClube
+            nome={nomeClube}
+            apelido={clube?.apelido}
+            escudoUrl={clube?.escudoUrl}
+            size="sm"
+          />
+        )}
         <div>
           <p className="font-semibold text-[rgb(var(--foreground))]">
             Sou só torcedor / não pertenço a nenhuma
           </p>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Acompanhe a comunidade nacional do seu clube.
+            Acesso só à comunidade nacional do {nomeClube} — sem vínculo com torcida
+            organizada.
           </p>
         </div>
       </button>
@@ -1149,6 +1156,7 @@ function maskCep(raw: string): string {
 }
 
 function PassoVinculo({
+  clube,
   torcida,
   nomeInicial,
   regiao,
@@ -1157,6 +1165,7 @@ function PassoVinculo({
   onVoltar,
   onErro,
 }: {
+  clube: AfiliacaoOnboarding | null
   torcida: TorcidaOnboarding
   nomeInicial: string
   regiao: string | undefined
@@ -1196,6 +1205,8 @@ function PassoVinculo({
     : null
   const unidadePendente =
     !unidadeNaoListada && torcida.sedes.length > 1 && !unidadeId
+
+  const nomeClube = clube?.apelido?.trim() || clube?.nome || 'seu clube'
 
   function abrirSocio() {
     onErro(null)
@@ -1285,8 +1296,48 @@ function PassoVinculo({
           Como você participa da {torcida.nome}?
         </h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Sócios passam por aprovação e têm acesso a benefícios exclusivos.
+          São dois espaços diferentes: a comunidade do clube e a comunidade da
+          torcida organizada. Escolha o nível de vínculo com a {torcida.nome}.
         </p>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+            <div className="flex items-center gap-3">
+              <EscudoClube
+                nome={nomeClube}
+                apelido={clube?.apelido}
+                escudoUrl={clube?.escudoUrl}
+                size="sm"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  Comunidade do clube
+                </p>
+                <p className="truncate font-semibold text-[rgb(var(--foreground))]">{nomeClube}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
+              Feed nacional de torcedores de {nomeClube}: posts públicos, conversa entre
+              torcidas e novidades do time — sem carteirinha.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+            <div className="flex items-center gap-3">
+              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  Comunidade da organizada
+                </p>
+                <p className="truncate font-semibold text-[rgb(var(--foreground))]">{torcida.nome}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
+              Espaço da {torcida.nome}: eventos, comunicados e posts da organização. Sócios
+              ainda veem o mural interno restrito.
+            </p>
+          </div>
+        </div>
 
         {!torcida.acessivelNoHost && (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
@@ -1308,12 +1359,21 @@ function PassoVinculo({
             disabled={pending || unidadePendente}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <Users className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />
-            <div>
+            <div className="flex shrink-0 items-center -space-x-2">
+              <EscudoClube
+                nome={nomeClube}
+                apelido={clube?.apelido}
+                escudoUrl={clube?.escudoUrl}
+                size="sm"
+              />
+              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
+            </div>
+            <div className="min-w-0">
               <p className="font-semibold text-[rgb(var(--foreground))]">Torcedor da torcida</p>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Entrada imediata, sem aprovação nem comprovante. Acesso à comunidade, eventos e
-                novidades da torcida.
+              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+                Entrada imediata na comunidade da <strong>{torcida.nome}</strong> e na
+                comunidade do <strong>{nomeClube}</strong>. Sem aprovação nem comprovante —
+                eventos e novidades abertas da organizada, sem mural exclusivo de sócios.
               </p>
             </div>
           </button>
@@ -1324,12 +1384,18 @@ function PassoVinculo({
             disabled={pending}
             className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-[rgb(var(--foreground-muted))]" />
-            <div>
-              <p className="font-semibold text-[rgb(var(--foreground))]">Sócio</p>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Carteirinha, benefícios e voz nas decisões. Requer aprovação e comprovante de
-                vínculo.
+            <div className="relative shrink-0">
+              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
+              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--color-primary))] ring-2 ring-[rgb(var(--surface))]">
+                <Shield className="h-3 w-3" />
+              </span>
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-[rgb(var(--foreground))]">Sócio da organizada</p>
+              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+                Acesso à comunidade interna de sócios da <strong>{torcida.nome}</strong>{' '}
+                (carteirinha, benefícios e posts só para sócios), além da comunidade do{' '}
+                <strong>{nomeClube}</strong>. Requer aprovação e comprovante de vínculo.
               </p>
             </div>
           </button>
