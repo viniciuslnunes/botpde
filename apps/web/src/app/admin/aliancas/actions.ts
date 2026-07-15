@@ -5,7 +5,7 @@ import { db } from '@torcida/db'
 import type { Alianca, StatusAlianca } from '@torcida/db'
 import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
-import { normalizeTenantPair } from '@/lib/aliancas'
+import { findAliancaEntreTenants } from '@/lib/aliancas'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -38,6 +38,10 @@ function assertStatus(alianca: Alianca, expected: StatusAlianca): void {
   }
 }
 
+/**
+ * Propõe aliança: origem = proponente, aliado = destinatário.
+ * Unicidade do par é bidirecional (A→B e B→A contam como o mesmo vínculo).
+ */
 export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
 
@@ -45,22 +49,16 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   if (!parsed.success) throw new Error('Torcida aliada inválida')
   if (parsed.data === tenant.id) throw new Error('Você não pode propor aliança para a própria torcida')
 
-  const [tenantOrigemId, tenantDestinoId] = normalizeTenantPair(tenant.id, parsed.data)
+  const tenantOrigemId = tenant.id
+  const tenantDestinoId = parsed.data
 
   const aliado: TenantLite | null = await db.tenant.findFirst({
-    where: { id: parsed.data, ativo: true },
+    where: { id: tenantDestinoId, ativo: true },
     select: { id: true, nome: true, slug: true },
   })
   if (!aliado) throw new Error('Torcida aliada não encontrada')
 
-  const existente: Alianca | null = await db.alianca.findUnique({
-    where: {
-      tenantOrigemId_tenantAliadoId: {
-        tenantOrigemId,
-        tenantAliadoId: tenantDestinoId,
-      },
-    },
-  })
+  const existente = await findAliancaEntreTenants(tenantOrigemId, tenantDestinoId)
 
   let aliancaId = existente?.id ?? null
   if (!existente) {
@@ -77,6 +75,8 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     const reaberta: Alianca = await db.alianca.update({
       where: { id: existente.id },
       data: {
+        tenantOrigemId,
+        tenantAliadoId: tenantDestinoId,
         status: 'PENDENTE',
         propostaPorId: session.user.id,
         confirmadaPorId: null,
@@ -109,6 +109,44 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   invalidateAliancaHierarchy(tenantOrigemId, tenantDestinoId)
 }
 
+/**
+ * Propõe a partir de uma recomendação ALTA com tenant mapeado.
+ */
+export async function proporAliancaFromRecomendacao(recomendacaoId: string): Promise<void> {
+  const { tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+
+  const parsed = uuidSchema.safeParse(recomendacaoId)
+  if (!parsed.success) throw new Error('Recomendação inválida')
+
+  const recomendacao: {
+    id: string
+    tenantId: string
+    tenantSugeridoId: string | null
+    nomeSugerido: string
+    confianca: 'ALTA' | 'MEDIA' | 'BAIXA'
+  } | null = await db.recomendacaoAlianca.findFirst({
+    where: { id: parsed.data, tenantId: tenant.id },
+    select: {
+      id: true,
+      tenantId: true,
+      tenantSugeridoId: true,
+      nomeSugerido: true,
+      confianca: true,
+    },
+  })
+  if (!recomendacao) throw new Error('Recomendação não encontrada')
+  if (recomendacao.confianca !== 'ALTA') {
+    throw new Error('Somente recomendações de alta confiança podem virar proposta automática')
+  }
+  if (!recomendacao.tenantSugeridoId) {
+    throw new Error(
+      `${recomendacao.nomeSugerido} ainda não está na plataforma — não é possível enviar a proposta automaticamente`,
+    )
+  }
+
+  await proporAlianca(recomendacao.tenantSugeridoId)
+}
+
 export async function aceitarAlianca(aliancaId: string): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
 
@@ -118,7 +156,7 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
   const alianca = await loadAliancaInTenant(parsed.data, tenant.id)
   if (!alianca) throw new Error('Aliança não encontrada')
   if (alianca.tenantAliadoId !== tenant.id) {
-    throw new Error('Somente o tenant aliado pode aceitar a proposta')
+    throw new Error('Somente o destinatário da proposta pode aceitá-la')
   }
   assertStatus(alianca, 'PENDENTE')
 
@@ -158,7 +196,7 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
   const alianca = await loadAliancaInTenant(parsed.data, tenant.id)
   if (!alianca) throw new Error('Aliança não encontrada')
   if (alianca.tenantAliadoId !== tenant.id) {
-    throw new Error('Somente o tenant aliado pode rejeitar a proposta')
+    throw new Error('Somente o destinatário da proposta pode rejeitá-la')
   }
   assertStatus(alianca, 'PENDENTE')
 
@@ -189,6 +227,49 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
   invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
+/**
+ * Cancela proposta enviada — só o tenant origem, enquanto PENDENTE.
+ */
+export async function cancelarProposta(aliancaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+
+  const parsed = uuidSchema.safeParse(aliancaId)
+  if (!parsed.success) throw new Error('Aliança inválida')
+
+  const alianca = await loadAliancaInTenant(parsed.data, tenant.id)
+  if (!alianca) throw new Error('Aliança não encontrada')
+  if (alianca.tenantOrigemId !== tenant.id) {
+    throw new Error('Somente quem enviou a proposta pode cancelá-la')
+  }
+  assertStatus(alianca, 'PENDENTE')
+
+  await db.alianca.update({
+    where: { id: alianca.id },
+    data: {
+      status: 'ENCERRADA',
+      confirmadaPorId: session.user.id,
+      confirmadaEm: new Date(),
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'ALIANCA_CANCELADA',
+      entidade: 'Alianca',
+      entidadeId: alianca.id,
+      detalhes: {
+        tenantOrigemId: alianca.tenantOrigemId,
+        tenantAliadoId: alianca.tenantAliadoId,
+      },
+    },
+  })
+
+  revalidatePath('/admin/aliancas')
+  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
+}
+
 export async function encerrarAlianca(aliancaId: string): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
 
@@ -197,10 +278,7 @@ export async function encerrarAlianca(aliancaId: string): Promise<void> {
 
   const alianca = await loadAliancaInTenant(parsed.data, tenant.id)
   if (!alianca) throw new Error('Aliança não encontrada')
-
-  if (alianca.status === 'ENCERRADA') {
-    throw new Error('Esta aliança já está encerrada')
-  }
+  assertStatus(alianca, 'ATIVA')
 
   await db.alianca.update({
     where: { id: alianca.id },

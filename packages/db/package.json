@@ -16,6 +16,7 @@
     "seed:escudos-soccerwiki": "node --use-system-ca scripts/seed-escudos-soccerwiki.js",
     "seed:escudos-ogol": "node --use-system-ca scripts/seed-escudos-ogol.js",
     "seed:departamentos": "node scripts/seed-departamentos.js",
+    "seed:recomendacoes-aliancas": "node scripts/seed-recomendacoes-aliancas.js",
     "seed:torcedores-estimados": "node scripts/seed-torcedores-estimados.js",
     "test:torcedores-estimados": "node scripts/test-torcedores-estimados.js",
     "coleta:ibope-ranking": "node scripts/coleta-ibope-ranking.js",
