@@ -6,6 +6,7 @@ import { db } from '@torcida/db'
 import type { TipoNotificacao } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
+import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { marcarTodasNotificacoesAdminLidas } from '@/app/actions/notificacoes'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
@@ -36,6 +37,8 @@ export default async function AdminNotificacoesPage() {
 
   const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
+
+  await reconciliarPropostasAliancaPendentes(tenant.id)
 
   const notificacoes: NotificacaoAdminRow[] = await db.notificacao.findMany({
     where: {

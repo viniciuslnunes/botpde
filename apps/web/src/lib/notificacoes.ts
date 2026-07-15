@@ -3,8 +3,10 @@ import type { Notificacao, TipoNotificacao } from '@torcida/db'
 import {
   calculateEffectivePermissions,
   hasPermission,
+  PERMISSIONS,
   permissionsOfRole,
 } from '@torcida/types'
+import { cache } from 'react'
 import { superAdminEmails } from '@/lib/env'
 
 export type CriarNotificacaoInput = {
@@ -291,6 +293,7 @@ export async function listarNotificacoesRecentes(
   tenantId: string,
   userId: string,
   limite = 8,
+  tipos?: TipoNotificacao[],
 ): Promise<
   Array<{
     id: string
@@ -302,7 +305,11 @@ export async function listarNotificacoesRecentes(
   }>
 > {
   return db.notificacao.findMany({
-    where: { tenantId, userId },
+    where: {
+      tenantId,
+      userId,
+      ...(tipos && tipos.length > 0 ? { tipo: { in: tipos } } : {}),
+    },
     orderBy: { criadoEm: 'desc' },
     take: limite,
     select: {
@@ -315,3 +322,61 @@ export async function listarNotificacoesRecentes(
     },
   })
 }
+
+/**
+ * Garante ALIANCA_PROPOSTA para destinatários do tenant quando há propostas
+ * PENDENTE sem notificação (ex.: propostas criadas antes do fan-out incluir
+ * super-admins, ou tenants sem UserRole).
+ * Uma vez por request via React.cache.
+ */
+export const reconciliarPropostasAliancaPendentes = cache(async function reconciliarPropostasAliancaPendentes(
+  tenantId: string,
+): Promise<number> {
+  try {
+    const pendentes: Array<{
+      tenantOrigem: { nome: string }
+      tenantAliado: { nome: string }
+    }> = await db.alianca.findMany({
+      where: { tenantAliadoId: tenantId, status: 'PENDENTE' },
+      select: {
+        tenantOrigem: { select: { nome: true } },
+        tenantAliado: { select: { nome: true } },
+      },
+    })
+    if (pendentes.length === 0) return 0
+
+    const targets = await listarDestinatariosAdmin(tenantId, PERMISSIONS.ALLIANCES_MANAGE)
+    if (targets.length === 0) return 0
+
+    let criadas = 0
+    for (const al of pendentes) {
+      const titulo = `Proposta de aliança de ${al.tenantOrigem.nome}`
+      const existentes: Array<{ userId: string }> = await db.notificacao.findMany({
+        where: {
+          tenantId,
+          tipo: 'ALIANCA_PROPOSTA',
+          titulo,
+          userId: { in: targets },
+        },
+        select: { userId: true },
+      })
+      const jaTem = new Set(existentes.map((e) => e.userId))
+      const faltando = targets.filter((id) => !jaTem.has(id))
+      if (faltando.length === 0) continue
+
+      criadas += await criarNotificacoesEmLote(
+        faltando.map((userId) => ({
+          userId,
+          tenantId,
+          tipo: 'ALIANCA_PROPOSTA' as const,
+          titulo,
+          corpo: `${al.tenantOrigem.nome} propôs aliança com ${al.tenantAliado.nome}.`,
+          link: '/admin/aliancas',
+        })),
+      )
+    }
+    return criadas
+  } catch {
+    return 0
+  }
+})

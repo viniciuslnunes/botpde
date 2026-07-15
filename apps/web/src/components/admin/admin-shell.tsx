@@ -48,6 +48,7 @@ interface AdminShellProps {
 function AdminTopbar({
   tenantNome,
   tenantCor,
+  tenantSlug,
   tenantLogoUrl,
   userName,
   userAvatar,
@@ -57,6 +58,7 @@ function AdminTopbar({
 }: {
   tenantNome: string
   tenantCor: string
+  tenantSlug: string
   tenantLogoUrl: string | null
   userName: string | null
   userAvatar: string | null
@@ -117,8 +119,10 @@ function AdminTopbar({
 
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell
+            key={tenantSlug}
             initialItems={notifications}
             verTodasHref="/admin/notificacoes"
+            verTodasLabel="Ver alertas operacionais"
           />
           <div className="hidden sm:block">
             <ThemeToggle />
@@ -227,6 +231,7 @@ export function AdminShell({
       <AdminTopbar
         tenantNome={tenantNome}
         tenantCor={tenantCor}
+        tenantSlug={tenantSlug}
         tenantLogoUrl={tenantLogoUrl}
         userName={userName}
         userAvatar={userAvatar}

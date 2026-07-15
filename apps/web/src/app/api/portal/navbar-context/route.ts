@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { contarMensagensNaoLidas } from '@/lib/mensageria'
+import { listarNotificacoesRecentes } from '@/lib/notificacoes'
+import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 
 export async function GET() {
   const session = await auth()
@@ -19,12 +21,7 @@ export async function GET() {
 
   const [unreadMessages, notifications, isAdmin] = await Promise.all([
     contarMensagensNaoLidas(userId).catch((): number => 0),
-    db.notificacao.findMany({
-      where: { tenantId: tenant.id, userId },
-      orderBy: { criadoEm: 'desc' },
-      take: 8,
-      select: { id: true, titulo: true, corpo: true, link: true, lida: true, criadoEm: true },
-    }),
+    listarNotificacoesRecentes(tenant.id, userId, 8, TIPOS_NOTIFICACAO_SOCIAL),
     db.userRole
       .findFirst({
         where: {

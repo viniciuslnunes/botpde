@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
@@ -32,6 +32,16 @@ export function NotificationBell({
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
   const [pending, startTransition] = useTransition()
+
+  const initialSignature = useMemo(
+    () => initialItems.map((item) => `${item.id}:${item.lida ? 1 : 0}`).join('|'),
+    [initialItems],
+  )
+
+  // Layout do admin/portal revalida sem remount — mantém a lista alinhada ao SSR.
+  useEffect(() => {
+    setItems(initialItems)
+  }, [initialSignature, initialItems])
 
   const unreadCount = useMemo(() => items.filter((item) => !item.lida).length, [items])
 
