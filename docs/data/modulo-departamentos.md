@@ -32,6 +32,37 @@ Ganhar um cargo não coloca automaticamente a pessoa num departamento.
 | **Colaborador** (membro do depto) | `UserDepartamento` | `Departamento.permissions` |
 | **Gestor** | `DepartamentoGestor` (+ também membro) | `permissions` + `permissionsGestor` + staffing da área |
 
+### Matriz canônica (seed)
+
+Fonte: `packages/db/src/departamentos-canonicos.js`. Alinha
+`docs/knowledge/estrutura-governanca.md`. Gestor sempre **soma** às permissões
+de colaborador. Novas chaves de domínio: `finance:view|manage`,
+`patrimony:view|manage` (grupos na UI de cargos; módulos ainda em evolução).
+
+| Departamento | Colaborador | Gestor+ |
+|---|---|---|
+| **Diretoria** | Ver membros, relatórios, financeiro e patrimônio; criar eventos; salas; DMs/grupos; postar; curar notícias; ver pedidos | Aprovar/reprovar/advertir/bloquear; comunicados; gerir eventos/mural/canais; sedes; gerir financeiro |
+| **Financeiro** | Ver financeiro, relatórios, membros e pedidos; DMs | Gerir financeiro; importar base; gerir loja; comunicados; salas/grupos |
+| **Social e eventos** | Criar eventos; postar; DMs/grupos/salas; ver membros e pedidos; curar | Gerir eventos/mural/moderação/canais; comunicados; sedes; ver financeiro e relatórios |
+| **Materiais / Loja** | Ver pedidos; DMs/grupos; postar; relatórios; ver membros | Gerir produtos; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
+| **Comunicação** | Postar; curar notícias; salas/grupos; criar eventos; DMs; ver membros | Comunicados; mural/moderação/canais; moderar msgs; gerir eventos; relatórios; ver pedidos |
+| **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos; criar eventos; ver pedidos/membros | Gerir patrimônio e sedes; gerir eventos/loja; ver financeiro; comunicados; salas/canais |
+| **Batucada** | Criar ensaios; postar; grupos/salas; ver membros e patrimônio; curar | Gerir eventos/canais/mural; comunicados; gerir patrimônio e sedes; ver pedidos |
+| **Caravanas** | Criar viagens; ver membros/pedidos/financeiro/relatórios; DMs/grupos/salas; postar | Gerir eventos/canais/mural; comunicados; gerir loja e financeiro; sedes; advertir |
+| **Feminino** | Postar; criar eventos; DMs/grupos/salas; ver membros; curar; ver pedidos | Gerir eventos/mural/moderação/canais; comunicados; moderar msgs; sedes; relatórios; advertir |
+| **Carnaval** | Eventos + comunidade + pedidos + ver financeiro/patrimônio/relatórios/membros; salas/grupos; curar | Gerir eventos/mural/loja/financeiro/patrimônio/sedes; canais; moderação; comunicados; advertir |
+
+**Não** entram via departamento: `settings:manage`, `roles:manage`,
+`torcida:global_view`, `alliances:manage` (Presidência / owner).
+
+Após deploy em tenants existentes:
+
+```bash
+pnpm --filter @torcida/db seed:departamentos
+pnpm --filter @torcida/db db:repair-system-roles
+```
+
+
 ## Conceito
 
 O **Departamento** concede acesso. Carrega duas listas do vocabulário canônico
@@ -84,8 +115,11 @@ Promoção Subsede→Tenant continua script manual
 3. Portal é hub que reusa módulos.
 4. Visão da torcida = worktree de Sede (Caso A) + Tenants filhos (Caso B).
 5. Uma torcida = um Presidente; Vice só na Sede.
-6. Diretoria/Patrimônio podem ter `permissions: []` (organizacional / stub).
+6. Diretoria tem acesso operacional de prancheta (sem poderes de Presidência);
+   Patrimônio usa sedes/relatórios até existir módulo de inventário.
 7. Sem FK perfil↔departamento — templates e atribuição ficam em Controle de acesso (3 seções).
+8. Presidência (`settings` / `roles` / `torcida:global_view` / `alliances`) não
+   é concedida por departamento.
 
 ## Planejado (ainda não implementado)
 

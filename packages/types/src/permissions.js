@@ -32,6 +32,14 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Relatórios
   REPORTS_VIEW: 'reports:view',
 
+  // Financeiro (módulo em evolução — permissão já usado por departamento)
+  FINANCE_VIEW: 'finance:view',
+  FINANCE_MANAGE: 'finance:manage',
+
+  // Patrimônio / inventário (módulo em evolução)
+  PATRIMONY_VIEW: 'patrimony:view',
+  PATRIMONY_MANAGE: 'patrimony:manage',
+
   // Comunidade (mural de posts locais/não-oficiais)
   COMMUNITY_MANAGE: 'community:manage',
 
@@ -102,6 +110,22 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.EVENTS_CREATE, label: 'Criar eventos' },
       { key: PERMISSIONS.EVENTS_MANAGE, label: 'Gerenciar eventos' },
+    ],
+  },
+  {
+    label: 'Financeiro',
+    base: PERMISSIONS.FINANCE_VIEW,
+    items: [
+      { key: PERMISSIONS.FINANCE_VIEW, label: 'Ver financeiro' },
+      { key: PERMISSIONS.FINANCE_MANAGE, label: 'Gerenciar financeiro' },
+    ],
+  },
+  {
+    label: 'Patrimônio',
+    base: PERMISSIONS.PATRIMONY_VIEW,
+    items: [
+      { key: PERMISSIONS.PATRIMONY_VIEW, label: 'Ver patrimônio' },
+      { key: PERMISSIONS.PATRIMONY_MANAGE, label: 'Gerenciar patrimônio' },
     ],
   },
   {
