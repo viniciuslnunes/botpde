@@ -127,14 +127,16 @@ export function torcidaAcessivelNoHost(_tenantSlug: string): boolean {
 
 /**
  * Torcida ativa no portal logado.
- * Ordem: subdomínio real → vínculo do usuário (pendente/aprovado) → cookie válido
- * para o clube do PerfilTorcedor → cookie genérico → TENANT_SLUG do deploy.
+ * Ordem: subdomínio real → vínculo de sócio APROVADO → cookie válido para o
+ * clube do PerfilTorcedor → cookie genérico → TENANT_SLUG do deploy.
  *
- * Torcedor global (só PerfilTorcedor, sem vínculo nem cookie do clube) recebe
- * `null` — cai no modo "comunidade nacional" via resolverContextoComunidade.
+ * Sócio PENDENTE e vínculo TORCEDOR (torcedor de uma torcida específica, sem
+ * aprovação) NÃO abrem tenant próprio — só sócio aprovado. Torcedor global
+ * (só PerfilTorcedor, sem vínculo aprovado nem cookie do clube) recebe `null`
+ * — cai no modo "comunidade nacional" via resolverContextoComunidade.
  *
  * Não delega a getTenantFromHost() inteiro — em single-tenant o TENANT_SLUG do deploy
- * (ex.: Gaviões) não pode vencer um SaasMembro PENDENTE em outra torcida (Camisa 12).
+ * (ex.: Gaviões) não pode vencer o contexto correto de outro usuário.
  */
 export async function getActiveTenant(
   userId?: string,
