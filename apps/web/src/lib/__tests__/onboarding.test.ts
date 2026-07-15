@@ -34,8 +34,8 @@ vi.mock('next/navigation', () => ({ redirect: redirectFn }))
 vi.mock('@/lib/tenant', () => ({
   buildPortalUrl: (slug: string) => `/portal/comunidade?torcida=${slug}`,
 }))
-// `setTenantContextSlug` usa cookies() do Next — indisponível fora de request.
-vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn() }))
+// `setTenantContextSlug`/`clearTenantContextSlug` usam cookies() do Next — indisponível fora de request.
+vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn(), clearTenantContextSlug: vi.fn() }))
 // Validação de cidade contra o IBGE — mockada para não bater na rede.
 const cidadePertenceUfFn = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/municipios-ibge', () => ({

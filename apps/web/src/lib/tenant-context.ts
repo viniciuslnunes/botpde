@@ -23,6 +23,14 @@ export async function setTenantContextSlug(slug: string): Promise<void> {
   cookieStore.set(TENANT_CTX_COOKIE, slug, sharedCookieOptions(isProd))
 }
 
+/** Limpa o cookie de contexto — ex.: vínculo TORCEDOR não deve herdar uma
+ * torcida fixada numa tentativa anterior (o cookie sobreviveria ao filtro
+ * de tipo em resolveUserTenantSlugForUser via fallback de torcedor global). */
+export async function clearTenantContextSlug(): Promise<void> {
+  const cookieStore = await cookies()
+  cookieStore.delete(TENANT_CTX_COOKIE)
+}
+
 /** Usuário sem SaasMembro e sem onboarding concluído → hub /onboarding. */
 export async function usuarioPrecisaOnboarding(userId: string): Promise<boolean> {
   const [membroCount, perfil] = await Promise.all([
