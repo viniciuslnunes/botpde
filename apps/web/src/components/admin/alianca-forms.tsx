@@ -26,6 +26,7 @@ interface TenantOption {
   id: string
   nome: string
   slug: string
+  afiliacaoId: string | null
   afiliacao: {
     nome: string
     apelido: string | null
@@ -36,6 +37,7 @@ interface TenantOption {
 
 interface AliancaFormsProps {
   tenantId: string
+  afiliacaoId: string | null
   aliancas: AliancaListItem[]
   recomendacoes: RecomendacaoAliancaListItem[]
   tenants: TenantOption[]
@@ -69,6 +71,16 @@ function confiancaLabel(confianca: RecomendacaoAliancaListItem['confianca']): st
   return 'Baixa confiança'
 }
 
+function tipoBadge(item: RecomendacaoAliancaListItem): { label: string; className: string } {
+  if (item.tipo === 'CO_IRMA') {
+    return {
+      label: 'Co-irmã',
+      className: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+    }
+  }
+  return { label: confiancaLabel(item.confianca), className: confiancaClass(item.confianca) }
+}
+
 function afiliacaoLabel(tenant: TenantOption): string | null {
   const af = tenant.afiliacao
   if (!af) return null
@@ -82,7 +94,13 @@ function scrollToSection(id: SectionId): void {
   el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: AliancaFormsProps) {
+export function AliancaForms({
+  tenantId,
+  afiliacaoId,
+  aliancas,
+  recomendacoes,
+  tenants,
+}: AliancaFormsProps) {
   const [pending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
@@ -105,6 +123,8 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
     if (!searchNeedle) return []
     const filtered = tenants.filter((item: TenantOption) => {
       if (blockedTenantIds.has(item.id)) return false
+      // Co-irmãs (mesmo time) não entram na busca de aliança formal.
+      if (afiliacaoId && item.afiliacaoId === afiliacaoId) return false
       const af = item.afiliacao
       const haystack = [
         item.slug,
@@ -120,7 +140,7 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
       return haystack.includes(searchNeedle)
     })
     return filtered.slice(0, 7)
-  }, [blockedTenantIds, searchNeedle, tenants])
+  }, [afiliacaoId, blockedTenantIds, searchNeedle, tenants])
 
   const pendentesRecebidas = aliancas.filter(
     (item: AliancaListItem) => item.status === 'PENDENTE' && item.tenantAliadoId === tenantId,
@@ -130,7 +150,10 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
   )
   const ativas = aliancas.filter((item: AliancaListItem) => item.status === 'ATIVA')
   const encerradas = aliancas.filter((item: AliancaListItem) => item.status === 'ENCERRADA')
-  const recomendacoesAlta = recomendacoes.filter((r: RecomendacaoAliancaListItem) => r.confianca === 'ALTA')
+  const recomendacoesAlta = recomendacoes.filter(
+    (r: RecomendacaoAliancaListItem) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
+  )
+  const recomendacoesCoIrma = recomendacoes.filter((r: RecomendacaoAliancaListItem) => r.tipo === 'CO_IRMA')
 
   function mostrarErro(error: unknown, fallback: string): void {
     setSucesso(null)
@@ -300,6 +323,12 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
     { id: 'ativas', label: 'Ativas', count: ativas.length },
     {
       id: 'recomendacoes',
+      label: 'Co-irmãs',
+      count: recomendacoesCoIrma.length,
+      highlight: recomendacoesCoIrma.length > 0,
+    },
+    {
+      id: 'recomendacoes',
       label: 'Sugestões altas',
       count: recomendacoesAlta.length,
       highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
@@ -324,7 +353,7 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
       <div className="flex flex-wrap gap-2">
         {summaryChips.map((chip) => (
           <button
-            key={chip.id}
+            key={`${chip.id}-${chip.label}`}
             type="button"
             onClick={() => scrollToSection(chip.id)}
             className={[
@@ -347,7 +376,8 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
             Recomendações ({recomendacoes.length})
           </h2>
           <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Sugestões da base de conhecimento. Alta confiança pode virar proposta em um clique.
+            Co-irmãs (mesmo time, alta confiança) e aliadas de bloco. Só aliança entre times
+            distintos vira proposta — PDEs/subsedes herdam o vínculo da sede.
           </p>
         </div>
         {recomendacoes.length === 0 ? (
@@ -373,14 +403,18 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
                     </p>
                     <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
                   </div>
-                  <span className={['rounded-full px-2 py-1 text-xs font-semibold', confiancaClass(item.confianca)].join(' ')}>
-                    {confiancaLabel(item.confianca)}
+                  <span className={['rounded-full px-2 py-1 text-xs font-semibold', tipoBadge(item).className].join(' ')}>
+                    {tipoBadge(item).label}
                   </span>
                 </div>
                 {item.observacao && (
                   <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
                 )}
-                {item.podePropor ? (
+                {item.tipo === 'CO_IRMA' ? (
+                  <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                    Relação de co-irmã (mesmo time) — não se propõe aliança formal.
+                  </p>
+                ) : item.podePropor ? (
                   <div className="mt-3">
                     <button
                       type="button"

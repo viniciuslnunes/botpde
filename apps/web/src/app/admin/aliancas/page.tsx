@@ -13,6 +13,7 @@ interface TenantOption {
   id: string
   nome: string
   slug: string
+  afiliacaoId: string | null
   afiliacao: {
     nome: string
     apelido: string | null
@@ -41,6 +42,7 @@ export default async function AdminAliancasPage() {
         id: true,
         nome: true,
         slug: true,
+        afiliacaoId: true,
         afiliacao: {
           select: { nome: true, apelido: true, cidade: true, estado: true },
         },
@@ -56,7 +58,7 @@ export default async function AdminAliancasPage() {
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Alianças</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Parcerias entre torcidas, propostas e recomendações da base de conhecimento.
+              Co-irmãs do mesmo time, alianças entre blocos e herança para PDEs/subsedes.
             </p>
           </div>
         </div>
@@ -66,6 +68,7 @@ export default async function AdminAliancasPage() {
         <div className="app-container">
           <AliancaForms
             tenantId={authz.tenant.id}
+            afiliacaoId={authz.tenant.afiliacaoId ?? null}
             aliancas={aliancas}
             recomendacoes={recomendacoes}
             tenants={tenants}

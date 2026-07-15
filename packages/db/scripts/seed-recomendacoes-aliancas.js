@@ -7,23 +7,34 @@
  * Nunca grava rivais. Mapeia tenantSugeridoId quando o aliado já existe no SaaS.
  */
 import { PrismaClient } from '@prisma/client'
-import { RECOMENDACOES_ALIANCAS } from '../src/data/recomendacoes-aliancas.js'
+import {
+  RECOMENDACOES_ALIANCAS,
+  TORCIDAS_PRINCIPAIS,
+  resumoRecomendacoes,
+} from '../src/data/recomendacoes-aliancas.js'
 
 const db = new PrismaClient()
+
+/**
+ * @param {import('@prisma/client').PrismaClient} client
+ * @param {string[]} slugs
+ */
+async function findTenantBySlugs(client, slugs) {
+  const unique = [...new Set(slugs.map((s) => s.trim()).filter(Boolean))]
+  if (unique.length === 0) return null
+  return client.tenant.findFirst({
+    where: { ativo: true, slug: { in: unique } },
+    select: { id: true, nome: true, slug: true },
+  })
+}
 
 /**
  * @param {import('@prisma/client').PrismaClient} client
  * @param {{ slugsSugeridos?: string[], nomesAlternativos?: string[], nomeSugerido: string }} item
  */
 async function resolverTenantSugerido(client, item) {
-  const slugs = item.slugsSugeridos ?? []
-  if (slugs.length > 0) {
-    const bySlug = await client.tenant.findFirst({
-      where: { ativo: true, slug: { in: slugs } },
-      select: { id: true, nome: true, slug: true },
-    })
-    if (bySlug) return bySlug
-  }
+  const bySlug = await findTenantBySlugs(client, item.slugsSugeridos ?? [])
+  if (bySlug) return bySlug
 
   const nomes = [item.nomeSugerido, ...(item.nomesAlternativos ?? [])]
   const uniqueNomes = [...new Set(nomes.map((n) => n.trim()).filter(Boolean))]
@@ -41,8 +52,30 @@ async function resolverTenantSugerido(client, item) {
   return byNome
 }
 
+/**
+ * Resolve o tenant que recebe a recomendação (slug principal ou alternativos do registro).
+ * @param {import('@prisma/client').PrismaClient} client
+ * @param {string} tenantSlug
+ */
+async function resolverTenantOrigem(client, tenantSlug) {
+  const direct = await client.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, nome: true, slug: true },
+  })
+  if (direct) return direct
+
+  const ref = Object.values(TORCIDAS_PRINCIPAIS).find((t) => t.slug === tenantSlug)
+  if (!ref) return null
+  return findTenantBySlugs(client, [ref.slug, ...(ref.slugs ?? [])])
+}
+
 async function main() {
-  console.log('Seed de recomendações de aliança...\n')
+  const resumo = resumoRecomendacoes()
+  console.log(
+    `Seed de recomendações de aliança (${resumo.torcidasNoCorte} torcidas no corte, ` +
+      `${resumo.recomendacoes} edges bidirecionais: ` +
+      `${resumo.porConfianca.ALTA} ALTA / ${resumo.porConfianca.MEDIA} MEDIA / ${resumo.porConfianca.BAIXA} BAIXA)...\n`,
+  )
 
   /** @type {Map<string, { id: string, nome: string, slug: string }>} */
   const tenantsBySlug = new Map()
@@ -55,10 +88,7 @@ async function main() {
   for (const item of RECOMENDACOES_ALIANCAS) {
     let tenant = tenantsBySlug.get(item.tenantSlug)
     if (!tenant) {
-      const found = await db.tenant.findUnique({
-        where: { slug: item.tenantSlug },
-        select: { id: true, nome: true, slug: true },
-      })
+      const found = await resolverTenantOrigem(db, item.tenantSlug)
       if (!found) {
         console.warn(`  · tenant "${item.tenantSlug}" não encontrado — pulando ${item.nomeSugerido}`)
         puladas += 1

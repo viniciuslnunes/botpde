@@ -82,6 +82,9 @@ export async function listAliancasForTenant(tenantId: string): Promise<AliancaLi
   return aliancas
 }
 
+/** ALIADA = bloco/bilateral entre times distintos; CO_IRMA = mesma afiliação. */
+export type RecomendacaoTipo = 'ALIADA' | 'CO_IRMA'
+
 export interface RecomendacaoAliancaListItem {
   id: string
   tenantId: string
@@ -93,7 +96,8 @@ export interface RecomendacaoAliancaListItem {
   fonte: string
   observacao: string | null
   criadoEm: Date
-  /** Só ALTA com tenant mapeado pode virar proposta automática. */
+  tipo: RecomendacaoTipo
+  /** Só ALTA de tipo ALIADA com tenant mapeado vira proposta automática. */
   podePropor: boolean
 }
 
@@ -124,9 +128,13 @@ export function confiancaRank(confianca: ConfiancaRecomendacao): number {
   return CONFIANCA_ORDEM[confianca] ?? 99
 }
 
+function tipoRank(tipo: RecomendacaoTipo): number {
+  return tipo === 'CO_IRMA' ? 0 : 1
+}
+
 /**
  * Filtra recomendações: omite quem já tem ATIVA/PENDENTE com o tenant
- * e ordena por confiança (ALTA → MEDIA → BAIXA).
+ * e ordena co-irmãs → ALTA → MEDIA → BAIXA.
  */
 export function filterAndSortRecomendacoes(
   recomendacoes: RecomendacaoAliancaListItem[],
@@ -138,6 +146,8 @@ export function filterAndSortRecomendacoes(
       return true
     })
     .sort((a: RecomendacaoAliancaListItem, b: RecomendacaoAliancaListItem) => {
+      const tipoDiff = tipoRank(a.tipo) - tipoRank(b.tipo)
+      if (tipoDiff !== 0) return tipoDiff
       const rankDiff = confiancaRank(a.confianca) - confiancaRank(b.confianca)
       if (rankDiff !== 0) return rankDiff
       return b.criadoEm.getTime() - a.criadoEm.getTime()
@@ -148,12 +158,41 @@ function counterpartTenantId(alianca: { tenantOrigemId: string; tenantAliadoId: 
   return alianca.tenantOrigemId === tenantId ? alianca.tenantAliadoId : alianca.tenantOrigemId
 }
 
+/**
+ * Outras organizadas ativas do mesmo time (Afiliacao) — co-irmãs, não aliadas.
+ */
+export function buildCoIrmaRecomendacoes(
+  tenantId: string,
+  coirmas: Array<{ id: string; nome: string; slug: string; afiliacaoNome: string | null }>,
+  agora: Date = new Date(),
+): RecomendacaoAliancaListItem[] {
+  return coirmas.map((c) => {
+    const clube = c.afiliacaoNome ?? 'mesmo time'
+    return {
+      id: `co-irma:${tenantId}:${c.id}`,
+      tenantId,
+      tenantSugeridoId: c.id,
+      tenantSugeridoSlug: c.slug,
+      tenantSugeridoNome: c.nome,
+      nomeSugerido: c.nome,
+      confianca: 'ALTA' as const,
+      fonte: `Mesma afiliação (${clube}) — relação de co-irmã`,
+      observacao:
+        'Organizadas do mesmo time são co-irmãs, não aliadas de bloco. A aliança formal é entre torcidas de times distintos.',
+      criadoEm: agora,
+      tipo: 'CO_IRMA' as const,
+      podePropor: false,
+    }
+  })
+}
+
 export async function listRecomendacoesForTenant(
   tenantId: string,
 ): Promise<RecomendacaoAliancaListItem[]> {
-  const [recomendacoes, aliancasAtivasOuPendentes]: [
+  const [recomendacoes, aliancasAtivasOuPendentes, me]: [
     RecomendacaoAliancaRow[],
     { tenantOrigemId: string; tenantAliadoId: string }[],
+    { id: string; afiliacaoId: string | null } | null,
   ] = await Promise.all([
     db.recomendacaoAlianca.findMany({
       where: { tenantId },
@@ -175,6 +214,10 @@ export async function listRecomendacoesForTenant(
         OR: [{ tenantOrigemId: tenantId }, { tenantAliadoId: tenantId }],
       },
       select: { tenantOrigemId: true, tenantAliadoId: true },
+    }),
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, afiliacaoId: true },
     }),
   ])
 
@@ -213,27 +256,70 @@ export async function listRecomendacoesForTenant(
     }
   }
 
-  const mapped: RecomendacaoAliancaListItem[] = recomendacoes.map((item: RecomendacaoAliancaRow) => {
-    const suggested =
-      (item.tenantSugeridoId ? tenantsById.get(item.tenantSugeridoId) : null) ??
-      tenantsByNome.get(item.nomeSugerido.toLowerCase()) ??
-      null
-    const tenantSugeridoId = suggested?.id ?? item.tenantSugeridoId
-    const confianca = item.confianca
-    return {
-      id: item.id,
-      tenantId: item.tenantId,
-      tenantSugeridoId,
-      tenantSugeridoSlug: suggested?.slug ?? null,
-      tenantSugeridoNome: suggested?.nome ?? item.nomeSugerido,
-      nomeSugerido: item.nomeSugerido,
-      confianca,
-      fonte: item.fonte,
-      observacao: item.observacao,
-      criadoEm: item.criadoEm,
-      podePropor: confianca === 'ALTA' && Boolean(tenantSugeridoId),
-    }
-  })
+  /** Omitir da lista de aliadas quem é co-irmã (mesmo clube). */
+  const sameClubIds = new Set<string>()
 
-  return filterAndSortRecomendacoes(mapped, blockedTenantIds)
+  let coIrmaItems: RecomendacaoAliancaListItem[] = []
+  if (me?.afiliacaoId) {
+    const coirmas: Array<{
+      id: string
+      nome: string
+      slug: string
+      afiliacao: { nome: string } | null
+    }> = await db.tenant.findMany({
+      where: {
+        ativo: true,
+        afiliacaoId: me.afiliacaoId,
+        id: { not: tenantId },
+      },
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        afiliacao: { select: { nome: true } },
+      },
+    })
+    for (const c of coirmas) sameClubIds.add(c.id)
+    coIrmaItems = buildCoIrmaRecomendacoes(
+      tenantId,
+      coirmas.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        slug: c.slug,
+        afiliacaoNome: c.afiliacao?.nome ?? null,
+      })),
+    )
+  }
+
+  const mapped: RecomendacaoAliancaListItem[] = recomendacoes
+    .map((item: RecomendacaoAliancaRow) => {
+      const suggested =
+        (item.tenantSugeridoId ? tenantsById.get(item.tenantSugeridoId) : null) ??
+        tenantsByNome.get(item.nomeSugerido.toLowerCase()) ??
+        null
+      const tenantSugeridoId = suggested?.id ?? item.tenantSugeridoId
+      const confianca = item.confianca
+      return {
+        id: item.id,
+        tenantId: item.tenantId,
+        tenantSugeridoId,
+        tenantSugeridoSlug: suggested?.slug ?? null,
+        tenantSugeridoNome: suggested?.nome ?? item.nomeSugerido,
+        nomeSugerido: item.nomeSugerido,
+        confianca,
+        fonte: item.fonte,
+        observacao: item.observacao,
+        criadoEm: item.criadoEm,
+        tipo: 'ALIADA' as const,
+        podePropor: confianca === 'ALTA' && Boolean(tenantSugeridoId),
+      }
+    })
+    .filter((item: RecomendacaoAliancaListItem) => {
+      // Seed legado / erro: não mostrar “aliada” quem é do mesmo clube.
+      if (item.tenantSugeridoId && sameClubIds.has(item.tenantSugeridoId)) return false
+      return true
+    })
+
+  return filterAndSortRecomendacoes([...coIrmaItems, ...mapped], blockedTenantIds)
 }
