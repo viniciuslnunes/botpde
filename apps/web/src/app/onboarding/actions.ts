@@ -15,6 +15,7 @@ import {
 } from '@/lib/onboarding'
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
+import { notificarSafe } from '@/lib/notificacoes'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -592,6 +593,19 @@ export async function solicitarVinculo(
     create: { userId, onboardingConcluidoEm: new Date() },
     update: { onboardingConcluidoEm: new Date() },
   })
+
+  // Avisa o solicitante do fluxo até a aprovação — só SOCIO fica PENDENTE
+  // (TORCEDOR já nasce APROVADO, sem fila).
+  if (statusInicial === 'PENDENTE') {
+    await notificarSafe({
+      userId,
+      tenantId: tenant.id,
+      tipo: 'MEMBRO_SOLICITADO',
+      titulo: 'Solicitação de sócio enviada',
+      corpo: `Sua solicitação para ${tenant.nome} está em análise pela diretoria. Enquanto isso, você acompanha a Comunidade Nacional do clube — assim que for aprovado ou reprovado, você é avisado aqui.`,
+      link: '/portal/comunidade',
+    })
+  }
 
   // Nunca fixa cookie de torcida aqui — SOCIO recém-solicitado ainda está
   // PENDENTE e não deve acessar a comunidade da torcida, só a Comunidade

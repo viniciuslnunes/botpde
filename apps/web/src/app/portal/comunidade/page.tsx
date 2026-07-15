@@ -14,6 +14,7 @@ import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
+import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 
 const ComunidadeChatPanel = dynamic(
   () =>
@@ -45,6 +46,7 @@ export default async function ComunidadePage({
   if (!ctx) redirect('/')
 
   if (ctx.modo === 'nacional') {
+    const solicitacaoPendente = await getSolicitacaoSocioPendente(session.user.id)
     return (
       <ComunidadeNacionalShell
         afiliacao={ctx.afiliacao}
@@ -53,6 +55,7 @@ export default async function ComunidadePage({
           nome: session.user.name ?? null,
           avatarUrl: session.user.image ?? null,
         }}
+        solicitacaoPendente={solicitacaoPendente}
       />
     )
   }

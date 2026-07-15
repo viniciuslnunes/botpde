@@ -30,6 +30,8 @@ export interface AdminMembroItem {
   anosSocio?: number | null
   /** True quando o usuário já é sócio aprovado em torcida rival (sem identificá-la). */
   alertaRivalSocio?: boolean
+  /** Nº de recrutamentos de sócio reprovados em OUTRAS torcidas/clubes (sem identificar qual). */
+  reprovacoesOutraTorcida?: number
   /** Nº de solicitações (cadastro + recadastros) registradas no AuditLog. */
   tentativas?: number
   ultimoMotivoReprovacao?: string
@@ -128,6 +130,12 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                         <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                           <TriangleAlert className="h-3 w-3 shrink-0" />
                           Já é sócio aprovado em torcida rival
+                        </p>
+                      )}
+                      {!!membro.reprovacoesOutraTorcida && (
+                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
+                          <TriangleAlert className="h-3 w-3 shrink-0" />
+                          Reprovado em recrutamento de outra torcida ({membro.reprovacoesOutraTorcida}x)
                         </p>
                       )}
                       {membro.tentativas !== undefined && membro.tentativas > 1 && (

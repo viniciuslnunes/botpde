@@ -14,6 +14,7 @@ export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = [
   'COMUNICADO_URGENTE',
   'MEMBRO_APROVADO',
   'MEMBRO_REPROVADO',
+  'MEMBRO_SOLICITADO',
 ]
 
 /** Tipos operacionais do admin (alianças, denúncias…). */
