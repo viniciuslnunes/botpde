@@ -255,11 +255,15 @@ export async function solicitarSeguir(userId: string): Promise<void> {
     )
   }
 
+  // Sócio é sempre "privado" pra torcedor: sem tenant (ator é torcedor global),
+  // nunca auto-aprova, mesmo que o alvo tenha perfilPrivado=false — só o próprio
+  // sócio aprovando manualmente libera as publicações dele pro torcedor.
   const perfilSeguido = await db.perfilMembro.findUnique({
     where: { userId_tenantId: { userId, tenantId: tenantContextoId } },
     select: { perfilPrivado: true },
   })
-  const statusInicial = perfilSeguido?.perfilPrivado === false ? 'APROVADO' : 'PENDENTE'
+  const statusInicial =
+    tenant && perfilSeguido?.perfilPrivado === false ? 'APROVADO' : 'PENDENTE'
 
   await db.seguimento.upsert({
     where: { seguidorId_seguidoId: { seguidorId: session.user.id, seguidoId: userId } },
