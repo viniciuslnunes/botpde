@@ -339,6 +339,83 @@ const DEPARTAMENTO_RENAMES = [
 ]
 
 /**
+ * Move atribuições de um cargo para outro e apaga o origem.
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {string} tenantId
+ * @param {string} fromRoleId
+ * @param {string} toRoleId
+ */
+async function migrarUserRolesEDeletarRole(client, tenantId, fromRoleId, toRoleId) {
+  if (fromRoleId === toRoleId) return
+  const links = await client.userRole.findMany({
+    where: { tenantId, roleId: fromRoleId },
+    select: { id: true, userId: true },
+  })
+  for (const link of links) {
+    const jaTem = await client.userRole.findFirst({
+      where: { userId: link.userId, tenantId, roleId: toRoleId },
+      select: { id: true },
+    })
+    if (jaTem) await client.userRole.delete({ where: { id: link.id } })
+    else {
+      await client.userRole.update({
+        where: { id: link.id },
+        data: { roleId: toRoleId },
+      })
+    }
+  }
+  await client.role.delete({ where: { id: fromRoleId } })
+}
+
+/**
+ * Renomeia cargo legado ou, se o destino já existe, funde (userRoles → destino, apaga origem).
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {string} tenantId
+ * @param {string} fromNome
+ * @param {string} toNome
+ * @param {string | null} departamentoId
+ */
+async function fundirOuRenomearRole(client, tenantId, fromNome, toNome, departamentoId) {
+  const fromRoles = await client.role.findMany({
+    where: { tenantId, nome: fromNome },
+    select: { id: true },
+  })
+  if (fromRoles.length === 0) return
+
+  const toRole = await client.role.findFirst({
+    where: { tenantId, nome: toNome },
+    select: { id: true },
+  })
+
+  if (!toRole) {
+    const [primeiro, ...extras] = fromRoles
+    await client.role.update({
+      where: { id: primeiro.id },
+      data: {
+        nome: toNome,
+        ...(departamentoId ? { departamentoId } : {}),
+      },
+    })
+    for (const extra of extras) {
+      await migrarUserRolesEDeletarRole(client, tenantId, extra.id, primeiro.id)
+    }
+    return
+  }
+
+  for (const from of fromRoles) {
+    await migrarUserRolesEDeletarRole(client, tenantId, from.id, toRole.id)
+  }
+  if (departamentoId) {
+    await client.role.update({
+      where: { id: toRole.id },
+      data: { departamentoId },
+    })
+  }
+}
+
+/**
  * Upsert dos 10 departamentos canônicos no tenant. Idempotente.
  * Também remove departamentos legados socio/torcedor.
  *
@@ -357,73 +434,74 @@ export async function upsertDepartamentosCanonicos(client, tenantId) {
       where: { tenantId, slug: rename.fromSlug },
       select: { id: true },
     })
-    if (!legado) continue
-
     const destino = await client.departamento.findFirst({
       where: { tenantId, slug: toSlug },
       select: { id: true },
     })
 
-    /** @type {string} */
-    let deptoId = legado.id
-    if (destino) {
-      deptoId = destino.id
-      await client.role.updateMany({
-        where: { tenantId, departamentoId: legado.id },
-        data: { departamentoId: destino.id },
-      })
-      // Projeções — unique (user,tenant,depto); evita conflito ao reapontar
-      const membrosLegado = await client.userDepartamento.findMany({
-        where: { tenantId, departamentoId: legado.id },
-        select: { id: true, userId: true },
-      })
-      for (const m of membrosLegado) {
-        const jaTem = await client.userDepartamento.findFirst({
-          where: { userId: m.userId, tenantId, departamentoId: destino.id },
-          select: { id: true },
+    /** @type {string | null} */
+    let deptoId = destino?.id ?? legado?.id ?? null
+
+    if (legado) {
+      if (destino) {
+        deptoId = destino.id
+        await client.role.updateMany({
+          where: { tenantId, departamentoId: legado.id },
+          data: { departamentoId: destino.id },
         })
-        if (jaTem) await client.userDepartamento.delete({ where: { id: m.id } })
-        else {
-          await client.userDepartamento.update({
-            where: { id: m.id },
-            data: { departamentoId: destino.id },
-          })
-        }
-      }
-      const gestoresLegado = await client.departamentoGestor.findMany({
-        where: { departamentoId: legado.id },
-        select: { id: true, userId: true },
-      })
-      for (const g of gestoresLegado) {
-        const jaTem = await client.departamentoGestor.findFirst({
-          where: { userId: g.userId, departamentoId: destino.id },
-          select: { id: true },
+        const membrosLegado = await client.userDepartamento.findMany({
+          where: { tenantId, departamentoId: legado.id },
+          select: { id: true, userId: true },
         })
-        if (jaTem) await client.departamentoGestor.delete({ where: { id: g.id } })
-        else {
-          await client.departamentoGestor.update({
-            where: { id: g.id },
-            data: { departamentoId: destino.id },
+        for (const m of membrosLegado) {
+          const jaTem = await client.userDepartamento.findFirst({
+            where: { userId: m.userId, tenantId, departamentoId: destino.id },
+            select: { id: true },
           })
+          if (jaTem) await client.userDepartamento.delete({ where: { id: m.id } })
+          else {
+            await client.userDepartamento.update({
+              where: { id: m.id },
+              data: { departamentoId: destino.id },
+            })
+          }
         }
+        const gestoresLegado = await client.departamentoGestor.findMany({
+          where: { departamentoId: legado.id },
+          select: { id: true, userId: true },
+        })
+        for (const g of gestoresLegado) {
+          const jaTem = await client.departamentoGestor.findFirst({
+            where: { userId: g.userId, departamentoId: destino.id },
+            select: { id: true },
+          })
+          if (jaTem) await client.departamentoGestor.delete({ where: { id: g.id } })
+          else {
+            await client.departamentoGestor.update({
+              where: { id: g.id },
+              data: { departamentoId: destino.id },
+            })
+          }
+        }
+        await client.departamento.delete({ where: { id: legado.id } })
+      } else {
+        await client.departamento.update({
+          where: { id: legado.id },
+          data: { nome: rename.toNome, slug: toSlug },
+        })
+        deptoId = legado.id
       }
-      await client.departamento.delete({ where: { id: legado.id } })
-    } else {
-      await client.departamento.update({
-        where: { id: legado.id },
-        data: { nome: rename.toNome, slug: toSlug },
-      })
     }
 
+    // Sempre funde nomes de perfil legado (também após falha parcial do seed)
     for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
-      await client.role.updateMany({
-        where: {
-          tenantId,
-          departamentoId: deptoId,
-          nome: nomePerfilDepartamento(rename.fromNome, papel),
-        },
-        data: { nome: nomePerfilDepartamento(rename.toNome, papel) },
-      })
+      await fundirOuRenomearRole(
+        client,
+        tenantId,
+        nomePerfilDepartamento(rename.fromNome, papel),
+        nomePerfilDepartamento(rename.toNome, papel),
+        deptoId,
+      )
     }
   }
 

@@ -42,24 +42,33 @@ async function main() {
 
   let i = 0
   let removedLegacy = 0
+  let falhas = 0
   for (const tenant of tenants) {
-    const result = await upsertDepartamentosCanonicos(db, tenant.id)
-    const sede = await db.sede.findFirst({
-      where: { tenantId: tenant.id, tipo: 'SEDE' },
-      select: { tipo: true },
-    })
-    const perfis = await upsertPerfisDepartamentoCanonicos(db, tenant.id, {
-      incluirVice: sede?.tipo === 'SEDE',
-    })
-    removedLegacy += result.removedLegacy
-    i += 1
-    if (verbose) {
-      console.log(`  ✓ ${result.upserted} departamentos sincronizados`)
-      console.log(`  ✓ ${perfis.perfisArea} perfis de área · ${perfis.systemUpserted} sistema`)
-      if (result.removedLegacy > 0) {
-        console.log(`  · removidos ${result.removedLegacy} legado(s) socio/torcedor`)
+    try {
+      const result = await upsertDepartamentosCanonicos(db, tenant.id)
+      const sede = await db.sede.findFirst({
+        where: { tenantId: tenant.id, tipo: 'SEDE' },
+        select: { tipo: true },
+      })
+      const perfis = await upsertPerfisDepartamentoCanonicos(db, tenant.id, {
+        incluirVice: sede?.tipo === 'SEDE',
+      })
+      removedLegacy += result.removedLegacy
+      if (verbose) {
+        console.log(`  ✓ ${result.upserted} departamentos sincronizados`)
+        console.log(`  ✓ ${perfis.perfisArea} perfis de área · ${perfis.systemUpserted} sistema`)
+        if (result.removedLegacy > 0) {
+          console.log(`  · removidos ${result.removedLegacy} legado(s) socio/torcedor`)
+        }
       }
-    } else if (i % 50 === 0 || i === tenants.length) {
+    } catch (error) {
+      falhas += 1
+      const msg = error instanceof Error ? error.message : String(error)
+      console.error(`  ✗ ${tenant.slug}: ${msg}`)
+      if (verbose) throw error
+    }
+    i += 1
+    if (!verbose && (i % 50 === 0 || i === tenants.length)) {
       console.log(`  … ${i}/${tenants.length}`)
     }
   }
@@ -67,8 +76,10 @@ async function main() {
   console.log(
     `\n10 departamentos × ${tenants.length} tenant(s) sincronizados` +
       (removedLegacy > 0 ? ` (${removedLegacy} legado(s) removidos)` : '') +
+      (falhas > 0 ? ` — ${falhas} falha(s)` : '') +
       '.',
   )
+  if (falhas > 0) process.exitCode = 1
 }
 
 main()
