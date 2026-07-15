@@ -2,13 +2,11 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, Palette, MessageSquare, Shield, Users2, Flag } from 'lucide-react'
+import { Settings, Palette, MessageSquare, Flag } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   AfiliacaoForm,
-  RolesManager,
-  DepartamentosManager,
 } from '@/components/admin/config-forms'
 import type { Metadata } from 'next'
 
@@ -18,45 +16,15 @@ export default async function ConfiguracoesPage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!tenant || !session?.user?.id) redirect('/')
 
-  // Quantos usuários usam cada cargo — controla o botão de excluir na UI
-  interface UsoPorRole {
-    roleId: string
-    _count: { roleId: number }
-  }
-  const usoPorRole: UsoPorRole[] = await db.userRole.groupBy({
-    by: ['roleId'],
-    where: { tenantId: tenant.id },
-    _count: { roleId: true },
-  })
-  const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
-
-  // Tipo da Sede do tenant — contextualiza rótulos de cargos de sistema
-  // (Presidente na Sede principal, Liderança em subsedes/PDEs).
-  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id, tipo: 'SEDE' },
-    select: { tipo: true },
-  })
-  const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
-
   interface AfiliacaoOption {
     id: string
     nome: string
   }
 
-  const [rolesRaw, departamentos, isOwner, afiliacoes]: [
-    Awaited<ReturnType<typeof db.role.findMany>>,
-    Awaited<ReturnType<typeof db.departamento.findMany>>,
+  const [isOwner, afiliacoes]: [
     Awaited<ReturnType<typeof db.userRole.findFirst>>,
     AfiliacaoOption[],
   ] = await Promise.all([
-    db.role.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
-    }),
-    db.departamento.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    }),
     db.userRole.findFirst({
       where: {
         userId: session.user.id,
@@ -69,11 +37,6 @@ export default async function ConfiguracoesPage() {
       select: { id: true, nome: true },
     }),
   ])
-
-  const roles = rolesRaw.map((role: (typeof rolesRaw)[number]) => ({
-    ...role,
-    emUso: usoMap.get(role.id) ?? 0,
-  }))
 
   const sections = [
     {
@@ -97,27 +60,10 @@ export default async function ConfiguracoesPage() {
       description: 'Defina qual time a torcida apoia para contexto global de notícias',
       ownerOnly: true,
     },
-    {
-      id: 'cargos',
-      icon: Shield,
-      title: 'Cargos (papéis transversais)',
-      description:
-        'Templates de perfil — Presidente, Vice, Admin, Membro e cargos customizados. Atribua depois em Controle de acesso.',
-      ownerOnly: false,
-    },
-    {
-      id: 'departamentos',
-      icon: Users2,
-      title: 'Departamentos (áreas)',
-      description:
-        'Templates de área com colaborador (membro) e gestor. Atribua depois em Controle de acesso.',
-      ownerOnly: false,
-    },
   ]
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Cabeçalho */}
+    <div className="flex h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
         <div className="app-container flex items-center gap-3">
           <Settings className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
@@ -130,7 +76,6 @@ export default async function ConfiguracoesPage() {
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
-
           {sections.map((section) => {
             const Icon = section.icon
             const blocked = section.ownerOnly && !isOwner
@@ -141,21 +86,17 @@ export default async function ConfiguracoesPage() {
                 id={section.id}
                 className={[
                   'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))] scroll-mt-6',
-                  blocked
-                    ? 'border-[rgb(var(--border))] opacity-60'
-                    : 'border-[rgb(var(--border))]',
+                  'border-[rgb(var(--border))]',
+                  blocked ? 'opacity-60' : '',
                 ].join(' ')}
               >
-                {/* Cabeçalho da seção */}
                 <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--surface))] border border-[rgb(var(--border))]">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
                     <Icon className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-[rgb(var(--foreground))]">
-                        {section.title}
-                      </h2>
+                      <h2 className="font-semibold text-[rgb(var(--foreground))]">{section.title}</h2>
                       {section.ownerOnly && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                           Somente owner
@@ -168,33 +109,24 @@ export default async function ConfiguracoesPage() {
                   </div>
                 </div>
 
-                {/* Conteúdo */}
                 <div className="px-6 py-5">
                   {blocked ? (
                     <p className="text-sm text-[rgb(var(--foreground-muted))]">
                       Apenas o owner da torcida pode alterar esta configuração.
                     </p>
                   ) : section.id === 'perfil' ? (
-                    <PerfilTenantForm
-                      nome={tenant.nome}
-                      corPrimaria={tenant.corPrimaria}
-                    />
+                    <PerfilTenantForm nome={tenant.nome} corPrimaria={tenant.corPrimaria} />
                   ) : section.id === 'discord' ? (
                     <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
                   ) : section.id === 'afiliacao' ? (
                     <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
-                  ) : section.id === 'cargos' ? (
-                    <RolesManager roles={roles} tipoSede={tipoSede} />
-                  ) : section.id === 'departamentos' ? (
-                    <DepartamentosManager departamentos={departamentos} />
                   ) : null}
                 </div>
               </div>
             )
           })}
 
-          {/* Info de plano */}
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
             <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
                 <Settings className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
@@ -213,15 +145,15 @@ export default async function ConfiguracoesPage() {
                     {tenant.plano === 'FREE'
                       ? 'Gratuito'
                       : tenant.plano === 'BASIC'
-                      ? 'Básico'
-                      : 'Premium'}
+                        ? 'Básico'
+                        : 'Premium'}
                   </p>
                   <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
                     {tenant.plano === 'FREE'
                       ? 'Recursos limitados — faça upgrade para desbloquear tudo'
                       : tenant.plano === 'BASIC'
-                      ? 'Acesso a recursos essenciais'
-                      : 'Acesso completo a todos os recursos'}
+                        ? 'Acesso a recursos essenciais'
+                        : 'Acesso completo a todos os recursos'}
                   </p>
                 </div>
                 <span
@@ -230,8 +162,8 @@ export default async function ConfiguracoesPage() {
                     tenant.plano === 'FREE'
                       ? 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]'
                       : tenant.plano === 'BASIC'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      : 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200',
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200',
                   ].join(' ')}
                 >
                   {tenant.plano}
@@ -239,7 +171,6 @@ export default async function ConfiguracoesPage() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

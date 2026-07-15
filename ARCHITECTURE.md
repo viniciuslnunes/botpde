@@ -212,9 +212,8 @@ flowchart LR
 membros **daquele** departamento (`adicionarMembroDepartamento` /
 `removerMembroDepartamento` em `/admin/acessos/actions`).
 
-**UI**: templates em `/admin/configuracoes` (`#cargos`, `#departamentos` —
-CRUD independente de usuários); atribuição em `/admin/acessos` (membro/gestor
-por departamento, matriz com origem). **Sem** FK `Role ↔ Departamento` — os
+**UI**: `/admin/acessos` com três seções — **Pessoas** (atribuição), **Cargos**
+e **Departamentos** (CRUD de templates). **Sem** FK `Role ↔ Departamento` — os
 eixos somam no usuário. Bootstrap de tenant semeia os 10 deptos canônicos
 (`upsertDepartamentosCanonicos`). Hub portal: `/portal/departamentos`.
 

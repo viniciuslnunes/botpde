@@ -1,8 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, Eye } from 'lucide-react'
+import Link from 'next/link'
+import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
 import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema, isDepartamentoCanonico } from '@torcida/types'
+import { AccessPermissionPreview } from '@/components/admin/access-permission-preview'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
@@ -306,13 +308,6 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        Cargos são papéis transversais (Presidente, Recrutador…). A atribuição a pessoas fica em{' '}
-        <a href="/admin/acessos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
-          Controle de acesso
-        </a>
-        .
-      </p>
       {erro && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           {erro}
@@ -426,61 +421,96 @@ function RoleRow({
   onDelete: () => void
   pending: boolean
 }) {
+  const [aberto, setAberto] = useState(false)
   const emUso = role.emUso ?? 0
   const podeExcluir = !role.isSystem && emUso === 0
+  const nomeExibicao = role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
+  const resumoPerms = role.permissions.includes('*')
+    ? 'Todas as permissões'
+    : role.permissions.length === 0
+      ? 'Sem permissões'
+      : `${role.permissions.length} permiss${role.permissions.length === 1 ? 'ão' : 'ões'}`
 
   return (
     <div
       className={[
-        'flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 transition-opacity',
+        'rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-opacity',
         disabled ? 'opacity-50' : '',
       ].join(' ')}
     >
-      {/* Cor */}
-      <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: role.cor }} />
+      <div className="flex items-start gap-3 px-4 py-3">
+        <div
+          className="mt-1 h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]"
+          style={{ backgroundColor: role.cor }}
+        />
 
-      {/* Nome + badges */}
-      <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
-        <span className="font-medium text-[rgb(var(--foreground))]">
-          {role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome}
-        </span>
-        {role.isSystem && (
-          <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            <Shield className="h-3 w-3" /> Sistema
-          </span>
-        )}
-        <span className="text-xs text-[rgb(var(--foreground-muted))]">
-          {role.permissions.length === 0
-            ? 'Sem permissões'
-            : role.permissions.includes('*')
-              ? 'Todas as permissões'
-              : `${role.permissions.length} permiss${role.permissions.length === 1 ? 'ão' : 'ões'}`}
-        </span>
-        {emUso > 0 && (
-          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-            {emUso} usuário{emUso === 1 ? '' : 's'}
-          </span>
-        )}
-      </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[rgb(var(--foreground))]">{nomeExibicao}</span>
+            {role.isSystem && (
+              <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                <Shield className="h-3 w-3" /> Sistema
+              </span>
+            )}
+            {emUso > 0 && (
+              <Link
+                href="/admin/acessos?secao=pessoas"
+                className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+              >
+                {emUso} pessoa{emUso === 1 ? '' : 's'}
+              </Link>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{resumoPerms}</p>
+        </div>
 
-      {/* Ações */}
-      {!role.isSystem && (
         <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={onEdit}
-            disabled={pending || disabled}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:pointer-events-none"
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            title={aberto ? 'Ocultar permissões' : 'Ver permissões'}
+            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            Ver
+            <ChevronDown className={['h-3.5 w-3.5 transition-transform', aberto ? 'rotate-180' : ''].join(' ')} />
           </button>
-          <button
-            onClick={onDelete}
-            disabled={pending || disabled || !podeExcluir}
-            title={podeExcluir ? 'Excluir cargo' : 'Cargo em uso — remova-o dos usuários primeiro'}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-red-950 dark:hover:text-red-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {!role.isSystem && (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={pending || disabled}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:pointer-events-none"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={pending || disabled || !podeExcluir}
+                title={podeExcluir ? 'Excluir cargo' : 'Cargo em uso — remova-o das pessoas primeiro'}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-red-950 dark:hover:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {aberto && (
+        <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.5)] px-4 py-3">
+          <AccessPermissionPreview permissions={role.permissions} />
+          {role.isSystem && (
+            <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+              Cargo de sistema — permissões fixas. Atribua em{' '}
+              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+                Pessoas
+              </Link>
+              .
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -730,13 +760,6 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        Departamentos são áreas com colaborador (membro) e gestor. A atribuição a pessoas fica em{' '}
-        <a href="/admin/acessos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
-          Controle de acesso
-        </a>
-        .
-      </p>
       <div className="space-y-2">
         {departamentos.map((departamento) =>
           editandoId === departamento.id ? (
@@ -809,47 +832,105 @@ function DepartamentoRow({
   onDelete: () => void
   pending: boolean
 }) {
+  const [aberto, setAberto] = useState(false)
   const organizacional =
     departamento.permissions.length === 0 && departamento.permissionsGestor.length === 0
   const canonico = isDepartamentoCanonico(departamento.slug)
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-      <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: departamento.cor }} />
-      <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
-        <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
-        {canonico && (
-          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-            Padrão
-          </span>
-        )}
-        <span className="text-xs text-[rgb(var(--foreground-muted))]">
-          {organizacional
-            ? 'Organizacional — não concede acesso'
-            : `membro ${departamento.permissions.length} · gestor+ ${departamento.permissionsGestor.length}`}
-        </span>
-        {departamento.moduloPortal && (
-          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
-            {moduloPortalLabel(departamento.moduloPortal)}
-          </span>
-        )}
+    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+      <div className="flex items-start gap-3 px-4 py-3">
+        <div
+          className="mt-1 h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]"
+          style={{ backgroundColor: departamento.cor }}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
+            {canonico && (
+              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                Padrão
+              </span>
+            )}
+            {departamento.moduloPortal && (
+              <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                {moduloPortalLabel(departamento.moduloPortal)}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+            {organizacional
+              ? 'Organizacional — não concede acesso'
+              : `Colaborador: ${departamento.permissions.length} · Gestor+: ${departamento.permissionsGestor.length}`}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            title={aberto ? 'Ocultar permissões' : 'Ver permissões'}
+            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          >
+            Ver
+            <ChevronDown className={['h-3.5 w-3.5 transition-transform', aberto ? 'rotate-180' : ''].join(' ')} />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={pending}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pending}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          onClick={onEdit}
-          disabled={pending}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={pending}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+
+      {aberto && (
+        <div className="space-y-4 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.5)] px-4 py-3">
+          {organizacional ? (
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Este departamento só organiza pessoas — não adiciona permissões. Atribua em{' '}
+              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+                Pessoas
+              </Link>
+              .
+            </p>
+          ) : (
+            <>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-[rgb(var(--foreground))]">Colaborador (membro)</p>
+                <AccessPermissionPreview
+                  permissions={departamento.permissions}
+                  emptyLabel="Sem permissões de colaborador"
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-[rgb(var(--foreground))]">A mais para o gestor</p>
+                <AccessPermissionPreview
+                  permissions={departamento.permissionsGestor}
+                  emptyLabel="Sem permissões extras de gestão"
+                />
+              </div>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                Atribua membro/gestor em{' '}
+                <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+                  Pessoas
+                </Link>
+                .
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -66,18 +66,18 @@ export function AccessManager({ usuarios, roles, departamentos, tipoSede }: Acce
           Nenhum usuário nesta torcida ainda
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
-          Defina primeiro os cargos e departamentos em Configurações. Depois, quando houver
-          membros, atribua os padrões a cada pessoa aqui.
+          Defina cargos e departamentos nas abas ao lado. Quando houver membros, volte aqui para
+          atribuir o acesso de cada pessoa.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           <Link
-            href="/admin/configuracoes#cargos"
+            href="/admin/acessos?secao=cargos"
             className="inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
             Gerenciar cargos
           </Link>
           <Link
-            href="/admin/configuracoes#departamentos"
+            href="/admin/acessos?secao=departamentos"
             className="inline-flex items-center rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
             Gerenciar departamentos

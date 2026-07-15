@@ -6,20 +6,20 @@
 
 ## Fluxo recomendado: templates → atribuição
 
-Há **dois eixos** (sem vínculo FK entre cargo e departamento):
+Há **três seções** no mesmo painel `/admin/acessos` (sem vínculo FK entre cargo e departamento):
 
-| Tela | Função |
+| Seção | Função |
 |------|--------|
-| `/admin/configuracoes` → Cargos e Departamentos | CRUD de **templates** (perfis e áreas) — independe de haver usuários |
-| `/admin/acessos` | Só **atribuição a pessoas** — cargos e departamentos já definidos |
+| **Cargos** (`?secao=cargos`) | CRUD de papéis transversais (Presidente, Recrutador…) |
+| **Departamentos** (`?secao=departamentos`) | CRUD de áreas com colaborador e gestor |
+| **Pessoas** (`?secao=pessoas`) | Atribuição de cargos e departamentos a cada usuário |
 
 Ordem sugerida:
 
-1. Em **Configurações**, revise ou ajuste os cargos (papéis transversais) e os
-   departamentos (áreas com colaborador e gestor). Novos tenants já nascem com
-   roles de sistema + 10 departamentos canônicos.
-2. Em **Controle de acesso**, quando houver membros, atribua cargo(s) e
-   departamento(s) a cada pessoa (membro e/ou gestor da área).
+1. Em **Cargos** / **Departamentos**, revise ou ajuste os templates. Novos tenants
+   já nascem com roles de sistema + 10 departamentos canônicos.
+2. Em **Pessoas**, quando houver membros, atribua cargo(s) e departamento(s)
+   (membro e/ou gestor da área).
 
 **Não** existe tabela `Role ↔ Departamento`. Os eixos **somam no usuário**:
 efetivas = ∪ perfis ∪ permissões dos deptos onde é membro/gestor ± overrides.
@@ -70,8 +70,8 @@ Promoção Subsede→Tenant continua script manual
 - Modelo: `Departamento { permissions, permissionsGestor, slug, moduloPortal }`
 - Vocabulário: `permissions.js` — `canManageDepartamento`, `DEPARTAMENTO_MODULO_ROTA`,
   `DEPARTAMENTO_MODULO_ADMIN_ROTA`, `isDepartamentoCanonico`
-- Admin CRUD (templates): `/admin/configuracoes#cargos` e `#departamentos`
-- Admin atribuição: `/admin/acessos` — estados **Membro** / **Gestor** + origem na matriz
+- Admin CRUD (templates): `/admin/acessos?secao=cargos` e `?secao=departamentos`
+- Admin atribuição: `/admin/acessos?secao=pessoas` — estados **Membro** / **Gestor** + origem na matriz
 - Staffing do gestor: `adicionarMembroDepartamento` / `removerMembroDepartamento`
 - Portal hub: `/portal/departamentos` — Abrir módulo / Só organização / Administrar→rota admin
 - Bootstrap: setup de tenant + `seed.js` + scripts de provisionamento chamam
@@ -85,7 +85,7 @@ Promoção Subsede→Tenant continua script manual
 4. Visão da torcida = worktree de Sede (Caso A) + Tenants filhos (Caso B).
 5. Uma torcida = um Presidente; Vice só na Sede.
 6. Diretoria/Patrimônio podem ter `permissions: []` (organizacional / stub).
-7. Sem FK perfil↔departamento — templates em Configurações; atribuição em Acessos.
+7. Sem FK perfil↔departamento — templates e atribuição ficam em Controle de acesso (3 seções).
 
 ## Planejado (ainda não implementado)
 
