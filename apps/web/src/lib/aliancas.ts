@@ -325,18 +325,18 @@ export async function listRecomendacoesForTenant(
   if (me?.afiliacaoId) {
     const coirmas: Array<TenantLogoRow & { afiliacao: { nome: string } | null }> =
       await db.tenant.findMany({
-      where: {
-        ativo: true,
-        sintetico: false,
-        afiliacaoId: me.afiliacaoId,
-        id: { not: tenantId },
-      },
-      orderBy: { nome: 'asc' },
-      select: {
-        ...TENANT_LITE_SELECT,
-        afiliacao: { select: { nome: true } },
-      },
-    })
+        where: {
+          ativo: true,
+          sintetico: false,
+          afiliacaoId: me.afiliacaoId,
+          id: { not: tenantId },
+        },
+        orderBy: { nome: 'asc' },
+        select: {
+          ...TENANT_LITE_SELECT,
+          afiliacao: { select: { nome: true } },
+        },
+      })
     for (const c of coirmas) sameClubIds.add(c.id)
     coIrmaItems = buildCoIrmaRecomendacoes(
       tenantId,

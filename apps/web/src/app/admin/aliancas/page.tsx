@@ -29,7 +29,24 @@ export default async function AdminAliancasPage() {
     redirect('/admin')
   }
 
-  const [aliancas, recomendacoes, tenants] = await Promise.all([
+  const [aliancas, recomendacoes, tenantsRaw]: [
+    Awaited<ReturnType<typeof listAliancasForTenant>>,
+    Awaited<ReturnType<typeof listRecomendacoesForTenant>>,
+    Array<{
+      id: string
+      nome: string
+      slug: string
+      logoUrl: string | null
+      afiliacaoId: string | null
+      torcidaConhecida: { logoUrl: string | null } | null
+      afiliacao: {
+        nome: string
+        apelido: string | null
+        cidade: string | null
+        estado: string | null
+      } | null
+    }>,
+  ] = await Promise.all([
     listAliancasForTenant(authz.tenant.id),
     listRecomendacoesForTenant(authz.tenant.id),
     db.tenant.findMany({
@@ -49,7 +66,7 @@ export default async function AdminAliancasPage() {
     }),
   ])
 
-  const tenantOptions: TenantOption[] = tenants.map((t) => ({
+  const tenantOptions: TenantOption[] = tenantsRaw.map((t) => ({
     id: t.id,
     nome: t.nome,
     slug: t.slug,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
+import Image from 'next/image'
 import {
   Check,
   Handshake,
@@ -24,12 +25,14 @@ import {
 } from '@/app/admin/aliancas/actions'
 import type { AliancaListItem, RecomendacaoAliancaListItem } from '@/lib/aliancas'
 import { formatDateTimeShort } from '@/lib/format-datetime'
+import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
 
 interface TenantOption {
   id: string
   nome: string
   slug: string
+  logoUrl: string | null
   afiliacaoId: string | null
   afiliacao: {
     nome: string
@@ -48,6 +51,38 @@ interface AliancaFormsProps {
 }
 
 type TabId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'propor' | 'historico'
+
+function TorcidaThumb({ nome, logoUrl }: { nome: string; logoUrl: string | null }) {
+  const className =
+    'h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] object-cover'
+
+  if (logoUrl) {
+    if (canOptimizeImageUrl(logoUrl)) {
+      return (
+        <Image
+          src={logoUrl}
+          alt=""
+          width={36}
+          height={36}
+          className={className}
+        />
+      )
+    }
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} alt="" className={className} loading="lazy" decoding="async" />
+    )
+  }
+
+  return (
+    <div
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-xs font-bold text-[rgb(var(--foreground-muted))]"
+      aria-hidden="true"
+    >
+      {(nome.charAt(0) || '?').toUpperCase()}
+    </div>
+  )
+}
 
 function statusLabel(status: AliancaListItem['status']): string {
   if (status === 'ATIVA') return 'Ativa'
@@ -252,14 +287,17 @@ export function AliancaForms({
         className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="font-medium text-[rgb(var(--foreground))]">{counterpart.nome}</p>
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">@{counterpart.slug}</p>
-            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-              {item.status === 'ATIVA' && item.confirmadaEm
-                ? `Ativa desde ${formatDateTimeShort(item.confirmadaEm)}`
-                : `Proposta por ${proponente} · ${formatDateTimeShort(item.criadoEm)}`}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <TorcidaThumb nome={counterpart.nome} logoUrl={counterpart.logoUrl} />
+            <div className="min-w-0">
+              <p className="font-medium text-[rgb(var(--foreground))]">{counterpart.nome}</p>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">@{counterpart.slug}</p>
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                {item.status === 'ATIVA' && item.confirmadaEm
+                  ? `Ativa desde ${formatDateTimeShort(item.confirmadaEm)}`
+                  : `Proposta por ${proponente} · ${formatDateTimeShort(item.criadoEm)}`}
+              </p>
+            </div>
           </div>
           <span className={['rounded-full px-2 py-1 text-xs font-semibold', statusClass(item.status)].join(' ')}>
             {statusLabel(item.status)}
@@ -418,18 +456,24 @@ export function AliancaForms({
                     className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-[rgb(var(--foreground))]">
-                          {item.tenantSugeridoNome}
-                          {item.tenantSugeridoSlug ? (
-                            <span className="ml-2 text-xs font-normal text-[rgb(var(--foreground-muted))]">
-                              @{item.tenantSugeridoSlug}
-                            </span>
+                      <div className="flex min-w-0 items-start gap-3">
+                        <TorcidaThumb
+                          nome={item.tenantSugeridoNome}
+                          logoUrl={item.tenantSugeridoLogoUrl}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-[rgb(var(--foreground))]">
+                            {item.tenantSugeridoNome}
+                            {item.tenantSugeridoSlug ? (
+                              <span className="ml-2 text-xs font-normal text-[rgb(var(--foreground-muted))]">
+                                @{item.tenantSugeridoSlug}
+                              </span>
+                            ) : null}
+                          </p>
+                          {item.fonte ? (
+                            <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
                           ) : null}
-                        </p>
-                        {item.fonte ? (
-                          <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
-                        ) : null}
+                        </div>
                       </div>
                       <span
                         className={[
@@ -604,17 +648,20 @@ export function AliancaForms({
                         type="button"
                         onClick={() => selectTenant(item)}
                         className={[
-                          'w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                          'flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
                           selectedTenantId === item.id ? 'bg-[rgb(var(--background-subtle))]' : '',
                         ].join(' ')}
                       >
-                        <span className="font-medium text-[rgb(var(--foreground))]">{item.nome}</span>
-                        <span className="ml-2 text-[rgb(var(--foreground-muted))]">@{item.slug}</span>
-                        {afLabel ? (
-                          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
-                            {afLabel}
-                          </span>
-                        ) : null}
+                        <TorcidaThumb nome={item.nome} logoUrl={item.logoUrl} />
+                        <span className="min-w-0">
+                          <span className="font-medium text-[rgb(var(--foreground))]">{item.nome}</span>
+                          <span className="ml-2 text-[rgb(var(--foreground-muted))]">@{item.slug}</span>
+                          {afLabel ? (
+                            <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                              {afLabel}
+                            </span>
+                          ) : null}
+                        </span>
                       </button>
                     )
                   })}

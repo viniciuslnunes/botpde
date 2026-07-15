@@ -11,6 +11,7 @@ function rec(
     tenantSugeridoId: null,
     tenantSugeridoSlug: null,
     tenantSugeridoNome: overrides.nomeSugerido,
+    tenantSugeridoLogoUrl: null,
     fonte: 'teste',
     observacao: null,
     criadoEm: new Date('2026-01-01'),
@@ -77,7 +78,13 @@ describe('filterAndSortRecomendacoes', () => {
 describe('buildCoIrmaRecomendacoes', () => {
   it('marca ALTA, tipo CO_IRMA e não permite propor aliança', () => {
     const items = buildCoIrmaRecomendacoes('tenant-gavioes', [
-      { id: 'c12', nome: 'Camisa 12', slug: 'camisa-12-corinthians', afiliacaoNome: 'Corinthians' },
+      {
+        id: 'c12',
+        nome: 'Camisa 12',
+        slug: 'camisa-12-corinthians',
+        afiliacaoNome: 'Corinthians',
+        logoUrl: 'https://example.com/camisa12.png',
+      },
     ])
     expect(items).toHaveLength(1)
     expect(items[0]?.tipo).toBe('CO_IRMA')
@@ -85,6 +92,7 @@ describe('buildCoIrmaRecomendacoes', () => {
     expect(items[0]?.podePropor).toBe(false)
     expect(items[0]?.fonte).toBe('Mesmo time (Corinthians)')
     expect(items[0]?.observacao).toBeNull()
+    expect(items[0]?.tenantSugeridoLogoUrl).toBe('https://example.com/camisa12.png')
   })
 })
 
