@@ -22,7 +22,7 @@ export default async function HierarquiaPage() {
   const tree = await getOrganizacaoTree(tenant.id, tenant.nome)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
         <div className="app-container flex items-center gap-3">
           <Network className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
@@ -35,7 +35,7 @@ export default async function HierarquiaPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto py-6">
+      <div className="py-6">
         <div className="app-container">
           <OrganizacaoMural tree={tree} />
         </div>

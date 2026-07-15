@@ -200,17 +200,16 @@ body {
 .app-shell-bg {
   position: relative;
   background-color: rgb(var(--background-subtle));
+  /* Grid no próprio elemento com attachment local: acompanha o scroll
+     e cobre toda a área rolável (absolute ::before só pintava o viewport). */
+  background-image:
+    linear-gradient(rgb(var(--foreground) / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--foreground) / 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-attachment: local;
 }
 .app-shell-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image:
-    linear-gradient(rgb(var(--foreground)) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--foreground)) 1px, transparent 1px);
-  background-size: 48px 48px;
+  content: none;
 }
 
 .app-scrollbar-none {

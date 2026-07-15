@@ -157,7 +157,11 @@ export async function getOrganizacaoTree(tenantId: string, tenantNome: string): 
   }
 
   const deptosFiltrados = departamentosRaw.filter(
-    (d) => d.slug !== 'socio' && d.slug !== 'torcedor',
+    (d) =>
+      d.slug !== 'socio' &&
+      d.slug !== 'torcedor' &&
+      d.nome !== 'Sócio' &&
+      d.nome !== 'Torcedor',
   )
 
   const branches: OrgDepartamentoBranch[] = deptosFiltrados.map((dept) => {
