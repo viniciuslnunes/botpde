@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 
 /**
@@ -53,6 +54,15 @@ export async function aprovarMembro(membroId: string) {
     },
   })
 
+  await notificarSafe({
+    userId: membro.userId,
+    tenantId: tenant.id,
+    tipo: 'MEMBRO_APROVADO',
+    titulo: 'Sua solicitação foi aprovada',
+    corpo: `Você agora é membro de ${tenant.nome}.`,
+    link: '/portal',
+  })
+
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
 }
@@ -60,7 +70,7 @@ export async function aprovarMembro(membroId: string) {
 export async function reprovarMembro(membroId: string, motivo?: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
 
-  await db.saasMembro.update({
+  const membro = await db.saasMembro.update({
     where: { id: membroId, tenantId: tenant.id },
     data: {
       status: 'REPROVADO',
@@ -79,6 +89,17 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
       entidadeId: membroId,
       detalhes: motivo ? { motivo } : undefined,
     },
+  })
+
+  await notificarSafe({
+    userId: membro.userId,
+    tenantId: tenant.id,
+    tipo: 'MEMBRO_REPROVADO',
+    titulo: 'Sua solicitação foi reprovada',
+    corpo: motivo?.trim()
+      ? motivo.trim()
+      : `Sua solicitação de ingresso em ${tenant.nome} não foi aprovada.`,
+    link: '/portal',
   })
 
   revalidatePath('/admin/membros')

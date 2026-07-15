@@ -1,15 +1,19 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import {
   Check,
-  ChevronDown,
   Handshake,
+  History,
+  Inbox,
   Loader2,
   Search,
+  Send,
   Sparkles,
+  Users,
   XCircle,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import {
   aceitarAlianca,
   cancelarProposta,
@@ -43,7 +47,7 @@ interface AliancaFormsProps {
   tenants: TenantOption[]
 }
 
-type SectionId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'historico' | 'propor'
+type TabId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'propor' | 'historico'
 
 function statusLabel(status: AliancaListItem['status']): string {
   if (status === 'ATIVA') return 'Ativa'
@@ -89,9 +93,12 @@ function afiliacaoLabel(tenant: TenantOption): string | null {
   return local ? `${clube} · ${local}` : clube
 }
 
-function scrollToSection(id: SectionId): void {
-  const el = document.getElementById(`aliancas-${id}`)
-  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+      {children}
+    </p>
+  )
 }
 
 export function AliancaForms({
@@ -106,7 +113,6 @@ export function AliancaForms({
   const [sucesso, setSucesso] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null)
-  const [historicoAberto, setHistoricoAberto] = useState(false)
 
   const blockedTenantIds = useMemo(() => {
     const ids = new Set<string>()
@@ -123,17 +129,9 @@ export function AliancaForms({
     if (!searchNeedle) return []
     const filtered = tenants.filter((item: TenantOption) => {
       if (blockedTenantIds.has(item.id)) return false
-      // Co-irmãs (mesmo time) não entram na busca de aliança formal.
       if (afiliacaoId && item.afiliacaoId === afiliacaoId) return false
       const af = item.afiliacao
-      const haystack = [
-        item.slug,
-        item.nome,
-        af?.nome,
-        af?.apelido,
-        af?.cidade,
-        af?.estado,
-      ]
+      const haystack = [item.slug, item.nome, af?.nome, af?.apelido, af?.cidade, af?.estado]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -153,7 +151,39 @@ export function AliancaForms({
   const recomendacoesAlta = recomendacoes.filter(
     (r: RecomendacaoAliancaListItem) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
   )
-  const recomendacoesCoIrma = recomendacoes.filter((r: RecomendacaoAliancaListItem) => r.tipo === 'CO_IRMA')
+
+  const defaultTab: TabId = (() => {
+    if (pendentesRecebidas.length > 0) return 'recebidas'
+    if (recomendacoes.length > 0) return 'recomendacoes'
+    if (ativas.length > 0) return 'ativas'
+    if (pendentesEnviadas.length > 0) return 'enviadas'
+    return 'propor'
+  })()
+
+  const [tab, setTab] = useState<TabId>(defaultTab)
+
+  const tabs: Array<{ id: TabId; label: string; count: number; icon: LucideIcon; highlight?: boolean }> = [
+    {
+      id: 'recomendacoes',
+      label: 'Recomendações',
+      count: recomendacoes.length,
+      icon: Sparkles,
+      highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
+    },
+    {
+      id: 'recebidas',
+      label: 'Recebidas',
+      count: pendentesRecebidas.length,
+      icon: Inbox,
+      highlight: pendentesRecebidas.length > 0,
+    },
+    { id: 'enviadas', label: 'Enviadas', count: pendentesEnviadas.length, icon: Send },
+    { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
+    { id: 'propor', label: 'Propor', count: 0, icon: Handshake },
+  ]
+  if (encerradas.length > 0) {
+    tabs.push({ id: 'historico', label: 'Histórico', count: encerradas.length, icon: History })
+  }
 
   function mostrarErro(error: unknown, fallback: string): void {
     setSucesso(null)
@@ -312,31 +342,8 @@ export function AliancaForms({
     )
   }
 
-  const summaryChips: Array<{
-    id: SectionId
-    label: string
-    count: number
-    highlight?: boolean
-  }> = [
-    { id: 'recebidas', label: 'Recebidas', count: pendentesRecebidas.length, highlight: pendentesRecebidas.length > 0 },
-    { id: 'enviadas', label: 'Enviadas', count: pendentesEnviadas.length },
-    { id: 'ativas', label: 'Ativas', count: ativas.length },
-    {
-      id: 'recomendacoes',
-      label: 'Co-irmãs',
-      count: recomendacoesCoIrma.length,
-      highlight: recomendacoesCoIrma.length > 0,
-    },
-    {
-      id: 'recomendacoes',
-      label: 'Sugestões altas',
-      count: recomendacoesAlta.length,
-      highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
-    },
-  ]
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {(erro || sucesso) && (
         <div
           className={[
@@ -350,256 +357,299 @@ export function AliancaForms({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {summaryChips.map((chip) => (
-          <button
-            key={`${chip.id}-${chip.label}`}
-            type="button"
-            onClick={() => scrollToSection(chip.id)}
-            className={[
-              'rounded-lg border px-3 py-1.5 text-left text-sm transition-colors',
-              chip.highlight
-                ? 'border-[rgb(var(--primary))]/40 bg-[rgb(var(--primary))]/10 text-[rgb(var(--foreground))]'
-                : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-            ].join(' ')}
-          >
-            <span className="font-semibold tabular-nums text-[rgb(var(--foreground))]">{chip.count}</span>
-            <span className="ml-1.5">{chip.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <section id="aliancas-recomendacoes" className="scroll-mt-4 space-y-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            <Sparkles className="h-4 w-4" />
-            Recomendações ({recomendacoes.length})
-          </h2>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Co-irmãs (mesmo time, alta confiança) e aliadas de bloco. Só aliança entre times
-            distintos vira proposta — PDEs/subsedes herdam o vínculo da sede.
-          </p>
-        </div>
-        {recomendacoes.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-sm text-[rgb(var(--foreground-muted))]">
-            Ainda não há recomendações para esta torcida. Use a busca abaixo para propor uma aliança.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {recomendacoes.map((item: RecomendacaoAliancaListItem) => (
-              <div
+      <nav aria-label="Seções de alianças">
+        <div
+          role="tablist"
+          className="app-scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+        >
+          {tabs.map((item) => {
+            const active = tab === item.id
+            const Icon = item.icon
+            return (
+              <button
                 key={item.id}
-                className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(item.id)}
+                className={[
+                  'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                    : item.highlight
+                      ? 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
+                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                ].join(' ')}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-[rgb(var(--foreground))]">
-                      {item.tenantSugeridoNome}
-                      {item.tenantSugeridoSlug ? (
-                        <span className="ml-2 text-xs font-normal text-[rgb(var(--foreground-muted))]">
-                          @{item.tenantSugeridoSlug}
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
-                  </div>
-                  <span className={['rounded-full px-2 py-1 text-xs font-semibold', tipoBadge(item).className].join(' ')}>
-                    {tipoBadge(item).label}
-                  </span>
-                </div>
-                {item.observacao && (
-                  <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
-                )}
-                {item.tipo === 'CO_IRMA' ? (
-                  <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-                    Relação de co-irmã (mesmo time) — não se propõe aliança formal.
-                  </p>
-                ) : item.podePropor ? (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      disabled={pending || (item.tenantSugeridoId != null && blockedTenantIds.has(item.tenantSugeridoId))}
-                      onClick={() =>
-                        runAction(
-                          () => proporAliancaFromRecomendacao(item.id),
-                          `Proposta enviada para ${item.tenantSugeridoNome}`,
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
-                      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Handshake className="h-3.5 w-3.5" />}
-                      Propor aliança
-                    </button>
-                  </div>
-                ) : item.confianca === 'ALTA' && !item.tenantSugeridoId ? (
-                  <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-                    Esta torcida ainda não está na plataforma — a recomendação fica só informativa.
-                  </p>
-                ) : item.tenantSugeridoId && !blockedTenantIds.has(item.tenantSugeridoId) ? (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => proporManualFromRec(item)}
-                      className="text-xs font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-60"
-                    >
-                      Propor mesmo assim
-                    </button>
-                  </div>
-                ) : item.confianca !== 'ALTA' ? (
-                  <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-                    Confiança insuficiente e torcida ainda fora da plataforma.
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section id="aliancas-recebidas" className="scroll-mt-4 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Pendentes recebidas ({pendentesRecebidas.length})
-        </h2>
-        {pendentesRecebidas.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma proposta pendente para aprovação.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {pendentesRecebidas.map((item: AliancaListItem) =>
-              renderAliancaRow(item, { showAcceptReject: true }),
-            )}
-          </div>
-        )}
-      </section>
-
-      <section id="aliancas-enviadas" className="scroll-mt-4 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Pendentes enviadas ({pendentesEnviadas.length})
-        </h2>
-        {pendentesEnviadas.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma proposta enviada aguardando resposta.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {pendentesEnviadas.map((item: AliancaListItem) =>
-              renderAliancaRow(item, { showCancel: true }),
-            )}
-          </div>
-        )}
-      </section>
-
-      <section id="aliancas-ativas" className="scroll-mt-4 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Alianças ativas ({ativas.length})
-        </h2>
-        {ativas.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-sm text-[rgb(var(--foreground-muted))]">
-            Você ainda não possui alianças ativas.
-            {recomendacoesAlta.length > 0 ? ' Comece pelas recomendações de alta confiança.' : ''}
-          </p>
-        ) : (
-          <div className="space-y-2">{ativas.map((item: AliancaListItem) => renderAliancaRow(item))}</div>
-        )}
-      </section>
-
-      {encerradas.length > 0 && (
-        <section id="aliancas-historico" className="scroll-mt-4 space-y-3">
-          <button
-            type="button"
-            onClick={() => setHistoricoAberto((open) => !open)}
-            className="flex w-full items-center justify-between text-left text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]"
-          >
-            <span>Histórico ({encerradas.length})</span>
-            <ChevronDown
-              className={['h-4 w-4 transition-transform', historicoAberto ? 'rotate-180' : ''].join(' ')}
-            />
-          </button>
-          {historicoAberto && (
-            <div className="space-y-2">
-              {encerradas.map((item: AliancaListItem) => renderAliancaRow(item))}
-            </div>
-          )}
-        </section>
-      )}
-
-      <section
-        id="aliancas-propor"
-        className="scroll-mt-4 space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
-      >
-        <div>
-          <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-            <Handshake className="h-4 w-4" />
-            Propor manualmente
-          </h2>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Busque por nome, slug, clube ou cidade.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setSelectedTenantId(null)
-              }}
-              placeholder="Ex: Remo, Belém, remocada…"
-              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-            />
-          </div>
-
-          {searchNeedle && tenantSuggestions.length === 0 && (
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">Nenhuma torcida encontrada.</p>
-          )}
-
-          {tenantSuggestions.length > 0 && (
-            <div className="max-h-56 space-y-1 overflow-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-1">
-              {tenantSuggestions.map((item: TenantOption) => {
-                const afLabel = afiliacaoLabel(item)
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => selectTenant(item)}
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+                {item.id !== 'propor' ? (
+                  <span
                     className={[
-                      'w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                      selectedTenantId === item.id ? 'bg-[rgb(var(--background-subtle))]' : '',
+                      'rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
+                      active
+                        ? 'bg-[rgb(var(--primary))] text-white'
+                        : item.highlight
+                          ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
+                          : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                   >
-                    <span className="font-medium text-[rgb(var(--foreground))]">{item.nome}</span>
-                    <span className="ml-2 text-[rgb(var(--foreground-muted))]">@{item.slug}</span>
-                    {afLabel ? (
-                      <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">{afLabel}</span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          <button
-            type="button"
-            disabled={pending || !selectedTenantId}
-            onClick={() => {
-              if (!selectedTenantId) return
-              runAction(async () => {
-                await proporAlianca(selectedTenantId)
-                setSelectedTenantId(null)
-                setSearch('')
-              }, 'Proposta enviada com sucesso')
-            }}
-            className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
-            Enviar proposta
-          </button>
+                    {item.count}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
         </div>
-      </section>
+      </nav>
+
+      <div role="tabpanel" className="min-h-[12rem]">
+        {tab === 'recomendacoes' && (
+          <div className="space-y-3">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Co-irmãs (mesmo time) e aliadas de bloco. Só aliança entre times distintos vira
+              proposta — PDEs/subsedes herdam o vínculo da sede.
+            </p>
+            {recomendacoes.length === 0 ? (
+              <EmptyState>
+                Ainda não há recomendações para esta torcida. Use a aba Propor para buscar
+                manualmente.
+              </EmptyState>
+            ) : (
+              <div className="space-y-2">
+                {recomendacoes.map((item: RecomendacaoAliancaListItem) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-[rgb(var(--foreground))]">
+                          {item.tenantSugeridoNome}
+                          {item.tenantSugeridoSlug ? (
+                            <span className="ml-2 text-xs font-normal text-[rgb(var(--foreground-muted))]">
+                              @{item.tenantSugeridoSlug}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
+                      </div>
+                      <span
+                        className={[
+                          'rounded-full px-2 py-1 text-xs font-semibold',
+                          tipoBadge(item).className,
+                        ].join(' ')}
+                      >
+                        {tipoBadge(item).label}
+                      </span>
+                    </div>
+                    {item.observacao && (
+                      <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
+                    )}
+                    {item.tipo === 'CO_IRMA' ? (
+                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                        Relação de co-irmã (mesmo time) — não se propõe aliança formal.
+                      </p>
+                    ) : item.podePropor ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          disabled={
+                            pending ||
+                            (item.tenantSugeridoId != null && blockedTenantIds.has(item.tenantSugeridoId))
+                          }
+                          onClick={() =>
+                            runAction(
+                              () => proporAliancaFromRecomendacao(item.id),
+                              `Proposta enviada para ${item.tenantSugeridoNome}`,
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                        >
+                          {pending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Handshake className="h-3.5 w-3.5" />
+                          )}
+                          Propor aliança
+                        </button>
+                      </div>
+                    ) : item.confianca === 'ALTA' && !item.tenantSugeridoId ? (
+                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                        Esta torcida ainda não está na plataforma — a recomendação fica só
+                        informativa.
+                      </p>
+                    ) : item.tenantSugeridoId && !blockedTenantIds.has(item.tenantSugeridoId) ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => proporManualFromRec(item)}
+                          className="text-xs font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-60"
+                        >
+                          Propor mesmo assim
+                        </button>
+                      </div>
+                    ) : item.confianca !== 'ALTA' ? (
+                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                        Confiança insuficiente e torcida ainda fora da plataforma.
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'recebidas' && (
+          <div className="space-y-3">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Propostas enviadas por outras torcidas aguardando sua aprovação.
+            </p>
+            {pendentesRecebidas.length === 0 ? (
+              <EmptyState>Nenhuma proposta pendente para aprovação.</EmptyState>
+            ) : (
+              <div className="space-y-2">
+                {pendentesRecebidas.map((item: AliancaListItem) =>
+                  renderAliancaRow(item, { showAcceptReject: true }),
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'enviadas' && (
+          <div className="space-y-3">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Propostas que você enviou e ainda aguardam resposta.
+            </p>
+            {pendentesEnviadas.length === 0 ? (
+              <EmptyState>Nenhuma proposta enviada aguardando resposta.</EmptyState>
+            ) : (
+              <div className="space-y-2">
+                {pendentesEnviadas.map((item: AliancaListItem) =>
+                  renderAliancaRow(item, { showCancel: true }),
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'ativas' && (
+          <div className="space-y-3">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Parcerias confirmadas. PDEs e subsedes herdam este vínculo.
+            </p>
+            {ativas.length === 0 ? (
+              <EmptyState>
+                Você ainda não possui alianças ativas.
+                {recomendacoesAlta.length > 0
+                  ? ' Comece pelas recomendações de alta confiança.'
+                  : ''}
+              </EmptyState>
+            ) : (
+              <div className="space-y-2">
+                {ativas.map((item: AliancaListItem) => renderAliancaRow(item))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'historico' && (
+          <div className="space-y-3">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Alianças encerradas, rejeitadas ou canceladas.
+            </p>
+            {encerradas.length === 0 ? (
+              <EmptyState>Nenhum histórico ainda.</EmptyState>
+            ) : (
+              <div className="space-y-2">
+                {encerradas.map((item: AliancaListItem) => renderAliancaRow(item))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'propor' && (
+          <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+            <div>
+              <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
+                <Handshake className="h-4 w-4" />
+                Propor manualmente
+              </h2>
+              <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
+                Busque por nome, slug, clube ou cidade. Organizadas do mesmo time não aparecem
+                aqui (são co-irmãs).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value)
+                    setSelectedTenantId(null)
+                  }}
+                  placeholder="Ex: Remo, Belém, remocada…"
+                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                />
+              </div>
+
+              {searchNeedle && tenantSuggestions.length === 0 && (
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">Nenhuma torcida encontrada.</p>
+              )}
+
+              {tenantSuggestions.length > 0 && (
+                <div className="max-h-56 space-y-1 overflow-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-1">
+                  {tenantSuggestions.map((item: TenantOption) => {
+                    const afLabel = afiliacaoLabel(item)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => selectTenant(item)}
+                        className={[
+                          'w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                          selectedTenantId === item.id ? 'bg-[rgb(var(--background-subtle))]' : '',
+                        ].join(' ')}
+                      >
+                        <span className="font-medium text-[rgb(var(--foreground))]">{item.nome}</span>
+                        <span className="ml-2 text-[rgb(var(--foreground-muted))]">@{item.slug}</span>
+                        {afLabel ? (
+                          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                            {afLabel}
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={pending || !selectedTenantId}
+                onClick={() => {
+                  if (!selectedTenantId) return
+                  runAction(async () => {
+                    await proporAlianca(selectedTenantId)
+                    setSelectedTenantId(null)
+                    setSearch('')
+                    setTab('enviadas')
+                  }, 'Proposta enviada com sucesso')
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
+                Enviar proposta
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
-import { marcarNotificacaoLida } from '@/app/portal/comunidade/actions'
+import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
 
 export interface NotificationItem {
   id: string
@@ -20,7 +20,15 @@ function formatarData(data: Date | string) {
   )
 }
 
-export function NotificationBell({ initialItems }: { initialItems: NotificationItem[] }) {
+export function NotificationBell({
+  initialItems,
+  verTodasHref = '/portal/comunidade/notificacoes',
+  verTodasLabel = 'Ver todas as notificações',
+}: {
+  initialItems: NotificationItem[]
+  verTodasHref?: string
+  verTodasLabel?: string
+}) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
   const [pending, startTransition] = useTransition()
@@ -94,11 +102,11 @@ export function NotificationBell({ initialItems }: { initialItems: NotificationI
 
             <div className="border-t border-[rgb(var(--border))] px-2 py-2">
               <Link
-                href="/portal/comunidade/notificacoes"
+                href={verTodasHref}
                 onClick={() => setOpen(false)}
                 className="block rounded-lg px-2 py-2 text-center text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))]"
               >
-                Ver todas as notificações
+                {verTodasLabel}
               </Link>
             </div>
 

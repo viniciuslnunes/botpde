@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { AdminSidebar } from '@/components/admin/sidebar'
+import { AdminShell } from '@/components/admin/admin-shell'
 import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
 import { AdminRouteTransition } from '@/components/motion/admin-route-transition'
 import {
@@ -14,6 +14,7 @@ import {
   PERMISSIONS,
 } from '@torcida/types'
 import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
+import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 
 export default async function AdminLayout({
   children,
@@ -64,28 +65,32 @@ export default async function AdminLayout({
     }))
 
   const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
+  const notifications = await listarNotificacoesRecentes(tenant.id, session.user.id, 8)
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <AdminSidebar
-        tenantNome={tenant.nome}
-        tenantCor={tenant.corPrimaria}
-        tenantSlug={tenant.slug}
-        items={menuItems}
-        isSuperAdmin={isSuperAdmin}
-        torcidas={torcidas}
-      />
-      <main className="app-shell-bg min-w-0 flex-1 overflow-auto pt-14 lg:pt-0">
-        {isSuperAdmin && (
+    <AdminShell
+      tenantNome={tenant.nome}
+      tenantCor={tenant.corPrimaria}
+      tenantSlug={tenant.slug}
+      tenantLogoUrl={tenant.logoUrl}
+      userName={session.user.name ?? null}
+      userAvatar={session.user.image ?? null}
+      items={menuItems}
+      isSuperAdmin={isSuperAdmin}
+      torcidas={torcidas}
+      notifications={notifications}
+      operatorBanner={
+        isSuperAdmin ? (
           <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
             Modo operador — gerenciando <strong>{tenant.nome}</strong>. Dados confidenciais
             ficam isolados por torcida; troque no seletor ao lado.
           </div>
-        )}
-        <AdminMotionShell>
-          <AdminRouteTransition>{children}</AdminRouteTransition>
-        </AdminMotionShell>
-      </main>
-    </div>
+        ) : null
+      }
+    >
+      <AdminMotionShell>
+        <AdminRouteTransition>{children}</AdminRouteTransition>
+      </AdminMotionShell>
+    </AdminShell>
   )
 }

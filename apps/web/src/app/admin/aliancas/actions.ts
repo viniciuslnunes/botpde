@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
 import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
+import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 
 const uuidSchema = z.string().uuid('ID inválido')
@@ -125,6 +126,15 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     },
   })
 
+  await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
+    tenantId: tenantDestinoId,
+    tipo: 'ALIANCA_PROPOSTA',
+    titulo: `Proposta de aliança de ${tenant.nome}`,
+    corpo: `${tenant.nome} propôs aliança com ${aliado.nome}.`,
+    link: '/admin/aliancas',
+    excetoUserId: session.user.id,
+  })
+
   revalidatePath('/admin/aliancas')
   await invalidateAliancaHierarchy(tenantOrigemId, tenantDestinoId)
 }
@@ -203,6 +213,15 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
     },
   })
 
+  await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
+    tenantId: alianca.tenantOrigemId,
+    tipo: 'ALIANCA_ACEITA',
+    titulo: `${tenant.nome} aceitou a aliança`,
+    corpo: 'A proposta de aliança foi aceita e está ativa.',
+    link: '/admin/aliancas',
+    excetoUserId: session.user.id,
+  })
+
   revalidatePath('/admin/aliancas')
   await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
@@ -241,6 +260,15 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
         tenantAliadoId: alianca.tenantAliadoId,
       },
     },
+  })
+
+  await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
+    tenantId: alianca.tenantOrigemId,
+    tipo: 'ALIANCA_REJEITADA',
+    titulo: `${tenant.nome} rejeitou a aliança`,
+    corpo: 'A proposta de aliança foi rejeitada.',
+    link: '/admin/aliancas',
+    excetoUserId: session.user.id,
   })
 
   revalidatePath('/admin/aliancas')
@@ -286,6 +314,15 @@ export async function cancelarProposta(aliancaId: string): Promise<void> {
     },
   })
 
+  await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
+    tenantId: alianca.tenantAliadoId,
+    tipo: 'ALIANCA_CANCELADA',
+    titulo: `${tenant.nome} cancelou a proposta`,
+    corpo: 'A proposta de aliança pendente foi cancelada.',
+    link: '/admin/aliancas',
+    excetoUserId: session.user.id,
+  })
+
   revalidatePath('/admin/aliancas')
   await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
@@ -317,6 +354,17 @@ export async function encerrarAlianca(aliancaId: string): Promise<void> {
         tenantAliadoId: alianca.tenantAliadoId,
       },
     },
+  })
+
+  const outroTenantId =
+    alianca.tenantOrigemId === tenant.id ? alianca.tenantAliadoId : alianca.tenantOrigemId
+  await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
+    tenantId: outroTenantId,
+    tipo: 'ALIANCA_ENCERRADA',
+    titulo: `${tenant.nome} encerrou a aliança`,
+    corpo: 'A aliança ativa foi encerrada.',
+    link: '/admin/aliancas',
+    excetoUserId: session.user.id,
   })
 
   revalidatePath('/admin/aliancas')

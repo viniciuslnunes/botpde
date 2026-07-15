@@ -10,6 +10,22 @@ export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = [
   'NOVA_REACAO',
   'SEGUIMENTO_PENDENTE',
   'SEGUIMENTO_APROVADO',
+  'COMUNICADO_URGENTE',
+  'MEMBRO_APROVADO',
+  'MEMBRO_REPROVADO',
+]
+
+/** Tipos operacionais do admin (alianças, denúncias…). */
+export const TIPOS_NOTIFICACAO_ADMIN: TipoNotificacao[] = [
+  'ALIANCA_PROPOSTA',
+  'ALIANCA_ACEITA',
+  'ALIANCA_REJEITADA',
+  'ALIANCA_ENCERRADA',
+  'ALIANCA_CANCELADA',
+  'DENUNCIA_NOVA',
+  'COMUNICADO_URGENTE',
+  'MEMBRO_APROVADO',
+  'MEMBRO_REPROVADO',
 ]
 
 export type FiltroNotificacaoSocial = 'todas' | 'mencoes' | 'reposts' | 'reacoes' | 'seguimento'
