@@ -49,6 +49,8 @@ interface PortalNavbarProps {
   /** Torcida ativa ou, no modo nacional, o clube (nome/escudo). */
   tenant: { nome: string; corPrimaria: string; logoUrl: string | null }
   temDepartamentos?: boolean
+  /** Comunidade do clube sem vínculo com torcida — sem carteirinha. */
+  modoNacional?: boolean
 }
 
 export function PortalNavbar({
@@ -56,6 +58,7 @@ export function PortalNavbar({
   userAvatar,
   tenant,
   temDepartamentos = false,
+  modoNacional = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const { unreadMessages, isAdmin, notifications } = useNavbarContext()
@@ -63,7 +66,10 @@ export function PortalNavbar({
   const [userDropOpen, setUserDropOpen] = useState(false)
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
-  const links = temDepartamentos ? [...navLinks, departamentosLink] : [...navLinks]
+  const baseLinks = modoNacional
+    ? navLinks.filter((link) => link.href !== '/portal/carteirinha')
+    : navLinks
+  const links = temDepartamentos ? [...baseLinks, departamentosLink] : [...baseLinks]
 
   function isActive(href: string) {
     return pathname.startsWith(href)

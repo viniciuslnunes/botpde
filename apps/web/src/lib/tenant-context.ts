@@ -1,3 +1,5 @@
+import { cache } from 'react'
+import { revalidateTag, unstable_cache } from 'next/cache'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
 import { SYSTEM_ROLES } from '@torcida/types'
@@ -121,6 +123,10 @@ export type TorcidaOpcao = {
   slug: string
   nome: string
   corPrimaria: string
+  /** Clube (afiliação), para distinguir homônimas — ex. várias "Camisa 12". */
+  clubeNome: string | null
+  /** UF do clube (ex. SP), quando disponível. */
+  clubeUf: string | null
 }
 
 export type TorcidaTransferencia = TorcidaOpcao & {
@@ -128,14 +134,75 @@ export type TorcidaTransferencia = TorcidaOpcao & {
   ownerEmail: string | null
 }
 
-/** Lista enxuta para seletores de super-admin. */
-export async function listarTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
-  const torcidas: TorcidaOpcao[] = await db.tenant.findMany({
+type TorcidaRowComAfiliacao = {
+  id: string
+  slug: string
+  nome: string
+  corPrimaria: string
+  afiliacao: { nome: string; apelido: string | null; estado: string | null } | null
+}
+
+function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
+  return {
+    id: row.id,
+    slug: row.slug,
+    nome: row.nome,
+    corPrimaria: row.corPrimaria,
+    clubeNome: row.afiliacao
+      ? (row.afiliacao.apelido ?? row.afiliacao.nome)
+      : null,
+    clubeUf: row.afiliacao?.estado ?? null,
+  }
+}
+
+/** "Corinthians (SP)" — subtítulo / busca. */
+export function labelClubeComUf(
+  t: Pick<TorcidaOpcao, 'clubeNome' | 'clubeUf'>,
+): string | null {
+  if (!t.clubeNome) return null
+  return t.clubeUf ? `${t.clubeNome} (${t.clubeUf})` : t.clubeNome
+}
+
+/** Rótulo "Torcida — Clube (UF)" para listagens e combobox. */
+export function labelTorcidaComClube(
+  t: Pick<TorcidaOpcao, 'nome' | 'clubeNome' | 'clubeUf'>,
+): string {
+  const clube = labelClubeComUf(t)
+  return clube ? `${t.nome} — ${clube}` : t.nome
+}
+
+const TORCIDA_SELECAO_SELECT = {
+  id: true,
+  slug: true,
+  nome: true,
+  corPrimaria: true,
+  afiliacao: { select: { nome: true, apelido: true, estado: true } },
+} as const
+
+export const TORCIDAS_SELECAO_CACHE_TAG = 'torcidas-para-selecao'
+
+async function fetchTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
+  const rows: TorcidaRowComAfiliacao[] = await db.tenant.findMany({
     where: { ativo: true, sintetico: false },
-    select: { id: true, slug: true, nome: true, corPrimaria: true },
+    select: TORCIDA_SELECAO_SELECT,
     orderBy: { nome: 'asc' },
   })
-  return torcidas
+  return rows.map(mapTorcidaOpcao)
+}
+
+/** Lista enxuta para seletores de super-admin (cache cross-request 5 min). */
+export const listarTorcidasParaSelecao = cache(async function listarTorcidasParaSelecao(): Promise<
+  TorcidaOpcao[]
+> {
+  return unstable_cache(fetchTorcidasParaSelecao, ['torcidas-para-selecao'], {
+    revalidate: 300,
+    tags: [TORCIDAS_SELECAO_CACHE_TAG],
+  })()
+})
+
+/** Invalida o cache da lista após criar/ativar/desativar tenants. */
+export function invalidateTorcidasSelecaoCache(): void {
+  revalidateTag(TORCIDAS_SELECAO_CACHE_TAG, 'max')
 }
 
 /** Torcidas ativas com indicação de owner — para transferência no super-admin. */
@@ -144,11 +211,7 @@ export async function listarTorcidasParaTransferencia(): Promise<TorcidaTransfer
     TorcidaOpcao[],
     { tenantId: string; user: { email: string | null } }[],
   ] = await Promise.all([
-    db.tenant.findMany({
-      where: { ativo: true, sintetico: false },
-      select: { id: true, slug: true, nome: true, corPrimaria: true },
-      orderBy: { nome: 'asc' },
-    }),
+    listarTorcidasParaSelecao(),
     db.userRole.findMany({
       where: { role: { nome: SYSTEM_ROLES.OWNER, isSystem: true } },
       select: { tenantId: true, user: { select: { email: true } } },

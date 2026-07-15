@@ -8,6 +8,7 @@ import {
 } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
+import { invalidateTorcidasSelecaoCache } from '@/lib/tenant-context'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { SYSTEM_ROLES, podeTerVice } from '@torcida/types'
@@ -109,6 +110,7 @@ export async function criarTenantInicial(
     return t
   })
 
+  invalidateTorcidasSelecaoCache()
   redirect(`/super-admin/setup/sucesso?tenant=${tenant.id}&slug=${tenant.slug}`)
 }
 

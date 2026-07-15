@@ -5,7 +5,8 @@ import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Loader2, Search, UserCheck, UserX } from 'lucide-react'
 import { transferirOwnerAction, type TransferirOwnerState } from './actions'
-import type { TorcidaTransferencia } from '@/lib/tenant-context'
+import { labelClubeComUf, type TorcidaTransferencia } from '@/lib/tenant-context'
+import { normalizarTexto } from '@/lib/onboarding-unidade'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -29,16 +30,18 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
   const semOwner = useMemo(() => torcidas.filter((t) => !t.temOwner).length, [torcidas])
 
   const filtradas = useMemo(() => {
-    const termo = busca.trim().toLocaleLowerCase('pt-BR')
-    if (!termo) return torcidas
-    return torcidas.filter(
-      (t) =>
-        t.nome.toLocaleLowerCase('pt-BR').includes(termo)
-        || t.slug.toLocaleLowerCase('pt-BR').includes(termo),
-    )
+    const alvo = normalizarTexto(busca)
+    if (!alvo) return torcidas
+    return torcidas.filter((t) => {
+      const haystack = normalizarTexto(
+        [t.nome, t.clubeNome ?? '', t.clubeUf ?? '', t.slug].join(' '),
+      )
+      return haystack.includes(alvo)
+    })
   }, [busca, torcidas])
 
   const selecionada = torcidas.find((t) => t.id === tenantId) ?? null
+  const selecionadaClube = selecionada ? labelClubeComUf(selecionada) : null
 
   useEffect(() => {
     if (state.success) {
@@ -59,7 +62,7 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
           type="search"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou slug…"
+          placeholder="Buscar por torcida, clube, UF ou slug…"
           className="w-full rounded-lg border border-zinc-700 bg-zinc-800 py-2 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           aria-label="Buscar torcida"
         />
@@ -89,7 +92,9 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium text-zinc-200">{t.nome}</span>
-                      <span className="block truncate font-mono text-[11px] text-zinc-500">{t.slug}</span>
+                      <span className="block truncate text-[11px] text-zinc-500">
+                        {labelClubeComUf(t) ?? t.slug}
+                      </span>
                     </span>
                     {t.temOwner ? (
                       <span className="shrink-0 truncate text-[11px] text-zinc-400" title={t.ownerEmail ?? ''}>
@@ -113,7 +118,11 @@ export function TransferirOwnerPainel({ torcidas }: { torcidas: TorcidaTransfere
         <form action={action} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <input type="hidden" name="tenantId" value={selecionada.id} />
           <p className="text-sm text-zinc-300">
-            Transferir <strong className="text-zinc-100">{selecionada.nome}</strong>
+            Transferir{' '}
+            <strong className="text-zinc-100">
+              {selecionada.nome}
+              {selecionadaClube ? ` — ${selecionadaClube}` : ''}
+            </strong>
             {selecionada.temOwner && selecionada.ownerEmail && (
               <span className="text-zinc-500"> (owner atual: {selecionada.ownerEmail})</span>
             )}

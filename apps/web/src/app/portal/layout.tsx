@@ -59,6 +59,7 @@ export default async function PortalLayout({
         userAvatar={session.user.image ?? null}
         tenant={navbarTenant}
         temDepartamentos={totalDepartamentos > 0}
+        modoNacional={ctx?.modo === 'nacional'}
       />
       <main className="app-container relative py-8">
         <PortalMotionShell>{children}</PortalMotionShell>
