@@ -310,27 +310,38 @@ async function resolveVisibleTenantIdsForFeed(
   userId: string | undefined,
 ): Promise<string[]> {
   const base = await getVisibleTenantIds(tenantId, 'comunidade')
-  if (!userId) return base
-
-  const membro: { status: string } | null = await db.saasMembro.findUnique({
-    where: { tenantId_userId: { tenantId, userId } },
-    select: { status: true },
-  })
-  if (membro?.status === 'APROVADO') return base
 
   const tenant: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
     where: { id: tenantId },
     select: { afiliacaoId: true },
   })
-  if (!tenant?.afiliacaoId) return base
 
-  // sintetico: false — posts de torcedor global (Comunidade Nacional) não se
-  // misturam no feed local de sócio; só aparecem no feed nacional agregado.
+  // Posts de torcedor global (tenant sintético do clube) entram como sugestão
+  // no feed de qualquer sócio da torcida — mesmo sem vínculo pendente.
+  let comSintetico = base
+  if (tenant?.afiliacaoId) {
+    const sintetico: { id: string } | null = await db.tenant.findFirst({
+      where: { afiliacaoId: tenant.afiliacaoId, sintetico: true },
+      select: { id: true },
+    })
+    if (sintetico) comSintetico = [...new Set([...base, sintetico.id])]
+  }
+
+  if (!userId) return comSintetico
+
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { status: true },
+  })
+  if (membro?.status === 'APROVADO') return comSintetico
+
+  if (!tenant?.afiliacaoId) return comSintetico
+
   const siblings: { id: string }[] = await db.tenant.findMany({
     where: { afiliacaoId: tenant.afiliacaoId, ativo: true, sintetico: false },
     select: { id: true },
   })
-  return [...new Set([...base, ...siblings.map((s) => s.id)])]
+  return [...new Set([...comSintetico, ...siblings.map((s) => s.id)])]
 }
 
 export const getPostsParaFeed = cache(async function getPostsParaFeed(
@@ -659,8 +670,10 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
 })
 
 /**
- * Feed da comunidade nacional: agrega posts PÚBLICOS de todas as torcidas do
- * clube (torcedor global não tem vínculo aprovado — nunca vê TENANT/PRIVADO).
+ * Feed da comunidade nacional: posts de torcedores (tenant sintético do clube,
+ * sempre abertos) + posts de sócios só de quem o torcedor segue e está
+ * APROVADO — sócio é sempre "privado" pro torcedor, independente da
+ * visibilidade PUBLICO/TENANT/PRIVADO que ele escolheu no post.
  */
 export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   afiliacaoId: string,
@@ -676,6 +689,15 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
     return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
   }
 
+  let seguindoAprovados: string[] = []
+  if (userId) {
+    const aprovados: SeguimentoLite[] = await db.seguimento.findMany({
+      where: { seguidorId: userId, status: 'APROVADO' },
+      select: { seguidoId: true },
+    })
+    seguindoAprovados = aprovados.map((s) => s.seguidoId)
+  }
+
   const postsRaw = (await db.post.findMany({
     where: {
       tenantId: { in: tenantIds },
@@ -684,6 +706,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
       oculto: false,
       ...escopoFeedPrincipal,
       ...cursorWhere,
+      OR: [{ tenant: { sintetico: true } }, { autorId: { in: seguindoAprovados } }],
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,
