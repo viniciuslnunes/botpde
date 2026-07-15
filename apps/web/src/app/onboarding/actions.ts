@@ -14,7 +14,7 @@ import {
   type DepartamentoOnboarding,
 } from '@/lib/onboarding'
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
-import { setTenantContextSlug } from '@/lib/tenant-context'
+import { setTenantContextSlug, clearTenantContextSlug } from '@/lib/tenant-context'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -147,6 +147,10 @@ export async function concluirComoTorcedor(): Promise<OnboardingActionState> {
     create: { userId: session.user.id, onboardingConcluidoEm: new Date() },
     update: { onboardingConcluidoEm: new Date() },
   })
+
+  // Limpa cookie de contexto de tentativa anterior (ex.: usuário já tinha
+  // fixado uma torcida específica) — torcedor global cai na Comunidade Nacional.
+  await clearTenantContextSlug()
 
   redirect('/portal/comunidade')
 }
@@ -589,7 +593,16 @@ export async function solicitarVinculo(
     update: { onboardingConcluidoEm: new Date() },
   })
 
-  await setTenantContextSlug(tenant.slug)
+  // Cookie de contexto só pra SOCIO — é ele quem abre o tenant da torcida em
+  // getActiveTenant. TORCEDOR não deve ter esse contexto fixado: precisa cair
+  // no fallback de torcedor global (Comunidade Nacional), não na torcida. Limpa
+  // explicitamente pra não herdar um cookie de uma tentativa anterior (ex.:
+  // usuário que já tinha escolhido SOCIO ou testado essa torcida antes).
+  if (data.tipo === 'SOCIO') {
+    await setTenantContextSlug(tenant.slug)
+  } else {
+    await clearTenantContextSlug()
+  }
   redirect(`/onboarding/solicitado?torcida=${encodeURIComponent(tenant.slug)}`)
   return { ok: true }
 }
