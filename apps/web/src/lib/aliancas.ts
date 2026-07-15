@@ -245,6 +245,7 @@ export async function listRecomendacoesForTenant(
     const tenants: TenantSugestaoRow[] = await db.tenant.findMany({
       where: {
         ativo: true,
+        sintetico: false,
         OR: orFilters,
       },
       select: { id: true, nome: true, slug: true },
@@ -268,6 +269,7 @@ export async function listRecomendacoesForTenant(
     }> = await db.tenant.findMany({
       where: {
         ativo: true,
+        sintetico: false,
         afiliacaoId: me.afiliacaoId,
         id: { not: tenantId },
       },

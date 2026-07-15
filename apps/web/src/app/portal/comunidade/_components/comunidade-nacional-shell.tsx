@@ -6,6 +6,7 @@ import { Users } from 'lucide-react'
 import { WidgetSection } from '@/components/sofascore/widget-section'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
 
 type Props = {
   afiliacao: AfiliacaoComunidade
@@ -59,6 +60,8 @@ export async function ComunidadeNacionalShell({ afiliacao, currentUser }: Props)
       </div>
 
       <WidgetSection contexto="clube" afiliacaoSlug={afiliacao.slug} limit={4} titulo="Sofascore" />
+
+      <ComunidadeNacionalComposer currentUser={currentUser} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

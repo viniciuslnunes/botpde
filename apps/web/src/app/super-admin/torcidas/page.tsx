@@ -22,7 +22,7 @@ export default async function TorcidasPage() {
     listarTorcidasParaSelecao(),
     listarTorcidasParaTransferencia(),
     getTenantFromHost(),
-    db.tenant.count({ where: { ativo: true } }),
+    db.tenant.count({ where: { ativo: true, sintetico: false } }),
   ])
 
   const semProvisionamento = totalTenants <= 5
