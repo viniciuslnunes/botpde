@@ -115,6 +115,28 @@ export default async function MembrosPage({
     )
   }
 
+  // Alerta informativo: sócio (desta página) já foi REPROVADO em recrutamento
+  // de OUTRA torcida/clube. Não identifica qual — só a contagem, mesmo padrão
+  // de privacidade do alerta de rival acima.
+  const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
+  if (userIdsSocios.length > 0) {
+    const reprovacoesOutrosTenants: { userId: string }[] = await db.saasMembro.findMany({
+      where: {
+        userId: { in: userIdsSocios },
+        status: 'REPROVADO',
+        tipo: 'SOCIO',
+        tenantId: { not: tenant.id },
+      },
+      select: { userId: true },
+    })
+    for (const r of reprovacoesOutrosTenants) {
+      reprovacoesOutraTorcidaPorUser.set(
+        r.userId,
+        (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
+      )
+    }
+  }
+
   // Histórico de tentativas via AuditLog (sem mudar schema): conta solicitações
   // e recupera o motivo da última reprovação para informar a decisão do admin.
   const membroIds = membros.map((m: (typeof membros)[number]) => m.id)
@@ -247,6 +269,9 @@ export default async function MembrosPage({
               numeroAssociado: isSocio ? membro.numeroAssociado : null,
               anosSocio: isSocio ? membro.anosSocio : null,
               alertaRivalSocio: isSocio && userIdsComRivalSocio.has(membro.userId),
+              reprovacoesOutraTorcida: isSocio
+                ? reprovacoesOutraTorcidaPorUser.get(membro.userId)
+                : undefined,
               tentativas: tentativasPorMembro.get(membro.id) ?? 1,
               ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
             }

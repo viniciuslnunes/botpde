@@ -2,7 +2,8 @@ import Image from 'next/image'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getPostsFeedNacional } from '@/lib/feed'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
-import { Users } from 'lucide-react'
+import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
+import { Clock, Users } from 'lucide-react'
 import { WidgetSection } from '@/components/sofascore/widget-section'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
@@ -11,9 +12,14 @@ import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
 type Props = {
   afiliacao: AfiliacaoComunidade
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
+  solicitacaoPendente?: SolicitacaoSocioPendente | null
 }
 
-export async function ComunidadeNacionalShell({ afiliacao, currentUser }: Props) {
+export async function ComunidadeNacionalShell({
+  afiliacao,
+  currentUser,
+  solicitacaoPendente = null,
+}: Props) {
   const [noticias, { posts }] = await Promise.all([
     getNoticiasAprovadas(afiliacao.id),
     getPostsFeedNacional(afiliacao.id, currentUser.id || undefined, { take: 20 }),
@@ -58,6 +64,17 @@ export async function ComunidadeNacionalShell({ afiliacao, currentUser }: Props)
           </div>
         </div>
       </div>
+
+      {solicitacaoPendente && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="text-sm">
+            Sua solicitação de sócio na <strong>{solicitacaoPendente.tenantNome}</strong> está em
+            análise pela diretoria. Você continua aqui, na Comunidade Nacional, até ser aprovado
+            ou reprovado — a gente te avisa assim que houver uma decisão.
+          </p>
+        </div>
+      )}
 
       <WidgetSection contexto="clube" afiliacaoSlug={afiliacao.slug} limit={4} titulo="Sofascore" />
 

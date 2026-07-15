@@ -1338,6 +1338,7 @@ enum TipoNotificacao {
   ALIANCA_CANCELADA
   MEMBRO_APROVADO
   MEMBRO_REPROVADO
+  MEMBRO_SOLICITADO
 }
 
 // ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────

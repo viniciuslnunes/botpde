@@ -36,6 +36,9 @@ vi.mock('@/lib/tenant', () => ({
 }))
 // `setTenantContextSlug`/`clearTenantContextSlug` usam cookies() do Next — indisponível fora de request.
 vi.mock('@/lib/tenant-context', () => ({ setTenantContextSlug: vi.fn(), clearTenantContextSlug: vi.fn() }))
+// `notificacoes.ts` valida env vars no import (fora do escopo deste teste).
+const notificarSafeFn = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/notificacoes', () => ({ notificarSafe: notificarSafeFn }))
 // Validação de cidade contra o IBGE — mockada para não bater na rede.
 const cidadePertenceUfFn = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/municipios-ibge', () => ({

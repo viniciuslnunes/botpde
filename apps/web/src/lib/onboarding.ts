@@ -503,3 +503,22 @@ export const getEstadoOnboarding = cache(
     return { perfil, temMembro: membro !== null }
   },
 )
+
+export type SolicitacaoSocioPendente = {
+  tenantNome: string
+  criadoEm: Date
+}
+
+/** Sócio ainda em análise (mais recente) — banner de status na Comunidade Nacional. */
+export const getSolicitacaoSocioPendente = cache(
+  async (userId: string): Promise<SolicitacaoSocioPendente | null> => {
+    const pendente: { criadoEm: Date; tenant: { nome: string } } | null =
+      await db.saasMembro.findFirst({
+        where: { userId, tipo: 'SOCIO', status: 'PENDENTE' },
+        orderBy: { criadoEm: 'desc' },
+        select: { criadoEm: true, tenant: { select: { nome: true } } },
+      })
+    if (!pendente) return null
+    return { tenantNome: pendente.tenant.nome, criadoEm: pendente.criadoEm }
+  },
+)
