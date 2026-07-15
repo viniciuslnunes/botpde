@@ -14,6 +14,7 @@ import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId, podeVerPost } from '@/lib/feed'
@@ -167,6 +168,60 @@ export async function publicarPost(
     console.error('[publicarPost]', error)
     return { message: 'Não foi possível publicar. Tente novamente.' }
   }
+}
+
+/**
+ * Publica um post na Comunidade Nacional do clube — torcedor global, sem vínculo
+ * com torcida na plataforma. Post vai para o tenant sintético do clube, sempre
+ * PUBLICO. Sem AuditLog (decisão registrada: o tenant sintético não tem admin
+ * para consultar auditoria; moderação fica no mecanismo de denúncia/oculto).
+ */
+export async function publicarPostComoTorcedorGlobal(
+  conteudo: string,
+  midias: string[],
+): Promise<void> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado')
+
+  const perfil: {
+    onboardingConcluidoEm: Date | null
+    afiliacaoId: string | null
+  } | null = await db.perfilTorcedor.findUnique({
+    where: { userId: session.user.id },
+    select: { onboardingConcluidoEm: true, afiliacaoId: true },
+  })
+  if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) {
+    throw new Error('Conclua o onboarding do torcedor para publicar.')
+  }
+
+  const parsed = postSchema.safeParse({ conteudo, midias, visibilidade: 'PUBLICO' })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Publicação inválida')
+  }
+
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) throw new Error(erroMencoes)
+
+  const tenant = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
+
+  const limiterKey = `post:${tenant.id}:${session.user.id}`
+  if (excedeuLimiteEngajamento(limiterKey)) {
+    throw new Error('Você está postando rápido demais. Aguarde um pouco.')
+  }
+  registrarAcaoEngajamento(limiterKey)
+
+  await db.post.create({
+    data: {
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      conteudo: parsed.data.conteudo,
+      midiaUrls: parsed.data.midias,
+    },
+  })
+
+  revalidatePath('/portal/comunidade')
 }
 
 export async function solicitarSeguir(userId: string): Promise<void> {

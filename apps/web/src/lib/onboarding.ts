@@ -397,7 +397,7 @@ export const getTorcidasPorAfiliacao = cache(
       sedes: SedeRow[]
     }
     const tenants: TenantComContagem[] = await db.tenant.findMany({
-      where: { afiliacaoId: { in: afiliacaoIds }, ativo: true },
+      where: { afiliacaoId: { in: afiliacaoIds }, ativo: true, sintetico: false },
       select: {
         id: true,
         nome: true,

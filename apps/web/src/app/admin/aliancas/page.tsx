@@ -36,7 +36,7 @@ export default async function AdminAliancasPage() {
     listAliancasForTenant(authz.tenant.id),
     listRecomendacoesForTenant(authz.tenant.id),
     db.tenant.findMany({
-      where: { ativo: true, id: { not: authz.tenant.id } },
+      where: { ativo: true, sintetico: false, id: { not: authz.tenant.id } },
       orderBy: { nome: 'asc' },
       select: {
         id: true,

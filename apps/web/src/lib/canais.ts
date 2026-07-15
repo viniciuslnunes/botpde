@@ -390,7 +390,7 @@ export async function listUnidadesVisiveis(
   const visibleIds = await getVisibleTenantIds(viewerTenantId, 'comunidade')
   const tenants: Array<{ id: string; nome: string; logoUrl: string | null }> =
     await db.tenant.findMany({
-      where: { id: { in: visibleIds }, ativo: true },
+      where: { id: { in: visibleIds }, ativo: true, sintetico: false },
       select: { id: true, nome: true, logoUrl: true },
       orderBy: { nome: 'asc' },
     })

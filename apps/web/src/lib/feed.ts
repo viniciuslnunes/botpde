@@ -324,8 +324,10 @@ async function resolveVisibleTenantIdsForFeed(
   })
   if (!tenant?.afiliacaoId) return base
 
+  // sintetico: false — posts de torcedor global (Comunidade Nacional) não se
+  // misturam no feed local de sócio; só aparecem no feed nacional agregado.
   const siblings: { id: string }[] = await db.tenant.findMany({
-    where: { afiliacaoId: tenant.afiliacaoId, ativo: true },
+    where: { afiliacaoId: tenant.afiliacaoId, ativo: true, sintetico: false },
     select: { id: true },
   })
   return [...new Set([...base, ...siblings.map((s) => s.id)])]

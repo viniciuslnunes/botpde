@@ -118,7 +118,7 @@ export type TorcidaTransferencia = TorcidaOpcao & {
 /** Lista enxuta para seletores de super-admin. */
 export async function listarTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
   const torcidas: TorcidaOpcao[] = await db.tenant.findMany({
-    where: { ativo: true },
+    where: { ativo: true, sintetico: false },
     select: { id: true, slug: true, nome: true, corPrimaria: true },
     orderBy: { nome: 'asc' },
   })
@@ -132,7 +132,7 @@ export async function listarTorcidasParaTransferencia(): Promise<TorcidaTransfer
     { tenantId: string; user: { email: string | null } }[],
   ] = await Promise.all([
     db.tenant.findMany({
-      where: { ativo: true },
+      where: { ativo: true, sintetico: false },
       select: { id: true, slug: true, nome: true, corPrimaria: true },
       orderBy: { nome: 'asc' },
     }),
