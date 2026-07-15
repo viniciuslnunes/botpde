@@ -31,6 +31,8 @@ export interface AccessRoleOpt {
   isSystem: boolean
   /** Já efetivas (pacote do depto + extras) — resolvidas na page. */
   permissions: string[]
+  /** Pacote herdado do departamento (sem extras) — para pré-seleção locked na UI. */
+  permissionsPacote?: string[]
   permissionsExtras?: string[]
   departamentoId?: string | null
   papelNoDepartamento?: string | null
@@ -118,6 +120,7 @@ export function AccessUserPanel({
   const [perfilIds, setPerfilIds] = useState<Set<string>>(() => new Set(usuario.perfilIds))
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [novoPerfilNome, setNovoPerfilNome] = useState('')
+  const [modalNovoPerfil, setModalNovoPerfil] = useState(false)
   const [gerenciandoRoleId, setGerenciandoRoleId] = useState<string | null>(null)
 
   const [overridesUi, setOverridesUi] = useState(() => {
@@ -271,21 +274,29 @@ export function AccessUserPanel({
     return null
   }
 
+  async function persistirAcessoUsuario(nextPerfilIds: Set<string>, nextPermissoes: Set<string>) {
+    const fd = new FormData()
+    nextPerfilIds.forEach((id) => fd.append('perfilIds', id))
+    nextPermissoes.forEach((p) => fd.append('permissoes', p))
+    const ok = await runPersistAction(() => salvarAcessoUsuario(usuario.id, fd), {
+      success: 'Acesso atualizado.',
+    })
+    if (ok) onClose()
+    return ok
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const fd = new FormData()
-    perfilIds.forEach((id) => fd.append('perfilIds', id))
-    permissoes.forEach((p) => fd.append('permissoes', p))
-
+    if (overridesUi.extras.size > 0) {
+      setModalNovoPerfil(true)
+      return
+    }
     startTransition(async () => {
-      await runPersistAction(() => salvarAcessoUsuario(usuario.id, fd), {
-        success: 'Acesso atualizado.',
-      })
-      onClose()
+      await persistirAcessoUsuario(perfilIds, permissoes)
     })
   }
 
-  async function handleSalvarComoPerfil() {
+  async function handleConfirmarNovoPerfilESalvar() {
     const nome = novoPerfilNome.trim()
     if (nome.length < 2) return
 
@@ -306,22 +317,29 @@ export function AccessUserPanel({
       const box: { current: Awaited<ReturnType<typeof salvarPerfilComposto>> | null } = {
         current: null,
       }
-      const ok = await runPersistAction(async () => {
-        box.current = await salvarPerfilComposto(fd)
-        return box.current
-      }, {
-        success: 'Novo perfil criado e atribuído a esta pessoa.',
-      })
+      const ok = await runPersistAction(
+        async () => {
+          box.current = await salvarPerfilComposto(fd)
+          return box.current
+        },
+        { success: 'Novo perfil criado e atribuído a esta pessoa.' },
+      )
       const result = box.current
       if (!ok || !result) return
 
       const depto = result.departamentoId ? deptoById.get(result.departamentoId) : null
+      const pacote = depto
+        ? result.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+          ? [...depto.permissions, ...depto.permissionsGestor]
+          : [...depto.permissions]
+        : []
       const novoRole: AccessRoleOpt = {
         id: result.id,
         nome: result.nome,
         cor: result.cor,
         isSystem: result.isSystem,
         permissionsExtras: result.permissionsExtras,
+        permissionsPacote: pacote,
         departamentoId: result.departamentoId,
         papelNoDepartamento: result.papelNoDepartamento,
         permissions: permissionsOfRole(
@@ -337,18 +355,18 @@ export function AccessUserPanel({
         ),
       }
 
-      setRoles((prev) => [...prev, novoRole])
       const nextPerfis = new Set(perfilIds)
       nextPerfis.add(result.id)
-      setOverridesUi((cur) => {
-        const extras = new Set(cur.extras)
-        for (const p of extrasList) extras.delete(p)
-        return { extras, revogadas: cur.revogadas }
-      })
+      const nextCobertura = coberturaDePerfis([...roles, novoRole], nextPerfis)
+      const nextPermissoes = efetivasDe(nextCobertura, new Set(), overridesUi.revogadas)
+
+      setRoles((prev) => [...prev, novoRole])
       setPerfilIds(nextPerfis)
+      setOverridesUi({ extras: new Set(), revogadas: overridesUi.revogadas })
       setNovoPerfilNome('')
-      setAba('perfis')
-      setGerenciandoRoleId(result.id)
+      setModalNovoPerfil(false)
+
+      await persistirAcessoUsuario(nextPerfis, nextPermissoes)
     } finally {
       setSalvandoPerfil(false)
     }
@@ -378,18 +396,10 @@ export function AccessUserPanel({
     })
     if (!ok) return false
 
-    const depto = role.departamentoId ? deptoById.get(role.departamentoId) : null
-    const permissions = permissionsOfRole(
-      {
-        permissions: role.departamentoId ? [] : data.extras,
-        permissionsExtras: role.departamentoId ? data.extras : [],
-        departamentoId: role.departamentoId,
-        papelNoDepartamento: role.papelNoDepartamento,
-      },
-      depto
-        ? { permissions: depto.permissions, permissionsGestor: depto.permissionsGestor }
-        : null,
-    )
+    const pacote = [...(role.permissionsPacote ?? pacoteDoPerfil(role, departamentos))]
+    const permissions = role.departamentoId
+      ? [...new Set([...pacote, ...data.extras])]
+      : [...data.extras]
 
     setRoles((prev) =>
       prev.map((r) =>
@@ -399,6 +409,7 @@ export function AccessUserPanel({
               nome: data.nome,
               cor: data.cor,
               permissionsExtras: data.extras,
+              permissionsPacote: pacote,
               permissions,
             }
           : r,
@@ -638,40 +649,17 @@ export function AccessUserPanel({
           <div className="space-y-4">
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               Extras além do pacote dos perfis. Desmarcar o que o perfil concede cria uma
-              revogação. Preferira ajustar o template do cargo ou{' '}
-              <strong className="font-medium text-[rgb(var(--foreground))]">
-                salvar como novo perfil
-              </strong>{' '}
-              para reutilizar.
+              revogação. Ao salvar o acesso com permissões extras, será necessário criar um
+              novo perfil com um título.
             </p>
 
-            {(overridesUi.extras.size > 0 || overridesUi.revogadas.size > 0) && (
-              <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
-                <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground))]">
-                  Salvar composição como novo perfil
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    value={novoPerfilNome}
-                    onChange={(e) => setNovoPerfilNome(e.target.value)}
-                    placeholder="Nome do perfil (ex.: Gestor Financeiro+)"
-                    className="min-w-[12rem] flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-                  />
-                  <button
-                    type="button"
-                    disabled={salvandoPerfil || novoPerfilNome.trim().length < 2}
-                    onClick={() => void handleSalvarComoPerfil()}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                  >
-                    {salvandoPerfil ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Save className="h-3.5 w-3.5" />
-                    )}
-                    Salvar perfil
-                  </button>
-                </div>
-              </div>
+            {overridesUi.extras.size > 0 && (
+              <p className="rounded-xl border border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.08)] px-3 py-2 text-xs text-[rgb(var(--foreground))]">
+                {overridesUi.extras.size} permissão
+                {overridesUi.extras.size === 1 ? '' : 'ões'} além do perfil/departamento
+                — ao clicar em <strong className="font-semibold">Salvar acesso</strong>, informe
+                o nome do novo perfil.
+              </p>
             )}
 
             <AccessPermissionWorktree
@@ -691,7 +679,7 @@ export function AccessUserPanel({
           <button
             type="button"
             onClick={onClose}
-            disabled={pending}
+            disabled={pending || salvandoPerfil}
             className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
             <X className="h-3.5 w-3.5" />
@@ -699,29 +687,120 @@ export function AccessUserPanel({
           </button>
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || salvandoPerfil}
             className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            {pending || salvandoPerfil ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
             Salvar acesso
           </button>
         </div>
       </div>
+
+      {modalNovoPerfil && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="presentation"
+          onClick={() => {
+            if (!salvandoPerfil) setModalNovoPerfil(false)
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-novo-perfil-titulo"
+            className="w-full max-w-md rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="modal-novo-perfil-titulo"
+              className="text-base font-semibold text-[rgb(var(--foreground))]"
+            >
+              Salvar composição como novo perfil
+            </h2>
+            <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
+              Você adicionou permissões além do perfil ou departamento associado a esta pessoa.
+              Para gravar esse acesso, é necessário criar um novo perfil e dar um título a ele —
+              assim a composição fica reutilizável e rastreável.
+            </p>
+            {overridesUi.extras.size > 0 && (
+              <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                {overridesUi.extras.size} permissão
+                {overridesUi.extras.size === 1 ? '' : 'ões'} extra
+                {overridesUi.extras.size === 1 ? '' : 's'} serão incluídas neste perfil.
+              </p>
+            )}
+            <label className="mt-4 block space-y-1.5">
+              <span className="text-xs font-medium text-[rgb(var(--foreground))]">
+                Nome do perfil
+              </span>
+              <input
+                autoFocus
+                value={novoPerfilNome}
+                onChange={(e) => setNovoPerfilNome(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleConfirmarNovoPerfilESalvar()
+                  }
+                }}
+                placeholder="Ex.: Gestor Financeiro+"
+                className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              />
+            </label>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={salvandoPerfil}
+                onClick={() => setModalNovoPerfil(false)}
+                className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-60"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={salvandoPerfil || novoPerfilNome.trim().length < 2}
+                onClick={() => void handleConfirmarNovoPerfilESalvar()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {salvandoPerfil ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Criar perfil e salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }
 
-function pacoteDepartamento(
+function pacoteDoPerfil(
   role: AccessRoleOpt,
   departamentos: AccessDepartamentoOpt[],
 ): Set<string> {
-  if (!role.departamentoId) return new Set()
-  const depto = departamentos.find((d) => d.id === role.departamentoId)
-  if (!depto) return new Set()
-  const base = depto.permissions
-  const gestor =
-    role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR ? depto.permissionsGestor : []
-  return new Set([...base, ...gestor])
+  // Preferir snapshot da page (inclui deptos legados ocultos na lista de áreas)
+  if (role.permissionsPacote && role.permissionsPacote.length > 0) {
+    return new Set(role.permissionsPacote)
+  }
+  if (role.departamentoId) {
+    const depto = departamentos.find((d) => d.id === role.departamentoId)
+    if (depto) {
+      const gestor =
+        role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR ? depto.permissionsGestor : []
+      return new Set([...depto.permissions, ...gestor])
+    }
+    // Fallback: efetivas menos extras (depto sumiu da lista filtrada, mas já veio resolvido)
+    const extras = new Set(role.permissionsExtras ?? [])
+    return new Set(role.permissions.filter((p) => !extras.has(p)))
+  }
+  return new Set()
 }
 
 function PerfilManagePanel({
@@ -745,8 +824,16 @@ function PerfilManagePanel({
 }) {
   const [nome, setNome] = useState(role.nome)
   const [cor, setCor] = useState(role.cor)
+  const pacote = useMemo(() => pacoteDoPerfil(role, departamentos), [role, departamentos])
   const [extras, setExtras] = useState(() => {
-    if (role.departamentoId) return new Set(role.permissionsExtras ?? [])
+    if (role.departamentoId) {
+      // Extras salvos + qualquer efetiva do perfil que não esteja no pacote
+      const next = new Set(role.permissionsExtras ?? [])
+      for (const p of role.permissions) {
+        if (!pacoteDoPerfil(role, departamentos).has(p)) next.add(p)
+      }
+      return next
+    }
     // Transversal: permissões próprias ficam em `permissions` (ou extras se preenchido)
     if (role.permissionsExtras && role.permissionsExtras.length > 0) {
       return new Set(role.permissionsExtras)
@@ -755,7 +842,7 @@ function PerfilManagePanel({
   })
   const [pending, setPending] = useState(false)
   const [confirmExcluir, setConfirmExcluir] = useState(false)
-  const pacote = useMemo(() => pacoteDepartamento(role, departamentos), [role, departamentos])
+  const selecionadas = useMemo(() => new Set([...pacote, ...extras]), [pacote, extras])
   const deptoNome = role.departamentoId
     ? departamentos.find((d) => d.id === role.departamentoId)?.nome
     : null
@@ -855,7 +942,13 @@ function PerfilManagePanel({
               <p className="text-xs text-[rgb(var(--foreground-muted))]">
                 Área: <strong className="font-medium text-[rgb(var(--foreground))]">{deptoNome}</strong>
                 {role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR ? ' · Gestor' : ' · Membro'}
-                . O pacote da área é herdado; abaixo só extras do perfil.
+                . As permissões da área já vêm marcadas; marque outras para extras do perfil.
+              </p>
+            )}
+            {!deptoNome && role.departamentoId && (
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                Perfil vinculado a uma área. Permissões herdadas aparecem como “via perfil”; as
+                demais são extras editáveis.
               </p>
             )}
           </div>
@@ -864,12 +957,19 @@ function PerfilManagePanel({
 
       {!somenteLeitura && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-[rgb(var(--foreground))]">
-            Permissões extras do perfil
-          </p>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground))]">
+              Permissões do perfil
+            </p>
+            <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+              Já selecionadas = o que o perfil concede. Itens{' '}
+              <span className="font-medium text-[rgb(var(--foreground))]">via perfil</span> vêm da
+              área (fixos); marque ou desmarque o restante para extras.
+            </p>
+          </div>
           <AccessPermissionWorktree
-            initiallyOpen={false}
-            selected={new Set([...pacote, ...extras])}
+            initiallyOpen={selecionadas.size > 0}
+            selected={selecionadas}
             lockedKeys={pacote}
             origemOf={(key) => {
               if (pacote.has(key)) return 'via perfil'
@@ -882,6 +982,23 @@ function PerfilManagePanel({
                 if (!pacote.has(key)) onlyExtras.add(key)
               }
               setExtras(onlyExtras)
+            }}
+          />
+        </div>
+      )}
+
+      {somenteLeitura && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-[rgb(var(--foreground))]">
+            Permissões deste perfil
+          </p>
+          <AccessPermissionWorktree
+            initiallyOpen={selecionadas.size > 0}
+            selected={selecionadas}
+            lockedKeys={selecionadas}
+            origemOf={(key) => (selecionadas.has(key) ? 'via perfil' : null)}
+            onChange={() => {
+              /* sistema: só leitura */
             }}
           />
         </div>
@@ -967,7 +1084,9 @@ function DepartamentoAreasPanel({
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
         Áreas da torcida. Marcar <strong className="font-medium text-[rgb(var(--foreground))]">Membro</strong>{' '}
         ou <strong className="font-medium text-[rgb(var(--foreground))]">Gestor</strong> atribui o perfil
-        correspondente da área (mesma regra da aba Perfis). Use Pacote para ver o template.
+        correspondente da área (mesma regra da aba Perfis). Use{' '}
+        <strong className="font-medium text-[rgb(var(--foreground))]">visualizar permissões</strong> para ver
+        o template.
       </p>
 
       {detalhe && (
@@ -983,7 +1102,7 @@ function DepartamentoAreasPanel({
                 style={{ backgroundColor: detalhe.cor }}
               />
               <h3 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                Pacote · {detalhe.nome}
+                Visualizar permissões · {detalhe.nome}
               </h3>
             </div>
             <button
@@ -1002,7 +1121,14 @@ function DepartamentoAreasPanel({
       )}
 
       <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {departamentos.map((depto) => {
+        {[...departamentos]
+          .sort((a, b) => {
+            const aAtivo = papelAtual(a.id) != null ? 0 : 1
+            const bAtivo = papelAtual(b.id) != null ? 0 : 1
+            if (aAtivo !== bAtivo) return aAtivo - bAtivo
+            return 0
+          })
+          .map((depto) => {
           const papel = papelAtual(depto.id)
           const isMembro = papel === 'MEMBRO' || papel === 'GESTOR'
           const isGestor = papel === 'GESTOR'
@@ -1016,21 +1142,28 @@ function DepartamentoAreasPanel({
             <div
               key={depto.id}
               className={[
-                'flex flex-col rounded-2xl border bg-[rgb(var(--surface))]',
+                'relative flex flex-col overflow-hidden rounded-2xl border transition-shadow',
                 selecionado
-                  ? 'border-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary)_/_0.25)]'
+                  ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.06)] shadow-[0_0_0_1px_rgb(var(--primary)_/_0.2)]'
                   : ativo
-                    ? 'border-[rgb(var(--primary)_/_0.45)]'
-                    : 'border-[rgb(var(--border))]',
+                    ? 'border-[rgb(var(--primary)_/_0.55)] bg-[rgb(var(--primary)_/_0.08)] shadow-[0_0_0_1px_rgb(var(--primary)_/_0.18)]'
+                    : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] opacity-90',
               ].join(' ')}
               style={{ borderTopColor: depto.cor, borderTopWidth: 3 }}
             >
+              {ativo && (
+                <div className="absolute right-2.5 top-2.5">
+                  <span className="rounded-md bg-[rgb(var(--primary))] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    {isGestor ? 'Gestor' : 'Membro'}
+                  </span>
+                </div>
+              )}
               <div className="flex items-start gap-2.5 px-3.5 py-3">
                 <span
                   className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: depto.cor }}
                 />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pr-14">
                   <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
                     {depto.nome}
                   </p>
@@ -1039,11 +1172,19 @@ function DepartamentoAreasPanel({
                       ? 'Organizacional'
                       : `Colab. ${depto.permissions.length} · Gestor+ ${depto.permissionsGestor.length}`}
                     {!temPerfis ? ' · sem perfil canônico' : ''}
+                    {ativo ? ' · associado a esta pessoa' : ''}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--border))] px-3 py-2.5">
+              <div
+                className={[
+                  'flex flex-wrap items-center gap-1.5 border-t px-3 py-2.5',
+                  ativo
+                    ? 'border-[rgb(var(--primary)_/_0.25)] bg-[rgb(var(--primary)_/_0.04)]'
+                    : 'border-[rgb(var(--border))]',
+                ].join(' ')}
+              >
                 <button
                   type="button"
                   disabled={!temPerfis}
@@ -1084,7 +1225,7 @@ function DepartamentoAreasPanel({
                       : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >
-                  Pacote
+                  visualizar permissões
                 </button>
               </div>
             </div>

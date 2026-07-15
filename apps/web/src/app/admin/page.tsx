@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { Metadata } from 'next'
 import { AdminDashboardKpis } from '@/components/motion/admin-dashboard-kpis'
+import { labelAcaoAuditoria } from '@/lib/audit-labels'
 
 export const metadata: Metadata = { title: 'Dashboard — Admin' }
 
@@ -25,24 +26,6 @@ function formatarDataRelativa(data: Date) {
 
 function formatarDataEvento(data: Date) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(data))
-}
-
-const acaoLabel: Record<string, string> = {
-  CADASTRO_SOLICITADO: 'Solicitou filiação',
-  RECADASTRO_SOLICITADO: 'Reenvio de cadastro',
-  MEMBRO_APROVADO: 'Membro aprovado',
-  MEMBRO_REPROVADO: 'Membro reprovado',
-  MEMBRO_REVERTIDO: 'Aprovação revertida',
-  CARTEIRINHA_EMITIDA: 'Carteirinha emitida',
-  CARTEIRINHA_RENOVADA: 'Carteirinha renovada',
-  CARTEIRINHA_REVOGADA: 'Carteirinha revogada',
-  EVENTO_CRIADO: 'Evento criado',
-  EVENTO_EDITADO: 'Evento editado',
-  EVENTO_EXCLUIDO: 'Evento excluído',
-  SEDE_CRIADA: 'Sede criada',
-  SEDE_EDITADA: 'Sede editada',
-  SEDE_ATIVADA: 'Sede ativada',
-  SEDE_DESATIVADA: 'Sede desativada',
 }
 
 type TenantInfo = { id: string; nome: string; corPrimaria: string }
@@ -304,10 +287,15 @@ async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
 
       {/* Log de atividade */}
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <h2 className="mb-4 flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-          <Activity className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          Atividade recente
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
+            <Activity className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+            Atividade recente
+          </h2>
+          <Link href="/admin/auditoria" className="text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
+            Ver registro →
+          </Link>
+        </div>
         {auditLog.length === 0 ? (
           <p className="py-4 text-center text-sm text-[rgb(var(--foreground-muted))]">Nenhuma atividade registrada</p>
         ) : (
@@ -317,7 +305,7 @@ async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
                 <div className="flex items-center gap-2.5">
                   <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[rgb(var(--foreground-muted))]" />
                   <p className="text-sm text-[rgb(var(--foreground))]">
-                    {acaoLabel[log.acao] ?? log.acao}
+                    {labelAcaoAuditoria(log.acao)}
                   </p>
                   <span className="hidden text-xs text-[rgb(var(--foreground-muted))] sm:inline">
                     · {log.entidade}

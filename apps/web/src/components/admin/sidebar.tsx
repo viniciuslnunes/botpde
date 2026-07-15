@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Newspaper,
   Network,
+  ScrollText,
   ChevronRight,
   Menu,
   X,
@@ -42,6 +43,7 @@ const ICON_BY_ID: Record<string, LucideIcon> = {
   noticias: Newspaper,
   aliancas: Handshake,
   acessos: KeyRound,
+  auditoria: ScrollText,
   configuracoes: Settings,
 }
 

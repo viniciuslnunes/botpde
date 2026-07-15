@@ -5,7 +5,7 @@ import { AccessManager } from '@/components/admin/access-manager'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
 import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS, permissionsOfRole } from '@torcida/types'
+import { PERMISSIONS, permissionsOfRole, PAPEL_DEPARTAMENTO } from '@torcida/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Controle de acesso — Admin' }
@@ -116,19 +116,27 @@ export default async function AcessosPage({
       ordem: true,
     },
   })
+  // UI de áreas: esconde slugs legados (tipos de membro). O mapa completo
+  // abaixo ainda resolve herança de perfis tipo "Membro · Torcedor".
   const departamentos = departamentosRaw.filter(
     (d) => d.slug !== 'socio' && d.slug !== 'torcedor' && d.nome !== 'Sócio' && d.nome !== 'Torcedor',
   )
 
-  // Efetivas exibidas = herança do depto + extras (para search/resumo na UI)
-  const deptoById = new Map(departamentos.map((d) => [d.id, d]))
-  const rolesComEfetivas = roles.map((role) => ({
-    ...role,
-    permissions: permissionsOfRole(
-      role,
-      role.departamentoId ? deptoById.get(role.departamentoId) ?? null : null,
-    ),
-  }))
+  // Efetivas exibidas = herança do depto + extras (usar mapa completo, não o filtrado)
+  const deptoById = new Map(departamentosRaw.map((d) => [d.id, d]))
+  const rolesComEfetivas = roles.map((role) => {
+    const depto = role.departamentoId ? deptoById.get(role.departamentoId) ?? null : null
+    return {
+      ...role,
+      permissions: permissionsOfRole(role, depto),
+      // Snapshot do pacote da área p/ a UI de edição (não depende da lista filtrada)
+      permissionsPacote: depto
+        ? role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+          ? [...depto.permissions, ...depto.permissionsGestor]
+          : [...depto.permissions]
+        : [],
+    }
+  })
 
   const usuarios: UsuarioBasico[] = await db.user.findMany({
     where: {

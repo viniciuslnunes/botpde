@@ -32,6 +32,9 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Relatórios
   REPORTS_VIEW: 'reports:view',
 
+  // Auditoria append-only — só leitura; Diretoria e Presidência (owner/vice/admin)
+  AUDIT_VIEW: 'audit:view',
+
   // Financeiro (módulo em evolução — permissão já usado por departamento)
   FINANCE_VIEW: 'finance:view',
   FINANCE_MANAGE: 'finance:manage',
@@ -167,6 +170,7 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.SEDES_MANAGE, label: 'Gerenciar sedes' },
       { key: PERMISSIONS.ROLES_MANAGE, label: 'Gerenciar cargos' },
       { key: PERMISSIONS.REPORTS_VIEW, label: 'Ver relatórios' },
+      { key: PERMISSIONS.AUDIT_VIEW, label: 'Ver registro de auditoria' },
     ],
   },
 ])

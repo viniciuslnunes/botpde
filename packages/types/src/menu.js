@@ -24,6 +24,8 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'noticias', label: 'Notícias', href: '/admin/comunidade/noticias', permissao: PERMISSIONS.NEWS_CURATE },
   { id: 'aliancas', label: 'Alianças', href: '/admin/aliancas', permissao: PERMISSIONS.ALLIANCES_MANAGE },
   { id: 'acessos', label: 'Controle de acesso', href: '/admin/acessos', permissao: PERMISSIONS.ROLES_MANAGE },
+  // Append-only: sem mutações na UI. Gate: Diretoria (+ owner/admin/vice via ALL_PERMISSIONS).
+  { id: 'auditoria', label: 'Auditoria', href: '/admin/auditoria', permissao: PERMISSIONS.AUDIT_VIEW },
   { id: 'configuracoes', label: 'Configurações', href: '/admin/configuracoes', permissao: PERMISSIONS.SETTINGS_MANAGE },
 ])
 

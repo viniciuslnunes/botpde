@@ -1,0 +1,150 @@
+/**
+ * Rótulos humanos para códigos `AuditLog.acao` e nomes de entidade.
+ * Append-only: a UI de auditoria nunca edita/apaga — só traduz para leitura.
+ */
+
+export const AUDIT_ACAO_LABEL: Record<string, string> = {
+  // Cadastro / membros
+  CADASTRO_SOLICITADO: 'Solicitou filiação',
+  RECADASTRO_SOLICITADO: 'Reenvio de cadastro',
+  UNIDADE_CADASTRO_SOLICITADO: 'Solicitou cadastro de unidade',
+  MEMBRO_APROVADO: 'Membro aprovado',
+  MEMBRO_REPROVADO: 'Membro reprovado',
+  MEMBRO_REVERTIDO: 'Aprovação revertida',
+  MEMBRO_REVERTIDO_PENDENTE: 'Membro revertido a pendente',
+  MEMBROS_IMPORTADOS: 'Base de membros importada',
+  IMPORTACAO_DESFEITA: 'Importação desfeita',
+
+  // Sócios
+  CARTEIRINHA_EMITIDA: 'Carteirinha emitida',
+  CARTEIRINHA_RENOVADA: 'Carteirinha renovada',
+  CARTEIRINHA_REVOGADA: 'Carteirinha revogada',
+  SOCIO_CARTEIRINHA_EMITIDA: 'Carteirinha emitida',
+  SOCIO_CARTEIRINHA_RENOVADA: 'Carteirinha renovada',
+  SOCIO_CARTEIRINHA_REVOGADA: 'Carteirinha revogada',
+
+  // Eventos / sedes
+  EVENTO_CRIADO: 'Evento criado',
+  EVENTO_EDITADO: 'Evento editado',
+  EVENTO_EXCLUIDO: 'Evento excluído',
+  EVENTO_CHECKIN: 'Check-in em evento',
+  SEDE_CRIADA: 'Sede criada',
+  SEDE_EDITADA: 'Sede editada',
+  SEDE_ATIVADA: 'Sede ativada',
+  SEDE_DESATIVADA: 'Sede desativada',
+
+  // Loja
+  PRODUTO_CRIADO: 'Produto criado',
+  PRODUTO_EDITADO: 'Produto editado',
+  PRODUTO_ATIVADO: 'Produto ativado',
+  PRODUTO_DESATIVADO: 'Produto desativado',
+  CATEGORIA_CRIADA: 'Categoria criada',
+  CATEGORIA_EXCLUIDA: 'Categoria excluída',
+  CUPOM_CRIADO: 'Cupom criado',
+  CUPOM_ATIVADO: 'Cupom ativado',
+  CUPOM_DESATIVADO: 'Cupom desativado',
+  PEDIDO_CRIADO: 'Pedido criado',
+  PEDIDO_STATUS_ATUALIZADO: 'Status do pedido atualizado',
+
+  // Comunidade / moderação
+  POST_CRIADO: 'Post criado',
+  POST_ATUALIZADO: 'Post atualizado',
+  POST_EXCLUIDO: 'Post excluído',
+  COMUNICADO_CRIADO: 'Comunicado criado',
+  COMUNICADO_ATUALIZADO: 'Comunicado atualizado',
+  COMUNICADO_EXCLUIDO: 'Comunicado excluído',
+  POST_SOCIAL_PUBLICADO: 'Post social publicado',
+  POST_SOCIAL_EDITADO: 'Post social editado',
+  POST_SOCIAL_EXCLUIDO: 'Post social excluído',
+  POST_COMENTARIO_CRIADO: 'Comentário criado',
+  POST_REPOSTADO: 'Post repostado',
+  COMUNICADO_REPOSTADO: 'Comunicado repostado',
+  POST_EVENTO_PUBLICADO: 'Post de evento publicado',
+  POST_GRUPO_PUBLICADO: 'Post de grupo publicado',
+  MOMENTO_STORY_PUBLICADO: 'Momento publicado',
+  CANAL_TEMATICO_CRIADO: 'Canal temático criado',
+  POST_CANAL_PUBLICADO: 'Post de canal publicado',
+  PERFIL_DESTAQUE_CRIADO: 'Destaque de perfil criado',
+  POST_DENUNCIADO: 'Post denunciado',
+  DENUNCIA_RESOLVIDA: 'Denúncia resolvida',
+  DENUNCIA_DESCARTADA: 'Denúncia descartada',
+  DENUNCIA_MENSAGEM_RESOLVIDA: 'Denúncia de mensagem resolvida',
+  DENUNCIA_MENSAGEM_DESCARTADA: 'Denúncia de mensagem descartada',
+  NOTICIA_APROVADA: 'Notícia aprovada',
+  NOTICIA_REJEITADA: 'Notícia rejeitada',
+
+  // Acesso / governança
+  ACESSO_USUARIO_ATUALIZADO: 'Acesso de usuário atualizado',
+  ROLE_CRIADO: 'Cargo criado',
+  ROLE_ATUALIZADO: 'Cargo atualizado',
+  ROLE_EXCLUIDO: 'Cargo excluído',
+  DEPARTAMENTO_CRIADO: 'Departamento criado',
+  DEPARTAMENTO_ATUALIZADO: 'Departamento atualizado',
+  DEPARTAMENTO_EXCLUIDO: 'Departamento excluído',
+  DEPARTAMENTO_MEMBRO_ADICIONADO: 'Membro adicionado ao departamento',
+  DEPARTAMENTO_MEMBRO_REMOVIDO: 'Membro removido do departamento',
+  TENANT_PERFIL_ATUALIZADO: 'Perfil da torcida atualizado',
+  TENANT_DISCORD_ATUALIZADO: 'Discord da torcida atualizado',
+  TENANT_AFILIACAO_ATUALIZADA: 'Afiliação da torcida atualizada',
+  TENANT_CRIADO: 'Torcida criada',
+  OWNER_ATRIBUIDO: 'Presidência atribuída',
+  OWNER_TRANSFERIDO: 'Presidência transferida',
+
+  // Alianças
+  ALIANCA_PROPOSTA: 'Aliança proposta',
+  ALIANCA_ACEITA: 'Aliança aceita',
+  ALIANCA_REJEITADA: 'Aliança rejeitada',
+  ALIANCA_ENCERRADA: 'Aliança encerrada',
+
+  // Mensageria / salas
+  GRUPO_CONVERSA_CRIADO: 'Grupo de conversa criado',
+  GRUPO_MEMBRO_ADICIONADO: 'Membro adicionado ao grupo',
+  GRUPO_MEMBRO_REMOVIDO: 'Membro removido do grupo',
+  GRUPO_ADMIN_TRANSFERIDO: 'Admin do grupo transferido',
+  MENSAGEM_DENUNCIADA: 'Mensagem denunciada',
+  MENSAGEM_REMOVIDA_MODERACAO: 'Mensagem removida por moderação',
+  USUARIO_BLOQUEADO_MENSAGERIA: 'Usuário bloqueado na mensageria',
+  SALA_REUNIAO_CRIADA: 'Sala de reunião criada',
+  SALA_REUNIAO_ENCERRADA: 'Sala de reunião encerrada',
+  SALA_MENSAGEM_EDITADA: 'Mensagem da sala editada',
+  SALA_MENSAGEM_EXCLUIDA: 'Mensagem da sala excluída',
+  SALA_ENQUETE_CRIADA: 'Enquete criada',
+  SALA_ENQUETE_VOTO: 'Voto em enquete',
+  SALA_ENQUETE_ENCERRADA: 'Enquete encerrada',
+  PERFIL_SOCIAL_ATUALIZADO: 'Perfil social atualizado',
+}
+
+export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
+  SaasMembro: 'Membro',
+  SaasSocio: 'Sócio',
+  Evento: 'Evento',
+  Sede: 'Sede',
+  SaasProduto: 'Produto',
+  SaasCategoria: 'Categoria',
+  SaasCupom: 'Cupom',
+  SaasPedido: 'Pedido',
+  Post: 'Post',
+  Announcement: 'Comunicado',
+  Denuncia: 'Denúncia',
+  Noticia: 'Notícia',
+  Role: 'Cargo',
+  Departamento: 'Departamento',
+  Tenant: 'Torcida',
+  Alianca: 'Aliança',
+  Conversa: 'Conversa',
+  Mensagem: 'Mensagem',
+  SalaReuniao: 'Sala',
+  User: 'Usuário',
+  UserRole: 'Acesso',
+  ImportacaoBase: 'Importação',
+  PerfilMembro: 'Perfil',
+}
+
+export function labelAcaoAuditoria(acao: string): string {
+  return AUDIT_ACAO_LABEL[acao] ?? acao.replace(/_/g, ' ').toLowerCase()
+}
+
+export function labelEntidadeAuditoria(entidade: string | null | undefined): string {
+  if (!entidade) return '—'
+  return AUDIT_ENTIDADE_LABEL[entidade] ?? entidade
+}
