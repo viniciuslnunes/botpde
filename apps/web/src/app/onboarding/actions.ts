@@ -502,6 +502,12 @@ export async function solicitarVinculo(
     departamentoId = dep.id
   }
 
+  // TORCEDOR entra sem fila de aprovação (copy do wizard: "entrada imediata,
+  // sem aprovação nem comprovante") — só não abre tenant próprio no portal
+  // (resolveUserTenantSlugForUser filtra tipo: 'SOCIO'), cai na Comunidade
+  // Nacional do clube. Só SOCIO passa pela fila de aprovação do admin.
+  const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
+
   const existing = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
     select: { id: true, status: true },
@@ -516,7 +522,7 @@ export async function solicitarVinculo(
         where: { id: existing.id },
         data: {
           ...dadosMembro,
-          status: 'PENDENTE',
+          status: statusInicial,
         },
       })
     } else {
@@ -525,7 +531,7 @@ export async function solicitarVinculo(
         where: { id: existing.id },
         data: {
           ...dadosMembro,
-          status: 'PENDENTE',
+          status: statusInicial,
           aprovadoPorId: null,
           aprovadoPorNome: null,
           aprovadoEm: null,
@@ -547,7 +553,7 @@ export async function solicitarVinculo(
         tenantId: tenant.id,
         userId,
         ...dadosMembro,
-        status: 'PENDENTE',
+        status: statusInicial,
       },
     })
     await db.auditLog.create({
