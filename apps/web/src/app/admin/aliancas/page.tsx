@@ -13,6 +13,12 @@ interface TenantOption {
   id: string
   nome: string
   slug: string
+  afiliacao: {
+    nome: string
+    apelido: string | null
+    cidade: string | null
+    estado: string | null
+  } | null
 }
 
 export default async function AdminAliancasPage() {
@@ -31,7 +37,14 @@ export default async function AdminAliancasPage() {
     db.tenant.findMany({
       where: { ativo: true, id: { not: authz.tenant.id } },
       orderBy: { nome: 'asc' },
-      select: { id: true, nome: true, slug: true },
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        afiliacao: {
+          select: { nome: true, apelido: true, cidade: true, estado: true },
+        },
+      },
     }),
   ])
 
@@ -43,7 +56,7 @@ export default async function AdminAliancasPage() {
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Alianças</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Gerencie parcerias entre torcidas e propostas pendentes.
+              Parcerias entre torcidas, propostas e recomendações da base de conhecimento.
             </p>
           </div>
         </div>
