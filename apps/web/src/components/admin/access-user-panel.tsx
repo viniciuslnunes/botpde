@@ -371,21 +371,20 @@ export function AccessUserPanel({
               Marcadas = acesso concedido. Badges mostram a origem. Desmarcar o que perfil/depto
               concede cria uma revogação.
             </p>
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid items-start gap-3 lg:grid-cols-2">
               {PERMISSION_GROUPS.map((group) => {
                 const marks = group.items.filter((i) => permissoes.has(i.key)).length
                 return (
-                  <details
+                  <div
                     key={group.label}
-                    open={marks > 0}
-                    className="group rounded-xl border border-[rgb(var(--border))]"
+                    className="rounded-xl border border-[rgb(var(--border))]"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))]">
                       <span>{group.label}</span>
                       <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
                         {marks}/{group.items.length}
                       </span>
-                    </summary>
+                    </div>
                     <div className="grid grid-cols-1 gap-1 border-t border-[rgb(var(--border))] p-2 sm:grid-cols-2">
                       {group.items.map((item) => {
                         const badge = origemBadge(item.key)
@@ -426,7 +425,7 @@ export function AccessUserPanel({
                         )
                       })}
                     </div>
-                  </details>
+                  </div>
                 )
               })}
             </div>
