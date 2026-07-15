@@ -16,7 +16,7 @@ import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
-import { getPostPorId } from '@/lib/feed'
+import { getPostPorId, podeVerPost } from '@/lib/feed'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
@@ -432,15 +432,25 @@ export interface ComentarioPostItem {
 }
 
 export async function listarComentariosPost(postId: string): Promise<ComentarioPostItem[]> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  // Leitura de comentários: gate é a visibilidade do post (podeVerPost), não
+  // permissão de comunidade — o mesmo post pode ser lido por torcedor global
+  // (sem tenant) desde que seja PUBLICO ou o viewer tenha acesso a ele.
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado')
 
-  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
-  const post: { id: string } | null = await db.post.findFirst({
-    where: { id: postId, tenantId: { in: visibleIds }, oculto: false },
-    select: { id: true },
+  const post: {
+    id: string
+    autorId: string
+    tenantId: string
+    visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+    oculto: boolean
+  } | null = await db.post.findUnique({
+    where: { id: postId },
+    select: { id: true, autorId: true, tenantId: true, visibilidade: true, oculto: true },
   })
-  if (!post) throw new Error('Post não encontrado')
+  if (!post || !(await podeVerPost(session.user.id, post))) {
+    throw new Error('Post não encontrado')
+  }
 
   const rows: Array<{
     id: string
