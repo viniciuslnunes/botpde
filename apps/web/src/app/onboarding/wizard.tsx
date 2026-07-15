@@ -5,12 +5,22 @@ import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
-import { ClubeOnboardingMeta } from '@/components/onboarding/clube-onboarding-meta'
+import { ClubeOnboardingCard } from '@/components/onboarding/clube-onboarding-card'
+import { MapaBrasilIsometrico } from '@/components/onboarding/mapa-brasil-isometrico'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { routePage, springGentle, springSnappy } from '@/lib/motion-presets'
+import {
+  routePage,
+  springGentle,
+  springSnappy,
+} from '@/lib/motion-presets'
+import {
+  NOME_UF,
+  REGIOES_BRASIL,
+  type RegiaoBrasilId,
+} from '@/lib/regioes-brasil'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -42,15 +52,6 @@ const PASSOS_VISIVEIS: { key: Passo; label: string }[] = [
   { key: 'unidade', label: 'Unidade' },
   { key: 'vinculo', label: 'Vínculo' },
 ]
-
-const SERIE_LABEL: Record<string, string> = {
-  A: 'Série A',
-  B: 'Série B',
-  C: 'Série C',
-  D: 'Série D',
-  ESTADUAL: 'Estadual',
-  OUTRA: 'Outra',
-}
 
 type Props = {
   afiliacoesIniciais: AfiliacaoOnboarding[]
@@ -371,6 +372,8 @@ function PassoClube({
 }) {
   const [busca, setBusca] = useState('')
   const [ufFiltro, setUfFiltro] = useState('')
+  const [regiaoAtiva, setRegiaoAtiva] = useState<RegiaoBrasilId | null>(null)
+  const [ufHover, setUfHover] = useState<string | null>(null)
   const [lista, setLista] = useState(afiliacoesIniciais)
   const [buscando, startBusca] = useTransition()
 
@@ -392,45 +395,71 @@ function PassoClube({
     recarregar(busca, prox)
   }
 
+  function onRegiao(id: RegiaoBrasilId | null) {
+    setRegiaoAtiva(id)
+    setUfHover(null)
+    if (ufFiltro) {
+      setUfFiltro('')
+      recarregar(busca, '')
+    }
+  }
+
+  const metaRegiaoAtiva = regiaoAtiva
+    ? REGIOES_BRASIL.find((r) => r.id === regiaoAtiva) ?? null
+    : null
+
+  /** Listagem agrupada por UF quando a região está ativa e não há busca textual. */
+  const gruposPorEstado = useMemo(() => {
+    if (!metaRegiaoAtiva || busca.trim()) return null
+    const fonte = ufFiltro
+      ? lista.filter((a) => a.estado?.toUpperCase() === ufFiltro)
+      : lista.filter((a) => {
+          const uf = a.estado?.toUpperCase()
+          return uf != null && metaRegiaoAtiva.ufs.includes(uf)
+        })
+
+    const map = new Map<string, AfiliacaoOnboarding[]>()
+    for (const uf of metaRegiaoAtiva.ufs) {
+      if (ufFiltro && uf !== ufFiltro) continue
+      map.set(uf, [])
+    }
+    for (const a of fonte) {
+      const uf = a.estado?.toUpperCase()
+      if (!uf || !map.has(uf)) continue
+      map.get(uf)!.push(a)
+    }
+    return [...map.entries()].filter(([, clubes]) => clubes.length > 0)
+  }, [metaRegiaoAtiva, lista, ufFiltro, busca])
+
   const tituloGrid =
     ufFiltro && !busca
-      ? `Clubes em ${ufFiltro}`
+      ? `Clubes em ${NOME_UF[ufFiltro] ?? ufFiltro}`
       : busca
         ? `Resultados para "${busca}"`
-        : null
+        : metaRegiaoAtiva
+          ? `Clubes · ${metaRegiaoAtiva.nome}`
+          : null
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Qual clube você torce?</h1>
       <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Escolha o time do seu coração. Filtre por estado ou busque pelo nome.
+        Escolha o time do seu coração. Explore o mapa por região ou busque pelo nome.
       </p>
 
       {regioes.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Sugestões por região
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {regioes.map((r) => {
-              const ativo = ufFiltro === r.uf
-              return (
-                <button
-                  key={r.uf}
-                  type="button"
-                  onClick={() => onUfFiltro(r.uf)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    ativo
-                      ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
-                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--color-primary))]/50'
-                  }`}
-                >
-                  {r.uf}
-                  <span className="ml-1 opacity-70">({r.total})</span>
-                </button>
-              )
-            })}
-          </div>
+        <div className="mt-5">
+          <MapaBrasilIsometrico
+            afiliacoes={afiliacoesIniciais}
+            regioes={regioes}
+            regiaoAtiva={regiaoAtiva}
+            ufHover={ufHover}
+            ufSelecionada={ufFiltro}
+            onRegiao={onRegiao}
+            onUfHover={setUfHover}
+            onUfSelecionar={onUfFiltro}
+            onSelecionarClube={onSelecionar}
+          />
         </div>
       )}
 
@@ -454,47 +483,99 @@ function PassoClube({
           Nenhum clube encontrado
           {busca ? ` para "${busca}"` : ufFiltro ? ` em ${ufFiltro}` : ''}. Tente outro filtro ou nome.
         </div>
+      ) : gruposPorEstado ? (
+        <div className="mt-5 space-y-6">
+          {tituloGrid && (
+            <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">{tituloGrid}</p>
+          )}
+          <AnimatePresence mode="popLayout">
+            {gruposPorEstado.map(([uf, clubes]) => (
+              <m.section
+                key={uf}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springGentle}
+                onMouseEnter={() => setUfHover(uf)}
+                onMouseLeave={() => setUfHover(null)}
+                className={`rounded-2xl border p-3 transition-colors sm:p-4 ${
+                  ufHover === uf || ufFiltro === uf
+                    ? 'border-[rgb(var(--color-primary))]/60 bg-[rgb(var(--color-primary))]/5'
+                    : 'border-[rgb(var(--border))] bg-transparent'
+                }`}
+              >
+                <header className="mb-3 flex items-baseline justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                    {NOME_UF[uf] ?? uf}
+                    <span className="ml-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                      {uf}
+                    </span>
+                  </h2>
+                  <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
+                    {clubes.length} {clubes.length === 1 ? 'clube' : 'clubes'}
+                  </span>
+                </header>
+                <m.ul
+                  className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+                  initial="hidden"
+                  animate="show"
+                  variants={{
+                    hidden: {},
+                    show: { transition: { staggerChildren: 0.03, delayChildren: 0.02 } },
+                  }}
+                >
+                  {clubes.map((a, i) => (
+                    <m.li
+                      key={a.id}
+                      variants={{
+                        hidden: { opacity: 0, y: 10 },
+                        show: {
+                          opacity: 1,
+                          y: 0,
+                          transition: { ...springGentle, delay: Math.min(i, 8) * 0.03 },
+                        },
+                      }}
+                    >
+                      <ClubeOnboardingCard clube={a} onSelecionar={onSelecionar} />
+                    </m.li>
+                  ))}
+                </m.ul>
+              </m.section>
+            ))}
+          </AnimatePresence>
+        </div>
       ) : (
         <>
           {tituloGrid && (
             <p className="mt-5 text-sm font-medium text-[rgb(var(--foreground-muted))]">{tituloGrid}</p>
           )}
-          <ul className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${tituloGrid ? 'mt-3' : 'mt-5'}`}>
-          {lista.map((a) => (
-            <li key={a.id}>
-              <button
-                type="button"
-                onClick={() => onSelecionar(a)}
-                className="flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
+          <m.ul
+            className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${tituloGrid ? 'mt-3' : 'mt-5'}`}
+            initial="hidden"
+            animate="show"
+            key={busca || ufFiltro || 'all'}
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.03, delayChildren: 0.02 } },
+            }}
+          >
+            {lista.map((a, i) => (
+              <m.li
+                key={a.id}
+                variants={{
+                  hidden: { opacity: 0, y: 10 },
+                  show: {
+                    opacity: 1,
+                    y: 0,
+                    transition: { ...springGentle, delay: Math.min(i, 12) * 0.025 },
+                  },
+                }}
               >
-                <EscudoClube
-                  nome={a.nome}
-                  apelido={a.apelido}
-                  escudoUrl={a.escudoUrl}
-                />
-                <span className="text-xs font-semibold uppercase text-[rgb(var(--foreground))] line-clamp-2">
-                  {a.nome}
-                </span>
-                {(a.apelido || a.estado) && (
-                  <span className="text-[10px] text-[rgb(var(--foreground-muted))] line-clamp-1">
-                    {[a.apelido, a.estado].filter(Boolean).join(' · ')}
-                  </span>
-                )}
-                {a.serie && (
-                  <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
-                    {SERIE_LABEL[a.serie] ?? a.serie}
-                  </span>
-                )}
-                <ClubeOnboardingMeta
-                  torcedoresEstimados={a.torcedoresEstimados}
-                  torcedoresEstimadosFonte={a.torcedoresEstimadosFonte}
-                  torcedoresEstimadosTipo={a.torcedoresEstimadosTipo}
-                  stats={a.stats}
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <ClubeOnboardingCard clube={a} onSelecionar={onSelecionar} />
+              </m.li>
+            ))}
+          </m.ul>
         </>
       )}
     </div>
