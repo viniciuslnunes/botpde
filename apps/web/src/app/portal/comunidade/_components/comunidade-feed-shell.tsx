@@ -8,8 +8,7 @@ import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
-import { ComunidadeFeedTabs } from './comunidade-feed-tabs'
-import { ComunidadeSearchBar } from './comunidade-search-bar'
+import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -178,12 +177,7 @@ export function ComunidadeFeedShell({
           </div>
         )}
 
-        <div className="sticky top-14 z-20 -mx-4 min-w-0 space-y-3 overflow-x-clip bg-[rgb(var(--background-subtle))]/90 px-4 pb-2 pt-1 backdrop-blur-md lg:top-16 lg:mx-0 lg:px-0">
-          <ComunidadeSearchBar />
-          <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
-            <ComunidadeFeedTabs />
-          </Suspense>
-        </div>
+        <ComunidadeStickySearchChrome />
 
         <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
           {[

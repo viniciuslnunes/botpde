@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { AnimatePresence, m } from 'motion/react'
+import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Home, Search, Video, Plus } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
+import { useScrollChromeVisibility } from '@/lib/use-scroll-chrome-visibility'
 
 interface ComunidadeDockProps {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
@@ -22,6 +23,8 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const chromeVisible = useScrollChromeVisibility()
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMounted(true), 0)
@@ -75,10 +78,15 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
       style={{ left: 0, right: 0 }}
     >
       <m.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={springSnappy}
-        className="pointer-events-auto"
+        initial={false}
+        animate={
+          chromeVisible
+            ? { opacity: 1, y: 0 }
+            : { opacity: 0, y: reduceMotion ? 0 : 24 }
+        }
+        transition={reduceMotion ? { duration: 0 } : springSnappy}
+        className={chromeVisible ? 'pointer-events-auto' : 'pointer-events-none'}
+        aria-hidden={!chromeVisible}
       >
         <nav
           aria-label="Navegação da comunidade"
