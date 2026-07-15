@@ -63,6 +63,52 @@ function initials(nome: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
+function coberturaDe(
+  roles: AccessRoleOpt[],
+  departamentos: AccessDepartamentoOpt[],
+  perfilIds: Set<string>,
+  departamentoIds: Set<string>,
+  gestorIds: Set<string>,
+): { viaPerfil: Set<string>; viaDepto: Set<string>; todas: Set<string> } {
+  const viaPerfil = new Set(
+    roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
+  )
+  const viaDepto = new Set(
+    departamentos
+      .filter((d) => departamentoIds.has(d.id))
+      .flatMap((d) => permsDoDepartamento(d, gestorIds.has(d.id))),
+  )
+  return { viaPerfil, viaDepto, todas: new Set([...viaPerfil, ...viaDepto]) }
+}
+
+/** Diff entre cobertura (perfil/depto) e o efetivo: extras e revogações. */
+function diffCoberturaEfetiva(
+  cobertura: Set<string>,
+  efetivas: Iterable<string>,
+): { extras: Set<string>; revogadas: Set<string> } {
+  const efetivasSet = new Set(efetivas)
+  const extras = new Set<string>()
+  const revogadas = new Set<string>()
+  for (const p of efetivasSet) {
+    if (!cobertura.has(p)) extras.add(p)
+  }
+  for (const p of cobertura) {
+    if (!efetivasSet.has(p)) revogadas.add(p)
+  }
+  return { extras, revogadas }
+}
+
+function efetivasDe(
+  cobertura: Set<string>,
+  extras: Set<string>,
+  revogadas: Set<string>,
+): Set<string> {
+  const next = new Set(cobertura)
+  for (const p of revogadas) next.delete(p)
+  for (const p of extras) next.add(p)
+  return next
+}
+
 /**
  * Painel dedicado de gestão de acesso de um usuário —
  * abas Perfis / Departamentos / Permissões (mesmas regras do formulário antigo).
@@ -82,79 +128,89 @@ export function AccessUserPanel({
 }) {
   const [aba, setAba] = useState<PainelAba>('perfis')
   const [pending, startTransition] = useTransition()
-  const [perfilIds, setPerfilIds] = useState<Set<string>>(new Set(usuario.perfilIds))
+  const [perfilIds, setPerfilIds] = useState<Set<string>>(() => new Set(usuario.perfilIds))
   const [departamentoIds, setDepartamentoIds] = useState<Set<string>>(
-    new Set(usuario.departamentoIds),
+    () => new Set(usuario.departamentoIds),
   )
-  const [gestorIds, setGestorIds] = useState<Set<string>>(new Set(usuario.gestorDepartamentoIds))
+  const [gestorIds, setGestorIds] = useState<Set<string>>(
+    () => new Set(usuario.gestorDepartamentoIds),
+  )
 
-  const coberturaBase = useMemo(() => {
-    const viaPerfil = new Set(
-      roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
+  /** Extras manuais e revogações — o efetivo deriva da cobertura atual. */
+  const [overridesUi, setOverridesUi] = useState(() => {
+    const cob = coberturaDe(
+      roles,
+      departamentos,
+      new Set(usuario.perfilIds),
+      new Set(usuario.departamentoIds),
+      new Set(usuario.gestorDepartamentoIds),
     )
-    const viaDepto = new Set(
-      departamentos
-        .filter((d) => departamentoIds.has(d.id))
-        .flatMap((d) => permsDoDepartamento(d, gestorIds.has(d.id))),
-    )
-    return { viaPerfil, viaDepto }
-  }, [roles, departamentos, perfilIds, departamentoIds, gestorIds])
+    const rolePermissions = [...cob.todas]
+    const efetivas = calculateEffectivePermissions(rolePermissions, usuario.permissoesAdicionais)
+    return diffCoberturaEfetiva(cob.todas, efetivas)
+  })
 
-  const permissoesEfetivasIniciais = useMemo(() => {
-    const rolePermissions = [
-      ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
-      ...departamentos
-        .filter((d) => usuario.departamentoIds.includes(d.id))
-        .flatMap((d) =>
-          permsDoDepartamento(d, usuario.gestorDepartamentoIds.includes(d.id)),
-        ),
-    ]
-    return calculateEffectivePermissions(rolePermissions, usuario.permissoesAdicionais)
-  }, [roles, departamentos, usuario])
+  const coberturaBase = useMemo(
+    () => coberturaDe(roles, departamentos, perfilIds, departamentoIds, gestorIds),
+    [roles, departamentos, perfilIds, departamentoIds, gestorIds],
+  )
 
-  const [permissoes, setPermissoes] = useState<Set<string>>(new Set(permissoesEfetivasIniciais))
+  const permissoes = useMemo(
+    () => efetivasDe(coberturaBase.todas, overridesUi.extras, overridesUi.revogadas),
+    [coberturaBase.todas, overridesUi],
+  )
 
   const nomeExibicao = usuario.nome ?? usuario.email ?? 'Usuário sem nome'
   const totalPerms = permissoes.size
   const totalPerfis = perfilIds.size
   const totalDeptos = departamentoIds.size
 
-  function toggleSet<T>(setter: (fn: (prev: Set<T>) => Set<T>) => void, value: T) {
-    setter((prev) => {
-      const next = new Set(prev)
-      if (next.has(value)) next.delete(value)
-      else next.add(value)
-      return next
+  function aplicarMudancaCobertura(
+    nextPerfis: Set<string>,
+    nextDeptos: Set<string>,
+    nextGestores: Set<string>,
+  ) {
+    const prev = coberturaBase.todas
+    const next = coberturaDe(roles, departamentos, nextPerfis, nextDeptos, nextGestores).todas
+    setOverridesUi((cur) => {
+      const extras = new Set(cur.extras)
+      const revogadas = new Set(cur.revogadas)
+      // Novas permissões da cobertura entram concedidas (não herdam revogação).
+      for (const p of next) {
+        if (!prev.has(p)) {
+          revogadas.delete(p)
+          extras.delete(p)
+        }
+      }
+      // Saiu da cobertura: limpa override órfão.
+      for (const p of prev) {
+        if (!next.has(p)) {
+          revogadas.delete(p)
+        }
+      }
+      // Extra que passou a ser coberto vira padrão do perfil.
+      for (const p of extras) {
+        if (next.has(p)) extras.delete(p)
+      }
+      return { extras, revogadas }
     })
+  }
+
+  function togglePerfil(roleId: string) {
+    const next = new Set(perfilIds)
+    if (next.has(roleId)) next.delete(roleId)
+    else next.add(roleId)
+    aplicarMudancaCobertura(next, departamentoIds, gestorIds)
+    setPerfilIds(next)
   }
 
   function togglePermissao(key: string) {
-    setPermissoes((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return new Set(applyPermissionCascade([...prev], [...next]))
-    })
-  }
-
-  function syncPermissoesComDeptos(nextDeptos: Set<string>, nextGestores: Set<string>) {
-    const cov = new Set([
-      ...roles.filter((r) => perfilIds.has(r.id)).flatMap((r) => r.permissions),
-      ...departamentos
-        .filter((d) => nextDeptos.has(d.id))
-        .flatMap((d) => permsDoDepartamento(d, nextGestores.has(d.id))),
-      ...usuario.permissoesAdicionais.filter((o) => o.granted).map((o) => o.permission),
-    ])
-    setPermissoes((prev) => {
-      const next = new Set(prev)
-      const todasDepto = new Set(departamentos.flatMap((d) => permsDoDepartamento(d, true)))
-      for (const p of todasDepto) {
-        if (cov.has(p)) next.add(p)
-        else next.delete(p)
-      }
-      for (const p of cov) next.add(p)
-      return next
-    })
+    const prevArr = [...permissoes]
+    const nextArr = permissoes.has(key)
+      ? prevArr.filter((p) => p !== key)
+      : [...prevArr, key]
+    const cascateadas = new Set(applyPermissionCascade(prevArr, nextArr))
+    setOverridesUi(diffCoberturaEfetiva(coberturaBase.todas, cascateadas))
   }
 
   function setMembroDepartamento(id: string, ativo: boolean) {
@@ -165,9 +221,9 @@ export function AccessUserPanel({
       nextDeptos.delete(id)
       nextGestores.delete(id)
     }
+    aplicarMudancaCobertura(perfilIds, nextDeptos, nextGestores)
     setDepartamentoIds(nextDeptos)
     setGestorIds(nextGestores)
-    syncPermissoesComDeptos(nextDeptos, nextGestores)
   }
 
   function setGestorDepartamento(id: string, ativo: boolean) {
@@ -179,30 +235,21 @@ export function AccessUserPanel({
     } else {
       nextGestores.delete(id)
     }
+    aplicarMudancaCobertura(perfilIds, nextDeptos, nextGestores)
     setDepartamentoIds(nextDeptos)
     setGestorIds(nextGestores)
-    syncPermissoesComDeptos(nextDeptos, nextGestores)
   }
 
   function origemBadge(permission: string): string | null {
+    const coberta =
+      coberturaBase.viaPerfil.has(permission) || coberturaBase.viaDepto.has(permission)
+    if (!permissoes.has(permission) && coberta) return 'revogada'
+    if (permissoes.has(permission) && !coberta) return 'extra'
     if (coberturaBase.viaPerfil.has(permission) && coberturaBase.viaDepto.has(permission)) {
       return 'perfil+depto'
     }
     if (coberturaBase.viaPerfil.has(permission)) return 'via perfil'
     if (coberturaBase.viaDepto.has(permission)) return 'via depto'
-    if (
-      permissoes.has(permission) &&
-      !coberturaBase.viaPerfil.has(permission) &&
-      !coberturaBase.viaDepto.has(permission)
-    ) {
-      return 'extra'
-    }
-    if (
-      !permissoes.has(permission) &&
-      (coberturaBase.viaPerfil.has(permission) || coberturaBase.viaDepto.has(permission))
-    ) {
-      return 'revogada'
-    }
     return null
   }
 
@@ -331,7 +378,7 @@ export function AccessUserPanel({
                       type="checkbox"
                       className="sr-only"
                       checked={checked}
-                      onChange={() => toggleSet(setPerfilIds, role.id)}
+                      onChange={() => togglePerfil(role.id)}
                     />
                     <span
                       className="h-3 w-3 shrink-0 rounded-full"
