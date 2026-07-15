@@ -17,7 +17,7 @@ import {
   rotuloCargoSistema,
 } from '@torcida/types'
 import { salvarAcessoUsuario } from '@/app/admin/acessos/actions'
-import { AccessPermissionPreview } from '@/components/admin/access-permission-preview'
+import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 
 export interface AccessRoleOpt {
   id: string
@@ -477,6 +477,7 @@ function DepartamentoAssignGrid({
   onToggleGestor: (id: string, ativo: boolean) => void
 }) {
   const [detalheId, setDetalheId] = useState<string | null>(null)
+  const detalhe = departamentos.find((d) => d.id === detalheId) ?? null
 
   return (
     <div className="space-y-3">
@@ -484,24 +485,28 @@ function DepartamentoAssignGrid({
         <strong className="font-medium text-[rgb(var(--foreground))]">Membro</strong> recebe as
         permissões de colaborador da área.{' '}
         <strong className="font-medium text-[rgb(var(--foreground))]">Gestor</strong> soma as extras
-        e administra a equipe. Abra <em>Ver pacote</em> para conferir o que cada papel concede.
+        e administra a equipe. Use <em>Pacote</em> para ver o detalhe em largura total abaixo.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+
+      {/* items-start: cards não esticam quando um pacote está aberto */}
+      <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {departamentos.map((depto) => {
           const isMembro = departamentoIds.has(depto.id)
           const isGestor = gestorIds.has(depto.id)
           const ativo = isMembro || isGestor
           const organizacional =
             depto.permissions.length === 0 && depto.permissionsGestor.length === 0
-          const aberto = detalheId === depto.id
+          const selecionado = detalheId === depto.id
           return (
             <div
               key={depto.id}
               className={[
-                'flex flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--surface))]',
-                ativo
-                  ? 'border-[rgb(var(--primary)_/_0.45)]'
-                  : 'border-[rgb(var(--border))]',
+                'flex flex-col rounded-2xl border bg-[rgb(var(--surface))]',
+                selecionado
+                  ? 'border-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary)_/_0.25)]'
+                  : ativo
+                    ? 'border-[rgb(var(--primary)_/_0.45)]'
+                    : 'border-[rgb(var(--border))]',
               ].join(' ')}
               style={{ borderTopColor: depto.cor, borderTopWidth: 3 }}
             >
@@ -522,7 +527,7 @@ function DepartamentoAssignGrid({
                 </div>
               </div>
 
-              <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--border))] px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--border))] px-3 py-2.5">
                 <button
                   type="button"
                   onClick={() => onToggleMembro(depto.id, !isMembro)}
@@ -551,48 +556,59 @@ function DepartamentoAssignGrid({
                 {!organizacional && (
                   <button
                     type="button"
-                    onClick={() => setDetalheId(aberto ? null : depto.id)}
-                    aria-expanded={aberto}
-                    className="ml-auto inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                    onClick={() => setDetalheId(selecionado ? null : depto.id)}
+                    aria-expanded={selecionado}
+                    className={[
+                      'ml-auto inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+                      selecionado
+                        ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                        : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                    ].join(' ')}
                   >
                     Pacote
                     <ChevronDown
-                      className={['h-3.5 w-3.5 transition-transform', aberto ? 'rotate-180' : ''].join(
-                        ' ',
-                      )}
+                      className={[
+                        'h-3.5 w-3.5 transition-transform',
+                        selecionado ? 'rotate-180' : '',
+                      ].join(' ')}
                     />
                   </button>
                 )}
               </div>
-
-              {aberto && !organizacional && (
-                <div className="space-y-3 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.5)] px-3 py-3">
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                      Colaborador
-                    </p>
-                    <AccessPermissionPreview
-                      permissions={depto.permissions}
-                      emptyLabel="Sem permissões"
-                      compact
-                    />
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                      Extra do gestor
-                    </p>
-                    <AccessPermissionPreview
-                      permissions={depto.permissionsGestor}
-                      emptyLabel="Sem extras"
-                      compact
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           )
         })}
       </div>
+
+      {detalhe && (
+        <div
+          className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-4 sm:p-5"
+          style={{ borderTopColor: detalhe.cor, borderTopWidth: 3 }}
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: detalhe.cor }}
+              />
+              <h3 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                Pacote · {detalhe.nome}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDetalheId(null)}
+              className="rounded-lg px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
+            >
+              Fechar
+            </button>
+          </div>
+          <AccessPermissionCompare
+            permissionsMembro={detalhe.permissions}
+            permissionsGestor={detalhe.permissionsGestor}
+          />
+        </div>
+      )}
     </div>
   )
 }
