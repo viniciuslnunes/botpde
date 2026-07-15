@@ -6,7 +6,7 @@ import type { Alianca, StatusAlianca } from '@torcida/db'
 import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
-import { invalidateHierarchyCache } from '@/lib/hierarquia'
+import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { PERMISSIONS } from '@torcida/types'
 
 const uuidSchema = z.string().uuid('ID inválido')
@@ -15,11 +15,17 @@ interface TenantLite {
   id: string
   nome: string
   slug: string
+  afiliacaoId: string | null
 }
 
-function invalidateAliancaHierarchy(origemId: string, aliadoId: string): void {
-  invalidateHierarchyCache(origemId)
-  invalidateHierarchyCache(aliadoId)
+async function invalidateAliancaHierarchy(origemId: string, aliadoId: string): Promise<void> {
+  const [lineA, lineB] = await Promise.all([
+    getTorcidaLineageTenantIds(origemId),
+    getTorcidaLineageTenantIds(aliadoId),
+  ])
+  for (const id of new Set([...lineA, ...lineB])) {
+    invalidateHierarchyCache(id)
+  }
 }
 
 async function loadAliancaInTenant(aliancaId: string, tenantId: string): Promise<Alianca | null> {
@@ -54,9 +60,23 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
 
   const aliado: TenantLite | null = await db.tenant.findFirst({
     where: { id: tenantDestinoId, ativo: true },
-    select: { id: true, nome: true, slug: true },
+    select: { id: true, nome: true, slug: true, afiliacaoId: true },
   })
   if (!aliado) throw new Error('Torcida aliada não encontrada')
+
+  const origemAfiliacao: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+    where: { id: tenantOrigemId },
+    select: { afiliacaoId: true },
+  })
+  if (
+    origemAfiliacao?.afiliacaoId &&
+    aliado.afiliacaoId &&
+    origemAfiliacao.afiliacaoId === aliado.afiliacaoId
+  ) {
+    throw new Error(
+      'Organizadas do mesmo time são co-irmãs, não aliadas — use o painel de recomendações (co-irmã)',
+    )
+  }
 
   const existente = await findAliancaEntreTenants(tenantOrigemId, tenantDestinoId)
 
@@ -106,7 +126,7 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
-  invalidateAliancaHierarchy(tenantOrigemId, tenantDestinoId)
+  await invalidateAliancaHierarchy(tenantOrigemId, tenantDestinoId)
 }
 
 /**
@@ -184,7 +204,7 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
-  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
+  await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
 export async function rejeitarAlianca(aliancaId: string): Promise<void> {
@@ -224,7 +244,7 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
-  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
+  await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
 /**
@@ -267,7 +287,7 @@ export async function cancelarProposta(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
-  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
+  await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }
 
 export async function encerrarAlianca(aliancaId: string): Promise<void> {
@@ -300,5 +320,5 @@ export async function encerrarAlianca(aliancaId: string): Promise<void> {
   })
 
   revalidatePath('/admin/aliancas')
-  invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
+  await invalidateAliancaHierarchy(alianca.tenantOrigemId, alianca.tenantAliadoId)
 }

@@ -164,19 +164,56 @@ export const getDescendantTenantIds = cache(async (tenantId: string): Promise<st
 })
 
 /**
+ * IDs de tenant da mesma torcida organizacional (worktree): o próprio +
+ * ancestrais + descendentes na árvore de Sede (Subsede/PDE).
+ * Usado para herdar aliança ATIVA da sede principal às sub-unidades.
+ */
+export async function getTorcidaLineageTenantIds(tenantId: string): Promise<string[]> {
+  const [ancestrais, descendentes] = await Promise.all([
+    getAncestorTenantIds(tenantId),
+    getDescendantTenantIds(tenantId),
+  ])
+  return Array.from(new Set([tenantId, ...ancestrais, ...descendentes]))
+}
+
+/**
  * IDs de tenants com aliança ATIVA em relação ao tenant indicado.
+ * Herda a ideologia da sede: se a raiz (ou qualquer unidade da worktree)
+ * tem aliança ATIVA com B, todas as unidades da worktree enxergam o
+ * lineage de B como aliado (decisão #3 — aliança nível torcida).
  */
 async function getAlliedTenantIdsImpl(tenantId: string): Promise<string[]> {
+  const lineage = await getTorcidaLineageTenantIds(tenantId)
+  if (lineage.length === 0) return []
+
   const aliancas: { tenantOrigemId: string; tenantAliadoId: string }[] =
     await db.alianca.findMany({
       where: {
         status: 'ATIVA',
-        OR: [{ tenantOrigemId: tenantId }, { tenantAliadoId: tenantId }],
+        OR: [{ tenantOrigemId: { in: lineage } }, { tenantAliadoId: { in: lineage } }],
       },
       select: { tenantOrigemId: true, tenantAliadoId: true },
     })
 
-  return aliancas.map((a) => (a.tenantOrigemId === tenantId ? a.tenantAliadoId : a.tenantOrigemId))
+  if (aliancas.length === 0) return []
+
+  const lineageSet = new Set(lineage)
+  const counterpartRoots = new Set<string>()
+  for (const a of aliancas) {
+    if (lineageSet.has(a.tenantOrigemId)) counterpartRoots.add(a.tenantAliadoId)
+    if (lineageSet.has(a.tenantAliadoId)) counterpartRoots.add(a.tenantOrigemId)
+  }
+
+  const allied = new Set<string>()
+  await Promise.all(
+    Array.from(counterpartRoots).map(async (counterpartId) => {
+      const counterpartLineage = await getTorcidaLineageTenantIds(counterpartId)
+      for (const id of counterpartLineage) {
+        if (!lineageSet.has(id)) allied.add(id)
+      }
+    }),
+  )
+  return Array.from(allied)
 }
 
 export const getAlliedTenantIds = cache(async (tenantId: string): Promise<string[]> => {
@@ -188,16 +225,23 @@ export const getAlliedTenantIds = cache(async (tenantId: string): Promise<string
 })
 
 /**
- * Verifica se dois tenants têm aliança ATIVA (simétrico).
+ * Verifica se dois tenants têm aliança ATIVA (simétrico), incluindo
+ * herança worktree (PDE/subsede ↔ torcida aliada da sede).
  */
 export async function tenantsAreAllied(tenantAId: string, tenantBId: string): Promise<boolean> {
   if (tenantAId === tenantBId) return true
+
+  const [lineageA, lineageB] = await Promise.all([
+    getTorcidaLineageTenantIds(tenantAId),
+    getTorcidaLineageTenantIds(tenantBId),
+  ])
+
   const count = await db.alianca.count({
     where: {
       status: 'ATIVA',
       OR: [
-        { tenantOrigemId: tenantAId, tenantAliadoId: tenantBId },
-        { tenantOrigemId: tenantBId, tenantAliadoId: tenantAId },
+        { tenantOrigemId: { in: lineageA }, tenantAliadoId: { in: lineageB } },
+        { tenantOrigemId: { in: lineageB }, tenantAliadoId: { in: lineageA } },
       ],
     },
   })
@@ -304,9 +348,8 @@ export const getTenantRelation = cache(
  * (o ator é descendente deles — só enxerga o público). Centraliza a regra
  * que antes estava implícita e duplicada em eventos, comunidade e loja.
  *
- * Gancho futuro (Fase 2 — Alianças): quando `Alianca` existir, adicionar
- * aqui os tenants de alianças ATIVAS para recursos públicos, via relação
- * 'allied' em resolveVisibility — este é o único ponto a estender.
+ * Gancho de alianças: tenants com aliança ATIVA (e suas worktrees —
+ * PDEs/subsedes herdando a sede) entram via getAlliedTenantIds.
  */
 async function getVisibleTenantIdsImpl(
   tenantId: string,

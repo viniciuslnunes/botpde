@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RecomendacaoAliancaListItem } from '@/lib/aliancas'
-import { confiancaRank, filterAndSortRecomendacoes } from '@/lib/aliancas'
+import { buildCoIrmaRecomendacoes, confiancaRank, filterAndSortRecomendacoes } from '@/lib/aliancas'
 
 function rec(
-  overrides: Partial<RecomendacaoAliancaListItem> & Pick<RecomendacaoAliancaListItem, 'id' | 'nomeSugerido' | 'confianca'>,
+  overrides: Partial<RecomendacaoAliancaListItem> &
+    Pick<RecomendacaoAliancaListItem, 'id' | 'nomeSugerido' | 'confianca'>,
 ): RecomendacaoAliancaListItem {
   return {
     tenantId: 'tenant-a',
@@ -13,6 +14,7 @@ function rec(
     fonte: 'teste',
     observacao: null,
     criadoEm: new Date('2026-01-01'),
+    tipo: 'ALIADA',
     podePropor: overrides.confianca === 'ALTA' && Boolean(overrides.tenantSugeridoId),
     ...overrides,
   }
@@ -59,14 +61,37 @@ describe('filterAndSortRecomendacoes', () => {
     ]
     expect(filterAndSortRecomendacoes(items, new Set()).map((i) => i.id)).toEqual(['a', 'm', 'b'])
   })
+
+  it('prioriza co-irmãs antes de aliadas', () => {
+    const items = [
+      rec({ id: 'aliada', nomeSugerido: 'Remoçada', confianca: 'ALTA', tipo: 'ALIADA' }),
+      {
+        ...rec({ id: 'co', nomeSugerido: 'Camisa 12', confianca: 'ALTA', tipo: 'CO_IRMA' }),
+        podePropor: false,
+      },
+    ]
+    expect(filterAndSortRecomendacoes(items, new Set()).map((i) => i.id)).toEqual(['co', 'aliada'])
+  })
 })
 
-// ─── Actions (mocked) ─────────────────────────────────────────────────────────
+describe('buildCoIrmaRecomendacoes', () => {
+  it('marca ALTA, tipo CO_IRMA e não permite propor aliança', () => {
+    const items = buildCoIrmaRecomendacoes('tenant-gavioes', [
+      { id: 'c12', nome: 'Camisa 12', slug: 'camisa-12-corinthians', afiliacaoNome: 'Corinthians' },
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0]?.tipo).toBe('CO_IRMA')
+    expect(items[0]?.confianca).toBe('ALTA')
+    expect(items[0]?.podePropor).toBe(false)
+    expect(items[0]?.fonte).toMatch(/co-irmã/i)
+  })
+})
 
 const findFirstAlianca = vi.hoisted(() => vi.fn())
 const createAlianca = vi.hoisted(() => vi.fn())
 const updateAlianca = vi.hoisted(() => vi.fn())
 const findFirstTenant = vi.hoisted(() => vi.fn())
+const findUniqueTenant = vi.hoisted(() => vi.fn())
 const findFirstRec = vi.hoisted(() => vi.fn())
 const createAudit = vi.hoisted(() => vi.fn())
 const assertPermission = vi.hoisted(() => vi.fn())
@@ -80,7 +105,7 @@ vi.mock('@torcida/db', () => ({
       create: createAlianca,
       update: updateAlianca,
     },
-    tenant: { findFirst: findFirstTenant },
+    tenant: { findFirst: findFirstTenant, findUnique: findUniqueTenant },
     recomendacaoAlianca: { findFirst: findFirstRec },
     auditLog: { create: createAudit },
   },
@@ -92,6 +117,7 @@ vi.mock('@/lib/authz', () => ({
 
 vi.mock('@/lib/hierarquia', () => ({
   invalidateHierarchyCache,
+  getTorcidaLineageTenantIds: vi.fn(async (id: string) => [id]),
 }))
 
 vi.mock('next/cache', () => ({
@@ -106,9 +132,41 @@ import {
   proporAliancaFromRecomendacao,
 } from '@/app/admin/aliancas/actions'
 
+describe('proporAlianca — co-irmã bloqueada', () => {
+  beforeEach(() => {
+    findFirstAlianca.mockReset()
+    createAlianca.mockReset()
+    findFirstTenant.mockReset()
+    findUniqueTenant.mockReset()
+    createAudit.mockReset()
+    assertPermission.mockReset()
+    invalidateHierarchyCache.mockReset()
+    revalidatePath.mockReset()
+  })
+
+  it('recusa proposta entre organizadas do mesmo time', async () => {
+    const gavioes = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const camisa12 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const afiliacao = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+
+    assertPermission.mockResolvedValue({
+      session: { user: { id: 'user-1' } },
+      tenant: { id: gavioes, nome: 'Gavioes', slug: 'pde-gavioes-fiel' },
+    })
+    findFirstTenant.mockResolvedValue({
+      id: camisa12,
+      nome: 'Camisa 12',
+      slug: 'camisa-12-corinthians',
+      afiliacaoId: afiliacao,
+    })
+    findUniqueTenant.mockResolvedValue({ afiliacaoId: afiliacao })
+
+    await expect(proporAlianca(camisa12)).rejects.toThrow(/co-irmãs/i)
+    expect(createAlianca).not.toHaveBeenCalled()
+  })
+})
+
 describe('proporAlianca — semântica origem/aliado', () => {
-  // UUIDs escolhidos para o proponente ser lexicograficamente MAIOR que o alvo
-  // (regressão do bug normalizeTenantPair).
   const proposerTenant = {
     id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
     nome: 'Proponente',
@@ -118,6 +176,7 @@ describe('proporAlianca — semântica origem/aliado', () => {
     id: '00000000-0000-0000-0000-000000000001',
     nome: 'Destinatario',
     slug: 'destino',
+    afiliacaoId: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
   }
 
   beforeEach(() => {
@@ -125,6 +184,7 @@ describe('proporAlianca — semântica origem/aliado', () => {
     createAlianca.mockReset()
     updateAlianca.mockReset()
     findFirstTenant.mockReset()
+    findUniqueTenant.mockReset()
     findFirstRec.mockReset()
     createAudit.mockReset()
     assertPermission.mockReset()
@@ -136,6 +196,7 @@ describe('proporAlianca — semântica origem/aliado', () => {
       tenant: proposerTenant,
     })
     findFirstTenant.mockResolvedValue(targetTenant)
+    findUniqueTenant.mockResolvedValue({ afiliacaoId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' })
     findFirstAlianca.mockResolvedValue(null)
     createAlianca.mockResolvedValue({ id: 'alianca-1' })
     createAudit.mockResolvedValue({})
@@ -241,6 +302,7 @@ describe('proporAliancaFromRecomendacao', () => {
     findFirstAlianca.mockReset()
     createAlianca.mockReset()
     findFirstTenant.mockReset()
+    findUniqueTenant.mockReset()
     findFirstRec.mockReset()
     createAudit.mockReset()
     assertPermission.mockReset()
@@ -299,7 +361,9 @@ describe('proporAliancaFromRecomendacao', () => {
       id: remocadaId,
       nome: 'Remoçada',
       slug: 'remocada',
+      afiliacaoId: 'aaaaaaaa-1111-1111-1111-111111111111',
     })
+    findUniqueTenant.mockResolvedValue({ afiliacaoId: 'bbbbbbbb-2222-2222-2222-222222222222' })
     findFirstAlianca.mockResolvedValue(null)
     createAlianca.mockResolvedValue({ id: 'alianca-1' })
     createAudit.mockResolvedValue({})
