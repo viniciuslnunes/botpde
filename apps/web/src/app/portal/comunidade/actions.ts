@@ -172,19 +172,36 @@ export async function publicarPost(
 export async function solicitarSeguir(userId: string): Promise<void> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
 
-  await assertMembroAtivo(tenant.id, session.user.id)
-  await assertMembroAtivo(tenant.id, userId)
-
-  const podeSeguir = await canFollowUser(session.user.id, userId, tenant.id)
-  if (!podeSeguir) throw new Error('Você só pode seguir membros da sua torcida ou torcidas aliadas.')
+  // canFollowUser é o ponto único do funil (mesma torcida, aliadas ou mesmo
+  // clube para torcedor global) — sem exigir SaasMembro do ator.
+  const podeSeguir = await canFollowUser(session.user.id, userId, tenant?.id ?? null)
+  if (!podeSeguir) {
+    throw new Error('Você só pode seguir torcedores do seu clube, da sua torcida ou de torcidas aliadas.')
+  }
 
   const statusAtual = await getSeguimentoStatus(session.user.id, userId)
   if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') return
 
+  // Seguimento.tenantContextoId é FK obrigatória: sem tenant do ator (torcedor
+  // global), usa o tenant do alvo. Dois torcedores globais entre si ficam de fora.
+  let tenantContextoId = tenant?.id ?? null
+  if (!tenantContextoId) {
+    const vinculoAlvo: { tenant: { id: string } } | null = await db.saasMembro.findFirst({
+      where: { userId, status: 'APROVADO' },
+      orderBy: { criadoEm: 'desc' },
+      select: { tenant: { select: { id: true } } },
+    })
+    tenantContextoId = vinculoAlvo?.tenant.id ?? null
+  }
+  if (!tenantContextoId) {
+    throw new Error(
+      'Não é possível seguir outro torcedor sem torcida ainda — funcionalidade em desenvolvimento.',
+    )
+  }
+
   const perfilSeguido = await db.perfilMembro.findUnique({
-    where: { userId_tenantId: { userId, tenantId: tenant.id } },
+    where: { userId_tenantId: { userId, tenantId: tenantContextoId } },
     select: { perfilPrivado: true },
   })
   const statusInicial = perfilSeguido?.perfilPrivado === false ? 'APROVADO' : 'PENDENTE'
@@ -194,16 +211,16 @@ export async function solicitarSeguir(userId: string): Promise<void> {
     create: {
       seguidorId: session.user.id,
       seguidoId: userId,
-      tenantContextoId: tenant.id,
+      tenantContextoId,
       status: statusInicial,
     },
-    update: { status: statusInicial, tenantContextoId: tenant.id },
+    update: { status: statusInicial, tenantContextoId },
   })
 
   if (statusInicial === 'PENDENTE') {
     await criarNotificacao({
       userId,
-      tenantId: tenant.id,
+      tenantId: tenantContextoId,
       tipo: 'SEGUIMENTO_PENDENTE',
       titulo: 'Nova solicitação para seguir',
       corpo: `${session.user.name ?? 'Um membro'} quer seguir você.`,
@@ -219,11 +236,14 @@ export async function solicitarSeguir(userId: string): Promise<void> {
 export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
 
+  // Destinatário torcedor global (sem tenant ativo): busca só por seguidoId —
+  // não há tenant do destinatário para comparar com tenantContextoId.
   const seguimento = await db.seguimento.findFirst({
-    where: { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id },
-    select: { id: true, seguidorId: true },
+    where: tenant
+      ? { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id }
+      : { id: seguimentoId, seguidoId: session.user.id },
+    select: { id: true, seguidorId: true, tenantContextoId: true },
   })
   if (!seguimento) throw new Error('Solicitação não encontrada')
 
@@ -234,7 +254,7 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
 
   await criarNotificacao({
     userId: seguimento.seguidorId,
-    tenantId: tenant.id,
+    tenantId: tenant?.id ?? seguimento.tenantContextoId,
     tipo: 'SEGUIMENTO_APROVADO',
     titulo: 'Solicitação aprovada',
     corpo: `${session.user.name ?? 'Um membro'} aceitou você.`,
@@ -249,10 +269,11 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
 export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
 
   const seguimento = await db.seguimento.findFirst({
-    where: { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id },
+    where: tenant
+      ? { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id }
+      : { id: seguimentoId, seguidoId: session.user.id },
     select: { id: true, seguidorId: true },
   })
   if (!seguimento) throw new Error('Solicitação não encontrada')
@@ -267,12 +288,10 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
 }
 
 export async function deixarDeSeguir(userId: string): Promise<void> {
-  const { session, tenant } = await getSessionAndPortalTenant()
+  const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
 
-  await assertMembroAtivo(tenant.id, session.user.id)
-
+  // Só apaga o próprio seguimento (seguidorId = sessão) — não precisa de tenant.
   await db.seguimento.deleteMany({
     where: {
       seguidorId: session.user.id,
@@ -1356,21 +1375,12 @@ export async function denunciarPost(postId: string, motivo: string): Promise<voi
   revalidatePath('/admin/comunidade/moderacao')
 }
 
-export async function marcarNotificacaoLida(notificacaoId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+export { marcarNotificacaoLida } from '@/app/actions/notificacoes'
 
-  await db.notificacao.updateMany({
-    where: { id: notificacaoId, tenantId: tenant.id, userId: session.user.id },
-    data: { lida: true },
-  })
-
-  revalidatePath('/portal')
-  revalidatePath('/portal/comunidade')
-  revalidatePath('/portal/comunidade/notificacoes')
-}
-
+/** Marca como lidas apenas notificações sociais (central da Comunidade). */
 export async function marcarTodasNotificacoesLidas(): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  const { session, tenant } = await getSessionAndPortalTenant()
+  if (!session?.user?.id || !tenant) throw new Error('Não autenticado')
 
   await db.notificacao.updateMany({
     where: {

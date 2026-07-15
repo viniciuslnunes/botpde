@@ -43,7 +43,16 @@ export default async function ComunidadePage({
   if (!ctx) redirect('/')
 
   if (ctx.modo === 'nacional') {
-    return <ComunidadeNacionalShell afiliacao={ctx.afiliacao} />
+    return (
+      <ComunidadeNacionalShell
+        afiliacao={ctx.afiliacao}
+        currentUser={{
+          id: session.user.id,
+          nome: session.user.name ?? null,
+          avatarUrl: session.user.image ?? null,
+        }}
+      />
+    )
   }
 
   const tenant = ctx.tenant
