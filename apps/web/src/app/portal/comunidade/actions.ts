@@ -1375,8 +1375,6 @@ export async function denunciarPost(postId: string, motivo: string): Promise<voi
   revalidatePath('/admin/comunidade/moderacao')
 }
 
-export { marcarNotificacaoLida } from '@/app/actions/notificacoes'
-
 /** Marca como lidas apenas notificações sociais (central da Comunidade). */
 export async function marcarTodasNotificacoesLidas(): Promise<void> {
   const { session, tenant } = await getSessionAndPortalTenant()
