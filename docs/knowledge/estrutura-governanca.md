@@ -51,7 +51,7 @@ Assembleia geral (associados)
 
 | Departamento | Função | Observações para o produto |
 |---|---|---|
-| Batucada / bateria | ritmo na arquibancada; ensaios | agenda própria de ensaios |
+| Bateria (batucada) | ritmo na arquibancada; ensaios | agenda própria de ensaios |
 | Caravanas / viagens | logística de deslocamento p/ jogos fora | RSVP, pagamento, listas de embarque |
 | Social / eventos | festas, ações beneficentes, churrascos na sede | módulo de eventos atual |
 | Materiais / loja | camisas, bandeiras, produtos oficiais | módulo Loja atual |
@@ -90,7 +90,7 @@ torcida) — consulta 2026-07-10.
    fiscal = leitura de auditoria/financeiro; representantes de
    batalhão/subsede = admin de núcleo local; associado = member.
 2. **Departamentos** já existem no schema — a lista acima é o vocabulário
-   real para seeds/sugestões (batucada, caravanas, social, materiais,
+   real para seeds/sugestões (bateria, caravanas, social, materiais,
    patrimônio, financeiro, comunicação, feminino, carnaval).
 3. **Exclusão de associado** é figura estatutária formal (e obrigação prática
    pós-LGE) — fluxo de desligamento com auditoria importa.

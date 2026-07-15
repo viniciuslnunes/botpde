@@ -21,7 +21,7 @@ operacional** antes de expandir para comunidade/informação.
   Esporte (14.597/2023) obriga cadastro completo de integrantes e impõe
   responsabilidade civil objetiva à torcida. Gestão de membros, desligamento
   auditado e exportação de cadastro são compliance, não conveniência.
-- `estrutura-governanca.md` — cargos, departamentos (batucada, caravanas,
+- `estrutura-governanca.md` — cargos, departamentos (bateria, caravanas,
   social, materiais, patrimônio, financeiro, comunicação, feminino, carnaval),
   batalhões/subsedes e eleições internas: é o mapa das jornadas admin reais.
 - `torcidas-brasil.md` — espectro de tenants: da Gaviões (~140k associados,

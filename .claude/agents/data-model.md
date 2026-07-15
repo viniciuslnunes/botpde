@@ -46,7 +46,7 @@ nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/
 
 ## Domínio: entidades reais do nicho (`docs/knowledge/`)
 - `estrutura-governanca.md` — departamentos reais para seeds/sugestões:
-  batucada, caravanas, social/eventos, materiais/loja, patrimônio, financeiro,
+  bateria, caravanas, social/eventos, materiais/loja, patrimônio, financeiro,
   comunicação, feminino, carnaval (quando a torcida tem escola de samba).
   "Batalhões"/subsedes por cidade confirmam a hierarquia Sede → Subsede → PDE.
 - `contexto-legal.md` — a ficha de membro deve comportar os campos do cadastro

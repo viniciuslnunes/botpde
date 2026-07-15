@@ -1,6 +1,6 @@
 # Módulo — Departamentos como unidade de acesso
 
-> Como uma torcida organiza acesso por departamentos (Financeiro, Social, Batucada,
+> Como uma torcida organiza acesso por departamentos (Financeiro, Social, Bateria,
 > Caravanas, Comunicação, Feminino, Carnaval, Patrimônio, Diretoria…). Complementa
 > `docs/knowledge/estrutura-governanca.md` (o vocabulário real) com a mecânica de RBAC.
 
@@ -61,7 +61,7 @@ Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` 
 | **Materiais / Loja** | Ver pedidos; DMs/grupos; postar; relatórios; ver membros | Gerir produtos; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
 | **Comunicação** | Postar; curar notícias; salas/grupos; criar eventos; DMs; ver membros | Comunicados; mural/moderação/canais; moderar msgs; gerir eventos; relatórios; ver pedidos |
 | **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos; criar eventos; ver pedidos/membros | Gerir patrimônio e sedes; gerir eventos/loja; ver financeiro; comunicados; salas/canais |
-| **Batucada** | Criar ensaios; postar; grupos/salas; ver membros e patrimônio; curar | Gerir eventos/canais/mural; comunicados; gerir patrimônio e sedes; ver pedidos |
+| **Bateria** | Criar ensaios; postar; grupos/salas; ver membros e patrimônio; curar | Gerir eventos/canais/mural; comunicados; gerir patrimônio e sedes; ver pedidos |
 | **Caravanas** | Criar viagens; ver membros/pedidos/financeiro/relatórios; DMs/grupos/salas; postar | Gerir eventos/canais/mural; comunicados; gerir loja e financeiro; sedes; advertir |
 | **Feminino** | Postar; criar eventos; DMs/grupos/salas; ver membros; curar; ver pedidos | Gerir eventos/mural/moderação/canais; comunicados; moderar msgs; sedes; relatórios; advertir |
 | **Carnaval** | Eventos + comunidade + pedidos + ver financeiro/patrimônio/relatórios/membros; salas/grupos; curar | Gerir eventos/mural/loja/financeiro/patrimônio/sedes; canais; moderação; comunicados; advertir |

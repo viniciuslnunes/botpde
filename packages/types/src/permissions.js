@@ -283,7 +283,7 @@ export const DEPARTAMENTOS_CANONICOS_SLUGS = Object.freeze([
   'materiais-loja',
   'comunicacao',
   'patrimonio',
-  'batucada',
+  'bateria',
   'caravanas',
   'feminino',
   'carnaval',

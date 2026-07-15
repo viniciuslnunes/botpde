@@ -36,7 +36,7 @@ export const DEPARTAMENTOS_CANONICOS_SLUGS = [
   'materiais-loja',
   'comunicacao',
   'patrimonio',
-  'batucada',
+  'bateria',
   'caravanas',
   'feminino',
   'carnaval',
@@ -210,7 +210,7 @@ export const DEPARTAMENTOS_CANONICOS = [
   },
   {
     // Bateria / ensaios — ritmo, ensaio, coordenação do núcleo musical
-    nome: 'Batucada',
+    nome: 'Bateria',
     cor: '#be123c',
     moduloPortal: 'eventos',
     permissions: [
@@ -331,6 +331,14 @@ export function isDepartamentoCanonico(slug) {
 }
 
 /**
+ * Renomes de slug canônico já semeados (legado → atual).
+ * Evita duplicar departamento ao mudar o nome/slug da lista canônica.
+ */
+const DEPARTAMENTO_RENAMES = [
+  { fromSlug: 'batucada', toNome: 'Bateria', fromNome: 'Batucada' },
+]
+
+/**
  * Upsert dos 10 departamentos canônicos no tenant. Idempotente.
  * Também remove departamentos legados socio/torcedor.
  *
@@ -342,6 +350,82 @@ export async function upsertDepartamentosCanonicos(client, tenantId) {
   const removed = await client.departamento.deleteMany({
     where: { tenantId, slug: { in: DEPARTAMENTOS_SLUGS_LEGADOS } },
   })
+
+  for (const rename of DEPARTAMENTO_RENAMES) {
+    const toSlug = slugifyDepartamento(rename.toNome)
+    const legado = await client.departamento.findFirst({
+      where: { tenantId, slug: rename.fromSlug },
+      select: { id: true },
+    })
+    if (!legado) continue
+
+    const destino = await client.departamento.findFirst({
+      where: { tenantId, slug: toSlug },
+      select: { id: true },
+    })
+
+    /** @type {string} */
+    let deptoId = legado.id
+    if (destino) {
+      deptoId = destino.id
+      await client.role.updateMany({
+        where: { tenantId, departamentoId: legado.id },
+        data: { departamentoId: destino.id },
+      })
+      // Projeções — unique (user,tenant,depto); evita conflito ao reapontar
+      const membrosLegado = await client.userDepartamento.findMany({
+        where: { tenantId, departamentoId: legado.id },
+        select: { id: true, userId: true },
+      })
+      for (const m of membrosLegado) {
+        const jaTem = await client.userDepartamento.findFirst({
+          where: { userId: m.userId, tenantId, departamentoId: destino.id },
+          select: { id: true },
+        })
+        if (jaTem) await client.userDepartamento.delete({ where: { id: m.id } })
+        else {
+          await client.userDepartamento.update({
+            where: { id: m.id },
+            data: { departamentoId: destino.id },
+          })
+        }
+      }
+      const gestoresLegado = await client.departamentoGestor.findMany({
+        where: { departamentoId: legado.id },
+        select: { id: true, userId: true },
+      })
+      for (const g of gestoresLegado) {
+        const jaTem = await client.departamentoGestor.findFirst({
+          where: { userId: g.userId, departamentoId: destino.id },
+          select: { id: true },
+        })
+        if (jaTem) await client.departamentoGestor.delete({ where: { id: g.id } })
+        else {
+          await client.departamentoGestor.update({
+            where: { id: g.id },
+            data: { departamentoId: destino.id },
+          })
+        }
+      }
+      await client.departamento.delete({ where: { id: legado.id } })
+    } else {
+      await client.departamento.update({
+        where: { id: legado.id },
+        data: { nome: rename.toNome, slug: toSlug },
+      })
+    }
+
+    for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
+      await client.role.updateMany({
+        where: {
+          tenantId,
+          departamentoId: deptoId,
+          nome: nomePerfilDepartamento(rename.fromNome, papel),
+        },
+        data: { nome: nomePerfilDepartamento(rename.toNome, papel) },
+      })
+    }
+  }
 
   let ordem = 0
   for (const canonico of DEPARTAMENTOS_CANONICOS) {
@@ -365,6 +449,7 @@ export async function upsertDepartamentosCanonicos(client, tenantId) {
         ordem,
       },
       update: {
+        nome: canonico.nome,
         cor: canonico.cor,
         moduloPortal: canonico.moduloPortal,
         permissions,
