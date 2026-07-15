@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useMemo, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { finalizarPedido } from '../actions'
 import Link from 'next/link'
@@ -9,6 +9,7 @@ import { rotuloTamanho } from '@torcida/types'
 import type { CheckoutItemSerializado } from '@/lib/loja-serialize'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
 function formatarPreco(preco: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(preco)
@@ -17,6 +18,21 @@ function formatarPreco(preco: number) {
 export function CheckoutForm({ itens, subtotal }: { itens: CheckoutItemSerializado[]; subtotal: number }) {
   const [state, action, pending] = useActionState(finalizarPedido, {})
   const [modalidade, setModalidade] = useState<'RETIRADA' | 'ENVIO'>('RETIRADA')
+  const [cupom, setCupom] = useState('')
+
+  const checkoutChanges = useMemo(() => {
+    const list: string[] = []
+    if (cupom.trim()) list.push('Cupom')
+    if (modalidade === 'ENVIO') list.push('Modalidade: envio')
+    return list
+  }, [cupom, modalidade])
+
+  useUnsavedChanges({
+    id: 'checkout-form',
+    title: 'Checkout',
+    isDirty: !state.success && checkoutChanges.length > 0,
+    changes: checkoutChanges,
+  })
 
   return (
     <AnimatePresence mode="wait">
@@ -49,6 +65,9 @@ export function CheckoutForm({ itens, subtotal }: { itens: CheckoutItemSerializa
               <h2 className="font-semibold mb-3">Cupom de desconto</h2>
               <input
                 name="cupomCodigo"
+                data-unsaved-label="Cupom"
+                value={cupom}
+                onChange={(e) => setCupom(e.target.value)}
                 placeholder="Ex.: EUSOUGAVIAO"
                 className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm uppercase"
               />

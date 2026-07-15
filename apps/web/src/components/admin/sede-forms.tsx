@@ -10,6 +10,7 @@ import {
 import { Loader2, MapPin, Power, PowerOff } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton } from '@torcida/ui'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
+import { useTrackedForm } from '@/lib/unsaved-changes'
 
 type SedeOption = { id: string; nome: string; tipo: string }
 
@@ -212,9 +213,11 @@ function SedeFormFields({
 /* ── Criar ────────────────────────────────────────────────────────────────── */
 export function CriarSedeForm({ sedes }: { sedes: SedeOption[] }) {
   const [state, setState] = useState<SedeState>({})
+  const { formRef } = useTrackedForm({ title: 'Nova sede' })
 
   return (
     <form
+      ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => criarSede({}, fd), setState, {
           success: 'Sede criada.',
@@ -231,9 +234,14 @@ export function CriarSedeForm({ sedes }: { sedes: SedeOption[] }) {
 /* ── Editar ───────────────────────────────────────────────────────────────── */
 export function EditarSedeForm({ sede, sedes }: { sede: SedeData; sedes: SedeOption[] }) {
   const [state, setState] = useState<SedeState>({})
+  const { formRef } = useTrackedForm({
+    id: `editar-sede-${sede.id}`,
+    title: 'Editar sede',
+  })
 
   return (
     <form
+      ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => editarSede(sede.id, {}, fd), setState, {
           success: 'Sede atualizada.',

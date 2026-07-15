@@ -9,6 +9,7 @@ import { ImagePlus, Loader2 } from 'lucide-react'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
+import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'XG', 'G1', 'G2', 'G3', 'UN']
 
@@ -287,9 +288,22 @@ const initialState: ProdutoState = {}
 export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: string; nome: string }[] }) {
   const [state, action, pending] = useActionState(criarProduto, initialState)
   const [open, setOpen] = useState(false)
-  useActionStateToast(state, pending, 'Produto criado.')
+  const { formRef, markPristine } = useTrackedForm({
+    title: 'Novo produto',
+    enabled: open,
+  })
+  const { confirmDiscard } = useUnsavedChangesContext()
+  useActionStateToast(state, pending, 'Produto criado.', {
+    onSuccess: () => {
+      markPristine()
+      setOpen(false)
+    },
+  })
 
-  if (state.success && open) setOpen(false)
+  async function closeForm() {
+    const ok = await confirmDiscard()
+    if (ok) setOpen(false)
+  }
 
   return (
     <div>
@@ -304,9 +318,9 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-[rgb(var(--foreground))]">Novo produto</h3>
-            <button onClick={() => setOpen(false)} className="text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">✕</button>
+            <button type="button" onClick={() => void closeForm()} className="text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">✕</button>
           </div>
-          <form action={action} className="space-y-4">
+          <form ref={formRef} action={action} className="space-y-4">
             <ProdutoFormFields state={state} categorias={categorias} />
             {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">{state.error}</p>}
             <div className="flex gap-3">
@@ -319,7 +333,7 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
               </button>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => void closeForm()}
                 className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 Cancelar
@@ -357,10 +371,14 @@ export function EditarProdutoForm({
 }) {
   const boundAction = editarProduto.bind(null, id)
   const [state, action, pending] = useActionState(boundAction, initialState)
-  useActionStateToast(state, pending, 'Produto atualizado.')
+  const { formRef, markPristine } = useTrackedForm({
+    id: `editar-produto-${id}`,
+    title: 'Editar produto',
+  })
+  useActionStateToast(state, pending, 'Produto atualizado.', { onSuccess: markPristine })
 
   return (
-    <form action={action} className="space-y-4">
+    <form ref={formRef} action={action} className="space-y-4">
       <ProdutoFormFields
         state={state}
         categorias={categorias}
@@ -445,15 +463,22 @@ export function StatusPedidoBadge({ status }: { status: string }) {
 export function StatusPedidoSelect({ id, statusAtual }: { id: string; statusAtual: string }) {
   const boundAction = atualizarStatusPedido.bind(null, id)
   const [state, action, pending] = useActionState(boundAction, {})
+  const { formRef, markPristine } = useTrackedForm({
+    id: `pedido-status-${id}`,
+    title: 'Status do pedido',
+    labels: { status: 'Status' },
+  })
   useActionStateToast(state, pending, 'Status do pedido atualizado.', {
     id: `pedido-status-${id}`,
     successDescription: 'A alteração foi salva e o pedido foi revalidado.',
+    onSuccess: markPristine,
   })
 
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form ref={formRef} action={action} className="flex items-center gap-2">
       <select
         name="status"
+        data-unsaved-label="Status"
         defaultValue={statusAtual}
         className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs"
       >

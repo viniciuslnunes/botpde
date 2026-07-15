@@ -166,9 +166,16 @@ export function useActionStateToast(
     successDescription?: string
     action?: ToastActionConfig
     id?: string | number
+    /** Chamado quando a action concluiu com sucesso (útil para limpar dirty). */
+    onSuccess?: () => void
   },
 ): void {
   const wasPending = useRef(false)
+  const onSuccessRef = useRef(options?.onSuccess)
+
+  useEffect(() => {
+    onSuccessRef.current = options?.onSuccess
+  }, [options?.onSuccess])
 
   useEffect(() => {
     if (wasPending.current && !pending) {
@@ -176,7 +183,7 @@ export function useActionStateToast(
       if (fieldError && !options?.toastFieldErrors) {
         if (state.message) toast.error(state.message)
       } else {
-        toastFromAction(
+        const ok = toastFromAction(
           state,
           {
             success: successMessage,
@@ -187,6 +194,7 @@ export function useActionStateToast(
           },
           { emptyAsSuccess: true },
         )
+        if (ok) onSuccessRef.current?.()
       }
     }
     wasPending.current = pending

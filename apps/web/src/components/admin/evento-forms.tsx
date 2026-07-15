@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
+import { useTrackedForm } from '@/lib/unsaved-changes'
 
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
@@ -18,6 +19,7 @@ function toDatetimeLocal(date: Date): string {
 /* ── Criar ─────────────────────────────────────────────────────────────────── */
 export function CriarEventoForm() {
   const [state, setState] = useState<EventoState>({})
+  const { formRef } = useTrackedForm({ title: 'Novo evento' })
 
   // Padrão: amanhã às 12h
   const amanha = new Date()
@@ -26,6 +28,7 @@ export function CriarEventoForm() {
 
   return (
     <form
+      ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => criarEvento({}, fd), setState, {
           success: 'Evento criado.',
@@ -109,9 +112,14 @@ type EventoData = {
 
 export function EditarEventoForm({ evento }: { evento: EventoData }) {
   const [state, setState] = useState<EventoState>({})
+  const { formRef } = useTrackedForm({
+    id: `editar-evento-${evento.id}`,
+    title: 'Editar evento',
+  })
 
   return (
     <form
+      ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => editarEvento(evento.id, {}, fd), setState, {
           success: 'Evento atualizado.',

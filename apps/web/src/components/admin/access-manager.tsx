@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Pencil, ShieldCheck, UserRound } from 'lucide-react'
 import { rotuloCargoSistema } from '@torcida/types'
 import {
@@ -12,6 +11,7 @@ import {
   type AccessRoleOpt,
   type AccessUsuario,
 } from '@/components/admin/access-user-panel'
+import { useGuardedRouter } from '@/lib/unsaved-changes'
 
 interface AccessManagerProps {
   usuarios: AccessUsuario[]
@@ -43,7 +43,7 @@ export function AccessManager({
   tipoSede,
   initialUserId = null,
 }: AccessManagerProps) {
-  const router = useRouter()
+  const router = useGuardedRouter()
   const [editandoId, setEditandoId] = useState<string | null>(initialUserId)
 
   useEffect(() => {
@@ -52,14 +52,16 @@ export function AccessManager({
 
   function openUser(id: string) {
     setEditandoId(id)
-    router.replace(`/admin/acessos?secao=pessoas&usuario=${encodeURIComponent(id)}`, {
-      scroll: false,
-    })
+    void router.unsafe.replace(
+      `/admin/acessos?secao=pessoas&usuario=${encodeURIComponent(id)}`,
+      { scroll: false },
+    )
   }
 
+  /** Fechamento após o painel já ter confirmado descarte (ou salvado). */
   function closeUser() {
     setEditandoId(null)
-    router.replace('/admin/acessos?secao=pessoas', { scroll: false })
+    void router.unsafe.replace('/admin/acessos?secao=pessoas', { scroll: false })
   }
 
   if (usuarios.length === 0) {

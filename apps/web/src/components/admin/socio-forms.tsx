@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Loader2, Plus, RefreshCw, Trash2, X, Check } from 'lucide-react'
 import { emitirCarteirinha, renovarCarteirinha, revogarCarteirinha } from '@/app/admin/socios/actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 interface MembroElegivel {
   userId: string
@@ -24,6 +25,16 @@ export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFor
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [defaultValidade] = useState(getValidadePadrao)
+  const { formRef, markPristine } = useTrackedForm({
+    title: 'Nova carteirinha',
+    enabled: open,
+  })
+  const { confirmDiscard } = useUnsavedChangesContext()
+
+  async function closeForm() {
+    const ok = await confirmDiscard()
+    if (ok) setOpen(false)
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -34,7 +45,10 @@ export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFor
         success: 'Carteirinha emitida.',
         errorFallback: 'Não foi possível emitir a carteirinha.',
       })
-      if (ok) setOpen(false)
+      if (ok) {
+        markPristine()
+        setOpen(false)
+      }
     })
   }
 
@@ -55,12 +69,12 @@ export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFor
     <div className="rounded-xl border border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--surface))] p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-semibold text-[rgb(var(--foreground))]">Nova carteirinha</h3>
-        <button onClick={() => setOpen(false)} className="text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
+        <button type="button" onClick={() => void closeForm()} className="text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Membro</label>
           <select
@@ -125,7 +139,7 @@ export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFor
           </button>
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={() => void closeForm()}
             className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
           >
             Cancelar

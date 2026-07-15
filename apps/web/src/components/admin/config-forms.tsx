@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
 import {
@@ -26,6 +26,11 @@ import {
 } from '@/app/admin/configuracoes/actions'
 import { toast } from '@torcida/ui'
 import { runPersistAction } from '@/lib/toast-action'
+import {
+  useTrackedForm,
+  useUnsavedChanges,
+  useUnsavedChangesContext,
+} from '@/lib/unsaved-changes'
 
 // ── Perfil do Tenant ──────────────────────────────────────────────────────────
 
@@ -37,19 +42,21 @@ interface PerfilTenantFormProps {
 export function PerfilTenantForm({ nome, corPrimaria }: PerfilTenantFormProps) {
   const [pending, startTransition] = useTransition()
   const [cor, setCor] = useState(corPrimaria)
+  const { formRef, markPristine } = useTrackedForm({ title: 'Perfil da torcida' })
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await runPersistAction(() => salvarPerfilTenant(fd), {
+      const ok = await runPersistAction(() => salvarPerfilTenant(fd), {
         success: 'Perfil da torcida salvo.',
       })
+      if (ok) markPristine()
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
           Nome da torcida
@@ -132,19 +139,21 @@ interface DiscordFormProps {
 
 export function DiscordForm({ discordGuildId }: DiscordFormProps) {
   const [pending, startTransition] = useTransition()
+  const { formRef, markPristine } = useTrackedForm({ title: 'Integração Discord' })
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await runPersistAction(() => salvarDiscordGuildId(fd), {
+      const ok = await runPersistAction(() => salvarDiscordGuildId(fd), {
         success: 'Guild ID do Discord salvo.',
       })
+      if (ok) markPristine()
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
           Guild ID do servidor Discord
@@ -188,19 +197,21 @@ interface AfiliacaoFormProps {
 
 export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
   const [pending, startTransition] = useTransition()
+  const { formRef, markPristine } = useTrackedForm({ title: 'Afiliação' })
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await runPersistAction(() => salvarAfiliacao(fd), {
+      const ok = await runPersistAction(() => salvarAfiliacao(fd), {
         success: 'Afiliação salva.',
       })
+      if (ok) markPristine()
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
           Time apoiado (Afiliação)
@@ -557,6 +568,7 @@ function RoleForm({
   const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
   const [departamentoId, setDepartamentoId] = useState<string>(initialDepartamentoId ?? '')
   const [papel, setPapel] = useState<string>(initialPapel ?? PAPEL_DEPARTAMENTO.MEMBRO)
+  const { confirmDiscard } = useUnsavedChangesContext()
 
   const isEdit = initialNome !== ''
   const initial = new Set(initialPermissions)
@@ -569,6 +581,41 @@ function RoleForm({
   // tudo é novo por definição, sem destaque, como na referência)
   const added = isEdit ? [...selected].filter((p) => !initial.has(p)) : []
   const removed = isEdit ? [...initial].filter((p) => !selected.has(p)) : []
+
+  const roleUnsaved = useMemo(() => {
+    const list: string[] = []
+    if (!isEdit) {
+      list.push('Novo cargo em criação')
+      if (selected.size > 0) list.push(`${selected.size} permissões selecionadas`)
+      return list
+    }
+    if (cor !== initialCor) list.push('Cor')
+    if ((departamentoId || '') !== (initialDepartamentoId ?? '')) list.push('Departamento')
+    if (departamentoId && papel !== (initialPapel ?? PAPEL_DEPARTAMENTO.MEMBRO)) {
+      list.push('Papel na área')
+    }
+    if (added.length > 0) list.push(`${added.length} permissão(ões) adicionada(s)`)
+    if (removed.length > 0) list.push(`${removed.length} permissão(ões) removida(s)`)
+    return list
+  }, [
+    isEdit,
+    cor,
+    initialCor,
+    departamentoId,
+    initialDepartamentoId,
+    papel,
+    initialPapel,
+    added.length,
+    removed.length,
+    selected.size,
+  ])
+
+  useUnsavedChanges({
+    id: `role-form-${initialNome || 'novo'}`,
+    title: isEdit ? `Editar cargo — ${initialNome}` : 'Novo cargo',
+    isDirty: roleUnsaved.length > 0,
+    changes: roleUnsaved,
+  })
 
   function toggle(key: string) {
     setSelected((prev) => {
@@ -807,7 +854,11 @@ function RoleForm({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => {
+            void confirmDiscard().then((ok) => {
+              if (ok) onCancel()
+            })
+          }}
           disabled={pending}
           className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]"
         >
@@ -1047,8 +1098,36 @@ function DepartamentoForm({
   const [selectedGestor, setSelectedGestor] = useState<Set<string>>(
     new Set(initialPermissionsGestor),
   )
+  const { confirmDiscard } = useUnsavedChangesContext()
 
   const isEdit = initialNome !== ''
+  const initialPermKey = useMemo(
+    () => [...initialPermissions].sort().join(','),
+    [initialPermissions],
+  )
+  const initialGestorKey = useMemo(
+    () => [...initialPermissionsGestor].sort().join(','),
+    [initialPermissionsGestor],
+  )
+
+  const deptoUnsaved = useMemo(() => {
+    const list: string[] = []
+    if (!isEdit) {
+      list.push('Novo departamento em criação')
+      return list
+    }
+    if (cor !== initialCor) list.push('Cor')
+    if ([...selected].sort().join(',') !== initialPermKey) list.push('Permissões de membro')
+    if ([...selectedGestor].sort().join(',') !== initialGestorKey) list.push('Permissões de gestor')
+    return list
+  }, [isEdit, cor, initialCor, selected, selectedGestor, initialPermKey, initialGestorKey])
+
+  useUnsavedChanges({
+    id: `depto-form-${initialNome || 'novo'}`,
+    title: isEdit ? `Editar departamento — ${initialNome}` : 'Novo departamento',
+    isDirty: deptoUnsaved.length > 0,
+    changes: deptoUnsaved,
+  })
 
   function toggleMembro(key: string) {
     setSelected((prev) => {
@@ -1231,7 +1310,11 @@ function DepartamentoForm({
         </button>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => {
+            void confirmDiscard().then((ok) => {
+              if (ok) onCancel()
+            })
+          }}
           className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         >
           <X className="h-3 w-3" /> Cancelar

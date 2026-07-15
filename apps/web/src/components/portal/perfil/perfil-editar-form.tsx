@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
 interface PerfilEditarFormProps {
   tenantId: string
@@ -73,6 +74,34 @@ export function PerfilEditarForm({
   const drag = useRef<{ startY: number; startPos: number; h: number } | null>(null)
 
   const displayAvatar = avatarUrl ?? avatarFallback
+
+  const socialUnsaved = useMemo(() => {
+    const list: string[] = []
+    if (bio !== bioInicial) list.push('Bio')
+    if (perfilPrivado !== privadoInicial) list.push('Privacidade do perfil')
+    if (exibirCidade !== cidadeInicial) list.push('Exibir cidade')
+    if (exibirSede !== sedeInicial) list.push('Exibir sede')
+    if (exibirDesde !== desdeInicial) list.push('Exibir since')
+    return list
+  }, [
+    bio,
+    bioInicial,
+    perfilPrivado,
+    privadoInicial,
+    exibirCidade,
+    cidadeInicial,
+    exibirSede,
+    sedeInicial,
+    exibirDesde,
+    desdeInicial,
+  ])
+
+  useUnsavedChanges({
+    id: 'perfil-social-editar',
+    title: 'Perfil social',
+    isDirty: socialUnsaved.length > 0,
+    changes: socialUnsaved,
+  })
 
   // Sincroniza com dados do servidor após router.refresh().
   useEffect(() => {

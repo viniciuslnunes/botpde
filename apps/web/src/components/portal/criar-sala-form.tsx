@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Video } from 'lucide-react'
 import { criarSala, type CriarSalaState } from '@/app/portal/comunidade/salas/actions'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
+import { useTrackedForm } from '@/lib/unsaved-changes'
 
 interface EventoOption {
   id: string
@@ -19,6 +20,7 @@ const INITIAL: CriarSalaState = {}
 
 export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
   const [state, action, pending] = useActionState<CriarSalaState, FormData>(criarSala, INITIAL)
+  const { formRef } = useTrackedForm({ title: 'Nova sala' })
 
   return (
     <m.section
@@ -48,9 +50,10 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
         )}
       </AnimatePresence>
 
-      <form action={action} className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+      <form ref={formRef} action={action} className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
         <input
           name="titulo"
+          data-unsaved-label="Título da sala"
           required
           minLength={3}
           maxLength={120}
@@ -60,6 +63,7 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
         />
         <select
           name="eventoId"
+          data-unsaved-label="Evento vinculado"
           defaultValue=""
           disabled={pending}
           className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60"

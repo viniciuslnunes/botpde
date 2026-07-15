@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 import {
   Loader2,
   Check,
@@ -23,6 +23,7 @@ import { atualizarRole, excluirRole } from '@/app/admin/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { AccessPermissionWorktree, type PermissaoOrigem } from '@/components/admin/access-permission-worktree'
 import { runPersistAction } from '@/lib/toast-action'
+import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 export interface AccessRoleOpt {
   id: string
@@ -128,6 +129,72 @@ export function AccessUserPanel({
     const efetivas = calculateEffectivePermissions([...cob], usuario.permissoesAdicionais)
     return diffCoberturaEfetiva(cob, efetivas)
   })
+
+  const initialPerfilKey = useMemo(
+    () => [...usuario.perfilIds].sort().join(','),
+    [usuario.perfilIds],
+  )
+  const initialOverrides = useMemo(() => {
+    const cob = coberturaDePerfis(rolesProp, new Set(usuario.perfilIds))
+    const efetivas = calculateEffectivePermissions([...cob], usuario.permissoesAdicionais)
+    return diffCoberturaEfetiva(cob, efetivas)
+  }, [rolesProp, usuario.perfilIds, usuario.permissoesAdicionais])
+
+  const { confirmDiscard } = useUnsavedChangesContext()
+
+  const unsavedChanges = useMemo(() => {
+    const list: string[] = []
+    const currentKey = [...perfilIds].sort().join(',')
+    if (currentKey !== initialPerfilKey) {
+      const inicial = new Set(usuario.perfilIds)
+      const added = [...perfilIds].filter((id) => !inicial.has(id))
+      const removed = [...inicial].filter((id) => !perfilIds.has(id))
+      const labelRole = (id: string) => {
+        const role = roles.find((r) => r.id === id)
+        return role ? roleLabel(role, tipoSede) : 'Perfil'
+      }
+      if (added.length > 0) {
+        list.push(`Perfis adicionados: ${added.map(labelRole).join(', ')}`)
+      }
+      if (removed.length > 0) {
+        list.push(`Perfis removidos: ${removed.map(labelRole).join(', ')}`)
+      }
+    }
+    const extrasIni = [...initialOverrides.extras].sort().join(',')
+    const extrasCur = [...overridesUi.extras].sort().join(',')
+    if (extrasIni !== extrasCur) {
+      const delta = overridesUi.extras.size - initialOverrides.extras.size
+      if (delta > 0) list.push(`${delta} permissão(ões) adicional(is) concedida(s)`)
+      else if (delta < 0) list.push(`${Math.abs(delta)} permissão(ões) adicional(is) removida(s)`)
+      else list.push('Permissões adicionais alteradas')
+    }
+    const revIni = [...initialOverrides.revogadas].sort().join(',')
+    const revCur = [...overridesUi.revogadas].sort().join(',')
+    if (revIni !== revCur) {
+      list.push('Revogações de permissão alteradas')
+    }
+    return list
+  }, [
+    perfilIds,
+    initialPerfilKey,
+    usuario.perfilIds,
+    roles,
+    tipoSede,
+    overridesUi,
+    initialOverrides,
+  ])
+
+  useUnsavedChanges({
+    id: `acesso-usuario-${usuario.id}`,
+    title: `Acesso — ${usuario.nome ?? usuario.email ?? 'Usuário'}`,
+    isDirty: unsavedChanges.length > 0,
+    changes: unsavedChanges,
+  })
+
+  const handleClose = useCallback(async () => {
+    const ok = await confirmDiscard()
+    if (ok) onClose()
+  }, [confirmDiscard, onClose])
 
   const coberturaBase = useMemo(
     () => coberturaDePerfis(roles, perfilIds),
@@ -453,7 +520,7 @@ export function AccessUserPanel({
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-6">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void handleClose()}
           className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -678,7 +745,7 @@ export function AccessUserPanel({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void handleClose()}
             disabled={pending || salvandoPerfil}
             className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
@@ -847,6 +914,43 @@ function PerfilManagePanel({
     ? departamentos.find((d) => d.id === role.departamentoId)?.nome
     : null
   const somenteLeitura = role.isSystem
+  const { confirmDiscard } = useUnsavedChangesContext()
+
+  const initialExtrasKey = useMemo(() => {
+    if (role.departamentoId) {
+      const next = new Set(role.permissionsExtras ?? [])
+      for (const p of role.permissions) {
+        if (!pacoteDoPerfil(role, departamentos).has(p)) next.add(p)
+      }
+      return [...next].sort().join(',')
+    }
+    if (role.permissionsExtras && role.permissionsExtras.length > 0) {
+      return [...role.permissionsExtras].sort().join(',')
+    }
+    return [...role.permissions].sort().join(',')
+  }, [role, departamentos])
+
+  const perfilUnsaved = useMemo(() => {
+    const list: string[] = []
+    if (!somenteLeitura && nome.trim() !== role.nome) list.push('Nome do perfil')
+    if (!somenteLeitura && cor !== role.cor) list.push('Cor do perfil')
+    if (!somenteLeitura && [...extras].sort().join(',') !== initialExtrasKey) {
+      list.push('Permissões do perfil')
+    }
+    return list
+  }, [somenteLeitura, nome, cor, extras, role.nome, role.cor, initialExtrasKey])
+
+  useUnsavedChanges({
+    id: `perfil-manage-${role.id}`,
+    title: `Editar perfil — ${roleLabel(role, tipoSede)}`,
+    isDirty: perfilUnsaved.length > 0,
+    changes: perfilUnsaved,
+  })
+
+  async function handleVoltar() {
+    const ok = await confirmDiscard()
+    if (ok) onClose()
+  }
 
   async function salvar() {
     if (somenteLeitura) return
@@ -874,7 +978,7 @@ function PerfilManagePanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void handleVoltar()}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />

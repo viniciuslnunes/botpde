@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays, Plus } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -13,6 +13,7 @@ import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
+import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
 const INITIAL_STATE: PublicarPostState = {}
 const MAX_ANEXOS = 10
@@ -164,6 +165,22 @@ function ComposerBody({
     : modoEvento
       ? texto.trim().length > 0 && eventoId.length > 0 && !pending
       : texto.trim().length > 0 && !enviando && !pending
+
+  const composerChanges = useMemo(() => {
+    const list: string[] = []
+    if (texto.trim()) list.push('Texto')
+    if (medias.length > 0) list.push(`Anexos (${medias.length})`)
+    if (modoEnquete) list.push('Enquete')
+    if (modoEvento) list.push('Evento')
+    return list
+  }, [texto, medias.length, modoEnquete, modoEvento])
+
+  useUnsavedChanges({
+    id: 'feed-composer',
+    title: 'Nova publicação',
+    isDirty: composerChanges.length > 0,
+    changes: composerChanges,
+  })
 
   function handleTextoChange(value: string, cursor?: number) {
     setTexto(value)

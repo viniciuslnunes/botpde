@@ -11,6 +11,7 @@ import {
 import { Pin, PinOff, Pencil, Trash2, MessageSquarePlus, X } from 'lucide-react'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
+import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
   return (
@@ -70,15 +71,22 @@ function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
 export function CriarPostForm() {
   const [state, action, pending] = useActionState<PostState, FormData>(criarPost, {})
   const [key, setKey] = useState(0)
-  useActionStateToast(state, pending, 'Post publicado.')
+  const { formRef, markPristine } = useTrackedForm({
+    id: `criar-post-${key}`,
+    title: 'Novo post',
+  })
+  useActionStateToast(state, pending, 'Post publicado.', {
+    onSuccess: () => {
+      markPristine()
+      setKey((k) => k + 1)
+    },
+  })
 
   return (
     <form
       key={key}
-      action={async (fd: FormData) => {
-        await action(fd)
-        setKey((k) => k + 1) // limpa o formulário após sucesso
-      }}
+      ref={formRef}
+      action={action}
       className="space-y-4"
     >
       <PostFields state={state} />
@@ -100,14 +108,22 @@ export interface Post {
 function EditarPostForm({ post, onCancel }: { post: Post; onCancel: () => void }) {
   const boundAction = atualizarPost.bind(null, post.id)
   const [state, action, pending] = useActionState<PostState, FormData>(boundAction, {})
-  useActionStateToast(state, pending, 'Post atualizado.')
+  const { formRef, markPristine } = useTrackedForm({
+    id: `editar-post-${post.id}`,
+    title: 'Editar post',
+  })
+  const { confirmDiscard } = useUnsavedChangesContext()
+  useActionStateToast(state, pending, 'Post atualizado.', {
+    onSuccess: () => {
+      markPristine()
+      onCancel()
+    },
+  })
 
   return (
     <form
-      action={async (fd: FormData) => {
-        await action(fd)
-        if (!state.errors && !state.message) onCancel()
-      }}
+      ref={formRef}
+      action={action}
       className="space-y-4"
     >
       <PostFields state={state} initial={post} />
@@ -115,7 +131,11 @@ function EditarPostForm({ post, onCancel }: { post: Post; onCancel: () => void }
         <SubmitButton label="Salvar" icon={<MessageSquarePlus className="h-4 w-4" />} />
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => {
+            void confirmDiscard().then((ok) => {
+              if (ok) onCancel()
+            })
+          }}
           className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         >
           <X className="h-3.5 w-3.5" /> Cancelar

@@ -4,6 +4,8 @@ import { useActionState } from 'react'
 import { solicitarCadastro, type CadastroState } from '@/app/portal/cadastro/actions'
 import { UserCircle2, Phone, MapPin, Tv2, ChevronRight, Building2 } from 'lucide-react'
 import { FieldError, Input, Select, SubmitButton, hexToRgb } from '@torcida/ui'
+import { useTrackedForm } from '@/lib/unsaved-changes'
+import { useActionStateToast } from '@/lib/toast-action'
 
 const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
@@ -24,10 +26,15 @@ export function CadastroForm({
   jaCadastrado,
   sedes = [],
 }: Props) {
-  const [state, action] = useActionState<CadastroState, FormData>(solicitarCadastro, {})
+  const [state, action, pending] = useActionState<CadastroState, FormData>(solicitarCadastro, {})
+  const { formRef, markPristine } = useTrackedForm({
+    title: 'Cadastro na torcida',
+    enabled: !jaCadastrado,
+  })
+  useActionStateToast(state, pending, 'Cadastro enviado.', { onSuccess: markPristine })
 
   return (
-    <form action={action} className="space-y-6">
+    <form ref={formRef} action={action} className="space-y-6">
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

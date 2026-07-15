@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   ArrowLeft,
@@ -34,6 +34,7 @@ import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { PostMedia } from './post-media'
 import { isConversaGrupoLike } from '@/lib/canais-shared'
+import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -92,6 +93,26 @@ export function MensagemThread({
 
   const conversaId = conversa.id
   const uploadPendente = medias.some((m) => m.url === null && !m.error)
+  const { confirmDiscard } = useUnsavedChangesContext()
+
+  const draftChanges = useMemo(() => {
+    const list: string[] = []
+    if (texto.trim()) list.push('Mensagem não enviada')
+    if (medias.length > 0) list.push(`Anexos (${medias.length})`)
+    return list
+  }, [texto, medias.length])
+
+  useUnsavedChanges({
+    id: `mensagem-draft-${conversaId}`,
+    title: 'Mensagem',
+    isDirty: draftChanges.length > 0,
+    changes: draftChanges,
+  })
+
+  async function handleBack() {
+    const ok = await confirmDiscard()
+    if (ok) onBack()
+  }
 
   const scrollToBottom = useCallback(() => {
     const el = listRef.current
@@ -299,7 +320,7 @@ export function MensagemThread({
       <div className="flex items-center gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => void handleBack()}
           aria-label="Voltar às conversas"
           className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] md:hidden"
         >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Users, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
@@ -31,6 +31,7 @@ import type {
   SedeOnboarding,
   RegiaoOnboarding,
 } from '@/lib/onboarding'
+import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
@@ -79,6 +80,24 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
+
+  const onboardingChanges = useMemo(() => {
+    if (passo === 'concluindo') return []
+    const list: string[] = []
+    if (clube) list.push(`Clube: ${clube.nome}`)
+    if (uf || cidade) list.push(`Região: ${[cidade, uf].filter(Boolean).join('/')}`)
+    if (torcida) list.push(`Torcida: ${torcida.nome}`)
+    if (unidadeId || unidadeNaoListada) list.push('Unidade selecionada')
+    if (passo === 'vinculo') list.push('Vínculo em andamento')
+    return list
+  }, [passo, clube, uf, cidade, torcida, unidadeId, unidadeNaoListada])
+
+  useUnsavedChanges({
+    id: 'onboarding-wizard',
+    title: 'Onboarding',
+    isDirty: onboardingChanges.length > 0,
+    changes: onboardingChanges,
+  })
 
   function limparErro() {
     setErro(null)

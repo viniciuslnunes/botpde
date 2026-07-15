@@ -11,6 +11,7 @@ import {
 import { Pin, PinOff, Pencil, Trash2, Megaphone, X } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton, Badge } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
+import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
 
@@ -83,17 +84,19 @@ function ComunicadoFields({ state, initial }: { state: ComunicadoState; initial?
 export function CriarComunicadoForm() {
   const [state, action, pending] = useActionState<ComunicadoState, FormData>(criarComunicado, {})
   const [key, setKey] = useState(0)
-  useActionStateToast(state, pending, 'Comunicado publicado.')
+  const { formRef, markPristine } = useTrackedForm({
+    id: `criar-comunicado-${key}`,
+    title: 'Novo comunicado',
+  })
+  useActionStateToast(state, pending, 'Comunicado publicado.', {
+    onSuccess: () => {
+      markPristine()
+      setKey((k) => k + 1)
+    },
+  })
 
   return (
-    <form
-      key={key}
-      action={async (fd: FormData) => {
-        await action(fd)
-        setKey((k) => k + 1)
-      }}
-      className="space-y-4"
-    >
+    <form key={key} ref={formRef} action={action} className="space-y-4">
       <ComunicadoFields state={state} />
       <SubmitButton label="Publicar comunicado" icon={<Megaphone className="h-4 w-4" />} />
     </form>
@@ -119,22 +122,30 @@ function EditarComunicadoForm({
 }) {
   const boundAction = atualizarComunicado.bind(null, comunicado.id)
   const [state, action, pending] = useActionState<ComunicadoState, FormData>(boundAction, {})
-  useActionStateToast(state, pending, 'Comunicado atualizado.')
+  const { formRef, markPristine } = useTrackedForm({
+    id: `editar-comunicado-${comunicado.id}`,
+    title: 'Editar comunicado',
+  })
+  const { confirmDiscard } = useUnsavedChangesContext()
+  useActionStateToast(state, pending, 'Comunicado atualizado.', {
+    onSuccess: () => {
+      markPristine()
+      onCancel()
+    },
+  })
 
   return (
-    <form
-      action={async (fd: FormData) => {
-        await action(fd)
-        if (!state.errors && !state.message) onCancel()
-      }}
-      className="space-y-4"
-    >
+    <form ref={formRef} action={action} className="space-y-4">
       <ComunicadoFields state={state} initial={comunicado} />
       <div className="flex gap-2">
         <SubmitButton label="Salvar" icon={<Megaphone className="h-4 w-4" />} />
         <button
           type="button"
-          onClick={onCancel}
+          onClick={() => {
+            void confirmDiscard().then((ok) => {
+              if (ok) onCancel()
+            })
+          }}
           className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         >
           <X className="h-3.5 w-3.5" /> Cancelar

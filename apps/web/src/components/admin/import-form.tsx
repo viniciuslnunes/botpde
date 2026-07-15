@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Download, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { importarMock, type ResultadoImportacao } from '@/app/admin/membros/importar/actions'
+import { useTrackedForm } from '@/lib/unsaved-changes'
 
 /**
  * Formulário de importação. Só a origem MOCK está ativa nesta fase — BOT e CSV
@@ -13,6 +14,7 @@ import { importarMock, type ResultadoImportacao } from '@/app/admin/membros/impo
 export function ImportForm() {
   const [pending, startTransition] = useTransition()
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null)
+  const { formRef, markPristine } = useTrackedForm({ title: 'Importação de membros' })
 
   function handleSubmit(formData: FormData) {
     setResultado(null)
@@ -37,6 +39,7 @@ export function ImportForm() {
           )
           .unwrap()
         setResultado(res)
+        markPristine()
       } catch (err) {
         setResultado({
           success: false,
@@ -72,7 +75,7 @@ export function ImportForm() {
         </span>
       </div>
 
-      <form action={handleSubmit} className="mt-4 flex flex-wrap items-end gap-3">
+      <form ref={formRef} action={handleSubmit} className="mt-4 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="quantidade" className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Quantidade de membros
@@ -80,6 +83,7 @@ export function ImportForm() {
           <input
             id="quantidade"
             name="quantidade"
+            data-unsaved-label="Quantidade de membros"
             type="number"
             min={1}
             max={500}
