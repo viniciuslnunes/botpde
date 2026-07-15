@@ -61,6 +61,11 @@ export function linkUnidadeComunidade(tenantId: string): string {
   return `/portal/comunidade/unidade/${tenantId}`
 }
 
+/** Preview de posts Públicos de uma torcida (sem gate de aliança). */
+export function linkTorcidaComunidadePublica(tenantId: string): string {
+  return `/portal/comunidade/torcida/${tenantId}`
+}
+
 export function linkCanalComunidade(conversaId: string): string {
   return `/portal/comunidade/canais/${conversaId}`
 }

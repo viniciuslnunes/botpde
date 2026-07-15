@@ -5,6 +5,7 @@ import {
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
   linkCanalComunidade,
+  linkTorcidaComunidadePublica,
 } from '../canais-shared'
 
 describe('canais', () => {
@@ -28,5 +29,6 @@ describe('canais', () => {
   it('gera links de navegação', () => {
     expect(linkUnidadeComunidade('abc')).toBe('/portal/comunidade/unidade/abc')
     expect(linkCanalComunidade('xyz')).toBe('/portal/comunidade/canais/xyz')
+    expect(linkTorcidaComunidadePublica('abc')).toBe('/portal/comunidade/torcida/abc')
   })
 })

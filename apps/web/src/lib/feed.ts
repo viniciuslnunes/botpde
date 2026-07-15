@@ -762,6 +762,75 @@ export async function getHashtagsEmAlta(
     .map(([tag, total]) => ({ tag, total }))
 }
 
+export interface TorcidaComunidadePublica {
+  tenant: {
+    id: string
+    nome: string
+    slug: string
+    logoUrl: string | null
+    corPrimaria: string
+  }
+  posts: PostSocialItem[]
+}
+
+/**
+ * Preview autenticado: posts Públicos de um tenant (não “Só torcida” / PRIVADO).
+ * Sem gate de hierarquia/aliança — usado para avaliar recomendação de aliança.
+ */
+export const getPostsPublicosDoTenant = cache(async function getPostsPublicosDoTenant(
+  targetTenantId: string,
+  viewerUserId: string,
+  viewerTenantId: string,
+): Promise<TorcidaComunidadePublica | null> {
+  const tenant: {
+    id: string
+    nome: string
+    slug: string
+    logoUrl: string | null
+    corPrimaria: string
+    torcidaConhecida: { logoUrl: string | null } | null
+  } | null = await db.tenant.findFirst({
+    where: { id: targetTenantId, ativo: true, sintetico: false },
+    select: {
+      id: true,
+      nome: true,
+      slug: true,
+      logoUrl: true,
+      corPrimaria: true,
+      torcidaConhecida: { select: { logoUrl: true } },
+    },
+  })
+  if (!tenant) return null
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: targetTenantId,
+      oculto: false,
+      visibilidade: 'PUBLICO',
+      ...escopoFeedPrincipal,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: 30,
+    include: postInclude(viewerUserId),
+  })) as PostRaw[]
+
+  let posts = postsRaw.map(projetarPost)
+  const autorIds = posts.map((p) => p.autorId)
+  const semAcesso = await getAutoresSemAcesso(viewerUserId, viewerTenantId, autorIds)
+  posts = posts.filter((p) => !semAcesso.has(p.autorId))
+
+  return {
+    tenant: {
+      id: tenant.id,
+      nome: tenant.nome,
+      slug: tenant.slug,
+      logoUrl: tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl,
+      corPrimaria: tenant.corPrimaria,
+    },
+    posts: await finalizarPosts(posts),
+  }
+})
+
 export async function getPostsPorHashtag(
   tenantId: string,
   tag: string,

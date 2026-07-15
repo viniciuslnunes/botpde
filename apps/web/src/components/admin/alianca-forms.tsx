@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   Check,
   Handshake,
@@ -24,6 +25,7 @@ import {
   rejeitarAlianca,
 } from '@/app/admin/aliancas/actions'
 import type { AliancaListItem, RecomendacaoAliancaListItem } from '@/lib/aliancas'
+import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
@@ -52,9 +54,24 @@ interface AliancaFormsProps {
 
 type TabId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'propor' | 'historico'
 
-function TorcidaThumb({ nome, logoUrl }: { nome: string; logoUrl: string | null }) {
-  const className =
-    'h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] object-cover'
+type ThumbSize = 'sm' | 'md'
+
+const THUMB_SIZES = {
+  sm: { box: 'h-10 w-10', px: 40, text: 'text-sm' },
+  md: { box: 'h-16 w-16', px: 64, text: 'text-lg' },
+} as const
+
+function TorcidaThumb({
+  nome,
+  logoUrl,
+  size = 'md',
+}: {
+  nome: string
+  logoUrl: string | null
+  size?: ThumbSize
+}) {
+  const s = THUMB_SIZES[size]
+  const className = `${s.box} shrink-0 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] object-contain`
 
   if (logoUrl) {
     if (canOptimizeImageUrl(logoUrl)) {
@@ -62,8 +79,8 @@ function TorcidaThumb({ nome, logoUrl }: { nome: string; logoUrl: string | null 
         <Image
           src={logoUrl}
           alt=""
-          width={36}
-          height={36}
+          width={s.px}
+          height={s.px}
           className={className}
         />
       )
@@ -76,11 +93,37 @@ function TorcidaThumb({ nome, logoUrl }: { nome: string; logoUrl: string | null 
 
   return (
     <div
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-xs font-bold text-[rgb(var(--foreground-muted))]"
+      className={`flex ${s.box} shrink-0 items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] ${s.text} font-bold text-[rgb(var(--foreground-muted))]`}
       aria-hidden="true"
     >
       {(nome.charAt(0) || '?').toUpperCase()}
     </div>
+  )
+}
+
+function TorcidaIdentityLink({
+  tenantId,
+  nome,
+  children,
+}: {
+  tenantId: string | null
+  nome: string
+  children: ReactNode
+}) {
+  if (!tenantId) {
+    return <div className="flex min-w-0 items-center gap-4">{children}</div>
+  }
+
+  return (
+    <Link
+      href={linkTorcidaComunidadePublica(tenantId)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex min-w-0 items-center gap-4 rounded-xl outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
+      title={`Ver publicações públicas de ${nome}`}
+    >
+      {children}
+    </Link>
   )
 }
 
@@ -284,22 +327,22 @@ export function AliancaForms({
     return (
       <div
         key={item.id}
-        className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
+        className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-4"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TorcidaIdentityLink tenantId={counterpart.id} nome={counterpart.nome}>
             <TorcidaThumb nome={counterpart.nome} logoUrl={counterpart.logoUrl} />
             <div className="min-w-0">
-              <p className="font-medium text-[rgb(var(--foreground))]">{counterpart.nome}</p>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">@{counterpart.slug}</p>
-              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              <p className="text-base font-semibold text-[rgb(var(--foreground))]">{counterpart.nome}</p>
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">@{counterpart.slug}</p>
+              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
                 {item.status === 'ATIVA' && item.confirmadaEm
                   ? `Ativa desde ${formatDateTimeShort(item.confirmadaEm)}`
                   : `Proposta por ${proponente} · ${formatDateTimeShort(item.criadoEm)}`}
               </p>
             </div>
-          </div>
-          <span className={['rounded-full px-2 py-1 text-xs font-semibold', statusClass(item.status)].join(' ')}>
+          </TorcidaIdentityLink>
+          <span className={['rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(item.status)].join(' ')}>
             {statusLabel(item.status)}
           </span>
         </div>
@@ -310,7 +353,7 @@ export function AliancaForms({
               type="button"
               onClick={() => runAction(() => aceitarAlianca(item.id), 'Aliança aceita com sucesso')}
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               Aceitar
@@ -327,7 +370,7 @@ export function AliancaForms({
                 )
               }
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
             >
               <XCircle className="h-3.5 w-3.5" />
               Rejeitar
@@ -349,7 +392,7 @@ export function AliancaForms({
                 )
               }
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
             >
               Cancelar proposta
             </button>
@@ -370,7 +413,7 @@ export function AliancaForms({
                 )
               }
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
             >
               Encerrar aliança
             </button>
@@ -449,35 +492,38 @@ export function AliancaForms({
                 Ainda não há recomendações. Use a aba Propor para buscar manualmente.
               </EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {recomendacoes.map((item: RecomendacaoAliancaListItem) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
+                    className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-4"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <TorcidaIdentityLink
+                        tenantId={item.tenantSugeridoId}
+                        nome={item.tenantSugeridoNome}
+                      >
                         <TorcidaThumb
                           nome={item.tenantSugeridoNome}
                           logoUrl={item.tenantSugeridoLogoUrl}
                         />
                         <div className="min-w-0">
-                          <p className="font-medium text-[rgb(var(--foreground))]">
+                          <p className="text-base font-semibold text-[rgb(var(--foreground))]">
                             {item.tenantSugeridoNome}
                             {item.tenantSugeridoSlug ? (
-                              <span className="ml-2 text-xs font-normal text-[rgb(var(--foreground-muted))]">
+                              <span className="ml-2 text-sm font-normal text-[rgb(var(--foreground-muted))]">
                                 @{item.tenantSugeridoSlug}
                               </span>
                             ) : null}
                           </p>
                           {item.fonte ? (
-                            <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
+                            <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
                           ) : null}
                         </div>
-                      </div>
+                      </TorcidaIdentityLink>
                       <span
                         className={[
-                          'rounded-full px-2 py-1 text-xs font-semibold',
+                          'rounded-full px-2.5 py-1 text-xs font-semibold',
                           tipoBadge(item).className,
                         ].join(' ')}
                       >
@@ -485,7 +531,7 @@ export function AliancaForms({
                       </span>
                     </div>
                     {item.observacao && item.tipo !== 'CO_IRMA' ? (
-                      <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
+                      <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
                     ) : null}
                     {item.tipo === 'CO_IRMA' ? null : item.podePropor ? (
                       <div className="mt-3">
@@ -501,7 +547,7 @@ export function AliancaForms({
                               `Proposta enviada para ${item.tenantSugeridoNome}`,
                             )
                           }
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                         >
                           {pending ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -512,7 +558,7 @@ export function AliancaForms({
                         </button>
                       </div>
                     ) : item.confianca === 'ALTA' && !item.tenantSugeridoId ? (
-                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                      <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
                         Esta torcida ainda não está na plataforma — a recomendação fica só
                         informativa.
                       </p>
@@ -522,13 +568,13 @@ export function AliancaForms({
                           type="button"
                           disabled={pending}
                           onClick={() => proporManualFromRec(item)}
-                          className="text-xs font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-60"
+                          className="text-sm font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-60"
                         >
                           Propor mesmo assim
                         </button>
                       </div>
                     ) : item.confianca !== 'ALTA' ? (
-                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+                      <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
                         Confiança insuficiente e torcida ainda fora da plataforma.
                       </p>
                     ) : null}
@@ -547,7 +593,7 @@ export function AliancaForms({
             {pendentesRecebidas.length === 0 ? (
               <EmptyState>Nenhuma proposta pendente para aprovação.</EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {pendentesRecebidas.map((item: AliancaListItem) =>
                   renderAliancaRow(item, { showAcceptReject: true }),
                 )}
@@ -564,7 +610,7 @@ export function AliancaForms({
             {pendentesEnviadas.length === 0 ? (
               <EmptyState>Nenhuma proposta enviada aguardando resposta.</EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {pendentesEnviadas.map((item: AliancaListItem) =>
                   renderAliancaRow(item, { showCancel: true }),
                 )}
@@ -586,7 +632,7 @@ export function AliancaForms({
                   : ''}
               </EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {ativas.map((item: AliancaListItem) => renderAliancaRow(item))}
               </div>
             )}
@@ -601,7 +647,7 @@ export function AliancaForms({
             {encerradas.length === 0 ? (
               <EmptyState>Nenhum histórico ainda.</EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {encerradas.map((item: AliancaListItem) => renderAliancaRow(item))}
               </div>
             )}
@@ -652,7 +698,7 @@ export function AliancaForms({
                           selectedTenantId === item.id ? 'bg-[rgb(var(--background-subtle))]' : '',
                         ].join(' ')}
                       >
-                        <TorcidaThumb nome={item.nome} logoUrl={item.logoUrl} />
+                        <TorcidaThumb nome={item.nome} logoUrl={item.logoUrl} size="sm" />
                         <span className="min-w-0">
                           <span className="font-medium text-[rgb(var(--foreground))]">{item.nome}</span>
                           <span className="ml-2 text-[rgb(var(--foreground-muted))]">@{item.slug}</span>
