@@ -706,7 +706,11 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
       oculto: false,
       ...escopoFeedPrincipal,
       ...cursorWhere,
-      OR: [{ tenant: { sintetico: true } }, { autorId: { in: seguindoAprovados } }],
+      OR: [
+        { tenant: { sintetico: true } },
+        { autorId: { in: seguindoAprovados } },
+        { alcanceNacional: true },
+      ],
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,

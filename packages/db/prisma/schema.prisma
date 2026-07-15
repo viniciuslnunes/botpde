@@ -1010,6 +1010,10 @@ model Post {
   visibilidade VisibilidadePost @default(PUBLICO)
   fixado      Boolean          @default(false)
   oculto      Boolean          @default(false)
+  /// Post PUBLICO de sócio que também alcança torcedores globais do clube na
+  /// Comunidade Nacional, bypassando o gate de follow aprovado. Exige
+  /// COMMUNITY_POST_NACIONAL — validado no servidor, nunca só no cliente.
+  alcanceNacional Boolean       @default(false) @map("alcance_nacional")
 
   postOrigemId String? @map("post_origem_id")
   postOrigem   Post?   @relation("Repost", fields: [postOrigemId], references: [id], onDelete: SetNull)

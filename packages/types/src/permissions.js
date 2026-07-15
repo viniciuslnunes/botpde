@@ -57,6 +57,9 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Comunidade social
   COMMUNITY_POST: 'community:post',
   COMMUNITY_MODERATE: 'community:moderate',
+  // Publicar post PUBLICO que também alcança torcedores globais do clube na
+  // Comunidade Nacional (bypassa o gate de follow aprovado sócio→torcedor).
+  COMMUNITY_POST_NACIONAL: 'community:post_nacional',
 
   // Notícias curadas
   NEWS_CURATE: 'news:curate',
@@ -138,6 +141,7 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.COMMUNITY_MANAGE, label: 'Gerenciar mural da comunidade' },
       { key: PERMISSIONS.ANNOUNCEMENTS_PUBLISH, label: 'Publicar comunicados oficiais' },
       { key: PERMISSIONS.COMMUNITY_POST, label: 'Publicar no feed como membro' },
+      { key: PERMISSIONS.COMMUNITY_POST_NACIONAL, label: 'Publicar para torcedores do clube (nacional)' },
       { key: PERMISSIONS.COMMUNITY_MODERATE, label: 'Moderar publicações e denúncias' },
       { key: PERMISSIONS.NEWS_CURATE, label: 'Curar notícias do time' },
       { key: PERMISSIONS.MEETINGS_HOST, label: 'Criar salas de vídeo' },

@@ -52,6 +52,8 @@ const postSchema = z.object({
   conteudo: z.string().trim().min(1, 'Conteúdo é obrigatório').max(3000),
   midias: z.array(midiaUrlSchema).max(MAX_MIDIAS, 'Máximo de 10 anexos').default([]),
   visibilidade: visibilidadePostSchema.default('PUBLICO'),
+  /** Cliente só sugere — servidor revalida com COMMUNITY_POST_NACIONAL antes de gravar. */
+  alcanceNacional: z.coerce.boolean().default(false),
 })
 
 function parseMidias(raw: FormDataEntryValue | null): unknown {
@@ -107,13 +109,14 @@ export async function publicarPost(
       conteudo: formData.get('conteudo'),
       midias: parseMidias(formData.get('midias')),
       visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
+      alcanceNacional: formData.get('alcanceNacional'),
     })
 
     if (!parsed.success) {
       return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
     }
 
-    const { conteudo, midias, visibilidade } = parsed.data
+    const { conteudo, midias, visibilidade, alcanceNacional: alcanceNacionalPedido } = parsed.data
 
     let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
     let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
@@ -128,6 +131,17 @@ export async function publicarPost(
 
     await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
+    // Servidor é a única fonte de verdade da permissão — o cliente só sugere.
+    let alcanceNacional = false
+    if (alcanceNacionalPedido && visibilidade === 'PUBLICO') {
+      const { rolePermissions, overrides } = await getUserPermissionsInTenant(
+        session.user.id,
+        tenant.id,
+      )
+      const effective = calculateEffectivePermissions(rolePermissions, overrides)
+      alcanceNacional = hasPermission(effective, PERMISSIONS.COMMUNITY_POST_NACIONAL)
+    }
+
     const post = await db.post.create({
       data: {
         tenantId: tenant.id,
@@ -136,6 +150,7 @@ export async function publicarPost(
         midiaUrls: midias,
         tipo: 'MEMBRO',
         visibilidade,
+        alcanceNacional,
       },
     })
 
