@@ -17,7 +17,7 @@ import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engage
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
-import { getPostPorId, podeVerPost } from '@/lib/feed'
+import { getPostPorId, podeVerFeedSocios } from '@/lib/feed'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
@@ -487,9 +487,12 @@ export interface ComentarioPostItem {
 }
 
 export async function listarComentariosPost(postId: string): Promise<ComentarioPostItem[]> {
-  // Leitura de comentários: gate é a visibilidade do post (podeVerPost), não
-  // permissão de comunidade — o mesmo post pode ser lido por torcedor global
-  // (sem tenant) desde que seja PUBLICO ou o viewer tenha acesso a ele.
+  // Leitura de comentários: gate é a visibilidade do PRÓPRIO POST (PUBLICO/
+  // TENANT/PRIVADO), não a privacidade de perfil do autor — comentário de post
+  // PUBLICO é legível por qualquer autenticado, mesmo torcedor global (sem
+  // tenant) e mesmo que o autor tenha perfilPrivado=true. Não reusa podeVerPost
+  // (feed.ts) porque essa função também exige podeVerConteudoSocial (privacidade
+  // de perfil), regra que nunca existiu pra leitura de comentário.
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
@@ -503,9 +506,17 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     where: { id: postId },
     select: { id: true, autorId: true, tenantId: true, visibilidade: true, oculto: true },
   })
-  if (!post || !(await podeVerPost(session.user.id, post))) {
-    throw new Error('Post não encontrado')
+  if (!post || post.oculto) throw new Error('Post não encontrado')
+
+  const viewerId = session.user.id
+  let podeVer = viewerId === post.autorId || post.visibilidade === 'PUBLICO'
+  if (!podeVer && post.visibilidade === 'TENANT') {
+    podeVer = await podeVerFeedSocios(viewerId, post.tenantId)
   }
+  if (!podeVer && post.visibilidade === 'PRIVADO') {
+    podeVer = (await getSeguimentoStatus(viewerId, post.autorId)) === 'APROVADO'
+  }
+  if (!podeVer) throw new Error('Post não encontrado')
 
   const rows: Array<{
     id: string
