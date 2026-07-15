@@ -212,15 +212,20 @@ flowchart LR
 membros **daquele** departamento (`adicionarMembroDepartamento` /
 `removerMembroDepartamento` em `/admin/acessos/actions`).
 
-**UI**: `/admin/acessos` (perfis, membro/gestor por departamento, matriz com
-origem); `/admin/configuracoes` (CRUD de departamento com as duas listas);
-hub `/portal/departamentos`.
+**UI**: templates em `/admin/configuracoes` (`#cargos`, `#departamentos` —
+CRUD independente de usuários); atribuição em `/admin/acessos` (membro/gestor
+por departamento, matriz com origem). **Sem** FK `Role ↔ Departamento` — os
+eixos somam no usuário. Bootstrap de tenant semeia os 10 deptos canônicos
+(`upsertDepartamentosCanonicos`). Hub portal: `/portal/departamentos`.
 
 **Visão da torcida** (`/admin/torcida`): worktree híbrida = árvore de `Sede`
 do tenant (onboarding) + Tenants filhos quando existentes; KPIs por
 `SaasMembro.sedeId`. Gate: `TORCIDA_GLOBAL_VIEW` + Sede `tipo: SEDE`.
 Ver `docs/data/modulo-departamentos.md`.
-### 3.3 Unificação bot ↔ web
+
+**Planejado:** o Presidente poderá, a partir da worktree, acessar afiliadas
+(membros, sócios, relatórios, financeiro) — escopo/UX a definir; o
+relacionamento hierárquico na Visão já está ok.### 3.3 Unificação bot ↔ web
 
 - Bot para de falar Postgres cru via `pg` e passa a usar `@torcida/db`
   (Prisma), mesmo cliente e mesmo schema que o web.

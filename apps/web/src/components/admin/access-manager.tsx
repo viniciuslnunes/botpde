@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Loader2, Check, X, Pencil, ShieldCheck, UserRound } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
@@ -59,10 +60,30 @@ export function AccessManager({ usuarios, roles, departamentos, tipoSede }: Acce
 
   if (usuarios.length === 0) {
     return (
-      <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Nenhum usuário associado a este tenant ainda. Usuários aparecem aqui assim que se cadastram
-        ou têm um membro aprovado.
-      </p>
+      <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-6 py-10 text-center">
+        <UserRound className="mx-auto mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
+        <h2 className="text-base font-semibold text-[rgb(var(--foreground))]">
+          Nenhum usuário nesta torcida ainda
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
+          Defina primeiro os cargos e departamentos em Configurações. Depois, quando houver
+          membros, atribua os padrões a cada pessoa aqui.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <Link
+            href="/admin/configuracoes#cargos"
+            className="inline-flex items-center rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            Gerenciar cargos
+          </Link>
+          <Link
+            href="/admin/configuracoes#departamentos"
+            className="inline-flex items-center rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Gerenciar departamentos
+          </Link>
+        </div>
+      </div>
     )
   }
 

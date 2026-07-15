@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS, ALL_PERMISSIONS } from '../../types/src/permissions.js'
+import { upsertDepartamentosCanonicos } from '../src/departamentos-canonicos.js'
 
 const db = new PrismaClient()
 
@@ -96,6 +97,12 @@ async function main() {
     })
     console.log(`✅ Cargo customizado: ${role.nome}`)
   }
+
+  // ── Departamentos canônicos (templates de área) ─────────────────────────
+  const deptos = await upsertDepartamentosCanonicos(db, tenant.id)
+  console.log(
+    `✅ Departamentos canônicos: ${deptos.upserted} (legado removido: ${deptos.removedLegacy})`,
+  )
 
   // ── Sede principal ───────────────────────────────────────────────────────
   const sede = await db.sede.upsert({

@@ -1,7 +1,7 @@
 'use server'
 
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
+import { db, upsertDepartamentosCanonicos } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
 import { redirect } from 'next/navigation'
@@ -119,6 +119,9 @@ export async function criarTenantInicial(
       },
     })
 
+    // Templates de área — 10 departamentos canônicos (membro vs gestor)
+    await upsertDepartamentosCanonicos(tx, t.id)
+
     // Atribui owner ao usuário logado
     if (session.user.id) {
       await tx.userRole.create({
@@ -205,6 +208,9 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
     ownerRole = createdOwner ?? roleMap[SYSTEM_ROLES.OWNER]
     rolesCriadas = created.map((r: (typeof created)[number]) => r.nome)
   }
+
+  // Garante deptos canônicos mesmo em tenant legado sem bootstrap completo
+  await upsertDepartamentosCanonicos(db, tenantId)
 
   if (!ownerRole) return { message: 'Erro ao criar cargo owner.' }
 

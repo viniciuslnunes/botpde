@@ -100,15 +100,17 @@ export default async function ConfiguracoesPage() {
     {
       id: 'cargos',
       icon: Shield,
-      title: 'Cargos e permissões',
-      description: 'Gerencie os cargos disponíveis e as permissões de cada um',
+      title: 'Cargos (papéis transversais)',
+      description:
+        'Templates de perfil — Presidente, Vice, Admin, Membro e cargos customizados. Atribua depois em Controle de acesso.',
       ownerOnly: false,
     },
     {
       id: 'departamentos',
       icon: Users2,
-      title: 'Departamentos',
-      description: 'Agrupamentos que concedem acesso. Membros recebem as permissões de equipe; gestores recebem as extras e administram a área.',
+      title: 'Departamentos (áreas)',
+      description:
+        'Templates de área com colaborador (membro) e gestor. Atribua depois em Controle de acesso.',
       ownerOnly: false,
     },
   ]
@@ -136,8 +138,9 @@ export default async function ConfiguracoesPage() {
             return (
               <div
                 key={section.id}
+                id={section.id}
                 className={[
-                  'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))]',
+                  'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))] scroll-mt-6',
                   blocked
                     ? 'border-[rgb(var(--border))] opacity-60'
                     : 'border-[rgb(var(--border))]',

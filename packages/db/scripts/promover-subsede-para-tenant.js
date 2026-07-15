@@ -21,6 +21,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissions.js'
+import { upsertDepartamentosCanonicos } from '../src/departamentos-canonicos.js'
 
 const db = new PrismaClient()
 const slugPrincipal = process.argv[2] ?? 'pde-gavioes-fiel'
@@ -80,6 +81,9 @@ async function main() {
     })
   }
   console.log(`✅ Cargos de sistema criados`)
+
+  const deptos = await upsertDepartamentosCanonicos(db, novoTenant.id)
+  console.log(`✅ Departamentos canônicos: ${deptos.upserted}`)
 
   const ownerPrincipal = await db.userRole.findFirst({
     where: { tenantId: tenantPrincipal.id, role: { isSystem: true, nome: 'owner' } },

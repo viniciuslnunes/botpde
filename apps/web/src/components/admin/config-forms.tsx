@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, Eye } from 'lucide-react'
-import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema } from '@torcida/types'
+import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema, isDepartamentoCanonico } from '@torcida/types'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
@@ -306,6 +306,13 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Cargos são papéis transversais (Presidente, Recrutador…). A atribuição a pessoas fica em{' '}
+        <a href="/admin/acessos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+          Controle de acesso
+        </a>
+        .
+      </p>
       {erro && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           {erro}
@@ -723,6 +730,13 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Departamentos são áreas com colaborador (membro) e gestor. A atribuição a pessoas fica em{' '}
+        <a href="/admin/acessos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+          Controle de acesso
+        </a>
+        .
+      </p>
       <div className="space-y-2">
         {departamentos.map((departamento) =>
           editandoId === departamento.id ? (
@@ -797,12 +811,18 @@ function DepartamentoRow({
 }) {
   const organizacional =
     departamento.permissions.length === 0 && departamento.permissionsGestor.length === 0
+  const canonico = isDepartamentoCanonico(departamento.slug)
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
       <div className="h-4 w-4 shrink-0 rounded-full border border-[rgb(var(--border))]" style={{ backgroundColor: departamento.cor }} />
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
         <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
+        {canonico && (
+          <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+            Padrão
+          </span>
+        )}
         <span className="text-xs text-[rgb(var(--foreground-muted))]">
           {organizacional
             ? 'Organizacional — não concede acesso'

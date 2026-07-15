@@ -12,6 +12,7 @@ import { PrismaClient } from '@prisma/client'
 import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS } from '../../types/src/permissions.js'
 import { TORCIDAS_BRASIL } from '../src/data/torcidas-brasil.js'
 import { normalizeNome } from '../src/data/afiliacoes-normalize.js'
+import { upsertDepartamentosCanonicos } from '../src/departamentos-canonicos.js'
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const db = new PrismaClient()
@@ -64,6 +65,7 @@ async function ensureSystemRoles(tenantId) {
       },
     })
   }
+  await upsertDepartamentosCanonicos(db, tenantId)
 }
 
 async function main() {

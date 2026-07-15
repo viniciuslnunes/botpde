@@ -249,6 +249,31 @@ export function slugifyDepartamento(nome) {
 }
 
 /**
+ * Slugs dos 10 departamentos canônicos semeados por tenant (badge "padrão" na UI).
+ * @type {readonly string[]}
+ */
+export const DEPARTAMENTOS_CANONICOS_SLUGS = Object.freeze([
+  'diretoria',
+  'financeiro',
+  'social-e-eventos',
+  'materiais-loja',
+  'comunicacao',
+  'patrimonio',
+  'batucada',
+  'caravanas',
+  'feminino',
+  'carnaval',
+])
+
+/**
+ * @param {string} slug
+ * @returns {boolean}
+ */
+export function isDepartamentoCanonico(slug) {
+  return DEPARTAMENTOS_CANONICOS_SLUGS.includes(slug)
+}
+
+/**
  * Cargos reservados do sistema — não podem ser editados ou removidos.
  */
 export const SYSTEM_ROLES = /** @type {const} */ ({

@@ -101,4 +101,12 @@ export {
   saoMesmoClube,
   indiceAfiliacaoCanonica,
 } from './data/afiliacoes-normalize.js'
+export {
+  DEPARTAMENTOS_CANONICOS,
+  DEPARTAMENTOS_CANONICOS_SLUGS,
+  DEPARTAMENTOS_SLUGS_LEGADOS,
+  isDepartamentoCanonico,
+  upsertDepartamentosCanonicos,
+} from './departamentos-canonicos.js'
+
 export { calcularMenorValorEstimadosConhecido } from './data/torcedores-estimados.js'
