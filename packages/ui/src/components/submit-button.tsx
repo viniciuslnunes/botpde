@@ -15,6 +15,8 @@ export interface SubmitButtonProps {
   iconPosition?: 'leading' | 'trailing'
   /** Ocupa 100% da largura do container, com padding maior — usado em formulários de página inteira (ex: cadastro) */
   fullWidth?: boolean
+  /** Desabilita o botão (além do estado pending do formulário). */
+  disabled?: boolean
 }
 
 /**
@@ -27,14 +29,16 @@ export function SubmitButton({
   icon,
   iconPosition = 'leading',
   fullWidth = false,
+  disabled = false,
 }: SubmitButtonProps) {
   const { pending } = useFormStatus()
   const spinner = <Loader2 className="h-4 w-4 animate-spin" />
+  const isDisabled = pending || disabled
 
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isDisabled}
       className={[
         'flex items-center justify-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60',
         fullWidth ? 'w-full rounded-xl px-6 py-3 text-sm' : 'px-5 py-2.5 text-sm',

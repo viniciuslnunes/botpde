@@ -69,6 +69,43 @@ export const nicknameSchema = z
   )
 
 /**
+ * Candidatos de @ a partir do nome — base + variantes numéricas se a base
+ * estiver ocupada/reservada. Usado no cadastro e na API de sugestão.
+ */
+export function candidatosNickname(nome, max = 24) {
+  const bruto = String(nome ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 20)
+
+  let base = sugerirNickname(nome)
+  if (!base && bruto.length >= 3 && !/^\d+$/.test(bruto)) {
+    // Nome caiu em reservado (ex.: "Admin") — ancora com sufixo.
+    base = `${bruto.slice(0, 18)}_1`
+  }
+  if (!base) return []
+
+  const out = []
+  const push = (n) => {
+    const parsed = nicknameSchema.safeParse(n)
+    if (parsed.success && !out.includes(parsed.data)) out.push(parsed.data)
+  }
+
+  push(base)
+  for (let i = 1; i <= max && out.length < max; i++) {
+    const suffix = String(i)
+    push(`${base.slice(0, 20 - suffix.length)}${suffix}`)
+    if (out.length >= max) break
+    const under = `_${i}`
+    push(`${base.slice(0, 20 - under.length)}${under}`)
+  }
+  return out
+}
+
+/**
  * Campo de formulário: vazio → null; valor válido → string normalizada.
  * Preferir `nicknameSchema` (obrigatório) no perfil e no pós-login.
  */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   NICKNAMES_RESERVADOS,
+  candidatosNickname,
   normalizarNickname,
   nicknameFormSchema,
   nicknameSchema,
@@ -25,6 +26,22 @@ describe('sugerirNickname', () => {
   it('retorna vazio quando inválido', () => {
     expect(sugerirNickname('ab')).toBe('')
     expect(sugerirNickname('admin')).toBe('')
+  })
+})
+
+describe('candidatosNickname', () => {
+  it('inclui base e variantes numéricas', () => {
+    const lista = candidatosNickname('Mano Beiço')
+    expect(lista[0]).toBe('mano_beico')
+    expect(lista).toContain('mano_beico1')
+    expect(lista).toContain('mano_beico_1')
+  })
+
+  it('ancora reservados com sufixo', () => {
+    const lista = candidatosNickname('Admin')
+    expect(lista.length).toBeGreaterThan(0)
+    expect(lista[0]).toMatch(/^admin/)
+    expect(lista.every((n) => nicknameSchema.safeParse(n).success)).toBe(true)
   })
 })
 

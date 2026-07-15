@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { salvarPerfil, type PerfilState } from '@/app/portal/perfil/actions'
 import { Save, CheckCircle2 } from 'lucide-react'
 import { FieldError, Input, SubmitButton } from '@torcida/ui'
@@ -30,9 +30,17 @@ export function PerfilForm({
   const [state, action, pending] = useActionState<PerfilState, FormData>(salvarPerfil, {})
   const { formRef, markPristine } = useTrackedForm({ title: 'Dados do perfil' })
   useActionStateToast(state, pending, 'Perfil atualizado.', { onSuccess: markPristine })
+  const [nickDisponivel, setNickDisponivel] = useState(Boolean(nickname))
 
   return (
-    <form ref={formRef} action={action} className="space-y-5">
+    <form
+      ref={formRef}
+      action={action}
+      className="space-y-5"
+      onSubmit={(e) => {
+        if (!nickDisponivel) e.preventDefault()
+      }}
+    >
       {state.success && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -46,7 +54,6 @@ export function PerfilForm({
         </div>
       )}
 
-      {/* Nome */}
       <div>
         <label htmlFor="nome" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Nome completo <span className="text-red-500">*</span>
@@ -76,10 +83,10 @@ export function PerfilForm({
             : 'Defina um @ único — aparece abaixo do seu nome no feed. Letras, números e _ · 3 a 20 caracteres.'
         }
         errors={state.errors?.nickname}
+        onDisponivelChange={setNickDisponivel}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Idade */}
         <div>
           <label htmlFor="idade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Idade
@@ -96,7 +103,6 @@ export function PerfilForm({
           <FieldError errors={state.errors?.idade} />
         </div>
 
-        {/* Telefone */}
         <div>
           <label htmlFor="telefone" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Telefone / WhatsApp
@@ -112,7 +118,6 @@ export function PerfilForm({
         </div>
       </div>
 
-      {/* Cidade */}
       <div>
         <label htmlFor="cidade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Cidade / Estado
@@ -127,7 +132,6 @@ export function PerfilForm({
         <FieldError errors={state.errors?.cidade} />
       </div>
 
-      {/* Discord */}
       <div>
         <label htmlFor="discordTag" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Usuário no Discord
@@ -152,8 +156,11 @@ export function PerfilForm({
         </p>
       )}
 
-      <SubmitButton label="Salvar alterações" icon={<Save className="h-4 w-4" />} />
+      <SubmitButton
+        label="Salvar alterações"
+        icon={<Save className="h-4 w-4" />}
+        disabled={!nickDisponivel}
+      />
     </form>
   )
 }
-

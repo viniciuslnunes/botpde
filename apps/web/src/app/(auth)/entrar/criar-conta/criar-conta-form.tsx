@@ -10,10 +10,17 @@ import { NicknameField } from '@/components/nickname-field'
 export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
   const [state, action] = useActionState<ContaState, FormData>(criarContaComSenha, {})
   const [mostrarSenha, setMostrarSenha] = useState(false)
-  const [mostrarConfirmar, setMostrarConfirmar] = useState(false)
+  const [nome, setNome] = useState('')
+  const [nickDisponivel, setNickDisponivel] = useState(false)
 
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={action}
+      className="space-y-4"
+      onSubmit={(e) => {
+        if (!nickDisponivel) e.preventDefault()
+      }}
+    >
       <AuthRedirectEffect redirectTo={state.redirectTo} />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
@@ -28,11 +35,25 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
             Nome completo
           </span>
         </label>
-        <Input id="nome" name="nome" type="text" placeholder="Seu nome completo" required />
+        <Input
+          id="nome"
+          name="nome"
+          type="text"
+          placeholder="Seu nome completo"
+          required
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          minLength={3}
+        />
         <FieldError errors={state.errors?.nome} />
       </div>
 
-      <NicknameField id="nickname" errors={state.errors?.nickname} />
+      <NicknameField
+        id="nickname"
+        suggestFromNome={nome}
+        errors={state.errors?.nickname}
+        onDisponivelChange={setNickDisponivel}
+      />
 
       <div>
         <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -57,7 +78,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
             id="senha"
             name="senha"
             type={mostrarSenha ? 'text' : 'password'}
-            placeholder="Mínimo 8 caracteres"
+            placeholder="Mín. 8 caracteres, letras e número"
             minLength={8}
             required
             className="pr-11"
@@ -71,33 +92,10 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
             {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+          Letras e pelo menos um número · use o olho para conferir.
+        </p>
         <FieldError errors={state.errors?.senha} />
-      </div>
-
-      <div>
-        <label htmlFor="confirmarSenha" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Confirmar senha
-        </label>
-        <div className="relative">
-          <Input
-            id="confirmarSenha"
-            name="confirmarSenha"
-            type={mostrarConfirmar ? 'text' : 'password'}
-            placeholder="Repita a senha"
-            minLength={8}
-            required
-            className="pr-11"
-          />
-          <button
-            type="button"
-            onClick={() => setMostrarConfirmar((v) => !v)}
-            className="absolute inset-y-0 right-0 flex items-center px-3 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-            aria-label={mostrarConfirmar ? 'Ocultar senha' : 'Mostrar senha'}
-          >
-            {mostrarConfirmar ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        <FieldError errors={state.errors?.confirmarSenha} />
       </div>
 
       <div className="pt-2" style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>
@@ -107,6 +105,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
           icon={<ChevronRight className="h-4 w-4" />}
           iconPosition="trailing"
           fullWidth
+          disabled={!nickDisponivel}
         />
       </div>
     </form>

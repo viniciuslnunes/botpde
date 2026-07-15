@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { AtSign, Check, Loader2, X } from 'lucide-react'
 import { FieldError, Input } from '@torcida/ui'
 import { normalizarNickname } from '@torcida/types'
 
-type Status =
+export type NicknameStatus =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'available'; proprio?: boolean }
@@ -18,12 +18,19 @@ type Props = {
   defaultValue?: string
   /** @ atual do usuário — se igual ao digitado, conta como disponível. */
   nicknameAtual?: string | null
+  /**
+   * Nome completo digitado no cadastro. Enquanto o usuário não editar o @,
+   * preenche com a primeira sugestão livre derivada deste nome.
+   */
+  suggestFromNome?: string
   label?: ReactNode
   helperText?: string
   errors?: string[]
   required?: boolean
   autoFocus?: boolean
   className?: string
+  /** true só quando o @ está disponível (ou é o próprio). */
+  onDisponivelChange?: (disponivel: boolean) => void
 }
 
 export function NicknameField({
@@ -31,18 +38,59 @@ export function NicknameField({
   name = 'nickname',
   defaultValue = '',
   nicknameAtual = null,
+  suggestFromNome,
   label,
   helperText = 'Único na plataforma · letras, números e _ · 3 a 20 caracteres.',
   errors,
   required = true,
   autoFocus = false,
   className,
+  onDisponivelChange,
 }: Props) {
   const autoId = useId()
   const id = idProp ?? `nickname-${autoId}`
   const [value, setValue] = useState(defaultValue)
-  const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const [status, setStatus] = useState<NicknameStatus>({ kind: 'idle' })
+  const dirtyRef = useRef(Boolean(defaultValue && !suggestFromNome))
+  const onDisponivelChangeRef = useRef(onDisponivelChange)
+  onDisponivelChangeRef.current = onDisponivelChange
 
+  // Sugestão automática a partir do nome (só se o usuário ainda não editou o @).
+  useEffect(() => {
+    if (suggestFromNome === undefined) return
+    if (dirtyRef.current) return
+
+    const nome = suggestFromNome.trim()
+    if (nome.length < 3) {
+      setValue('')
+      setStatus({ kind: 'idle' })
+      return
+    }
+
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/nickname/sugerir?nome=${encodeURIComponent(nome)}`,
+            { signal: ctrl.signal },
+          )
+          if (!res.ok || dirtyRef.current) return
+          const data = (await res.json()) as { nickname: string | null }
+          if (data.nickname) setValue(data.nickname)
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return
+        }
+      })()
+    }, 400)
+
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [suggestFromNome])
+
+  // Checagem de disponibilidade do valor atual.
   useEffect(() => {
     const normalizado = normalizarNickname(value)
     if (!normalizado) {
@@ -78,7 +126,10 @@ export function NicknameField({
           if (!res.ok || !data.ok) {
             setStatus({
               kind: 'invalid',
-              motivo: data.motivo ?? 'Apelido inválido',
+              motivo:
+                res.status === 429
+                  ? 'Muitas verificações. Aguarde um momento.'
+                  : (data.motivo ?? 'Apelido inválido'),
             })
             return
           }
@@ -102,6 +153,10 @@ export function NicknameField({
       ctrl.abort()
     }
   }, [value, nicknameAtual])
+
+  useEffect(() => {
+    onDisponivelChangeRef.current?.(status.kind === 'available')
+  }, [status])
 
   const feedback =
     status.kind === 'checking' ? (
@@ -150,7 +205,10 @@ export function NicknameField({
           name={name}
           type="text"
           value={value}
-          onChange={(e) => setValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+          onChange={(e) => {
+            dirtyRef.current = true
+            setValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))
+          }}
           placeholder="seu_apelido"
           autoComplete="off"
           spellCheck={false}

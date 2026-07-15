@@ -1,11 +1,13 @@
 'use server'
 
 import { db } from '@torcida/db'
-import { nicknameSchema } from '@torcida/types'
+import { nicknameSchema, senhaCadastroSchema } from '@torcida/types'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import { excedeuLimite } from '@/lib/rate-limit'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
+import { excedeuLimitePublico, registrarUsoPublico } from '@/lib/public-rate-limit'
+import { getClientIp } from '@/lib/request-ip'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -64,18 +66,12 @@ export async function entrarComSenha(
   return entrarComCredenciais(email, senha, '/auth/contexto')
 }
 
-const contaSchema = z
-  .object({
-    nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
-    nickname: nicknameSchema,
-    email: z.string().email('E-mail inválido'),
-    senha: z.string().min(8, 'A senha deve ter ao menos 8 caracteres').max(72),
-    confirmarSenha: z.string(),
-  })
-  .refine((data) => data.senha === data.confirmarSenha, {
-    message: 'As senhas não coincidem',
-    path: ['confirmarSenha'],
-  })
+const contaSchema = z.object({
+  nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
+  nickname: nicknameSchema,
+  email: z.string().email('E-mail inválido'),
+  senha: senhaCadastroSchema,
+})
 
 export type ContaState = {
   errors?: Record<string, string[]>
@@ -87,12 +83,18 @@ export async function criarContaComSenha(
   _prev: ContaState,
   formData: FormData,
 ): Promise<ContaState> {
+  const ip = await getClientIp()
+  if (excedeuLimitePublico('criarConta', ip)) {
+    return {
+      message: 'Muitas contas criadas deste dispositivo. Tente novamente mais tarde.',
+    }
+  }
+
   const raw = {
     nome: formData.get('nome') as string,
     nickname: formData.get('nickname') as string,
     email: formData.get('email') as string,
     senha: formData.get('senha') as string,
-    confirmarSenha: formData.get('confirmarSenha') as string,
   }
 
   const parsed = contaSchema.safeParse(raw)
@@ -102,6 +104,9 @@ export async function criarContaComSenha(
 
   const { nome, nickname, senha } = parsed.data
   const email = parsed.data.email.trim().toLowerCase()
+
+  // Conta tentada de fato — conta no rate limit (só após dados válidos).
+  registrarUsoPublico('criarConta', ip)
 
   const emailExistente = await db.user.findFirst({
     where: { email: { equals: email, mode: 'insensitive' } },

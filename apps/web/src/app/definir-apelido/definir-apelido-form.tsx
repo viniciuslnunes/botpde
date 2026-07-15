@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { AtSign } from 'lucide-react'
 import { SubmitButton } from '@torcida/ui'
 import { AuthRedirectEffect } from '@/components/auth-redirect-effect'
@@ -15,9 +15,16 @@ export function DefinirApelidoForm({
   nicknameAtual: string | null
 }) {
   const [state, action] = useActionState<DefinirApelidoState, FormData>(definirApelido, {})
+  const [nickDisponivel, setNickDisponivel] = useState(Boolean(sugestao))
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={action}
+      className="space-y-5"
+      onSubmit={(e) => {
+        if (!nickDisponivel) e.preventDefault()
+      }}
+    >
       <AuthRedirectEffect redirectTo={state.redirectTo} />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
@@ -37,11 +44,13 @@ export function DefinirApelidoForm({
         helperText="Único na plataforma · letras, números e _ · 3 a 20 caracteres. Aparece abaixo do seu nome no feed."
         errors={state.errors?.nickname}
         autoFocus
+        onDisponivelChange={setNickDisponivel}
       />
 
       <SubmitButton
         label={nicknameAtual ? 'Salvar e continuar' : 'Escolher apelido'}
         icon={<AtSign className="h-4 w-4" />}
+        disabled={!nickDisponivel}
       />
     </form>
   )

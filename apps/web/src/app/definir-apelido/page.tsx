@@ -3,11 +3,20 @@ import { redirect } from 'next/navigation'
 import { AtSign } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { sugerirNickname } from '@torcida/types'
+import { candidatosNickname } from '@torcida/types'
+import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { DefinirApelidoForm } from './definir-apelido-form'
 
 export const metadata: Metadata = { title: 'Escolher apelido' }
+
+async function primeiraSugestaoLivre(nome: string, userId: string): Promise<string> {
+  for (const candidato of candidatosNickname(nome)) {
+    const check = await checarNicknameDisponivel(candidato, userId)
+    if (check.ok && check.disponivel) return check.nickname
+  }
+  return ''
+}
 
 export default async function DefinirApelidoPage() {
   const session = await auth()
@@ -27,7 +36,10 @@ export default async function DefinirApelidoPage() {
     redirect('/auth/contexto')
   }
 
-  const sugestao = sugerirNickname(user?.nome ?? session.user.name ?? '')
+  const sugestao = await primeiraSugestaoLivre(
+    user?.nome ?? session.user.name ?? '',
+    session.user.id,
+  )
 
   return (
     <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
