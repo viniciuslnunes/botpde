@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@torcida/db'
+import { nicknameSchema } from '@torcida/types'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import { excedeuLimite } from '@/lib/rate-limit'
@@ -65,6 +66,7 @@ export async function entrarComSenha(
 const contaSchema = z
   .object({
     nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
+    nickname: nicknameSchema,
     email: z.string().email('E-mail inválido'),
     senha: z.string().min(8, 'A senha deve ter ao menos 8 caracteres').max(72),
     confirmarSenha: z.string(),
@@ -86,6 +88,7 @@ export async function criarContaComSenha(
 ): Promise<ContaState> {
   const raw = {
     nome: formData.get('nome') as string,
+    nickname: formData.get('nickname') as string,
     email: formData.get('email') as string,
     senha: formData.get('senha') as string,
     confirmarSenha: formData.get('confirmarSenha') as string,
@@ -96,21 +99,40 @@ export async function criarContaComSenha(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { nome, senha } = parsed.data
+  const { nome, nickname, senha } = parsed.data
   const email = parsed.data.email.trim().toLowerCase()
 
-  const existente = await db.user.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
-    select: { id: true },
-  })
-  if (existente) {
+  const [emailExistente, nickExistente] = await Promise.all([
+    db.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    }),
+    db.user.findFirst({
+      where: { nickname },
+      select: { id: true },
+    }),
+  ])
+  if (emailExistente) {
     return { message: 'Já existe uma conta com este e-mail. Tente entrar.' }
+  }
+  if (nickExistente) {
+    return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
   }
 
   const senhaHash = await bcrypt.hash(senha, 10)
-  await db.user.create({ data: { nome, email, senhaHash } })
+  try {
+    await db.user.create({ data: { nome, email, senhaHash, nickname } })
+  } catch (err) {
+    const code =
+      err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
+    if (code === 'P2002') {
+      return { message: 'E-mail ou apelido já cadastrado. Tente entrar ou escolha outro @.' }
+    }
+    throw err
+  }
 
-  const login = await entrarComCredenciais(email, senha, '/onboarding')
+  // Router canônico: com nickname já definido → /onboarding (evita /definir-apelido).
+  const login = await entrarComCredenciais(email, senha, '/auth/contexto')
   if (login.message) {
     return {
       message:

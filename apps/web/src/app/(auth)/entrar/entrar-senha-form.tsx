@@ -1,14 +1,15 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { entrarComSenha, type LoginSenhaState } from './actions'
-import { AuthRedirectEffect } from './auth-redirect-effect'
-import { Mail, Lock, ChevronRight } from 'lucide-react'
+import { AuthRedirectEffect } from '@/components/auth-redirect-effect'
+import { Mail, Lock, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Input, SubmitButton, hexToRgb } from '@torcida/ui'
 import Link from 'next/link'
 
 export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
   const [state, action] = useActionState<LoginSenhaState, FormData>(entrarComSenha, {})
+  const [mostrarSenha, setMostrarSenha] = useState(false)
 
   return (
     <div className="space-y-3">
@@ -33,7 +34,24 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
             <Lock className="h-3.5 w-3.5" />
             Senha
           </label>
-          <Input id="senha" name="senha" type="password" placeholder="Sua senha" required />
+          <div className="relative">
+            <Input
+              id="senha"
+              name="senha"
+              type={mostrarSenha ? 'text' : 'password'}
+              placeholder="Sua senha"
+              required
+              className="pr-11"
+            />
+            <button
+              type="button"
+              onClick={() => setMostrarSenha((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+              aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         <div style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>

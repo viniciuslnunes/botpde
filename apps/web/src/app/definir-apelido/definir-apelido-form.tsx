@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { AtSign } from 'lucide-react'
 import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { AuthRedirectEffect } from '@/components/auth-redirect-effect'
 import { definirApelido, type DefinirApelidoState } from './actions'
 
 export function DefinirApelidoForm({
@@ -16,6 +17,7 @@ export function DefinirApelidoForm({
 
   return (
     <form action={action} className="space-y-5">
+      <AuthRedirectEffect redirectTo={state.redirectTo} />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

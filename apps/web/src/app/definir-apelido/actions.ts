@@ -1,6 +1,5 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { nicknameSchema } from '@torcida/types'
@@ -10,6 +9,8 @@ import { z } from 'zod'
 export type DefinirApelidoState = {
   errors?: Record<string, string[]>
   message?: string
+  /** Cliente navega (redirect() do servidor em SA pode perder o contexto de sessão). */
+  redirectTo?: string
 }
 
 const schema = z.object({
@@ -17,7 +18,7 @@ const schema = z.object({
 })
 
 /**
- * Define o @nickname (obrigatório). Usado no pós-login e permite alteração.
+ * Define o @nickname (obrigatório). Usado no pós-login OAuth e contas antigas.
  */
 export async function definirApelido(
   _prev: DefinirApelidoState,
@@ -25,7 +26,7 @@ export async function definirApelido(
 ): Promise<DefinirApelidoState> {
   const session = await auth()
   if (!session?.user?.id) {
-    return { message: 'Não autenticado.' }
+    return { redirectTo: '/entrar' }
   }
 
   const parsed = schema.safeParse({ nickname: formData.get('nickname') })
@@ -60,5 +61,6 @@ export async function definirApelido(
   revalidatePath('/portal')
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
-  redirect('/auth/contexto')
+  // Mesmo padrão do login: o cliente navega para preservar o cookie de sessão.
+  return { redirectTo: '/auth/contexto' }
 }

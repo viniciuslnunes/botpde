@@ -33,7 +33,7 @@ export default async function CriarContaPage() {
             Criar conta
           </h1>
           <p className="mt-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Use e-mail e senha pra entrar sem Discord ou Google
+            Defina nome, @apelido, e-mail e senha pra começar
           </p>
         </div>
 
