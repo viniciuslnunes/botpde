@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
 import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema, isDepartamentoCanonico } from '@torcida/types'
-import { AccessPermissionPreview } from '@/components/admin/access-permission-preview'
+import { AccessPermissionPreview, AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
@@ -895,7 +895,7 @@ function DepartamentoRow({
       </div>
 
       {aberto && (
-        <div className="space-y-4 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.5)] px-4 py-3">
+        <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.45)] px-4 py-4 sm:px-5">
           {organizacional ? (
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               Este departamento só organiza pessoas — não adiciona permissões. Atribua em{' '}
@@ -905,21 +905,11 @@ function DepartamentoRow({
               .
             </p>
           ) : (
-            <>
-              <div>
-                <p className="mb-2 text-xs font-semibold text-[rgb(var(--foreground))]">Colaborador (membro)</p>
-                <AccessPermissionPreview
-                  permissions={departamento.permissions}
-                  emptyLabel="Sem permissões de colaborador"
-                />
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold text-[rgb(var(--foreground))]">A mais para o gestor</p>
-                <AccessPermissionPreview
-                  permissions={departamento.permissionsGestor}
-                  emptyLabel="Sem permissões extras de gestão"
-                />
-              </div>
+            <div className="space-y-3">
+              <AccessPermissionCompare
+                permissionsMembro={departamento.permissions}
+                permissionsGestor={departamento.permissionsGestor}
+              />
               <p className="text-xs text-[rgb(var(--foreground-muted))]">
                 Atribua membro/gestor em{' '}
                 <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
@@ -927,7 +917,7 @@ function DepartamentoRow({
                 </Link>
                 .
               </p>
-            </>
+            </div>
           )}
         </div>
       )}

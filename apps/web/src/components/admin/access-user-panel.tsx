@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   UserRound,
   ArrowLeft,
+  ChevronDown,
 } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
@@ -16,6 +17,7 @@ import {
   rotuloCargoSistema,
 } from '@torcida/types'
 import { salvarAcessoUsuario } from '@/app/admin/acessos/actions'
+import { AccessPermissionPreview } from '@/components/admin/access-permission-preview'
 
 export interface AccessRoleOpt {
   id: string
@@ -227,10 +229,10 @@ export function AccessUserPanel({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto flex max-w-3xl flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
+      className="flex w-full flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
     >
       {/* Cabeçalho */}
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-5">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-6">
         <button
           type="button"
           onClick={onClose}
@@ -239,20 +241,20 @@ export function AccessUserPanel({
           <ArrowLeft className="h-3.5 w-3.5" />
           Voltar à lista
         </button>
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 sm:gap-4">
           {usuario.avatarUrl ? (
             <img
               src={usuario.avatarUrl}
               alt=""
-              className="h-12 w-12 shrink-0 rounded-full object-cover"
+              className="h-12 w-12 shrink-0 rounded-full object-cover sm:h-14 sm:w-14"
             />
           ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-white">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-sm font-semibold text-white sm:h-14 sm:w-14">
               {initials(nomeExibicao)}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-semibold text-[rgb(var(--foreground))]">
+            <h2 className="truncate text-lg font-semibold text-[rgb(var(--foreground))] sm:text-xl">
               {nomeExibicao}
             </h2>
             {usuario.email && (
@@ -274,7 +276,7 @@ export function AccessUserPanel({
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1 border-b border-[rgb(var(--border))] px-3 pt-2 sm:px-4">
+      <div className="flex gap-1 overflow-x-auto border-b border-[rgb(var(--border))] px-3 pt-2 sm:px-6">
         {abas.map((item) => {
           const active = aba === item.id
           return (
@@ -283,9 +285,9 @@ export function AccessUserPanel({
               type="button"
               onClick={() => setAba(item.id)}
               className={[
-                'inline-flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors',
+                'inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 active
-                  ? 'bg-[rgb(var(--surface))] text-[rgb(var(--primary))] border border-b-0 border-[rgb(var(--border))] -mb-px'
+                  ? 'border border-b-0 border-[rgb(var(--border))] -mb-px bg-[rgb(var(--surface))] text-[rgb(var(--primary))]'
                   : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
@@ -305,14 +307,14 @@ export function AccessUserPanel({
         })}
       </div>
 
-      {/* Conteúdo da aba */}
-      <div className="max-h-[min(60vh,32rem)] overflow-y-auto px-4 py-4 sm:px-5">
+      {/* Conteúdo da aba — largura total do container admin */}
+      <div className="max-h-[min(70vh,40rem)] overflow-y-auto px-4 py-5 sm:px-6">
         {aba === 'perfis' && (
           <div className="space-y-3">
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               Papéis transversais concedidos a esta pessoa.
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {roles.map((role) => {
                 const checked = perfilIds.has(role.id)
                 return (
@@ -354,144 +356,86 @@ export function AccessUserPanel({
         )}
 
         {aba === 'departamentos' && (
-          <div className="space-y-3">
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              <strong className="font-medium text-[rgb(var(--foreground))]">Membro</strong> = equipe
-              da área. <strong className="font-medium text-[rgb(var(--foreground))]">Gestor</strong> =
-              age a mais e administra a equipe.
-            </p>
-            <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))]">
-              {departamentos.map((depto) => {
-                const isMembro = departamentoIds.has(depto.id)
-                const isGestor = gestorIds.has(depto.id)
-                const organizacional =
-                  depto.permissions.length === 0 && depto.permissionsGestor.length === 0
-                return (
-                  <li
-                    key={depto.id}
-                    className={[
-                      'flex items-center gap-2 px-3 py-2.5',
-                      isMembro || isGestor ? 'bg-[rgb(var(--primary)_/_0.04)]' : '',
-                    ].join(' ')}
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: depto.cor }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                        {depto.nome}
-                      </p>
-                      {organizacional && (
-                        <p className="text-[10px] text-[rgb(var(--foreground-muted))]">
-                          Organizacional
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setMembroDepartamento(depto.id, !isMembro)}
-                        className={[
-                          'rounded-md px-2 py-1 text-[11px] font-semibold transition-colors',
-                          isMembro
-                            ? 'bg-[rgb(var(--primary))] text-white'
-                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-                        ].join(' ')}
-                      >
-                        Membro
-                      </button>
-                      <button
-                        type="button"
-                        title="Gestor da área"
-                        onClick={() => setGestorDepartamento(depto.id, !isGestor)}
-                        className={[
-                          'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors',
-                          isGestor
-                            ? 'bg-[rgb(var(--primary))] text-white'
-                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
-                        ].join(' ')}
-                      >
-                        <ShieldCheck className="h-3 w-3" />
-                        Gestor
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+          <DepartamentoAssignGrid
+            departamentos={departamentos}
+            departamentoIds={departamentoIds}
+            gestorIds={gestorIds}
+            onToggleMembro={setMembroDepartamento}
+            onToggleGestor={setGestorDepartamento}
+          />
         )}
 
         {aba === 'permissoes' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               Marcadas = acesso concedido. Badges mostram a origem. Desmarcar o que perfil/depto
               concede cria uma revogação.
             </p>
-            {PERMISSION_GROUPS.map((group) => {
-              const marks = group.items.filter((i) => permissoes.has(i.key)).length
-              return (
-                <details
-                  key={group.label}
-                  open={marks > 0}
-                  className="group rounded-xl border border-[rgb(var(--border))]"
-                >
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span>{group.label}</span>
-                    <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
-                      {marks}/{group.items.length}
-                    </span>
-                  </summary>
-                  <div className="grid grid-cols-1 gap-1.5 border-t border-[rgb(var(--border))] p-2 sm:grid-cols-2">
-                    {group.items.map((item) => {
-                      const badge = origemBadge(item.key)
-                      const on = permissoes.has(item.key)
-                      return (
-                        <label
-                          key={item.key}
-                          className={[
-                            'flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors',
-                            on
-                              ? 'border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.06)] text-[rgb(var(--foreground))]'
-                              : 'border-transparent text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-                          ].join(' ')}
-                        >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={on}
-                            onChange={() => togglePermissao(item.key)}
-                          />
-                          <span
+            <div className="grid gap-3 lg:grid-cols-2">
+              {PERMISSION_GROUPS.map((group) => {
+                const marks = group.items.filter((i) => permissoes.has(i.key)).length
+                return (
+                  <details
+                    key={group.label}
+                    open={marks > 0}
+                    className="group rounded-xl border border-[rgb(var(--border))]"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
+                      <span>{group.label}</span>
+                      <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
+                        {marks}/{group.items.length}
+                      </span>
+                    </summary>
+                    <div className="grid grid-cols-1 gap-1 border-t border-[rgb(var(--border))] p-2 sm:grid-cols-2">
+                      {group.items.map((item) => {
+                        const badge = origemBadge(item.key)
+                        const on = permissoes.has(item.key)
+                        return (
+                          <label
+                            key={item.key}
                             className={[
-                              'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                              'flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors',
                               on
-                                ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                                : 'border-[rgb(var(--border-strong))]',
+                                ? 'border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.06)] text-[rgb(var(--foreground))]'
+                                : 'border-transparent text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
                             ].join(' ')}
                           >
-                            {on && <Check className="h-2.5 w-2.5 text-white" />}
-                          </span>
-                          <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
-                          {badge && (
-                            <span className="shrink-0 rounded bg-[rgb(var(--background-subtle))] px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                              {badge}
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={on}
+                              onChange={() => togglePermissao(item.key)}
+                            />
+                            <span
+                              className={[
+                                'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                                on
+                                  ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                                  : 'border-[rgb(var(--border-strong))]',
+                              ].join(' ')}
+                            >
+                              {on && <Check className="h-2.5 w-2.5 text-white" />}
                             </span>
-                          )}
-                        </label>
-                      )
-                    })}
-                  </div>
-                </details>
-              )
-            })}
+                            <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
+                            {badge && (
+                              <span className="shrink-0 rounded bg-[rgb(var(--background-subtle))] px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                                {badge}
+                              </span>
+                            )}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </details>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
 
       {/* Rodapé fixo */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 sm:px-6">
         <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
           Alterações só valem após salvar.
         </p>
@@ -516,6 +460,140 @@ export function AccessUserPanel({
         </div>
       </div>
     </form>
+  )
+}
+
+function DepartamentoAssignGrid({
+  departamentos,
+  departamentoIds,
+  gestorIds,
+  onToggleMembro,
+  onToggleGestor,
+}: {
+  departamentos: AccessDepartamentoOpt[]
+  departamentoIds: Set<string>
+  gestorIds: Set<string>
+  onToggleMembro: (id: string, ativo: boolean) => void
+  onToggleGestor: (id: string, ativo: boolean) => void
+}) {
+  const [detalheId, setDetalheId] = useState<string | null>(null)
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        <strong className="font-medium text-[rgb(var(--foreground))]">Membro</strong> recebe as
+        permissões de colaborador da área.{' '}
+        <strong className="font-medium text-[rgb(var(--foreground))]">Gestor</strong> soma as extras
+        e administra a equipe. Abra <em>Ver pacote</em> para conferir o que cada papel concede.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {departamentos.map((depto) => {
+          const isMembro = departamentoIds.has(depto.id)
+          const isGestor = gestorIds.has(depto.id)
+          const ativo = isMembro || isGestor
+          const organizacional =
+            depto.permissions.length === 0 && depto.permissionsGestor.length === 0
+          const aberto = detalheId === depto.id
+          return (
+            <div
+              key={depto.id}
+              className={[
+                'flex flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--surface))]',
+                ativo
+                  ? 'border-[rgb(var(--primary)_/_0.45)]'
+                  : 'border-[rgb(var(--border))]',
+              ].join(' ')}
+              style={{ borderTopColor: depto.cor, borderTopWidth: 3 }}
+            >
+              <div className="flex items-start gap-2.5 px-3.5 py-3">
+                <span
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: depto.cor }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                    {depto.nome}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+                    {organizacional
+                      ? 'Organizacional'
+                      : `Colab. ${depto.permissions.length} · Gestor+ ${depto.permissionsGestor.length}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--border))] px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => onToggleMembro(depto.id, !isMembro)}
+                  className={[
+                    'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                    isMembro
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                  ].join(' ')}
+                >
+                  Membro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleGestor(depto.id, !isGestor)}
+                  className={[
+                    'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                    isGestor
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                  ].join(' ')}
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  Gestor
+                </button>
+                {!organizacional && (
+                  <button
+                    type="button"
+                    onClick={() => setDetalheId(aberto ? null : depto.id)}
+                    aria-expanded={aberto}
+                    className="ml-auto inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                  >
+                    Pacote
+                    <ChevronDown
+                      className={['h-3.5 w-3.5 transition-transform', aberto ? 'rotate-180' : ''].join(
+                        ' ',
+                      )}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {aberto && !organizacional && (
+                <div className="space-y-3 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.5)] px-3 py-3">
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                      Colaborador
+                    </p>
+                    <AccessPermissionPreview
+                      permissions={depto.permissions}
+                      emptyLabel="Sem permissões"
+                      compact
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                      Extra do gestor
+                    </p>
+                    <AccessPermissionPreview
+                      permissions={depto.permissionsGestor}
+                      emptyLabel="Sem extras"
+                      compact
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
