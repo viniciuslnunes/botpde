@@ -25,9 +25,17 @@ interface CurrentUser {
   avatarUrl: string | null
 }
 
+interface UserCardInfo {
+  numeroSocio: number | null
+  numeroAssociado: string | null
+  tipo: 'SOCIO' | 'TORCEDOR' | null
+  departamentos: string[]
+}
+
 interface ComunidadeFeedShellProps {
   tenant: { id: string; nome: string; afiliacaoId: string | null }
   currentUser: CurrentUser
+  userCard?: UserCardInfo
   cursor?: string
   perfilPrivado?: boolean
   /** `data` em ISO — serializado na page antes de cruzar para o FeedComposer (client). */
@@ -40,6 +48,8 @@ interface ComunidadeFeedShellProps {
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
   /** Slug do clube (Afiliacao) para widgets Sofascore contextualizados. */
   afiliacaoSlug?: string | null
+  /** COMMUNITY_POST_NACIONAL — libera "Torcida e torcedores" no composer. */
+  podePublicarNacional?: boolean
 }
 
 function ComunicadosFallback() {
@@ -68,6 +78,7 @@ function AsideWidgetsFallback() {
 export function ComunidadeFeedShell({
   tenant,
   currentUser,
+  userCard = { numeroSocio: null, numeroAssociado: null, tipo: null, departamentos: [] },
   cursor,
   perfilPrivado = true,
   eventosComposer = [],
@@ -77,7 +88,15 @@ export function ComunidadeFeedShell({
   filtro = 'descobrir',
   clubeNacional = null,
   afiliacaoSlug = null,
+  podePublicarNacional = false,
 }: ComunidadeFeedShellProps) {
+  const numeroExibido =
+    userCard.numeroSocio != null
+      ? String(userCard.numeroSocio).padStart(5, '0')
+      : userCard.numeroAssociado?.trim() || null
+  const departamentosLabel =
+    userCard.departamentos.length > 0 ? userCard.departamentos.join(' · ') : null
+
   const navItems = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
     { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false, badge: 0 },
@@ -118,15 +137,37 @@ export function ComunidadeFeedShell({
       <aside className="hidden lg:block">
         <div className="sticky top-20 space-y-4">
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <div className="flex items-center gap-3">
+            <Link
+              href={
+                currentUser.id
+                  ? `/portal/comunidade/perfil/${currentUser.id}`
+                  : '/portal/comunidade'
+              }
+              className="flex items-start gap-3 rounded-xl outline-offset-2 transition-opacity hover:opacity-90"
+            >
               <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="md" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
                   {currentUser.nome ?? 'Torcedor'}
                 </p>
                 <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
+                {(numeroExibido || departamentosLabel) && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {numeroExibido && (
+                      <p className="truncate text-[11px] font-medium tabular-nums text-[rgb(var(--foreground-muted))]">
+                        Nº {numeroExibido}
+                        {userCard.tipo === 'SOCIO' ? ' · Sócio' : ''}
+                      </p>
+                    )}
+                    {departamentosLabel && (
+                      <p className="truncate text-[11px] text-[rgb(var(--primary))]">
+                        {departamentosLabel}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            </Link>
           </div>
 
           <nav className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
@@ -220,6 +261,7 @@ export function ComunidadeFeedShell({
             eventos={eventosComposer}
             bloqueioPublicacao={bloqueioPublicacao}
             somentePublico={somentePublico}
+            podePublicarNacional={podePublicarNacional}
           />
         )}
 
