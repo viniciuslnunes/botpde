@@ -8,15 +8,12 @@ import {
   ShieldCheck,
   UserRound,
   ArrowLeft,
-  ChevronDown,
   Save,
   Pencil,
   Trash2,
 } from 'lucide-react'
 import {
-  PERMISSION_GROUPS,
   calculateEffectivePermissions,
-  applyPermissionCascade,
   rotuloCargoSistema,
   PAPEL_DEPARTAMENTO,
   permissionsOfRole,
@@ -24,6 +21,7 @@ import {
 import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/acessos/actions'
 import { atualizarRole, excluirRole } from '@/app/admin/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
+import { AccessPermissionWorktree, type PermissaoOrigem } from '@/components/admin/access-permission-worktree'
 import { runPersistAction } from '@/lib/toast-action'
 
 export interface AccessRoleOpt {
@@ -121,9 +119,6 @@ export function AccessUserPanel({
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [novoPerfilNome, setNovoPerfilNome] = useState('')
   const [gerenciandoRoleId, setGerenciandoRoleId] = useState<string | null>(null)
-  const [gruposPermAbertos, setGruposPermAbertos] = useState(
-    () => new Set(PERMISSION_GROUPS.map((g) => g.label)),
-  )
 
   const [overridesUi, setOverridesUi] = useState(() => {
     const cob = coberturaDePerfis(rolesProp, new Set(usuario.perfilIds))
@@ -268,16 +263,7 @@ export function AccessUserPanel({
     return temMembro ? 'MEMBRO' : null
   }
 
-  function togglePermissao(key: string) {
-    const prevArr = [...permissoes]
-    const nextArr = permissoes.has(key)
-      ? prevArr.filter((p) => p !== key)
-      : [...prevArr, key]
-    const cascateadas = new Set(applyPermissionCascade(prevArr, nextArr))
-    setOverridesUi(diffCoberturaEfetiva(coberturaBase, cascateadas))
-  }
-
-  function origemBadge(permission: string): string | null {
+  function origemBadge(permission: string): PermissaoOrigem {
     const coberta = coberturaBase.has(permission)
     if (!permissoes.has(permission) && coberta) return 'revogada'
     if (permissoes.has(permission) && !coberta) return 'extra'
@@ -688,75 +674,11 @@ export function AccessUserPanel({
               </div>
             )}
 
-            <div className="grid items-start gap-3 lg:grid-cols-2">
-              {PERMISSION_GROUPS.map((group) => {
-                const marks = group.items.filter((i) => permissoes.has(i.key)).length
-                return (
-                  <details
-                    key={group.label}
-                    className="group/perm rounded-xl border border-[rgb(var(--border))]"
-                    open={gruposPermAbertos.has(group.label)}
-                    onToggle={(e) => {
-                      const aberto = (e.target as HTMLDetailsElement).open
-                      setGruposPermAbertos((prev) => {
-                        const next = new Set(prev)
-                        if (aberto) next.add(group.label)
-                        else next.delete(group.label)
-                        return next
-                      })
-                    }}
-                  >
-                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
-                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-open/perm:rotate-180" />
-                      <span className="min-w-0 flex-1 truncate">{group.label}</span>
-                      <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
-                        {marks}/{group.items.length}
-                      </span>
-                    </summary>
-                    <div className="grid grid-cols-1 gap-1 border-t border-[rgb(var(--border))] p-2 sm:grid-cols-2">
-                      {group.items.map((item) => {
-                        const badge = origemBadge(item.key)
-                        const on = permissoes.has(item.key)
-                        return (
-                          <label
-                            key={item.key}
-                            className={[
-                              'flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors',
-                              on
-                                ? 'border-[rgb(var(--primary)_/_0.35)] bg-[rgb(var(--primary)_/_0.06)] text-[rgb(var(--foreground))]'
-                                : 'border-transparent text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-                            ].join(' ')}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={on}
-                              onChange={() => togglePermissao(item.key)}
-                            />
-                            <span
-                              className={[
-                                'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                                on
-                                  ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                                  : 'border-[rgb(var(--border-strong))]',
-                              ].join(' ')}
-                            >
-                              {on && <Check className="h-2.5 w-2.5 text-white" />}
-                            </span>
-                            <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
-                            {badge && (
-                              <span className="shrink-0 rounded bg-[rgb(var(--background-subtle))] px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                                {badge}
-                              </span>
-                            )}
-                          </label>
-                        )
-                      })}
-                    </div>
-                  </details>
-                )
-              })}
-            </div>
+            <AccessPermissionWorktree
+              selected={permissoes}
+              onChange={(next) => setOverridesUi(diffCoberturaEfetiva(coberturaBase, next))}
+              origemOf={origemBadge}
+            />
           </div>
         )}
       </div>
@@ -838,16 +760,6 @@ function PerfilManagePanel({
     ? departamentos.find((d) => d.id === role.departamentoId)?.nome
     : null
   const somenteLeitura = role.isSystem
-
-  function toggleExtra(key: string) {
-    if (somenteLeitura || pacote.has(key)) return
-    setExtras((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
 
   async function salvar() {
     if (somenteLeitura) return
@@ -955,60 +867,23 @@ function PerfilManagePanel({
           <p className="text-xs font-medium text-[rgb(var(--foreground))]">
             Permissões extras do perfil
           </p>
-          <div className="grid max-h-64 items-start gap-2 overflow-y-auto lg:grid-cols-2">
-            {PERMISSION_GROUPS.map((group) => (
-              <div
-                key={group.label}
-                className="rounded-xl border border-[rgb(var(--border))] p-2"
-              >
-                <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                  {group.label}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const viaPacote = pacote.has(item.key)
-                    const on = viaPacote || extras.has(item.key)
-                    return (
-                      <label
-                        key={item.key}
-                        className={[
-                          'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs',
-                          viaPacote
-                            ? 'cursor-not-allowed opacity-60'
-                            : 'cursor-pointer hover:bg-[rgb(var(--background-subtle))]',
-                          on ? 'text-[rgb(var(--foreground))]' : 'text-[rgb(var(--foreground-muted))]',
-                        ].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          disabled={viaPacote}
-                          checked={on}
-                          onChange={() => toggleExtra(item.key)}
-                        />
-                        <span
-                          className={[
-                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                            on
-                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                              : 'border-[rgb(var(--border-strong))]',
-                          ].join(' ')}
-                        >
-                          {on && <Check className="h-2.5 w-2.5 text-white" />}
-                        </span>
-                        <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
-                        {viaPacote && (
-                          <span className="text-[9px] uppercase tracking-wide opacity-70">
-                            pacote
-                          </span>
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <AccessPermissionWorktree
+            initiallyOpen={false}
+            selected={new Set([...pacote, ...extras])}
+            lockedKeys={pacote}
+            origemOf={(key) => {
+              if (pacote.has(key)) return 'via perfil'
+              if (extras.has(key)) return 'extra'
+              return null
+            }}
+            onChange={(next) => {
+              const onlyExtras = new Set<string>()
+              for (const key of next) {
+                if (!pacote.has(key)) onlyExtras.add(key)
+              }
+              setExtras(onlyExtras)
+            }}
+          />
         </div>
       )}
 
