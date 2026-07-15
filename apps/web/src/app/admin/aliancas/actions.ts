@@ -126,13 +126,14 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     },
   })
 
+  // Sem excetoUserId: a inbox do destinatário inclui quem propôs se também
+  // gerencia (ou opera) o tenant destino — comum em modo operador / dual-hat.
   await notificarUsuariosComPermissao(PERMISSIONS.ALLIANCES_MANAGE, {
     tenantId: tenantDestinoId,
     tipo: 'ALIANCA_PROPOSTA',
     titulo: `Proposta de aliança de ${tenant.nome}`,
     corpo: `${tenant.nome} propôs aliança com ${aliado.nome}.`,
     link: '/admin/aliancas',
-    excetoUserId: session.user.id,
   })
 
   revalidatePath('/admin/aliancas')

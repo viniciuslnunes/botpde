@@ -13,6 +13,7 @@ interface TenantOption {
   id: string
   nome: string
   slug: string
+  logoUrl: string | null
   afiliacaoId: string | null
   afiliacao: {
     nome: string
@@ -28,11 +29,7 @@ export default async function AdminAliancasPage() {
     redirect('/admin')
   }
 
-  const [aliancas, recomendacoes, tenants]: [
-    Awaited<ReturnType<typeof listAliancasForTenant>>,
-    Awaited<ReturnType<typeof listRecomendacoesForTenant>>,
-    TenantOption[],
-  ] = await Promise.all([
+  const [aliancas, recomendacoes, tenants] = await Promise.all([
     listAliancasForTenant(authz.tenant.id),
     listRecomendacoesForTenant(authz.tenant.id),
     db.tenant.findMany({
@@ -42,13 +39,24 @@ export default async function AdminAliancasPage() {
         id: true,
         nome: true,
         slug: true,
+        logoUrl: true,
         afiliacaoId: true,
+        torcidaConhecida: { select: { logoUrl: true } },
         afiliacao: {
           select: { nome: true, apelido: true, cidade: true, estado: true },
         },
       },
     }),
   ])
+
+  const tenantOptions: TenantOption[] = tenants.map((t) => ({
+    id: t.id,
+    nome: t.nome,
+    slug: t.slug,
+    logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
+    afiliacaoId: t.afiliacaoId,
+    afiliacao: t.afiliacao,
+  }))
 
   return (
     <div className="flex h-full flex-col">
@@ -71,7 +79,7 @@ export default async function AdminAliancasPage() {
             afiliacaoId={authz.tenant.afiliacaoId ?? null}
             aliancas={aliancas}
             recomendacoes={recomendacoes}
-            tenants={tenants}
+            tenants={tenantOptions}
           />
         </div>
       </div>

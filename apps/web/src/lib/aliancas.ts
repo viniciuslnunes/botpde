@@ -6,6 +6,13 @@ export function normalizeTenantPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
 }
 
+export interface AliancaTenantLite {
+  id: string
+  nome: string
+  slug: string
+  logoUrl: string | null
+}
+
 export interface AliancaListItem {
   id: string
   tenantOrigemId: string
@@ -15,10 +22,39 @@ export interface AliancaListItem {
   confirmadaPorId: string | null
   confirmadaEm: Date | null
   criadoEm: Date
-  tenantOrigem: { id: string; nome: string; slug: string }
-  tenantAliado: { id: string; nome: string; slug: string }
+  tenantOrigem: AliancaTenantLite
+  tenantAliado: AliancaTenantLite
   propostaPor: { id: string; nome: string | null; email: string | null }
 }
+
+interface TenantLogoRow {
+  id: string
+  nome: string
+  slug: string
+  logoUrl: string | null
+  torcidaConhecida: { logoUrl: string | null } | null
+}
+
+function resolveTenantLogoUrl(tenant: TenantLogoRow): string | null {
+  return tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl
+}
+
+function toAliancaTenantLite(tenant: TenantLogoRow): AliancaTenantLite {
+  return {
+    id: tenant.id,
+    nome: tenant.nome,
+    slug: tenant.slug,
+    logoUrl: resolveTenantLogoUrl(tenant),
+  }
+}
+
+const TENANT_LITE_SELECT = {
+  id: true,
+  nome: true,
+  slug: true,
+  logoUrl: true,
+  torcidaConhecida: { select: { logoUrl: true } },
+} as const
 
 interface AliancaPairRow {
   id: string
@@ -59,7 +95,19 @@ export async function findAliancaEntreTenants(
 }
 
 export async function listAliancasForTenant(tenantId: string): Promise<AliancaListItem[]> {
-  const aliancas: AliancaListItem[] = await db.alianca.findMany({
+  const aliancas: Array<{
+    id: string
+    tenantOrigemId: string
+    tenantAliadoId: string
+    status: StatusAlianca
+    propostaPorId: string
+    confirmadaPorId: string | null
+    confirmadaEm: Date | null
+    criadoEm: Date
+    tenantOrigem: TenantLogoRow
+    tenantAliado: TenantLogoRow
+    propostaPor: { id: string; nome: string | null; email: string | null }
+  }> = await db.alianca.findMany({
     where: {
       OR: [{ tenantOrigemId: tenantId }, { tenantAliadoId: tenantId }],
     },
@@ -73,13 +121,17 @@ export async function listAliancasForTenant(tenantId: string): Promise<AliancaLi
       confirmadaPorId: true,
       confirmadaEm: true,
       criadoEm: true,
-      tenantOrigem: { select: { id: true, nome: true, slug: true } },
-      tenantAliado: { select: { id: true, nome: true, slug: true } },
+      tenantOrigem: { select: TENANT_LITE_SELECT },
+      tenantAliado: { select: TENANT_LITE_SELECT },
       propostaPor: { select: { id: true, nome: true, email: true } },
     },
   })
 
-  return aliancas
+  return aliancas.map((item) => ({
+    ...item,
+    tenantOrigem: toAliancaTenantLite(item.tenantOrigem),
+    tenantAliado: toAliancaTenantLite(item.tenantAliado),
+  }))
 }
 
 /** ALIADA = bloco/bilateral entre times distintos; CO_IRMA = mesma afiliação. */
@@ -91,6 +143,7 @@ export interface RecomendacaoAliancaListItem {
   tenantSugeridoId: string | null
   tenantSugeridoSlug: string | null
   tenantSugeridoNome: string
+  tenantSugeridoLogoUrl: string | null
   nomeSugerido: string
   confianca: ConfiancaRecomendacao
   fonte: string
@@ -116,6 +169,7 @@ interface TenantSugestaoRow {
   id: string
   nome: string
   slug: string
+  logoUrl: string | null
 }
 
 const CONFIANCA_ORDEM: Record<ConfiancaRecomendacao, number> = {
@@ -163,7 +217,13 @@ function counterpartTenantId(alianca: { tenantOrigemId: string; tenantAliadoId: 
  */
 export function buildCoIrmaRecomendacoes(
   tenantId: string,
-  coirmas: Array<{ id: string; nome: string; slug: string; afiliacaoNome: string | null }>,
+  coirmas: Array<{
+    id: string
+    nome: string
+    slug: string
+    afiliacaoNome: string | null
+    logoUrl: string | null
+  }>,
   agora: Date = new Date(),
 ): RecomendacaoAliancaListItem[] {
   return coirmas.map((c) => {
@@ -174,6 +234,7 @@ export function buildCoIrmaRecomendacoes(
       tenantSugeridoId: c.id,
       tenantSugeridoSlug: c.slug,
       tenantSugeridoNome: c.nome,
+      tenantSugeridoLogoUrl: c.logoUrl,
       nomeSugerido: c.nome,
       confianca: 'ALTA' as const,
       fonte: `Mesmo time (${clube})`,
@@ -242,17 +303,18 @@ export async function listRecomendacoesForTenant(
       orFilters.push({ nome: { in: unresolvedNames, mode: 'insensitive' } })
     }
 
-    const tenants: TenantSugestaoRow[] = await db.tenant.findMany({
+    const tenants: TenantLogoRow[] = await db.tenant.findMany({
       where: {
         ativo: true,
         sintetico: false,
         OR: orFilters,
       },
-      select: { id: true, nome: true, slug: true },
+      select: TENANT_LITE_SELECT,
     })
     for (const tenant of tenants) {
-      tenantsById.set(tenant.id, tenant)
-      tenantsByNome.set(tenant.nome.toLowerCase(), tenant)
+      const lite = toAliancaTenantLite(tenant)
+      tenantsById.set(tenant.id, lite)
+      tenantsByNome.set(tenant.nome.toLowerCase(), lite)
     }
   }
 
@@ -261,12 +323,8 @@ export async function listRecomendacoesForTenant(
 
   let coIrmaItems: RecomendacaoAliancaListItem[] = []
   if (me?.afiliacaoId) {
-    const coirmas: Array<{
-      id: string
-      nome: string
-      slug: string
-      afiliacao: { nome: string } | null
-    }> = await db.tenant.findMany({
+    const coirmas: Array<TenantLogoRow & { afiliacao: { nome: string } | null }> =
+      await db.tenant.findMany({
       where: {
         ativo: true,
         sintetico: false,
@@ -275,9 +333,7 @@ export async function listRecomendacoesForTenant(
       },
       orderBy: { nome: 'asc' },
       select: {
-        id: true,
-        nome: true,
-        slug: true,
+        ...TENANT_LITE_SELECT,
         afiliacao: { select: { nome: true } },
       },
     })
@@ -289,6 +345,7 @@ export async function listRecomendacoesForTenant(
         nome: c.nome,
         slug: c.slug,
         afiliacaoNome: c.afiliacao?.nome ?? null,
+        logoUrl: resolveTenantLogoUrl(c),
       })),
     )
   }
@@ -307,6 +364,7 @@ export async function listRecomendacoesForTenant(
         tenantSugeridoId,
         tenantSugeridoSlug: suggested?.slug ?? null,
         tenantSugeridoNome: suggested?.nome ?? item.nomeSugerido,
+        tenantSugeridoLogoUrl: suggested?.logoUrl ?? null,
         nomeSugerido: item.nomeSugerido,
         confianca,
         fonte: item.fonte,

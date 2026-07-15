@@ -5,6 +5,7 @@ import {
   hasPermission,
   permissionsOfRole,
 } from '@torcida/types'
+import { superAdminEmails } from '@/lib/env'
 
 export type CriarNotificacaoInput = {
   userId: string
@@ -181,6 +182,38 @@ export async function listarUserIdsComPermissao(
   return matched
 }
 
+/**
+ * UserIds dos super-admins configurados em SUPER_ADMIN_EMAILS.
+ * Operadores entram no admin sem UserRole no tenant — precisam receber
+ * alertas operacionais (alianças, denúncias…) no sino da torcida gerida.
+ */
+export async function listarUserIdsSuperAdmin(): Promise<string[]> {
+  if (superAdminEmails.length === 0) return []
+  const users: Array<{ id: string }> = await db.user.findMany({
+    where: { email: { in: superAdminEmails } },
+    select: { id: true },
+  })
+  return users.map((u) => u.id)
+}
+
+/**
+ * Destinatários de alerta administrativo: quem tem a permissão no tenant
+ * + super-admins (modo operador), menos `excetoUserId` se informado.
+ */
+export async function listarDestinatariosAdmin(
+  tenantId: string,
+  permission: string,
+  excetoUserId?: string,
+): Promise<string[]> {
+  const [comPermissao, superAdmins] = await Promise.all([
+    listarUserIdsComPermissao(tenantId, permission),
+    listarUserIdsSuperAdmin(),
+  ])
+  const merged = new Set<string>([...comPermissao, ...superAdmins])
+  if (excetoUserId) merged.delete(excetoUserId)
+  return Array.from(merged)
+}
+
 export async function listarUserIdsMembrosAprovados(tenantId: string): Promise<string[]> {
   const membros: Array<{ userId: string }> = await db.saasMembro.findMany({
     where: { tenantId, status: 'APROVADO' },
@@ -195,18 +228,21 @@ type DestinoNotificacao = {
   titulo: string
   corpo?: string
   link?: string
-  /** Quem iniciou a ação — não recebe a própria notificação. */
+  /** Quem iniciou a ação — não recebe a própria notificação (mesmo tenant). */
   excetoUserId?: string
 }
 
-/** Notifica usuários com permissão no tenant (best-effort). */
+/** Notifica usuários com permissão no tenant + super-admins (best-effort). */
 export async function notificarUsuariosComPermissao(
   permission: string,
   destino: DestinoNotificacao,
 ): Promise<number> {
   try {
-    const userIds = await listarUserIdsComPermissao(destino.tenantId, permission)
-    const targets = userIds.filter((id) => id !== destino.excetoUserId)
+    const targets = await listarDestinatariosAdmin(
+      destino.tenantId,
+      permission,
+      destino.excetoUserId,
+    )
     return criarNotificacoesEmLote(
       targets.map((userId) => ({
         userId,
