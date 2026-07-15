@@ -540,7 +540,16 @@ export function AccessUserPanel({
                   <details
                     key={group.label}
                     className="group/perm rounded-xl border border-[rgb(var(--border))]"
-                    open
+                    open={gruposPermAbertos.has(group.label)}
+                    onToggle={(e) => {
+                      const aberto = (e.target as HTMLDetailsElement).open
+                      setGruposPermAbertos((prev) => {
+                        const next = new Set(prev)
+                        if (aberto) next.add(group.label)
+                        else next.delete(group.label)
+                        return next
+                      })
+                    }}
                   >
                     <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
                       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-open/perm:rotate-180" />
