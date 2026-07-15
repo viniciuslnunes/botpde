@@ -5,7 +5,7 @@ import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Loader2, Search, UserCheck, UserX } from 'lucide-react'
 import { transferirOwnerAction, type TransferirOwnerState } from './actions'
-import { labelClubeComUf, type TorcidaTransferencia } from '@/lib/tenant-context'
+import { labelClubeComUf, type TorcidaTransferencia } from '@/lib/torcida-labels'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 
 function SubmitButton() {

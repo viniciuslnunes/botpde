@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
-import type { TorcidaOpcao } from '@/lib/tenant-context'
+import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */

@@ -5,6 +5,15 @@ import { db } from '@torcida/db'
 import { SYSTEM_ROLES } from '@torcida/types'
 import { env, isProd, superAdminEmails } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
+import {
+  labelClubeComUf,
+  labelTorcidaComClube,
+  type TorcidaOpcao,
+  type TorcidaTransferencia,
+} from '@/lib/torcida-labels'
+
+export type { TorcidaOpcao, TorcidaTransferencia }
+export { labelClubeComUf, labelTorcidaComClube }
 
 /** Cookie httpOnly — torcida ativa quando não há subdomínio (single-tenant ou apex). */
 export const TENANT_CTX_COOKIE = 'torcida_ctx'
@@ -118,22 +127,6 @@ export async function resolvePortalHomeForUser(
   return '/auth/contexto'
 }
 
-export type TorcidaOpcao = {
-  id: string
-  slug: string
-  nome: string
-  corPrimaria: string
-  /** Clube (afiliação), para distinguir homônimas — ex. várias "Camisa 12". */
-  clubeNome: string | null
-  /** UF do clube (ex. SP), quando disponível. */
-  clubeUf: string | null
-}
-
-export type TorcidaTransferencia = TorcidaOpcao & {
-  temOwner: boolean
-  ownerEmail: string | null
-}
-
 type TorcidaRowComAfiliacao = {
   id: string
   slug: string
@@ -153,22 +146,6 @@ function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
       : null,
     clubeUf: row.afiliacao?.estado ?? null,
   }
-}
-
-/** "Corinthians (SP)" — subtítulo / busca. */
-export function labelClubeComUf(
-  t: Pick<TorcidaOpcao, 'clubeNome' | 'clubeUf'>,
-): string | null {
-  if (!t.clubeNome) return null
-  return t.clubeUf ? `${t.clubeNome} (${t.clubeUf})` : t.clubeNome
-}
-
-/** Rótulo "Torcida — Clube (UF)" para listagens e combobox. */
-export function labelTorcidaComClube(
-  t: Pick<TorcidaOpcao, 'nome' | 'clubeNome' | 'clubeUf'>,
-): string {
-  const clube = labelClubeComUf(t)
-  return clube ? `${t.nome} — ${clube}` : t.nome
 }
 
 const TORCIDA_SELECAO_SELECT = {

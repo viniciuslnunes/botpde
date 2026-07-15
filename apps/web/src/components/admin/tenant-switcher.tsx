@@ -12,7 +12,7 @@ import {
   labelClubeComUf,
   labelTorcidaComClube,
   type TorcidaOpcao,
-} from '@/lib/tenant-context'
+} from '@/lib/torcida-labels'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import {
   lerTorcidasRecentes,

@@ -20,7 +20,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { AdminSidebar } from '@/components/admin/sidebar'
-import type { TorcidaOpcao } from '@/lib/tenant-context'
+import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
 interface AdminMenuItem {
   id: string
