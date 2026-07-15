@@ -115,6 +115,9 @@ export function AccessUserPanel({
   const [perfilIds, setPerfilIds] = useState<Set<string>>(() => new Set(usuario.perfilIds))
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [novoPerfilNome, setNovoPerfilNome] = useState('')
+  const [gruposPermAbertos, setGruposPermAbertos] = useState(
+    () => new Set(PERMISSION_GROUPS.map((g) => g.label)),
+  )
 
   const [overridesUi, setOverridesUi] = useState(() => {
     const cob = coberturaDePerfis(roles, new Set(usuario.perfilIds))
@@ -537,7 +540,7 @@ export function AccessUserPanel({
                   <details
                     key={group.label}
                     className="group/perm rounded-xl border border-[rgb(var(--border))]"
-                    {...(marks > 0 ? { open: true } : {})}
+                    open
                   >
                     <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
                       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-open/perm:rotate-180" />
