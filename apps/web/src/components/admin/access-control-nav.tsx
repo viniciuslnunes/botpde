@@ -65,7 +65,7 @@ export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
       <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
         {secao === 'pessoas' && (
           <>
-            Atribua cargos e departamentos a cada pessoa.{' '}
+            Atribua perfis a cada pessoa — a área vem com o perfil de departamento.{' '}
             <Link href="/admin/acessos?secao=cargos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
               Edite cargos
             </Link>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import {
   Loader2,
   Check,
@@ -19,6 +19,7 @@ import {
   PAPEL_DEPARTAMENTO,
 } from '@torcida/types'
 import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/acessos/actions'
+import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { runPersistAction } from '@/lib/toast-action'
 
 export interface AccessRoleOpt {
@@ -52,7 +53,7 @@ export interface AccessUsuario {
   permissoesAdicionais: { permission: string; granted: boolean }[]
 }
 
-type PainelAba = 'perfis' | 'adicionais'
+type PainelAba = 'perfis' | 'departamentos' | 'adicionais'
 
 function roleLabel(role: AccessRoleOpt, tipoSede: string): string {
   return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
@@ -215,6 +216,44 @@ export function AccessUserPanel({
     setPerfilIds(next)
   }
 
+  /** Alterna perfil Membro/Gestor da área — mesma fonte de verdade da aba Perfis. */
+  function setPapelDepartamento(departamentoId: string, papel: 'MEMBRO' | 'GESTOR' | null) {
+    const roleMembro = roles.find(
+      (r) =>
+        r.departamentoId === departamentoId &&
+        r.papelNoDepartamento === PAPEL_DEPARTAMENTO.MEMBRO,
+    )
+    const roleGestor = roles.find(
+      (r) =>
+        r.departamentoId === departamentoId &&
+        r.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR,
+    )
+    const next = new Set(perfilIds)
+    if (roleMembro) next.delete(roleMembro.id)
+    if (roleGestor) next.delete(roleGestor.id)
+    if (papel === 'MEMBRO' && roleMembro) next.add(roleMembro.id)
+    if (papel === 'GESTOR' && roleGestor) next.add(roleGestor.id)
+    aplicarMudancaPerfis(next)
+    setPerfilIds(next)
+  }
+
+  function papelAtualDepartamento(departamentoId: string): 'MEMBRO' | 'GESTOR' | null {
+    const temGestor = roles.some(
+      (r) =>
+        perfilIds.has(r.id) &&
+        r.departamentoId === departamentoId &&
+        r.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR,
+    )
+    if (temGestor) return 'GESTOR'
+    const temMembro = roles.some(
+      (r) =>
+        perfilIds.has(r.id) &&
+        r.departamentoId === departamentoId &&
+        r.papelNoDepartamento === PAPEL_DEPARTAMENTO.MEMBRO,
+    )
+    return temMembro ? 'MEMBRO' : null
+  }
+
   function togglePermissao(key: string) {
     const prevArr = [...permissoes]
     const nextArr = permissoes.has(key)
@@ -273,6 +312,7 @@ export function AccessUserPanel({
 
   const abas: { id: PainelAba; label: string; count: number }[] = [
     { id: 'perfis', label: 'Perfis', count: totalPerfis },
+    { id: 'departamentos', label: 'Departamentos', count: areasDerivadas.length },
     { id: 'adicionais', label: 'Permissões adicionais', count: totalExtras },
   ]
 
@@ -441,6 +481,15 @@ export function AccessUserPanel({
           </div>
         )}
 
+        {aba === 'departamentos' && (
+          <DepartamentoAreasPanel
+            departamentos={departamentos}
+            roles={roles}
+            papelAtual={papelAtualDepartamento}
+            onSetPapel={setPapelDepartamento}
+          />
+        )}
+
         {aba === 'adicionais' && (
           <div className="space-y-4">
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -570,6 +619,170 @@ export function AccessUserPanel({
         </div>
       </div>
     </form>
+  )
+}
+
+function DepartamentoAreasPanel({
+  departamentos,
+  roles,
+  papelAtual,
+  onSetPapel,
+}: {
+  departamentos: AccessDepartamentoOpt[]
+  roles: AccessRoleOpt[]
+  papelAtual: (departamentoId: string) => 'MEMBRO' | 'GESTOR' | null
+  onSetPapel: (departamentoId: string, papel: 'MEMBRO' | 'GESTOR' | null) => void
+}) {
+  const [detalheId, setDetalheId] = useState<string | null>(null)
+  const detalheRef = useRef<HTMLDivElement>(null)
+  const detalhe = departamentos.find((d) => d.id === detalheId) ?? null
+
+  function abrirPacote(id: string) {
+    const fechar = detalheId === id
+    setDetalheId(fechar ? null : id)
+    if (!fechar) {
+      requestAnimationFrame(() => {
+        detalheRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Áreas da torcida. Marcar <strong className="font-medium text-[rgb(var(--foreground))]">Membro</strong>{' '}
+        ou <strong className="font-medium text-[rgb(var(--foreground))]">Gestor</strong> atribui o perfil
+        correspondente da área (mesma regra da aba Perfis). Use Pacote para ver o template.
+      </p>
+
+      {detalhe && (
+        <div
+          ref={detalheRef}
+          className="scroll-mt-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-4 sm:p-5"
+          style={{ borderTopColor: detalhe.cor, borderTopWidth: 3 }}
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: detalhe.cor }}
+              />
+              <h3 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                Pacote · {detalhe.nome}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDetalheId(null)}
+              className="rounded-lg px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
+            >
+              Fechar
+            </button>
+          </div>
+          <AccessPermissionCompare
+            permissionsMembro={detalhe.permissions}
+            permissionsGestor={detalhe.permissionsGestor}
+          />
+        </div>
+      )}
+
+      <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {departamentos.map((depto) => {
+          const papel = papelAtual(depto.id)
+          const isMembro = papel === 'MEMBRO' || papel === 'GESTOR'
+          const isGestor = papel === 'GESTOR'
+          const ativo = isMembro
+          const temPerfis = roles.some((r) => r.departamentoId === depto.id)
+          const organizacional =
+            depto.permissions.length === 0 && depto.permissionsGestor.length === 0
+          const selecionado = detalheId === depto.id
+
+          return (
+            <div
+              key={depto.id}
+              className={[
+                'flex flex-col rounded-2xl border bg-[rgb(var(--surface))]',
+                selecionado
+                  ? 'border-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary)_/_0.25)]'
+                  : ativo
+                    ? 'border-[rgb(var(--primary)_/_0.45)]'
+                    : 'border-[rgb(var(--border))]',
+              ].join(' ')}
+              style={{ borderTopColor: depto.cor, borderTopWidth: 3 }}
+            >
+              <div className="flex items-start gap-2.5 px-3.5 py-3">
+                <span
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: depto.cor }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                    {depto.nome}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+                    {organizacional
+                      ? 'Organizacional'
+                      : `Colab. ${depto.permissions.length} · Gestor+ ${depto.permissionsGestor.length}`}
+                    {!temPerfis ? ' · sem perfil canônico' : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-[rgb(var(--border))] px-3 py-2.5">
+                <button
+                  type="button"
+                  disabled={!temPerfis}
+                  onClick={() =>
+                    onSetPapel(depto.id, papel === 'MEMBRO' ? null : 'MEMBRO')
+                  }
+                  className={[
+                    'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-40',
+                    isMembro && !isGestor
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                  ].join(' ')}
+                >
+                  Membro
+                </button>
+                <button
+                  type="button"
+                  disabled={!temPerfis}
+                  onClick={() =>
+                    onSetPapel(depto.id, papel === 'GESTOR' ? 'MEMBRO' : 'GESTOR')
+                  }
+                  className={[
+                    'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-40',
+                    isGestor
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                  ].join(' ')}
+                >
+                  Gestor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => abrirPacote(depto.id)}
+                  className={[
+                    'ml-auto rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors',
+                    selecionado
+                      ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
+                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                  ].join(' ')}
+                >
+                  Pacote
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {departamentos.length === 0 && (
+        <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Nenhum departamento nesta torcida. Crie templates em Controle de acesso → Departamentos.
+        </p>
+      )}
+    </div>
   )
 }
 
