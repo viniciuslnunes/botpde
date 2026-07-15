@@ -83,7 +83,8 @@ describe('buildCoIrmaRecomendacoes', () => {
     expect(items[0]?.tipo).toBe('CO_IRMA')
     expect(items[0]?.confianca).toBe('ALTA')
     expect(items[0]?.podePropor).toBe(false)
-    expect(items[0]?.fonte).toMatch(/co-irmã/i)
+    expect(items[0]?.fonte).toBe('Mesmo time (Corinthians)')
+    expect(items[0]?.observacao).toBeNull()
   })
 })
 

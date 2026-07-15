@@ -58,7 +58,7 @@ export default async function AdminAliancasPage() {
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Alianças</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Co-irmãs do mesmo time, alianças entre blocos e herança para PDEs/subsedes.
+              Aliança formal só entre times distintos. Co-irmãs e PDEs herdam o vínculo da sede.
             </p>
           </div>
         </div>

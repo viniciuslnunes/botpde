@@ -176,9 +176,8 @@ export function buildCoIrmaRecomendacoes(
       tenantSugeridoNome: c.nome,
       nomeSugerido: c.nome,
       confianca: 'ALTA' as const,
-      fonte: `Mesma afiliação (${clube}) — relação de co-irmã`,
-      observacao:
-        'Organizadas do mesmo time são co-irmãs, não aliadas de bloco. A aliança formal é entre torcidas de times distintos.',
+      fonte: `Mesmo time (${clube})`,
+      observacao: null,
       criadoEm: agora,
       tipo: 'CO_IRMA' as const,
       podePropor: false,

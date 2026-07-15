@@ -106,7 +106,7 @@ function AdminTopbar({
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+            <p className="truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
               {tenantNome}
             </p>
             <p className="hidden text-[11px] text-[rgb(var(--foreground-muted))] sm:block">
@@ -237,8 +237,6 @@ export function AdminShell({
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <AdminSidebar
-          tenantNome={tenantNome}
-          tenantCor={tenantCor}
           tenantSlug={tenantSlug}
           items={items}
           isSuperAdmin={isSuperAdmin}

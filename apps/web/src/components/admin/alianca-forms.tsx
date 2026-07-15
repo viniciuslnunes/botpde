@@ -406,14 +406,9 @@ export function AliancaForms({
       <div role="tabpanel" className="min-h-[12rem]">
         {tab === 'recomendacoes' && (
           <div className="space-y-3">
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Co-irmãs (mesmo time) e aliadas de bloco. Só aliança entre times distintos vira
-              proposta — PDEs/subsedes herdam o vínculo da sede.
-            </p>
             {recomendacoes.length === 0 ? (
               <EmptyState>
-                Ainda não há recomendações para esta torcida. Use a aba Propor para buscar
-                manualmente.
+                Ainda não há recomendações. Use a aba Propor para buscar manualmente.
               </EmptyState>
             ) : (
               <div className="space-y-2">
@@ -432,7 +427,9 @@ export function AliancaForms({
                             </span>
                           ) : null}
                         </p>
-                        <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
+                        {item.fonte ? (
+                          <p className="text-xs text-[rgb(var(--foreground-muted))]">{item.fonte}</p>
+                        ) : null}
                       </div>
                       <span
                         className={[
@@ -443,14 +440,10 @@ export function AliancaForms({
                         {tipoBadge(item).label}
                       </span>
                     </div>
-                    {item.observacao && (
+                    {item.observacao && item.tipo !== 'CO_IRMA' ? (
                       <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
-                    )}
-                    {item.tipo === 'CO_IRMA' ? (
-                      <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-                        Relação de co-irmã (mesmo time) — não se propõe aliança formal.
-                      </p>
-                    ) : item.podePropor ? (
+                    ) : null}
+                    {item.tipo === 'CO_IRMA' ? null : item.podePropor ? (
                       <div className="mt-3">
                         <button
                           type="button"
@@ -579,8 +572,7 @@ export function AliancaForms({
                 Propor manualmente
               </h2>
               <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-                Busque por nome, slug, clube ou cidade. Organizadas do mesmo time não aparecem
-                aqui (são co-irmãs).
+                Busque por nome, slug, clube ou cidade. Co-irmãs (mesmo time) não entram na busca.
               </p>
             </div>
 

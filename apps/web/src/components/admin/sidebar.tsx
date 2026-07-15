@@ -52,8 +52,6 @@ interface AdminMenuItem {
 }
 
 interface AdminSidebarProps {
-  tenantNome: string
-  tenantCor: string
   tenantSlug: string
   /** Itens já filtrados pelas permissões efetivas do usuário (ver ADMIN_MENU/filterMenuByPermissions) */
   items: AdminMenuItem[]
@@ -111,8 +109,6 @@ function NavItems({ items, pathname, onNavigate }: NavItemsProps) {
 }
 
 function SidebarBody({
-  tenantNome,
-  tenantCor,
   tenantSlug,
   items,
   pathname,
@@ -120,8 +116,6 @@ function SidebarBody({
   torcidas,
   onNavigate,
 }: {
-  tenantNome: string
-  tenantCor: string
   tenantSlug: string
   items: AdminMenuItem[]
   pathname: string
@@ -131,19 +125,6 @@ function SidebarBody({
 }) {
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-[rgb(var(--border))] px-5 py-4">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
-          style={{ backgroundColor: tenantCor }}
-        >
-          {tenantNome.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{tenantNome}</p>
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">Menu</p>
-        </div>
-      </div>
-
       {isSuperAdmin && torcidas.length > 0 && (
         <div className="border-b border-[rgb(var(--border))] px-4 py-3">
           <TenantSwitcher
@@ -183,8 +164,6 @@ function SidebarBody({
 }
 
 export function AdminSidebar({
-  tenantNome,
-  tenantCor,
   tenantSlug,
   items,
   isSuperAdmin = false,
@@ -206,8 +185,6 @@ export function AdminSidebar({
           />
           <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
             <SidebarBody
-              tenantNome={tenantNome}
-              tenantCor={tenantCor}
               tenantSlug={tenantSlug}
               items={items}
               pathname={pathname}
@@ -221,8 +198,6 @@ export function AdminSidebar({
 
       <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
         <SidebarBody
-          tenantNome={tenantNome}
-          tenantCor={tenantCor}
           tenantSlug={tenantSlug}
           items={items}
           pathname={pathname}
