@@ -68,7 +68,7 @@ export default async function PerfilComunidadePage({
   const [user, membro, socio] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
-      select: { id: true, nome: true, avatarUrl: true, email: true, criadoEm: true },
+      select: { id: true, nome: true, nickname: true, avatarUrl: true, email: true, criadoEm: true },
     }),
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: tenant.id, userId } },
@@ -193,6 +193,7 @@ export default async function PerfilComunidadePage({
 
       <PerfilHeader
         nome={user.nome}
+        nickname={user.nickname}
         avatarUrl={avatarUrl}
         bannerUrl={perfil.bannerUrl}
         bannerPos={perfil.bannerPos}
@@ -260,6 +261,7 @@ export default async function PerfilComunidadePage({
                 validadeSocio={isSelf ? (socio?.validade ?? null) : null}
                 membroForm={{
                   nome: membro?.nome ?? user.nome ?? '',
+                  nickname: user.nickname,
                   idade: membro?.idade,
                   telefone: membro?.telefone,
                   cidade: membro?.cidade,

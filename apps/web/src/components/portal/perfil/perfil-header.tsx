@@ -5,6 +5,7 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 interface PerfilHeaderProps {
   nome: string | null
+  nickname?: string | null
   avatarUrl: string | null
   bannerUrl: string | null
   bannerPos?: number | null
@@ -17,6 +18,7 @@ interface PerfilHeaderProps {
 
 export function PerfilHeader({
   nome,
+  nickname,
   avatarUrl,
   bannerUrl,
   bannerPos,
@@ -58,6 +60,9 @@ export function PerfilHeader({
         <h1 className="mt-3 text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">
           {nome ?? 'Membro'}
         </h1>
+        {nickname && (
+          <p className="mt-0.5 text-sm font-medium text-[rgb(var(--primary))]">@{nickname}</p>
+        )}
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">

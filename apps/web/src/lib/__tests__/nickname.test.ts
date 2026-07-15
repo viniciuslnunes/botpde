@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import {
+  NICKNAMES_RESERVADOS,
+  normalizarNickname,
+  nicknameFormSchema,
+  nicknameSchema,
+  sugerirNickname,
+} from '@torcida/types'
+
+describe('normalizarNickname', () => {
+  it('remove @ e deixa minúsculo', () => {
+    expect(normalizarNickname('@Mano_Beico')).toBe('mano_beico')
+  })
+
+  it('trim espaços', () => {
+    expect(normalizarNickname('  gavioes  ')).toBe('gavioes')
+  })
+})
+
+describe('sugerirNickname', () => {
+  it('deriva handle do nome', () => {
+    expect(sugerirNickname('Mano Beiço')).toBe('mano_beico')
+  })
+
+  it('retorna vazio quando inválido', () => {
+    expect(sugerirNickname('ab')).toBe('')
+    expect(sugerirNickname('admin')).toBe('')
+  })
+})
+
+describe('nicknameSchema', () => {
+  it('aceita handle válido', () => {
+    expect(nicknameSchema.safeParse('mano_beico').success).toBe(true)
+    expect(nicknameSchema.parse('@Mano_Beico')).toBe('mano_beico')
+  })
+
+  it('rejeita curto, acento, só número e reservado', () => {
+    expect(nicknameSchema.safeParse('ab').success).toBe(false)
+    expect(nicknameSchema.safeParse('mão').success).toBe(false)
+    expect(nicknameSchema.safeParse('12345').success).toBe(false)
+    expect(nicknameSchema.safeParse('admin').success).toBe(false)
+    expect(NICKNAMES_RESERVADOS.has('torcida')).toBe(true)
+  })
+})
+
+describe('nicknameFormSchema', () => {
+  it('string vazia vira null', () => {
+    expect(nicknameFormSchema.parse('')).toBe(null)
+    expect(nicknameFormSchema.parse('   ')).toBe(null)
+  })
+
+  it('normaliza valor preenchido', () => {
+    expect(nicknameFormSchema.parse('@Fiel_1910')).toBe('fiel_1910')
+  })
+})

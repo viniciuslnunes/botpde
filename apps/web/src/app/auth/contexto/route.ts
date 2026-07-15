@@ -7,6 +7,7 @@ import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
   isSuperAdminEmail,
   resolveUserTenantSlugForUser,
+  usuarioPrecisaNickname,
   usuarioPrecisaOnboarding,
   TENANT_CTX_COOKIE,
 } from '@/lib/tenant-context'
@@ -24,6 +25,11 @@ export async function GET(request: Request) {
 
   if (isSuperAdminEmail(session.user.email)) {
     return NextResponse.redirect(publicUrl('/super-admin/torcidas', request))
+  }
+
+  // Apelido obrigatório antes de onboarding/portal (contas novas e antigas).
+  if (await usuarioPrecisaNickname(session.user.id)) {
+    return NextResponse.redirect(publicUrl('/definir-apelido', request))
   }
 
   if (await usuarioPrecisaOnboarding(session.user.id)) {

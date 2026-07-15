@@ -9,6 +9,7 @@ import { useTrackedForm } from '@/lib/unsaved-changes'
 
 type Props = {
   nome: string
+  nickname?: string | null
   idade?: number | null
   telefone?: string | null
   cidade?: string | null
@@ -16,7 +17,15 @@ type Props = {
   temMembro: boolean
 }
 
-export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembro }: Props) {
+export function PerfilForm({
+  nome,
+  nickname,
+  idade,
+  telefone,
+  cidade,
+  discordTag,
+  temMembro,
+}: Props) {
   const [state, action, pending] = useActionState<PerfilState, FormData>(salvarPerfil, {})
   const { formRef, markPristine } = useTrackedForm({ title: 'Dados do perfil' })
   useActionStateToast(state, pending, 'Perfil atualizado.', { onSuccess: markPristine })
@@ -47,9 +56,41 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
           type="text"
           defaultValue={nome}
           required
-         
         />
         <FieldError errors={state.errors?.nome} />
+      </div>
+
+      {/* Nickname (@) — adicionar ou alterar */}
+      <div>
+        <label
+          htmlFor="nickname"
+          className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]"
+        >
+          Apelido (@usuário) <span className="text-red-500">*</span>
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]">@</span>
+          <Input
+            id="nickname"
+            name="nickname"
+            type="text"
+            defaultValue={nickname ?? ''}
+            placeholder="seu_apelido"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={20}
+            pattern="[a-zA-Z0-9_]*"
+            required
+            className="flex-1"
+          />
+        </div>
+        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+          {nickname
+            ? 'Você pode alterar seu @ a qualquer momento (desde que esteja livre).'
+            : 'Defina um @ único — aparece abaixo do seu nome no feed.'}{' '}
+          Letras, números e _ · 3 a 20 caracteres.
+        </p>
+        <FieldError errors={state.errors?.nickname} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -66,7 +107,6 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
             max={120}
             defaultValue={idade ?? ''}
             placeholder="Ex: 25"
-           
           />
           <FieldError errors={state.errors?.idade} />
         </div>
@@ -82,7 +122,6 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
             type="tel"
             defaultValue={telefone ?? ''}
             placeholder="(11) 99999-9999"
-           
           />
           <FieldError errors={state.errors?.telefone} />
         </div>
@@ -99,7 +138,6 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
           type="text"
           defaultValue={cidade ?? ''}
           placeholder="Ex: São Paulo, SP"
-         
         />
         <FieldError errors={state.errors?.cidade} />
       </div>
@@ -115,7 +153,6 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
           type="text"
           defaultValue={discordTag ?? ''}
           placeholder="Ex: seuusuario"
-         
         />
         <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
           Para vincular sua conta ao servidor da torcida no Discord.
@@ -134,3 +171,4 @@ export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembr
     </form>
   )
 }
+

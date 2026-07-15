@@ -18,14 +18,24 @@ export function PostRepostEmbed({ origem }: PostRepostEmbedProps) {
 
   return (
     <div className="mt-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex min-w-0 items-center gap-2">
         <Avatar nome={origem.autor.nome} avatarUrl={origem.autor.avatarUrl} size="xs" />
-        <Link
-          href={`/portal/comunidade/perfil/${origem.autor.id}`}
-          className="text-xs font-semibold hover:underline"
-        >
-          {origem.autor.nome ?? 'Membro'}
-        </Link>
+        <div className="min-w-0">
+          <Link
+            href={`/portal/comunidade/perfil/${origem.autor.id}`}
+            className="block truncate text-xs font-semibold hover:underline"
+          >
+            {origem.autor.nome ?? 'Membro'}
+          </Link>
+          {origem.autor.nickname && (
+            <Link
+              href={`/portal/comunidade/perfil/${origem.autor.id}`}
+              className="block truncate text-[11px] text-[rgb(var(--foreground-muted))] hover:underline"
+            >
+              @{origem.autor.nickname}
+            </Link>
+          )}
+        </div>
       </div>
       <PostConteudoRich
         conteudo={origem.conteudo}

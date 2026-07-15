@@ -3,11 +3,16 @@ import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding, UFS_BRASIL } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
+import { usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { OnboardingWizard } from './wizard'
 
 export default async function OnboardingPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
+
+  if (await usuarioPrecisaNickname(session.user.id)) {
+    redirect('/definir-apelido')
+  }
 
   const [estado, hostTenant] = await Promise.all([
     getEstadoOnboarding(session.user.id),

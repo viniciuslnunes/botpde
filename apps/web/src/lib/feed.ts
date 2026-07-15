@@ -32,7 +32,7 @@ export interface EnquetePostItem {
 export interface PostOrigemEmbed {
   id: string
   conteudo: string
-  autor: { id: string; nome: string | null; avatarUrl: string | null }
+  autor: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
   midiaUrls: string[]
   oculto: boolean
 }
@@ -73,6 +73,7 @@ export interface PostSocialItem {
   autor: {
     id: string
     nome: string | null
+    nickname: string | null
     avatarUrl: string | null
     sedeNome: string | null
     cargoNome: string | null
@@ -104,7 +105,7 @@ export type PostRaw = Omit<
     conteudo: string
     oculto: boolean
     midiaUrls: string[]
-    autor: { id: string; nome: string | null; avatarUrl: string | null }
+    autor: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
   } | null
   comunicadoOrigem?: {
     id: string
@@ -194,14 +195,14 @@ export function projetarPost(post: PostRaw): PostSocialItem {
 export function postInclude(userId?: string) {
   return {
     tenant: { select: { nome: true } },
-    autor: { select: { id: true, nome: true, avatarUrl: true } },
+    autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
     postOrigem: {
       select: {
         id: true,
         conteudo: true,
         oculto: true,
         midiaUrls: true,
-        autor: { select: { id: true, nome: true, avatarUrl: true } },
+        autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
       },
     },
     comunicadoOrigem: {

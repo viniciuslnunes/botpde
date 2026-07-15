@@ -60,6 +60,14 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
               </span>
             )}
           </div>
+          {post.autor.nickname && (
+            <Link
+              href={`/portal/comunidade/perfil/${post.autor.id}`}
+              className="block truncate text-xs text-[rgb(var(--foreground-muted))] hover:underline"
+            >
+              @{post.autor.nickname}
+            </Link>
+          )}
           <Link
             href={linkPostComunidade(post.id)}
             className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"

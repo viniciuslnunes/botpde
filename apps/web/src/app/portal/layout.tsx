@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { getEstadoOnboarding } from '@/lib/onboarding'
+import { usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 
@@ -15,6 +16,10 @@ export default async function PortalLayout({
 
   if (!session?.user?.id) {
     redirect('/entrar')
+  }
+
+  if (await usuarioPrecisaNickname(session.user.id)) {
+    redirect('/definir-apelido')
   }
 
   // Gate de onboarding: quem ainda não concluiu e não tem vínculo é direcionado

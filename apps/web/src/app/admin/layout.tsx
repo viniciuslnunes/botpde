@@ -13,7 +13,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from '@torcida/types'
-import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
+import { isSuperAdminEmail, listarTorcidasParaSelecao, usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { listarNotificacoesRecentes, reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 
@@ -29,6 +29,12 @@ export default async function AdminLayout({
   }
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
+
+  // Operadores (super-admin) não precisam de @; líderes de torcida sim.
+  if (!isSuperAdmin && session.user.id && (await usuarioPrecisaNickname(session.user.id))) {
+    redirect('/definir-apelido')
+  }
+
   const tenant = await getTenantFromHost()
 
   if (!tenant) {

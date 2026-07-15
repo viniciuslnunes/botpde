@@ -12,7 +12,7 @@ const PUBLIC_PATHS = [
 ]
 
 /** Auth real fica no Route Handler / página — evita falso negativo do proxy. */
-const AUTH_DEFER_PATHS = ['/auth/contexto', '/onboarding']
+const AUTH_DEFER_PATHS = ['/auth/contexto', '/onboarding', '/definir-apelido']
 
 export const proxy = auth((req) => {
   if (process.env.NODE_ENV === 'development') {

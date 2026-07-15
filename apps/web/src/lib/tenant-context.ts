@@ -44,6 +44,15 @@ export async function usuarioPrecisaOnboarding(userId: string): Promise<boolean>
   return !perfil?.onboardingConcluidoEm
 }
 
+/** Sem @nickname definido — precisa passar por /definir-apelido. */
+export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
+  const user: { nickname: string | null } | null = await db.user.findUnique({
+    where: { id: userId },
+    select: { nickname: true },
+  })
+  return !user?.nickname
+}
+
 /**
  * Slug da torcida do usuário (vínculo real). Sem fallback TENANT_SLUG —
  * use em roteamento pós-login; TENANT_SLUG é só contexto do deploy.

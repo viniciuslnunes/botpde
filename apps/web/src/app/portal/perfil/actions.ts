@@ -3,11 +3,14 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { nicknameSchema } from '@torcida/types'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 const schema = z.object({
   nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
+  /** Obrigatório: adicionar (primeiro @) ou alterar o atual. */
+  nickname: nicknameSchema,
   idade: z
     .string()
     .optional()
@@ -48,6 +51,7 @@ export async function salvarPerfil(
 
   const raw = {
     nome: formData.get('nome') as string,
+    nickname: formData.get('nickname') as string | undefined,
     idade: formData.get('idade') as string | undefined,
     telefone: formData.get('telefone') as string | undefined,
     cidade: formData.get('cidade') as string | undefined,
@@ -59,15 +63,30 @@ export async function salvarPerfil(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { nome, idade, telefone, cidade, discordTag } = parsed.data
+  const { nome, nickname, idade, telefone, cidade, discordTag } = parsed.data
 
-  // Atualiza nome no registro do usuário
-  await db.user.update({
-    where: { id: session.user.id },
-    data: { nome },
+  const ocupado: { id: string } | null = await db.user.findFirst({
+    where: { nickname, NOT: { id: session.user.id } },
+    select: { id: true },
   })
+  if (ocupado) {
+    return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
+  }
 
-  // Atualiza SaasMembro se existir no tenant atual
+  try {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { nome, nickname },
+    })
+  } catch (err) {
+    const code =
+      err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
+    if (code === 'P2002') {
+      return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
+    }
+    throw err
+  }
+
   if (tenant) {
     const membro = await db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
@@ -85,5 +104,6 @@ export async function salvarPerfil(
   revalidatePath('/portal/perfil')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath('/portal')
+  revalidatePath('/portal/comunidade')
   return { success: true }
 }
