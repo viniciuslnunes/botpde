@@ -46,16 +46,15 @@ const departamentosLink = {
 interface PortalNavbarProps {
   userName: string | null
   userAvatar: string | null
-  tenantNome: string
-  tenantCor: string
+  /** Torcida ativa ou, no modo nacional, o clube (nome/escudo). */
+  tenant: { nome: string; corPrimaria: string; logoUrl: string | null }
   temDepartamentos?: boolean
 }
 
 export function PortalNavbar({
   userName,
   userAvatar,
-  tenantNome,
-  tenantCor,
+  tenant,
   temDepartamentos = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
@@ -94,14 +93,29 @@ export function PortalNavbar({
         <div className="app-container flex h-14 items-center gap-4">
 
           <PortalNavLink href="/portal/comunidade" className="flex shrink-0 items-center gap-2" showSpinner={false}>
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
-              style={{ backgroundColor: tenantCor }}
-            >
-              {tenantNome.charAt(0).toUpperCase()}
-            </div>
+            {tenant.logoUrl ? (
+              canOptimizeImageUrl(tenant.logoUrl) ? (
+                <Image
+                  src={tenant.logoUrl}
+                  alt={tenant.nome}
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 rounded-lg object-contain"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tenant.logoUrl} alt={tenant.nome} className="h-7 w-7 rounded-lg object-contain" />
+              )
+            ) : (
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
+                style={{ backgroundColor: tenant.corPrimaria }}
+              >
+                {tenant.nome.charAt(0).toUpperCase()}
+              </div>
+            )}
             <span className="hidden text-sm font-semibold text-[rgb(var(--foreground))] sm:block">
-              {tenantNome}
+              {tenant.nome}
             </span>
           </PortalNavLink>
 
@@ -173,7 +187,7 @@ export function PortalNavbar({
                 ) : (
                   <div
                     className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                    style={{ backgroundColor: tenantCor }}
+                    style={{ backgroundColor: tenant.corPrimaria }}
                   >
                     {firstName.charAt(0).toUpperCase()}
                   </div>
@@ -250,7 +264,7 @@ export function PortalNavbar({
               ) : (
                 <div
                   className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
-                  style={{ backgroundColor: tenantCor }}
+                  style={{ backgroundColor: tenant.corPrimaria }}
                 >
                   {firstName.charAt(0).toUpperCase()}
                 </div>

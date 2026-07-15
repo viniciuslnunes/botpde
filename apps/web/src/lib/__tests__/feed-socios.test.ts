@@ -8,6 +8,7 @@ vi.mock('@torcida/db', () => ({
 
 // Stubs dos módulos vizinhos importados por feed.ts que puxam next/cache etc.
 vi.mock('@/lib/comunidade', () => ({ getFeedComunidade: vi.fn() }))
+vi.mock('@/lib/comunidade-contexto', () => ({ getTenantIdsPorAfiliacao: vi.fn() }))
 vi.mock('@/lib/hierarquia', () => ({ getVisibleTenantIds: vi.fn() }))
 vi.mock('@/lib/perfil-social', () => ({
   getAutoresSemAcesso: vi.fn(),

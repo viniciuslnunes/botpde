@@ -32,5 +32,17 @@ export async function resolvePerfilTenantForUser(
     if (vinculo?.tenant.ativo) return vinculo.tenant
   }
 
+  // Torcedor global (sem tenant pelo host) abrindo o perfil de outra pessoa:
+  // usa o tenant do perfil visitado. Perfil de outro torcedor global (nenhum
+  // vínculo aprovado) segue fora de escopo — retorna null.
+  if (!fromHost && profileUserId !== viewerId) {
+    const vinculoPerfil: { tenant: Tenant } | null = await db.saasMembro.findFirst({
+      where: { userId: profileUserId, status: 'APROVADO' },
+      orderBy: { criadoEm: 'desc' },
+      select: { tenant: true },
+    })
+    if (vinculoPerfil?.tenant.ativo) return vinculoPerfil.tenant
+  }
+
   return fromHost
 }

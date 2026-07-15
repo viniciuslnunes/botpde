@@ -7,12 +7,19 @@ export type AfiliacaoComunidade = {
   nome: string
   apelido: string | null
   slug: string | null
+  escudoUrl: string | null
 }
 
 export type ContextoComunidadePortal =
   | {
       modo: 'torcida'
-      tenant: { id: string; nome: string; afiliacaoId: string | null }
+      tenant: {
+        id: string
+        nome: string
+        afiliacaoId: string | null
+        logoUrl: string | null
+        corPrimaria: string
+      }
       afiliacao: AfiliacaoComunidade | null
     }
   | {
@@ -33,12 +40,18 @@ export const resolverContextoComunidade = cache(
       if (tenant.afiliacaoId) {
         afiliacao = await db.afiliacao.findUnique({
           where: { id: tenant.afiliacaoId },
-          select: { id: true, nome: true, apelido: true, slug: true },
+          select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
         })
       }
       return {
         modo: 'torcida',
-        tenant: { id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId },
+        tenant: {
+          id: tenant.id,
+          nome: tenant.nome,
+          afiliacaoId: tenant.afiliacaoId,
+          logoUrl: tenant.logoUrl,
+          corPrimaria: tenant.corPrimaria,
+        },
         afiliacao,
       }
     }
@@ -54,7 +67,7 @@ export const resolverContextoComunidade = cache(
 
     const afiliacao: AfiliacaoComunidade | null = await db.afiliacao.findUnique({
       where: { id: perfil.afiliacaoId },
-      select: { id: true, nome: true, apelido: true, slug: true },
+      select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
     })
     if (!afiliacao) return null
 

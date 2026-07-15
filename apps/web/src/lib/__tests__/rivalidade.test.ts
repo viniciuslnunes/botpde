@@ -2,18 +2,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { canViewRecurso, ordenarPar, resolveVisibility, saoRivais, SENSIBILIDADE } from '@torcida/types'
 
 const findMany = vi.hoisted(() => vi.fn())
+const perfilTorcedorFindUnique = vi.hoisted(() => vi.fn())
 const getAlliedTenantIds = vi.hoisted(() => vi.fn())
 const getTenantRelation = vi.hoisted(() => vi.fn())
 const tenantsAreAllied = vi.hoisted(() => vi.fn())
+const getTenantIdsPorAfiliacao = vi.hoisted(() => vi.fn())
 
 vi.mock('@torcida/db', () => ({
-  db: { saasMembro: { findMany }, seguimento: { findUnique: vi.fn() }, perfilMembro: { upsert: vi.fn() } },
+  db: {
+    saasMembro: { findMany },
+    seguimento: { findUnique: vi.fn() },
+    perfilMembro: { upsert: vi.fn() },
+    perfilTorcedor: { findUnique: perfilTorcedorFindUnique },
+  },
 }))
 
 vi.mock('@/lib/hierarquia', () => ({
   getAlliedTenantIds,
   getTenantRelation,
   tenantsAreAllied,
+}))
+
+vi.mock('@/lib/comunidade-contexto', () => ({
+  getTenantIdsPorAfiliacao,
 }))
 
 import { canFollowUser } from '@/lib/social'
@@ -59,11 +70,14 @@ type Vinculo = { userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }
 describe('canFollowUser × rivalidade', () => {
   beforeEach(() => {
     findMany.mockReset()
+    perfilTorcedorFindUnique.mockReset()
     getAlliedTenantIds.mockReset()
     getTenantRelation.mockReset()
     tenantsAreAllied.mockReset()
+    getTenantIdsPorAfiliacao.mockReset()
     getAlliedTenantIds.mockResolvedValue(['t2'])
     tenantsAreAllied.mockResolvedValue(true)
+    perfilTorcedorFindUnique.mockResolvedValue(null)
   })
 
   function mockVinculos(vinculos: Vinculo[]) {
@@ -112,5 +126,28 @@ describe('canFollowUser × rivalidade', () => {
   it('seguir a si mesmo continua bloqueado', async () => {
     await expect(canFollowUser('u1', 'u1', 't1')).resolves.toBe(false)
     expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('torcedor global (sem SaasMembro) segue sócio de torcida do mesmo clube', async () => {
+    mockVinculos([{ userId: 'u2', tenantId: 't1', tipo: 'SOCIO' }])
+    perfilTorcedorFindUnique.mockResolvedValue({ afiliacaoId: 'af1' })
+    getTenantIdsPorAfiliacao.mockResolvedValue(['t1', 't9'])
+    await expect(canFollowUser('u1', 'u2', null)).resolves.toBe(true)
+    // Torcedor global não entra no bloqueio de rivalidade (não é sócio)
+    expect(getTenantRelation).not.toHaveBeenCalled()
+  })
+
+  it('torcedor global não segue sócio de torcida de outro clube', async () => {
+    mockVinculos([{ userId: 'u2', tenantId: 't5', tipo: 'SOCIO' }])
+    perfilTorcedorFindUnique.mockResolvedValue({ afiliacaoId: 'af1' })
+    getTenantIdsPorAfiliacao.mockResolvedValue(['t1', 't9'])
+    tenantsAreAllied.mockResolvedValue(false)
+    await expect(canFollowUser('u1', 'u2', null)).resolves.toBe(false)
+  })
+
+  it('usuário sem vínculo e sem PerfilTorcedor não segue ninguém', async () => {
+    mockVinculos([{ userId: 'u2', tenantId: 't1', tipo: 'SOCIO' }])
+    perfilTorcedorFindUnique.mockResolvedValue(null)
+    await expect(canFollowUser('u1', 'u2', null)).resolves.toBe(false)
   })
 })

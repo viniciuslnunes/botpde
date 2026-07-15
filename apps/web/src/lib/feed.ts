@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
+import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
 import { getVisibleTenantIds } from './hierarquia'
 import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
 import { getSeguimentoStatus } from './social'
@@ -634,6 +635,51 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
       tipo: 'MEMBRO',
       oculto: false,
       autorId: { in: redeIds },
+      ...escopoFeedPrincipal,
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+})
+
+/**
+ * Feed da comunidade nacional: agrega posts PÚBLICOS de todas as torcidas do
+ * clube (torcedor global não tem vínculo aprovado — nunca vê TENANT/PRIVADO).
+ */
+export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
+  afiliacaoId: string,
+  userId: string | undefined,
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+
+  const tenantIds = await getTenantIdsPorAfiliacao(afiliacaoId)
+  if (tenantIds.length === 0) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: tenantIds },
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      oculto: false,
       ...escopoFeedPrincipal,
       ...cursorWhere,
     },

@@ -55,15 +55,28 @@ export async function getOrCreatePerfilMembro(
   return perfil
 }
 
+/** Torcedor global (sem SaasMembro): as torcidas do clube do PerfilTorcedor. */
+async function getTenantsDoClubeDoTorcedor(userId: string): Promise<string[]> {
+  const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
+    where: { userId },
+    select: { afiliacaoId: true },
+  })
+  if (!perfil?.afiliacaoId) return []
+  // Import dinâmico: comunidade-contexto puxa tenant.ts/env — evita acoplar
+  // este módulo (usado em testes puros) ao ambiente Next.
+  const { getTenantIdsPorAfiliacao } = await import('./comunidade-contexto')
+  return getTenantIdsPorAfiliacao(perfil.afiliacaoId)
+}
+
 export async function canFollowUser(
   seguidorId: string,
   seguidoId: string,
-  tenantContextoId: string,
+  tenantContextoId: string | null,
 ): Promise<boolean> {
   if (seguidorId === seguidoId) return false
 
   const [aliadosContexto, vinculos] = await Promise.all([
-    getAlliedTenantIds(tenantContextoId),
+    tenantContextoId ? getAlliedTenantIds(tenantContextoId) : Promise.resolve([] as string[]),
     db.saasMembro.findMany({
       where: {
         status: 'APROVADO',
@@ -73,15 +86,29 @@ export async function canFollowUser(
     }) as Promise<{ userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }[]>,
   ])
 
-  const visiveisNoContexto = new Set([tenantContextoId, ...aliadosContexto])
-  const seguidorVinculos = vinculos.filter(
-    (v) => v.userId === seguidorId && visiveisNoContexto.has(v.tenantId),
-  )
-  const seguidoVinculos = vinculos.filter(
-    (v) => v.userId === seguidoId && visiveisNoContexto.has(v.tenantId),
-  )
+  // Sem tenant de contexto (ator é torcedor global) não há recorte de
+  // visibilidade — a interseção por clube/aliança abaixo já limita o alcance.
+  const visiveisNoContexto: Set<string> | null = tenantContextoId
+    ? new Set([tenantContextoId, ...aliadosContexto])
+    : null
+  const noContexto = (tenantId: string): boolean =>
+    visiveisNoContexto === null || visiveisNoContexto.has(tenantId)
 
-  if (seguidorVinculos.length === 0 || seguidoVinculos.length === 0) return false
+  const seguidorVinculos = vinculos.filter((v) => v.userId === seguidorId && noContexto(v.tenantId))
+  const seguidoVinculos = vinculos.filter((v) => v.userId === seguidoId && noContexto(v.tenantId))
+
+  // Torcedor global: sem vínculo real, o "conjunto de tenants" do lado é o das
+  // torcidas do clube dele — segue/é seguido por qualquer torcida do mesmo clube.
+  const seguidorTenants =
+    seguidorVinculos.length > 0
+      ? seguidorVinculos.map((v) => v.tenantId)
+      : await getTenantsDoClubeDoTorcedor(seguidorId)
+  const seguidoTenants =
+    seguidoVinculos.length > 0
+      ? seguidoVinculos.map((v) => v.tenantId)
+      : await getTenantsDoClubeDoTorcedor(seguidoId)
+
+  if (seguidorTenants.length === 0 || seguidoTenants.length === 0) return false
 
   // Bloqueio de rivalidade (spec-onboarding §3.2): SOMENTE quando AMBOS os
   // lados são sócios (tipo SOCIO, status APROVADO — o where já filtra) de
@@ -96,9 +123,6 @@ export async function canFollowUser(
       if (saoRivais(relation)) return false
     }
   }
-
-  const seguidorTenants = seguidorVinculos.map((v) => v.tenantId)
-  const seguidoTenants = seguidoVinculos.map((v) => v.tenantId)
 
   const seguidorSet = new Set(seguidorTenants)
   for (const tenantId of seguidoTenants) {
