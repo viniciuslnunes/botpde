@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import { salvarPerfil, type PerfilState } from '@/app/portal/perfil/actions'
 import { Save, CheckCircle2 } from 'lucide-react'
 import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { NicknameField } from '@/components/nickname-field'
 import { useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 
@@ -60,38 +61,22 @@ export function PerfilForm({
         <FieldError errors={state.errors?.nome} />
       </div>
 
-      {/* Nickname (@) — adicionar ou alterar */}
-      <div>
-        <label
-          htmlFor="nickname"
-          className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]"
-        >
-          Apelido (@usuário) <span className="text-red-500">*</span>
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]">@</span>
-          <Input
-            id="nickname"
-            name="nickname"
-            type="text"
-            defaultValue={nickname ?? ''}
-            placeholder="seu_apelido"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={20}
-            pattern="[a-zA-Z0-9_]*"
-            required
-            className="flex-1"
-          />
-        </div>
-        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-          {nickname
-            ? 'Você pode alterar seu @ a qualquer momento (desde que esteja livre).'
-            : 'Defina um @ único — aparece abaixo do seu nome no feed.'}{' '}
-          Letras, números e _ · 3 a 20 caracteres.
-        </p>
-        <FieldError errors={state.errors?.nickname} />
-      </div>
+      <NicknameField
+        id="nickname"
+        defaultValue={nickname ?? ''}
+        nicknameAtual={nickname}
+        label={
+          <>
+            Apelido (@usuário) <span className="text-red-500">*</span>
+          </>
+        }
+        helperText={
+          nickname
+            ? 'Você pode alterar seu @ a qualquer momento (desde que esteja livre). Letras, números e _ · 3 a 20 caracteres.'
+            : 'Defina um @ único — aparece abaixo do seu nome no feed. Letras, números e _ · 3 a 20 caracteres.'
+        }
+        errors={state.errors?.nickname}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Idade */}

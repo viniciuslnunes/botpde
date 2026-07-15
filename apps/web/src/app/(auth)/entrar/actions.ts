@@ -5,6 +5,7 @@ import { nicknameSchema } from '@torcida/types'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import { excedeuLimite } from '@/lib/rate-limit'
+import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -102,21 +103,20 @@ export async function criarContaComSenha(
   const { nome, nickname, senha } = parsed.data
   const email = parsed.data.email.trim().toLowerCase()
 
-  const [emailExistente, nickExistente] = await Promise.all([
-    db.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-      select: { id: true },
-    }),
-    db.user.findFirst({
-      where: { nickname },
-      select: { id: true },
-    }),
-  ])
+  const emailExistente = await db.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
+  })
   if (emailExistente) {
     return { message: 'Já existe uma conta com este e-mail. Tente entrar.' }
   }
-  if (nickExistente) {
-    return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
+
+  const nickCheck = await checarNicknameDisponivel(nickname)
+  if (!nickCheck.ok) {
+    return { errors: { nickname: [nickCheck.motivo] } }
+  }
+  if (!nickCheck.disponivel) {
+    return { errors: { nickname: [nickCheck.motivo] } }
   }
 
   const senhaHash = await bcrypt.hash(senha, 10)

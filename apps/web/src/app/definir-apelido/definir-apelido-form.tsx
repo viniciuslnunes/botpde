@@ -2,8 +2,9 @@
 
 import { useActionState } from 'react'
 import { AtSign } from 'lucide-react'
-import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { SubmitButton } from '@torcida/ui'
 import { AuthRedirectEffect } from '@/components/auth-redirect-effect'
+import { NicknameField } from '@/components/nickname-field'
 import { definirApelido, type DefinirApelidoState } from './actions'
 
 export function DefinirApelidoForm({
@@ -24,36 +25,19 @@ export function DefinirApelidoForm({
         </div>
       )}
 
-      <div>
-        <label
-          htmlFor="nickname"
-          className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]"
-        >
-          Seu @ <span className="text-red-500">*</span>
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]">@</span>
-          <Input
-            id="nickname"
-            name="nickname"
-            type="text"
-            defaultValue={nicknameAtual ?? sugestao}
-            placeholder="seu_apelido"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={20}
-            pattern="[a-zA-Z0-9_]*"
-            required
-            autoFocus
-            className="flex-1"
-          />
-        </div>
-        <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
-          Único na plataforma · letras, números e _ · 3 a 20 caracteres. Aparece abaixo do seu nome
-          no feed.
-        </p>
-        <FieldError errors={state.errors?.nickname} />
-      </div>
+      <NicknameField
+        id="nickname"
+        defaultValue={nicknameAtual ?? sugestao}
+        nicknameAtual={nicknameAtual}
+        label={
+          <>
+            Seu @ <span className="text-red-500">*</span>
+          </>
+        }
+        helperText="Único na plataforma · letras, números e _ · 3 a 20 caracteres. Aparece abaixo do seu nome no feed."
+        errors={state.errors?.nickname}
+        autoFocus
+      />
 
       <SubmitButton
         label={nicknameAtual ? 'Salvar e continuar' : 'Escolher apelido'}

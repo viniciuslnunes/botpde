@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { nicknameSchema } from '@torcida/types'
+import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -36,12 +37,12 @@ export async function definirApelido(
 
   const { nickname } = parsed.data
 
-  const ocupado: { id: string } | null = await db.user.findFirst({
-    where: { nickname, NOT: { id: session.user.id } },
-    select: { id: true },
-  })
-  if (ocupado) {
-    return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
+  const nickCheck = await checarNicknameDisponivel(nickname, session.user.id)
+  if (!nickCheck.ok) {
+    return { errors: { nickname: [nickCheck.motivo] } }
+  }
+  if (!nickCheck.disponivel) {
+    return { errors: { nickname: [nickCheck.motivo] } }
   }
 
   try {

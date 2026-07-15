@@ -3,8 +3,9 @@
 import { useActionState, useState } from 'react'
 import { criarContaComSenha, type ContaState } from '../actions'
 import { AuthRedirectEffect } from '@/components/auth-redirect-effect'
-import { UserCircle2, Mail, Lock, ChevronRight, AtSign, Eye, EyeOff } from 'lucide-react'
+import { UserCircle2, Mail, Lock, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { FieldError, Input, SubmitButton, hexToRgb } from '@torcida/ui'
+import { NicknameField } from '@/components/nickname-field'
 
 export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: string }) {
   const [state, action] = useActionState<ContaState, FormData>(criarContaComSenha, {})
@@ -31,36 +32,7 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
         <FieldError errors={state.errors?.nome} />
       </div>
 
-      <div>
-        <label
-          htmlFor="nickname"
-          className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]"
-        >
-          <span className="flex items-center gap-1.5">
-            <AtSign className="h-3.5 w-3.5" />
-            Apelido <span className="text-red-500">*</span>
-          </span>
-        </label>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]">@</span>
-          <Input
-            id="nickname"
-            name="nickname"
-            type="text"
-            placeholder="seu_apelido"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={20}
-            pattern="[a-zA-Z0-9_]*"
-            required
-            className="flex-1"
-          />
-        </div>
-        <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
-          Único na plataforma · letras, números e _ · 3 a 20 caracteres.
-        </p>
-        <FieldError errors={state.errors?.nickname} />
-      </div>
+      <NicknameField id="nickname" errors={state.errors?.nickname} />
 
       <div>
         <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">

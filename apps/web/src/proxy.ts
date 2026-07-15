@@ -5,6 +5,8 @@ import { resetPrismaQueryCount } from '@torcida/db'
 const PUBLIC_PATHS = [
   '/entrar',
   '/api/auth',
+  // Checagem de @ no cadastro (ainda sem sessão).
+  '/api/nickname',
   '/_next',
   '/favicon.ico',
   // Stickers locais — o otimizador de imagem busca sem sessão.
