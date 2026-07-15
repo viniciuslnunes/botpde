@@ -104,6 +104,9 @@ Promoção Subsede→Tenant continua script manual
 - Admin CRUD (templates): `/admin/acessos?secao=cargos` e `?secao=departamentos`
 - Admin atribuição: `/admin/acessos?secao=pessoas` — estados **Membro** / **Gestor** + origem na matriz
 - Staffing do gestor: `adicionarMembroDepartamento` / `removerMembroDepartamento`
+- Mural organizacional: `/admin/hierarquia` — árvore Presidente → Vice → Diretoria →
+  departamentos (gestor/colaborador) → base sócios/torcedores (`getOrganizacaoTree`)
+- Hierarquia **territorial** (Sede→Subsede→PDE) continua em `/admin/sedes` e `/admin/torcida`
 - Portal hub: `/portal/departamentos` — Abrir módulo / Só organização / Administrar→rota admin
 - Bootstrap: setup de tenant + `seed.js` + scripts de provisionamento chamam
   `upsertDepartamentosCanonicos`; legado: `pnpm --filter @torcida/db seed:departamentos`

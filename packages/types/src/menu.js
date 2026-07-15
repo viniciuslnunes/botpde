@@ -15,7 +15,8 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'socios', label: 'Sócios', href: '/admin/socios', permissao: PERMISSIONS.MEMBERS_VIEW },
   { id: 'eventos', label: 'Eventos', href: '/admin/eventos', permissao: [PERMISSIONS.EVENTS_CREATE, PERMISSIONS.EVENTS_MANAGE] },
   { id: 'sedes', label: 'Sedes', href: '/admin/sedes', permissao: PERMISSIONS.SEDES_MANAGE },
-  { id: 'hierarquia', label: 'Hierarquia', href: '/admin/hierarquia', permissao: PERMISSIONS.SEDES_MANAGE },
+  // Mural organizacional (cargos/deptos/base) — territorial fica em Sedes / Visão da torcida
+  { id: 'hierarquia', label: 'Hierarquia', href: '/admin/hierarquia', permissao: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.MEMBERS_VIEW] },
   { id: 'loja', label: 'Loja', href: '/admin/loja', permissao: PERMISSIONS.STORE_MANAGE },
   { id: 'loja-pedidos', label: 'Pedidos (Loja)', href: '/admin/loja/pedidos', permissao: PERMISSIONS.STORE_VIEW_ORDERS },
   { id: 'comunidade', label: 'Comunidade', href: '/admin/comunidade', permissao: PERMISSIONS.COMMUNITY_MANAGE },
