@@ -63,12 +63,13 @@ function PersonNode({
   accent?: string
   highlighted?: boolean
 }) {
+  const href = `/admin/acessos?secao=pessoas&usuario=${encodeURIComponent(person.id)}`
   return (
     <Link
-      href="/admin/acessos?secao=pessoas"
+      href={href}
       title={`Gerenciar acesso de ${person.nome}`}
       className={[
-        'flex min-w-[11rem] max-w-[14rem] items-center gap-2.5 rounded-xl border bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm transition-colors',
+        'flex min-w-[12rem] max-w-[16rem] items-center gap-2.5 rounded-xl border bg-[rgb(var(--surface))] px-3 py-2.5 shadow-sm transition-colors',
         'hover:border-[rgb(var(--primary)_/_0.45)] hover:bg-[rgb(var(--primary)_/_0.04)]',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]',
         highlighted

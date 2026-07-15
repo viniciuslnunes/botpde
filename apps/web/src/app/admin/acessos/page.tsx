@@ -59,7 +59,7 @@ interface UsoPorRole {
 export default async function AcessosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ secao?: string }>
+  searchParams: Promise<{ secao?: string; usuario?: string }>
 }) {
   let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
@@ -68,8 +68,9 @@ export default async function AcessosPage({
     redirect('/admin')
   }
 
-  const { secao: secaoRaw } = await searchParams
+  const { secao: secaoRaw, usuario: usuarioRaw } = await searchParams
   const secao = parseAccessSecao(secaoRaw)
+  const initialUserId = usuarioRaw?.trim() || null
 
   const usoPorRole: UsoPorRole[] = await db.userRole.groupBy({
     by: ['roleId'],
@@ -162,7 +163,7 @@ export default async function AcessosPage({
   }))
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
         <div className="app-container">
           <div className="flex items-center gap-3">
@@ -174,18 +175,20 @@ export default async function AcessosPage({
               </p>
             </div>
           </div>
-          <AccessControlNav
-            secao={secao}
-            counts={{
-              pessoas: usuariosFormatados.length,
-              cargos: roles.length,
-              departamentos: departamentos.length,
-            }}
-          />
+          {!(secao === 'pessoas' && initialUserId) && (
+            <AccessControlNav
+              secao={secao}
+              counts={{
+                pessoas: usuariosFormatados.length,
+                cargos: roles.length,
+                departamentos: departamentos.length,
+              }}
+            />
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto py-6">
+      <div className="py-6">
         <div className="app-container">
           {secao === 'cargos' && <RolesManager roles={roles} tipoSede={tipoSede} />}
           {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
@@ -195,6 +198,7 @@ export default async function AcessosPage({
               roles={roles}
               departamentos={departamentos}
               tipoSede={tipoSede}
+              initialUserId={initialUserId}
             />
           )}
         </div>
