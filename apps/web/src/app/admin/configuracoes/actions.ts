@@ -14,16 +14,28 @@ import {
 import { z } from 'zod'
 
 /**
- * Sanitiza a lista de permissões vinda do formulário de cargo:
- * descarta códigos fora do vocabulário canônico, aplica a cascata de
- * dependência (base do grupo) e exige ao menos uma permissão.
+ * Sanitiza lista de permissões (vocabulário + cascata). Pode ser vazia quando
+ * o cargo herda só do departamento.
  */
-function sanitizeRolePermissions(permissionsRaw: string[]): string[] {
+function sanitizePermissionsList(permissionsRaw: string[]): string[] {
   const canonical: readonly string[] = ALL_PERMISSIONS
   const valid = permissionsRaw.filter((p) => canonical.includes(p))
-  const cascaded: string[] = applyPermissionCascade([], valid)
-  if (cascaded.length === 0) throw new Error('Selecione ao menos uma permissão para o cargo')
-  return cascaded
+  return applyPermissionCascade([], valid)
+}
+
+function parseDepartamentoPapel(formData: FormData): {
+  departamentoId: string | null
+  papelNoDepartamento: string | null
+} {
+  const departamentoIdRaw = String(formData.get('departamentoId') ?? '').trim()
+  const papelRaw = String(formData.get('papelNoDepartamento') ?? '').trim()
+  const departamentoId = departamentoIdRaw || null
+  const papelNoDepartamento =
+    papelRaw === 'MEMBRO' || papelRaw === 'GESTOR' ? papelRaw : null
+  if (Boolean(departamentoId) !== Boolean(papelNoDepartamento)) {
+    throw new Error('Departamento e papel (membro/gestor) devem ser informados juntos.')
+  }
+  return { departamentoId, papelNoDepartamento }
 }
 
 async function assertTenantOwner(userId: string, tenantId: string): Promise<void> {
@@ -151,11 +163,28 @@ export async function criarRole(formData: FormData) {
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const extrasRaw = formData.getAll('permissionsExtras') as string[]
   const permissionsRaw = formData.getAll('permissions') as string[]
+  const { departamentoId, papelNoDepartamento } = parseDepartamentoPapel(formData)
 
   if (!nome) throw new Error('Nome do cargo é obrigatório')
 
-  const permissions = sanitizeRolePermissions(permissionsRaw)
+  if (departamentoId) {
+    const depto = await db.departamento.findFirst({
+      where: { id: departamentoId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!depto) throw new Error('Departamento não encontrado')
+  }
+
+  const permissionsExtras = sanitizePermissionsList(extrasRaw)
+  const permissions = departamentoId
+    ? []
+    : sanitizePermissionsList(permissionsRaw.length > 0 ? permissionsRaw : extrasRaw)
+
+  if (!departamentoId && permissions.length === 0 && permissionsExtras.length === 0) {
+    throw new Error('Selecione ao menos uma permissão ou vincule um departamento')
+  }
 
   const existing = await db.role.findFirst({
     where: { tenantId: tenant.id, nome },
@@ -168,6 +197,9 @@ export async function criarRole(formData: FormData) {
       nome,
       cor,
       permissions,
+      permissionsExtras,
+      departamentoId,
+      papelNoDepartamento,
       isSystem: false,
     },
   })
@@ -177,11 +209,12 @@ export async function criarRole(formData: FormData) {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'ROLE_CRIADO',
-      detalhes: { nome, cor, permissions },
+      detalhes: { nome, cor, permissions, permissionsExtras, departamentoId, papelNoDepartamento },
     },
   })
 
   revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/acessos')
 }
 
 export async function atualizarRole(roleId: string, formData: FormData) {
@@ -195,20 +228,44 @@ export async function atualizarRole(roleId: string, formData: FormData) {
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const extrasRaw = formData.getAll('permissionsExtras') as string[]
   const permissionsRaw = formData.getAll('permissions') as string[]
+  const { departamentoId, papelNoDepartamento } = parseDepartamentoPapel(formData)
 
   if (!nome) throw new Error('Nome do cargo é obrigatório')
+
+  if (departamentoId) {
+    const depto = await db.departamento.findFirst({
+      where: { id: departamentoId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!depto) throw new Error('Departamento não encontrado')
+  }
 
   const duplicado = await db.role.findFirst({
     where: { tenantId: tenant.id, nome, id: { not: roleId } },
   })
   if (duplicado) throw new Error('Já existe um cargo com este nome')
 
-  const permissions = sanitizeRolePermissions(permissionsRaw)
+  const permissionsExtras = sanitizePermissionsList(extrasRaw)
+  const permissions = departamentoId
+    ? []
+    : sanitizePermissionsList(permissionsRaw.length > 0 ? permissionsRaw : extrasRaw)
+
+  if (!departamentoId && permissions.length === 0 && permissionsExtras.length === 0) {
+    throw new Error('Selecione ao menos uma permissão ou vincule um departamento')
+  }
 
   await db.role.update({
     where: { id: roleId },
-    data: { nome, cor, permissions },
+    data: {
+      nome,
+      cor,
+      permissions,
+      permissionsExtras,
+      departamentoId,
+      papelNoDepartamento,
+    },
   })
 
   await db.auditLog.create({
@@ -222,12 +279,17 @@ export async function atualizarRole(roleId: string, formData: FormData) {
         nome,
         cor,
         permissions,
+        permissionsExtras,
+        departamentoId,
+        papelNoDepartamento,
         permissoesAntes: role.permissions,
+        extrasAntes: role.permissionsExtras,
       },
     },
   })
 
   revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/acessos')
 }
 
 export async function excluirRole(roleId: string) {

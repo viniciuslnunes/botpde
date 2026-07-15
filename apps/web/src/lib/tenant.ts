@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
+import { permissionsOfRole } from '@torcida/types'
 import { env } from '@/lib/env'
 import { resolveRequestHost } from '@/lib/request-origin'
 import { TENANT_CTX_COOKIE } from '@/lib/tenant-context'
@@ -184,7 +185,15 @@ async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
   const [userRoles, userPermissions, userDepartamentos, gestaoDepartamentos] = await Promise.all([
     db.userRole.findMany({
       where: { userId, tenantId },
-      include: { role: true },
+      include: {
+        role: {
+          include: {
+            departamento: {
+              select: { permissions: true, permissionsGestor: true },
+            },
+          },
+        },
+      },
     }),
     db.userPermission.findMany({
       where: { userId, tenantId },
@@ -199,39 +208,54 @@ async function fetchUserPermissionsImpl(userId: string, tenantId: string) {
     }),
   ])
 
-  const rolePermissions = userRoles.flatMap(
-    (ur: { role: { permissions: string[] } }) => ur.role.permissions,
-  )
+  const base = new Set<string>()
+  const coveredDeptoIds = new Set<string>()
 
+  for (const ur of userRoles as Array<{
+    role: {
+      permissions: string[]
+      permissionsExtras: string[]
+      departamentoId: string | null
+      papelNoDepartamento: string | null
+      isSystem: boolean
+      nome: string
+      departamento: { permissions: string[]; permissionsGestor: string[] } | null
+    }
+  }>) {
+    for (const p of permissionsOfRole(ur.role, ur.role.departamento)) {
+      base.add(p)
+    }
+    if (ur.role.departamentoId) coveredDeptoIds.add(ur.role.departamentoId)
+  }
+
+  // Legado: membership de departamento sem perfil de área vinculado
   const gestorIds = new Set(
     gestaoDepartamentos.map((g: { departamentoId: string }) => g.departamentoId),
   )
-
-  const departamentoPermissions: string[] = []
   for (const ud of userDepartamentos as Array<{
     departamentoId: string
     departamento: { permissions: string[]; permissionsGestor: string[] }
   }>) {
-    departamentoPermissions.push(...ud.departamento.permissions)
+    if (coveredDeptoIds.has(ud.departamentoId)) continue
+    for (const p of ud.departamento.permissions) base.add(p)
     if (gestorIds.has(ud.departamentoId)) {
-      departamentoPermissions.push(...ud.departamento.permissionsGestor)
+      for (const p of ud.departamento.permissionsGestor) base.add(p)
     }
   }
-  // Gestor sem UserDepartamento (legado): ainda assim recebe perms do depto.
   for (const g of gestaoDepartamentos as Array<{
     departamentoId: string
     departamento: { permissions: string[]; permissionsGestor: string[] }
   }>) {
+    if (coveredDeptoIds.has(g.departamentoId)) continue
     if (userDepartamentos.some((ud: { departamentoId: string }) => ud.departamentoId === g.departamentoId)) {
       continue
     }
-    departamentoPermissions.push(...g.departamento.permissions, ...g.departamento.permissionsGestor)
+    for (const p of g.departamento.permissions) base.add(p)
+    for (const p of g.departamento.permissionsGestor) base.add(p)
   }
 
-  const basePermissions: string[] = [...rolePermissions, ...departamentoPermissions]
-
   return {
-    rolePermissions: basePermissions,
+    rolePermissions: Array.from(base),
     overrides: userPermissions.map((up: { permission: string; granted: boolean }) => ({
       permission: up.permission,
       granted: up.granted,

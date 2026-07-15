@@ -233,11 +233,21 @@ model Role {
   cor         String   @default("#6b7280")
   ordem       Int      @default(0)
   isSystem    Boolean  @default(false) @map("is_system")
-  permissions String[]
+  /// Pacote legado / transversal (sem departamento). Perfis de área preferem
+  /// herança ao vivo do Departamento + permissionsExtras.
+  permissions String[] @default([])
+  /// Deltas além do pacote do departamento (Presidente, perfis compostos…).
+  permissionsExtras String[] @default([]) @map("permissions_extras")
+  /// Área de atuação — null = perfil transversal (ex.: member).
+  departamentoId String? @map("departamento_id")
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+  /// MEMBRO | GESTOR — obrigatório quando departamentoId está setado.
+  papelNoDepartamento String? @map("papel_no_departamento")
 
   userRoles UserRole[]
 
   @@unique([tenantId, nome])
+  @@index([departamentoId])
   @@map("saas_roles")
 }
 
@@ -276,11 +286,11 @@ model UserPermission {
 }
 
 // ─── DEPARTAMENTOS ────────────────────────────────────────────────────────────
-// Agrupamento organizacional (Diretoria, Financeiro, Comunicação…),
-// independente de Perfil. Departamento é unidade de acesso: suas `permissions`
-// somam-se às dos perfis do usuário na composição de permissões efetivas.
-// Sócio/Torcedor NÃO são departamentos — são tipos de membro / entidades próprias.
-// Lista plana por tenant (sem sub-departamento no MVP).
+// Agrupamento organizacional (Diretoria, Financeiro, Comunicação…).
+// Perfis (Role) de área vinculam-se ao departamento (membro/gestor) e herdam
+// o pacote ao vivo; Role.permissionsExtras guarda deltas. UserDepartamento /
+// DepartamentoGestor são projeção ao atribuir o perfil.
+// Sócio/Torcedor NÃO são departamentos. Lista plana por tenant (MVP).
 
 model Departamento {
   id       String @id @default(uuid())
@@ -301,6 +311,7 @@ model Departamento {
 
   membros  UserDepartamento[]
   gestores DepartamentoGestor[]
+  roles    Role[]
 
   @@unique([tenantId, nome])
   @@unique([tenantId, slug])

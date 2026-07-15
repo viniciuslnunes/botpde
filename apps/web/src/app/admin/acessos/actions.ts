@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db, type Prisma } from '@torcida/db'
+import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import {
   ALL_PERMISSIONS,
@@ -12,7 +12,9 @@ import {
   canManageDepartamento,
   calculateEffectivePermissions,
   hasPermission,
+  permissionsOfRole,
   podeTerVice,
+  PAPEL_DEPARTAMENTO,
 } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { getActiveTenant, getUserPermissionsInTenant, invalidatePermissionsCache } from '@/lib/tenant'
@@ -20,14 +22,14 @@ import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
 
-// Tipos explícitos para os resultados das queries abaixo — o schema tem
-// relações suficientes para o TypeScript desistir de inferir os tipos do
-// Prisma silenciosamente (vira `unknown`/implicit any sem anotação).
 interface RoleLite {
   id: string
   nome: string
   isSystem: boolean
   permissions: string[]
+  permissionsExtras: string[]
+  departamentoId: string | null
+  papelNoDepartamento: string | null
 }
 interface DepartamentoLite {
   id: string
@@ -37,33 +39,19 @@ interface DepartamentoLite {
 interface UserRoleLite {
   roleId: string
 }
-interface UserDepartamentoLite {
-  departamentoId: string
-}
 interface UserPermissionLite {
   permission: string
   granted: boolean
 }
-interface DepartamentoGestorLite {
-  departamentoId: string
-}
 
 /**
- * Salva o acesso completo de um usuário no tenant atual: perfis (Role),
- * departamentos (com gestor opcional) e permissões adicionais.
- *
- * O formulário envia o estado EFETIVO desejado (perfis marcados,
- * departamentos marcados, permissões marcadas como concedidas) — esta
- * função calcula o diff mínimo contra o estado atual do banco.
+ * Salva o acesso do usuário: perfis + overrides de permissões adicionais.
+ * Membership de departamento é projeção dos perfis vinculados (sync).
  */
 export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const perfilIds = new Set(formData.getAll('perfilIds') as string[])
-  const departamentoIds = new Set(formData.getAll('departamentoIds') as string[])
-  const gestorDepartamentoIds = new Set(formData.getAll('gestorDepartamentoIds') as string[])
-  // Filtra pelo vocabulário canônico e aplica a cascata de dependência
-  // (base do grupo) — garante consistência mesmo se o cliente burlar a UI
   const permissoesEfetivas = new Set<string>(
     applyPermissionCascade(
       [],
@@ -76,38 +64,35 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
   const rolesTenant: RoleLite[] = await db.role.findMany({
     where: { tenantId: tenant.id },
-    select: { id: true, nome: true, isSystem: true, permissions: true },
+    select: {
+      id: true,
+      nome: true,
+      isSystem: true,
+      permissions: true,
+      permissionsExtras: true,
+      departamentoId: true,
+      papelNoDepartamento: true,
+    },
   })
   const departamentosTenant: DepartamentoLite[] = await db.departamento.findMany({
     where: { tenantId: tenant.id },
     select: { id: true, permissions: true, permissionsGestor: true },
   })
+  const deptoById = new Map(departamentosTenant.map((d) => [d.id, d]))
+
   const userRolesAtuais: UserRoleLite[] = await db.userRole.findMany({
     where: { userId, tenantId: tenant.id },
     select: { roleId: true },
-  })
-  const userDepartamentosAtuais: UserDepartamentoLite[] = await db.userDepartamento.findMany({
-    where: { userId, tenantId: tenant.id },
-    select: { departamentoId: true },
   })
   const userPermissionsAtuais: UserPermissionLite[] = await db.userPermission.findMany({
     where: { userId, tenantId: tenant.id },
     select: { permission: true, granted: true },
   })
-  const gestorAtuais: DepartamentoGestorLite[] = await db.departamentoGestor.findMany({
-    where: { userId, departamento: { tenantId: tenant.id } },
-    select: { departamentoId: true },
-  })
 
-  // Governança: no máximo MAX_VICE_PRESIDENTES vice-presidentes por torcida.
-  // Conta os OUTROS usuários que já têm o cargo de sistema 'vice' antes de
-  // conceder — atribuir vice a quem já é vice não conta duas vezes.
   const viceRole: RoleLite | undefined = rolesTenant.find(
     (r) => r.isSystem && r.nome === SYSTEM_ROLES.VICE,
   )
   if (viceRole && perfilIds.has(viceRole.id)) {
-    // Vice-presidente só existe no tenant da Sede principal (tipo SEDE).
-    // Sem Sede cadastrada → trata como não-SEDE por segurança.
     const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
       where: { tenantId: tenant.id, tipo: 'SEDE' },
       select: { tipo: true },
@@ -124,32 +109,18 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   }
 
   const validRoleIds = new Set(rolesTenant.map((r) => r.id))
-  const validDepartamentoIds = new Set(departamentosTenant.map((d) => d.id))
-
   const roleIdsAtuais = new Set(userRolesAtuais.map((r) => r.roleId))
-  const departamentoIdsAtuais = new Set(userDepartamentosAtuais.map((d) => d.departamentoId))
-  const gestorIdsAtuais = new Set(gestorAtuais.map((g) => g.departamentoId))
 
-  // Permissões efetivamente concedidas pelos perfis E departamentos
-  // SELECIONADOS no formulário — o que um departamento concede não deve
-  // virar override redundante
-  const cobertoPorPerfisEDeptos = new Set<string>()
+  const cobertoPorPerfis = new Set<string>()
   for (const role of rolesTenant) {
-    if (perfilIds.has(role.id)) role.permissions.forEach((p) => cobertoPorPerfisEDeptos.add(p))
-  }
-  for (const depto of departamentosTenant) {
-    if (departamentoIds.has(depto.id)) {
-      depto.permissions.forEach((p) => cobertoPorPerfisEDeptos.add(p))
-      if (gestorDepartamentoIds.has(depto.id)) {
-        depto.permissionsGestor.forEach((p) => cobertoPorPerfisEDeptos.add(p))
-      }
-    }
+    if (!perfilIds.has(role.id)) continue
+    const depto = role.departamentoId ? deptoById.get(role.departamentoId) ?? null : null
+    for (const p of permissionsOfRole(role, depto)) cobertoPorPerfis.add(p)
   }
 
   const overridesAtuais = new Map(userPermissionsAtuais.map((p) => [p.permission, p.granted]))
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    // ── Perfis ──
     for (const roleId of perfilIds) {
       if (!validRoleIds.has(roleId) || roleIdsAtuais.has(roleId)) continue
       await tx.userRole.create({ data: { userId, tenantId: tenant.id, roleId } })
@@ -160,44 +131,20 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
       }
     }
 
-    // ── Departamentos + gestores ──
-    for (const departamentoId of departamentoIds) {
-      if (!validDepartamentoIds.has(departamentoId) || departamentoIdsAtuais.has(departamentoId)) continue
-      await tx.userDepartamento.create({ data: { userId, tenantId: tenant.id, departamentoId } })
-    }
-    for (const departamentoId of departamentoIdsAtuais) {
-      if (!departamentoIds.has(departamentoId)) {
-        await tx.userDepartamento.deleteMany({ where: { userId, tenantId: tenant.id, departamentoId } })
-      }
-    }
+    await syncMembershipFromRoles(tx, { userId, tenantId: tenant.id })
 
-    for (const departamentoId of gestorDepartamentoIds) {
-      const valido = validDepartamentoIds.has(departamentoId) && departamentoIds.has(departamentoId)
-      if (!valido || gestorIdsAtuais.has(departamentoId)) continue
-      await tx.departamentoGestor.create({ data: { userId, departamentoId } })
-    }
-    for (const departamentoId of gestorIdsAtuais) {
-      const deveSerGestor = departamentoIds.has(departamentoId) && gestorDepartamentoIds.has(departamentoId)
-      if (!deveSerGestor) {
-        await tx.departamentoGestor.deleteMany({ where: { userId, departamentoId } })
-      }
-    }
-
-    // ── Permissões adicionais (diff contra o estado efetivo desejado) ──
     for (const permission of ALL_PERMISSIONS) {
       const desejaConceder = permissoesEfetivas.has(permission)
-      const coberto = cobertoPorPerfisEDeptos.has(permission)
+      const coberto = cobertoPorPerfis.has(permission)
       const overrideAtual = overridesAtuais.get(permission)
 
       if (desejaConceder === coberto) {
-        // Estado desejado já é o padrão do perfil — override (se existir) fica obsoleto
         if (overrideAtual !== undefined) {
           await tx.userPermission.deleteMany({ where: { userId, tenantId: tenant.id, permission } })
         }
         continue
       }
 
-      // desejaConceder !== coberto → precisa de override explícito
       if (overrideAtual !== desejaConceder) {
         await tx.userPermission.upsert({
           where: { userId_tenantId_permission: { userId, tenantId: tenant.id, permission } },
@@ -216,97 +163,91 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
         entidadeId: userId,
         detalhes: {
           perfilIds: [...perfilIds],
-          departamentoIds: [...departamentoIds],
-          gestorDepartamentoIds: [...gestorDepartamentoIds],
+          permissoesEfetivas: [...permissoesEfetivas],
         },
       },
     })
   })
 
-  revalidatePath('/admin/acessos')
   invalidatePermissionsCache(userId, tenant.id)
+  revalidatePath('/admin/acessos')
+  revalidatePath('/admin/hierarquia')
+  revalidatePath('/portal/departamentos')
 }
 
 /**
- * Gestor do departamento (ou quem tem ROLES_MANAGE) inclui um usuário
- * como membro do departamento — sem poder editar perfis/overrides globais.
+ * Cria um novo perfil a partir de departamento + papel + extras (composição).
  */
-export async function adicionarMembroDepartamento(departamentoId: string, targetUserId: string) {
-  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
+export async function salvarPerfilComposto(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
-  const [departamento, alvo]: [{ id: string } | null, { id: string } | null] = await Promise.all([
-    db.departamento.findFirst({
+  const nome = String(formData.get('nome') ?? '').trim()
+  const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const departamentoIdRaw = String(formData.get('departamentoId') ?? '').trim()
+  const papelRaw = String(formData.get('papelNoDepartamento') ?? '').trim()
+  const extras = applyPermissionCascade(
+    [],
+    (formData.getAll('permissionsExtras') as string[]).filter((p) => ALL_PERMISSIONS_SET.includes(p)),
+  )
+
+  if (nome.length < 2) throw new Error('Nome do perfil é obrigatório')
+
+  const departamentoId = departamentoIdRaw || null
+  const papelNoDepartamento =
+    papelRaw === PAPEL_DEPARTAMENTO.GESTOR || papelRaw === PAPEL_DEPARTAMENTO.MEMBRO
+      ? papelRaw
+      : null
+
+  if (Boolean(departamentoId) !== Boolean(papelNoDepartamento)) {
+    throw new Error('Departamento e papel (membro/gestor) devem ser informados juntos.')
+  }
+
+  if (departamentoId) {
+    const depto = await db.departamento.findFirst({
       where: { id: departamentoId, tenantId: tenant.id },
       select: { id: true },
-    }),
-    db.user.findUnique({ where: { id: targetUserId }, select: { id: true } }),
-  ])
-  if (!departamento) throw new Error('Departamento não encontrado')
-  if (!alvo) throw new Error('Usuário não encontrado')
+    })
+    if (!depto) throw new Error('Departamento não encontrado')
+  }
 
-  await db.userDepartamento.upsert({
-    where: {
-      userId_tenantId_departamentoId: {
-        userId: targetUserId,
-        tenantId: tenant.id,
-        departamentoId,
-      },
+  const existing = await db.role.findFirst({
+    where: { tenantId: tenant.id, nome },
+  })
+  if (existing) throw new Error('Já existe um perfil com este nome')
+
+  const role = await db.role.create({
+    data: {
+      tenantId: tenant.id,
+      nome,
+      cor: /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : '#6b7280',
+      isSystem: false,
+      permissions: departamentoId ? [] : extras,
+      permissionsExtras: departamentoId ? extras : [],
+      departamentoId,
+      papelNoDepartamento,
     },
-    create: { userId: targetUserId, tenantId: tenant.id, departamentoId },
-    update: {},
   })
 
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
       atorId: session.user.id,
-      acao: 'DEPARTAMENTO_MEMBRO_ADICIONADO',
-      entidade: 'Departamento',
-      entidadeId: departamentoId,
-      detalhes: { userId: targetUserId },
+      acao: 'ROLE_CRIADO',
+      entidade: 'Role',
+      entidadeId: role.id,
+      detalhes: {
+        nome,
+        departamentoId,
+        papelNoDepartamento,
+        permissionsExtras: extras,
+        origem: 'perfil_composto',
+      },
     },
   })
 
-  invalidatePermissionsCache(targetUserId, tenant.id)
   revalidatePath('/admin/acessos')
-  revalidatePath('/portal/departamentos')
-}
-
-/**
- * Remove membro (e gestor, se houver) do departamento — gated por
- * canManageDepartamento.
- */
-export async function removerMembroDepartamento(departamentoId: string, targetUserId: string) {
-  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
-
-  const departamento: { id: string } | null = await db.departamento.findFirst({
-    where: { id: departamentoId, tenantId: tenant.id },
-    select: { id: true },
-  })
-  if (!departamento) throw new Error('Departamento não encontrado')
-
-  await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    await tx.userDepartamento.deleteMany({
-      where: { userId: targetUserId, tenantId: tenant.id, departamentoId },
-    })
-    await tx.departamentoGestor.deleteMany({
-      where: { userId: targetUserId, departamentoId },
-    })
-    await tx.auditLog.create({
-      data: {
-        tenantId: tenant.id,
-        atorId: session.user.id,
-        acao: 'DEPARTAMENTO_MEMBRO_REMOVIDO',
-        entidade: 'Departamento',
-        entidadeId: departamentoId,
-        detalhes: { userId: targetUserId },
-      },
-    })
-  })
-
-  invalidatePermissionsCache(targetUserId, tenant.id)
-  revalidatePath('/admin/acessos')
-  revalidatePath('/portal/departamentos')
+  revalidatePath('/admin/configuracoes')
+  return { id: role.id }
 }
 
 async function assertPodeGerirDepartamento(departamentoId: string) {
@@ -340,4 +281,98 @@ async function assertPodeGerirDepartamento(departamentoId: string) {
   }
 
   return { session, tenant }
+}
+
+export async function adicionarMembroDepartamento(departamentoId: string, targetUserId: string) {
+  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
+
+  const departamento: { id: string; nome: string } | null = await db.departamento.findFirst({
+    where: { id: departamentoId, tenantId: tenant.id },
+    select: { id: true, nome: true },
+  })
+  if (!departamento) throw new Error('Departamento não encontrado')
+
+  const roleMembro = await db.role.findFirst({
+    where: {
+      tenantId: tenant.id,
+      departamentoId,
+      papelNoDepartamento: PAPEL_DEPARTAMENTO.MEMBRO,
+    },
+    select: { id: true },
+  })
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (roleMembro) {
+      const ja = await tx.userRole.findFirst({
+        where: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
+      })
+      if (!ja) {
+        await tx.userRole.create({
+          data: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
+        })
+      }
+    } else {
+      await tx.userDepartamento.upsert({
+        where: {
+          userId_tenantId_departamentoId: {
+            userId: targetUserId,
+            tenantId: tenant.id,
+            departamentoId,
+          },
+        },
+        create: { userId: targetUserId, tenantId: tenant.id, departamentoId },
+        update: {},
+      })
+    }
+    await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_MEMBRO_ADICIONADO',
+        entidade: 'Departamento',
+        entidadeId: departamentoId,
+        detalhes: { userId: targetUserId },
+      },
+    })
+  })
+
+  invalidatePermissionsCache(targetUserId, tenant.id)
+  revalidatePath('/admin/acessos')
+  revalidatePath('/portal/departamentos')
+}
+
+export async function removerMembroDepartamento(departamentoId: string, targetUserId: string) {
+  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
+
+  const departamento: { id: string } | null = await db.departamento.findFirst({
+    where: { id: departamentoId, tenantId: tenant.id },
+    select: { id: true },
+  })
+  if (!departamento) throw new Error('Departamento não encontrado')
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.userRole.deleteMany({
+      where: {
+        userId: targetUserId,
+        tenantId: tenant.id,
+        role: { departamentoId },
+      },
+    })
+    await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_MEMBRO_REMOVIDO',
+        entidade: 'Departamento',
+        entidadeId: departamentoId,
+        detalhes: { userId: targetUserId },
+      },
+    })
+  })
+
+  invalidatePermissionsCache(targetUserId, tenant.id)
+  revalidatePath('/admin/acessos')
+  revalidatePath('/portal/departamentos')
 }

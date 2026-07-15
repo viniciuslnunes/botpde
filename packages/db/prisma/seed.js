@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { SYSTEM_ROLES, SYSTEM_ROLE_PERMISSIONS, ALL_PERMISSIONS } from '../../types/src/permissions.js'
-import { upsertDepartamentosCanonicos } from '../src/departamentos-canonicos.js'
+import { bootstrapAcessoTenant } from '../src/departamentos-canonicos.js'
 
 const db = new PrismaClient()
 
@@ -23,48 +22,13 @@ async function main() {
 
   console.log(`✅ Tenant criado: ${tenant.nome} (${tenant.slug})`)
 
-  // ── Cargos do sistema (não editáveis) ───────────────────────────────────
-  const systemRoles = [
-    {
-      nome: SYSTEM_ROLES.OWNER,
-      cor: '#f59e0b',
-      ordem: 100,
-      isSystem: true,
-      permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER],
-    },
-    {
-      nome: SYSTEM_ROLES.VICE,
-      cor: '#0ea5e9',
-      ordem: 95,
-      isSystem: true,
-      permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
-    },
-    {
-      nome: SYSTEM_ROLES.ADMIN,
-      cor: '#3b82f6',
-      ordem: 90,
-      isSystem: true,
-      permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
-    },
-    {
-      nome: SYSTEM_ROLES.MEMBER,
-      cor: '#6b7280',
-      ordem: 0,
-      isSystem: true,
-      permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER],
-    },
-  ]
+  // ── Departamentos + perfis de área + cargos de sistema ──────────────────
+  const boot = await bootstrapAcessoTenant(db, tenant.id, { incluirVice: true })
+  console.log(
+    `✅ Departamentos: ${boot.upserted} · perfis área: ${boot.perfisArea} · sistema: ${boot.systemUpserted}`,
+  )
 
-  for (const roleData of systemRoles) {
-    const role = await db.role.upsert({
-      where: { tenantId_nome: { tenantId: tenant.id, nome: roleData.nome } },
-      update: { permissions: roleData.permissions },
-      create: { tenantId: tenant.id, ...roleData },
-    })
-    console.log(`✅ Cargo do sistema: ${role.nome}`)
-  }
-
-  // ── Cargos customizados iniciais ────────────────────────────────────────
+  // ── Cargos customizados iniciais (transversais) ─────────────────────────
   const customRoles = [
     {
       nome: 'Recrutador',
@@ -72,6 +36,7 @@ async function main() {
       ordem: 50,
       isSystem: false,
       permissions: ['members:view', 'members:approve', 'members:reject'],
+      permissionsExtras: [],
     },
     {
       nome: 'Fiscal de Loja',
@@ -79,6 +44,7 @@ async function main() {
       ordem: 40,
       isSystem: false,
       permissions: ['store:view_orders', 'store:manage'],
+      permissionsExtras: [],
     },
     {
       nome: 'Coordenador de Eventos',
@@ -86,6 +52,7 @@ async function main() {
       ordem: 45,
       isSystem: false,
       permissions: ['events:create', 'events:manage', 'sedes:manage'],
+      permissionsExtras: [],
     },
   ]
 
@@ -97,12 +64,6 @@ async function main() {
     })
     console.log(`✅ Cargo customizado: ${role.nome}`)
   }
-
-  // ── Departamentos canônicos (templates de área) ─────────────────────────
-  const deptos = await upsertDepartamentosCanonicos(db, tenant.id)
-  console.log(
-    `✅ Departamentos canônicos: ${deptos.upserted} (legado removido: ${deptos.removedLegacy})`,
-  )
 
   // ── Sede principal ───────────────────────────────────────────────────────
   const sede = await db.sede.upsert({

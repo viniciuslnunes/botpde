@@ -16,6 +16,10 @@ import {
   PERMISSIONS,
   applyPermissionCascade,
   slugifyDepartamento,
+  SYSTEM_ROLES,
+  SYSTEM_ROLE_PERMISSIONS,
+  PAPEL_DEPARTAMENTO,
+  nomePerfilDepartamento,
 } from '../../types/src/permissions.js'
 
 /** Slugs legados que não são departamentos (são tipos de membro). */
@@ -375,4 +379,227 @@ export async function upsertDepartamentosCanonicos(client, tenantId) {
     upserted: DEPARTAMENTOS_CANONICOS.length,
     removedLegacy: removed.count,
   }
+}
+
+const SYSTEM_ROLE_DEFAULTS = {
+  [SYSTEM_ROLES.OWNER]: { cor: '#7c3aed', ordem: 0 },
+  [SYSTEM_ROLES.VICE]: { cor: '#0ea5e9', ordem: 1 },
+  [SYSTEM_ROLES.ADMIN]: { cor: '#2563eb', ordem: 2 },
+  [SYSTEM_ROLES.MEMBER]: { cor: '#6b7280', ordem: 99 },
+}
+
+/**
+ * Garante perfis canônicos por departamento (Membro · X / Gestor · X) e
+ * vincula owner/vice/admin à Diretoria como GESTOR com extras de governança.
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {string} tenantId
+ * @param {{ incluirVice?: boolean }} [opts]
+ */
+export async function upsertPerfisDepartamentoCanonicos(client, tenantId, opts = {}) {
+  const incluirVice = opts.incluirVice !== false
+  const deptos = await client.departamento.findMany({
+    where: { tenantId },
+    select: {
+      id: true,
+      nome: true,
+      slug: true,
+      cor: true,
+      ordem: true,
+      permissions: true,
+      permissionsGestor: true,
+    },
+  })
+  const bySlug = new Map(deptos.map((d) => [d.slug, d]))
+  const diretoria = bySlug.get('diretoria') ?? null
+
+  let perfisArea = 0
+  for (const depto of deptos) {
+    for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
+      const nome = nomePerfilDepartamento(depto.nome, papel)
+      const ordem = depto.ordem * 2 + (papel === PAPEL_DEPARTAMENTO.GESTOR ? 1 : 0) + 10
+      await client.role.upsert({
+        where: { tenantId_nome: { tenantId, nome } },
+        create: {
+          tenantId,
+          nome,
+          cor: depto.cor,
+          ordem,
+          isSystem: false,
+          permissions: [],
+          permissionsExtras: [],
+          departamentoId: depto.id,
+          papelNoDepartamento: papel,
+        },
+        update: {
+          cor: depto.cor,
+          ordem,
+          departamentoId: depto.id,
+          papelNoDepartamento: papel,
+        },
+      })
+      perfisArea += 1
+    }
+  }
+
+  // Sistema: owner/admin/vice → Diretoria GESTOR; member → transversal
+  const systemSpecs = [
+    {
+      nome: SYSTEM_ROLES.OWNER,
+      departamentoId: diretoria?.id ?? null,
+      papelNoDepartamento: diretoria ? PAPEL_DEPARTAMENTO.GESTOR : null,
+      permissions: [],
+      permissionsExtras: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER],
+      ...SYSTEM_ROLE_DEFAULTS[SYSTEM_ROLES.OWNER],
+    },
+    {
+      nome: SYSTEM_ROLES.ADMIN,
+      departamentoId: diretoria?.id ?? null,
+      papelNoDepartamento: diretoria ? PAPEL_DEPARTAMENTO.GESTOR : null,
+      permissions: [],
+      permissionsExtras: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN],
+      ...SYSTEM_ROLE_DEFAULTS[SYSTEM_ROLES.ADMIN],
+    },
+    {
+      nome: SYSTEM_ROLES.VICE,
+      departamentoId: diretoria?.id ?? null,
+      papelNoDepartamento: diretoria ? PAPEL_DEPARTAMENTO.GESTOR : null,
+      permissions: [],
+      permissionsExtras: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE],
+      ...SYSTEM_ROLE_DEFAULTS[SYSTEM_ROLES.VICE],
+    },
+    {
+      nome: SYSTEM_ROLES.MEMBER,
+      departamentoId: null,
+      papelNoDepartamento: null,
+      permissions: SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.MEMBER],
+      permissionsExtras: [],
+      ...SYSTEM_ROLE_DEFAULTS[SYSTEM_ROLES.MEMBER],
+    },
+  ]
+
+  let systemUpserted = 0
+  for (const spec of systemSpecs) {
+    if (spec.nome === SYSTEM_ROLES.VICE && !incluirVice) continue
+    await client.role.upsert({
+      where: { tenantId_nome: { tenantId, nome: spec.nome } },
+      create: {
+        tenantId,
+        nome: spec.nome,
+        isSystem: true,
+        cor: spec.cor,
+        ordem: spec.ordem,
+        permissions: spec.permissions,
+        permissionsExtras: spec.permissionsExtras,
+        departamentoId: spec.departamentoId,
+        papelNoDepartamento: spec.papelNoDepartamento,
+      },
+      update: {
+        isSystem: true,
+        cor: spec.cor,
+        ordem: spec.ordem,
+        permissions: spec.permissions,
+        permissionsExtras: spec.permissionsExtras,
+        departamentoId: spec.departamentoId,
+        papelNoDepartamento: spec.papelNoDepartamento,
+      },
+    })
+    systemUpserted += 1
+  }
+
+  return { perfisArea, systemUpserted }
+}
+
+/**
+ * Sincroniza UserDepartamento / DepartamentoGestor a partir dos roles do usuário
+ * que têm departamento vinculado (projeção do perfil → área).
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {{ userId: string, tenantId: string }} args
+ */
+export async function syncMembershipFromRoles(client, { userId, tenantId }) {
+  const userRoles = await client.userRole.findMany({
+    where: { userId, tenantId },
+    include: {
+      role: {
+        select: {
+          departamentoId: true,
+          papelNoDepartamento: true,
+        },
+      },
+    },
+  })
+
+  /** @type {Map<string, 'MEMBRO' | 'GESTOR'>} */
+  const desired = new Map()
+  for (const ur of userRoles) {
+    const deptoId = ur.role.departamentoId
+    if (!deptoId) continue
+    const papel = ur.role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+      ? PAPEL_DEPARTAMENTO.GESTOR
+      : PAPEL_DEPARTAMENTO.MEMBRO
+    const atual = desired.get(deptoId)
+    if (!atual || (papel === PAPEL_DEPARTAMENTO.GESTOR && atual === PAPEL_DEPARTAMENTO.MEMBRO)) {
+      desired.set(deptoId, papel)
+    }
+  }
+
+  const atuaisMembros = await client.userDepartamento.findMany({
+    where: { userId, tenantId },
+    select: { departamentoId: true },
+  })
+  const atuaisGestores = await client.departamentoGestor.findMany({
+    where: { userId, departamento: { tenantId } },
+    select: { departamentoId: true },
+  })
+
+  const membroSet = new Set(atuaisMembros.map((m) => m.departamentoId))
+  const gestorSet = new Set(atuaisGestores.map((g) => g.departamentoId))
+  const desiredIds = new Set(desired.keys())
+
+  for (const [departamentoId, papel] of desired) {
+    if (!membroSet.has(departamentoId)) {
+      await client.userDepartamento.create({
+        data: { userId, tenantId, departamentoId },
+      })
+    }
+    if (papel === PAPEL_DEPARTAMENTO.GESTOR && !gestorSet.has(departamentoId)) {
+      await client.departamentoGestor.create({
+        data: { userId, departamentoId },
+      })
+    }
+    if (papel === PAPEL_DEPARTAMENTO.MEMBRO && gestorSet.has(departamentoId)) {
+      await client.departamentoGestor.deleteMany({
+        where: { userId, departamentoId },
+      })
+    }
+  }
+
+  for (const departamentoId of membroSet) {
+    if (!desiredIds.has(departamentoId)) {
+      await client.userDepartamento.deleteMany({
+        where: { userId, tenantId, departamentoId },
+      })
+    }
+  }
+  for (const departamentoId of gestorSet) {
+    if (!desiredIds.has(departamentoId) || desired.get(departamentoId) !== PAPEL_DEPARTAMENTO.GESTOR) {
+      await client.departamentoGestor.deleteMany({
+        where: { userId, departamentoId },
+      })
+    }
+  }
+}
+
+/**
+ * Bootstrap completo: departamentos canônicos + perfis de área/sistema.
+ *
+ * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
+ * @param {string} tenantId
+ * @param {{ incluirVice?: boolean }} [opts]
+ */
+export async function bootstrapAcessoTenant(client, tenantId, opts = {}) {
+  const deptos = await upsertDepartamentosCanonicos(client, tenantId)
+  const perfis = await upsertPerfisDepartamentoCanonicos(client, tenantId, opts)
+  return { ...deptos, ...perfis }
 }

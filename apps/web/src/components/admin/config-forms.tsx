@@ -3,7 +3,15 @@
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
-import { PERMISSION_GROUPS, applyPermissionCascade, DEPARTAMENTO_MODULOS, rotuloCargoSistema, isDepartamentoCanonico } from '@torcida/types'
+import {
+  PERMISSION_GROUPS,
+  applyPermissionCascade,
+  DEPARTAMENTO_MODULOS,
+  rotuloCargoSistema,
+  isDepartamentoCanonico,
+  PAPEL_DEPARTAMENTO,
+  permissionsDoPacoteDepartamento,
+} from '@torcida/types'
 import { AccessPermissionPreview, AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import {
   salvarPerfilTenant,
@@ -16,6 +24,8 @@ import {
   atualizarDepartamento,
   excluirDepartamento,
 } from '@/app/admin/configuracoes/actions'
+import { toast } from '@torcida/ui'
+import { runPersistAction } from '@/lib/toast-action'
 
 // ── Perfil do Tenant ──────────────────────────────────────────────────────────
 
@@ -27,15 +37,14 @@ interface PerfilTenantFormProps {
 export function PerfilTenantForm({ nome, corPrimaria }: PerfilTenantFormProps) {
   const [pending, startTransition] = useTransition()
   const [cor, setCor] = useState(corPrimaria)
-  const [success, setSuccess] = useState(false)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await salvarPerfilTenant(fd)
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      await runPersistAction(() => salvarPerfilTenant(fd), {
+        success: 'Perfil da torcida salvo.',
+      })
     })
   }
 
@@ -110,11 +119,6 @@ export function PerfilTenantForm({ nome, corPrimaria }: PerfilTenantFormProps) {
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar alterações
         </button>
-        {success && (
-          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-            <Check className="h-4 w-4" /> Salvo com sucesso
-          </span>
-        )}
       </div>
     </form>
   )
@@ -128,15 +132,14 @@ interface DiscordFormProps {
 
 export function DiscordForm({ discordGuildId }: DiscordFormProps) {
   const [pending, startTransition] = useTransition()
-  const [success, setSuccess] = useState(false)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await salvarDiscordGuildId(fd)
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      await runPersistAction(() => salvarDiscordGuildId(fd), {
+        success: 'Guild ID do Discord salvo.',
+      })
     })
   }
 
@@ -166,11 +169,6 @@ export function DiscordForm({ discordGuildId }: DiscordFormProps) {
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar Guild ID
         </button>
-        {success && (
-          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-            <Check className="h-4 w-4" /> Salvo com sucesso
-          </span>
-        )}
       </div>
     </form>
   )
@@ -190,15 +188,14 @@ interface AfiliacaoFormProps {
 
 export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
   const [pending, startTransition] = useTransition()
-  const [success, setSuccess] = useState(false)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      await salvarAfiliacao(fd)
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      await runPersistAction(() => salvarAfiliacao(fd), {
+        success: 'Afiliação salva.',
+      })
     })
   }
 
@@ -234,11 +231,6 @@ export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar afiliação
         </button>
-        {success && (
-          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-            <Check className="h-4 w-4" /> Salvo com sucesso
-          </span>
-        )}
       </div>
     </form>
   )
@@ -251,13 +243,26 @@ interface Role {
   nome: string
   cor: string
   isSystem: boolean
+  /** Permissões efetivas (já resolvidas com herança do depto) — UI/search */
   permissions: string[]
+  permissionsExtras?: string[]
+  departamentoId?: string | null
+  papelNoDepartamento?: string | null
   /** Quantos usuários têm este cargo atribuído — bloqueia exclusão quando > 0 */
   emUso?: number
 }
 
+interface DepartamentoOpt {
+  id: string
+  nome: string
+  cor: string
+  permissions: string[]
+  permissionsGestor: string[]
+}
+
 interface RolesManagerProps {
   roles: Role[]
+  departamentos?: DepartamentoOpt[]
   /** TipoSede do tenant — contextualiza rótulos de cargos de sistema (Presidente/Liderança) */
   tipoSede: string
 }
@@ -271,7 +276,7 @@ function permissionLabel(key: string): string {
   return key
 }
 
-export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
+export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManagerProps) {
   const [criando, setCriando] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -293,13 +298,16 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
       )
     : roles
 
-  function executar(acao: () => Promise<void>) {
+  function executar(acao: () => Promise<void>, successMessage: string) {
     setErro(null)
     startTransition(async () => {
       try {
         await acao()
+        toast.success(successMessage)
       } catch (e) {
-        setErro(e instanceof Error ? e.message : 'Erro ao salvar o cargo')
+        const message = e instanceof Error ? e.message : 'Erro ao salvar o cargo'
+        setErro(message)
+        toast.error(message)
       }
     })
   }
@@ -340,14 +348,17 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
               key={role.id}
               initialNome={role.nome}
               initialCor={role.cor}
-              initialPermissions={role.permissions}
+              initialPermissions={role.permissionsExtras?.length ? role.permissionsExtras : []}
+              initialDepartamentoId={role.departamentoId ?? null}
+              initialPapel={role.papelNoDepartamento ?? null}
+              departamentos={departamentos}
               isSystem={role.isSystem}
               onCancel={() => setEditandoId(null)}
               onSubmit={(fd) => {
                 executar(async () => {
                   await atualizarRole(role.id, fd)
                   setEditandoId(null)
-                })
+                }, 'Cargo atualizado.')
               }}
               pending={pending}
             />
@@ -363,7 +374,7 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
               }}
               onDelete={() => {
                 if (!confirm(`Excluir o cargo "${role.nome}"?`)) return
-                executar(() => excluirRole(role.id))
+                executar(() => excluirRole(role.id), 'Cargo excluído.')
               }}
               pending={pending}
             />
@@ -376,12 +387,13 @@ export function RolesManager({ roles, tipoSede }: RolesManagerProps) {
         <div className="rounded-xl border border-dashed border-[rgb(var(--border))] p-4">
           <p className="mb-3 text-sm font-medium text-[rgb(var(--foreground))]">Novo cargo</p>
           <RoleForm
+            departamentos={departamentos}
             onCancel={() => setCriando(false)}
             onSubmit={(fd) => {
               executar(async () => {
                 await criarRole(fd)
                 setCriando(false)
-              })
+              }, 'Cargo criado.')
             }}
             pending={pending}
           />
@@ -521,6 +533,9 @@ function RoleForm({
   initialNome = '',
   initialCor = '#6b7280',
   initialPermissions = [],
+  initialDepartamentoId = null,
+  initialPapel = null,
+  departamentos = [],
   isSystem = false,
   onCancel,
   onSubmit,
@@ -529,6 +544,9 @@ function RoleForm({
   initialNome?: string
   initialCor?: string
   initialPermissions?: string[]
+  initialDepartamentoId?: string | null
+  initialPapel?: string | null
+  departamentos?: DepartamentoOpt[]
   isSystem?: boolean
   onCancel: () => void
   onSubmit: (fd: FormData) => void
@@ -537,9 +555,15 @@ function RoleForm({
   const formRef = useRef<HTMLFormElement>(null)
   const [cor, setCor] = useState(initialCor)
   const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
+  const [departamentoId, setDepartamentoId] = useState<string>(initialDepartamentoId ?? '')
+  const [papel, setPapel] = useState<string>(initialPapel ?? PAPEL_DEPARTAMENTO.MEMBRO)
 
   const isEdit = initialNome !== ''
   const initial = new Set(initialPermissions)
+  const deptoSelecionado = departamentos.find((d) => d.id === departamentoId) ?? null
+  const pacoteDepto = deptoSelecionado
+    ? permissionsDoPacoteDepartamento(deptoSelecionado, papel)
+    : []
 
   // Diff em relação ao estado original (só relevante na edição — na criação
   // tudo é novo por definição, sem destaque, como na referência)
@@ -552,13 +576,10 @@ function RoleForm({
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      // Cascata: marcar não-base puxa a base do grupo; desmarcar a base
-      // derruba as irmãs (mesma regra aplicada no servidor)
       return new Set(applyPermissionCascade(prevArr, [...next]))
     })
   }
 
-  /** Contadores de mudança por grupo, para o badge no cabeçalho (edição) */
   function groupChanges(groupKeys: readonly string[]) {
     return {
       added: added.filter((p) => groupKeys.includes(p)).length,
@@ -568,9 +589,8 @@ function RoleForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (selected.size === 0) return
+    if (!departamentoId && selected.size === 0) return
 
-    // Confirmação com resumo das mudanças antes de gravar
     if (isEdit && (added.length > 0 || removed.length > 0)) {
       const linhas = [
         ...added.map((p) => `  + ${permissionLabel(p)}`),
@@ -582,13 +602,22 @@ function RoleForm({
     }
 
     const fd = new FormData(e.currentTarget)
-    // Injeta as permissões selecionadas manualmente (checkboxes podem ser perdidos)
     fd.delete('permissions')
-    for (const p of selected) fd.append('permissions', p)
+    fd.delete('permissionsExtras')
+    for (const p of selected) {
+      fd.append('permissionsExtras', p)
+      if (!departamentoId) fd.append('permissions', p)
+    }
+    if (departamentoId) {
+      fd.set('departamentoId', departamentoId)
+      fd.set('papelNoDepartamento', papel)
+    } else {
+      fd.delete('departamentoId')
+      fd.delete('papelNoDepartamento')
+    }
     onSubmit(fd)
   }
 
-  /** Estilo do item conforme estado: selecionado / adicionado / removido / neutro */
   function itemClass(key: string): string {
     const base = 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors'
     if (isEdit && added.includes(key)) {
@@ -613,7 +642,7 @@ function RoleForm({
             defaultValue={initialNome}
             required
             disabled={isSystem}
-            placeholder="Ex: Moderador"
+            placeholder="Ex: Gestor · Bandeiras"
             className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))] disabled:opacity-50"
           />
         </div>
@@ -627,25 +656,70 @@ function RoleForm({
               onChange={(e) => setCor(e.target.value)}
               className="h-10 w-10 cursor-pointer rounded-lg border border-[rgb(var(--border))] bg-transparent p-0.5"
             />
-            <input
-              type="hidden"
-              name="cor"
-              value={cor}
-            />
+            <input type="hidden" name="cor" value={cor} />
           </div>
         </div>
       </div>
 
-      {/* Aviso: nenhuma permissão selecionada */}
-      {selected.size === 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Selecione ao menos uma permissão para o cargo.
+      {!isSystem && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Departamento (área)
+            </label>
+            <select
+              value={departamentoId}
+              onChange={(e) => setDepartamentoId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+            >
+              <option value="">Transversal (sem área)</option>
+              {departamentos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          {departamentoId && (
+            <div>
+              <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Papel na área
+              </label>
+              <select
+                value={papel}
+                onChange={(e) => setPapel(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              >
+                <option value={PAPEL_DEPARTAMENTO.MEMBRO}>Membro</option>
+                <option value={PAPEL_DEPARTAMENTO.GESTOR}>Gestor</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Permissões */}
+      {deptoSelecionado && (
+        <div className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5">
+          <p className="text-xs font-medium text-[rgb(var(--foreground))]">
+            Pacote do departamento ({papel === PAPEL_DEPARTAMENTO.GESTOR ? 'gestor' : 'membro'}) —{' '}
+            {pacoteDepto.length} permiss{pacoteDepto.length === 1 ? 'ão' : 'ões'}
+          </p>
+          <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+            Herança ao vivo do template da área. Ajuste o pacote em Departamentos; aqui só extras.
+          </p>
+        </div>
+      )}
+
+      {!departamentoId && selected.size === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Selecione ao menos uma permissão ou vincule um departamento.
+        </div>
+      )}
+
       <div>
-        <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">Permissões</p>
+        <p className="mb-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          {departamentoId ? 'Permissões adicionais (além do pacote da área)' : 'Permissões'}
+        </p>
         <div className="space-y-3">
           {PERMISSION_GROUPS.map((group) => {
             const groupKeys = group.items.map((i) => i.key)
@@ -667,27 +741,39 @@ function RoleForm({
                 </p>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {group.items.map((item) => {
+                    const noPacote = pacoteDepto.includes(item.key)
                     const isBase = group.base === item.key
                     return (
-                      <label key={item.key} className={itemClass(item.key)}>
+                      <label
+                        key={item.key}
+                        className={[
+                          itemClass(item.key),
+                          noPacote ? 'opacity-60' : '',
+                        ].join(' ')}
+                        title={noPacote ? 'Já coberta pelo pacote do departamento' : undefined}
+                      >
                         <input
                           type="checkbox"
                           className="sr-only"
-                          checked={selected.has(item.key)}
+                          checked={selected.has(item.key) || noPacote}
+                          disabled={noPacote}
                           onChange={() => toggle(item.key)}
                         />
                         <span
                           className={[
                             'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                            selected.has(item.key)
+                            selected.has(item.key) || noPacote
                               ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
                               : 'border-[rgb(var(--border-strong))]',
                           ].join(' ')}
                         >
-                          {selected.has(item.key) && <Check className="h-2.5 w-2.5 text-white" />}
+                          {(selected.has(item.key) || noPacote) && (
+                            <Check className="h-2.5 w-2.5 text-white" />
+                          )}
                         </span>
                         <span className={isEdit && removed.includes(item.key) ? 'line-through opacity-70' : ''}>
                           {item.label}
+                          {noPacote ? ' · área' : ''}
                         </span>
                         {isBase && (
                           <Eye
@@ -704,14 +790,16 @@ function RoleForm({
           })}
         </div>
         <p className="mt-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          {selected.size} permiss{selected.size === 1 ? 'ão' : 'ões'} selecionada{selected.size === 1 ? '' : 's'}
+          {departamentoId
+            ? `${pacoteDepto.length} da área + ${selected.size} extra${selected.size === 1 ? '' : 's'}`
+            : `${selected.size} permiss${selected.size === 1 ? 'ão' : 'ões'} selecionada${selected.size === 1 ? '' : 's'}`}
         </p>
       </div>
 
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={pending || selected.size === 0}
+          disabled={pending || (!departamentoId && selected.size === 0) || isSystem}
           className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -720,9 +808,10 @@ function RoleForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+          disabled={pending}
+          className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]"
         >
-          <X className="h-3 w-3" /> Cancelar
+          Cancelar
         </button>
       </div>
     </form>
@@ -773,8 +862,11 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
               onCancel={() => setEditandoId(null)}
               onSubmit={(fd) => {
                 startTransition(async () => {
-                  await atualizarDepartamento(departamento.id, fd)
-                  setEditandoId(null)
+                  const ok = await runPersistAction(
+                    () => atualizarDepartamento(departamento.id, fd),
+                    { success: 'Departamento atualizado.' },
+                  )
+                  if (ok) setEditandoId(null)
                 })
               }}
               pending={pending}
@@ -786,7 +878,11 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
               onEdit={() => setEditandoId(departamento.id)}
               onDelete={() => {
                 if (!confirm(`Excluir o departamento "${departamento.nome}"?`)) return
-                startTransition(() => excluirDepartamento(departamento.id))
+                startTransition(async () => {
+                  await runPersistAction(() => excluirDepartamento(departamento.id), {
+                    success: 'Departamento excluído.',
+                  })
+                })
               }}
               pending={pending}
             />
@@ -801,8 +897,10 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
             onCancel={() => setCriando(false)}
             onSubmit={(fd) => {
               startTransition(async () => {
-                await criarDepartamento(fd)
-                setCriando(false)
+                const ok = await runPersistAction(() => criarDepartamento(fd), {
+                  success: 'Departamento criado.',
+                })
+                if (ok) setCriando(false)
               })
             }}
             pending={pending}

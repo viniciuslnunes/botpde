@@ -26,21 +26,13 @@ function roleLabel(role: AccessRoleOpt, tipoSede: string): string {
   return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
 }
 
-function permsDoDepartamento(depto: AccessDepartamentoOpt, isGestor: boolean): string[] {
-  return isGestor ? [...depto.permissions, ...depto.permissionsGestor] : [...depto.permissions]
-}
-
 function contarPermissoesAdicionais(
   usuario: AccessUsuario,
   roles: AccessRoleOpt[],
-  departamentos: AccessDepartamentoOpt[],
 ): number {
-  const coberto = new Set([
-    ...roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
-    ...departamentos
-      .filter((d) => usuario.departamentoIds.includes(d.id))
-      .flatMap((d) => permsDoDepartamento(d, usuario.gestorDepartamentoIds.includes(d.id))),
-  ])
+  const coberto = new Set(
+    roles.filter((r) => usuario.perfilIds.includes(r.id)).flatMap((r) => r.permissions),
+  )
   return usuario.permissoesAdicionais.filter((p) => p.granted && !coberto.has(p.permission)).length
 }
 
@@ -78,8 +70,8 @@ export function AccessManager({
           Nenhum usuário nesta torcida ainda
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--foreground-muted))]">
-          Defina cargos e departamentos nas abas ao lado. Quando houver membros, volte aqui para
-          atribuir o acesso de cada pessoa.
+          Defina cargos (perfis de área) e templates de departamento. Depois atribua perfis
+          às pessoas — a área de atuação vem junto com o perfil.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           <Link
@@ -147,7 +139,7 @@ function UsuarioAcessoRow({
 }) {
   const perfis = roles.filter((r) => usuario.perfilIds.includes(r.id))
   const deptos = departamentos.filter((d) => usuario.departamentoIds.includes(d.id))
-  const extras = contarPermissoesAdicionais(usuario, roles, departamentos)
+  const extras = contarPermissoesAdicionais(usuario, roles)
   const nome = usuario.nome ?? usuario.email ?? 'Usuário sem nome'
 
   return (

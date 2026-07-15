@@ -5,7 +5,7 @@ import { AccessManager } from '@/components/admin/access-manager'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
 import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, permissionsOfRole } from '@torcida/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Controle de acesso — Admin' }
@@ -22,6 +22,9 @@ interface RoleLite {
   cor: string
   isSystem: boolean
   permissions: string[]
+  permissionsExtras: string[]
+  departamentoId: string | null
+  papelNoDepartamento: string | null
   ordem: number
 }
 interface DepartamentoLite {
@@ -88,6 +91,9 @@ export default async function AcessosPage({
       cor: true,
       isSystem: true,
       permissions: true,
+      permissionsExtras: true,
+      departamentoId: true,
+      papelNoDepartamento: true,
       ordem: true,
     },
   })
@@ -113,6 +119,16 @@ export default async function AcessosPage({
   const departamentos = departamentosRaw.filter(
     (d) => d.slug !== 'socio' && d.slug !== 'torcedor' && d.nome !== 'Sócio' && d.nome !== 'Torcedor',
   )
+
+  // Efetivas exibidas = herança do depto + extras (para search/resumo na UI)
+  const deptoById = new Map(departamentos.map((d) => [d.id, d]))
+  const rolesComEfetivas = roles.map((role) => ({
+    ...role,
+    permissions: permissionsOfRole(
+      role,
+      role.departamentoId ? deptoById.get(role.departamentoId) ?? null : null,
+    ),
+  }))
 
   const usuarios: UsuarioBasico[] = await db.user.findMany({
     where: {
@@ -180,7 +196,7 @@ export default async function AcessosPage({
               secao={secao}
               counts={{
                 pessoas: usuariosFormatados.length,
-                cargos: roles.length,
+                cargos: rolesComEfetivas.length,
                 departamentos: departamentos.length,
               }}
             />
@@ -190,12 +206,14 @@ export default async function AcessosPage({
 
       <div className="py-6">
         <div className="app-container">
-          {secao === 'cargos' && <RolesManager roles={roles} tipoSede={tipoSede} />}
+          {secao === 'cargos' && (
+            <RolesManager roles={rolesComEfetivas} departamentos={departamentos} tipoSede={tipoSede} />
+          )}
           {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
           {secao === 'pessoas' && (
             <AccessManager
               usuarios={usuariosFormatados}
-              roles={roles}
+              roles={rolesComEfetivas}
               departamentos={departamentos}
               tipoSede={tipoSede}
               initialUserId={initialUserId}

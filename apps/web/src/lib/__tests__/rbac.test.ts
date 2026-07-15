@@ -9,6 +9,7 @@ import {
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   podeTerVice,
+  permissionsOfRole,
   rotuloCargoMaximo,
   rotuloCargoSistema,
   SYSTEM_ROLE_PERMISSIONS,
@@ -60,6 +61,53 @@ describe('calculateEffectivePermissions', () => {
 
     expect(hasPermission(effective, PERMISSIONS.ROLES_MANAGE)).toBe(false)
     expect(hasPermission(effective, PERMISSIONS.MEMBERS_VIEW)).toBe(true)
+  })
+})
+
+describe('permissionsOfRole (perfil ↔ departamento)', () => {
+  it('perfil de área herda pacote de membro + extras', () => {
+    const depto = {
+      permissions: [PERMISSIONS.FINANCE_VIEW],
+      permissionsGestor: [PERMISSIONS.FINANCE_MANAGE],
+    }
+    const role = {
+      departamentoId: 'd1',
+      papelNoDepartamento: 'MEMBRO',
+      permissions: [],
+      permissionsExtras: [PERMISSIONS.REPORTS_VIEW],
+    }
+    const perms = permissionsOfRole(role, depto)
+    expect(perms).toContain(PERMISSIONS.FINANCE_VIEW)
+    expect(perms).toContain(PERMISSIONS.REPORTS_VIEW)
+    expect(perms).not.toContain(PERMISSIONS.FINANCE_MANAGE)
+  })
+
+  it('gestor soma permissionsGestor', () => {
+    const depto = {
+      permissions: [PERMISSIONS.FINANCE_VIEW],
+      permissionsGestor: [PERMISSIONS.FINANCE_MANAGE],
+    }
+    const role = {
+      departamentoId: 'd1',
+      papelNoDepartamento: 'GESTOR',
+      permissions: [],
+      permissionsExtras: [],
+    }
+    const perms = permissionsOfRole(role, depto)
+    expect(perms).toEqual(
+      expect.arrayContaining([PERMISSIONS.FINANCE_VIEW, PERMISSIONS.FINANCE_MANAGE]),
+    )
+  })
+
+  it('perfil transversal usa permissions legado', () => {
+    const role = {
+      departamentoId: null,
+      permissions: [PERMISSIONS.COMMUNITY_POST],
+      permissionsExtras: [PERMISSIONS.MESSAGES_SEND],
+    }
+    const perms = permissionsOfRole(role, null)
+    expect(perms).toContain(PERMISSIONS.COMMUNITY_POST)
+    expect(perms).toContain(PERMISSIONS.MESSAGES_SEND)
   })
 })
 

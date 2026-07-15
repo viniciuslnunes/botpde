@@ -7,7 +7,7 @@
  * Sem TENANT_SLUG, semeia todos os tenants ativos. Idempotente.
  */
 import { PrismaClient } from '@prisma/client'
-import { upsertDepartamentosCanonicos } from '../src/departamentos-canonicos.js'
+import { upsertDepartamentosCanonicos, upsertPerfisDepartamentoCanonicos } from '../src/departamentos-canonicos.js'
 
 const db = new PrismaClient()
 
@@ -44,10 +44,18 @@ async function main() {
   let removedLegacy = 0
   for (const tenant of tenants) {
     const result = await upsertDepartamentosCanonicos(db, tenant.id)
+    const sede = await db.sede.findFirst({
+      where: { tenantId: tenant.id, tipo: 'SEDE' },
+      select: { tipo: true },
+    })
+    const perfis = await upsertPerfisDepartamentoCanonicos(db, tenant.id, {
+      incluirVice: sede?.tipo === 'SEDE',
+    })
     removedLegacy += result.removedLegacy
     i += 1
     if (verbose) {
       console.log(`  ✓ ${result.upserted} departamentos sincronizados`)
+      console.log(`  ✓ ${perfis.perfisArea} perfis de área · ${perfis.systemUpserted} sistema`)
       if (result.removedLegacy > 0) {
         console.log(`  · removidos ${result.removedLegacy} legado(s) socio/torcedor`)
       }

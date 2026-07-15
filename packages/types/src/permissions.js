@@ -308,6 +308,15 @@ export const SYSTEM_ROLES = /** @type {const} */ ({
 })
 
 /**
+ * Papel do perfil dentro do departamento vinculado.
+ * @type {{ readonly MEMBRO: 'MEMBRO', readonly GESTOR: 'GESTOR' }}
+ */
+export const PAPEL_DEPARTAMENTO = /** @type {const} */ ({
+  MEMBRO: 'MEMBRO',
+  GESTOR: 'GESTOR',
+})
+
+/**
  * Regra de governança: uma torcida admite no máximo 2 vice-presidentes.
  */
 export const MAX_VICE_PRESIDENTES = 2
@@ -329,6 +338,63 @@ export const SYSTEM_ROLE_PERMISSIONS = {
     PERMISSIONS.MESSAGES_SEND,
     PERMISSIONS.GROUPS_CREATE,
   ],
+}
+
+/**
+ * Pacote ao vivo do departamento para um papel (membro ou gestor).
+ *
+ * @param {{ permissions?: string[], permissionsGestor?: string[] } | null | undefined} departamento
+ * @param {string | null | undefined} papelNoDepartamento - MEMBRO | GESTOR
+ * @returns {string[]}
+ */
+export function permissionsDoPacoteDepartamento(departamento, papelNoDepartamento) {
+  if (!departamento) return []
+  const base = [...(departamento.permissions ?? [])]
+  if (papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR) {
+    base.push(...(departamento.permissionsGestor ?? []))
+  }
+  return base
+}
+
+/**
+ * Permissões concedidas por um Unique Role, com herança ao vivo do departamento.
+ *
+ * - Com departamento: pacote (membro/gestor) ∪ permissionsExtras
+ * - Sem departamento (transversal): permissions (legado) ∪ permissionsExtras
+ *
+ * @param {{
+ *   permissions?: string[],
+ *   permissionsExtras?: string[],
+ *   departamentoId?: string | null,
+ *   papelNoDepartamento?: string | null,
+ * }} role
+ * @param {{ permissions?: string[], permissionsGestor?: string[] } | null | undefined} departamento
+ * @returns {string[]}
+ */
+export function permissionsOfRole(role, departamento) {
+  const result = new Set()
+
+  if (role.departamentoId) {
+    for (const p of permissionsDoPacoteDepartamento(departamento, role.papelNoDepartamento)) {
+      result.add(p)
+    }
+  } else {
+    for (const p of role.permissions ?? []) result.add(p)
+  }
+
+  for (const p of role.permissionsExtras ?? []) result.add(p)
+  return Array.from(result)
+}
+
+/**
+ * Nome canônico dos perfis gerados por departamento.
+ * @param {string} nomeDepartamento
+ * @param {'MEMBRO' | 'GESTOR'} papel
+ */
+export function nomePerfilDepartamento(nomeDepartamento, papel) {
+  return papel === PAPEL_DEPARTAMENTO.GESTOR
+    ? `Gestor · ${nomeDepartamento}`
+    : `Membro · ${nomeDepartamento}`
 }
 
 /**

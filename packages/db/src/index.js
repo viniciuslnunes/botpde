@@ -107,6 +107,9 @@ export {
   DEPARTAMENTOS_SLUGS_LEGADOS,
   isDepartamentoCanonico,
   upsertDepartamentosCanonicos,
+  upsertPerfisDepartamentoCanonicos,
+  syncMembershipFromRoles,
+  bootstrapAcessoTenant,
 } from './departamentos-canonicos.js'
 
 export { calcularMenorValorEstimadosConhecido } from './data/torcedores-estimados.js'
