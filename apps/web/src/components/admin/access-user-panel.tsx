@@ -275,8 +275,8 @@ export function AccessUserPanel({
         </div>
       </div>
 
-      {/* Abas */}
-      <div className="flex gap-1 overflow-x-auto border-b border-[rgb(var(--border))] px-3 pt-2 sm:px-6">
+      {/* Abas — overflow-y hidden evita scrollbar vertical espúria do overflow-x */}
+      <div className="app-scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[rgb(var(--border))] px-3 pt-2 sm:px-6">
         {abas.map((item) => {
           const active = aba === item.id
           return (
