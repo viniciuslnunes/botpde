@@ -262,8 +262,10 @@ export function AccessUserPanel({
     permissoes.forEach((p) => fd.append('permissoes', p))
 
     startTransition(async () => {
-      await salvarAcessoUsuario(usuario.id, fd)
-      onClose()
+      const ok = await runPersistAction(() => salvarAcessoUsuario(usuario.id, fd), {
+        success: 'Acesso do usuário salvo.',
+      })
+      if (ok) onClose()
     })
   }
 
@@ -422,16 +424,18 @@ export function AccessUserPanel({
               {PERMISSION_GROUPS.map((group) => {
                 const marks = group.items.filter((i) => permissoes.has(i.key)).length
                 return (
-                  <div
+                  <details
                     key={group.label}
-                    className="rounded-xl border border-[rgb(var(--border))]"
+                    className="group/perm rounded-xl border border-[rgb(var(--border))] open:bg-[rgb(var(--surface))]"
+                    defaultOpen={marks > 0}
                   >
-                    <div className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))]">
-                      <span>{group.label}</span>
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] marker:content-none [&::-webkit-details-marker]:hidden">
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform group-open/perm:rotate-180" />
+                      <span className="min-w-0 flex-1 truncate">{group.label}</span>
                       <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
                         {marks}/{group.items.length}
                       </span>
-                    </div>
+                    </summary>
                     <div className="grid grid-cols-1 gap-1 border-t border-[rgb(var(--border))] p-2 sm:grid-cols-2">
                       {group.items.map((item) => {
                         const badge = origemBadge(item.key)
@@ -472,7 +476,7 @@ export function AccessUserPanel({
                         )
                       })}
                     </div>
-                  </div>
+                  </details>
                 )
               })}
             </div>
