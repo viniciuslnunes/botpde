@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { atualizarItemCarrinho, removerDoCarrinho } from '../actions'
+import { useRouter } from 'next/navigation'
+import { atualizarItemCarrinho, removerDoCarrinho, adicionarAoCarrinho } from '../actions'
 import Link from 'next/link'
 import { Trash2, ArrowRight, ShoppingBag } from 'lucide-react'
 import { rotuloTamanho } from '@torcida/types'
+import { toast } from '@torcida/ui'
 import { ProdutoCardImagem } from '@/components/portal/produto-card-imagem'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { cartItemExit, springSnappy } from '@/lib/motion-presets'
@@ -16,15 +18,55 @@ function formatarPreco(preco: number) {
 }
 
 export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSerializado[] }) {
+  const router = useRouter()
   const [itens, setItens] = useState(itensIniciais)
   const [pending, startTransition] = useTransition()
 
+  useEffect(() => {
+    setItens(itensIniciais)
+  }, [itensIniciais])
+
   const subtotal = itens.reduce((acc, i) => acc + i.produto.preco * i.quantidade, 0)
 
-  function remover(id: string) {
+  function remover(item: SacolaItemSerializado) {
     startTransition(async () => {
-      await removerDoCarrinho(id)
-      setItens((prev) => prev.filter((i) => i.id !== id))
+      const result = await removerDoCarrinho(item.id)
+      if (result?.error) {
+        toast.error(result.error)
+        return
+      }
+
+      setItens((prev) => prev.filter((i) => i.id !== item.id))
+
+      toast.message('Item removido da sacola.', {
+        id: `sacola-rm-${item.id}`,
+        description: item.produto.nome,
+        duration: 8000,
+        action: {
+          label: 'Desfazer',
+          onClick: (event) => {
+            event.preventDefault()
+            startTransition(async () => {
+              const fd = new FormData()
+              fd.append('produtoId', item.produto.id)
+              if (item.tamanho && item.tamanho !== 'UN') {
+                fd.append('tamanho', item.tamanho)
+              }
+              fd.append('quantidade', String(item.quantidade))
+              const res = await adicionarAoCarrinho({}, fd)
+              if (res.error) {
+                toast.error(res.error, { id: `sacola-rm-${item.id}` })
+                return
+              }
+              toast.success('Item devolvido à sacola.', {
+                id: `sacola-rm-${item.id}`,
+                description: item.produto.nome,
+              })
+              router.refresh()
+            })
+          },
+        },
+      })
     })
   }
 
@@ -101,8 +143,9 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
                     disabled={pending}
                     aria-label={`Quantidade de ${item.produto.nome}`}
                     onChange={(e) =>
-                      startTransition(() => {
-                        void atualizarItemCarrinho(item.id, Number(e.target.value))
+                      startTransition(async () => {
+                        const result = await atualizarItemCarrinho(item.id, Number(e.target.value))
+                        if (result?.error) toast.error(result.error)
                       })
                     }
                     className="rounded-lg border border-[rgb(var(--foreground-muted)_/_0.4)] bg-[rgb(var(--background))] px-2.5 py-1.5 text-sm focus:border-[rgb(var(--primary))] focus:outline-none"
@@ -116,7 +159,7 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
                   <m.button
                     type="button"
                     disabled={pending}
-                    onClick={() => remover(item.id)}
+                    onClick={() => remover(item)}
                     whileTap={{ scale: 0.9 }}
                     transition={springSnappy}
                     className="rounded-lg border border-[rgb(var(--foreground-muted)_/_0.3)] p-2 text-red-500 hover:border-red-400/50 hover:bg-red-500/10"

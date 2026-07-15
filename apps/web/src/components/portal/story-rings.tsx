@@ -34,16 +34,25 @@ export function StoryRings({
   function publicar(file: File) {
     startTransition(async () => {
       try {
-        const url = await uploadMediaToCloudinary(file)
+        const url = await toast
+          .promise(uploadMediaToCloudinary(file), {
+            loading: 'Enviando momento…',
+            success: 'Upload pronto. Publicando…',
+            error: (e) => (e instanceof Error ? e.message : 'Falha no upload.'),
+            id: 'story-upload',
+          })
+          .unwrap()
         const result = await publicarMomentoStory(url)
         if (!result.success) {
-          toast.error(result.message ?? 'Não foi possível publicar o momento.')
+          toast.error(result.message ?? 'Não foi possível publicar o momento.', {
+            id: 'story-upload',
+          })
           return
         }
-        toast.success('Momento publicado! Expira em 24h.')
+        toast.success('Momento publicado! Expira em 24h.', { id: 'story-upload' })
         window.location.reload()
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Falha no upload.')
+      } catch {
+        // erro já notificado
       }
     })
   }

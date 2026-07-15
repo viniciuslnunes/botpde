@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Loader2 } from 'lucide-react'
+import { toast } from '@torcida/ui'
 import {
   selecionarTorcidaAction,
   type SelecionarTorcidaState,
@@ -35,13 +36,14 @@ export function TenantSwitcher({
     selecionarTorcidaAction,
     {},
   )
+  const wasPending = useRef(false)
 
   useEffect(() => {
-    if (state.message) {
-      // eslint-disable-next-line no-alert
-      alert(state.message)
+    if (wasPending.current && !pending && state.message) {
+      toast.error(state.message)
     }
-  }, [state.message])
+    wasPending.current = pending
+  }, [pending, state.message])
 
   const selectClass =
     variant === 'super-admin'

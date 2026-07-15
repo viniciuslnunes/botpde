@@ -68,6 +68,13 @@ async function request<T>(
       // corpo não é JSON
     }
 
+    // Toast automático no cliente (callers podem passar skipToast: true)
+    if (!skipToast && typeof window !== 'undefined') {
+      void import('./toast').then(({ toast }) => {
+        toast.error(message, { id: `api-${response.status}-${path}` })
+      })
+    }
+
     throw new ApiError(response.status, message, body)
   }
 

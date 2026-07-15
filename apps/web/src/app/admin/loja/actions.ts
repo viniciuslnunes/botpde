@@ -209,8 +209,8 @@ export async function excluirCategoria(id: string) {
   revalidatePath('/admin/loja/categorias')
 }
 
-export async function criarCategoriaForm(formData: FormData) {
-  await criarCategoria({}, formData)
+export async function criarCategoriaForm(formData: FormData): Promise<ActionState> {
+  return criarCategoria({}, formData)
 }
 
 export async function excluirCategoriaForm(formData: FormData) {
@@ -218,8 +218,8 @@ export async function excluirCategoriaForm(formData: FormData) {
   if (id) await excluirCategoria(id)
 }
 
-export async function criarCupomForm(formData: FormData) {
-  await criarCupom({}, formData)
+export async function criarCupomForm(formData: FormData): Promise<ActionState> {
+  return criarCupom({}, formData)
 }
 
 // ── Cupons ───────────────────────────────────────────────────────────────────

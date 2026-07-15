@@ -1,12 +1,13 @@
 'use client'
 
-import { useActionState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/app/admin/eventos/actions'
 import { Loader2, Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
+import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
@@ -16,7 +17,7 @@ function toDatetimeLocal(date: Date): string {
 
 /* ── Criar ─────────────────────────────────────────────────────────────────── */
 export function CriarEventoForm() {
-  const [state, action] = useActionState<EventoState, FormData>(criarEvento, {})
+  const [state, setState] = useState<EventoState>({})
 
   // Padrão: amanhã às 12h
   const amanha = new Date()
@@ -24,7 +25,14 @@ export function CriarEventoForm() {
   amanha.setHours(12, 0, 0, 0)
 
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={async (fd) => {
+        await submitRedirectAction(() => criarEvento({}, fd), setState, {
+          success: 'Evento criado.',
+        })
+      }}
+      className="space-y-4"
+    >
       <AnimatePresence>
         {state.message && (
           <m.div
@@ -100,11 +108,17 @@ type EventoData = {
 }
 
 export function EditarEventoForm({ evento }: { evento: EventoData }) {
-  const boundAction = editarEvento.bind(null, evento.id)
-  const [state, action] = useActionState<EventoState, FormData>(boundAction, {})
+  const [state, setState] = useState<EventoState>({})
 
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={async (fd) => {
+        await submitRedirectAction(() => editarEvento(evento.id, {}, fd), setState, {
+          success: 'Evento atualizado.',
+        })
+      }}
+      className="space-y-4"
+    >
       <AnimatePresence>
         {state.message && (
           <m.div
@@ -178,7 +192,9 @@ export function ExcluirEventoButton({ eventoId }: { eventoId: string }) {
   function handleExcluir() {
     if (!confirm('Excluir este evento? Todos os RSVPs também serão removidos.')) return
     startTransition(async () => {
-      await excluirEvento(eventoId)
+      await runPersistAction(() => excluirEvento(eventoId), {
+        success: 'Evento excluído.',
+      })
       router.refresh()
     })
   }

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { chaveTamanho } from '@torcida/types'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { springSnappy } from '@/lib/motion-presets'
+import { useActionStateToast } from '@/lib/toast-action'
 
 type Produto = {
   id: string
@@ -18,6 +19,15 @@ type Produto = {
 export function AdicionarSacolaForm({ produto }: { produto: Produto }) {
   const [state, action, pending] = useActionState(adicionarAoCarrinho, {})
   const [tamanhoSel, setTamanhoSel] = useState<string>(produto.tamanhos[0] ?? '')
+  useActionStateToast(state, pending, 'Adicionado à sacola!', {
+    id: 'loja-add-sacola',
+    action: {
+      label: 'Ver sacola',
+      onClick: () => {
+        window.location.href = '/portal/loja/sacola'
+      },
+    },
+  })
 
   const semTamanho = produto.tamanhos.length === 0
   const chave = semTamanho ? 'UN' : chaveTamanho(tamanhoSel)

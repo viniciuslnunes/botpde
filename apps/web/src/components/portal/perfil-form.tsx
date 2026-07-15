@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import { salvarPerfil, type PerfilState } from '@/app/portal/perfil/actions'
 import { Save, CheckCircle2 } from 'lucide-react'
 import { FieldError, Input, SubmitButton } from '@torcida/ui'
+import { useActionStateToast } from '@/lib/toast-action'
 
 type Props = {
   nome: string
@@ -15,7 +16,8 @@ type Props = {
 }
 
 export function PerfilForm({ nome, idade, telefone, cidade, discordTag, temMembro }: Props) {
-  const [state, action] = useActionState<PerfilState, FormData>(salvarPerfil, {})
+  const [state, action, pending] = useActionState<PerfilState, FormData>(salvarPerfil, {})
+  useActionStateToast(state, pending, 'Perfil atualizado.')
 
   return (
     <form action={action} className="space-y-5">

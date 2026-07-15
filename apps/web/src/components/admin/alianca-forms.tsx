@@ -9,6 +9,7 @@ import {
   rejeitarAlianca,
 } from '@/app/admin/aliancas/actions'
 import type { AliancaListItem, RecomendacaoAliancaListItem } from '@/lib/aliancas'
+import { toast } from '@torcida/ui'
 
 interface TenantOption {
   id: string
@@ -88,8 +89,10 @@ export function AliancaForms({ tenantId, aliancas, recomendacoes, tenants }: Ali
       try {
         await action()
         setSucesso(successMessage)
+        toast.success(successMessage)
       } catch (error) {
         mostrarErro(error, 'Não foi possível concluir a ação')
+        toast.error(error instanceof Error ? error.message : 'Não foi possível concluir a ação')
       }
     })
   }

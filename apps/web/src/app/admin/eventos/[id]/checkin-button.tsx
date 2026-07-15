@@ -3,6 +3,7 @@
 import { useTransition } from 'react'
 import { registrarCheckIn } from '../actions'
 import { Loader2, ScanLine, CheckCircle2 } from 'lucide-react'
+import { runPersistAction } from '@/lib/toast-action'
 
 function formatarHora(data: Date | string) {
   return new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(data))
@@ -30,7 +31,13 @@ export function CheckInButton({
 
   return (
     <button
-      onClick={() => startTransition(() => registrarCheckIn(eventoId, userId))}
+      onClick={() =>
+        startTransition(async () => {
+          await runPersistAction(() => registrarCheckIn(eventoId, userId), {
+            success: 'Check-in registrado.',
+          })
+        })
+      }
       disabled={pending}
       className="flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] disabled:opacity-60"
     >

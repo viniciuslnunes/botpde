@@ -5,6 +5,7 @@ import { db } from '@torcida/db'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { Newspaper } from 'lucide-react'
 import { aprovarNoticia, rejeitarNoticia } from './actions'
+import { AdminActionForm } from '@/components/admin/admin-action-form'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Curadoria de Notícias' }
@@ -91,22 +92,28 @@ export default async function AdminNoticiasPage() {
               </a>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <form action={aprovarNoticia.bind(null, noticia.id)}>
+                <AdminActionForm
+                  action={aprovarNoticia.bind(null, noticia.id)}
+                  success="Notícia aprovada."
+                >
                   <button
                     type="submit"
                     className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
                   >
                     Aprovar
                   </button>
-                </form>
-                <form action={rejeitarNoticia.bind(null, noticia.id)}>
+                </AdminActionForm>
+                <AdminActionForm
+                  action={rejeitarNoticia.bind(null, noticia.id)}
+                  success="Notícia rejeitada."
+                >
                   <button
                     type="submit"
                     className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >
                     Rejeitar
                   </button>
-                </form>
+                </AdminActionForm>
               </div>
             </div>
           ))}

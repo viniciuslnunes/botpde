@@ -186,21 +186,29 @@ export function PerfilEditarForm({
 
   async function handleUpload(file: File, tipo: 'banner' | 'avatar') {
     setUploading(tipo)
+    const toastId = tipo === 'banner' ? 'perfil-banner-upload' : 'perfil-avatar-upload'
     try {
       const purpose = tipo === 'banner' ? 'perfil-banner' : 'perfil-avatar'
-      const url = await uploadMediaToCloudinary(file, undefined, purpose, tenantId)
+      const url = await toast
+        .promise(uploadMediaToCloudinary(file, undefined, purpose, tenantId), {
+          loading: tipo === 'banner' ? 'Enviando capa…' : 'Enviando foto…',
+          success: 'Arquivo enviado. Salvando no perfil…',
+          error: (e) => (e instanceof Error ? e.message : 'Falha no upload.'),
+          id: toastId,
+        })
+        .unwrap()
       if (tipo === 'banner') {
         setBannerUrl(url)
         setBannerPos(50)
         await persistPerfil({ bannerUrl: url, bannerPos: 50 }, { silent: true, refresh: true })
-        toast.success('Capa salva no perfil.')
+        toast.success('Capa salva no perfil.', { id: toastId })
       } else {
         setAvatarUrl(url)
         await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true })
-        toast.success('Foto de perfil salva.')
+        toast.success('Foto de perfil salva.', { id: toastId })
       }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Falha no upload.')
+    } catch {
+      // erro já notificado pelo toast.promise
     } finally {
       setUploading(null)
     }

@@ -3,6 +3,7 @@
 import { useTransition } from 'react'
 import { Check, X, RotateCcw, Loader2 } from 'lucide-react'
 import { aprovarMembro, reprovarMembro, reverterMembro } from '@/app/admin/membros/actions'
+import { runPersistAction } from '@/lib/toast-action'
 
 interface MemberActionsProps {
   membroId: string
@@ -13,15 +14,27 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
   const [pending, startTransition] = useTransition()
 
   function handleAprovar() {
-    startTransition(() => aprovarMembro(membroId))
+    startTransition(async () => {
+      await runPersistAction(() => aprovarMembro(membroId), {
+        success: 'Membro aprovado.',
+      })
+    })
   }
 
   function handleReprovar() {
-    startTransition(() => reprovarMembro(membroId))
+    startTransition(async () => {
+      await runPersistAction(() => reprovarMembro(membroId), {
+        success: 'Membro reprovado.',
+      })
+    })
   }
 
   function handleReverter() {
-    startTransition(() => reverterMembro(membroId))
+    startTransition(async () => {
+      await runPersistAction(() => reverterMembro(membroId), {
+        success: 'Membro movido para pendente.',
+      })
+    })
   }
 
   if (pending) {

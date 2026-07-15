@@ -228,3 +228,55 @@ body {
     min-height: 2.75rem;
   }
 }
+
+/* ── Sonner toasts (mobile/desktop) ───────────────────────────── */
+/* Desktop: canto superior direito. Mobile (<640px): bottom-center
+   (posição setada no ToastProvider) + largura confortável e safe-area. */
+[data-sonner-toaster].torcida-toaster {
+  --width: 356px;
+  z-index: 9999;
+}
+
+[data-sonner-toast].torcida-toast {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.08),
+    0 10px 24px -8px rgb(0 0 0 / 0.12) !important;
+}
+
+@media (max-width: 639px) {
+  [data-sonner-toaster].torcida-toaster {
+    --width: min(100vw - 24px, 420px);
+    width: var(--width) !important;
+  }
+
+  /* Garante centragem horizontal no eixo bottom-center */
+  [data-sonner-toaster].torcida-toaster[data-x-position='center'] {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+  }
+
+  [data-sonner-toast].torcida-toast {
+    width: var(--width) !important;
+    max-width: var(--width) !important;
+    font-size: 0.9375rem !important;
+    line-height: 1.35 !important;
+    padding: 14px 16px !important;
+  }
+
+  .torcida-toast-title {
+    font-size: 0.9375rem !important;
+    font-weight: 600 !important;
+  }
+
+  .torcida-toast-description {
+    font-size: 0.8125rem !important;
+  }
+
+  /* Alvo de toque maior no X (dedão) */
+  [data-sonner-toast].torcida-toast [data-close-button],
+  .torcida-toast-close {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+}

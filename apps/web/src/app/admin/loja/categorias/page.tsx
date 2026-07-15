@@ -5,6 +5,7 @@ import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { criarCategoriaForm, excluirCategoriaForm } from '../actions'
+import { AdminActionForm } from '@/components/admin/admin-action-form'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -33,12 +34,17 @@ export default async function AdminCategoriasPage() {
       </Link>
       <h1 className="text-xl font-bold">Categorias</h1>
 
-      <form action={criarCategoriaForm} className="rounded-2xl border border-[rgb(var(--border))] p-4 space-y-3">
-        <h2 className="font-semibold text-sm">Nova categoria</h2>
+      <AdminActionForm
+        action={criarCategoriaForm}
+        success="Categoria criada."
+        interpretResult
+        className="space-y-3 rounded-2xl border border-[rgb(var(--border))] p-4"
+      >
+        <h2 className="text-sm font-semibold">Nova categoria</h2>
         <input name="nome" required placeholder="Nome" className="w-full rounded-lg border px-3 py-2 text-sm" />
         <input name="ordem" type="number" defaultValue={categorias.length + 1} className="w-24 rounded-lg border px-3 py-2 text-sm" />
         <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar</button>
-      </form>
+      </AdminActionForm>
 
       <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))]">
         {categorias.map((c: (typeof categorias)[number]) => (
@@ -47,10 +53,10 @@ export default async function AdminCategoriasPage() {
               <p className="font-medium">{c.nome}</p>
               <p className="text-xs text-[rgb(var(--foreground-muted))]">{c._count.produtos} produtos · ordem {c.ordem}</p>
             </div>
-            <form action={excluirCategoriaForm}>
+            <AdminActionForm action={excluirCategoriaForm} success="Categoria excluída.">
               <input type="hidden" name="id" value={c.id} />
               <button type="submit" className="text-xs text-red-600 hover:underline">Excluir</button>
-            </form>
+            </AdminActionForm>
           </li>
         ))}
       </ul>

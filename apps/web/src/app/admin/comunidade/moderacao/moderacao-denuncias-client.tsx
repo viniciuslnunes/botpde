@@ -6,6 +6,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { runPersistAction } from '@/lib/toast-action'
 
 export interface DenunciaPostItem {
   id: string
@@ -54,29 +55,37 @@ export function ModeracaoDenunciasClient({
 
   function resolverPost(id: string) {
     startTransition(async () => {
-      await onResolverPost(id)
-      setPosts((prev) => prev.filter((d) => d.id !== id))
+      const ok = await runPersistAction(() => onResolverPost(id), {
+        success: 'Denúncia resolvida. Post ocultado.',
+      })
+      if (ok) setPosts((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function descartarPost(id: string) {
     startTransition(async () => {
-      await onDescartarPost(id)
-      setPosts((prev) => prev.filter((d) => d.id !== id))
+      const ok = await runPersistAction(() => onDescartarPost(id), {
+        success: 'Denúncia de post descartada.',
+      })
+      if (ok) setPosts((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function resolverMensagem(id: string) {
     startTransition(async () => {
-      await onResolverMensagem(id)
-      setMensagens((prev) => prev.filter((d) => d.id !== id))
+      const ok = await runPersistAction(() => onResolverMensagem(id), {
+        success: 'Denúncia resolvida. Mensagem tratada.',
+      })
+      if (ok) setMensagens((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function descartarMensagem(id: string) {
     startTransition(async () => {
-      await onDescartarMensagem(id)
-      setMensagens((prev) => prev.filter((d) => d.id !== id))
+      const ok = await runPersistAction(() => onDescartarMensagem(id), {
+        success: 'Denúncia de mensagem descartada.',
+      })
+      if (ok) setMensagens((prev) => prev.filter((d) => d.id !== id))
     })
   }
 

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Loader2, Plus, RefreshCw, Trash2, X, Check } from 'lucide-react'
 import { emitirCarteirinha, renovarCarteirinha, revogarCarteirinha } from '@/app/admin/socios/actions'
+import { runPersistAction } from '@/lib/toast-action'
 
 interface MembroElegivel {
   userId: string
@@ -29,12 +30,11 @@ export function EmitirCarteirinhaForm({ membrosElegiveis }: EmitirCarteirinhaFor
     setError(null)
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      try {
-        await emitirCarteirinha(fd)
-        setOpen(false)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      }
+      const ok = await runPersistAction(() => emitirCarteirinha(fd), {
+        success: 'Carteirinha emitida.',
+        errorFallback: 'Não foi possível emitir a carteirinha.',
+      })
+      if (ok) setOpen(false)
     })
   }
 
@@ -148,14 +148,20 @@ export function SocioActions({ socioId }: SocioActionsProps) {
 
   function handleRenovar() {
     startTransition(async () => {
-      await renovarCarteirinha(socioId, novaValidade)
-      setRenovando(false)
+      const ok = await runPersistAction(() => renovarCarteirinha(socioId, novaValidade), {
+        success: 'Carteirinha renovada.',
+      })
+      if (ok) setRenovando(false)
     })
   }
 
   function handleRevogar() {
     if (!confirm('Revogar esta carteirinha? Esta ação não pode ser desfeita.')) return
-    startTransition(() => revogarCarteirinha(socioId))
+    startTransition(async () => {
+      await runPersistAction(() => revogarCarteirinha(socioId), {
+        success: 'Carteirinha revogada.',
+      })
+    })
   }
 
   if (pending) {

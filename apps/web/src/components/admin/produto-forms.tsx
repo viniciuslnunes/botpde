@@ -8,6 +8,7 @@ import { FieldError, toast } from '@torcida/ui'
 import { ImagePlus, Loader2 } from 'lucide-react'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 
 const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'XG', 'G1', 'G2', 'G3', 'UN']
 
@@ -76,11 +77,17 @@ function ImagemProdutoField({
 
     setUploading(true)
     try {
-      const url = await uploadMediaToCloudinary(file)
+      const url = await toast
+        .promise(uploadMediaToCloudinary(file), {
+          loading: 'Enviando imagem…',
+          success: 'Imagem enviada.',
+          error: (err) => (err instanceof Error ? err.message : 'Falha no upload.'),
+        })
+        .unwrap()
       setImagemUrl(url)
       onUrlChange?.(url)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha no upload.')
+    } catch {
+      // erro já notificado pelo toast.promise
     } finally {
       setUploading(false)
     }
@@ -280,6 +287,7 @@ const initialState: ProdutoState = {}
 export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: string; nome: string }[] }) {
   const [state, action, pending] = useActionState(criarProduto, initialState)
   const [open, setOpen] = useState(false)
+  useActionStateToast(state, pending, 'Produto criado.')
 
   if (state.success && open) setOpen(false)
 
@@ -349,6 +357,7 @@ export function EditarProdutoForm({
 }) {
   const boundAction = editarProduto.bind(null, id)
   const [state, action, pending] = useActionState(boundAction, initialState)
+  useActionStateToast(state, pending, 'Produto atualizado.')
 
   return (
     <form action={action} className="space-y-4">
@@ -390,7 +399,13 @@ export function ToggleProdutoButton({ id, ativo }: { id: string; ativo: boolean 
   return (
     <button
       disabled={pending}
-      onClick={() => startTransition(async () => { await alterarStatusProduto(id, !ativo) })}
+      onClick={() =>
+        startTransition(async () => {
+          await runPersistAction(() => alterarStatusProduto(id, !ativo), {
+            success: ativo ? 'Produto desativado.' : 'Produto ativado.',
+          })
+        })
+      }
       className={[
         'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
         ativo
@@ -429,7 +444,11 @@ export function StatusPedidoBadge({ status }: { status: string }) {
 
 export function StatusPedidoSelect({ id, statusAtual }: { id: string; statusAtual: string }) {
   const boundAction = atualizarStatusPedido.bind(null, id)
-  const [, action, pending] = useActionState(boundAction, {})
+  const [state, action, pending] = useActionState(boundAction, {})
+  useActionStateToast(state, pending, 'Status do pedido atualizado.', {
+    id: `pedido-status-${id}`,
+    successDescription: 'A alteração foi salva e o pedido foi revalidado.',
+  })
 
   return (
     <form action={action} className="flex items-center gap-2">

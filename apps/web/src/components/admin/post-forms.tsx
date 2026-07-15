@@ -10,6 +10,7 @@ import {
 } from '@/app/admin/comunidade/actions'
 import { Pin, PinOff, Pencil, Trash2, MessageSquarePlus, X } from 'lucide-react'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
+import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 
 function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
   return (
@@ -67,8 +68,9 @@ function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
 
 /* ── Criar ─────────────────────────────────────────────────────────────────── */
 export function CriarPostForm() {
-  const [state, action] = useActionState<PostState, FormData>(criarPost, {})
+  const [state, action, pending] = useActionState<PostState, FormData>(criarPost, {})
   const [key, setKey] = useState(0)
+  useActionStateToast(state, pending, 'Post publicado.')
 
   return (
     <form
@@ -97,7 +99,8 @@ export interface Post {
 
 function EditarPostForm({ post, onCancel }: { post: Post; onCancel: () => void }) {
   const boundAction = atualizarPost.bind(null, post.id)
-  const [state, action] = useActionState<PostState, FormData>(boundAction, {})
+  const [state, action, pending] = useActionState<PostState, FormData>(boundAction, {})
+  useActionStateToast(state, pending, 'Post atualizado.')
 
   return (
     <form
@@ -192,7 +195,13 @@ export function PostsManager({ posts }: { posts: Post[] }) {
 
               <div className="flex shrink-0 items-center gap-1">
                 <button
-                  onClick={() => startTransition(() => alternarFixado(post.id))}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await runPersistAction(() => alternarFixado(post.id), {
+                        success: post.fixado ? 'Post desafixado.' : 'Post fixado no topo.',
+                      })
+                    })
+                  }
                   disabled={pending}
                   title={post.fixado ? 'Desafixar' : 'Fixar no topo'}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
@@ -209,7 +218,11 @@ export function PostsManager({ posts }: { posts: Post[] }) {
                 <button
                   onClick={() => {
                     if (!confirm('Excluir este post?')) return
-                    startTransition(() => excluirPost(post.id))
+                    startTransition(async () => {
+                      await runPersistAction(() => excluirPost(post.id), {
+                        success: 'Post excluído.',
+                      })
+                    })
                   }}
                   disabled={pending}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"

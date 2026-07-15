@@ -5,6 +5,7 @@ import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { criarCupomForm, toggleCupomForm } from '../actions'
+import { AdminActionForm } from '@/components/admin/admin-action-form'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -37,8 +38,13 @@ export default async function AdminCuponsPage() {
       </Link>
       <h1 className="text-xl font-bold">Cupons</h1>
 
-      <form action={criarCupomForm} className="rounded-2xl border border-[rgb(var(--border))] p-4 space-y-3">
-        <h2 className="font-semibold text-sm">Novo cupom</h2>
+      <AdminActionForm
+        action={criarCupomForm}
+        success="Cupom criado."
+        interpretResult
+        className="space-y-3 rounded-2xl border border-[rgb(var(--border))] p-4"
+      >
+        <h2 className="text-sm font-semibold">Novo cupom</h2>
         <input name="codigo" required placeholder="Código (ex.: EUSOUGAVIAO)" className="w-full rounded-lg border px-3 py-2 text-sm uppercase" />
         <select name="tipo" className="w-full rounded-lg border px-3 py-2 text-sm">
           <option value="PERCENTUAL">Percentual (%)</option>
@@ -52,7 +58,7 @@ export default async function AdminCuponsPage() {
           <input type="checkbox" name="ativo" defaultChecked /> Ativo
         </label>
         <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar cupom</button>
-      </form>
+      </AdminActionForm>
 
       <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border">
         {cupons.map((c: (typeof cupons)[number]) => (
@@ -65,11 +71,14 @@ export default async function AdminCuponsPage() {
                 {!c.ativo ? ' · inativo' : ''}
               </p>
             </div>
-            <form action={toggleCupomForm}>
+            <AdminActionForm
+              action={toggleCupomForm}
+              success={c.ativo ? 'Cupom desativado.' : 'Cupom ativado.'}
+            >
               <input type="hidden" name="id" value={c.id} />
               <input type="hidden" name="ativo" value={String(!c.ativo)} />
               <button type="submit" className="text-xs font-medium">{c.ativo ? 'Desativar' : 'Ativar'}</button>
-            </form>
+            </AdminActionForm>
           </li>
         ))}
       </ul>

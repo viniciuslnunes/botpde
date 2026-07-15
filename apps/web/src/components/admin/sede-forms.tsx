@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import {
   criarSede,
   editarSede,
@@ -9,6 +9,7 @@ import {
 } from '@/app/admin/sedes/actions'
 import { Loader2, MapPin, Power, PowerOff } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton } from '@torcida/ui'
+import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 
 type SedeOption = { id: string; nome: string; tipo: string }
 
@@ -210,10 +211,17 @@ function SedeFormFields({
 
 /* ── Criar ────────────────────────────────────────────────────────────────── */
 export function CriarSedeForm({ sedes }: { sedes: SedeOption[] }) {
-  const [state, action] = useActionState<SedeState, FormData>(criarSede, {})
+  const [state, setState] = useState<SedeState>({})
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={async (fd) => {
+        await submitRedirectAction(() => criarSede({}, fd), setState, {
+          success: 'Sede criada.',
+        })
+      }}
+      className="space-y-5"
+    >
       <SedeFormFields state={state} sedes={sedes} />
       <SubmitButton label="Criar sede" />
     </form>
@@ -222,11 +230,17 @@ export function CriarSedeForm({ sedes }: { sedes: SedeOption[] }) {
 
 /* ── Editar ───────────────────────────────────────────────────────────────── */
 export function EditarSedeForm({ sede, sedes }: { sede: SedeData; sedes: SedeOption[] }) {
-  const boundAction = editarSede.bind(null, sede.id)
-  const [state, action] = useActionState<SedeState, FormData>(boundAction, {})
+  const [state, setState] = useState<SedeState>({})
 
   return (
-    <form action={action} className="space-y-5">
+    <form
+      action={async (fd) => {
+        await submitRedirectAction(() => editarSede(sede.id, {}, fd), setState, {
+          success: 'Sede atualizada.',
+        })
+      }}
+      className="space-y-5"
+    >
       <SedeFormFields state={state} sedes={sedes.filter((s) => s.id !== sede.id)} defaults={sede} />
       <SubmitButton label="Salvar alterações" />
     </form>
@@ -241,7 +255,9 @@ export function ToggleSedeButton({ sedeId, ativa }: { sedeId: string; ativa: boo
     <button
       onClick={() =>
         startTransition(async () => {
-          await alterarStatusSede(sedeId, !ativa)
+          await runPersistAction(() => alterarStatusSede(sedeId, !ativa), {
+            success: ativa ? 'Sede desativada.' : 'Sede ativada.',
+          })
         })
       }
       disabled={pending}

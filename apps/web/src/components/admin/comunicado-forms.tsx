@@ -10,6 +10,7 @@ import {
 } from '@/app/admin/comunidade/actions'
 import { Pin, PinOff, Pencil, Trash2, Megaphone, X } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton, Badge } from '@torcida/ui'
+import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 
 type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
 
@@ -80,8 +81,9 @@ function ComunicadoFields({ state, initial }: { state: ComunicadoState; initial?
 
 /* ── Criar ─────────────────────────────────────────────────────────────────── */
 export function CriarComunicadoForm() {
-  const [state, action] = useActionState<ComunicadoState, FormData>(criarComunicado, {})
+  const [state, action, pending] = useActionState<ComunicadoState, FormData>(criarComunicado, {})
   const [key, setKey] = useState(0)
+  useActionStateToast(state, pending, 'Comunicado publicado.')
 
   return (
     <form
@@ -116,7 +118,8 @@ function EditarComunicadoForm({
   onCancel: () => void
 }) {
   const boundAction = atualizarComunicado.bind(null, comunicado.id)
-  const [state, action] = useActionState<ComunicadoState, FormData>(boundAction, {})
+  const [state, action, pending] = useActionState<ComunicadoState, FormData>(boundAction, {})
+  useActionStateToast(state, pending, 'Comunicado atualizado.')
 
   return (
     <form
@@ -207,7 +210,15 @@ export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] 
 
               <div className="flex shrink-0 items-center gap-1">
                 <button
-                  onClick={() => startTransition(() => alternarFixadoComunicado(comunicado.id))}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await runPersistAction(() => alternarFixadoComunicado(comunicado.id), {
+                        success: comunicado.fixado
+                          ? 'Comunicado desafixado.'
+                          : 'Comunicado fixado no topo.',
+                      })
+                    })
+                  }
                   disabled={pending}
                   title={comunicado.fixado ? 'Desafixar' : 'Fixar no topo'}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
@@ -224,7 +235,11 @@ export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] 
                 <button
                   onClick={() => {
                     if (!confirm('Excluir este comunicado?')) return
-                    startTransition(() => excluirComunicado(comunicado.id))
+                    startTransition(async () => {
+                      await runPersistAction(() => excluirComunicado(comunicado.id), {
+                        success: 'Comunicado excluído.',
+                      })
+                    })
                   }}
                   disabled={pending}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"

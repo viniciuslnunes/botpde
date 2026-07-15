@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Download, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { toast } from '@torcida/ui'
 import { importarMock, type ResultadoImportacao } from '@/app/admin/membros/importar/actions'
 
 /**
@@ -16,8 +17,32 @@ export function ImportForm() {
   function handleSubmit(formData: FormData) {
     setResultado(null)
     startTransition(async () => {
-      const res = await importarMock(formData)
-      setResultado(res)
+      try {
+        const res = await toast
+          .promise(
+            importarMock(formData).then((data) => {
+              if (!data.success) {
+                throw new Error(data.error ?? 'Não foi possível importar.')
+              }
+              return data
+            }),
+            {
+              loading: 'Importando membros…',
+              success: (data) =>
+                `${data.importados ?? 0} importados · ${data.duplicados ?? 0} duplicados · ${data.erros ?? 0} erros`,
+              error: (err) =>
+                err instanceof Error ? err.message : 'Não foi possível importar.',
+              id: 'importacao-membros',
+            },
+          )
+          .unwrap()
+        setResultado(res)
+      } catch (err) {
+        setResultado({
+          success: false,
+          error: err instanceof Error ? err.message : 'Não foi possível importar.',
+        })
+      }
     })
   }
 
