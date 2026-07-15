@@ -57,10 +57,10 @@ export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
  * Slug da torcida do usuário (vínculo real). Sem fallback TENANT_SLUG —
  * use em roteamento pós-login; TENANT_SLUG é só contexto do deploy.
  *
- * `tipo: 'SOCIO'` — vínculo TORCEDOR (torcedor de uma torcida específica,
- * sem aprovação/comprovante) não abre um tenant próprio; cai no fallback de
- * torcedor global (Comunidade Nacional) em getActiveTenant. Só sócio (em
- * análise ou aprovado) resolve a torcida como tenant ativo.
+ * Só sócio APROVADO abre tenant próprio. Vínculo TORCEDOR (torcedor de uma
+ * torcida específica, sem aprovação/comprovante) e sócio ainda PENDENTE não
+ * têm acesso à comunidade da torcida — caem no fallback de torcedor global
+ * (Comunidade Nacional) em getActiveTenant até a diretoria aprovar o cadastro.
  */
 export async function resolveUserTenantSlugForUser(userId: string): Promise<string | null> {
   const aprovado: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
@@ -68,20 +68,11 @@ export async function resolveUserTenantSlugForUser(userId: string): Promise<stri
     orderBy: { criadoEm: 'desc' },
     select: { tenant: { select: { slug: true } } },
   })
-  if (aprovado) return aprovado.tenant.slug
-
-  const pendente: { tenant: { slug: string } } | null = await db.saasMembro.findFirst({
-    where: { userId, status: 'PENDENTE', tipo: 'SOCIO' },
-    orderBy: { criadoEm: 'desc' },
-    select: { tenant: { select: { slug: true } } },
-  })
-  if (pendente) return pendente.tenant.slug
-
-  return null
+  return aprovado?.tenant.slug ?? null
 }
 
 /**
- * Slug da torcida "casa" do usuário: aprovado > pendente > fallback TENANT_SLUG.
+ * Slug da torcida "casa" do usuário: sócio aprovado > fallback TENANT_SLUG.
  * Usado para resolver tenant ativo no portal (single-tenant), não pós-login.
  */
 export async function resolveHomeTenantSlugForUser(userId: string): Promise<string | null> {
