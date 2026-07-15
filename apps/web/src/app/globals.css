@@ -234,7 +234,8 @@ body {
    (posição setada no ToastProvider) + largura confortável e safe-area. */
 [data-sonner-toaster].torcida-toaster {
   --width: 356px;
-  z-index: 9999;
+  /* Acima de overlays admin (sidebar, dialogs) */
+  z-index: 2147483646 !important;
 }
 
 [data-sonner-toast].torcida-toast {

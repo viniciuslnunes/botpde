@@ -14,7 +14,9 @@ const serverActionOrigins = [
 
 const nextConfig: NextConfig = {
   experimental: {
-    optimizePackageImports: ['lucide-react', '@torcida/ui'],
+    // Sem @torcida/ui: optimizePackageImports no barrel quebra o singleton do Sonner
+    // (toast() e <Toaster /> em grafos distintos → toasts silenciosos).
+    optimizePackageImports: ['lucide-react'],
     staleTimes: {
       dynamic: 120,
       static: 180,

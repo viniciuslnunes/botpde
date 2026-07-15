@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { toast, type ToastActionConfig } from '@torcida/ui'
+import { toast, type ToastActionConfig } from '@torcida/ui/services/toast'
 
 /** Formas de retorno usadas pelas Server Actions do app. */
 export type ActionLike = {

@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import {
@@ -290,9 +290,10 @@ export async function atualizarRole(roleId: string, formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/acessos')
+  return { success: true as const }
 }
 
-export async function excluirRole(roleId: string) {
+export async function excluirRole(roleId: string, formData?: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const role = await db.role.findFirst({
@@ -301,26 +302,40 @@ export async function excluirRole(roleId: string) {
   if (!role) throw new Error('Cargo não encontrado')
   if (role.isSystem) throw new Error('Cargos do sistema não podem ser excluídos')
 
-  // Cargo em uso não pode ser excluído — remova-o dos usuários primeiro
-  const emUso = await db.userRole.count({ where: { roleId } })
-  if (emUso > 0) {
-    throw new Error(
-      `Este cargo está atribuído a ${emUso} usuário(s) e não pode ser excluído. Remova-o dos usuários em Controle de acesso primeiro.`,
-    )
-  }
+  const liberarUserId = formData
+    ? String(formData.get('liberarUserId') ?? '').trim() || null
+    : null
 
-  await db.role.delete({ where: { id: roleId } })
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (liberarUserId) {
+      await tx.userRole.deleteMany({
+        where: { roleId, userId: liberarUserId, tenantId: tenant.id },
+      })
+      await syncMembershipFromRoles(tx, { userId: liberarUserId, tenantId: tenant.id })
+    }
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'ROLE_EXCLUIDO',
-      detalhes: { nome: role.nome },
-    },
+    const emUso = await tx.userRole.count({ where: { roleId } })
+    if (emUso > 0) {
+      throw new Error(
+        `Este cargo está atribuído a ${emUso} outro(s) usuário(s) e não pode ser excluído.`,
+      )
+    }
+
+    await tx.role.delete({ where: { id: roleId } })
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'ROLE_EXCLUIDO',
+        detalhes: { nome: role.nome, liberarUserId },
+      },
+    })
   })
 
+  if (liberarUserId) invalidatePermissionsCache(liberarUserId, tenant.id)
   revalidatePath('/admin/configuracoes')
+  revalidatePath('/admin/acessos')
+  return { success: true as const }
 }
 
 // ── Departamentos ─────────────────────────────────────────────────────────────

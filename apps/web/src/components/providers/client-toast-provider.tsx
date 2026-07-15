@@ -1,8 +1,9 @@
 'use client'
 
-import dynamic from 'next/dynamic'
+/** Import direto do módulo — evita fragmentar toast/Toaster via barrel + optimizePackageImports. */
+import { ToastProvider } from '@torcida/ui/services/toast'
 
-export const ClientToastProvider = dynamic(
-  () => import('@torcida/ui').then((mod) => mod.ToastProvider),
-  { ssr: false },
-)
+/** Toast no root layout — sem dynamic, para o Toaster existir antes das actions. */
+export function ClientToastProvider() {
+  return <ToastProvider />
+}

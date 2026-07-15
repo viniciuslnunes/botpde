@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useTheme } from 'next-themes'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -85,13 +84,22 @@ function useIsMobileToast(): boolean {
 }
 
 export function ToastProvider() {
-  const { resolvedTheme } = useTheme()
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const isMobile = useIsMobileToast()
   const position: ToasterProps['position'] = isMobile ? 'bottom-center' : 'top-right'
 
+  useEffect(() => {
+    const root = document.documentElement
+    const sync = () => setTheme(root.classList.contains('light') ? 'light' : 'dark')
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
   return (
     <Toaster
-      theme={resolvedTheme === 'light' ? 'light' : 'dark'}
+      theme={theme}
       position={position}
       richColors
       closeButton
@@ -99,7 +107,6 @@ export function ToastProvider() {
       visibleToasts={isMobile ? 2 : 4}
       duration={4000}
       gap={isMobile ? 8 : 10}
-      // Desktop: canto; mobile: polegar + notch/home indicator
       offset={{ top: 16, right: 16, bottom: 16, left: 16 }}
       mobileOffset={{
         top: 'max(12px, env(safe-area-inset-top, 0px))',
@@ -107,12 +114,12 @@ export function ToastProvider() {
         left: 12,
         right: 12,
       }}
-      // Swipe alinhado à posição (baixo no mobile, direita no desktop)
       swipeDirections={isMobile ? ['bottom', 'left', 'right'] : ['right', 'top']}
       pauseWhenPageIsHidden
       containerAriaLabel="Notificações"
       hotkey={['altKey', 'KeyT']}
       className="torcida-toaster"
+      style={{ zIndex: 2147483646 }}
       icons={{
         success: <CheckCircle2 className="h-4 w-4" aria-hidden />,
         error: <XCircle className="h-4 w-4" aria-hidden />,

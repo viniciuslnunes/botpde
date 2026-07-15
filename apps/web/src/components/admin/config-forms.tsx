@@ -298,7 +298,7 @@ export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManag
       )
     : roles
 
-  function executar(acao: () => Promise<void>, successMessage: string) {
+  function executar(acao: () => Promise<unknown>, successMessage: string) {
     setErro(null)
     startTransition(async () => {
       try {

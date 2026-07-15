@@ -10,6 +10,8 @@ import {
   ArrowLeft,
   ChevronDown,
   Save,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import {
   PERMISSION_GROUPS,
@@ -17,8 +19,10 @@ import {
   applyPermissionCascade,
   rotuloCargoSistema,
   PAPEL_DEPARTAMENTO,
+  permissionsOfRole,
 } from '@torcida/types'
 import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/acessos/actions'
+import { atualizarRole, excluirRole } from '@/app/admin/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { runPersistAction } from '@/lib/toast-action'
 
@@ -99,7 +103,7 @@ function efetivasDe(
 
 export function AccessUserPanel({
   usuario,
-  roles,
+  roles: rolesProp,
   departamentos,
   tipoSede,
   onClose,
@@ -112,15 +116,17 @@ export function AccessUserPanel({
 }) {
   const [aba, setAba] = useState<PainelAba>('perfis')
   const [pending, startTransition] = useTransition()
+  const [roles, setRoles] = useState<AccessRoleOpt[]>(rolesProp)
   const [perfilIds, setPerfilIds] = useState<Set<string>>(() => new Set(usuario.perfilIds))
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [novoPerfilNome, setNovoPerfilNome] = useState('')
+  const [gerenciandoRoleId, setGerenciandoRoleId] = useState<string | null>(null)
   const [gruposPermAbertos, setGruposPermAbertos] = useState(
     () => new Set(PERMISSION_GROUPS.map((g) => g.label)),
   )
 
   const [overridesUi, setOverridesUi] = useState(() => {
-    const cob = coberturaDePerfis(roles, new Set(usuario.perfilIds))
+    const cob = coberturaDePerfis(rolesProp, new Set(usuario.perfilIds))
     const efetivas = calculateEffectivePermissions([...cob], usuario.permissoesAdicionais)
     return diffCoberturaEfetiva(cob, efetivas)
   })
@@ -138,6 +144,11 @@ export function AccessUserPanel({
   const deptoById = useMemo(
     () => new Map(departamentos.map((d) => [d.id, d])),
     [departamentos],
+  )
+
+  const roleGerenciando = useMemo(
+    () => (gerenciandoRoleId ? roles.find((r) => r.id === gerenciandoRoleId) ?? null : null),
+    [roles, gerenciandoRoleId],
   )
 
   const areasDerivadas = useMemo(() => {
@@ -293,24 +304,142 @@ export function AccessUserPanel({
     if (nome.length < 2) return
 
     const deptoRole = roles.find((r) => perfilIds.has(r.id) && r.departamentoId)
+    const extrasList = [...overridesUi.extras]
     const fd = new FormData()
     fd.set('nome', nome)
     fd.set('cor', deptoRole?.cor ?? '#6b7280')
+    fd.set('userId', usuario.id)
     if (deptoRole?.departamentoId && deptoRole.papelNoDepartamento) {
       fd.set('departamentoId', deptoRole.departamentoId)
       fd.set('papelNoDepartamento', deptoRole.papelNoDepartamento)
     }
-    for (const p of overridesUi.extras) fd.append('permissionsExtras', p)
+    for (const p of extrasList) fd.append('permissionsExtras', p)
 
     setSalvandoPerfil(true)
     try {
-      const ok = await runPersistAction(() => salvarPerfilComposto(fd), {
-        success: 'Novo perfil criado — disponível na lista de cargos.',
+      const box: { current: Awaited<ReturnType<typeof salvarPerfilComposto>> | null } = {
+        current: null,
+      }
+      const ok = await runPersistAction(async () => {
+        box.current = await salvarPerfilComposto(fd)
+        return box.current
+      }, {
+        success: 'Novo perfil criado e atribuído a esta pessoa.',
       })
-      if (ok) setNovoPerfilNome('')
+      const result = box.current
+      if (!ok || !result) return
+
+      const depto = result.departamentoId ? deptoById.get(result.departamentoId) : null
+      const novoRole: AccessRoleOpt = {
+        id: result.id,
+        nome: result.nome,
+        cor: result.cor,
+        isSystem: result.isSystem,
+        permissionsExtras: result.permissionsExtras,
+        departamentoId: result.departamentoId,
+        papelNoDepartamento: result.papelNoDepartamento,
+        permissions: permissionsOfRole(
+          {
+            permissions: result.departamentoId ? [] : extrasList,
+            permissionsExtras: result.departamentoId ? extrasList : result.permissionsExtras,
+            departamentoId: result.departamentoId,
+            papelNoDepartamento: result.papelNoDepartamento,
+          },
+          depto
+            ? { permissions: depto.permissions, permissionsGestor: depto.permissionsGestor }
+            : null,
+        ),
+      }
+
+      setRoles((prev) => [...prev, novoRole])
+      const nextPerfis = new Set(perfilIds)
+      nextPerfis.add(result.id)
+      setOverridesUi((cur) => {
+        const extras = new Set(cur.extras)
+        for (const p of extrasList) extras.delete(p)
+        return { extras, revogadas: cur.revogadas }
+      })
+      setPerfilIds(nextPerfis)
+      setNovoPerfilNome('')
+      setAba('perfis')
+      setGerenciandoRoleId(result.id)
     } finally {
       setSalvandoPerfil(false)
     }
+  }
+
+  async function handleAtualizarPerfil(
+    roleId: string,
+    data: { nome: string; cor: string; extras: string[] },
+  ) {
+    const role = roles.find((r) => r.id === roleId)
+    if (!role || role.isSystem) return false
+
+    const fd = new FormData()
+    fd.set('nome', data.nome)
+    fd.set('cor', data.cor)
+    if (role.departamentoId && role.papelNoDepartamento) {
+      fd.set('departamentoId', role.departamentoId)
+      fd.set('papelNoDepartamento', role.papelNoDepartamento)
+    }
+    for (const p of data.extras) fd.append('permissionsExtras', p)
+    if (!role.departamentoId) {
+      for (const p of data.extras) fd.append('permissions', p)
+    }
+
+    const ok = await runPersistAction(() => atualizarRole(roleId, fd), {
+      success: 'Perfil atualizado.',
+    })
+    if (!ok) return false
+
+    const depto = role.departamentoId ? deptoById.get(role.departamentoId) : null
+    const permissions = permissionsOfRole(
+      {
+        permissions: role.departamentoId ? [] : data.extras,
+        permissionsExtras: role.departamentoId ? data.extras : [],
+        departamentoId: role.departamentoId,
+        papelNoDepartamento: role.papelNoDepartamento,
+      },
+      depto
+        ? { permissions: depto.permissions, permissionsGestor: depto.permissionsGestor }
+        : null,
+    )
+
+    setRoles((prev) =>
+      prev.map((r) =>
+        r.id === roleId
+          ? {
+              ...r,
+              nome: data.nome,
+              cor: data.cor,
+              permissionsExtras: data.extras,
+              permissions,
+            }
+          : r,
+      ),
+    )
+    return true
+  }
+
+  async function handleExcluirPerfil(roleId: string) {
+    const role = roles.find((r) => r.id === roleId)
+    if (!role || role.isSystem) return false
+
+    const fd = new FormData()
+    if (perfilIds.has(roleId)) fd.set('liberarUserId', usuario.id)
+
+    const ok = await runPersistAction(() => excluirRole(roleId, fd), {
+      success: 'Perfil excluído.',
+    })
+    if (!ok) return false
+
+    const nextPerfis = new Set(perfilIds)
+    nextPerfis.delete(roleId)
+    aplicarMudancaPerfis(nextPerfis)
+    setPerfilIds(nextPerfis)
+    setRoles((prev) => prev.filter((r) => r.id !== roleId))
+    setGerenciandoRoleId(null)
+    return true
   }
 
   const abas: { id: PainelAba; label: string; count: number }[] = [
@@ -415,72 +544,98 @@ export function AccessUserPanel({
       <div className="max-h-[min(70vh,40rem)] overflow-y-auto px-4 py-5 sm:px-6">
         {aba === 'perfis' && (
           <div className="space-y-5">
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              Marcar um perfil de área já coloca a pessoa no departamento (membro ou gestor) e
-              concede o pacote correspondente. Perfis transversais (Presidente, associado…) não
-              exigem área.
-            </p>
-            {gruposPerfil.map((grupo) => (
-              <div key={grupo.key} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  {grupo.cor && (
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: grupo.cor }} />
-                  )}
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    {grupo.label}
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {grupo.items.map((role) => {
-                    const checked = perfilIds.has(role.id)
-                    return (
-                      <label
-                        key={role.id}
-                        className={[
-                          'flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors',
-                          checked
-                            ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
-                            : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
-                        ].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={checked}
-                          onChange={() => togglePerfil(role.id)}
-                        />
+            {roleGerenciando ? (
+              <PerfilManagePanel
+                key={roleGerenciando.id}
+                role={roleGerenciando}
+                tipoSede={tipoSede}
+                departamentos={departamentos}
+                atribuido={perfilIds.has(roleGerenciando.id)}
+                onClose={() => setGerenciandoRoleId(null)}
+                onToggleAtribuicao={() => togglePerfil(roleGerenciando.id)}
+                onSave={(data) => handleAtualizarPerfil(roleGerenciando.id, data)}
+                onDelete={() => handleExcluirPerfil(roleGerenciando.id)}
+              />
+            ) : (
+              <>
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                  Clique no perfil para editar ou excluir. O check à direita atribui ou remove a
+                  pessoa. Perfis de área também colocam no departamento (membro ou gestor).
+                </p>
+                {gruposPerfil.map((grupo) => (
+                  <div key={grupo.key} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {grupo.cor && (
                         <span
-                          className="h-3 w-3 shrink-0 rounded-full"
-                          style={{ backgroundColor: role.cor }}
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: grupo.cor }}
                         />
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-medium leading-snug">
-                            {roleLabel(role, tipoSede)}
-                          </span>
-                          {role.papelNoDepartamento && (
-                            <span className="text-[10px] uppercase tracking-wide opacity-70">
-                              {role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
-                                ? 'Gestor'
-                                : 'Membro'}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className={[
-                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                            checked
-                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
-                              : 'border-[rgb(var(--border-strong))]',
-                          ].join(' ')}
-                        >
-                          {checked && <Check className="h-2.5 w-2.5 text-white" />}
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+                      )}
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                        {grupo.label}
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {grupo.items.map((role) => {
+                        const checked = perfilIds.has(role.id)
+                        return (
+                          <div
+                            key={role.id}
+                            className={[
+                              'flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors',
+                              checked
+                                ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--foreground))]'
+                                : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--border-strong))]',
+                            ].join(' ')}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setGerenciandoRoleId(role.id)}
+                              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                            >
+                              <span
+                                className="h-3 w-3 shrink-0 rounded-full"
+                                style={{ backgroundColor: role.cor }}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-medium leading-snug">
+                                  {roleLabel(role, tipoSede)}
+                                </span>
+                                <span className="text-[10px] uppercase tracking-wide opacity-70">
+                                  {role.isSystem
+                                    ? 'Sistema'
+                                    : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR
+                                      ? 'Gestor · editar'
+                                      : role.papelNoDepartamento === PAPEL_DEPARTAMENTO.MEMBRO
+                                        ? 'Membro · editar'
+                                        : 'Editar'}
+                                </span>
+                              </span>
+                              {!role.isSystem && (
+                                <Pencil className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={checked ? 'Remover perfil' : 'Atribuir perfil'}
+                              onClick={() => togglePerfil(role.id)}
+                              className={[
+                                'flex h-5 w-5 shrink-0 items-center justify-center rounded border',
+                                checked
+                                  ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                                  : 'border-[rgb(var(--border-strong))]',
+                              ].join(' ')}
+                            >
+                              {checked && <Check className="h-2.5 w-2.5 text-white" />}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
@@ -631,6 +786,279 @@ export function AccessUserPanel({
         </div>
       </div>
     </form>
+  )
+}
+
+function pacoteDepartamento(
+  role: AccessRoleOpt,
+  departamentos: AccessDepartamentoOpt[],
+): Set<string> {
+  if (!role.departamentoId) return new Set()
+  const depto = departamentos.find((d) => d.id === role.departamentoId)
+  if (!depto) return new Set()
+  const base = depto.permissions
+  const gestor =
+    role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR ? depto.permissionsGestor : []
+  return new Set([...base, ...gestor])
+}
+
+function PerfilManagePanel({
+  role,
+  tipoSede,
+  departamentos,
+  atribuido,
+  onClose,
+  onToggleAtribuicao,
+  onSave,
+  onDelete,
+}: {
+  role: AccessRoleOpt
+  tipoSede: string
+  departamentos: AccessDepartamentoOpt[]
+  atribuido: boolean
+  onClose: () => void
+  onToggleAtribuicao: () => void
+  onSave: (data: { nome: string; cor: string; extras: string[] }) => Promise<boolean>
+  onDelete: () => Promise<boolean>
+}) {
+  const [nome, setNome] = useState(role.nome)
+  const [cor, setCor] = useState(role.cor)
+  const [extras, setExtras] = useState(() => {
+    if (role.departamentoId) return new Set(role.permissionsExtras ?? [])
+    // Transversal: permissões próprias ficam em `permissions` (ou extras se preenchido)
+    if (role.permissionsExtras && role.permissionsExtras.length > 0) {
+      return new Set(role.permissionsExtras)
+    }
+    return new Set(role.permissions)
+  })
+  const [pending, setPending] = useState(false)
+  const [confirmExcluir, setConfirmExcluir] = useState(false)
+  const pacote = useMemo(() => pacoteDepartamento(role, departamentos), [role, departamentos])
+  const deptoNome = role.departamentoId
+    ? departamentos.find((d) => d.id === role.departamentoId)?.nome
+    : null
+  const somenteLeitura = role.isSystem
+
+  function toggleExtra(key: string) {
+    if (somenteLeitura || pacote.has(key)) return
+    setExtras((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  async function salvar() {
+    if (somenteLeitura) return
+    setPending(true)
+    try {
+      const ok = await onSave({ nome: nome.trim(), cor, extras: [...extras] })
+      if (ok) onClose()
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function excluir() {
+    if (somenteLeitura) return
+    setPending(true)
+    try {
+      await onDelete()
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Voltar aos perfis
+        </button>
+        <button
+          type="button"
+          onClick={onToggleAtribuicao}
+          className={[
+            'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium',
+            atribuido
+              ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--primary))]'
+              : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
+          ].join(' ')}
+        >
+          {atribuido ? <Check className="h-3 w-3" /> : null}
+          {atribuido ? 'Atribuído a esta pessoa' : 'Atribuir a esta pessoa'}
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cor }} />
+          <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            {roleLabel(role, tipoSede)}
+          </h3>
+          {somenteLeitura && (
+            <span className="rounded-full bg-[rgb(var(--surface))] px-2 py-0.5 text-[10px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
+              Sistema
+            </span>
+          )}
+        </div>
+
+        {somenteLeitura ? (
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            Perfis do sistema não podem ser editados nem excluídos. Use a atribuição acima ou crie
+            um perfil personalizado na aba de permissões adicionais.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <label className="block space-y-1">
+                <span className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                  Nome
+                </span>
+                <input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                  Cor
+                </span>
+                <input
+                  type="color"
+                  value={cor}
+                  onChange={(e) => setCor(e.target.value)}
+                  className="h-10 w-full min-w-[3.5rem] cursor-pointer rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-1 sm:w-14"
+                />
+              </label>
+            </div>
+            {deptoNome && (
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                Área: <strong className="font-medium text-[rgb(var(--foreground))]">{deptoNome}</strong>
+                {role.papelNoDepartamento === PAPEL_DEPARTAMENTO.GESTOR ? ' · Gestor' : ' · Membro'}
+                . O pacote da área é herdado; abaixo só extras do perfil.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!somenteLeitura && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-[rgb(var(--foreground))]">
+            Permissões extras do perfil
+          </p>
+          <div className="grid max-h-64 items-start gap-2 overflow-y-auto lg:grid-cols-2">
+            {PERMISSION_GROUPS.map((group) => (
+              <div
+                key={group.label}
+                className="rounded-xl border border-[rgb(var(--border))] p-2"
+              >
+                <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const viaPacote = pacote.has(item.key)
+                    const on = viaPacote || extras.has(item.key)
+                    return (
+                      <label
+                        key={item.key}
+                        className={[
+                          'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs',
+                          viaPacote
+                            ? 'cursor-not-allowed opacity-60'
+                            : 'cursor-pointer hover:bg-[rgb(var(--background-subtle))]',
+                          on ? 'text-[rgb(var(--foreground))]' : 'text-[rgb(var(--foreground-muted))]',
+                        ].join(' ')}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          disabled={viaPacote}
+                          checked={on}
+                          onChange={() => toggleExtra(item.key)}
+                        />
+                        <span
+                          className={[
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                            on
+                              ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]'
+                              : 'border-[rgb(var(--border-strong))]',
+                          ].join(' ')}
+                        >
+                          {on && <Check className="h-2.5 w-2.5 text-white" />}
+                        </span>
+                        <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
+                        {viaPacote && (
+                          <span className="text-[9px] uppercase tracking-wide opacity-70">
+                            pacote
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!somenteLeitura && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
+          <div>
+            {confirmExcluir ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-[rgb(var(--foreground-muted))]">Excluir de vez?</span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void excluir()}
+                  className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmExcluir(false)}
+                  className="text-xs text-[rgb(var(--foreground-muted))]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setConfirmExcluir(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/5 disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluir perfil
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            disabled={pending || nome.trim().length < 2}
+            onClick={() => void salvar()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Salvar perfil
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

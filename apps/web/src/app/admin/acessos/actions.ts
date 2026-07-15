@@ -177,12 +177,14 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
 /**
  * Cria um novo perfil a partir de departamento + papel + extras (composição).
+ * Se `userId` for enviado, atribui o perfil à pessoa e sincroniza membership.
  */
 export async function salvarPerfilComposto(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
   const nome = String(formData.get('nome') ?? '').trim()
   const cor = String(formData.get('cor') ?? '#6b7280').trim()
+  const userId = String(formData.get('userId') ?? '').trim() || null
   const departamentoIdRaw = String(formData.get('departamentoId') ?? '').trim()
   const papelRaw = String(formData.get('papelNoDepartamento') ?? '').trim()
   const extras = applyPermissionCascade(
@@ -215,39 +217,71 @@ export async function salvarPerfilComposto(formData: FormData) {
   })
   if (existing) throw new Error('Já existe um perfil com este nome')
 
-  const role = await db.role.create({
-    data: {
-      tenantId: tenant.id,
-      nome,
-      cor: /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : '#6b7280',
-      isSystem: false,
-      permissions: departamentoId ? [] : extras,
-      permissionsExtras: departamentoId ? extras : [],
-      departamentoId,
-      papelNoDepartamento,
-    },
-  })
-
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'ROLE_CRIADO',
-      entidade: 'Role',
-      entidadeId: role.id,
-      detalhes: {
+  const role = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const created = await tx.role.create({
+      data: {
+        tenantId: tenant.id,
         nome,
+        cor: /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : '#6b7280',
+        isSystem: false,
+        permissions: departamentoId ? [] : extras,
+        permissionsExtras: departamentoId ? extras : [],
         departamentoId,
         papelNoDepartamento,
-        permissionsExtras: extras,
-        origem: 'perfil_composto',
       },
-    },
+    })
+
+    if (userId) {
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true } })
+      if (!user) throw new Error('Usuário não encontrado')
+      await tx.userRole.create({
+        data: { userId, tenantId: tenant.id, roleId: created.id },
+      })
+      // Extras do perfil deixam de ser overrides pontuais na pessoa
+      for (const permission of extras) {
+        await tx.userPermission.deleteMany({
+          where: { userId, tenantId: tenant.id, permission },
+        })
+      }
+      await syncMembershipFromRoles(tx, { userId, tenantId: tenant.id })
+    }
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'ROLE_CRIADO',
+        entidade: 'Role',
+        entidadeId: created.id,
+        detalhes: {
+          nome,
+          departamentoId,
+          papelNoDepartamento,
+          permissionsExtras: extras,
+          origem: 'perfil_composto',
+          atribuidoA: userId,
+        },
+      },
+    })
+
+    return created
   })
 
+  if (userId) invalidatePermissionsCache(userId, tenant.id)
   revalidatePath('/admin/acessos')
   revalidatePath('/admin/configuracoes')
-  return { id: role.id }
+  revalidatePath('/admin/hierarquia')
+
+  return {
+    success: true as const,
+    id: role.id,
+    nome: role.nome,
+    cor: role.cor,
+    isSystem: role.isSystem,
+    permissionsExtras: role.permissionsExtras,
+    departamentoId: role.departamentoId,
+    papelNoDepartamento: role.papelNoDepartamento,
+  }
 }
 
 async function assertPodeGerirDepartamento(departamentoId: string) {
