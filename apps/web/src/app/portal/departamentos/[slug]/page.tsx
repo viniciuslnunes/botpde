@@ -62,8 +62,8 @@ export async function generateMetadata({
   return { title: `Departamento · ${slug}` }
 }
 
-const MODULO_LABEL = new Map(
-  DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label] as const),
+const MODULO_LABEL = new Map<string, string>(
+  DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label]),
 )
 
 export default async function DepartamentoHomePage({
