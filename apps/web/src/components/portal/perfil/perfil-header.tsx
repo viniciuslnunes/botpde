@@ -34,45 +34,26 @@ export function PerfilHeader({
       {/* Faixa de topo: banner do membro quando existe, senão gradiente da torcida. */}
       <div className="relative h-28 sm:h-36">
         {bannerUrl ? (
-          <>
-            {/* Fundo desfocado preenche a faixa; a imagem em si aparece inteira por cima, sem corte. */}
-            {canOptimizeImageUrl(bannerUrl) ? (
-              <Image
-                src={bannerUrl}
-                alt=""
-                fill
-                aria-hidden
-                sizes="(max-width: 640px) 100vw, 42rem"
-                className="scale-110 object-cover blur-xl brightness-75"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={bannerUrl}
-                alt=""
-                aria-hidden
-                className="h-full w-full scale-110 object-cover blur-xl brightness-75"
-              />
-            )}
-            {canOptimizeImageUrl(bannerUrl) ? (
-              <Image
-                src={bannerUrl}
-                alt=""
-                fill
-                sizes="(max-width: 640px) 100vw, 42rem"
-                className="object-contain"
-                style={{ objectPosition }}
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={bannerUrl}
-                alt=""
-                className="absolute inset-0 h-full w-full object-contain"
-                style={{ objectPosition }}
-              />
-            )}
-          </>
+          canOptimizeImageUrl(bannerUrl) ? (
+            <Image
+              src={bannerUrl}
+              alt=""
+              fill
+              aria-hidden
+              sizes="(max-width: 640px) 100vw, 42rem"
+              className="object-cover"
+              style={{ objectPosition }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={bannerUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition }}
+            />
+          )
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />
         )}
