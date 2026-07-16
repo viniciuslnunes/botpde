@@ -32,18 +32,23 @@ function truncar(texto: string, max = 90): string {
   return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto
 }
 
+/** Tipos cujo efeito muda dados renderizados por Server Components (ex.: painel
+ * lateral da comunidade) — exigem `router.refresh()` além do toast. */
+const TIPOS_QUE_EXIGEM_REFRESH: ReadonlySet<string> = new Set(['MEMBRO_APROVADO'])
+
 /**
  * Dispara toasts para notificações novas detectadas no polling. O primeiro
- * fetch apenas semeia os ids (sem toast-storm ao abrir a aba).
+ * fetch apenas semeia os ids (sem toast-storm ao abrir a aba). Retorna `true`
+ * quando alguma notificação nova exige revalidar a árvore de Server Components.
  */
 function notificarNovas(
   notifications: NotificationItem[],
   navegar: (href: string) => void,
-): void {
+): boolean {
   if (!hasSeededSeenIds) {
     for (const n of notifications) seenNotificationIds.add(n.id)
     hasSeededSeenIds = true
-    return
+    return false
   }
 
   const novas: NotificationItem[] = []
@@ -53,7 +58,9 @@ function notificarNovas(
     novas.push(n)
   }
 
-  if (novas.length === 0) return
+  if (novas.length === 0) return false
+
+  const precisaRefresh = novas.some((n) => TIPOS_QUE_EXIGEM_REFRESH.has(n.tipo))
 
   if (novas.length > MAX_TOASTS_INDIVIDUAIS) {
     toast.action(
@@ -64,7 +71,7 @@ function notificarNovas(
       },
       { duration: TOAST_DURATION_MS },
     )
-    return
+    return precisaRefresh
   }
 
   for (const n of novas) {
@@ -95,6 +102,8 @@ function notificarNovas(
       { duration: TOAST_DURATION_MS },
     )
   }
+
+  return precisaRefresh
 }
 
 /**
@@ -170,9 +179,10 @@ export function useNavbarContext() {
   const refresh = useCallback(
     (force = false) => {
       void loadNavbarContext(force).then((data) => {
-        notificarNovas(data.notifications, (href) => router.push(href))
+        const precisaRefresh = notificarNovas(data.notifications, (href) => router.push(href))
         notificarMensagemNova(data.unreadMessages, onMensagensPage, (href) => router.push(href))
         setCtx(data)
+        if (precisaRefresh) router.refresh()
       })
     },
     [router, onMensagensPage],
