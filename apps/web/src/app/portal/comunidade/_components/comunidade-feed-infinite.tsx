@@ -58,7 +58,7 @@ export function ComunidadeFeedInfinite({
     initialCursor,
   })
 
-  const { start, end, topSpacer, bottomSpacer } = useFeedWindow(posts.length)
+  const windowing = useFeedWindow(posts.length)
 
   const refreshDebounceRef = useRef<number | null>(null)
 
@@ -104,30 +104,51 @@ export function ComunidadeFeedInfinite({
     return () => obs.disconnect()
   }, [loadMoreWithDeeplink])
 
-  const visiblePosts = posts.slice(start, end)
-
   return (
     <>
       <section className="space-y-4">
         {posts.length === 0 ? (
           <ComunidadeFeedEmpty filtro={filtro} />
-        ) : (
-          <>
-            {topSpacer > 0 ? <div aria-hidden style={{ height: topSpacer }} /> : null}
-            {visiblePosts.map((post, index) => (
-              <MotionReveal key={post.id} index={start + index}>
-                <div className="feed-post-window">
-                  <FeedPostCard
-                    post={post}
-                    showTenantBadge={post.tenantId !== tenantId}
-                    currentUser={currentUser}
-                    salvo={salvoSet.has(post.id)}
-                  />
+        ) : windowing.enabled && windowing.virtualItems ? (
+          <div className="relative w-full" style={{ height: windowing.totalSize }}>
+            {windowing.virtualItems.map((item) => {
+              const post = posts[item.index]
+              if (!post) return null
+              return (
+                <div
+                  key={post.id}
+                  data-index={item.index}
+                  ref={windowing.measureElement}
+                  className="absolute left-0 top-0 w-full pb-4"
+                  style={{ transform: `translateY(${item.start}px)` }}
+                >
+                  <MotionReveal index={item.index}>
+                    <div className="feed-post-window">
+                      <FeedPostCard
+                        post={post}
+                        showTenantBadge={post.tenantId !== tenantId}
+                        currentUser={currentUser}
+                        salvo={salvoSet.has(post.id)}
+                      />
+                    </div>
+                  </MotionReveal>
                 </div>
-              </MotionReveal>
-            ))}
-            {bottomSpacer > 0 ? <div aria-hidden style={{ height: bottomSpacer }} /> : null}
-          </>
+              )
+            })}
+          </div>
+        ) : (
+          posts.map((post, index) => (
+            <MotionReveal key={post.id} index={index}>
+              <div className="feed-post-window">
+                <FeedPostCard
+                  post={post}
+                  showTenantBadge={post.tenantId !== tenantId}
+                  currentUser={currentUser}
+                  salvo={salvoSet.has(post.id)}
+                />
+              </div>
+            </MotionReveal>
+          ))
         )}
       </section>
 

@@ -125,20 +125,18 @@ aprovação humana antes de implementação (`product-strategy` + `performance`)
 
 ### Fase C — refinamento zero-infra (próximos 2–4 sprints)
 
-**Entregue parcialmente (2026-07-16):** C2 `revalidateTag` + tags em caches;
-C1 windowing (`useFeedWindow` + `content-visibility`); C3 hook compartilhado
-`useComunidadeInfiniteFeed` (substitui Map duplicado); C5 `ComunidadePrefetchLink`;
-C4 e2e budget Comunidade; C6 hashtags com TTL 300s + invalidação on-write.
-**Pendente:** TanStack Query/Virtual quando `@tanstack/*` instalável no ambiente.
+**Entregue (2026-07-16):** C1–C6 — windowing TanStack Virtual + Query no infinite
+feed/rede, `revalidateTag`, prefetch hover, e2e budget, hashtags com TTL/invalidação.
+Provider: `ComunidadeQueryProvider` no layout da Comunidade.
 
-| # | Recorte | Por quê | Esforço |
-|---|---------|---------|---------|
-| C1 | **Virtualização** de listas longas (`@tanstack/react-virtual` ou equivalente) em feed infinite, notificações e inbox | DOM e hidratação custam mais que query após ~50 cards | Médio |
-| C2 | **`revalidateTag` na timeline** ao publicar/editar/ocultar post e ao follow/unfollow | Hoje TTL implícito; invalidação explícita reduz staleness pós-escrita | Baixo |
-| C3 | **TanStack Query** no client (quando install estável) substituindo cache `Map` manual | Dedupe, retry, staleTime por rota; menos código bespoke | Médio |
-| C4 | **E2E de latência Comunidade** — estender `nav-latency.portal.spec.ts` com budget de queries/API por rota | Regressão automática no CI | Baixo |
-| C5 | **Prefetch on-hover** em cards de perfil/hashtag no feed | Alinha com padrão da navbar | Baixo |
-| C6 | **Materialized view ou job** para hashtags trending (refresh 5–15 min) | `groupBy` semanal ainda pesado em tenants muito ativos | Médio |
+| # | Recorte | Por quê | Esforço | Status |
+|---|---------|---------|---------|--------|
+| C1 | **Virtualização** (`@tanstack/react-virtual` / `useWindowVirtualizer`) | DOM após ~50 cards | Médio | ✅ |
+| C2 | **`revalidateTag`** nos caches Comunidade | Staleness pós-escrita | Baixo | ✅ |
+| C3 | **TanStack Query** (`useInfiniteQuery`) no feed/rede | Dedupe, retry, staleTime | Médio | ✅ |
+| C4 | **E2E de latência Comunidade** | Regressão no CI | Baixo | ✅ |
+| C5 | **Prefetch on-hover** perfil/hashtag | Alinha navbar | Baixo | ✅ |
+| C6 | Hashtags trending TTL 300s + tag on-write | Escala trending | Baixo | ✅ (MV job ainda futuro) |
 
 ### Fase D — tempo quase real e consistência multi-instância
 
@@ -211,8 +209,9 @@ escutam SSE; polling 60s como rede de segurança.
 | Área | Caminho |
 |------|---------|
 | Cache tags | `apps/web/src/lib/comunidade-cache.ts` |
-| Infinite hook | `apps/web/src/lib/use-comunidade-infinite-feed.ts` |
-| Windowing | `apps/web/src/lib/use-feed-window.ts` |
+| Infinite hook | `apps/web/src/lib/use-comunidade-infinite-feed.ts` (TanStack Query) |
+| Windowing | `apps/web/src/lib/use-feed-window.ts` (`@tanstack/react-virtual`) |
+| Query provider | `apps/web/src/components/portal/comunidade-query-provider.tsx` |
 | Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
 | Feed + ranking | `apps/web/src/lib/feed.ts` |
 | Timeline | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts` |

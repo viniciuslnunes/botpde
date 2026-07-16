@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useMemo } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 
 export interface PageInfo {
   hasMore: boolean
@@ -12,21 +13,35 @@ export type ComunidadeFeedPage<TPost> = {
   pageInfo: PageInfo
 }
 
-type FetchParams = {
+async function fetchFeedPage<TPost>(params: {
+  endpoint: string
   cursor: string | null
+  take: number
+  filtro?: string
   signal: AbortSignal
-}
+}): Promise<ComunidadeFeedPage<TPost>> {
+  const url = new URL(params.endpoint, window.location.origin)
+  url.searchParams.set('take', String(params.take))
+  if (params.cursor) url.searchParams.set('cursor', params.cursor)
+  if (params.filtro) url.searchParams.set('filtro', params.filtro)
 
-const MAX_CACHED_PAGES = 12
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    signal: params.signal,
+    credentials: 'include',
+  })
 
-function cacheKey(parts: string[]): string {
-  return parts.join(':')
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(body?.error ?? 'Erro ao carregar posts.')
+  }
+
+  return (await res.json()) as ComunidadeFeedPage<TPost>
 }
 
 /**
- * Infinite scroll compartilhado (feed/rede) — dedupe, abort e cache de páginas.
- * Substitui Map manual duplicado; migração futura para TanStack Query quando
- * o pacote estiver instalável no ambiente.
+ * Infinite scroll do feed/rede via TanStack Query (dedupe, cache, retry).
+ * SSR entrega a 1ª página em `initialData`.
  */
 export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options: {
   endpoint: string
@@ -49,146 +64,112 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     take = 20,
   } = options
 
-  const pageCache = useRef(new Map<string, ComunidadeFeedPage<TPost>>())
-
-  const [posts, setPosts] = useState<TPost[]>(initialPosts)
-  const [pageInfo, setPageInfo] = useState<PageInfo>(initialPageInfo)
-  const [currentCursor, setCurrentCursor] = useState<string | null>(initialCursor)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const abortRef = useRef<AbortController | null>(null)
-  const loadedCursorsRef = useRef<Set<string | null>>(new Set([initialCursor]))
-
-  const buildKey = useCallback(
-    (cursor: string | null) =>
-      cacheKey([tenantId, viewerId, filtro ?? '', cursor ?? '']),
-    [tenantId, viewerId, filtro],
+  const queryClient = useQueryClient()
+  const queryKey = useMemo(
+    () => ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? ''] as const,
+    [endpoint, tenantId, viewerId, filtro],
   )
 
-  const fetchPage = useCallback(
-    async ({ cursor, signal }: FetchParams): Promise<ComunidadeFeedPage<TPost>> => {
-      const url = new URL(endpoint, window.location.origin)
-      url.searchParams.set('take', String(take))
-      if (cursor) url.searchParams.set('cursor', cursor)
-      if (filtro) url.searchParams.set('filtro', filtro)
-
-      const res = await fetch(url.toString(), {
-        method: 'GET',
+  const query = useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      fetchFeedPage<TPost>({
+        endpoint,
+        cursor: pageParam,
+        take,
+        filtro,
         signal,
-        credentials: 'include',
-      })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Erro ao carregar posts.')
-      }
-
-      return (await res.json()) as ComunidadeFeedPage<TPost>
+      }),
+    initialPageParam: initialCursor as string | null,
+    getNextPageParam: (last) =>
+      last.pageInfo.hasMore ? last.pageInfo.nextCursor : undefined,
+    initialData: {
+      pages: [{ posts: initialPosts, pageInfo: initialPageInfo }],
+      pageParams: [initialCursor],
     },
-    [endpoint, filtro, take],
-  )
+    staleTime: 30_000,
+  })
 
-  const mergePosts = useCallback((prev: TPost[], incoming: TPost[]) => {
-    const existing = new Set(prev.map((p) => p.id))
-    const deduped = incoming.filter((p) => !existing.has(p.id))
-    return [...prev, ...deduped]
-  }, [])
+  const posts = useMemo(() => {
+    const seen = new Set<string>()
+    const flat: TPost[] = []
+    for (const page of query.data?.pages ?? []) {
+      for (const post of page.posts) {
+        if (seen.has(post.id)) continue
+        seen.add(post.id)
+        flat.push(post)
+      }
+    }
+    return flat
+  }, [query.data?.pages])
 
-  const loadMore = useCallback(async () => {
+  const lastPage = query.data?.pages[query.data.pages.length - 1]
+  const pageInfo: PageInfo = lastPage?.pageInfo ?? initialPageInfo
+  const currentCursor =
+    (query.data?.pageParams[query.data.pageParams.length - 1] as string | null | undefined) ??
+    initialCursor
+
+  const loadMore = useCallback(async (): Promise<string | undefined> => {
     if (!pageInfo.hasMore || !pageInfo.nextCursor) return
-    if (loadingMore) return
+    if (query.isFetchingNextPage) return
 
     const cursor = pageInfo.nextCursor
-    if (loadedCursorsRef.current.has(cursor)) return
-
-    const key = buildKey(cursor)
-    const cached = pageCache.current.get(key)
-    if (cached) {
-      loadedCursorsRef.current.add(cursor)
-      setPosts((prev) => mergePosts(prev, cached.posts))
-      setPageInfo(cached.pageInfo)
-      return
-    }
-
-    loadedCursorsRef.current.add(cursor)
-    setLoadingMore(true)
-    setError(null)
-
-    abortRef.current?.abort()
-    const ac = new AbortController()
-    abortRef.current = ac
-
-    try {
-      const data = await fetchPage({ cursor, signal: ac.signal })
-
-      setPosts((prev) => mergePosts(prev, data.posts))
-      setPageInfo(data.pageInfo)
-      setCurrentCursor(cursor)
-
-      if (pageCache.current.size >= MAX_CACHED_PAGES) {
-        const firstKey = pageCache.current.keys().next().value as string | undefined
-        if (firstKey) pageCache.current.delete(firstKey)
-      }
-      pageCache.current.set(key, data)
-
-      return cursor
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      setError(e instanceof Error ? e.message : 'Erro ao carregar mais posts.')
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [buildKey, fetchPage, loadingMore, mergePosts, pageInfo.hasMore, pageInfo.nextCursor])
+    await query.fetchNextPage()
+    return cursor
+  }, [pageInfo.hasMore, pageInfo.nextCursor, query])
 
   const refreshCurrentPage = useCallback(
     async (cursorOverride?: string | null) => {
-      const cursor = cursorOverride !== undefined ? cursorOverride : currentCursor
-      setError(null)
-      abortRef.current?.abort()
-      const ac = new AbortController()
-      abortRef.current = ac
-
+      const cursor = cursorOverride !== undefined ? cursorOverride : initialCursor
       try {
-        const data = await fetchPage({ cursor, signal: ac.signal })
-        const refreshedIds = new Set(data.posts.map((p) => p.id))
-
-        setPosts((prev) => {
-          const prevIds = new Set(prev.map((p) => p.id))
-          const mergedNew = data.posts.filter((p) => !prevIds.has(p.id))
-          const merged = [...mergedNew, ...prev]
-          const unique: TPost[] = []
-          const seen = new Set<string>()
-          for (const p of merged) {
-            if (seen.has(p.id)) continue
-            seen.add(p.id)
-            unique.push(p)
-          }
-          const top = unique.filter((p) => refreshedIds.has(p.id))
-          const rest = unique.filter((p) => !refreshedIds.has(p.id))
-          return [...top, ...rest]
+        const fresh = await fetchFeedPage<TPost>({
+          endpoint,
+          cursor,
+          take,
+          filtro,
+          signal: new AbortController().signal,
         })
 
-        setPageInfo(data.pageInfo)
-        pageCache.current.set(buildKey(cursor), data)
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return
-        setError(e instanceof Error ? e.message : 'Erro ao atualizar feed.')
+        queryClient.setQueryData(
+          queryKey,
+          (prev: { pages: ComunidadeFeedPage<TPost>[]; pageParams: Array<string | null> } | undefined) => {
+            if (!prev || prev.pages.length === 0) {
+              return {
+                pages: [fresh],
+                pageParams: [cursor],
+              }
+            }
+
+            const refreshedIds = new Set(fresh.posts.map((p) => p.id))
+            const restPosts = prev.pages
+              .flatMap((p) => p.posts)
+              .filter((p) => !refreshedIds.has(p.id))
+
+            const mergedPage: ComunidadeFeedPage<TPost> = {
+              posts: [...fresh.posts, ...restPosts],
+              pageInfo: fresh.pageInfo,
+            }
+
+            return {
+              pages: [mergedPage, ...prev.pages.slice(1)],
+              pageParams: [cursor, ...prev.pageParams.slice(1)],
+            }
+          },
+        )
+      } catch {
+        // SSE refresh silencioso
       }
     },
-    [buildKey, currentCursor, fetchPage],
+    [endpoint, filtro, initialCursor, queryClient, queryKey, take],
   )
-
-  useEffect(() => () => abortRef.current?.abort(), [])
 
   return {
     posts,
     pageInfo,
     currentCursor,
-    loadingMore,
-    error,
+    loadingMore: query.isFetchingNextPage,
+    error: query.error instanceof Error ? query.error.message : null,
     loadMore,
     refreshCurrentPage,
-    setError,
   }
 }

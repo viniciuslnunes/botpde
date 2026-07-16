@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { ComunidadeDock } from './_components/comunidade-dock'
 import { ComunidadeRouteTransition } from './_components/comunidade-route-transition'
+import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 
 /**
  * Layout da Comunidade: hospeda o dock flutuante do mobile em todas as
@@ -20,9 +21,11 @@ export default async function ComunidadeLayout({
   }
 
   return (
-    <div className="pb-24 lg:pb-0">
-      <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
-      {currentUser.id && <ComunidadeDock currentUser={currentUser} />}
-    </div>
+    <ComunidadeQueryProvider>
+      <div className="pb-24 lg:pb-0">
+        <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
+        {currentUser.id && <ComunidadeDock currentUser={currentUser} />}
+      </div>
+    </ComunidadeQueryProvider>
   )
 }

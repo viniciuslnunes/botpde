@@ -568,9 +568,9 @@ C–F): **`docs/data/modulo-comunidade-performance.md`**.
 **Próximo recorte documentado (Fase C):** virtualização de feed, `revalidateTag`
 na timeline, TanStack Query, e2e de latência Comunidade — ver doc acima.
 
-**Fase C parcial (2026-07-16):** `revalidateTag` em caches (`comunidade-cache.ts`),
-windowing (`useFeedWindow`), hook infinite compartilhado, prefetch hover, e2e budget.
-TanStack Query/Virtual pendente de instalação de pacote no ambiente.
+**Fase C (2026-07-16):** `revalidateTag`, TanStack Query (`useInfiniteQuery`) +
+Virtual (`useWindowVirtualizer`) no feed/rede, prefetch hover, e2e budget.
+Ver `docs/data/modulo-comunidade-performance.md`.
 
 **Fase D1 (2026-07-16):** `REDIS_URL` opcional → `realtime-bus.ts` (ioredis) liga
 `feed-bus` / `notificacoes-bus` entre réplicas. Sem env = in-memory. Setup Upstash
