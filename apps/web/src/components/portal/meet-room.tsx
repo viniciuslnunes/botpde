@@ -838,21 +838,23 @@ function MeetConference({
     <LayoutContextProvider value={layoutContext}>
       <div className="meet-room-layout">
         <div className="meet-room-stage">
-          <AnimatePresence mode="wait">
-            {!conectado ? (
-              <m.div
-                key="connecting"
-                variants={fadeScale}
-                initial="hidden"
-                animate="show"
-                exit="hidden"
-                transition={springSnappy}
-                className="meet-room-connecting"
-              >
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span>Conectando à sala…</span>
-              </m.div>
-            ) : (
+          {!conectado ? (
+            <div className="meet-room-connecting">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Conectando à sala…</span>
+            </div>
+          ) : popoutMode ? (
+            <div className="h-full w-full">
+              <MeetStage
+                lk={lk}
+                userId={userId}
+                participantProfiles={participantProfiles}
+                showParticipantStrip={showParticipantStrip}
+                onToggleParticipantStrip={onToggleParticipantStrip}
+              />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
               <m.div
                 key="stage"
                 variants={fadeScale}
@@ -870,8 +872,8 @@ function MeetConference({
                   onToggleParticipantStrip={onToggleParticipantStrip}
                 />
               </m.div>
-            )}
-          </AnimatePresence>
+            </AnimatePresence>
+          )}
 
           {conectado && canOpenVideoPopout && onOpenVideoPopout && !popoutMode ? (
             <div className="meet-room-stage-actions">
