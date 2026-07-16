@@ -1381,8 +1381,10 @@ export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAM
     select: { id: true, tipo: true },
   })
 
-  if (existente?.tipo === parsed.data.tipo) {
-    await db.reacao.delete({ where: { id: existente.id } })
+  const removendo = existente?.tipo === parsed.data.tipo
+
+  if (removendo) {
+    await db.reacao.delete({ where: { id: existente!.id } })
   } else if (existente) {
     await db.reacao.update({ where: { id: existente.id }, data: { tipo: parsed.data.tipo } })
   } else {
@@ -1391,7 +1393,8 @@ export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAM
     })
   }
 
-  if (post.autorId !== session.user.id) {
+  // Só notifica ao adicionar/trocar reação — remover a própria reação não gera alerta.
+  if (!removendo && post.autorId !== session.user.id) {
     await criarNotificacao({
       userId: post.autorId,
       tenantId: tenant.id,

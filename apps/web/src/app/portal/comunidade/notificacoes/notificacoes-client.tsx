@@ -6,7 +6,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { marcarTodasNotificacoesLidas } from '@/app/portal/comunidade/actions'
-import { NotificationAvatar } from '@/components/portal/notification-item-visual'
+import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
@@ -211,7 +211,7 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
                         <NotificationAvatar ator={item.ator} tipo={item.tipo} size="md" />
                         <span className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                            {item.titulo}
+                            {formatarTituloNotificacao(item)}
                           </p>
                           {item.corpo && (
                             <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">

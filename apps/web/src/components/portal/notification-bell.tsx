@@ -5,7 +5,7 @@ import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
-import { NotificationAvatar } from '@/components/portal/notification-item-visual'
+import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
 
 export interface NotificationItem {
   id: string
@@ -103,7 +103,9 @@ export function NotificationBell({
                     <span className="flex items-start gap-2.5">
                       <NotificationAvatar ator={item.ator} tipo={item.tipo} size="sm" />
                       <span className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[rgb(var(--foreground))]">{item.titulo}</p>
+                        <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                          {formatarTituloNotificacao(item)}
+                        </p>
                         {item.corpo && (
                           <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
                             {item.corpo}

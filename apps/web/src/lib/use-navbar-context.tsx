@@ -22,6 +22,9 @@ let inflight: Promise<NavbarContext> | null = null
 const seenNotificationIds = new Set<string>()
 let hasSeededSeenIds = false
 
+/** Última contagem de não lidas do chat — detecta aumento sem duplicar entre polls. */
+let lastUnreadMessages: number | null = null
+
 const MAX_TOASTS_INDIVIDUAIS = 3
 const TOAST_DURATION_MS = 6000
 
@@ -94,6 +97,32 @@ function notificarNovas(
   }
 }
 
+/**
+ * Alerta genérico de mensagem nova a partir do contador do chat — não usa a
+ * tabela `Notificacao` (mensagens ficam só no ícone/inbox de chat). Silencia
+ * quando o usuário já está em `/portal/mensagens`.
+ */
+function notificarMensagemNova(
+  unreadMessages: number,
+  naTelaDeMensagens: boolean,
+  navegar: (href: string) => void,
+): void {
+  if (lastUnreadMessages === null) {
+    lastUnreadMessages = unreadMessages
+    return
+  }
+
+  if (unreadMessages > lastUnreadMessages && !naTelaDeMensagens) {
+    toast.action(
+      'Nova mensagem',
+      { label: 'Ver', onClick: () => navegar('/portal/mensagens') },
+      { duration: TOAST_DURATION_MS },
+    )
+  }
+
+  lastUnreadMessages = unreadMessages
+}
+
 async function fetchNavbarContext(): Promise<NavbarContext> {
   const res = await fetch('/api/portal/navbar-context', { cache: 'no-store' })
   if (!res.ok) {
@@ -142,10 +171,11 @@ export function useNavbarContext() {
     (force = false) => {
       void loadNavbarContext(force).then((data) => {
         notificarNovas(data.notifications, (href) => router.push(href))
+        notificarMensagemNova(data.unreadMessages, onMensagensPage, (href) => router.push(href))
         setCtx(data)
       })
     },
-    [router],
+    [router, onMensagensPage],
   )
 
   useEffect(() => {

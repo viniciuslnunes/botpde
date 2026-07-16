@@ -4,13 +4,11 @@ import { db } from '@torcida/db'
 import {
   criarMensagem,
   listMensagens,
-  listMembrosConversa,
   serializeMensagem,
   MAX_CONTEUDO_MENSAGEM,
 } from '@/lib/mensageria'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
-import { criarNotificacao } from '@/lib/notificacoes'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const midiaSchema = z
@@ -57,7 +55,7 @@ export async function POST(
 ) {
   try {
     const { id: conversaId } = await context.params
-    const { userId, tenant, conversa } = await assertConversaAccess(conversaId)
+    const { userId, tenant } = await assertConversaAccess(conversaId)
 
     const body: unknown = await request.json()
     const parsed = enviarSchema.safeParse(body)
@@ -95,49 +93,6 @@ export async function POST(
       parsed.data.midias,
       parsed.data.respostaAId,
     )
-
-    // Notifica quem estava "em dia" (sem não-lidas antes desta mensagem) e não
-    // silenciou a conversa. Nota: Notificacao carrega o tenant da conversa —
-    // membro de torcida aliada vê o não-lido pelo badge de mensagens (que é
-    // independente de tenant), não pelo sino.
-    const membros = await listMembrosConversa(conversaId)
-    const destinatarios = membros.filter((m) => m.userId !== userId)
-    void Promise.all(
-      destinatarios.map(async (dest) => {
-        const membroRow: { silenciada: boolean; ultimaLeituraEm: Date | null } | null =
-          await db.membroConversa.findFirst({
-            where: { conversaId, userId: dest.userId, saiuEm: null },
-            select: { silenciada: true, ultimaLeituraEm: true },
-          })
-        if (!membroRow || membroRow.silenciada) return
-        const naoLidasAntes = await db.mensagemDireta.count({
-          where: {
-            conversaId,
-            autorId: { not: dest.userId },
-            removidaEm: null,
-            id: { not: mensagem.id },
-            ...(membroRow.ultimaLeituraEm
-              ? { criadoEm: { gt: membroRow.ultimaLeituraEm } }
-              : {}),
-          },
-        })
-        if (naoLidasAntes > 0) return
-        await criarNotificacao({
-          userId: dest.userId,
-          tenantId: conversa.tenantId,
-          tipo: 'NOVA_MENSAGEM',
-          titulo:
-            conversa.tipo === 'DIRETA'
-              ? 'Nova mensagem direta'
-              : `Nova mensagem em ${conversa.nome ?? (conversa.tipo === 'CANAL' ? 'canal' : 'grupo')}`,
-          corpo: parsed.data.conteudo.slice(0, 140),
-          link: `/portal/mensagens?c=${conversaId}`,
-          atorId: userId,
-        })
-      }),
-    ).catch(() => {
-      // notificação é best-effort — nunca derruba o envio
-    })
 
     return NextResponse.json({ mensagem: serializeMensagem(mensagem) })
   } catch (error) {

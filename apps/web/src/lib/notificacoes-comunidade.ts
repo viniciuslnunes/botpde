@@ -2,7 +2,11 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import type { TipoNotificacao } from '@torcida/db'
 
-/** Tipos exibidos na central social da Comunidade / sino do portal. */
+/**
+ * Tipos exibidos na central social da Comunidade / sino do portal.
+ * NOVA_MENSAGEM fica de fora: mensagens diretas já têm inbox e badge
+ * próprios (ícone de chat na navbar) — não duplicam no sino.
+ */
 export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = [
   'MENCAO',
   'REPOST',
@@ -10,7 +14,6 @@ export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = [
   'NOVA_REACAO',
   'SEGUIMENTO_PENDENTE',
   'SEGUIMENTO_APROVADO',
-  'NOVA_MENSAGEM',
   'COMUNICADO_URGENTE',
   'MEMBRO_APROVADO',
   'MEMBRO_REPROVADO',

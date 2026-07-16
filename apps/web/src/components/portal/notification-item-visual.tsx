@@ -42,6 +42,33 @@ export interface NotificacaoAtorInfo {
   avatarUrl: string | null
 }
 
+/** Título com o nome de quem gerou a ação, para os tipos com ator social. */
+const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>> = {
+  SEGUIMENTO_PENDENTE: (nome) => `${nome} quer seguir você`,
+  SEGUIMENTO_APROVADO: (nome) => `${nome} aceitou você`,
+  NOVO_COMENTARIO: (nome) => `${nome} comentou no seu post`,
+  NOVA_REACAO: (nome) => `${nome} reagiu ao seu post`,
+  MENCAO: (nome) => `${nome} mencionou você`,
+  REPOST: (nome) => `${nome} compartilhou seu post`,
+}
+
+/**
+ * Título de exibição da notificação: usa o nome do ator quando disponível
+ * (tipos sociais), senão cai no título salvo (tipos sistêmicos ou registros
+ * antigos sem ator).
+ */
+export function formatarTituloNotificacao(item: {
+  tipo: TipoNotificacao
+  titulo: string
+  ator: NotificacaoAtorInfo | null
+}): string {
+  const nome = item.ator?.nome?.trim()
+  if (!nome) return item.titulo
+
+  const formatar = TITULO_COM_ATOR[item.tipo]
+  return formatar ? formatar(nome) : item.titulo
+}
+
 /**
  * Avatar do ator com badge do tipo (Instagram/Twitter). Sem ator, mostra só o
  * ícone do tipo num círculo — notificações operacionais/sistêmicas.
