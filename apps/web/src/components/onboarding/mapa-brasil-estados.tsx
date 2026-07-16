@@ -1,10 +1,18 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { MapPin, X } from 'lucide-react'
-import { ClubeOnboardingCard } from '@/components/onboarding/clube-onboarding-card'
+import { MapPin, Search, Sparkles, X, ZoomOut } from 'lucide-react'
+import { ClubeOnboardingCardRow } from '@/components/onboarding/clube-onboarding-card-row'
 import { BRASIL_ESTADOS_PATHS } from '@/components/onboarding/brasil-estados-paths'
+import {
+  CENTRO_UF,
+  VIEWBOX_BRASIL,
+  VIEWBOX_REGIAO,
+  VIEWBOX_UF,
+  type MapViewport,
+} from '@/components/onboarding/mapa-brasil-viewports'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import {
   fadeUp,
   springGentle,
@@ -20,7 +28,13 @@ import {
   type RegiaoBrasilId,
 } from '@/lib/regioes-brasil'
 
-const VIEWBOX = '0 0 450 460'
+const VIEWBOX_FULL = '0 0 450 460'
+
+function isViewportBrasil(v: MapViewport): boolean {
+  return v.x === VIEWBOX_BRASIL.x && v.y === VIEWBOX_BRASIL.y && v.w === VIEWBOX_BRASIL.w
+}
+
+const VIEWBOX_FULL = '0 0 450 460'
 
 type Props = {
   afiliacoes: AfiliacaoOnboarding[]
@@ -36,6 +50,15 @@ function corRegiao(uf: string): string {
   return REGIOES_BRASIL.find((r) => r.id === regiao)?.face ?? '#4b5563'
 }
 
+function viewportTransform(v: MapViewport): string {
+  const scale = Math.min(450 / v.w, 460 / v.h) * 0.94
+  const cx = v.x + v.w / 2
+  const cy = v.y + v.h / 2
+  const tx = 225 - cx * scale
+  const ty = 230 - cy * scale
+  return `translate(${tx} ${ty}) scale(${scale})`
+}
+
 function EstadoSvg({
   uf,
   nome,
@@ -43,6 +66,7 @@ function EstadoSvg({
   selecionado,
   hovered,
   dimmed,
+  semClubes,
   total,
   onEnter,
   onLeave,
@@ -55,6 +79,7 @@ function EstadoSvg({
   selecionado: boolean
   hovered: boolean
   dimmed: boolean
+  semClubes: boolean
   total: number
   onEnter: () => void
   onLeave: () => void
@@ -63,42 +88,191 @@ function EstadoSvg({
 }) {
   const fill = corRegiao(uf)
   const ativo = selecionado || hovered
+  const centro = CENTRO_UF[uf]
 
   return (
-    <m.path
-      d={path}
-      fill={fill}
-      stroke={ativo ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.35)'}
-      strokeWidth={ativo ? 1.4 : 0.6}
-      strokeLinejoin="round"
-      strokeLinecap="round"
-      role="button"
-      tabIndex={0}
-      aria-label={`${nome}${total > 0 ? `, ${total} clubes` : ''}`}
-      aria-pressed={selecionado}
-      style={{ cursor: 'pointer', outline: 'none' }}
-      initial={false}
-      animate={{
-        opacity: dimmed ? 0.38 : ativo ? 1 : 0.82,
-        filter: selecionado
-          ? `brightness(1.18) drop-shadow(0 0 10px ${fill})`
-          : hovered
-            ? 'brightness(1.12)'
-            : 'brightness(1)',
-      }}
-      transition={reduceMotion ? { duration: 0 } : springSnappy}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onFocus={onEnter}
-      onBlur={onLeave}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-    />
+    <g>
+      {selecionado && !reduceMotion && (
+        <m.circle
+          cx={centro?.x ?? 0}
+          cy={centro?.y ?? 0}
+          r={18}
+          fill="none"
+          stroke="rgb(var(--color-primary))"
+          strokeWidth={1.5}
+          initial={{ opacity: 0.6, scale: 0.6 }}
+          animate={{ opacity: 0, scale: 2.2 }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+        />
+      )}
+      <m.path
+        d={path}
+        fill={fill}
+        stroke={ativo ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.32)'}
+        strokeWidth={ativo ? 1.6 : 0.55}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        role="button"
+        tabIndex={semClubes ? -1 : 0}
+        aria-label={`${nome}${total > 0 ? `, ${total} clubes` : ', sem clubes cadastrados'}`}
+        aria-pressed={selecionado}
+        aria-disabled={semClubes}
+        style={{ cursor: semClubes ? 'not-allowed' : 'pointer', outline: 'none' }}
+        initial={false}
+        animate={{
+          opacity: dimmed ? 0.28 : semClubes ? 0.45 : ativo ? 1 : 0.88,
+          filter: selecionado
+            ? `brightness(1.2) drop-shadow(0 0 14px ${fill})`
+            : hovered
+              ? 'brightness(1.1)'
+              : semClubes
+                ? 'saturate(0.35)'
+                : 'brightness(1)',
+        }}
+        transition={reduceMotion ? { duration: 0 } : springSnappy}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onFocus={onEnter}
+        onBlur={onLeave}
+        onClick={() => {
+          if (!semClubes) onClick()
+        }}
+        onKeyDown={(e) => {
+          if (semClubes) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClick()
+          }
+        }}
+      />
+      {total > 0 && !dimmed && (
+        <circle
+          cx={centro?.x ?? 0}
+          cy={centro?.y ?? 0}
+          r={selecionado ? 3.2 : 2.2}
+          fill={selecionado ? '#fff' : 'rgba(255,255,255,0.75)'}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+    </g>
+  )
+}
+
+function PainelClubes({
+  uf,
+  clubes,
+  filtro,
+  onFiltro,
+  onLimpar,
+  onSelecionarClube,
+  reduceMotion,
+  className,
+}: {
+  uf: string
+  clubes: AfiliacaoOnboarding[]
+  filtro: string
+  onFiltro: (v: string) => void
+  onLimpar: () => void
+  onSelecionarClube: (a: AfiliacaoOnboarding) => void
+  reduceMotion: boolean
+  className?: string
+}) {
+  const filtrados = useMemo(() => {
+    const q = filtro.trim().toLowerCase()
+    if (!q) return clubes
+    return clubes.filter(
+      (c) =>
+        c.nome.toLowerCase().includes(q) ||
+        c.apelido?.toLowerCase().includes(q),
+    )
+  }, [clubes, filtro])
+
+  return (
+    <m.aside
+      key={uf}
+      initial={{ opacity: 0, x: reduceMotion ? 0 : 20, y: reduceMotion ? 0 : 8 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      exit={{ opacity: 0, x: reduceMotion ? 0 : 12 }}
+      transition={reduceMotion ? { duration: 0 } : springGentle}
+      className={
+        className ??
+        'flex min-h-[240px] flex-col border-t border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))]/70 lg:min-h-[380px] lg:border-l lg:border-t-0'
+      }
+    >
+      <header
+        className="border-b border-[rgb(var(--border))] px-4 py-3"
+        style={{
+          background: `linear-gradient(135deg, ${corRegiao(uf)}22 0%, transparent 65%)`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white shadow-sm"
+              style={{ backgroundColor: corRegiao(uf) }}
+            >
+              {uf}
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                {NOME_UF[uf] ?? uf}
+              </p>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                {clubes.length} {clubes.length === 1 ? 'clube' : 'clubes'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onLimpar}
+            className="rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
+            aria-label="Fechar seleção"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {clubes.length > 4 && (
+          <div className="relative mt-3">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+            <input
+              type="search"
+              value={filtro}
+              onChange={(e) => onFiltro(e.target.value)}
+              placeholder="Filtrar neste estado..."
+              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-8 pr-3 text-xs text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]/50 focus:outline-none focus:ring-1 focus:ring-[rgb(var(--color-primary))]/30"
+              aria-label={`Filtrar clubes em ${NOME_UF[uf] ?? uf}`}
+            />
+          </div>
+        )}
+      </header>
+
+      {filtrados.length === 0 ? (
+        <MotionEmptyState
+          className="m-4 flex-1 border-none bg-transparent py-10"
+          icon={<MapPin className="mb-2 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+          title={filtro ? 'Nenhum resultado' : 'Sem clubes aqui'}
+          description={
+            filtro
+              ? 'Tente outro nome ou limpe o filtro.'
+              : 'Escolha outro estado ou busque pelo nome do clube.'
+          }
+        />
+      ) : (
+        <m.ul
+          className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+        >
+          {filtrados.map((c) => (
+            <m.li key={c.id} variants={staggerItem}>
+              <ClubeOnboardingCardRow clube={c} onSelecionar={onSelecionarClube} />
+            </m.li>
+          ))}
+        </m.ul>
+      )}
+    </m.aside>
   )
 }
 
@@ -112,6 +286,8 @@ export function MapaBrasilEstados({
   const reduceMotion = useReducedMotion()
   const [ufHover, setUfHover] = useState<string | null>(null)
   const [regiaoDestaque, setRegiaoDestaque] = useState<RegiaoBrasilId | null>(null)
+  const [viewport, setViewport] = useState<MapViewport>(VIEWBOX_BRASIL)
+  const [filtroPainel, setFiltroPainel] = useState('')
 
   const totalPorUf = useMemo(() => {
     const map = new Map<string, number>()
@@ -133,9 +309,40 @@ export function MapaBrasilEstados({
 
   const clubesPainel = ufSelecionada ? (clubesPorUf.get(ufSelecionada) ?? []) : []
   const ufTooltip = ufHover && ufHover !== ufSelecionada ? ufHover : null
+  const zoomAtivo = !isViewportBrasil(viewport)
 
-  function toggleUf(uf: string) {
+  useEffect(() => {
+    setFiltroPainel('')
+  }, [ufSelecionada])
+
+  useEffect(() => {
+    if (ufSelecionada && VIEWBOX_UF[ufSelecionada]) {
+      setViewport(VIEWBOX_UF[ufSelecionada])
+      return
+    }
+    if (regiaoDestaque && VIEWBOX_REGIAO[regiaoDestaque]) {
+      setViewport(VIEWBOX_REGIAO[regiaoDestaque])
+      return
+    }
+    setViewport(VIEWBOX_BRASIL)
+  }, [ufSelecionada, regiaoDestaque])
+
+  function selecionarUf(uf: string) {
+    if ((totalPorUf.get(uf) ?? 0) === 0) return
     onUfSelecionar(ufSelecionada === uf ? '' : uf)
+    setRegiaoDestaque(null)
+  }
+
+  function limparTudo() {
+    onUfSelecionar('')
+    setRegiaoDestaque(null)
+    setViewport(VIEWBOX_BRASIL)
+  }
+
+  function toggleRegiao(id: RegiaoBrasilId) {
+    const prox = regiaoDestaque === id ? null : id
+    setRegiaoDestaque(prox)
+    if (prox) onUfSelecionar('')
   }
 
   function estadoDimmed(uf: string): boolean {
@@ -147,162 +354,178 @@ export function MapaBrasilEstados({
     return false
   }
 
+  const subtitulo = ufSelecionada
+    ? `Escolha seu clube em ${NOME_UF[ufSelecionada] ?? ufSelecionada}`
+    : regiaoDestaque
+      ? `Explore os estados do ${REGIOES_BRASIL.find((r) => r.id === regiaoDestaque)?.nome}`
+      : 'Toque num estado colorido para ver os clubes da região'
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+    <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm">
+      {/* Cabeçalho */}
       <div
-        className="border-b border-[rgb(var(--border))] px-4 py-3 sm:px-5"
+        className="border-b border-[rgb(var(--border))] px-4 py-3.5 sm:px-5"
         style={{
           background:
-            'radial-gradient(ellipse 80% 120% at 0% 0%, rgb(var(--color-primary) / 0.12), transparent 55%), linear-gradient(180deg, rgb(var(--surface-raised)) 0%, rgb(var(--surface)) 100%)',
+            'radial-gradient(ellipse 90% 140% at 0% 0%, rgb(var(--color-primary) / 0.14), transparent 60%), linear-gradient(180deg, rgb(var(--surface-raised)) 0%, rgb(var(--surface)) 100%)',
         }}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Mapa do Brasil
-            </p>
-            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-              {ufSelecionada
-                ? `${NOME_UF[ufSelecionada] ?? ufSelecionada} · clique no estado para trocar`
-                : 'Clique em um estado para ver os clubes'}
-            </p>
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-1.5 text-[rgb(var(--color-primary))]">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              <span className="text-[10px] font-semibold uppercase tracking-widest">
+                Explore o Brasil
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{subtitulo}</p>
           </div>
-          {ufSelecionada && (
-            <button
-              type="button"
-              onClick={() => onUfSelecionar('')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
-            >
-              <X className="h-3.5 w-3.5" />
-              Limpar seleção
-            </button>
-          )}
+          <div className="flex shrink-0 gap-2">
+            {zoomAtivo && (
+              <button
+                type="button"
+                onClick={limparTudo}
+                className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--color-primary))]/50 hover:text-[rgb(var(--foreground))]"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+                Ver Brasil
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div
-        className={`grid gap-0 transition-[grid-template-columns] duration-300 ${
-          ufSelecionada ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]' : 'grid-cols-1'
+        className={`grid gap-0 ${
+          ufSelecionada
+            ? 'lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'
+            : 'grid-cols-1'
         }`}
       >
         {/* Mapa */}
-        <div
-          className="relative px-3 py-4 sm:px-5 sm:py-5"
-          style={{
-            background:
-              'radial-gradient(ellipse 65% 50% at 50% 45%, rgb(var(--color-primary) / 0.08), transparent 70%)',
-          }}
-        >
-          <svg
-            viewBox={VIEWBOX}
-            className="mx-auto h-auto w-full max-w-[420px]"
-            role="img"
-            aria-label="Mapa do Brasil por estados"
+        <div className="relative overflow-hidden">
+          <div
+            className="absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage:
+                'radial-gradient(rgb(var(--color-primary) / 0.15) 1px, transparent 1px)',
+              backgroundSize: '18px 18px',
+            }}
+            aria-hidden
+          />
+          <div
+            className="relative px-2 py-3 sm:px-4 sm:py-4"
+            style={{
+              background:
+                'radial-gradient(ellipse 70% 55% at 50% 42%, rgb(var(--color-primary) / 0.1), transparent 72%)',
+            }}
           >
-            <defs>
-              <filter id="mapa-estado-glow" x="-30%" y="-30%" width="160%" height="160%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" />
-              </filter>
-            </defs>
-            <g filter="url(#mapa-estado-glow)">
-              {BRASIL_ESTADOS_PATHS.map((estado) => (
-                <EstadoSvg
-                  key={estado.uf}
-                  uf={estado.uf}
-                  nome={estado.nome}
-                  path={estado.path}
-                  selecionado={ufSelecionada === estado.uf}
-                  hovered={ufHover === estado.uf}
-                  dimmed={estadoDimmed(estado.uf)}
-                  total={totalPorUf.get(estado.uf) ?? 0}
-                  onEnter={() => setUfHover(estado.uf)}
-                  onLeave={() => setUfHover(null)}
-                  onClick={() => toggleUf(estado.uf)}
-                  reduceMotion={reduceMotion ?? false}
-                />
-              ))}
-            </g>
-          </svg>
-
-          <AnimatePresence>
-            {ufTooltip && (
-              <m.div
-                key={ufTooltip}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={reduceMotion ? { duration: 0 } : springSnappy}
-                className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]/95 px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] shadow-lg backdrop-blur-sm"
+            <svg
+              viewBox={VIEWBOX_FULL}
+              className="mx-auto h-auto w-full max-w-[440px]"
+              role="img"
+              aria-label="Mapa interativo do Brasil por estados"
+            >
+              <defs>
+                <filter id="mapa-estado-shadow" x="-25%" y="-25%" width="150%" height="150%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.28" />
+                </filter>
+              </defs>
+              <m.g
+                filter="url(#mapa-estado-shadow)"
+                initial={false}
+                animate={{ transform: viewportTransform(viewport) }}
+                transition={reduceMotion ? { duration: 0 } : { ...springGentle, duration: 0.55 }}
+                style={{ transformOrigin: '0 0' }}
               >
-                <MapPin className="mr-1 inline h-3 w-3 text-[rgb(var(--color-primary))]" />
-                {NOME_UF[ufTooltip] ?? ufTooltip}
-                <span className="ml-1.5 text-[rgb(var(--foreground-muted))]">
-                  · {totalPorUf.get(ufTooltip) ?? 0} clubes
-                </span>
-              </m.div>
-            )}
-          </AnimatePresence>
+                {BRASIL_ESTADOS_PATHS.map((estado) => {
+                  const total = totalPorUf.get(estado.uf) ?? 0
+                  return (
+                    <EstadoSvg
+                      key={estado.uf}
+                      uf={estado.uf}
+                      nome={estado.nome}
+                      path={estado.path}
+                      selecionado={ufSelecionada === estado.uf}
+                      hovered={ufHover === estado.uf}
+                      dimmed={estadoDimmed(estado.uf)}
+                      semClubes={total === 0}
+                      total={total}
+                      onEnter={() => setUfHover(estado.uf)}
+                      onLeave={() => setUfHover(null)}
+                      onClick={() => selecionarUf(estado.uf)}
+                      reduceMotion={reduceMotion ?? false}
+                    />
+                  )
+                })}
+              </m.g>
+            </svg>
+
+            <AnimatePresence>
+              {ufTooltip && (
+                <m.div
+                  key={ufTooltip}
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                  transition={reduceMotion ? { duration: 0 } : springSnappy}
+                  className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]/95 px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] shadow-lg backdrop-blur-md"
+                >
+                  <MapPin className="mr-1 inline h-3 w-3 text-[rgb(var(--color-primary))]" />
+                  {NOME_UF[ufTooltip] ?? ufTooltip}
+                  <span className="ml-1.5 text-[rgb(var(--foreground-muted))]">
+                    · {totalPorUf.get(ufTooltip) ?? 0} clubes
+                  </span>
+                </m.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* Painel conectado — só após clique */}
+        {/* Painel desktop */}
         <AnimatePresence mode="wait">
           {ufSelecionada && (
-            <m.aside
-              key={ufSelecionada}
-              initial={{ opacity: 0, x: reduceMotion ? 0 : 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: reduceMotion ? 0 : 12 }}
-              transition={reduceMotion ? { duration: 0 } : springGentle}
-              className="flex min-h-[220px] flex-col border-t border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))]/60 lg:min-h-[360px] lg:border-l lg:border-t-0"
-            >
-              <header className="border-b border-[rgb(var(--border))] px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
-                    style={{ backgroundColor: corRegiao(ufSelecionada) }}
-                  >
-                    {ufSelecionada}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                      {NOME_UF[ufSelecionada] ?? ufSelecionada}
-                    </p>
-                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                      {clubesPainel.length}{' '}
-                      {clubesPainel.length === 1 ? 'clube' : 'clubes'} cadastrados
-                    </p>
-                  </div>
-                </div>
-              </header>
-
-              {clubesPainel.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-                  Nenhum clube neste estado ainda. Tente outro estado ou busque pelo nome.
-                </div>
-              ) : (
-                <m.ul
-                  className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-4"
-                  variants={staggerContainer}
-                  initial="hidden"
-                  animate="show"
-                >
-                  {clubesPainel.map((c) => (
-                    <m.li key={c.id} variants={staggerItem}>
-                      <ClubeOnboardingCard
-                        clube={c}
-                        onSelecionar={onSelecionarClube}
-                        compact
-                      />
-                    </m.li>
-                  ))}
-                </m.ul>
-              )}
-            </m.aside>
+            <div className="hidden lg:block">
+              <PainelClubes
+                uf={ufSelecionada}
+                clubes={clubesPainel}
+                filtro={filtroPainel}
+                onFiltro={setFiltroPainel}
+                onLimpar={limparTudo}
+                onSelecionarClube={onSelecionarClube}
+                reduceMotion={reduceMotion ?? false}
+              />
+            </div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Legenda por região */}
+      {/* Painel mobile — sheet */}
+      <AnimatePresence>
+        {ufSelecionada && (
+          <m.div
+            key={`mobile-${ufSelecionada}`}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={reduceMotion ? { duration: 0 } : springGentle}
+            className="border-t border-[rgb(var(--border))] lg:hidden"
+          >
+            <PainelClubes
+              uf={ufSelecionada}
+              clubes={clubesPainel}
+              filtro={filtroPainel}
+              onFiltro={setFiltroPainel}
+              onLimpar={limparTudo}
+              onSelecionarClube={onSelecionarClube}
+              reduceMotion={reduceMotion ?? false}
+              className="flex max-h-[min(52vh,420px)] flex-col bg-[rgb(var(--surface-raised))]/80"
+            />
+          </m.div>
+        )}
+      </AnimatePresence>
+
+      {/* Regiões */}
       <m.div
         variants={fadeUp}
         initial="hidden"
@@ -311,7 +534,7 @@ export function MapaBrasilEstados({
         className="border-t border-[rgb(var(--border))] px-4 py-3 sm:px-5"
       >
         <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Regiões
+          Filtrar por região
         </p>
         <ul className="flex flex-wrap gap-2">
           {REGIOES_BRASIL.map((regiao) => {
@@ -321,20 +544,20 @@ export function MapaBrasilEstados({
               <li key={regiao.id}>
                 <button
                   type="button"
-                  onClick={() => setRegiaoDestaque(ativa ? null : regiao.id)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  onClick={() => toggleRegiao(regiao.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-all ${
                     ativa
-                      ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
-                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--color-primary))]/40'
+                      ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/12 text-[rgb(var(--color-primary))] shadow-sm'
+                      : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--color-primary))]/40 hover:text-[rgb(var(--foreground))]'
                   }`}
                 >
                   <span
-                    className="h-2 w-2 rounded-full"
+                    className="h-2 w-2 rounded-full ring-1 ring-white/20"
                     style={{ backgroundColor: regiao.face }}
                     aria-hidden
                   />
                   {regiao.nome}
-                  <span className="opacity-60">({total})</span>
+                  <span className="opacity-55">({total})</span>
                 </button>
               </li>
             )
