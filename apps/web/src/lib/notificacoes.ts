@@ -16,6 +16,8 @@ export type CriarNotificacaoInput = {
   titulo: string
   corpo?: string
   link?: string
+  /** Quem gerou a notificação (comentou, seguiu, reagiu…) — para avatar na UI. */
+  atorId?: string
 }
 
 /**
@@ -31,6 +33,7 @@ export async function criarNotificacao(input: CriarNotificacaoInput): Promise<No
       titulo: input.titulo,
       corpo: input.corpo,
       link: input.link,
+      atorId: input.atorId,
     },
   })
 }
@@ -45,6 +48,7 @@ export async function criarNotificacoesEmLote(inputs: CriarNotificacaoInput[]): 
       titulo: input.titulo,
       corpo: input.corpo ?? null,
       link: input.link ?? null,
+      atorId: input.atorId ?? null,
     })),
   })
   return result.count
@@ -230,6 +234,8 @@ type DestinoNotificacao = {
   titulo: string
   corpo?: string
   link?: string
+  /** Quem gerou a notificação (para avatar na UI). */
+  atorId?: string
   /** Quem iniciou a ação — não recebe a própria notificação (mesmo tenant). */
   excetoUserId?: string
 }
@@ -253,6 +259,7 @@ export async function notificarUsuariosComPermissao(
         titulo: destino.titulo,
         corpo: destino.corpo,
         link: destino.link,
+        atorId: destino.atorId,
       })),
     )
   } catch {
@@ -273,6 +280,7 @@ export async function notificarMembrosAprovados(destino: DestinoNotificacao): Pr
         titulo: destino.titulo,
         corpo: destino.corpo,
         link: destino.link,
+        atorId: destino.atorId,
       })),
     )
   } catch {
@@ -297,11 +305,13 @@ export async function listarNotificacoesRecentes(
 ): Promise<
   Array<{
     id: string
+    tipo: TipoNotificacao
     titulo: string
     corpo: string | null
     link: string | null
     lida: boolean
     criadoEm: Date
+    ator: { id: string; nome: string | null; avatarUrl: string | null } | null
   }>
 > {
   return db.notificacao.findMany({
@@ -314,11 +324,13 @@ export async function listarNotificacoesRecentes(
     take: limite,
     select: {
       id: true,
+      tipo: true,
       titulo: true,
       corpo: true,
       link: true,
       lida: true,
       criadoEm: true,
+      ator: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
 }

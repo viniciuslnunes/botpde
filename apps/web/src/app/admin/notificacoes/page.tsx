@@ -8,6 +8,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { marcarTodasNotificacoesAdminLidas } from '@/app/actions/notificacoes'
+import { NotificationAvatar } from '@/components/portal/notification-item-visual'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { redirect } from 'next/navigation'
@@ -101,15 +102,20 @@ export default async function AdminNotificacoesPage() {
                     : 'bg-[rgb(var(--primary)_/_0.06)] hover:bg-[rgb(var(--primary)_/_0.1)]',
                 ].join(' ')}
               >
-                <p className="text-sm font-medium text-[rgb(var(--foreground))]">{n.titulo}</p>
-                {n.corpo && (
-                  <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                    {n.corpo}
-                  </p>
-                )}
-                <p className="mt-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-                  {formatarData(n.criadoEm)}
-                </p>
+                <span className="flex items-start gap-2.5">
+                  <NotificationAvatar ator={null} tipo={n.tipo} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[rgb(var(--foreground))]">{n.titulo}</p>
+                    {n.corpo && (
+                      <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                        {n.corpo}
+                      </p>
+                    )}
+                    <p className="mt-2 text-[10px] text-[rgb(var(--foreground-muted))]">
+                      {formatarData(n.criadoEm)}
+                    </p>
+                  </span>
+                </span>
               </Link>
             </li>
           ))}

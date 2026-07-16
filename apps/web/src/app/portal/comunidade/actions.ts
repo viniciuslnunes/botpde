@@ -299,6 +299,7 @@ export async function solicitarSeguir(userId: string): Promise<void> {
       titulo: 'Nova solicitação para seguir',
       corpo: `${session.user.name ?? 'Um membro'} quer seguir você.`,
       link: '/portal/comunidade/seguindo',
+      atorId: session.user.id,
     })
   }
 
@@ -333,6 +334,7 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
     titulo: 'Solicitação aprovada',
     corpo: `${session.user.name ?? 'Um membro'} aceitou você.`,
     link: `/portal/comunidade/perfil/${session.user.id}`,
+    atorId: session.user.id,
   })
 
   revalidatePath('/portal/comunidade')
@@ -596,6 +598,7 @@ export async function comentarPost(
       titulo: 'Novo comentário no seu post',
       corpo: parsed.data.conteudo.slice(0, 140),
       link: linkPostComunidade(post.id),
+      atorId: session.user.id,
     })
   }
 
@@ -877,6 +880,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
       titulo: 'Sua publicação foi compartilhada',
       corpo: `${session.user.name ?? 'Um membro'} compartilhou seu post.`,
       link: linkPostComunidade(original.id),
+      atorId: session.user.id,
     })
   }
 
@@ -1402,6 +1406,7 @@ export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAM
               ? 'Marcou presença no seu post.'
               : 'Recebeu uma curtida.',
       link: linkPostComunidade(post.id),
+      atorId: session.user.id,
     })
   }
 

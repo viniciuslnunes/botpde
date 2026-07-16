@@ -55,6 +55,7 @@ export async function notificarMencoesDoPost(opts: {
       titulo: 'Você foi mencionado',
       corpo: `${opts.autorNome ?? 'Um membro'} mencionou você em uma publicação.`,
       link: opts.link,
+      atorId: opts.autorId,
     })
   }
 }

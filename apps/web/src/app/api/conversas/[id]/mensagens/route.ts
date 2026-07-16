@@ -132,6 +132,7 @@ export async function POST(
               : `Nova mensagem em ${conversa.nome ?? (conversa.tipo === 'CANAL' ? 'canal' : 'grupo')}`,
           corpo: parsed.data.conteudo.slice(0, 140),
           link: `/portal/mensagens?c=${conversaId}`,
+          atorId: userId,
         })
       }),
     ).catch(() => {

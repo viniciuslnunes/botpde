@@ -117,6 +117,7 @@ describe('notificarUsuariosComPermissao', () => {
           titulo: 'Proposta de aliança de Gaviões da Fiel',
           corpo: 'Gaviões da Fiel propôs aliança com Remista.',
           link: '/admin/aliancas',
+          atorId: null,
         },
       ],
     })

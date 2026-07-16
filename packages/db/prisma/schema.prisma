@@ -204,6 +204,7 @@ model User {
   denuncias            Denuncia[]
   denunciasResolvidas  Denuncia[]           @relation("DenunciaResolvidoPor")
   notificacoes         Notificacao[]
+  notificacoesAtor     Notificacao[]        @relation("NotificacaoAtor")
   noticiasCuradas      Noticia[]
   aliancasPropostas    Alianca[]            @relation("AliancaPropostaPor")
   aliancasConfirmadas  Alianca[]            @relation("AliancaConfirmadaPor")
@@ -1312,9 +1313,11 @@ model Notificacao {
   corpo     String?
   link      String?
   lida      Boolean          @default(false)
+  atorId    String?          @map("ator_id")
   criadoEm  DateTime         @default(now()) @map("criado_em")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ator User? @relation("NotificacaoAtor", fields: [atorId], references: [id], onDelete: SetNull)
 
   @@index([userId, lida, criadoEm])
   @@index([tenantId, userId, criadoEm])

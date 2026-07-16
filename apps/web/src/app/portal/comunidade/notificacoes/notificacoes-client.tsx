@@ -3,9 +3,10 @@
 import { useCallback, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { Bell, Loader2 } from 'lucide-react'
+import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { marcarTodasNotificacoesLidas } from '@/app/portal/comunidade/actions'
+import { NotificationAvatar } from '@/components/portal/notification-item-visual'
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
@@ -22,6 +23,35 @@ function formatarData(data: Date | string) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
     new Date(data),
   )
+}
+
+/** Chave de dia local (ano/mês/dia) para comparação sem bug de fuso. */
+function chaveDiaLocal(data: Date): string {
+  return `${data.getFullYear()}-${data.getMonth()}-${data.getDate()}`
+}
+
+/** Particiona em "Hoje" / "Ontem" / "Mais antigas", preservando a ordem original. */
+function agruparPorDia(
+  itens: NotificacaoSocialItem[],
+): Array<{ label: string; itens: NotificacaoSocialItem[] }> {
+  const agora = new Date()
+  const hoje = chaveDiaLocal(agora)
+  const ontem = chaveDiaLocal(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - 1))
+
+  const grupos: Array<{ label: string; itens: NotificacaoSocialItem[] }> = [
+    { label: 'Hoje', itens: [] },
+    { label: 'Ontem', itens: [] },
+    { label: 'Mais antigas', itens: [] },
+  ]
+
+  for (const item of itens) {
+    const chave = chaveDiaLocal(new Date(item.criadoEm))
+    if (chave === hoje) grupos[0].itens.push(item)
+    else if (chave === ontem) grupos[1].itens.push(item)
+    else grupos[2].itens.push(item)
+  }
+
+  return grupos.filter((g) => g.itens.length > 0)
 }
 
 interface Props {
@@ -151,38 +181,53 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
             exit="hidden"
             variants={{ show: { transition: { staggerChildren: 0.04 } } }}
           >
-            {itens.map((item, i) => (
-              <m.div
-                key={item.id}
-                custom={i}
-                variants={menuItemStagger}
-                layout
-                animate={{
-                  opacity: item.lida ? 0.85 : 1,
-                  scale: item.lida ? 0.99 : 1,
-                }}
-                transition={springSnappy}
-              >
-                <Link
-                  href={item.link ?? '/portal/comunidade'}
-                  className={[
-                    'block rounded-xl border border-[rgb(var(--border))] p-3 transition-colors',
-                    item.lida
-                      ? 'bg-[rgb(var(--surface))] hover:bg-[rgb(var(--background-subtle))]'
-                      : 'border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.06)] hover:bg-[rgb(var(--primary)_/_0.1)]',
-                  ].join(' ')}
-                >
-                  <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{item.titulo}</p>
-                  {item.corpo && (
-                    <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                      {item.corpo}
-                    </p>
-                  )}
-                  <p className="mt-1.5 text-[10px] text-[rgb(var(--foreground-muted))]">
-                    {formatarData(item.criadoEm)}
-                  </p>
-                </Link>
-              </m.div>
+            {agruparPorDia(itens).map((grupo) => (
+              <div key={grupo.label} className="space-y-2">
+                <p className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] first:pt-0">
+                  {grupo.label}
+                </p>
+                {grupo.itens.map((item, i) => (
+                  <m.div
+                    key={item.id}
+                    custom={i}
+                    variants={menuItemStagger}
+                    layout
+                    animate={{
+                      opacity: item.lida ? 0.85 : 1,
+                      scale: item.lida ? 0.99 : 1,
+                    }}
+                    transition={springSnappy}
+                  >
+                    <Link
+                      href={item.link ?? '/portal/comunidade'}
+                      className={[
+                        'block rounded-xl border border-[rgb(var(--border))] p-3 transition-colors',
+                        item.lida
+                          ? 'bg-[rgb(var(--surface))] hover:bg-[rgb(var(--background-subtle))]'
+                          : 'border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.06)] hover:bg-[rgb(var(--primary)_/_0.1)]',
+                      ].join(' ')}
+                    >
+                      <span className="flex items-start gap-3">
+                        <NotificationAvatar ator={item.ator} tipo={item.tipo} size="md" />
+                        <span className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                            {item.titulo}
+                          </p>
+                          {item.corpo && (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                              {item.corpo}
+                            </p>
+                          )}
+                          <p className="mt-1.5 text-[10px] text-[rgb(var(--foreground-muted))]">
+                            {formatarData(item.criadoEm)}
+                          </p>
+                        </span>
+                        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                      </span>
+                    </Link>
+                  </m.div>
+                ))}
+              </div>
             ))}
           </m.div>
         )}

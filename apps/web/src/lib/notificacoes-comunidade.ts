@@ -40,6 +40,7 @@ export interface NotificacaoSocialItem {
   link: string | null
   lida: boolean
   criadoEm: Date
+  ator: { id: string; nome: string | null; avatarUrl: string | null } | null
 }
 
 const FILTRO_POR_TIPO: Record<Exclude<FiltroNotificacaoSocial, 'todas'>, TipoNotificacao[]> = {
@@ -107,6 +108,7 @@ export async function listarNotificacoesSociais(
       link: true,
       lida: true,
       criadoEm: true,
+      ator: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
   return rows

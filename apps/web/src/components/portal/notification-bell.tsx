@@ -3,15 +3,19 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
+import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
+import { NotificationAvatar } from '@/components/portal/notification-item-visual'
 
 export interface NotificationItem {
   id: string
+  tipo: TipoNotificacao
   titulo: string
   corpo: string | null
   link: string | null
   lida: boolean
   criadoEm: Date | string
+  ator: { id: string; nome: string | null; avatarUrl: string | null } | null
 }
 
 function formatarData(data: Date | string) {
@@ -96,15 +100,20 @@ export function NotificationBell({
                         : 'bg-[rgb(var(--primary)_/_0.08)] hover:bg-[rgb(var(--primary)_/_0.12)]',
                     ].join(' ')}
                   >
-                    <p className="text-sm font-medium text-[rgb(var(--foreground))]">{item.titulo}</p>
-                    {item.corpo && (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                        {item.corpo}
-                      </p>
-                    )}
-                    <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">
-                      {formatarData(item.criadoEm)}
-                    </p>
+                    <span className="flex items-start gap-2.5">
+                      <NotificationAvatar ator={item.ator} tipo={item.tipo} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[rgb(var(--foreground))]">{item.titulo}</p>
+                        {item.corpo && (
+                          <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                            {item.corpo}
+                          </p>
+                        )}
+                        <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">
+                          {formatarData(item.criadoEm)}
+                        </p>
+                      </span>
+                    </span>
                   </Link>
                 ))}
               </div>
