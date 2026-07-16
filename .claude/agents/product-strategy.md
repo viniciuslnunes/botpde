@@ -52,10 +52,11 @@ Salas de vídeo ao vivo (Meet: chat, presença, enquetes, LiveKit/WebRTC opciona
 construídas e são um recurso de engajamento entregue, não um item de roadmap. Ver
 `docs/data/modulo-salas.md` e `docs/product/roadmap.md` (épico K).
 
-**Performance da Comunidade (2026-07-16):** ondas A–B entregues (`0dca679`) — timeline
-materializada, infinite scroll, busca `pg_trgm`, caches. Plano futuro profissional
-(Fases C–F: virtualização, Redis, busca dedicada, observabilidade) em
-`docs/data/modulo-comunidade-performance.md`. Priorize Fase C antes de infra paga.
+**Performance da Comunidade (2026-07-16):** ondas A–D + C entregues — timeline,
+infinite scroll, busca `pg_trgm`, Redis SSE, fan-out async, TanStack Query/Virtual.
+Ganhos estimados por cenário (%) e teto zero-custo (~85–95% sem domínio) em
+`docs/data/modulo-comunidade-performance.md`. **Não** priorizar E/F ou CDN pago
+sem métrica; Cloudflare Free só com domínio próprio (`docs/ops/cloudflare-cdn.md`).
 
 ## Como trabalhar
 1. Enquadre o problema por domínio (Operação, Mobilização, Comunidade, Alianças,
