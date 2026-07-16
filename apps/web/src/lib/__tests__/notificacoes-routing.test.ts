@@ -36,12 +36,16 @@ vi.mock('@torcida/db', () => ({
 }))
 
 import {
+  agregarBadgesPorMenu,
   listarDestinatariosPorPermissoes,
+  menuIdParaTipo,
   notificarAdminsPorPermissao,
   notificarDenunciaPost,
   notificarNovoMembroPendente,
+  POLITICA_POR_TIPO,
   TIPOS_NOTIFICACAO_ADMIN,
 } from '@/lib/notificacoes-routing'
+import type { TipoNotificacao } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 
 function setupVazio() {
@@ -57,6 +61,37 @@ describe('TIPOS_NOTIFICACAO_ADMIN', () => {
   it('inclui MEMBRO_SOLICITADO e DENUNCIA_NOVA', () => {
     expect(TIPOS_NOTIFICACAO_ADMIN).toContain('MEMBRO_SOLICITADO')
     expect(TIPOS_NOTIFICACAO_ADMIN).toContain('DENUNCIA_NOVA')
+  })
+})
+
+describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
+  it('mapeia tipos operacionais para ids do ADMIN_MENU', () => {
+    expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('membros')
+    expect(menuIdParaTipo('DENUNCIA_NOVA')).toBe('comunidade-moderacao')
+    expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
+    expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
+    expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
+  })
+
+  it('mantém POLITICA_POR_TIPO.menuId alinhado ao mapa de badges', () => {
+    for (const [tipo, politica] of Object.entries(POLITICA_POR_TIPO) as Array<
+      [TipoNotificacao, { menuId?: string }]
+    >) {
+      expect(menuIdParaTipo(tipo)).toBe(politica.menuId ?? null)
+    }
+  })
+
+  it('agrega contagens por menu e ignora tipos sem menuId', () => {
+    const badges = agregarBadgesPorMenu([
+      { tipo: 'MEMBRO_SOLICITADO', _count: { tipo: 2 } },
+      { tipo: 'ALIANCA_PROPOSTA', _count: { tipo: 1 } },
+      { tipo: 'ALIANCA_ACEITA', _count: { tipo: 3 } },
+      { tipo: 'COMUNICADO_URGENTE', _count: { tipo: 5 } },
+    ])
+    expect(badges).toEqual({
+      membros: 2,
+      aliancas: 4,
+    })
   })
 })
 

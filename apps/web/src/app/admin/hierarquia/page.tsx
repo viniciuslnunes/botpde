@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { Network } from 'lucide-react'
-import { assertAnyPermission } from '@/lib/authz'
+import { assertPermission } from '@/lib/authz'
 import { getOrganizacaoTree } from '@/lib/organizacao-tree'
 import { OrganizacaoMural } from '@/components/admin/organizacao-mural'
 import { PERMISSIONS } from '@torcida/types'
@@ -9,12 +9,9 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Hierarquia — Admin' }
 
 export default async function HierarquiaPage() {
-  let tenant: Awaited<ReturnType<typeof assertAnyPermission>>['tenant']
+  let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
   try {
-    ;({ tenant } = await assertAnyPermission([
-      PERMISSIONS.ROLES_MANAGE,
-      PERMISSIONS.MEMBERS_VIEW,
-    ]))
+    ;({ tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE))
   } catch {
     redirect('/admin')
   }

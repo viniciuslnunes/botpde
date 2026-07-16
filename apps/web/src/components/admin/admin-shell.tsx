@@ -27,6 +27,7 @@ interface AdminMenuItem {
   id: string
   label: string
   href: string
+  secao?: string
   exact?: boolean
 }
 
@@ -54,6 +55,7 @@ function AdminTopbar({
   userName,
   userAvatar,
   notifications,
+  unreadNotifications,
   mobileOpen,
   onToggleMobile,
 }: {
@@ -64,13 +66,12 @@ function AdminTopbar({
   userName: string | null
   userAvatar: string | null
   notifications: NotificationItem[]
+  unreadNotifications: number
   mobileOpen: boolean
   onToggleMobile: () => void
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
   const firstName = userName?.split(' ')[0] ?? 'Admin'
-  const { notifications: liveNotifications, unreadNotifications } =
-    useAdminNavbarContext(notifications)
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -123,7 +124,7 @@ function AdminTopbar({
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell
             key={tenantSlug}
-            initialItems={liveNotifications}
+            initialItems={notifications}
             unreadCount={unreadNotifications}
             verTodasHref="/admin/notificacoes"
             verTodasLabel="Ver alertas operacionais"
@@ -229,6 +230,11 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const {
+    notifications: liveNotifications,
+    unreadNotifications,
+    menuBadges,
+  } = useAdminNavbarContext(notifications)
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -239,7 +245,8 @@ export function AdminShell({
         tenantLogoUrl={tenantLogoUrl}
         userName={userName}
         userAvatar={userAvatar}
-        notifications={notifications}
+        notifications={liveNotifications}
+        unreadNotifications={unreadNotifications}
         mobileOpen={mobileOpen}
         onToggleMobile={() => setMobileOpen((v) => !v)}
       />
@@ -248,6 +255,7 @@ export function AdminShell({
         <AdminSidebar
           tenantSlug={tenantSlug}
           items={items}
+          badges={menuBadges}
           isSuperAdmin={isSuperAdmin}
           torcidas={torcidas}
           mobileOpen={mobileOpen}

@@ -373,7 +373,7 @@ export async function adicionarMembroDepartamento(departamentoId: string, target
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   revalidatePath('/admin/acessos')
-  revalidatePath('/portal/departamentos')
+  revalidatePath('/portal/departamentos', 'layout')
 }
 
 export async function removerMembroDepartamento(departamentoId: string, targetUserId: string) {
@@ -408,5 +408,5 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   revalidatePath('/admin/acessos')
-  revalidatePath('/portal/departamentos')
+  revalidatePath('/portal/departamentos', 'layout')
 }

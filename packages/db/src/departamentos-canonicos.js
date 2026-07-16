@@ -57,99 +57,94 @@ export const DEPARTAMENTOS_CANONICOS_SLUGS = [
  */
 export const DEPARTAMENTOS_CANONICOS = [
   {
-    // Prancheta / conselho operacional — visão ampla SEM poderes de Presidência
+    // Prancheta / conselho — membro no portal; operação admin só gestor.
     nome: 'Diretoria',
     cor: '#1f2937',
     moduloPortal: 'membros',
     permissions: [
-      PERMISSIONS.MEMBERS_VIEW,
       PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.AUDIT_VIEW,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.PATRIMONY_VIEW,
-      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
-      PERMISSIONS.NEWS_CURATE,
-      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
     permissionsGestor: [
+      PERMISSIONS.MEMBERS_VIEW,
       PERMISSIONS.MEMBERS_APPROVE,
       PERMISSIONS.MEMBERS_REJECT,
       PERMISSIONS.MEMBERS_WARN,
       PERMISSIONS.MEMBERS_BLOCK,
+      PERMISSIONS.AUDIT_VIEW,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.SEDES_MANAGE,
+      PERMISSIONS.STORE_VIEW_ORDERS,
       PERMISSIONS.FINANCE_MANAGE,
     ],
   },
   {
-    // Mensalidades, inadimplência, prestação de contas, caixa de eventos/loja
+    // Mensalidades, inadimplência, prestação de contas, caixa
+    // Escopo: portal (view); admin financeiro só com finance:manage (gestor).
     nome: 'Financeiro',
     cor: '#047857',
     moduloPortal: 'financeiro',
     permissions: [
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.MEMBERS_VIEW,
-      PERMISSIONS.STORE_VIEW_ORDERS,
       PERMISSIONS.MESSAGES_SEND,
     ],
     permissionsGestor: [
       PERMISSIONS.FINANCE_MANAGE,
-      PERMISSIONS.MEMBERS_IMPORT,
-      PERMISSIONS.STORE_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.GROUPS_CREATE,
     ],
   },
   {
-    // Festas, ações beneficentes, churrascos — mobilização social da sede
+    // Festas, ações beneficentes, churrascos — membro participa no portal.
     nome: 'Social e eventos',
     cor: '#7c3aed',
     moduloPortal: 'eventos',
     permissions: [
-      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.GROUPS_CREATE,
-      PERMISSIONS.MEMBERS_VIEW,
-      PERMISSIONS.STORE_VIEW_ORDERS,
-      PERMISSIONS.NEWS_CURATE,
     ],
     permissionsGestor: [
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.REPORTS_VIEW,
+      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
-    // Camisas, bandeiras, produtos — operação de estoque e pedidos
+    // Camisas, bandeiras, produtos — membro usa a loja no portal.
     nome: 'Materiais / Loja',
     cor: '#b45309',
     moduloPortal: 'loja',
     permissions: [
-      PERMISSIONS.STORE_VIEW_ORDERS,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.MEMBERS_VIEW,
     ],
     permissionsGestor: [
+      PERMISSIONS.STORE_VIEW_ORDERS,
       PERMISSIONS.STORE_MANAGE,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
@@ -160,7 +155,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     ],
   },
   {
-    // Mídia, mural, comunicados, notícias, canais — voz institucional
+    // Mídia, mural, comunicados — membro posta no portal; curadoria = gestor.
     nome: 'Comunicação',
     cor: '#0369a1',
     moduloPortal: 'comunidade',
@@ -168,24 +163,23 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.MEETINGS_HOST,
-      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.GROUPS_CREATE,
-      PERMISSIONS.EVENTS_CREATE,
-      PERMISSIONS.MEMBERS_VIEW,
     ],
     permissionsGestor: [
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.MESSAGES_MODERATE,
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
-    // Sede, instrumentos, bandeirões, espaços físicos
+    // Sede, instrumentos, bandeirões — ver no portal; gerir no admin (gestor).
     nome: 'Patrimônio',
     cor: '#57534e',
     moduloPortal: 'patrimonio',
@@ -194,13 +188,11 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
-      PERMISSIONS.EVENTS_CREATE,
-      PERMISSIONS.STORE_VIEW_ORDERS,
-      PERMISSIONS.MEMBERS_VIEW,
     ],
     permissionsGestor: [
       PERMISSIONS.PATRIMONY_MANAGE,
       PERMISSIONS.SEDES_MANAGE,
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.STORE_MANAGE,
       PERMISSIONS.FINANCE_VIEW,
@@ -210,48 +202,45 @@ export const DEPARTAMENTOS_CANONICOS = [
     ],
   },
   {
-    // Bateria / ensaios — ritmo, ensaio, coordenação do núcleo musical
+    // Bateria / ensaios — membro no portal; criar/gerir ensaios = gestor.
     nome: 'Bateria',
     cor: '#be123c',
     moduloPortal: 'eventos',
     permissions: [
-      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
       PERMISSIONS.MEETINGS_HOST,
-      PERMISSIONS.MEMBERS_VIEW,
       PERMISSIONS.PATRIMONY_VIEW,
-      PERMISSIONS.NEWS_CURATE,
     ],
     permissionsGestor: [
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.PATRIMONY_MANAGE,
       PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
-    // Viagens / jogos fora — listas de embarque, custo, logística
+    // Viagens / jogos fora — membro no portal; operação = gestor.
     nome: 'Caravanas',
     cor: '#c2410c',
     moduloPortal: 'eventos',
     permissions: [
-      PERMISSIONS.EVENTS_CREATE,
-      PERMISSIONS.MEMBERS_VIEW,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
-      PERMISSIONS.STORE_VIEW_ORDERS,
-      PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.MEETINGS_HOST,
+      PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.REPORTS_VIEW,
     ],
     permissionsGestor: [
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.CHANNELS_MANAGE,
@@ -263,22 +252,20 @@ export const DEPARTAMENTOS_CANONICOS = [
     ],
   },
   {
-    // Organização das mulheres — mobilização, eventos e voz própria
+    // Organização das mulheres — membro no portal.
     nome: 'Feminino',
     cor: '#db2777',
     moduloPortal: 'comunidade',
     permissions: [
       PERMISSIONS.COMMUNITY_POST,
-      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,
       PERMISSIONS.MEETINGS_HOST,
-      PERMISSIONS.MEMBERS_VIEW,
-      PERMISSIONS.NEWS_CURATE,
-      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
     permissionsGestor: [
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
@@ -287,30 +274,29 @@ export const DEPARTAMENTOS_CANONICOS = [
       PERMISSIONS.SEDES_MANAGE,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.MEMBERS_WARN,
+      PERMISSIONS.STORE_VIEW_ORDERS,
     ],
   },
   {
-    // Escola de samba / operação paralela — eventos + loja + finanças + patrimônio
+    // Escola de samba — membro no portal; operação ampla = gestor.
     nome: 'Carnaval',
     cor: '#4d7c0f',
     moduloPortal: 'eventos',
     permissions: [
-      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.MEETINGS_HOST,
       PERMISSIONS.GROUPS_CREATE,
-      PERMISSIONS.STORE_VIEW_ORDERS,
-      PERMISSIONS.MEMBERS_VIEW,
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.PATRIMONY_VIEW,
       PERMISSIONS.REPORTS_VIEW,
-      PERMISSIONS.NEWS_CURATE,
     ],
     permissionsGestor: [
+      PERMISSIONS.EVENTS_CREATE,
       PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.COMMUNITY_MANAGE,
       PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.NEWS_CURATE,
       PERMISSIONS.ANNOUNCEMENTS_PUBLISH,
       PERMISSIONS.CHANNELS_MANAGE,
       PERMISSIONS.MESSAGES_MODERATE,

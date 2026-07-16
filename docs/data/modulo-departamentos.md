@@ -60,18 +60,23 @@ Bateria sem precisar de `ROLES_MANAGE` (que abriria todos os departamentos).
 Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` /
 `upsertPerfisDepartamentoCanonicos`.
 
-| Departamento | Colaborador | Gestor+ |
+| Departamento | Colaborador (portal) | Gestor+ (portal + operação admin) |
 |---|---|---|
-| **Diretoria** | Ver membros, relatórios, financeiro e patrimônio; criar eventos; salas; DMs/grupos; postar; curar notícias; ver pedidos | Aprovar/reprovar/advertir/bloquear; comunicados; gerir eventos/mural/canais; sedes; gerir financeiro |
-| **Financeiro** | Ver financeiro, relatórios, membros e pedidos; DMs | Gerir financeiro; importar base; gerir loja; comunicados; salas/grupos |
-| **Social e eventos** | Criar eventos; postar; DMs/grupos/salas; ver membros e pedidos; curar | Gerir eventos/mural/moderação/canais; comunicados; sedes; ver financeiro e relatórios |
-| **Materiais / Loja** | Ver pedidos; DMs/grupos; postar; relatórios; ver membros | Gerir produtos; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
-| **Comunicação** | Postar; curar notícias; salas/grupos; criar eventos; DMs; ver membros | Comunicados; mural/moderação/canais; moderar msgs; gerir eventos; relatórios; ver pedidos |
-| **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos; criar eventos; ver pedidos/membros | Gerir patrimônio e sedes; gerir eventos/loja; ver financeiro; comunicados; salas/canais |
-| **Bateria** | Criar ensaios; postar; grupos/salas; ver membros e patrimônio; curar | Gerir eventos/canais/mural; comunicados; gerir patrimônio e sedes; ver pedidos |
-| **Caravanas** | Criar viagens; ver membros/pedidos/financeiro/relatórios; DMs/grupos/salas; postar | Gerir eventos/canais/mural; comunicados; gerir loja e financeiro; sedes; advertir |
-| **Feminino** | Postar; criar eventos; DMs/grupos/salas; ver membros; curar; ver pedidos | Gerir eventos/mural/moderação/canais; comunicados; moderar msgs; sedes; relatórios; advertir |
-| **Carnaval** | Eventos + comunidade + pedidos + ver financeiro/patrimônio/relatórios/membros; salas/grupos; curar | Gerir eventos/mural/loja/financeiro/patrimônio/sedes; canais; moderação; comunicados; advertir |
+| **Diretoria** | Relatórios; ver financeiro/patrimônio; salas; DMs/grupos; postar | Ver/aprovar/reprovar/advertir/bloquear membros; auditoria; comunicados; eventos; mural/moderação/notícias; sedes; pedidos; gerir financeiro |
+| **Financeiro** | Ver financeiro e relatórios; DMs | Gerir financeiro; comunicados; salas/grupos |
+| **Social e eventos** | Postar; DMs/grupos/salas | Criar/gerir eventos; comunicados; mural/moderação/notícias; sedes; ver financeiro/relatórios/pedidos |
+| **Materiais / Loja** | DMs/grupos; postar; relatórios | Ver/gerir pedidos e catálogo; ver financeiro; comunicados; criar eventos; canais; salas; ver patrimônio |
+| **Comunicação** | Postar; salas/grupos; DMs | Curar notícias; comunicados; mural/moderação/canais; moderar msgs; eventos; relatórios; ver pedidos |
+| **Patrimônio** | Ver patrimônio e relatórios; DMs/grupos | Gerir patrimônio e sedes; eventos; loja; ver financeiro; comunicados; salas/canais |
+| **Bateria** | Postar; grupos/salas; ver patrimônio | Criar/gerir eventos; canais/mural/notícias; comunicados; gerir patrimônio e sedes; ver pedidos |
+| **Caravanas** | DMs/grupos/salas; postar; ver financeiro/relatórios | Criar/gerir eventos; canais/mural; comunicados; gerir loja e financeiro; sedes; advertir |
+| **Feminino** | Postar; DMs/grupos/salas | Eventos; notícias; mural/moderação/canais; comunicados; sedes; relatórios; advertir; ver pedidos |
+| **Carnaval** | Postar; salas/grupos; ver financeiro/patrimônio/relatórios | Eventos; mural/loja/financeiro/patrimônio/sedes; canais; moderação; notícias; comunicados; advertir |
+
+**Princípio Fase 2:** colaborador **não** recebe permissões que abrem o menu `/admin`
+(`members:view`, `events:manage`, `store:*`, `news:curate`, `finance:manage`, etc.).
+`finance:view` / `patrimony:view` / `events:create` ficam no portal ou no pacote gestor;
+itens admin de Financeiro/Patrimônio/Eventos exigem `*:manage`.
 
 **Presidência** (`settings:manage`, `roles:manage`, `torcida:global_view`, `alliances:manage`)
 entra via extras de `owner` / `vice` (Diretoria + GESTOR), não no pacote base da área.
@@ -103,6 +108,25 @@ Onboarding e Sedes usam a **árvore de `Sede`** no mesmo tenant. A **Visão da t
 - Bootstrap: `bootstrapAcessoTenant` / `syncMembershipFromRoles` em `@torcida/db`
 - Admin: `/admin/acessos` — cargos, departamentos, pessoas
 - Mural: `/admin/hierarquia`
+
+## Menu admin e segregação
+
+O sidebar de `/admin` filtra por **permissão efetiva** (`filterMenuByPermissions`),
+agrupada em seções alinhadas a `DEPARTAMENTO_MODULOS` (`ADMIN_MENU_SECOES`).
+
+- Departamento **não** esconde itens por id: quem recebe a permissão (pacote, extra
+  ou override) vê o módulo correspondente.
+- Ex.: **Membro · Financeiro** (só `finance:view` + `reports:view`) vê Dashboard +
+  Financeiro — não vê Pessoas, Loja, Comunidade nem Governança.
+- Para abrir Pedidos ou Membros, atribua o perfil da área (Materiais / Diretoria) ou
+  uma permissão adicional explícita.
+
+Visão-alvo portal × admin (membros no portal, gestores com painel + operação):
+ver `docs/data/proposta-departamentos-portal-admin.md`.
+
+**Diretoria (gestor):** a home `/portal/departamentos/diretoria` lista solicitações
+`PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).
+Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).
 
 ## Decisões fechadas
 

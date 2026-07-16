@@ -4,7 +4,7 @@ import { db } from '@torcida/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { assertPermission } from '@/lib/authz'
+import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 
 const eventoSchema = z.object({
@@ -23,7 +23,10 @@ export async function criarEvento(
   _prev: EventoState,
   formData: FormData,
 ): Promise<EventoState> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_CREATE)
+  const { session, tenant } = await assertAnyPermission([
+    PERMISSIONS.EVENTS_CREATE,
+    PERMISSIONS.EVENTS_MANAGE,
+  ])
 
   const raw = {
     titulo: formData.get('titulo') as string,

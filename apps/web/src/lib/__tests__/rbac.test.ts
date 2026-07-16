@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADMIN_MENU,
   calculateEffectivePermissions,
   canManageDepartamento,
+  capabilityPorSlug,
   DEPARTAMENTO_MODULO_ROTA,
   DEPARTAMENTO_MODULOS,
   filterMenuByPermissions,
+  groupAdminMenuBySecao,
+  hasAdminAreaAccess,
   hasPermission,
+  hrefHomeDepartamento,
+  hrefModuloPortal,
+  hrefOperacaoAdmin,
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   podeTerVice,
@@ -16,6 +23,7 @@ import {
   SYSTEM_ROLES,
   WILDCARD_PERMISSION,
 } from '@torcida/types'
+import { DEPARTAMENTOS_CANONICOS } from '../../../../../packages/db/src/departamentos-canonicos.js'
 
 describe('hasPermission', () => {
   it('concede acesso quando a permissão está na lista efetiva (role autorizada)', () => {
@@ -206,14 +214,26 @@ describe('DEPARTAMENTO_MODULO_ROTA (hub do portal)', () => {
     }
   })
 
-  it('módulo disponível tem href; indisponível não tem', () => {
+  it('módulo disponível tem href portal; indisponível não tem; nenhum aponta para admin', () => {
     for (const rota of Object.values(DEPARTAMENTO_MODULO_ROTA)) {
       if (rota.disponivel) {
         expect(rota.href).toBeTruthy()
+        expect(rota.href?.startsWith('/portal')).toBe(true)
+        expect(rota.href?.startsWith('/admin')).toBe(false)
       } else {
         expect(rota.href).toBeNull()
       }
     }
+  })
+})
+
+describe('departamento capabilities', () => {
+  it('home e operação: módulo portal nunca é admin; operação pode ser', () => {
+    expect(hrefHomeDepartamento('financeiro')).toBe('/portal/departamentos/financeiro')
+    expect(hrefModuloPortal('eventos')).toBe('/portal/eventos')
+    expect(hrefModuloPortal('financeiro')).toBe('/portal/financeiro')
+    expect(hrefOperacaoAdmin('financeiro')).toBe('/admin/financeiro')
+    expect(capabilityPorSlug('bateria')?.portalPanel).toBe('bateria')
   })
 })
 
@@ -236,5 +256,73 @@ describe('filterMenuByPermissions com OR', () => {
     expect(filterMenuByPermissions(menu, [PERMISSIONS.EVENTS_CREATE])).toHaveLength(1)
     expect(filterMenuByPermissions(menu, [PERMISSIONS.EVENTS_MANAGE])).toHaveLength(1)
     expect(filterMenuByPermissions(menu, [PERMISSIONS.MEMBERS_VIEW])).toHaveLength(0)
+  })
+
+  it('ADMIN_MENU: members:approve vê Membros; messages:moderate vê Moderação', () => {
+    const soAprovar = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MEMBERS_APPROVE])
+    expect(soAprovar.map((i) => i.id)).toContain('membros')
+    expect(soAprovar.map((i) => i.id)).not.toContain('socios')
+
+    const soMsgMod = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MESSAGES_MODERATE])
+    expect(soMsgMod.map((i) => i.id)).toContain('comunidade-moderacao')
+  })
+
+  it('ADMIN_MENU: pacote Financeiro (membro) não abre admin — só Dashboard', () => {
+    const financePerms = [
+      PERMISSIONS.FINANCE_VIEW,
+      PERMISSIONS.REPORTS_VIEW,
+      PERMISSIONS.MESSAGES_SEND,
+    ]
+    const ids = filterMenuByPermissions(ADMIN_MENU, financePerms).map((i) => i.id)
+    expect(ids).toEqual(['dashboard'])
+    expect(ids).not.toContain('financeiro')
+    expect(ids).not.toContain('membros')
+  })
+
+  it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Eventos', () => {
+    expect(
+      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.FINANCE_MANAGE]).map((i) => i.id),
+    ).toEqual(['dashboard', 'financeiro'])
+    expect(
+      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_MANAGE]).map((i) => i.id),
+    ).toEqual(['dashboard', 'eventos'])
+    expect(
+      filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_CREATE]).map((i) => i.id),
+    ).toEqual(['dashboard'])
+  })
+
+  it('hierarquia exige roles:manage (não members:view)', () => {
+    const soMembers = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MEMBERS_VIEW]).map(
+      (i) => i.id,
+    )
+    expect(soMembers).toContain('membros')
+    expect(soMembers).not.toContain('hierarquia')
+  })
+
+  it('groupAdminMenuBySecao omite seções vazias e agrupa por módulo', () => {
+    const items = filterMenuByPermissions(ADMIN_MENU, [
+      PERMISSIONS.FINANCE_MANAGE,
+      PERMISSIONS.MEMBERS_VIEW,
+    ]).map((i) => ({ id: i.id, label: i.label, href: i.href, secao: i.secao }))
+    const groups = groupAdminMenuBySecao(items)
+    expect(groups.map((g) => g.id)).toEqual(['geral', 'pessoas', 'financeiro'])
+    expect(groups.find((g) => g.id === 'financeiro')?.label).toBe('Financeiro')
+  })
+
+  it('Fase 2: pacote colaborador de toda área canônica não abre área admin', () => {
+    for (const area of DEPARTAMENTOS_CANONICOS) {
+      const ids = filterMenuByPermissions(ADMIN_MENU, area.permissions).map((i) => i.id)
+      expect(ids, area.nome).toEqual(['dashboard'])
+      expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(false)
+    }
+  })
+
+  it('Fase 2: gestor de cada área canônica ganha ao menos um item admin além do dashboard', () => {
+    for (const area of DEPARTAMENTOS_CANONICOS) {
+      const efetivas = [...area.permissions, ...area.permissionsGestor]
+      expect(hasAdminAreaAccess(efetivas), area.nome).toBe(true)
+      const ids = filterMenuByPermissions(ADMIN_MENU, efetivas).map((i) => i.id)
+      expect(ids.length, area.nome).toBeGreaterThan(1)
+    }
   })
 })

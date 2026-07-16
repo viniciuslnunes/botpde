@@ -10,6 +10,7 @@ import {
   Handshake,
   MapPin,
   ShoppingBag,
+  Package,
   Settings,
   Calendar,
   KeyRound,
@@ -18,9 +19,12 @@ import {
   Newspaper,
   Network,
   ScrollText,
+  Wallet,
+  Landmark,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
+import { groupAdminMenuBySecao } from '@torcida/types'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -35,9 +39,12 @@ const ICON_BY_ID: Record<string, LucideIcon> = {
   sedes: MapPin,
   hierarquia: Network,
   loja: ShoppingBag,
+  'loja-pedidos': Package,
   comunidade: MessagesSquare,
   'comunidade-moderacao': ShieldAlert,
   noticias: Newspaper,
+  financeiro: Wallet,
+  patrimonio: Landmark,
   aliancas: Handshake,
   acessos: KeyRound,
   auditoria: ScrollText,
@@ -48,6 +55,7 @@ interface AdminMenuItem {
   id: string
   label: string
   href: string
+  secao?: string
   exact?: boolean
 }
 
@@ -55,6 +63,8 @@ interface AdminSidebarProps {
   tenantSlug: string
   /** Itens já filtrados pelas permissões efetivas do usuário (ver ADMIN_MENU/filterMenuByPermissions) */
   items: AdminMenuItem[]
+  /** Contagens de notificações não lidas por id de menu. */
+  badges?: Record<string, number>
   isSuperAdmin?: boolean
   torcidas?: TorcidaOpcao[]
   mobileOpen?: boolean
@@ -63,6 +73,7 @@ interface AdminSidebarProps {
 
 interface NavItemsProps {
   items: AdminMenuItem[]
+  badges: Record<string, number>
   pathname: string
   onNavigate?: () => void
 }
@@ -72,12 +83,17 @@ function isItemActive(item: AdminMenuItem, pathname: string) {
   return pathname.startsWith(item.href)
 }
 
-function NavItems({ items, pathname, onNavigate }: NavItemsProps) {
+function formatBadgeCount(n: number) {
+  return n > 9 ? '9+' : String(n)
+}
+
+function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-0.5">
       {items.map((item) => {
         const active = isItemActive(item, pathname)
         const Icon = ICON_BY_ID[item.id] ?? LayoutDashboard
+        const badgeCount = badges[item.id] ?? 0
         return (
           <li key={item.href}>
             <Link
@@ -99,7 +115,16 @@ function NavItems({ items, pathname, onNavigate }: NavItemsProps) {
                 ].join(' ')}
               />
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {active && <ChevronRight className="h-3 w-3 shrink-0 text-[rgb(var(--primary))]" />}
+              {badgeCount > 0 ? (
+                <span
+                  className="min-w-4 shrink-0 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-4 text-white"
+                  aria-label={`${badgeCount} notificações pendentes`}
+                >
+                  {formatBadgeCount(badgeCount)}
+                </span>
+              ) : (
+                active && <ChevronRight className="h-3 w-3 shrink-0 text-[rgb(var(--primary))]" />
+              )}
             </Link>
           </li>
         )
@@ -108,9 +133,44 @@ function NavItems({ items, pathname, onNavigate }: NavItemsProps) {
   )
 }
 
+function NavSections({
+  items,
+  badges,
+  pathname,
+  onNavigate,
+}: {
+  items: AdminMenuItem[]
+  badges: Record<string, number>
+  pathname: string
+  onNavigate?: () => void
+}) {
+  const groups = groupAdminMenuBySecao(items)
+
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => (
+        <div key={group.id}>
+          {group.label ? (
+            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
+              {group.label}
+            </p>
+          ) : null}
+          <NavItems
+            items={group.items as AdminMenuItem[]}
+            badges={badges}
+            pathname={pathname}
+            onNavigate={onNavigate}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SidebarBody({
   tenantSlug,
   items,
+  badges,
   pathname,
   isSuperAdmin,
   torcidas,
@@ -118,6 +178,7 @@ function SidebarBody({
 }: {
   tenantSlug: string
   items: AdminMenuItem[]
+  badges: Record<string, number>
   pathname: string
   isSuperAdmin: boolean
   torcidas: TorcidaOpcao[]
@@ -136,8 +197,8 @@ function SidebarBody({
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <NavItems items={items} pathname={pathname} onNavigate={onNavigate} />
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Menu administrativo">
+        <NavSections items={items} badges={badges} pathname={pathname} onNavigate={onNavigate} />
       </nav>
 
       <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
@@ -166,6 +227,7 @@ function SidebarBody({
 export function AdminSidebar({
   tenantSlug,
   items,
+  badges = {},
   isSuperAdmin = false,
   torcidas = [],
   mobileOpen = false,
@@ -187,6 +249,7 @@ export function AdminSidebar({
             <SidebarBody
               tenantSlug={tenantSlug}
               items={items}
+              badges={badges}
               pathname={pathname}
               isSuperAdmin={isSuperAdmin}
               torcidas={torcidas}
@@ -200,6 +263,7 @@ export function AdminSidebar({
         <SidebarBody
           tenantSlug={tenantSlug}
           items={items}
+          badges={badges}
           pathname={pathname}
           isSuperAdmin={isSuperAdmin}
           torcidas={torcidas}

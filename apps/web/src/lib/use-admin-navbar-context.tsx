@@ -15,37 +15,42 @@ const notificarNovas = criarVigiaDeNotificacoes('/admin/notificacoes')
 async function fetchAdminNavbarContext(): Promise<{
   notifications: NotificationItem[]
   unreadNotifications: number
+  menuBadges: Record<string, number>
 }> {
   const res = await fetch('/api/admin/navbar-context', { cache: 'no-store' })
-  if (!res.ok) return { notifications: [], unreadNotifications: 0 }
+  if (!res.ok) return { notifications: [], unreadNotifications: 0, menuBadges: {} }
   const data = (await res.json()) as {
     notifications?: NotificationItem[]
     unreadNotifications?: number
+    menuBadges?: Record<string, number>
   }
   return {
     notifications: data.notifications ?? [],
     unreadNotifications: data.unreadNotifications ?? 0,
+    menuBadges: data.menuBadges ?? {},
   }
 }
 
 /**
- * Mantém o sino do admin vivo: parte da lista SSR (`initial`, só no primeiro
- * render — o polling/SSE mantém os dados mais frescos que a prop em navegações
- * seguintes), refaz o fetch por polling (fallback) e por push SSE.
+ * Mantém o sino e os badges do menu admin vivos: parte da lista SSR (`initial`),
+ * refaz o fetch por polling (fallback) e por push SSE.
  */
 export function useAdminNavbarContext(initial: NotificationItem[]): {
   notifications: NotificationItem[]
   unreadNotifications: number
+  menuBadges: Record<string, number>
 } {
   const router = useRouter()
   const [notifications, setNotifications] = useState<NotificationItem[]>(initial)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [menuBadges, setMenuBadges] = useState<Record<string, number>>({})
 
   const refresh = useCallback(() => {
     void fetchAdminNavbarContext().then((data) => {
       const precisaRefresh = notificarNovas(data.notifications, (href) => router.push(href))
       setNotifications(data.notifications)
       setUnreadNotifications(data.unreadNotifications)
+      setMenuBadges(data.menuBadges)
       if (precisaRefresh) router.refresh()
     })
   }, [router])
@@ -57,5 +62,5 @@ export function useAdminNavbarContext(initial: NotificationItem[]): {
   useVisibleInterval(() => refresh(), CACHE_MS)
   useNotificationStream(() => refresh())
 
-  return { notifications, unreadNotifications }
+  return { notifications, unreadNotifications, menuBadges }
 }

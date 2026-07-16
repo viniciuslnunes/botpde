@@ -19,6 +19,8 @@ type PoliticaRoteamento = {
   permissaoAdmin?: string
   /** Permissões alternativas (OR) para destinatários administrativos. */
   permissoesAdminOr?: string[]
+  /** Id do item em ADMIN_MENU para badge no sidebar (só tipos operacionais). */
+  menuId?: string
 }
 
 /**
@@ -39,14 +41,41 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   MEMBRO_SOLICITADO: {
     escopo: 'hibrido',
     permissoesAdminOr: [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
+    menuId: 'membros',
   },
-  DENUNCIA_NOVA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.COMMUNITY_MODERATE },
-  ALIANCA_PROPOSTA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE },
-  ALIANCA_ACEITA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE },
-  ALIANCA_REJEITADA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE },
-  ALIANCA_ENCERRADA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE },
-  ALIANCA_CANCELADA: { escopo: 'admin', permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE },
+  DENUNCIA_NOVA: {
+    escopo: 'admin',
+    permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
+    menuId: 'comunidade-moderacao',
+  },
+  ALIANCA_PROPOSTA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
+    menuId: 'aliancas',
+  },
+  ALIANCA_ACEITA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
+    menuId: 'aliancas',
+  },
+  ALIANCA_REJEITADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
+    menuId: 'aliancas',
+  },
+  ALIANCA_ENCERRADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
+    menuId: 'aliancas',
+  },
+  ALIANCA_CANCELADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
+    menuId: 'aliancas',
+  },
 }
+
+export { agregarBadgesPorMenu, menuIdParaTipo } from '@/lib/notificacoes-menu-badges'
 
 /** Tipos puramente sociais — sino do portal para qualquer membro ativo. */
 export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = (

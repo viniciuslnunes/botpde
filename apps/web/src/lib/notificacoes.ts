@@ -9,6 +9,7 @@ import {
 import { cache } from 'react'
 import { superAdminEmails } from '@/lib/env'
 import { emitNotificacaoPing } from './notificacoes-bus'
+import { agregarBadgesPorMenu } from '@/lib/notificacoes-menu-badges'
 
 export type CriarNotificacaoInput = {
   userId: string
@@ -375,22 +376,47 @@ const NOTIFICACAO_INBOX_SELECT = {
 } as const
 
 /**
- * Lista recentes + contagem de não lidas num único round-trip ao banco.
- * Usado pelas APIs de navbar (portal e admin).
+ * Lista recentes + contagem de não lidas (+ badges por menu, quando solicitado)
+ * num único round-trip ao banco. Usado pelas APIs de navbar (portal e admin).
  */
 export async function getInboxNavbar(
   tenantId: string,
   userId: string,
   tipos: TipoNotificacao[],
   limite = 8,
-): Promise<{ notifications: NotificacaoInboxItem[]; unreadCount: number }> {
+  opts?: { withMenuBadges?: boolean },
+): Promise<{
+  notifications: NotificacaoInboxItem[]
+  unreadCount: number
+  menuBadges: Record<string, number>
+}> {
   if (tipos.length === 0) {
-    return { notifications: [], unreadCount: 0 }
+    return { notifications: [], unreadCount: 0, menuBadges: {} }
   }
 
   const baseWhere = { tenantId, userId, tipo: { in: tipos } }
+  const withMenuBadges = opts?.withMenuBadges === true
 
-  const [notifications, unreadCount]: [NotificacaoInboxItem[], number] = await db.$transaction([
+  if (!withMenuBadges) {
+    const [notifications, unreadCount]: [NotificacaoInboxItem[], number] = await db.$transaction([
+      db.notificacao.findMany({
+        where: baseWhere,
+        orderBy: { criadoEm: 'desc' },
+        take: limite,
+        select: NOTIFICACAO_INBOX_SELECT,
+      }),
+      db.notificacao.count({
+        where: { ...baseWhere, lida: false },
+      }),
+    ])
+    return { notifications, unreadCount, menuBadges: {} }
+  }
+
+  const [notifications, unreadCount, grouped]: [
+    NotificacaoInboxItem[],
+    number,
+    Array<{ tipo: TipoNotificacao; _count: { tipo: number } }>,
+  ] = await db.$transaction([
     db.notificacao.findMany({
       where: baseWhere,
       orderBy: { criadoEm: 'desc' },
@@ -400,9 +426,18 @@ export async function getInboxNavbar(
     db.notificacao.count({
       where: { ...baseWhere, lida: false },
     }),
+    db.notificacao.groupBy({
+      by: ['tipo'],
+      where: { ...baseWhere, lida: false },
+      _count: { tipo: true },
+    }),
   ])
 
-  return { notifications, unreadCount }
+  return {
+    notifications,
+    unreadCount,
+    menuBadges: agregarBadgesPorMenu(grouped),
+  }
 }
 
 export async function contarNotificacoesNaoLidas(

@@ -68,6 +68,7 @@ export default async function AdminLayout({
       id: item.id,
       label: item.label,
       href: item.href,
+      secao: item.secao,
       ...('exact' in item && item.exact ? { exact: true as const } : {}),
     }))
 

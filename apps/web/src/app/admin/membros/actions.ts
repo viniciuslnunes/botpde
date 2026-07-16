@@ -78,6 +78,7 @@ export async function aprovarMembro(membroId: string) {
 
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
+  revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${membro.userId}`)
 }
@@ -119,6 +120,7 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
 
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
+  revalidatePath('/portal/departamentos', 'layout')
 }
 
 export async function reverterMembro(membroId: string) {
@@ -148,4 +150,5 @@ export async function reverterMembro(membroId: string) {
   })
 
   revalidatePath('/admin/membros')
+  revalidatePath('/portal/departamentos', 'layout')
 }

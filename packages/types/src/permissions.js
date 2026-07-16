@@ -233,23 +233,24 @@ export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
 ])
 
 /**
- * Rota de destino no app para cada módulo de `DEPARTAMENTO_MODULOS`.
- * O hub de departamentos do portal NÃO reimplementa gestão — só direciona
- * para o módulo existente; `disponivel: false` = módulo ainda não lançado
- * (a UI mostra "Em breve" em vez de link).
+ * Rota de destino no **portal** para cada módulo de `DEPARTAMENTO_MODULOS`.
+ * Nunca aponta para `/admin` — membros operam no portal; gestores usam
+ * `DEPARTAMENTO_MODULO_ADMIN_ROTA` via atalho "Operação".
+ * `disponivel: false` = experiência ainda só na home da área (`/portal/departamentos/[slug]`).
  */
 export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   eventos: { href: '/portal/eventos', disponivel: true },
   loja: { href: '/portal/loja', disponivel: true },
   comunidade: { href: '/portal/comunidade', disponivel: true },
   sedes: { href: '/portal/sedes', disponivel: true },
-  membros: { href: '/admin/membros', disponivel: true },
-  financeiro: { href: null, disponivel: false },
+  // Diretoria / pessoas: home da área no portal (sem fila admin para membros)
+  membros: { href: null, disponivel: false },
+  financeiro: { href: '/portal/financeiro', disponivel: true },
   patrimonio: { href: null, disponivel: false },
 })
 
 /**
- * Rota admin correspondente ao módulo (atalho "Administrar" do hub).
+ * Rota admin correspondente ao módulo (atalho "Operação" do hub — só gestores).
  * null = sem área admin dedicada ainda.
  */
 export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
@@ -258,8 +259,8 @@ export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   comunidade: '/admin/comunidade',
   sedes: '/admin/sedes',
   membros: '/admin/membros',
-  financeiro: null,
-  patrimonio: null,
+  financeiro: '/admin/financeiro',
+  patrimonio: '/admin/patrimonio',
 })
 
 /**
