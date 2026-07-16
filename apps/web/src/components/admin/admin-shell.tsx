@@ -69,7 +69,8 @@ function AdminTopbar({
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
   const firstName = userName?.split(' ')[0] ?? 'Admin'
-  const liveNotifications = useAdminNavbarContext(notifications)
+  const { notifications: liveNotifications, unreadNotifications } =
+    useAdminNavbarContext(notifications)
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -123,6 +124,7 @@ function AdminTopbar({
           <NotificationBell
             key={tenantSlug}
             initialItems={liveNotifications}
+            unreadCount={unreadNotifications}
             verTodasHref="/admin/notificacoes"
             verTodasLabel="Ver alertas operacionais"
           />

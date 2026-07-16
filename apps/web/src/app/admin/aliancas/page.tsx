@@ -4,6 +4,7 @@ import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { listAliancasForTenant, listRecomendacoesForTenant } from '@/lib/aliancas'
+import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -28,6 +29,8 @@ export default async function AdminAliancasPage() {
   if (!authz) {
     redirect('/admin')
   }
+
+  await reconciliarPropostasAliancaPendentes(authz.tenant.id)
 
   const [aliancas, recomendacoes, tenantsRaw]: [
     Awaited<ReturnType<typeof listAliancasForTenant>>,

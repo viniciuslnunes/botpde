@@ -14,6 +14,10 @@ vi.mock('@/lib/env', () => ({
   superAdminEmails: ['ops@torcida.app'],
 }))
 
+vi.mock('@/lib/notificacoes-bus', () => ({
+  emitNotificacaoPing: vi.fn(),
+}))
+
 vi.mock('@torcida/db', () => ({
   db: {
     user: { findMany: mocks.userFindMany },
@@ -28,6 +32,7 @@ vi.mock('@torcida/db', () => ({
 
 import {
   listarDestinatariosAdmin,
+  listarUserIdsComQualquerPermissao,
   listarUserIdsSuperAdmin,
   notificarUsuariosComPermissao,
 } from '@/lib/notificacoes'
@@ -45,6 +50,48 @@ describe('listarUserIdsSuperAdmin', () => {
       where: { email: { in: ['ops@torcida.app'] } },
       select: { id: true },
     })
+  })
+})
+
+describe('listarUserIdsComQualquerPermissao', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.userRoleFindMany.mockResolvedValue([])
+    mocks.userPermissionFindMany.mockResolvedValue([])
+    mocks.userDepartamentoFindMany.mockResolvedValue([])
+    mocks.departamentoGestorFindMany.mockResolvedValue([])
+  })
+
+  it('resolve múltiplas permissões com uma única carga do tenant', async () => {
+    mocks.userRoleFindMany.mockResolvedValue([
+      {
+        userId: 'mod-1',
+        role: {
+          permissions: [],
+          permissionsExtras: [PERMISSIONS.COMMUNITY_MODERATE],
+          departamentoId: null,
+          papelNoDepartamento: null,
+          departamento: null,
+        },
+      },
+      {
+        userId: 'loja-1',
+        role: {
+          permissions: [],
+          permissionsExtras: [PERMISSIONS.STORE_MANAGE],
+          departamentoId: null,
+          papelNoDepartamento: null,
+          departamento: null,
+        },
+      },
+    ])
+
+    const ids = await listarUserIdsComQualquerPermissao('tenant-x', [
+      PERMISSIONS.COMMUNITY_MODERATE,
+      PERMISSIONS.STORE_MANAGE,
+    ])
+    expect(ids.sort()).toEqual(['loja-1', 'mod-1'].sort())
+    expect(mocks.userRoleFindMany).toHaveBeenCalledTimes(1)
   })
 })
 

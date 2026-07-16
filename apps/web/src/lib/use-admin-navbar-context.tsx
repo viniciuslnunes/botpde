@@ -12,11 +12,20 @@ const CACHE_MS = 20_000
 /** Vigia singleton do admin — só há um topbar admin montado por vez. */
 const notificarNovas = criarVigiaDeNotificacoes('/admin/notificacoes')
 
-async function fetchAdminNotifications(): Promise<NotificationItem[]> {
+async function fetchAdminNavbarContext(): Promise<{
+  notifications: NotificationItem[]
+  unreadNotifications: number
+}> {
   const res = await fetch('/api/admin/navbar-context', { cache: 'no-store' })
-  if (!res.ok) return []
-  const data = (await res.json()) as { notifications?: NotificationItem[] }
-  return data.notifications ?? []
+  if (!res.ok) return { notifications: [], unreadNotifications: 0 }
+  const data = (await res.json()) as {
+    notifications?: NotificationItem[]
+    unreadNotifications?: number
+  }
+  return {
+    notifications: data.notifications ?? [],
+    unreadNotifications: data.unreadNotifications ?? 0,
+  }
 }
 
 /**
@@ -24,14 +33,19 @@ async function fetchAdminNotifications(): Promise<NotificationItem[]> {
  * render — o polling/SSE mantém os dados mais frescos que a prop em navegações
  * seguintes), refaz o fetch por polling (fallback) e por push SSE.
  */
-export function useAdminNavbarContext(initial: NotificationItem[]): NotificationItem[] {
+export function useAdminNavbarContext(initial: NotificationItem[]): {
+  notifications: NotificationItem[]
+  unreadNotifications: number
+} {
   const router = useRouter()
-  const [items, setItems] = useState<NotificationItem[]>(initial)
+  const [notifications, setNotifications] = useState<NotificationItem[]>(initial)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const refresh = useCallback(() => {
-    void fetchAdminNotifications().then((notifications) => {
-      const precisaRefresh = notificarNovas(notifications, (href) => router.push(href))
-      setItems(notifications)
+    void fetchAdminNavbarContext().then((data) => {
+      const precisaRefresh = notificarNovas(data.notifications, (href) => router.push(href))
+      setNotifications(data.notifications)
+      setUnreadNotifications(data.unreadNotifications)
       if (precisaRefresh) router.refresh()
     })
   }, [router])
@@ -43,5 +57,5 @@ export function useAdminNavbarContext(initial: NotificationItem[]): Notification
   useVisibleInterval(() => refresh(), CACHE_MS)
   useNotificationStream(() => refresh())
 
-  return items
+  return { notifications, unreadNotifications }
 }

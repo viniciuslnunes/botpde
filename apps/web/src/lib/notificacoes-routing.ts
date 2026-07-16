@@ -2,7 +2,7 @@ import type { TipoNotificacao } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 import {
   criarNotificacoesEmLote,
-  listarDestinatariosAdmin,
+  listarDestinatariosAdminPorPermissoes,
   listarUserIdsMembrosAprovados,
   notificarMembrosAprovados,
   notificarSafe,
@@ -78,13 +78,7 @@ export async function listarDestinatariosPorPermissoes(
   permissions: string[],
   excetoUserId?: string,
 ): Promise<string[]> {
-  const merged = new Set<string>()
-  for (const permission of permissions) {
-    const ids = await listarDestinatariosAdmin(tenantId, permission, excetoUserId)
-    for (const id of ids) merged.add(id)
-  }
-  if (excetoUserId) merged.delete(excetoUserId)
-  return Array.from(merged)
+  return listarDestinatariosAdminPorPermissoes(tenantId, permissions, excetoUserId)
 }
 
 /** Fan-out administrativo por permissão única ou OR de permissões. */

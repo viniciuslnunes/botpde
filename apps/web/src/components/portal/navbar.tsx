@@ -61,7 +61,7 @@ export function PortalNavbar({
   modoNacional = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
-  const { unreadMessages, unreadNotifications, hasAdminAreaAccess, isAdmin, notifications } =
+  const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
@@ -312,7 +312,7 @@ export function PortalNavbar({
                   </PortalNavLink>
                 )
               })}
-              {isAdmin && (
+              {hasAdminAreaAccess && (
                 <Link
                   href="/admin"
                   prefetch={false}

@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { contarMensagensNaoLidas } from '@/lib/mensageria'
-import { listarNotificacoesRecentes } from '@/lib/notificacoes'
-import {
-  contarNotificacoesPortalNaoLidas,
-  tiposInboxPortal,
-} from '@/lib/notificacoes-comunidade'
+import { getInboxNavbar } from '@/lib/notificacoes'
+import { tiposInboxPortal } from '@/lib/notificacoes-comunidade'
 import { calculateEffectivePermissions, hasAdminAreaAccess } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 
@@ -31,19 +28,18 @@ export async function GET() {
 
   const tiposInbox = tiposInboxPortal(hasAdminAreaAccessFlag)
 
-  const [unreadMessages, notifications, unreadNotifications] = await Promise.all([
+  const [unreadMessages, inbox] = await Promise.all([
     contarMensagensNaoLidas(userId).catch((): number => 0),
-    listarNotificacoesRecentes(tenant.id, userId, 8, tiposInbox),
-    contarNotificacoesPortalNaoLidas(tenant.id, userId, hasAdminAreaAccessFlag),
+    getInboxNavbar(tenant.id, userId, tiposInbox, 8),
   ])
 
   return NextResponse.json({
     unreadMessages,
-    unreadNotifications,
+    unreadNotifications: inbox.unreadCount,
     hasAdminAreaAccess: hasAdminAreaAccessFlag,
     /** @deprecated Use hasAdminAreaAccess — mantido para compatibilidade do client. */
     isAdmin: hasAdminAreaAccessFlag,
-    notifications: notifications.map((n: (typeof notifications)[number]) => ({
+    notifications: inbox.notifications.map((n) => ({
       ...n,
       criadoEm: n.criadoEm.toISOString(),
     })),

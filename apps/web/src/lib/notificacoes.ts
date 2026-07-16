@@ -70,14 +70,15 @@ type RolePermShape = {
 
 type DeptoPermShape = { permissions: string[]; permissionsGestor: string[] }
 
-/**
- * UserIds com a permissão efetiva no tenant (roles + deptos + overrides).
- * Espelha a lógica de `fetchUserPermissionsImpl` em lote.
- */
-export async function listarUserIdsComPermissao(
-  tenantId: string,
-  permission: string,
-): Promise<string[]> {
+type TenantRbacSnapshot = {
+  rolesByUser: Map<string, RolePermShape[]>
+  overridesByUser: Map<string, { permission: string; granted: boolean }[]>
+  deptosByUser: Map<string, Array<{ departamentoId: string; departamento: DeptoPermShape }>>
+  gestaoByUser: Map<string, Array<{ departamentoId: string; departamento: DeptoPermShape }>>
+}
+
+/** Carrega roles, overrides e departamentos do tenant uma única vez. */
+async function carregarSnapshotRbacTenant(tenantId: string): Promise<TenantRbacSnapshot> {
   const [userRoles, overrides, userDepartamentos, gestaoDepartamentos]: [
     Array<{ userId: string; role: RolePermShape }>,
     Array<{ userId: string; permission: string; granted: boolean }>,
@@ -149,49 +150,86 @@ export async function listarUserIdsComPermissao(
     gestaoByUser.set(g.userId, prev)
   }
 
+  return { rolesByUser, overridesByUser, deptosByUser, gestaoByUser }
+}
+
+function calcularPermissoesEfetivasDoSnapshot(
+  snapshot: TenantRbacSnapshot,
+  userId: string,
+): string[] {
+  const base = new Set<string>()
+  const coveredDeptoIds = new Set<string>()
+
+  for (const role of snapshot.rolesByUser.get(userId) ?? []) {
+    for (const p of permissionsOfRole(role, role.departamento)) base.add(p)
+    if (role.departamentoId) coveredDeptoIds.add(role.departamentoId)
+  }
+
+  const uds = snapshot.deptosByUser.get(userId) ?? []
+  const gestoes = snapshot.gestaoByUser.get(userId) ?? []
+  const gestorIds = new Set(gestoes.map((g) => g.departamentoId))
+
+  for (const ud of uds) {
+    if (coveredDeptoIds.has(ud.departamentoId)) continue
+    for (const p of ud.departamento.permissions) base.add(p)
+    if (gestorIds.has(ud.departamentoId)) {
+      for (const p of ud.departamento.permissionsGestor) base.add(p)
+    }
+  }
+  for (const g of gestoes) {
+    if (coveredDeptoIds.has(g.departamentoId)) continue
+    if (uds.some((ud) => ud.departamentoId === g.departamentoId)) continue
+    for (const p of g.departamento.permissions) base.add(p)
+    for (const p of g.departamento.permissionsGestor) base.add(p)
+  }
+
+  return calculateEffectivePermissions(
+    Array.from(base),
+    snapshot.overridesByUser.get(userId) ?? [],
+  )
+}
+
+function filtrarUserIdsPorPermissoes(
+  snapshot: TenantRbacSnapshot,
+  permissions: string[],
+): string[] {
   const userIds = new Set<string>([
-    ...rolesByUser.keys(),
-    ...overridesByUser.keys(),
-    ...deptosByUser.keys(),
-    ...gestaoByUser.keys(),
+    ...snapshot.rolesByUser.keys(),
+    ...snapshot.overridesByUser.keys(),
+    ...snapshot.deptosByUser.keys(),
+    ...snapshot.gestaoByUser.keys(),
   ])
 
   const matched: string[] = []
   for (const userId of userIds) {
-    const base = new Set<string>()
-    const coveredDeptoIds = new Set<string>()
-
-    for (const role of rolesByUser.get(userId) ?? []) {
-      for (const p of permissionsOfRole(role, role.departamento)) base.add(p)
-      if (role.departamentoId) coveredDeptoIds.add(role.departamentoId)
-    }
-
-    const uds = deptosByUser.get(userId) ?? []
-    const gestoes = gestaoByUser.get(userId) ?? []
-    const gestorIds = new Set(gestoes.map((g) => g.departamentoId))
-
-    for (const ud of uds) {
-      if (coveredDeptoIds.has(ud.departamentoId)) continue
-      for (const p of ud.departamento.permissions) base.add(p)
-      if (gestorIds.has(ud.departamentoId)) {
-        for (const p of ud.departamento.permissionsGestor) base.add(p)
-      }
-    }
-    for (const g of gestoes) {
-      if (coveredDeptoIds.has(g.departamentoId)) continue
-      if (uds.some((ud) => ud.departamentoId === g.departamentoId)) continue
-      for (const p of g.departamento.permissions) base.add(p)
-      for (const p of g.departamento.permissionsGestor) base.add(p)
-    }
-
-    const effective = calculateEffectivePermissions(
-      Array.from(base),
-      overridesByUser.get(userId) ?? [],
-    )
-    if (hasPermission(effective, permission)) matched.push(userId)
+    const effective = calcularPermissoesEfetivasDoSnapshot(snapshot, userId)
+    if (permissions.some((p) => hasPermission(effective, p))) matched.push(userId)
   }
-
   return matched
+}
+
+/**
+ * UserIds com qualquer uma das permissões efetivas no tenant (OR).
+ * Uma única carga do snapshot RBAC — preferir a múltiplas chamadas isoladas.
+ */
+export async function listarUserIdsComQualquerPermissao(
+  tenantId: string,
+  permissions: string[],
+): Promise<string[]> {
+  if (permissions.length === 0) return []
+  const snapshot = await carregarSnapshotRbacTenant(tenantId)
+  return filtrarUserIdsPorPermissoes(snapshot, permissions)
+}
+
+/**
+ * UserIds com a permissão efetiva no tenant (roles + deptos + overrides).
+ * Espelha a lógica de `fetchUserPermissionsImpl` em lote.
+ */
+export async function listarUserIdsComPermissao(
+  tenantId: string,
+  permission: string,
+): Promise<string[]> {
+  return listarUserIdsComQualquerPermissao(tenantId, [permission])
 }
 
 /**
@@ -209,6 +247,23 @@ export async function listarUserIdsSuperAdmin(): Promise<string[]> {
 }
 
 /**
+ * Destinatários admin com qualquer permissão da lista (OR) + super-admins.
+ */
+export async function listarDestinatariosAdminPorPermissoes(
+  tenantId: string,
+  permissions: string[],
+  excetoUserId?: string,
+): Promise<string[]> {
+  const [comPermissao, superAdmins] = await Promise.all([
+    listarUserIdsComQualquerPermissao(tenantId, permissions),
+    listarUserIdsSuperAdmin(),
+  ])
+  const merged = new Set<string>([...comPermissao, ...superAdmins])
+  if (excetoUserId) merged.delete(excetoUserId)
+  return Array.from(merged)
+}
+
+/**
  * Destinatários de alerta administrativo: quem tem a permissão no tenant
  * + super-admins (modo operador), menos `excetoUserId` se informado.
  */
@@ -217,13 +272,7 @@ export async function listarDestinatariosAdmin(
   permission: string,
   excetoUserId?: string,
 ): Promise<string[]> {
-  const [comPermissao, superAdmins] = await Promise.all([
-    listarUserIdsComPermissao(tenantId, permission),
-    listarUserIdsSuperAdmin(),
-  ])
-  const merged = new Set<string>([...comPermissao, ...superAdmins])
-  if (excetoUserId) merged.delete(excetoUserId)
-  return Array.from(merged)
+  return listarDestinatariosAdminPorPermissoes(tenantId, [permission], excetoUserId)
 }
 
 export async function listarUserIdsMembrosAprovados(tenantId: string): Promise<string[]> {
@@ -303,6 +352,59 @@ export async function notificarSafe(input: CriarNotificacaoInput): Promise<void>
   }
 }
 
+export type NotificacaoInboxItem = {
+  id: string
+  tipo: TipoNotificacao
+  titulo: string
+  corpo: string | null
+  link: string | null
+  lida: boolean
+  criadoEm: Date
+  ator: { id: string; nome: string | null; avatarUrl: string | null } | null
+}
+
+const NOTIFICACAO_INBOX_SELECT = {
+  id: true,
+  tipo: true,
+  titulo: true,
+  corpo: true,
+  link: true,
+  lida: true,
+  criadoEm: true,
+  ator: { select: { id: true, nome: true, avatarUrl: true } },
+} as const
+
+/**
+ * Lista recentes + contagem de não lidas num único round-trip ao banco.
+ * Usado pelas APIs de navbar (portal e admin).
+ */
+export async function getInboxNavbar(
+  tenantId: string,
+  userId: string,
+  tipos: TipoNotificacao[],
+  limite = 8,
+): Promise<{ notifications: NotificacaoInboxItem[]; unreadCount: number }> {
+  if (tipos.length === 0) {
+    return { notifications: [], unreadCount: 0 }
+  }
+
+  const baseWhere = { tenantId, userId, tipo: { in: tipos } }
+
+  const [notifications, unreadCount]: [NotificacaoInboxItem[], number] = await db.$transaction([
+    db.notificacao.findMany({
+      where: baseWhere,
+      orderBy: { criadoEm: 'desc' },
+      take: limite,
+      select: NOTIFICACAO_INBOX_SELECT,
+    }),
+    db.notificacao.count({
+      where: { ...baseWhere, lida: false },
+    }),
+  ])
+
+  return { notifications, unreadCount }
+}
+
 export async function contarNotificacoesNaoLidas(
   tenantId: string,
   userId: string,
@@ -319,18 +421,7 @@ export async function listarNotificacoesRecentes(
   userId: string,
   limite = 8,
   tipos?: TipoNotificacao[],
-): Promise<
-  Array<{
-    id: string
-    tipo: TipoNotificacao
-    titulo: string
-    corpo: string | null
-    link: string | null
-    lida: boolean
-    criadoEm: Date
-    ator: { id: string; nome: string | null; avatarUrl: string | null } | null
-  }>
-> {
+): Promise<NotificacaoInboxItem[]> {
   return db.notificacao.findMany({
     where: {
       tenantId,
@@ -339,16 +430,7 @@ export async function listarNotificacoesRecentes(
     },
     orderBy: { criadoEm: 'desc' },
     take: limite,
-    select: {
-      id: true,
-      tipo: true,
-      titulo: true,
-      corpo: true,
-      link: true,
-      lida: true,
-      criadoEm: true,
-      ator: { select: { id: true, nome: true, avatarUrl: true } },
-    },
+    select: NOTIFICACAO_INBOX_SELECT,
   })
 }
 

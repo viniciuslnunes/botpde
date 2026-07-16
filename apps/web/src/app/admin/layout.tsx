@@ -14,7 +14,7 @@ import {
   PERMISSIONS,
 } from '@torcida/types'
 import { isSuperAdminEmail, listarTorcidasParaSelecao, usuarioPrecisaNickname } from '@/lib/tenant-context'
-import { listarNotificacoesRecentes, reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
+import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 
 export default async function AdminLayout({
@@ -72,7 +72,6 @@ export default async function AdminLayout({
     }))
 
   const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
-  await reconciliarPropostasAliancaPendentes(tenant.id)
   const notifications = await listarNotificacoesRecentes(
     tenant.id,
     session.user.id,
