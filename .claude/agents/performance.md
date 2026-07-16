@@ -26,7 +26,11 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
 - Mensageria: `mensageria.ts`, `mensagens-shell.tsx`, `comunidade-chat-panel.tsx`,
   `api/conversas/resumo`, `use-visible-interval.ts`.
 - SSE multi-réplica: `realtime-bus.ts` + `REDIS_URL` opcional (Upstash Free);
-  `feed-bus.ts`, `notificacoes-bus.ts`.
+  `feed-bus.ts`, `notificacoes-bus.ts`, `mensageria-bus.ts`.
+- Feed live (zero-custo, `f6690cb`): ping SSE **após** fan-out
+  (`feed-timeline-queue`); auto-refetch no topo (`feed-live-refresh.ts`,
+  `FEED_SSE_DEBOUNCE_MS` / `FEED_NEAR_TOP_PX`); longe do topo → banner com clique.
+  **Não** reintroduzir `emitFeedPing` síncrono na Server Action de publicar.
 - Imagens: `optimizable-image.ts`, `next.config.ts` `images.remotePatterns`.
 - DB: `packages/db/src/index.js` (`connection_limit`), índices em `schema.prisma`.
 - Medição: `apps/web/e2e/nav-latency.portal.spec.ts`; contador dev em
@@ -53,6 +57,8 @@ na porta do estádio.
 - Estado `lido` de comunicados: cache só do conteúdo público; overlay por usuário.
 - Feed Comunidade: timeline materializada para rede; discover com ranking + cache
   base pública; privacidade sempre em batch (`getAutoresSemAcesso`).
+- Feed live: ping só pós-fan-out; refetch automático **só** perto do scroll top;
+  banner “novos posts” quando o usuário está rolando (não saltar a lista).
 - Chat embutido: resumo em `/api/conversas/resumo`; inbox completa só ao expandir.
 - Salas ao vivo: uma leitura na `page.tsx`, distribuída por props.
 - Prefetch on-hover na navbar — não voltar a `prefetch={true}` em todas as rotas.

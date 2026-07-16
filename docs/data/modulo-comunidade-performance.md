@@ -1,7 +1,8 @@
 # Comunidade — performance e escalabilidade
 
 > Plano de otimização da Comunidade entregue em **2026-07-16** (`0dca679` na
-> `main`). Complementa `ARCHITECTURE.md` §5.6 e `docs/data/modulo-comunidade.md`.
+> `main`). Live UX zero-custo (`f6690cb`): ping SSE pós-fan-out + auto-refetch no
+> topo. Complementa `ARCHITECTURE.md` §5.6 e `docs/data/modulo-comunidade.md`.
 > Agente responsável por novas auditorias: `performance`.
 
 ## Objetivo
@@ -17,7 +18,7 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | Item | Arquivo(s) | Efeito |
 |------|------------|--------|
 | Comentários lazy | `post-engagement.tsx` | Sem fetch de comentários no mount |
-| SSE feed + refresh | `feed-live-banner.tsx`, `use-feed-stream.ts` | Atualização sem navegar |
+| SSE feed + refresh | `feed-live-banner.tsx`, `use-feed-stream.ts`, `feed-live-refresh.ts` | Topo: auto-refetch; rolado: banner |
 | Batch visibilidade | `perfil-social.ts`, `social.ts`, `comunidade-busca.ts` | Fim de N+1 em busca/feed |
 | Batch contagens | `getContagensSeguimentoEmLote` | Aside "Para seguir" |
 | Hashtags em alta SQL | `feed.ts` `getHashtagsEmAlta` | `groupBy` em vez de agregar em memória |
@@ -296,6 +297,7 @@ com evidência (p95 / reclamações). Não contratar engine sem medir.
 | Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
 | Feed + ranking | `apps/web/src/lib/feed.ts` |
 | Timeline | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts` |
+| Live refresh | `apps/web/src/lib/feed-live-refresh.ts`, `feed-live-banner.tsx` |
 | Busca | `apps/web/src/lib/comunidade-busca.ts` |
 | Stories | `apps/web/src/lib/stories.ts` |
 | SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |

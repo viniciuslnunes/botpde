@@ -5,7 +5,8 @@ produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/ag
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
 Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
 `docs/data/modulo-comunidade-performance.md` (inclui **ganhos estimados por
-cenário %**); agente `performance` para auditorias novas.
+cenário %** e live UX: ping pós-fan-out / auto-refetch no topo); agente
+`performance` para auditorias novas.
 
 ## O que é
 

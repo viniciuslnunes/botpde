@@ -44,6 +44,9 @@ responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
 - Mobile-first: legível e operável em telas pequenas.
 - Comunidade: separar claramente **comunicado oficial** de **mural local**; deixar
   visível o vínculo territorial e (quando houver) o contexto de aliados.
+- Feed live: no **topo**, posts novos entram sozinhos (refetch ~250ms); **rolando**,
+  banner “N novos posts” com clique — não saltar a lista no meio da leitura
+  (`feed-live-banner.tsx`, `feed-live-refresh.ts`).
 - Consistência com `@torcida/ui` e tokens; não introduzir estilos soltos.
 - Salas (Meet): lista/lobby, grid de chamada, chat, enquetes, presença e o gesto de
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho

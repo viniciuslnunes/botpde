@@ -162,15 +162,16 @@ Shell atual: `apps/web/src/app/portal/comunidade/layout.tsx` (`MotionShell`).
 
 ## Performance e escalabilidade
 
-Otimização entregue em **2026-07-16** (`0dca679`): infinite scroll com cursor,
-timeline materializada (`FeedTimeline`), ranking heurístico do Descobrir, busca
-`pg_trgm`, caches por escopo, SSE de feed, resumo leve de mensagens e leitura
-única de salas ao vivo na página.
+Otimização entregue em **2026-07-16**: infinite scroll com cursor, timeline
+materializada (`FeedTimeline`), ranking heurístico do Descobrir, busca `pg_trgm`,
+caches por escopo, SSE de feed (ping **após** fan-out), auto-refetch no topo /
+banner se rolado, resumo leve de mensagens e leitura única de salas ao vivo.
 
 **Documentação completa, pós-deploy, ganhos estimados (%) e plano futuro:**
 [`docs/data/modulo-comunidade-performance.md`](modulo-comunidade-performance.md).
 
 **Padrões a preservar:** batch de privacidade/visibilidade, separar cache público
-de overlay por usuário, inbox completa só ao expandir chat, tipos explícitos em
-queries Prisma. Agente: `performance` (ver `docs/agents/README.md`). Teto
-zero-custo já capturado (~85–95%); reabrir plano só com gatilho do doc.
+de overlay por usuário, inbox completa só ao expandir chat, ping SSE pós-fan-out
+(não na action de publicar), tipos explícitos em queries Prisma. Agente:
+`performance` (ver `docs/agents/README.md`). Teto zero-custo (~85–95%); reabrir
+plano só com gatilho do doc.

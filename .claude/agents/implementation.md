@@ -57,8 +57,10 @@ dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` d
 Loja: sacola/checkout/cupom — ver `docs/data/modulo-loja.md`; agente `loja` para escopo amplo.
 Performance: ver `ARCHITECTURE.md` §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md`;
 não reintroduza fetch-on-mount onde já há SSR, infinite scroll via API ou resumo leve de chat.
-Comunidade — feed/timeline/busca: `feed.ts`, `feed-timeline.ts`, `comunidade-busca.ts`;
-padrões em `modulo-comunidade-performance.md` (batch privacidade, SSE ping, salas únicas na page).
+Comunidade — feed/timeline/busca: `feed.ts`, `feed-timeline.ts`, `feed-timeline-queue.ts`,
+`comunidade-busca.ts`, `feed-live-refresh.ts`;
+padrões: batch privacidade, SSE ping **pós-fan-out** (não na action de publicar),
+auto-refetch só no topo, banner se rolado, salas únicas na page.
 Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
 Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
 `seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Coleta mensual:

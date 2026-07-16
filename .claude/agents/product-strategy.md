@@ -54,9 +54,11 @@ construídas e são um recurso de engajamento entregue, não um item de roadmap.
 
 **Performance da Comunidade (2026-07-16):** ondas A–D + C entregues — timeline,
 infinite scroll, busca `pg_trgm`, Redis SSE, fan-out async, TanStack Query/Virtual.
-Ganhos estimados por cenário (%) e teto zero-custo (~85–95% sem domínio) em
-`docs/data/modulo-comunidade-performance.md`. **Não** priorizar E/F ou CDN pago
-sem métrica; Cloudflare Free só com domínio próprio (`docs/ops/cloudflare-cdn.md`).
+Live UX zero-custo (`f6690cb`): ping SSE **após** fan-out; auto-refetch no topo;
+banner se rolado. Ganhos estimados (%) e teto (~85–95% sem domínio) em
+`docs/data/modulo-comunidade-performance.md`. **Não** priorizar E/F, CDN pago
+nem realtime pago (Pusher/Ably) sem métrica/domínio; Cloudflare Free só com
+domínio próprio (`docs/ops/cloudflare-cdn.md`).
 
 ## Como trabalhar
 1. Enquadre o problema por domínio (Operação, Mobilização, Comunidade, Alianças,
