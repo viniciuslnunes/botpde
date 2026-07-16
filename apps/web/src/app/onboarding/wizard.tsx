@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
@@ -618,65 +617,22 @@ function PassoTorcida({
   return (
     <div>
       <BotaoVoltar onClick={onVoltar} disabled={pending} />
-      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))] text-balance">
         Você pertence a alguma organizada?
       </h1>
-      <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Torcidas de {nomeClube} na plataforma. Escolha a sua ou siga como torcedor.
+      <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
+        Comece como torcedor do {nomeClube} ou vincule-se a uma torcida na plataforma.
       </p>
 
-      {torcidas.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-8 text-center">
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma torcida de {nomeClube} está na plataforma ainda.
-          </p>
-          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-            Você pode entrar como torcedor e acompanhar a comunidade.
-          </p>
-        </div>
-      ) : (
-        <ul className="mt-6 space-y-3">
-          {torcidas.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => onEscolher(t)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
-              >
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white"
-                  style={{ backgroundColor: t.corPrimaria }}
-                >
-                  {t.logoUrl ? (
-                    <Image src={t.logoUrl} alt={t.nome} width={44} height={44} className="h-full w-full object-cover" />
-                  ) : (
-                    t.nome.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold uppercase text-[rgb(var(--foreground))]">{t.nome}</p>
-                  <TorcidaOnboardingMeta stats={t.stats} />
-                  {!t.acessivelNoHost && (
-                    <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
-                      Portal em outro endereço — solicitação válida, aprovação na torcida escolhida.
-                    </p>
-                  )}
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
+      {/* Caminho padrão: só torcedor — sempre primeiro */}
       <button
         type="button"
         onClick={onTorcedorGlobal}
         disabled={pending}
-        className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-dashed border-[rgb(var(--border))] p-4 text-left transition-all hover:bg-[rgb(var(--surface))] disabled:opacity-50"
+        className="mt-6 flex w-full items-start gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
       >
         {pending ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))]">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
             <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
           </div>
         ) : (
@@ -687,16 +643,69 @@ function PassoTorcida({
             size="sm"
           />
         )}
-        <div>
-          <p className="font-semibold text-[rgb(var(--foreground))]">
-            Sou só torcedor / não pertenço a nenhuma
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
+            Sem organizada
           </p>
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Acesso só à comunidade nacional do {nomeClube} — sem vínculo com torcida
-            organizada.
+          <p className="mt-0.5 font-semibold text-[rgb(var(--foreground))]">
+            Sou só torcedor do {nomeClube}
+          </p>
+          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            Acesso à comunidade nacional — posts, novidades e conversa entre torcedores.
+            Sem vínculo com torcida organizada.
           </p>
         </div>
+        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
       </button>
+
+      {torcidas.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-8 text-center">
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhuma torcida de {nomeClube} está na plataforma ainda.
+          </p>
+          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            Entre como torcedor acima e acompanhe a comunidade.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-8 flex items-center gap-3" role="separator">
+            <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+            <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Ou escolha sua organizada
+            </p>
+            <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+          </div>
+
+          <ul className="mt-4 space-y-2.5">
+            {torcidas.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => onEscolher(t)}
+                  disabled={pending}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3.5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+                >
+                  <EscudoClube nome={t.nome} escudoUrl={t.logoUrl} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold uppercase text-[rgb(var(--foreground))]">
+                      {t.nome}
+                    </p>
+                    <TorcidaOnboardingMeta stats={t.stats} />
+                    {!t.acessivelNoHost && (
+                      <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                        Portal em outro endereço — solicitação válida, aprovação na torcida
+                        escolhida.
+                      </p>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   )
 }
@@ -1241,57 +1250,19 @@ function PassoVinculo({
     modo === 'escolha' ? (
       <div>
         <BotaoVoltar onClick={onVoltar} disabled={pending} />
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))] text-balance">
           Como você participa da {torcida.nome}?
         </h1>
-        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          São dois espaços diferentes: a comunidade do clube e a comunidade da
-          torcida organizada. Escolha o nível de vínculo com a {torcida.nome}.
+        <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
+          Escolha um dos dois caminhos. Cada um define o que você vê na comunidade
+          do {nomeClube} e na da {torcida.nome}.
         </p>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <div className="flex items-center gap-3">
-              <EscudoClube
-                nome={nomeClube}
-                apelido={clube?.apelido}
-                escudoUrl={clube?.escudoUrl}
-                size="sm"
-              />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                  Comunidade do clube
-                </p>
-                <p className="truncate font-semibold text-[rgb(var(--foreground))]">{nomeClube}</p>
-              </div>
-            </div>
-            <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-              Feed nacional de torcedores de {nomeClube}: posts públicos, conversa entre
-              torcidas e novidades do time — sem carteirinha.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <div className="flex items-center gap-3">
-              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                  Comunidade da organizada
-                </p>
-                <p className="truncate font-semibold text-[rgb(var(--foreground))]">{torcida.nome}</p>
-              </div>
-            </div>
-            <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-              Espaço da {torcida.nome}: eventos, comunicados e posts da organização. Sócios
-              ainda veem o mural interno restrito.
-            </p>
-          </div>
-        </div>
 
         {!torcida.acessivelNoHost && (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            O portal da <strong>{torcida.nome}</strong> fica em outro endereço. Sua solicitação será
-            analisada pela diretoria dessa torcida — não aparecerá pendente no admin deste site.
+            O portal da <strong>{torcida.nome}</strong> fica em outro endereço. Sua
+            solicitação será analisada pela diretoria dessa torcida — não aparecerá
+            pendente no admin deste site.
           </p>
         )}
 
@@ -1301,52 +1272,116 @@ function PassoVinculo({
           className="mt-4"
         />
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {/* Card 1: Torcedor da torcida */}
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
             disabled={pending || unidadePendente}
-            className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
+            className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <div className="flex shrink-0 items-center -space-x-2">
+            <div className="flex items-center">
               <EscudoClube
                 nome={nomeClube}
                 apelido={clube?.apelido}
                 escudoUrl={clube?.escudoUrl}
                 size="sm"
+                className="relative z-10 ring-2 ring-[rgb(var(--surface))]"
               />
-              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
+              <EscudoClube
+                nome={torcida.nome}
+                escudoUrl={torcida.logoUrl}
+                size="sm"
+                className="relative -ml-2.5 ring-2 ring-[rgb(var(--surface))]"
+              />
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-[rgb(var(--foreground))]">Torcedor da torcida</p>
-              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-                Entrada imediata na comunidade da <strong>{torcida.nome}</strong> e na
-                comunidade do <strong>{nomeClube}</strong>. Sem aprovação nem comprovante —
-                eventos e novidades abertas da organizada, sem mural exclusivo de sócios.
-              </p>
-            </div>
+
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
+              Entrada imediata
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
+              Torcedor da torcida
+            </p>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Entra agora nas duas comunidades — sem aprovação nem comprovante.
+            </p>
+
+            <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                <span>
+                  Comunidade do <strong>{nomeClube}</strong> (feed nacional)
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                <span>
+                  Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
+                  novidades)
+                </span>
+              </li>
+              <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                <span>Sem mural exclusivo de sócios</span>
+              </li>
+            </ul>
+
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+              Entrar agora
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </button>
 
+          {/* Card 2: Sócio da organizada */}
           <button
             type="button"
             onClick={abrirSocio}
             disabled={pending}
-            className="flex w-full items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] disabled:opacity-50"
+            className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <div className="relative shrink-0">
+            <div className="relative w-fit">
               <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
-              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--color-primary))] ring-2 ring-[rgb(var(--surface))]">
-                <Shield className="h-3 w-3" />
+              <span
+                className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
+                aria-hidden
+              >
+                <Shield className="h-3.5 w-3.5" />
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-[rgb(var(--foreground))]">Sócio da organizada</p>
-              <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-                Acesso à comunidade interna de sócios da <strong>{torcida.nome}</strong>{' '}
-                (carteirinha, benefícios e posts só para sócios), além da comunidade do{' '}
-                <strong>{nomeClube}</strong>. Requer aprovação e comprovante de vínculo.
-              </p>
-            </div>
+
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Requer aprovação
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
+              Sócio da organizada
+            </p>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+              Acesso interno de sócios, com comprovante e análise da liderança.
+            </p>
+
+            <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                <span>
+                  Comunidade do <strong>{nomeClube}</strong>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                <span>
+                  Mural interno de sócios da <strong>{torcida.nome}</strong>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                <span>Carteirinha, benefícios e posts exclusivos</span>
+              </li>
+            </ul>
+
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+              Solicitar vínculo
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </button>
         </div>
       </div>

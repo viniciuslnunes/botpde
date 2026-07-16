@@ -17,6 +17,8 @@ type Props = {
   apelido?: string | null
   escudoUrl?: string | null
   size?: EscudoClubeSize
+  /** Classes extras no frame (ex.: ring para empilhar). */
+  className?: string
 }
 
 /** Inicial exibida no placeholder — apelido curto ou nome sem sufixo "(UF)". */
@@ -26,49 +28,56 @@ export function inicialClubeEscudo(nome: string, apelido?: string | null): strin
 }
 
 /**
- * Escudo do clube no onboarding: imagem hospedada quando existe; placeholder neutro
- * (inicial + ícone) quando ausente ou com falha de carregamento — nunca inventa escudo.
+ * Escudo do clube/torcida no onboarding: frame fixo + object-contain (nunca corta o logo).
+ * Placeholder neutro quando ausente ou com falha — nunca inventa escudo.
  */
-export function EscudoClube({ nome, apelido, escudoUrl, size = 'md' }: Props) {
+export function EscudoClube({ nome, apelido, escudoUrl, size = 'md', className }: Props) {
   const [imagemFalhou, setImagemFalhou] = useState(false)
   const s = SIZES[size]
   const label = apelido || nome
   const mostrarImagem = Boolean(escudoUrl && !imagemFalhou)
 
+  const frameClass = [
+    'relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl',
+    'border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',
+    s.box,
+    className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   if (mostrarImagem && escudoUrl) {
-    if (canOptimizeImageUrl(escudoUrl)) {
-      return (
-        <Image
-          src={escudoUrl}
-          alt={`Escudo ${label}`}
-          width={s.px}
-          height={s.px}
-          className={`${s.box} object-contain`}
-          onError={() => setImagemFalhou(true)}
-        />
-      )
-    }
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={escudoUrl}
-        alt={`Escudo ${label}`}
-        width={s.px}
-        height={s.px}
-        loading="lazy"
-        decoding="async"
-        className={`${s.box} object-contain`}
-        onError={() => setImagemFalhou(true)}
-      />
+      <div className={frameClass} aria-hidden={!label}>
+        {canOptimizeImageUrl(escudoUrl) ? (
+          <Image
+            src={escudoUrl}
+            alt={`Escudo ${label}`}
+            width={s.px}
+            height={s.px}
+            className="h-full w-full object-contain p-1"
+            onError={() => setImagemFalhou(true)}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={escudoUrl}
+            alt={`Escudo ${label}`}
+            width={s.px}
+            height={s.px}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-contain p-1"
+            onError={() => setImagemFalhou(true)}
+          />
+        )}
+      </div>
     )
   }
 
   const inicial = inicialClubeEscudo(nome, apelido)
   return (
-    <div
-      className={`relative flex ${s.box} shrink-0 items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]`}
-      aria-hidden="true"
-    >
+    <div className={`${frameClass} border-dashed`} aria-hidden="true">
       <Shield className={`absolute ${s.icon} text-[rgb(var(--foreground-muted)_/_0.35)]`} />
       <span className={`relative ${s.text} font-bold text-[rgb(var(--foreground-muted))]`}>
         {inicial}
