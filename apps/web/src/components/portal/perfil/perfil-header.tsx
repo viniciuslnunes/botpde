@@ -32,7 +32,7 @@ export function PerfilHeader({
   return (
     <section className="card-soft overflow-hidden rounded-3xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
       {/* Faixa de topo: banner do membro quando existe, senão gradiente da torcida. */}
-      <div className="relative h-28 sm:h-36">
+      <div className="relative h-[clamp(7rem,4rem+12vw,9.875rem)]">
         {bannerUrl ? (
           canOptimizeImageUrl(bannerUrl) ? (
             <Image
