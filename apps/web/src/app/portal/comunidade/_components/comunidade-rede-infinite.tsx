@@ -10,6 +10,7 @@ import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
+import { FEED_SSE_DEBOUNCE_MS, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
 
 interface CurrentUser {
   id: string
@@ -42,7 +43,6 @@ export function ComunidadeRedeInfinite({
   const {
     posts,
     pageInfo,
-    currentCursor,
     loadingMore,
     error,
     loadMore,
@@ -72,10 +72,11 @@ export function ComunidadeRedeInfinite({
   }, [loadMore, replaceUrlCursor])
 
   useFeedStream(() => {
+    if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
     refreshDebounceRef.current = window.setTimeout(() => {
-      void refreshCurrentPage(currentCursor)
-    }, 800)
+      void refreshCurrentPage(initialCursor)
+    }, FEED_SSE_DEBOUNCE_MS)
   })
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)

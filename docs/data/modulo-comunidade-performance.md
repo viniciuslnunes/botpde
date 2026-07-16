@@ -91,8 +91,11 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    `filtrarPostsVisiveis`; nunca `podeVerPost` por item em lista grande.
 3. **Infinite scroll via API** — não recarregar documento; cursor keyset no
    backend; `history.replaceState` para deep-link parcial.
-4. **SSE = ping, não payload** — cliente refetcha o trecho visível; debounce
-   para evitar tempestade de requests.
+4. **SSE = ping, não payload** — cliente refetcha o trecho do **topo** se
+   estiver perto do scroll top (`FEED_NEAR_TOP_PX`); longe do topo, banner
+   pede clique. Debounce `FEED_SSE_DEBOUNCE_MS` (250ms). Ping do servidor só
+   após fan-out da timeline (`feed-timeline-queue`), para o filtro Seguindo
+   já ter a linha materializada.
 5. **Chat colapsado = resumo** — inbox completa só quando o usuário expande.
 6. **Uma leitura, vários consumidores** — dados compartilhados (ex.: salas)
    buscados no nível `page`/shell e passados por props.
@@ -131,6 +134,7 @@ porém mais lenta em bases grandes).
 | 1ª carga Comunidade (RSC + asides) | Queries em série / N+1 / salas 3× | Batch + caches + salas 1× + Suspense | **~40–60%** menos trabalho no servidor |
 | 2ª visita &lt;2 min (cache quente) | Quase tudo de novo no Postgres | `unstable_cache` + tags | **~50–70%** menos hits nos blocos cacheados |
 | Scroll do feed | Reload ou DOM enorme | Infinite API + Virtual + Query | **~70–90%** menos DOM após ~50 posts; sem reload de documento |
+| Novos posts (SSE) | Ping cedo / lista estática | Ping **pós-fan-out**; auto-refetch no topo (~250ms); banner se rolado | Quase em tempo real no topo; “Seguindo” consistente |
 | Chat colapsado | Inbox completa no mount | Só `/api/conversas/resumo` | **~80–95%** menos payload/queries de DM no mount |
 | Badge / nova DM | Poll 15s | SSE (+ poll 60s fallback) | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s** |
 | Publicar post (rede grande) | Fan-out sync na action | Autor sync + fila Redis | **~60–90%** menos tempo na action (∝ seguidores) |
@@ -217,7 +221,8 @@ no free tier (256 MB · 500k comandos/mês).
 
 **D2:** ao publicar, `materializarTimelineAutor` (sync, 1 row) + fila
 `torcida:queue:fanout-timeline` (Redis LPUSH/BRPOP se `REDIS_URL`; senão
-in-process). Worker consome `fanoutSeguidoresPostParaRede`. Sem custo extra.
+in-process). Worker consome `fanoutSeguidoresPostParaRede` e **só então**
+dispara `emitFeedPing` (SSE). Sem custo extra.
 
 **D3:** `mensageria-bus` + `GET /api/conversas/stream` e `/api/conversas/[id]/stream`.
 Ao enviar mensagem, ping na thread e na inbox de cada membro. Clients

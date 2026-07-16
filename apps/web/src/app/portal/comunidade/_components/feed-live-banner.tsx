@@ -4,17 +4,25 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
+import { isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
 
 /**
- * Banner "N novos posts": conta pings SSE do feed desde a montagem e, ao
- * clicar, navega para a primeira página do feed (preservando o filtro atual).
- * Não atualiza a lista sozinho para não bagunçar a rolagem de quem está lendo.
+ * Banner "N novos posts" quando o usuário está longe do topo.
+ * No topo, o infinite feed já refetcha sozinho — aqui só reforça scroll/RSC.
  */
 export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' }) {
   const router = useRouter()
   const [novos, setNovos] = useState(0)
 
-  useFeedStream(() => setNovos((n) => n + 1))
+  useFeedStream(() => {
+    if (isComunidadeFeedNearTop()) {
+      setNovos(0)
+      router.refresh()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    setNovos((n) => n + 1)
+  })
 
   if (novos === 0) return null
 

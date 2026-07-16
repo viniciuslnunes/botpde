@@ -11,7 +11,6 @@ import { db } from '@torcida/db'
 import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
-import { emitFeedPing } from '@/lib/feed-bus'
 import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
@@ -45,13 +44,21 @@ function invalidarLeituraComunidade(tenantId: string): void {
   invalidarCachesComunidadeFeed(tenantId)
 }
 
-/** Autor na timeline na hora; seguidores via fila (Redis ou in-process). */
+/**
+ * Autor na timeline na hora; seguidores via fila (Redis ou in-process).
+ * O ping SSE do feed só dispara depois do fan-out (`feed-timeline-queue`).
+ */
 async function publicarNaTimelineRede(seed: {
   postId: string
   autorId: string
+  tenantId: string
   criadoEm: Date
 }): Promise<void> {
-  await materializarTimelineAutor(seed)
+  await materializarTimelineAutor({
+    postId: seed.postId,
+    autorId: seed.autorId,
+    criadoEm: seed.criadoEm,
+  })
   scheduleFanoutPostParaRede(seed)
 }
 
@@ -202,13 +209,13 @@ export async function publicarPost(
       publicarNaTimelineRede({
         postId: post.id,
         autorId: session.user.id,
+        tenantId: tenant.id,
         criadoEm: post.criadoEm,
       }),
     ])
 
     revalidatePath('/portal/comunidade')
     invalidarLeituraComunidade(tenant.id)
-    emitFeedPing(tenant.id)
     return { success: true, token: post.id }
   } catch (error) {
     console.error('[publicarPost]', error)
@@ -270,12 +277,12 @@ export async function publicarPostComoTorcedorGlobal(
   await publicarNaTimelineRede({
     postId: post.id,
     autorId: session.user.id,
+    tenantId: tenant.id,
     criadoEm: post.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
   invalidarLeituraComunidade(tenant.id)
-  emitFeedPing(tenant.id)
 }
 
 export type SeguimentoResultado = 'APROVADO' | 'PENDENTE'
@@ -783,13 +790,13 @@ export async function publicarEnquete(
     publicarNaTimelineRede({
       postId: post.id,
       autorId: session.user.id,
+      tenantId: tenant.id,
       criadoEm: post.criadoEm,
     }),
   ])
 
   revalidatePath('/portal/comunidade')
   invalidarLeituraComunidade(tenant.id)
-  emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
 
@@ -992,12 +999,12 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   await publicarNaTimelineRede({
     postId: repost.id,
     autorId: session.user.id,
+    tenantId: tenant.id,
     criadoEm: repost.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
   invalidarLeituraComunidade(tenant.id)
-  emitFeedPing(tenant.id)
 }
 
 export async function repostarComunicado(comunicadoId: string, comentario?: string): Promise<void> {
@@ -1042,12 +1049,12 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
   await publicarNaTimelineRede({
     postId: repost.id,
     autorId: session.user.id,
+    tenantId: tenant.id,
     criadoEm: repost.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
   invalidarLeituraComunidade(tenant.id)
-  emitFeedPing(tenant.id)
 }
 
 export async function publicarPostEvento(
@@ -1107,6 +1114,7 @@ export async function publicarPostEvento(
     publicarNaTimelineRede({
       postId: post.id,
       autorId: session.user.id,
+      tenantId: tenant.id,
       criadoEm: post.criadoEm,
     }),
   ])
@@ -1124,7 +1132,6 @@ export async function publicarPostEvento(
 
   revalidatePath('/portal/comunidade')
   invalidarLeituraComunidade(tenant.id)
-  emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
 

@@ -564,7 +564,8 @@ checklist: **`docs/data/modulo-comunidade-performance.md`**.
 | Pós-B | `unstable_cache` em discover, sugestões, canais, hashtags, stories, salas |
 | Chat/salas | `GET /api/conversas/resumo`; inbox só ao expandir; `listSalasAtivas` uma vez na `page.tsx` |
 | C | TanStack Query + Virtual, `revalidateTag`, prefetch hover |
-| D1–D3 | Redis SSE, fan-out async, SSE mensageria |
+| D1–D3 | Redis SSE, fan-out async (+ ping SSE **após** fan-out), SSE mensageria |
+| Live UX | Auto-refetch no topo (~250ms); banner “novos posts” só se rolado |
 
 **Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
 

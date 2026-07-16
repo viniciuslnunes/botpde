@@ -8,6 +8,7 @@ import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
+import { FEED_SSE_DEBOUNCE_MS, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
 
 interface CurrentUser {
   id: string
@@ -79,10 +80,12 @@ export function ComunidadeFeedInfinite({
   }, [loadMore, replaceUrlCursor])
 
   useFeedStream(() => {
+    // Longe do topo: banner pede clique — evita saltar a lista no meio da leitura.
+    if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
     refreshDebounceRef.current = window.setTimeout(() => {
       void refreshCurrentPage(initialCursor)
-    }, 800)
+    }, FEED_SSE_DEBOUNCE_MS)
   })
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)

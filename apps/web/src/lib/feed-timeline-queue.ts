@@ -1,12 +1,14 @@
 import { getRedisCommandClient } from '@/lib/redis-client'
 import { isRedisConfigured } from '@/lib/env'
 import { fanoutSeguidoresPostParaRede } from '@/lib/feed-timeline'
+import { emitFeedPing } from '@/lib/feed-bus'
 
 const QUEUE_KEY = 'torcida:queue:fanout-timeline'
 
 export type FanoutJob = {
   postId: string
   autorId: string
+  tenantId: string
   /** ISO string — JSON-safe */
   criadoEm: string
 }
@@ -15,20 +17,31 @@ const localQueue: FanoutJob[] = []
 let localDraining = false
 let redisWorkerStarted = false
 
-function toJob(seed: { postId: string; autorId: string; criadoEm: Date }): FanoutJob {
+function toJob(seed: {
+  postId: string
+  autorId: string
+  tenantId: string
+  criadoEm: Date
+}): FanoutJob {
   return {
     postId: seed.postId,
     autorId: seed.autorId,
+    tenantId: seed.tenantId,
     criadoEm: seed.criadoEm.toISOString(),
   }
 }
 
 async function processJob(job: FanoutJob): Promise<void> {
-  await fanoutSeguidoresPostParaRede({
-    postId: job.postId,
-    autorId: job.autorId,
-    criadoEm: new Date(job.criadoEm),
-  })
+  try {
+    await fanoutSeguidoresPostParaRede({
+      postId: job.postId,
+      autorId: job.autorId,
+      criadoEm: new Date(job.criadoEm),
+    })
+  } finally {
+    // Ping só depois do fan-out: "Seguindo" já tem a linha na timeline.
+    if (job.tenantId) emitFeedPing(job.tenantId)
+  }
 }
 
 async function drainLocalQueue(): Promise<void> {
@@ -80,10 +93,12 @@ async function startRedisWorker(): Promise<void> {
  * Enfileira fan-out da timeline — não bloqueia a Server Action / route.
  * Com REDIS_URL: lista Redis (várias réplicas podem consumir via BRPOP).
  * Sem Redis: fila in-process no mesmo Node.
+ * Após cada job: `emitFeedPing` (SSE) para o tenant.
  */
 export function scheduleFanoutPostParaRede(seed: {
   postId: string
   autorId: string
+  tenantId: string
   criadoEm: Date
 }): void {
   const job = toJob(seed)
