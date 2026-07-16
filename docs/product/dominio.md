@@ -17,11 +17,12 @@ Não é rede social genérica — cada recurso resolve uma dor real da torcida.
 
 | Domínio | Núcleo | Estado |
 |---|---|---|
-| Operação | membros, sócios, carteirinha, sedes/subsedes/PDE, departamentos, RBAC, auditoria | Existe |
+| Operação | membros, sócios, carteirinha, sedes/subsedes/PDE, departamentos (colaborador/gestor), RBAC, auditoria | Existe |
 | Mobilização | eventos, RSVP, check-in, presença | Existe |
-| Comunidade | comunicados oficiais, mural/posts por unidade, salas de vídeo ao vivo (Meet) | Existe (intra-tenant) |
-| Alianças 🆕 | relação curada torcida↔torcida; visibilidade pública cross-tenant | Novo |
-| Informação do nicho 🆕 | afiliação (time), jogos/calendário/resultados, notícias, dados institucionais | Novo |
+| Comunidade | comunicados oficiais, mural/posts por unidade, feed social (perfil, seguir, enquetes, canais), **Comunidade Nacional** (feed cross-tenant por afiliação), notificações sociais, salas de vídeo ao vivo (Meet) | **Entregue além do previsto** — deixou de ser intra-tenant (2026-07-16: reconciliar com `roadmap.md`) |
+| Alianças | relação curada torcida↔torcida; visibilidade pública cross-tenant; recomendações automáticas; rivalidade como bloqueio técnico de visibilidade | **Entregue** — ver `docs/knowledge/aliancas.md` |
+| Aquisição / torcedor global 🆕 | perfil de torcedor sem organizada própria, onboarding com estimativa de base digital, funil para virar sócio | Novo — sem racional de produto próprio ainda (ver Atores) |
+| Informação do nicho | afiliação (time), jogos/calendário/resultados, notícias, dados institucionais | Existe |
 
 **Âncora nova — `Afiliacao`**: o time que a torcida existe para apoiar (sua *razão de
 viver*) — não se usa o termo genérico "clube" como entidade. Tabela global;
@@ -34,11 +35,16 @@ A hierarquia Sede → Subsede → PDE é **afiliação territorial** (subsedes/P
 
 | Perfil | Superfície | Papel |
 |---|---|---|
-| Associado | Portal | Status, eventos, comunicados, unidade local, feed do time |
+| Torcedor 🆕 | Portal (Comunidade Nacional, onboarding) | Simpatizante da afiliação sem organizada própria; topo do funil de aquisição; `PerfilTorcedor` global; pode publicar posts públicos mesmo antes de virar sócio de uma torcida (`SaasMembro.tipo = TORCEDOR`) |
+| Associado (sócio) | Portal | Status, eventos, comunicados, unidade local, feed do time; `SaasMembro.tipo = SOCIO` |
 | Admin de núcleo | Admin local | Opera sede/subsede/PDE, membros, eventos |
 | Diretoria | Admin ampliado | Comunicados e ações de maior alcance |
 | Presidente (owner) | Admin + Config | Define alianças, afiliação (time) da torcida, governança |
 | Super-admin | Painel global | Governança técnica da plataforma |
+
+> **Torcedor** ainda não tem racional de produto registrado (por que existe,
+> que dor de aquisição resolve, como converte a sócio) — pendência levantada
+> na auditoria de 2026-07-16, ver `roadmap.md`.
 
 ## Jornadas centrais
 

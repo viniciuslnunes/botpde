@@ -3,6 +3,17 @@
 // Fonte da verdade: packages/db/prisma/schema.prisma
 // Gerado a partir do schema em 2026-07-09. Regenerar quando o schema mudar.
 //
+// ⚠️ DESATUALIZADO (achado da auditoria de conhecimento, 2026-07-16): faltam
+// ~20 tabelas adicionadas depois de 2026-07-09, entre elas: saas_afiliacoes,
+// saas_torcidas_conhecidas, saas_perfis_torcedor, saas_rivalidades_clube,
+// saas_rivalidades_torcida, saas_aliancas, saas_recomendacoes_alianca,
+// saas_comentarios, saas_reacoes, saas_denuncias, saas_enquetes_post (+opcoes/
+// votos), saas_hashtags (+post_hashtags), saas_post_salvos,
+// saas_momentos_story, saas_perfil_destaques (+itens), saas_seguimentos,
+// saas_perfis_membro, saas_notificacoes, saas_noticias. Não confiar neste
+// arquivo para o modelo atual de Comunidade/Alianças — ler schema.prisma
+// diretamente até a regeneração completa.
+//
 // Como usar: abra https://dbdiagram.io/d, cole este arquivo inteiro no editor.
 // Nomes de tabela/coluna = nomes REAIS no Postgres (@map do Prisma).
 // ═══════════════════════════════════════════════════════════════════════════

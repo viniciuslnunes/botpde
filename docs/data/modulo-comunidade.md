@@ -118,6 +118,31 @@ Notificações de menção, comentário, reação e repost apontam para
 Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
 `getVisibleTenantIds(tenant, 'comunidade')` define o escopo de posts e busca.
 
+- **Seguimento é um grafo GLOBAL, não por tenant**: `@@unique([seguidorId, seguidoId])`
+  em `Seguimento` **não** inclui `tenantContextoId` — um usuário só pode seguir
+  outro uma única vez em toda a plataforma, mesmo que o encontre em contextos
+  de tenant diferentes (o contexto é só guardado, não faz parte da unicidade).
+  Enum de status inclui `BLOQUEADO` além de `PENDENTE`/`APROVADO`/`REJEITADO`.
+- **Comunidade Nacional / alcance por afiliação**: `Tenant.sintetico` marca o
+  tenant-container onde vivem os posts de torcedores globais (sem organizada
+  própria); `Post.alcanceNacional` faz o post **bypassar o gate de seguir** —
+  qualquer torcedor da mesma afiliação vê, mesmo sem seguir o autor. Publicar
+  com `alcanceNacional` exige `COMMUNITY_POST_NACIONAL`.
+- **Torcedor global pode publicar mesmo PENDENTE**: `assertAutorPublicacaoPost`
+  (`apps/web/src/lib/authz.ts`) diferencia sócio de torcedor — um torcedor com
+  onboarding concluído na mesma afiliação publica posts com visibilidade
+  `PUBLICO` mesmo com `StatusMembro = PENDENTE` (ainda não aprovado como sócio);
+  só o sócio `APROVADO` pode publicar em qualquer visibilidade.
+
+## Canais e mensageria (M3) — candidato a doc próprio
+
+O bloco "Canais institucionais" acima cobre só a superfície de produto. O
+modelo de dados subjacente é maior e ainda não tem doc dedicado:
+`Conversa.tipo = CANAL` + `canalOficial` + `institucional` + `VisibilidadeCanal`
+(`TENANT` / `HIERARQUIA` / `ALIADOS` / `PUBLICO`, default `HIERARQUIA`) +
+`somenteAdminPublica`. Se o módulo crescer além de canal oficial + temáticos,
+vale extrair para `docs/data/modulo-mensageria.md`.
+
 ## Upload de mídia
 
 - Posts: `torcida/{tenantId}/comunidade`

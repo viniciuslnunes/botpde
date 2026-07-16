@@ -87,3 +87,18 @@ Staging + auditoria da importação da base existente (prioridade #1 de dados).
 - `Afiliacao` global exige que queries de `Partida`/`Noticia` **não** filtrem por tenant.
 - Índices: `(afiliacaoId, dataHora)` em `Partida`; `(afiliacaoId, publicadoEm)` em `Noticia`.
 - Anotar tipos de retorno explícitos nas queries novas (teto de inferência Prisma).
+
+## Achados da auditoria de conhecimento (2026-07-16)
+
+- **RSVP ≠ check-in**: `EventoRsvp.checkedInAt`/`checkedInPorId` são campos
+  independentes de `status` (que só tem `CONFIRMADO`/`RECUSADO`, sem estado
+  "pendente"). Confirmar presença não implica ter comparecido — o check-in é
+  um evento separado, registrado à parte.
+- **Sede pré-adesão**: `Sede.tenantId` é nullable, e `sedeReferenciaNome`/
+  `sedeReferenciaSlug` apontam para uma sede-mãe que **ainda não é um tenant**
+  no sistema. Modela o caso de onboarding em que uma subsede/PDE se cadastra
+  antes da sede principal existir na plataforma.
+- **Gap de campos legais (LGE)**: `docs/knowledge/contexto-legal.md` exige RG,
+  CPF, filiação, escolaridade, profissão, foto e data de nascimento no cadastro
+  de membro; `SaasMembro` hoje só tem `idade`, `telefone`, `cidade`, endereço e
+  `imagemProva`. Ver decisão em aberto #9 em `docs/product/decisoes-abertas.md`.

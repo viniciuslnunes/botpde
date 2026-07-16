@@ -522,6 +522,32 @@ em cinco fases; commits de referência na `main`:
   página inteira).
 - Mensageria em polling HTTP (item 27 — SSE/WebSocket só com demanda de escala).
 
+**Padrões adicionados na auditoria de Comunidade (2026-07-16, ver commits de
+banner/busca/painel lateral):**
+- **Singleton client + dedupe de in-flight** para dados globais consumidos por
+  vários componentes (badges, contadores): cachear em escopo de módulo com TTL
+  curto e devolver a mesma `Promise` a chamadas concorrentes, em vez de um
+  fetch por consumidor do hook. Referência: `use-navbar-context.tsx`.
+- **Invalidação seletiva por tipo de evento**: ao invés de `router.refresh()`
+  a cada notificação recebida via polling, classificar quais tipos de evento
+  realmente mudam a árvore de Server Components (ex.: `MEMBRO_APROVADO` no
+  painel lateral) e só revalidar nesses casos.
+- **Busca instantânea client**: debounce (~280ms) + `AbortController`
+  cancelando a request anterior + guarda de tamanho mínimo (2 chars) +
+  `startTransition`. Evita respostas fora de ordem e queries desnecessárias.
+  Referência: `comunidade-search-bar.tsx`. Padrão a reaplicar em qualquer
+  autocomplete futuro (Loja, membros admin).
+- **Scroll chrome com rAF-throttle**: listeners de scroll sempre `passive`,
+  coalescidos por `requestAnimationFrame` (nunca `setState` cru no handler de
+  scroll). Referência: `use-scroll-chrome-visibility.ts`.
+
+**Alerta de anti-padrão — fan-out N+1 em checagens por item:** checagens de
+visibilidade/seguimento chamadas em `map`/`for` por item de uma lista (ex.:
+`canFollowUser` por candidato em `buscarMembrosComunidade`, `podeVerPost` por
+post em `buscarComunidade`) multiplicam round-trips ao Postgres remoto
+justamente nos caminhos de busca/feed. Preferir uma query `IN` batched ou
+memoizar com `React.cache` a função de checagem por item.
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em

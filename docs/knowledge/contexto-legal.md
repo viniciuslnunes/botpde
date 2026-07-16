@@ -17,6 +17,17 @@ III); modeloinicial.com.br.
 carteirinha, foto) não é conveniência — é **compliance legal**. Campos do
 cadastro legal devem existir no modelo de dados.
 
+**Gap atual (achado da auditoria de 2026-07-16):** `SaasMembro` hoje só
+modela `idade`, `telefone`, `cidade` e endereço — RG, CPF, filiação,
+escolaridade e profissão exigidos pela LGE não estão no modelo. Decisão em
+aberto #9 em `docs/product/decisoes-abertas.md`.
+
+**Nota LGPD sobre `imagemProva`:** o comprovante de vínculo anexado na
+admissão do sócio (ver `docs/knowledge/estrutura-governanca.md`) é dado
+pessoal — ao modelar os campos legais acima, tratar retenção e minimização
+com o mesmo cuidado (não expor em telas públicas, não reter além do
+necessário à comprovação).
+
 ### Responsabilidade civil objetiva e solidária
 
 A torcida responde civil e **objetivamente** (independe de culpa) e

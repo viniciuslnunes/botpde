@@ -48,6 +48,13 @@ salvos como **novo perfil** reutilizável (`salvarPerfilComposto`).
 | **MEMBRO** | `UserDepartamento` | `Departamento.permissions` |
 | **GESTOR** | membro + `DepartamentoGestor` | `permissions` ∪ `permissionsGestor` |
 
+**Delegação sem virar admin geral**: `canManageDepartamento` (`permissions.js`)
+libera a gestão de pessoas de um departamento para quem tem `ROLES_MANAGE`
+global **ou** está registrado como `DepartamentoGestor` daquele departamento
+específico — um Gestor de Bateria, por exemplo, administra os colaboradores da
+Bateria sem precisar de `ROLES_MANAGE` (que abriria todos os departamentos).
+É o mecanismo central de delegação pontual do módulo.
+
 ### Matriz canônica (seed)
 
 Fonte: `packages/db/src/departamentos-canonicos.js` — `bootstrapAcessoTenant` /

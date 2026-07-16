@@ -117,11 +117,27 @@ Bola; DOL (consulta 2026-07-10).
   detalhada abaixo (confiança alta). Corinthians e Santos permanecem **fora
   dos blocos nacionais** (Trivela, 2026-07-10).
 
-## Rivalidades estruturais (APENAS moderação/segurança)
+## Rivalidades estruturais (moderação **e** segregação técnica cross-tenant)
 
-> Registro factual mínimo para (a) nunca sugerir rivais como aliados e
-> (b) sinalizar conteúdo sensível. Nunca derivar disso ranking ou narrativa de
+> Registro factual mínimo para (a) nunca sugerir rivais como aliados,
+> (b) sinalizar conteúdo sensível e (c) alimentar a segregação técnica de
+> visibilidade cross-tenant. Nunca derivar disso ranking ou narrativa de
 > confronto.
+>
+> **Atualização 2026-07-16**: `rival` deixou de ser só rótulo de moderação.
+> `packages/types/src/visibility.js` trata `rival` como uma das relações de
+> `TenantRelation` e retorna `false` (nem público) em `resolveVisibility` —
+> ou seja, pares rivais **não se enxergam** no feed/busca cross-tenant, igual
+> a `unrelated`. As entradas deste arquivo são a base factual que alimenta o
+> seed de `RivalidadeClube` (nível afiliação) e `RivalidadeTorcida` (override
+> torcida×torcida, par canônico com `aId < bId`).
+>
+> **Precedência com alianças** (`self > hierarquia > allied > rival >
+> unrelated`): uma `Alianca` **ATIVA** entre duas torcidas neutraliza a
+> rivalidade herdada do clube — ou seja, um par que seria `rival` por
+> `RivalidadeClube` deixa de ser bloqueado se as próprias torcidas assinaram
+> aliança. Rivalidade de torcida×torcida explícita (`RivalidadeTorcida`) não
+> tem essa saída — é override direto.
 
 | Par | Contexto | Fonte (consulta 2026-07-10) |
 |---|---|---|
@@ -149,6 +165,37 @@ Sub-unidades (**Subsede/PDE**) da torcida **não** são co-irmãs: são a mesma
 organização territorial. Ao aceitar uma aliança na sede, **toda a worktree**
 (sede + PDEs/subsedes promovidos) herda o vínculo `allied` com a worktree
 aliada (decisão de produto #3).
+
+**Enforcement co-irmã no servidor**: `proporAlianca` (`admin/aliancas/actions.ts`)
+rejeita a proposta se as duas torcidas compartilham `afiliacaoId` — "organizadas
+do mesmo time são co-irmãs, não aliadas" não é só vocabulário, é regra
+validada no backend.
+
+### Máquina de estados (`StatusAlianca`)
+
+`SUGERIDA → PENDENTE → ATIVA → ENCERRADA`, com reabertura `ENCERRADA → PENDENTE`.
+`Alianca` grava um par **direcional** (`@@unique([tenantOrigemId, tenantAliadoId])`)
+mas é lida como simétrica (`allied` vale para os dois lados). Governança
+bilateral via `ALLIANCES_MANAGE` (Presidente) nos dois tenants:
+
+| Transição | Quem pode |
+|---|---|
+| `PENDENTE` → `ATIVA` (aceitar) ou `ENCERRADA` (rejeitar) | só o **destinatário** (`tenantAliadoId`) |
+| `PENDENTE` → cancelar | só a **origem** (`tenantOrigemId`) |
+| `ATIVA` → `ENCERRADA` | qualquer uma das partes |
+| `ENCERRADA` → `PENDENTE` (reabrir) | qualquer uma das partes, vira nova proposta |
+
+`SUGERIDA` é o estado usado quando o sistema (recomendação) sugere a aliança
+antes de qualquer Presidente propor formalmente — não é uma transição do
+fluxo manual, é a origem "gerada pelo produto" (`RecomendacaoAlianca`, com
+`ConfiancaRecomendacao { ALTA, MEDIA, BAIXA }`, mesma escala de confiança
+deste doc).
+
+A segregação sócio×torcedor (torcedor global, feed em dois níveis, gate por
+vínculo ATIVO) é tema do onboarding, não de alianças — ver
+`docs/data/spec-onboarding.md`. O único ponto de contato com este doc é a
+própria base de rivalidade usada como seed e a precedência aliança>rivalidade
+descrita acima.
 
 ## Entradas
 

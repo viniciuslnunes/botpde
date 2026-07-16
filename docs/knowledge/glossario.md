@@ -86,6 +86,30 @@
 
 Ver `docs/knowledge/futebol-dados-publicos.md` e `docs/data/torcedores-estimados.md`.
 
+## Comunidade e cadastro
+
+- **Sócio** — associado cadastrado (e em geral pagante) de uma torcida
+  organizada específica; `SaasMembro.tipo = SOCIO`.
+- **Torcedor** — simpatizante da **afiliação** (o time), sem vínculo formal
+  com nenhuma organizada; `SaasMembro.tipo = TORCEDOR`. Persona de topo do
+  funil de aquisição — tem `PerfilTorcedor` global, participa da Comunidade
+  Nacional, pode iniciar admissão para virar sócio.
+- **Perfil do torcedor** (`PerfilTorcedor`, global, um por usuário) × **Perfil
+  de membro** (`PerfilMembro`, por tenant) — não confundir: o primeiro é a
+  identidade única da pessoa na plataforma; o segundo é a identidade social
+  dela dentro de uma torcida específica.
+- **Torcida conhecida** (`PerfilTorcedor.torcidaConhecida`) — organizada que o
+  torcedor diz conhecer/torcer junto fora da plataforma, sem vínculo formal.
+- **Número de associado / anos de sócio** — antiguidade do vínculo, usada
+  como sinal de status dentro da torcida (não confundir com "sócio-torcedor"
+  do clube, que é outro programa).
+- **Imagem de prova / comprovante de vínculo** — documento anexado no
+  cadastro para validar a admissão do associado (dado pessoal sensível).
+- **Importação de base** — migração de uma base de associados já existente
+  (planilha, sistema legado) para o cadastro do produto.
+- **Seguir / seguimento com aprovação** — camada de comunidade: seguir um
+  perfil privado exige aprovação do dono, distinto do vínculo associativo.
+
 ## Uso no produto
 
 - Copy do portal fala com o **associado** ("sua torcida", "sua sede", "próxima

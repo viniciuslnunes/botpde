@@ -83,16 +83,46 @@ torcida) — consulta 2026-07-10.
   na Lei Geral do Esporte na Câmara. Fontes: anatorg.com.br; Câmara dos
   Deputados; ResearchGate; Redalyc — consulta 2026-07-10.
 
+## Modelo associativo — dois níveis de vínculo (atualização 2026-07-16)
+
+O produto modela dois tipos de vínculo com a torcida — real no nicho, não é
+só um detalhe técnico: `SaasMembro.tipo = SOCIO | TORCEDOR`.
+
+- **Sócio**: associado cadastrado e (em geral) pagante da torcida organizada,
+  com ficha/carteirinha — o "membro" tradicional do estatuto.
+- **Torcedor**: simpatizante da **afiliação** (o time), sem vínculo formal com
+  nenhuma organizada específica — a persona de topo do funil de aquisição
+  (perfil global, `PerfilTorcedor`, feed da Comunidade Nacional).
+
+Um torcedor pode iniciar um processo de admissão e virar sócio de uma torcida
+específica; nem todo torcedor vira sócio.
+
+### Admissão de associado (figura estatutária, hoje só documentada como "exclusão")
+
+`StatusMembro = PENDENTE / APROVADO / REPROVADO`, com `aprovadoPor`/`aprovadoEm`
+e `imagemProva` (comprovante de vínculo) implementam a **admissão** exigida
+pelo estatuto (Código Civil art. 54: requisitos de admissão) — não só a
+exclusão. É fluxo com aprovação da diretoria e auditoria (`MEMBERS_APPROVE`).
+`imagemProva` é dado pessoal — tratar com a mesma cautela de retenção/minimização
+que os demais dados sensíveis de cadastro (ver `contexto-legal.md`).
+
 ## Mapeamento para o produto (RBAC e dados)
 
 1. Cargos reais → papéis do sistema: Presidente = owner; diretoria executiva
    = admins com escopos (financeiro, eventos, comunicação, loja); conselho
    fiscal = leitura de auditoria/financeiro; representantes de
    batalhão/subsede = admin de núcleo local; associado = member.
-2. **Departamentos** já existem no schema — a lista acima é o vocabulário
-   real para seeds/sugestões (bateria, caravanas, social, materiais,
-   patrimônio, financeiro, comunicação, feminino, carnaval).
+2. **Departamentos** já existem no schema como par de papéis **Colaborador
+   (MEMBRO)** e **Gestor (GESTOR)** por área, com "Diretoria" tratada como
+   departamento — ver `docs/data/modulo-departamentos.md` para o modelo
+   completo (a lista de departamentos típicos acima é o vocabulário real
+   para seeds/sugestões: bateria, caravanas, social, materiais, patrimônio,
+   financeiro, comunicação, feminino, carnaval). Um Gestor de departamento
+   administra membros daquele depto sem precisar de `ROLES_MANAGE` global —
+   delegação pontual por design.
 3. **Exclusão de associado** é figura estatutária formal (e obrigação prática
-   pós-LGE) — fluxo de desligamento com auditoria importa.
+   pós-LGE) — fluxo de desligamento com auditoria importa. Hoje reusa
+   `MEMBERS_BLOCK`/`MEMBERS_WARN`; não há permissão dedicada de desligamento
+   estatutário com registro formal — lacuna a considerar (ver `ARCHITECTURE.md §6`).
 4. Eleições internas com chapas são realidade nas grandes — enquetes/votação
    (módulo Salas) têm caso de uso forte.

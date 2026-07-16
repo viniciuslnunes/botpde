@@ -8,7 +8,7 @@
 | 2 | Confirmação da aliança | **Mútua**: A propõe → B aceita → `ATIVA` |
 | 3 | Granularidade da aliança | **Nível torcida**, herdada pelas sub-unidades |
 | 4 | Escopo dos dados externos | **Global por afiliação** (compartilhado entre torcidas do mesmo time) |
-| 5 | Rastrear rivalidades | **Sim, só para moderação/segurança** — registro factual e neutro, nunca sugeridas como aliadas nem usadas para conteúdo de confronto |
+| 5 | Rastrear rivalidades | **Sim** — registro factual e neutro, nunca sugeridas como aliadas nem usadas para conteúdo de confronto. **Atualizado 2026-07-16**: além de moderação, `rival` agora também bloqueia visibilidade cross-tenant (`resolveVisibility` trata `rival` como `unrelated`); ver `docs/knowledge/aliancas.md` |
 | 6 | Fonte da importação de associados | Dedup por prioridade **`discordId > email > telefone`** |
 | 8 | Permissão dedicada de "sócio" | Reusar `MEMBERS_APPROVE` por ora; revisitar se o fluxo de sócio crescer |
 
@@ -22,6 +22,10 @@ auto-relação de `Sede`.
 | # | Decisão | Opções | Nota |
 |---|---|---|---|
 | 7 | Provedor de API de jogos | ex.: API-Football, outros | Spike técnico na Fase 2: avaliar limites do plano free antes de fechar |
+| 9 | Campos obrigatórios da LGE no cadastro de membro | Adicionar RG, CPF, filiação, escolaridade, profissão, data de nascimento a `SaasMembro`, ou manter mínimo atual | LGE 14.597/2023 exige esses dados; `SaasMembro` hoje só tem idade/telefone/endereço/`imagemProva`. Achado da auditoria de 2026-07-16 (agente `data-model`) |
+| 10 | Permissão dedicada de desligamento estatutário de associado | Nova permissão `MEMBERS_DISMISS` (ou similar) com AuditLog próprio, vs. reusar `MEMBERS_BLOCK`/`MEMBERS_WARN` | Desligamento é figura estatutária distinta de bloqueio/advertência; hoje sem par dedicado. Achado da auditoria de 2026-07-16 (agentes `rbac`/`research-dominio`) |
+| 11 | Lock otimista no estoque da Loja | Adicionar campo `version`/lock otimista aos itens de estoque JSON, vs. manter read-modify-write | Sob concorrência real (duas compras simultâneas do mesmo item) o mapa de estoque pode ser sobrescrito. Achado da auditoria de 2026-07-16 (agente `loja`) |
+| 12 | Remover `fazerPedido` (deprecated) | Remover quando não houver mais chamador do fluxo single-item antigo | Hoje delega a `adicionarAoCarrinho`; resquício do fluxo pré multi-item. Achado da auditoria de 2026-07-16 (agente `loja`) |
 
 ## Já decididas antes (referência — ver `ARCHITECTURE.md` §5)
 

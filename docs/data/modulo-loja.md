@@ -82,6 +82,32 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 - Cupom: `validarCupom()` + `calcularDesconto()`; seed `EUSOUGAVIAO` = 10% primeira compra
 - Cancelamento admin: `atualizarStatusPedido(CANCELADO)` **restaura estoque** dos itens
 - Auditoria: `PRODUTO_*`, `PEDIDO_*`, `CATEGORIA_*`, `CUPOM_*` em `AuditLog`
+- **Cupom é tenant-scoped e reaplicado por tenant no checkout multi-tenant**:
+  `finalizarPedido` busca e valida o mesmo código **em cada tenant dono** do
+  grupo de checkout. Se o cupom existe no tenant A mas não no B, o checkout
+  inteiro falha (`throw` dentro da `$transaction`) mesmo com o item de A
+  válido. Se o cupom existe em ambos, desconta em ambos os pedidos.
+- **`primeiraCompra` é por tenant, não global**: `userJaComprou` conta
+  `SaasPedido` filtrado por `tenantId` do dono. O mesmo associado pode reusar
+  cupom de primeira compra em cada torcida diferente.
+- **Checkout multi-tenant é atômico "tudo ou nada"**: qualquer falha (estoque,
+  produto inativo, cupom) aborta a `$transaction` inteira — não existe
+  checkout parcial nem pedidos parcialmente confirmados.
+- **Cap de 10 unidades por item** na sacola (`adicionarAoCarrinho`/`atualizarItemCarrinho`).
+- **Sem lock otimista no estoque**: estoque é lido e reescrito como JSON
+  (`{ ...estoque, [chave]: disponivel - qtd }`) dentro da transação, sem campo
+  `version`. Sob concorrência real duas transações podem sobrescrever o mapa —
+  risco conhecido, candidato a correção de fase 2 (ver `ARCHITECTURE.md §6`).
+- **Sem stacking de cupons**: um único `cupomCodigo` por checkout.
+- **Preview de desconto não é autoritativo**: `validarCupomAction` recebe o
+  `subtotal` do formulário só para exibir o preview; `finalizarPedido`
+  recompõe o valor no servidor — a autoridade do valor final é sempre o
+  checkout, nunca o preview do cliente.
+- **`total` nunca fica negativo**: `total = max(0, subtotal - desconto)`.
+- **`fazerPedido` está `@deprecated`** — fluxo single-item antigo, delega a
+  `adicionarAoCarrinho`; candidato a remoção quando não houver mais chamador.
+- Auditoria `PEDIDO_CRIADO` grava **fora** da `$transaction` do pedido — se
+  falhar, o pedido existe sem log (diverge da convenção de auditoria atômica).
 
 ## Schemas Zod compartilhados
 
