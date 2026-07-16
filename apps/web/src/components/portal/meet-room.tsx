@@ -713,7 +713,9 @@ function MeetStage({
     if (!stage) return
 
     function syncAvatars() {
-      for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
+      const root = stageRef.current
+      if (!root) return
+      for (const tile of Array.from(root.querySelectorAll('.lk-participant-tile'))) {
         ensureTileAvatarFallback(tile, userId, participantProfiles)
       }
     }
