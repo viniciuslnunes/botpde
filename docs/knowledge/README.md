@@ -23,6 +23,7 @@
 |-----|----------|
 | [`docs/data/escudos-afiliacoes.md`](../data/escudos-afiliacoes.md) | Escudos de `Afiliacao` (Soccer Wiki, Ogol, Cloudinary) |
 | [`docs/data/torcedores-estimados.md`](../data/torcedores-estimados.md) | Base digital IBOPE + teto conservador no onboarding |
+| [`docs/data/modulo-comunidade-performance.md`](../data/modulo-comunidade-performance.md) | Feed, timeline, busca, caches e plano futuro Comunidade |
 
 ## Protocolo de manutenção
 

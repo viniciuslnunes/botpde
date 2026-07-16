@@ -74,7 +74,8 @@ navega os fluxos principais e salva PNGs em `apps/web/e2e/screenshots/<fluxo>/`.
   leitura de código quando a tela envolver estado client-side complexo
   (composer, Salas/Meet, wizards).
 - Latência percebida: skeleton/loading/spinner são com este agente; **TTFB, queries
-  e polling** são com o agente `performance` (`ARCHITECTURE.md` §5.6).
+  e polling** são com o agente `performance` (`ARCHITECTURE.md` §5.6–§5.6.1,
+  `docs/data/modulo-comunidade-performance.md` para feed/chat).
 
 ## Entregável
 - Diagnóstico por tela/fluxo (o que confunde e por quê), citando o PNG usado

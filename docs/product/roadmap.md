@@ -47,6 +47,8 @@ entregue, não só planejado) e herança de aliança pela worktree inteira.
    **entregue antecipadamente** como Comunidade Nacional (feed por afiliação,
    `Post.alcanceNacional`, tenant sintético, perfil de torcedor global) e central
    de notificações sociais. Ver `docs/data/modulo-comunidade.md`.
+   **Performance (2026-07-16):** feed escalável, timeline materializada, busca
+   `pg_trgm` e plano futuro C–F — `docs/data/modulo-comunidade-performance.md`.
 3. Métricas/dashboards (engajamento, presença, crescimento) sobre a base real.
 4. Mobile (React Native/Expo sobre tRPC); convergência bot → tRPC/Prisma (sai do raw `pg`).
 5. **Grafo nacional de relacionamento entre torcidas** (aliados/rivais) e aprendizado
@@ -71,4 +73,5 @@ rivalidade e recomendações) · **I. Informação do nicho** 🆕 ·
 **L. Escudos de clubes** 🔄 fase A entregue (`docs/data/escudos-afiliacoes.md`) ·
 **M. Comunidade Nacional / torcedor global** ✅ entregue — falta racional de
 produto próprio, ver `dominio.md` · **N. Controle de acesso por Departamentos**
-✅ entregue, ver `docs/data/modulo-departamentos.md`.
+✅ entregue, ver `docs/data/modulo-departamentos.md` · **O. Performance Comunidade**
+✅ ondas A–B (`0dca679`); manutenção e Fases C–F em `docs/data/modulo-comunidade-performance.md`.

@@ -46,12 +46,16 @@ arquitetura, registre nos docs que os agentes leem (este é o protocolo de
 ## Performance (plano concluído — manutenção contínua)
 
 As Fases 1–5 de otimização web estão documentadas em `ARCHITECTURE.md` §5.6
-(commits `99443a7` → `82ae6f3`). Use o agente `performance` para:
+(commits `99443a7` → `82ae6f3`). **Comunidade (2026-07-16):** ondas A–B +
+caches em `docs/data/modulo-comunidade-performance.md` (commit `0dca679`).
+Use o agente `performance` para:
 - validar que uma feature nova não reintroduz N+1 ou prefetch agressivo;
 - propor recortes quando navegação ou demo voltarem a degradar;
-- decidir se o próximo passo é código ou infra (pooler, CDN, etc.).
+- decidir se o próximo passo é código ou infra (pooler, CDN, Redis, etc.);
+- priorizar Fases C–F do plano Comunidade quando o escopo for feed/busca/chat.
 
-Não há “Fase 6 grátis” planejada — ganhos adicionais exigem mudança arquitetural.
+Não há “Fase 6 grátis” planejada para o app inteiro — ganhos adicionais exigem
+mudança arquitetural (ver plano futuro em `modulo-comunidade-performance.md`).
 
 ## Escudos de clubes (`Afiliacao`) — entregue (Fases A–F)
 

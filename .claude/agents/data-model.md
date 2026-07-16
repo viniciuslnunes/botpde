@@ -17,6 +17,8 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
   legadas do bot sem prefixo).
 - Docs: `ARCHITECTURE.md` §2.2, `docs/data/entidades-novas.md`, `docs/data/modulo-salas.md`
   (módulo Salas/Meet), `docs/data/modulo-loja.md` (módulo Loja),
+  `docs/data/modulo-comunidade.md` + `docs/data/modulo-comunidade-performance.md`
+  (feed social, `FeedTimeline`, índices e busca),
   `docs/data/escudos-afiliacoes.md` (pipeline de escudos de `Afiliacao`) e
   `docs/data/torcedores-estimados.md` (base digital IBOPE + enum `TorcedoresEstimadosTipo`).
 - Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).

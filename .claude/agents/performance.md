@@ -15,11 +15,15 @@ gargalos reais, priorizar por ROI e preservar as convenções já adotadas — n
 reinventar arquitetura nem empurrar migração de infra sem evidência.
 
 ## Fontes de verdade (leia antes de opinar)
-- `ARCHITECTURE.md` §5.4 (provedor DB), §5.6 (plano de 5 fases concluído).
+- `ARCHITECTURE.md` §5.4 (provedor DB), §5.6 (plano de 5 fases concluído),
+  §5.6.1 (Comunidade 2026-07-16).
+- `docs/data/modulo-comunidade-performance.md` — entregas A–B, padrões, Fases C–F.
 - `CLAUDE.md` — convenções de cache, multi-tenant e Prisma.
-- Cache: `apps/web/src/lib/tenant.ts`, `hierarquia.ts`, `comunidade.ts`, `feed.ts`.
+- Cache: `apps/web/src/lib/tenant.ts`, `hierarquia.ts`, `comunidade.ts`, `feed.ts`,
+  `feed-timeline.ts`, `comunidade-busca.ts`, `stories.ts`, `salas.ts`.
 - Navegação: `portal-nav-link.tsx`, `nav-pending-context.tsx`, `loading.tsx` no portal.
-- Mensageria: `mensageria.ts`, `mensagens-shell.tsx`, `use-visible-interval.ts`.
+- Mensageria: `mensageria.ts`, `mensagens-shell.tsx`, `comunidade-chat-panel.tsx`,
+  `api/conversas/resumo`, `use-visible-interval.ts`.
 - Imagens: `optimizable-image.ts`, `next.config.ts` `images.remotePatterns`.
 - DB: `packages/db/src/index.js` (`connection_limit`), índices em `schema.prisma`.
 - Medição: `apps/web/e2e/nav-latency.portal.spec.ts`; contador dev em
@@ -44,6 +48,10 @@ na porta do estádio.
 ## Padrões a preservar (não regredir)
 - Autorização e `tenantId` intactos — cache nunca bypassa `assertPermission`.
 - Estado `lido` de comunicados: cache só do conteúdo público; overlay por usuário.
+- Feed Comunidade: timeline materializada para rede; discover com ranking + cache
+  base pública; privacidade sempre em batch (`getAutoresSemAcesso`).
+- Chat embutido: resumo em `/api/conversas/resumo`; inbox completa só ao expandir.
+- Salas ao vivo: uma leitura na `page.tsx`, distribuída por props.
 - Prefetch on-hover na navbar — não voltar a `prefetch={true}` em todas as rotas.
 - Polling com `useVisibleInterval`; evitar `setInterval` cru em features novas.
 - Tipos explícitos em queries Prisma novas (§5.2).
@@ -61,9 +69,12 @@ na porta do estádio.
 ## Como trabalhar
 1. Reproduza ou leia benchmark (`nav-latency` e2e ou medição manual em produção).
 2. Mapeie o caminho crítico (ex.: `/portal/comunidade` → queries + Suspense).
-3. Liste ganhos estimados (ms, queries, KB) × esforço (baixo/médio/alto).
-4. Recomende recorte mínimo — uma fase por vez, como as Fases 1–5 já entregues.
-5. Indique arquivos exatos e se precisa de `db:push` (índices) ou só código.
+3. Consulte `docs/data/modulo-comunidade-performance.md` se o escopo for feed,
+   busca, stories, chat lateral ou timeline.
+4. Liste ganhos estimados (ms, queries, KB) × esforço (baixo/médio/alto).
+5. Recomende recorte mínimo — uma fase por vez.
+6. Indique arquivos exatos e se precisa de `db:push` (índices/timeline) ou
+   `db:enable-pg-trgm` ou só código.
 
 ## Entregável
 - Diagnóstico com evidência (números ou caminho de request).

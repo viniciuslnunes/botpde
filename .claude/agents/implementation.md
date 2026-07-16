@@ -55,8 +55,10 @@ updates frequentes. Use `assertSalaMembro(salaId)` / `assertSalaAnfitriao(salaId
 dependência externa opcional (ex.: LiveKit), siga o padrão `isXConfigured()` de
 `apps/web/src/lib/livekit.ts` — degrade, não quebre. Ver `docs/data/modulo-salas.md`.
 Loja: sacola/checkout/cupom — ver `docs/data/modulo-loja.md`; agente `loja` para escopo amplo.
-Performance: ver `ARCHITECTURE.md` §5.6; não reintroduza fetch-on-mount onde já há SSR ou
-prefetch agressivo na navbar.
+Performance: ver `ARCHITECTURE.md` §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md`;
+não reintroduza fetch-on-mount onde já há SSR, infinite scroll via API ou resumo leve de chat.
+Comunidade — feed/timeline/busca: `feed.ts`, `feed-timeline.ts`, `comunidade-busca.ts`;
+padrões em `modulo-comunidade-performance.md` (batch privacidade, SSE ping, salas únicas na page).
 Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
 Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
 `seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Coleta mensual:

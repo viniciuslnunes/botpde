@@ -3,7 +3,8 @@
 Guia curto para trabalhar neste repositório. Detalhe arquitetural em `ARCHITECTURE.md`;
 produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`);
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
-Performance web: `ARCHITECTURE.md` §5.6; agente `performance` para auditorias novas.
+Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
+`docs/data/modulo-comunidade-performance.md`; agente `performance` para auditorias novas.
 
 ## O que é
 
@@ -33,6 +34,7 @@ pnpm --filter @torcida/web lint
 pnpm --filter @torcida/web test       # Vitest (RBAC, rate-limit, visibilidade)
 pnpm --filter @torcida/db db:generate # prisma generate
 pnpm --filter @torcida/db db:push     # sincroniza schema (NÃO há migrations)
+pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comunidade
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
@@ -57,8 +59,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `self`/`ancestor` = tudo; `descendant` e `allied` = só PÚBLICO; `unrelated` = nada.
 - **UX**: cubra estados de vazio, erro e loading.
 - **Performance** (páginas com muitas queries, feed ou polling): siga `ARCHITECTURE.md`
-  §5.6 — `React.cache`/`unstable_cache`, Suspense, prefetch on-hover, `useVisibleInterval`,
-  `next/image` quando aplicável. Dúvida de diagnóstico → agente `performance` antes de codar.
+  §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` — `React.cache`/`unstable_cache`,
+  Suspense, prefetch on-hover, `useVisibleInterval`, `next/image` quando aplicável.
+  Dúvida de diagnóstico → agente `performance` antes de codar.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Expandir shell para `portal/layout` antes de
@@ -91,6 +94,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `docs/data/modulo-departamentos.md`; seed `packages/db/scripts/seed-departamentos.js`.
 - **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
   `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
+- **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
+  `feed-timeline.ts`, `comunidade-busca.ts`; ver `docs/data/modulo-comunidade.md` e
+  `docs/data/modulo-comunidade-performance.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.

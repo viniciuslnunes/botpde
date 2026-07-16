@@ -548,6 +548,26 @@ post em `buscarComunidade`) multiplicam round-trips ao Postgres remoto
 justamente nos caminhos de busca/feed. Preferir uma query `IN` batched ou
 memoizar com `React.cache` a função de checagem por item.
 
+### 5.6.1 Otimização Comunidade — ondas A–B + caches (2026-07-16)
+
+Commit de referência: `0dca679`. Documentação detalhada e plano futuro (Fases
+C–F): **`docs/data/modulo-comunidade-performance.md`**.
+
+| Onda | Foco |
+|------|------|
+| A | Batch visibilidade/contagens, índices, comentários lazy, stories batch, SSE banner |
+| B1–B3 | APIs paginadas `/api/comunidade/feed` e `/rede`, infinite scroll, cursor na URL, SSE refetch |
+| B4 | `FeedTimeline` — fan-out on write para rede/seguindo (`feed-timeline.ts`) |
+| B5 | Ranking heurístico Descobrir (`scoreDescobrirPost`) |
+| B6 | Busca `pg_trgm` + script `db:enable-pg-trgm` (fallback ILIKE) |
+| Pós-B | `unstable_cache` em discover, sugestões, canais, hashtags, stories, salas |
+| Chat/salas | `GET /api/conversas/resumo`; inbox só ao expandir; `listSalasAtivas` uma vez na `page.tsx` |
+
+**Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
+
+**Próximo recorte documentado (Fase C):** virtualização de feed, `revalidateTag`
+na timeline, TanStack Query, e2e de latência Comunidade — ver doc acima.
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em

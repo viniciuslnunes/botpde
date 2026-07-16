@@ -32,7 +32,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] Tipos de retorno de queries Prisma novas anotados explicitamente (§5.2).
 - [ ] Documentação atualizada quando o impacto é estrutural.
 - [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
-  §5.6 (cache, Suspense, `useVisibleInterval`, prefetch on-hover).
+  §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` (cache, Suspense,
+  `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat).
 
 ## Compliance de domínio (`docs/knowledge/contexto-legal.md`)
 Em mudanças que tocam membros/cadastro, verifique também:
@@ -53,8 +54,9 @@ Em mudanças que tocam membros/cadastro, verifique também:
   quebra a página; ações `SALA_REUNIAO_CRIADA/ENCERRADA`, `SALA_ENQUETE_CRIADA/VOTO/
   ENCERRADA` gravadas em `AuditLog`.
 - Performance (quando a mudança toca portal/feed/mensagens): rodar ou revisar
-  `apps/web/e2e/nav-latency.portal.spec.ts` se disponível; conferir que não há
-  waterfall client desnecessário (SSR + API duplicada) nem `setInterval` cru.
+  `apps/web/e2e/nav-latency.portal.spec.ts` se disponível; em Comunidade, validar que
+  chat colapsado não dispara inbox completa e scroll usa `/api/comunidade/feed` (não reload).
+  Conferir que não há waterfall client desnecessário (SSR + API duplicada) nem `setInterval` cru.
 - Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
   (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
   inscritos digitais com torcedores presenciais.

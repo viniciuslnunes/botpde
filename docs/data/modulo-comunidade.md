@@ -17,6 +17,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `Hashtag` / `PostHashtag` | — | Hashtags por tenant |
 | `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
 | `MomentoStory` | `saas_momentos_story` | Momentos efêmeros (24h) no feed |
+| `FeedTimeline` | `saas_feed_timeline` | Timeline materializada por viewer (fan-out on write) para feed de rede/seguindo |
 | `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos; posts do mural via `Post.conversaId` |
 | `Conversa` (`tipo: CANAL`) | `saas_conversas` | Canais institucionais e comunidades temáticas (M3); mural só-admin opcional |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
@@ -60,8 +61,12 @@ visibilidade do post).
 | Endpoint | Uso |
 |---|---|
 | `GET /api/comunidade/membros?q=` | Busca membros aprovados em tenants visíveis |
-| `GET /api/comunidade/busca?q=` | Busca unificada (membros + hashtags + posts) |
+| `GET /api/comunidade/busca?q=` | Busca unificada (membros + hashtags + posts); ranking com `pg_trgm` quando habilitado |
+| `GET /api/comunidade/feed?cursor=&take=&filtro=` | Paginação do feed (Descobrir / Seguindo) |
+| `GET /api/comunidade/rede?cursor=&take=` | Paginação de Minha rede |
+| `GET /api/comunidade/feed/stream` | SSE — ping de novos posts (sem payload) |
 | `GET /api/comunidade/notificacoes?filtro=` | Lista notificações sociais com filtro |
+| `GET /api/conversas/resumo` | Badge de mensagens + bloqueio de inbox (sem lista de conversas) |
 | `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar) |
 
 ## Server Actions (`comunidade/actions.ts`)
@@ -154,3 +159,17 @@ vale extrair para `docs/data/modulo-mensageria.md`.
 Feed, stories, engajamento e demais interações usam **Motion** (`motion` v12).
 Presets e padrões de implementação: [`docs/frontend/motion.md`](../frontend/motion.md).
 Shell atual: `apps/web/src/app/portal/comunidade/layout.tsx` (`MotionShell`).
+
+## Performance e escalabilidade
+
+Otimização entregue em **2026-07-16** (`0dca679`): infinite scroll com cursor,
+timeline materializada (`FeedTimeline`), ranking heurístico do Descobrir, busca
+`pg_trgm`, caches por escopo, SSE de feed, resumo leve de mensagens e leitura
+única de salas ao vivo na página.
+
+**Documentação completa, pós-deploy e plano futuro (Fases C–F):**
+[`docs/data/modulo-comunidade-performance.md`](modulo-comunidade-performance.md).
+
+**Padrões a preservar:** batch de privacidade/visibilidade, separar cache público
+de overlay por usuário, inbox completa só ao expandir chat, tipos explícitos em
+queries Prisma. Agente: `performance` (ver `docs/agents/README.md`).
