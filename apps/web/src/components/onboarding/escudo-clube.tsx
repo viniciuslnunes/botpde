@@ -8,15 +8,21 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 const SIZES = {
   sm: { box: 'h-11 w-11', px: 44, icon: 'h-4 w-4', text: 'text-sm' },
   md: { box: 'h-14 w-14', px: 56, icon: 'h-5 w-5', text: 'text-lg' },
+  lg: { box: 'h-16 w-16', px: 64, icon: 'h-6 w-6', text: 'text-xl' },
 } as const
 
 export type EscudoClubeSize = keyof typeof SIZES
+export type EscudoClubeShape = 'rounded' | 'circle'
 
 type Props = {
   nome: string
   apelido?: string | null
   escudoUrl?: string | null
   size?: EscudoClubeSize
+  /** `circle` = borda circular (torcidas); `rounded` = cantos (clubes). */
+  shape?: EscudoClubeShape
+  /** Prioriza decode/fetch (primeiros cards acima da dobra). */
+  priority?: boolean
   /** Classes extras no frame (ex.: ring para empilhar). */
   className?: string
 }
@@ -31,14 +37,24 @@ export function inicialClubeEscudo(nome: string, apelido?: string | null): strin
  * Escudo do clube/torcida no onboarding: frame fixo + object-contain (nunca corta o logo).
  * Placeholder neutro quando ausente ou com falha — nunca inventa escudo.
  */
-export function EscudoClube({ nome, apelido, escudoUrl, size = 'md', className }: Props) {
+export function EscudoClube({
+  nome,
+  apelido,
+  escudoUrl,
+  size = 'md',
+  shape = 'rounded',
+  priority = false,
+  className,
+}: Props) {
   const [imagemFalhou, setImagemFalhou] = useState(false)
   const s = SIZES[size]
   const label = apelido || nome
   const mostrarImagem = Boolean(escudoUrl && !imagemFalhou)
+  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-xl'
 
   const frameClass = [
-    'relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl',
+    'relative flex shrink-0 items-center justify-center overflow-hidden',
+    radius,
     'border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',
     s.box,
     className ?? '',
@@ -47,15 +63,17 @@ export function EscudoClube({ nome, apelido, escudoUrl, size = 'md', className }
     .join(' ')
 
   if (mostrarImagem && escudoUrl) {
+    const imgClass = 'h-full w-full object-contain p-1.5'
     return (
-      <div className={frameClass} aria-hidden={!label}>
+      <div className={frameClass}>
         {canOptimizeImageUrl(escudoUrl) ? (
           <Image
             src={escudoUrl}
             alt={`Escudo ${label}`}
             width={s.px}
             height={s.px}
-            className="h-full w-full object-contain p-1"
+            className={imgClass}
+            priority={priority}
             onError={() => setImagemFalhou(true)}
           />
         ) : (
@@ -65,9 +83,10 @@ export function EscudoClube({ nome, apelido, escudoUrl, size = 'md', className }
             alt={`Escudo ${label}`}
             width={s.px}
             height={s.px}
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
             decoding="async"
-            className="h-full w-full object-contain p-1"
+            fetchPriority={priority ? 'high' : 'auto'}
+            className={imgClass}
             onError={() => setImagemFalhou(true)}
           />
         )}

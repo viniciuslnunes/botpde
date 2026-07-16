@@ -5,8 +5,9 @@ import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
-import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
+import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
@@ -617,10 +618,10 @@ function PassoTorcida({
   return (
     <div>
       <BotaoVoltar onClick={onVoltar} disabled={pending} />
-      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))] text-balance">
+      <h1 className="text-2xl font-bold tracking-tight text-[rgb(var(--foreground))] text-balance sm:text-3xl">
         Você pertence a alguma organizada?
       </h1>
-      <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
+      <p className="mt-1.5 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
         Comece como torcedor do {nomeClube} ou vincule-se a uma torcida na plataforma.
       </p>
 
@@ -629,10 +630,10 @@ function PassoTorcida({
         type="button"
         onClick={onTorcedorGlobal}
         disabled={pending}
-        className="mt-6 flex w-full items-start gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+        className="mt-6 flex w-full items-center gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 sm:p-5"
       >
         {pending ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
             <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
           </div>
         ) : (
@@ -640,22 +641,24 @@ function PassoTorcida({
             nome={nomeClube}
             apelido={clube?.apelido}
             escudoUrl={clube?.escudoUrl}
-            size="sm"
+            size="md"
+            shape="circle"
+            priority
           />
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
             Sem organizada
           </p>
-          <p className="mt-0.5 font-semibold text-[rgb(var(--foreground))]">
+          <p className="mt-0.5 text-base font-semibold text-[rgb(var(--foreground))]">
             Sou só torcedor do {nomeClube}
           </p>
-          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+          <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
             Acesso à comunidade nacional — posts, novidades e conversa entre torcedores.
             Sem vínculo com torcida organizada.
           </p>
         </div>
-        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+        <ArrowRight className="hidden h-5 w-5 shrink-0 text-[rgb(var(--color-primary))] sm:block" />
       </button>
 
       {torcidas.length === 0 ? (
@@ -677,30 +680,17 @@ function PassoTorcida({
             <div className="h-px flex-1 bg-[rgb(var(--border))]" />
           </div>
 
-          <ul className="mt-4 space-y-2.5">
-            {torcidas.map((t) => (
+          <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {torcidas.map((t, i) => (
               <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => onEscolher(t)}
-                  disabled={pending}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3.5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
-                >
-                  <EscudoClube nome={t.nome} escudoUrl={t.logoUrl} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold uppercase text-[rgb(var(--foreground))]">
-                      {t.nome}
-                    </p>
-                    <TorcidaOnboardingMeta stats={t.stats} />
-                    {!t.acessivelNoHost && (
-                      <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
-                        Portal em outro endereço — solicitação válida, aprovação na torcida
-                        escolhida.
-                      </p>
-                    )}
-                  </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-                </button>
+                <MotionReveal index={i} className="h-full">
+                  <TorcidaOnboardingCard
+                    torcida={t}
+                    onEscolher={onEscolher}
+                    disabled={pending}
+                    priority={i < 4}
+                  />
+                </MotionReveal>
               </li>
             ))}
           </ul>
