@@ -33,10 +33,13 @@ import {
   FinanceiroCaixaSkeleton,
 } from '../_components/financeiro-caixa-aside'
 import {
+  PatrimonioInventarioAside,
+  PatrimonioInventarioSkeleton,
+} from '../_components/patrimonio-inventario-aside'
+import {
   ArrowLeft,
   ArrowRight,
   Briefcase,
-  Landmark,
   Shield,
 } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -119,6 +122,8 @@ export default async function DepartamentoHomePage({
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.MEMBERS_APPROVE)
   const podeVerFinanceiro =
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.FINANCE_VIEW)
+  const podeVerPatrimonio =
+    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.PATRIMONY_VIEW)
 
   const membrosRaw: Array<{
     userId: string
@@ -270,7 +275,12 @@ export default async function DepartamentoHomePage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {moduloHref && (panel !== 'financeiro' || podeVerFinanceiro) && (
+            {moduloHref &&
+              (panel === 'financeiro'
+                ? podeVerFinanceiro
+                : panel === 'patrimonio'
+                  ? podeVerPatrimonio
+                  : true) && (
               <Link
                 href={moduloHref}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
@@ -325,6 +335,17 @@ export default async function DepartamentoHomePage({
                 podeVerFinanceiro={podeVerFinanceiro}
               />
             </Suspense>
+          ) : panel === 'patrimonio' ? (
+            <Suspense fallback={<PatrimonioInventarioSkeleton />}>
+              <PatrimonioInventarioAside
+                tenantId={tenant.id}
+                nome={depto.nome}
+                isGestor={isGestor}
+                moduloHref={moduloHref}
+                operacaoHref={operacaoHref}
+                podeVerPatrimonio={podeVerPatrimonio}
+              />
+            </Suspense>
           ) : (
             <PainelDominio
               panel={panel}
@@ -350,27 +371,6 @@ function PainelDominio({
   operacaoHref: string | null
   totalPendentes: number
 }) {
-  if (panel === 'patrimonio') {
-    return (
-      <div className="space-y-4">
-        <MotionEmptyState
-          icon={<Landmark className="mb-3 h-8 w-8 text-stone-600 dark:text-stone-300" />}
-          title="Patrimônio em construção"
-          description="Inventário e responsáveis por item vão viver nesta área do portal."
-          className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-10 text-center"
-        />
-        {isGestor && operacaoHref && (
-          <Link
-            href={operacaoHref}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            <Shield className="h-4 w-4" />
-            Abrir operação (admin)
-          </Link>
-        )}
-      </div>
-    )
-  }
   if (panel === 'diretoria') {
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">

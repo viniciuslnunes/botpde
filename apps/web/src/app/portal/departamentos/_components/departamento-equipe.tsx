@@ -130,24 +130,33 @@ function AdicionarMembroForm({
   const [state, action, pending] = useActionState(adicionarMembroArea, {} as ActionState)
   useActionStateToast(state, pending, 'Membro adicionado à área')
 
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setCandidatos([])
-      return
-    }
-    const t = setTimeout(() => {
-      startSearch(() => {
-        void buscarCandidatosArea(departamentoId, q).then(setCandidatos)
-      })
-    }, 280)
-    return () => clearTimeout(t)
-  }, [q, departamentoId])
+  const qBusca = q.trim().length >= 2 ? q.trim() : ''
+  const candidatosVisiveis = qBusca ? candidatos : []
 
   useEffect(() => {
-    if (state.ok) {
+    if (!qBusca) return
+    let cancelled = false
+    const t = setTimeout(() => {
+      startSearch(() => {
+        void buscarCandidatosArea(departamentoId, qBusca).then((rows) => {
+          if (!cancelled) setCandidatos(rows)
+        })
+      })
+    }, 280)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [qBusca, departamentoId])
+
+  // Após sucesso, limpa no próximo tick (evita setState síncrono no efeito).
+  useEffect(() => {
+    if (!state.ok) return
+    const t = setTimeout(() => {
       setQ('')
       setCandidatos([])
-    }
+    }, 0)
+    return () => clearTimeout(t)
   }, [state.ok])
 
   return (
@@ -162,12 +171,12 @@ function AdicionarMembroForm({
           className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
         />
       </label>
-      {pendingSearch && (
+      {pendingSearch && qBusca && (
         <p className="text-xs text-[rgb(var(--foreground-muted))]">Buscando…</p>
       )}
-      {candidatos.length > 0 && (
+      {candidatosVisiveis.length > 0 && (
         <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))]">
-          {candidatos.map((c) => (
+          {candidatosVisiveis.map((c) => (
             <li key={c.id} className="flex items-center gap-2 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">

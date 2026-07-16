@@ -232,8 +232,11 @@ describe('departamento capabilities', () => {
     expect(hrefHomeDepartamento('financeiro')).toBe('/portal/departamentos/financeiro')
     expect(hrefModuloPortal('eventos')).toBe('/portal/eventos')
     expect(hrefModuloPortal('financeiro')).toBe('/portal/financeiro')
+    expect(hrefModuloPortal('patrimonio')).toBe('/portal/patrimonio')
     expect(hrefOperacaoAdmin('financeiro')).toBe('/admin/financeiro')
+    expect(hrefOperacaoAdmin('patrimonio')).toBe('/admin/patrimonio')
     expect(capabilityPorSlug('bateria')?.portalPanel).toBe('bateria')
+    expect(capabilityPorSlug('patrimonio')?.portalPanel).toBe('patrimonio')
   })
 })
 

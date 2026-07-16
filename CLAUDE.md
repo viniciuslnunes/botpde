@@ -96,6 +96,8 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `docs/data/modulo-departamentos.md`; seed `packages/db/scripts/seed-departamentos.js`.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
+- **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
+  portal `/portal/patrimonio`, admin `/admin/patrimonio`.
 - **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
   `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,

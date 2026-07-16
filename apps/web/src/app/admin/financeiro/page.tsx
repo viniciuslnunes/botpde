@@ -35,7 +35,8 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
 
   const sp = await searchParams
   const { filtro, values } = parseFiltroFinanceiro(sp)
-  const { page: _page, ...filtroResumo } = filtro
+  const filtroResumo = { ...filtro }
+  delete filtroResumo.page
 
   const [resumo, lista] = await Promise.all([
     resumirFinanceiro(tenant.id, filtroResumo),

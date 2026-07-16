@@ -72,6 +72,7 @@ describe('relationFromLineage (VIN-18 — direção da relação)', () => {
     expect(canViewRecurso(relation, 'membros')).toBe(false)
     expect(canViewRecurso(relation, 'socios')).toBe(false)
     expect(canViewRecurso(relation, 'financeiro')).toBe(false)
+    expect(canViewRecurso(relation, 'patrimonio')).toBe(false)
     // ...e mantém o público visível (comportamento existente preservado):
     expect(canViewRecurso(relation, 'loja')).toBe(true)
     expect(canViewRecurso(relation, 'comunidade')).toBe(true)

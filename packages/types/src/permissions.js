@@ -246,7 +246,7 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   // Diretoria / pessoas: home da área no portal (sem fila admin para membros)
   membros: { href: null, disponivel: false },
   financeiro: { href: '/portal/financeiro', disponivel: true },
-  patrimonio: { href: null, disponivel: false },
+  patrimonio: { href: '/portal/patrimonio', disponivel: true },
 })
 
 /**

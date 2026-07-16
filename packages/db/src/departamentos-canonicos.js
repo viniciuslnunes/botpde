@@ -403,127 +403,165 @@ async function fundirOuRenomearRole(client, tenantId, fromNome, toNome, departam
 }
 
 /**
+ * Executa tarefas em série (seguro em interactive transaction) ou em paralelo.
+ * @param {boolean} concurrent
+ * @param {Array<() => Promise<unknown>>} tasks
+ */
+async function runTasks(concurrent, tasks) {
+  if (concurrent) {
+    await Promise.all(tasks.map((task) => task()))
+    return
+  }
+  for (const task of tasks) await task()
+}
+
+/**
  * Upsert dos 10 departamentos canônicos no tenant. Idempotente.
  * Também remove departamentos legados socio/torcedor.
  *
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
  * @param {string} tenantId
+ * @param {{ concurrent?: boolean }} [opts] `concurrent: true` só fora de `$transaction`
  * @returns {Promise<{ upserted: number, removedLegacy: number }>}
  */
-export async function upsertDepartamentosCanonicos(client, tenantId) {
+export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) {
+  const concurrent = opts.concurrent === true
   const removed = await client.departamento.deleteMany({
     where: { tenantId, slug: { in: DEPARTAMENTOS_SLUGS_LEGADOS } },
   })
 
-  for (const rename of DEPARTAMENTO_RENAMES) {
-    const toSlug = slugifyDepartamento(rename.toNome)
-    const legado = await client.departamento.findFirst({
-      where: { tenantId, slug: rename.fromSlug },
-      select: { id: true },
+  // Fast-path: a maioria dos tenants não tem rename legado — 2 queries em vez de ~6+.
+  if (DEPARTAMENTO_RENAMES.length > 0) {
+    const fromSlugs = DEPARTAMENTO_RENAMES.map((r) => r.fromSlug)
+    const fromNomes = DEPARTAMENTO_RENAMES.flatMap((r) =>
+      [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR].map((papel) =>
+        nomePerfilDepartamento(r.fromNome, papel),
+      ),
+    )
+    // Sequencial: este helper também roda dentro de `$transaction` interativo.
+    const deptosLegados = await client.departamento.findMany({
+      where: { tenantId, slug: { in: fromSlugs } },
+      select: { id: true, slug: true },
     })
-    const destino = await client.departamento.findFirst({
-      where: { tenantId, slug: toSlug },
-      select: { id: true },
+    const rolesLegados = await client.role.findMany({
+      where: { tenantId, nome: { in: fromNomes } },
+      select: { id: true, nome: true },
     })
 
-    /** @type {string | null} */
-    let deptoId = destino?.id ?? legado?.id ?? null
+    if (deptosLegados.length > 0 || rolesLegados.length > 0) {
+      const legadoBySlug = new Map(deptosLegados.map((d) => [d.slug, d]))
+      const roleNomesLegados = new Set(rolesLegados.map((r) => r.nome))
 
-    if (legado) {
-      if (destino) {
-        deptoId = destino.id
-        await client.role.updateMany({
-          where: { tenantId, departamentoId: legado.id },
-          data: { departamentoId: destino.id },
+      for (const rename of DEPARTAMENTO_RENAMES) {
+        const toSlug = slugifyDepartamento(rename.toNome)
+        const legado = legadoBySlug.get(rename.fromSlug) ?? null
+        const destino = await client.departamento.findFirst({
+          where: { tenantId, slug: toSlug },
+          select: { id: true },
         })
-        const membrosLegado = await client.userDepartamento.findMany({
-          where: { tenantId, departamentoId: legado.id },
-          select: { id: true, userId: true },
-        })
-        for (const m of membrosLegado) {
-          const jaTem = await client.userDepartamento.findFirst({
-            where: { userId: m.userId, tenantId, departamentoId: destino.id },
-            select: { id: true },
-          })
-          if (jaTem) await client.userDepartamento.delete({ where: { id: m.id } })
-          else {
-            await client.userDepartamento.update({
-              where: { id: m.id },
+
+        /** @type {string | null} */
+        let deptoId = destino?.id ?? legado?.id ?? null
+
+        if (legado) {
+          if (destino) {
+            deptoId = destino.id
+            await client.role.updateMany({
+              where: { tenantId, departamentoId: legado.id },
               data: { departamentoId: destino.id },
             })
-          }
-        }
-        const gestoresLegado = await client.departamentoGestor.findMany({
-          where: { departamentoId: legado.id },
-          select: { id: true, userId: true },
-        })
-        for (const g of gestoresLegado) {
-          const jaTem = await client.departamentoGestor.findFirst({
-            where: { userId: g.userId, departamentoId: destino.id },
-            select: { id: true },
-          })
-          if (jaTem) await client.departamentoGestor.delete({ where: { id: g.id } })
-          else {
-            await client.departamentoGestor.update({
-              where: { id: g.id },
-              data: { departamentoId: destino.id },
+            const membrosLegado = await client.userDepartamento.findMany({
+              where: { tenantId, departamentoId: legado.id },
+              select: { id: true, userId: true },
             })
+            for (const m of membrosLegado) {
+              const jaTem = await client.userDepartamento.findFirst({
+                where: { userId: m.userId, tenantId, departamentoId: destino.id },
+                select: { id: true },
+              })
+              if (jaTem) await client.userDepartamento.delete({ where: { id: m.id } })
+              else {
+                await client.userDepartamento.update({
+                  where: { id: m.id },
+                  data: { departamentoId: destino.id },
+                })
+              }
+            }
+            const gestoresLegado = await client.departamentoGestor.findMany({
+              where: { departamentoId: legado.id },
+              select: { id: true, userId: true },
+            })
+            for (const g of gestoresLegado) {
+              const jaTem = await client.departamentoGestor.findFirst({
+                where: { userId: g.userId, departamentoId: destino.id },
+                select: { id: true },
+              })
+              if (jaTem) await client.departamentoGestor.delete({ where: { id: g.id } })
+              else {
+                await client.departamentoGestor.update({
+                  where: { id: g.id },
+                  data: { departamentoId: destino.id },
+                })
+              }
+            }
+            await client.departamento.delete({ where: { id: legado.id } })
+          } else {
+            await client.departamento.update({
+              where: { id: legado.id },
+              data: { nome: rename.toNome, slug: toSlug },
+            })
+            deptoId = legado.id
           }
         }
-        await client.departamento.delete({ where: { id: legado.id } })
-      } else {
-        await client.departamento.update({
-          where: { id: legado.id },
-          data: { nome: rename.toNome, slug: toSlug },
-        })
-        deptoId = legado.id
+
+        for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
+          const fromNome = nomePerfilDepartamento(rename.fromNome, papel)
+          if (!roleNomesLegados.has(fromNome)) continue
+          await fundirOuRenomearRole(
+            client,
+            tenantId,
+            fromNome,
+            nomePerfilDepartamento(rename.toNome, papel),
+            deptoId,
+          )
+        }
       }
     }
-
-    // Sempre funde nomes de perfil legado (também após falha parcial do seed)
-    for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
-      await fundirOuRenomearRole(
-        client,
-        tenantId,
-        nomePerfilDepartamento(rename.fromNome, papel),
-        nomePerfilDepartamento(rename.toNome, papel),
-        deptoId,
-      )
-    }
   }
 
-  let ordem = 0
-  for (const canonico of DEPARTAMENTOS_CANONICOS) {
-    const slug = slugifyDepartamento(canonico.nome)
-    const permissions = applyPermissionCascade([], canonico.permissions)
-    const permissionsGestor = applyPermissionCascade(
-      permissions,
-      [...permissions, ...canonico.permissionsGestor],
-    ).filter((p) => !permissions.includes(p))
+  await runTasks(
+    concurrent,
+    DEPARTAMENTOS_CANONICOS.map((canonico, ordem) => async () => {
+      const slug = slugifyDepartamento(canonico.nome)
+      const permissions = applyPermissionCascade([], canonico.permissions)
+      const permissionsGestor = applyPermissionCascade(
+        permissions,
+        [...permissions, ...canonico.permissionsGestor],
+      ).filter((p) => !permissions.includes(p))
 
-    await client.departamento.upsert({
-      where: { tenantId_slug: { tenantId, slug } },
-      create: {
-        tenantId,
-        nome: canonico.nome,
-        slug,
-        cor: canonico.cor,
-        moduloPortal: canonico.moduloPortal,
-        permissions,
-        permissionsGestor,
-        ordem,
-      },
-      update: {
-        nome: canonico.nome,
-        cor: canonico.cor,
-        moduloPortal: canonico.moduloPortal,
-        permissions,
-        permissionsGestor,
-        ordem,
-      },
-    })
-    ordem += 1
-  }
+      await client.departamento.upsert({
+        where: { tenantId_slug: { tenantId, slug } },
+        create: {
+          tenantId,
+          nome: canonico.nome,
+          slug,
+          cor: canonico.cor,
+          moduloPortal: canonico.moduloPortal,
+          permissions,
+          permissionsGestor,
+          ordem,
+        },
+        update: {
+          nome: canonico.nome,
+          cor: canonico.cor,
+          moduloPortal: canonico.moduloPortal,
+          permissions,
+          permissionsGestor,
+          ordem,
+        },
+      })
+    }),
+  )
 
   return {
     upserted: DEPARTAMENTOS_CANONICOS.length,
@@ -544,10 +582,11 @@ const SYSTEM_ROLE_DEFAULTS = {
  *
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
  * @param {string} tenantId
- * @param {{ incluirVice?: boolean }} [opts]
+ * @param {{ incluirVice?: boolean, concurrent?: boolean }} [opts]
  */
 export async function upsertPerfisDepartamentoCanonicos(client, tenantId, opts = {}) {
   const incluirVice = opts.incluirVice !== false
+  const concurrent = opts.concurrent === true
   const deptos = await client.departamento.findMany({
     where: { tenantId },
     select: {
@@ -563,34 +602,38 @@ export async function upsertPerfisDepartamentoCanonicos(client, tenantId, opts =
   const bySlug = new Map(deptos.map((d) => [d.slug, d]))
   const diretoria = bySlug.get('diretoria') ?? null
 
-  let perfisArea = 0
+  /** @type {Array<() => Promise<unknown>>} */
+  const perfilTasks = []
   for (const depto of deptos) {
     for (const papel of [PAPEL_DEPARTAMENTO.MEMBRO, PAPEL_DEPARTAMENTO.GESTOR]) {
       const nome = nomePerfilDepartamento(depto.nome, papel)
       const ordem = depto.ordem * 2 + (papel === PAPEL_DEPARTAMENTO.GESTOR ? 1 : 0) + 10
-      await client.role.upsert({
-        where: { tenantId_nome: { tenantId, nome } },
-        create: {
-          tenantId,
-          nome,
-          cor: depto.cor,
-          ordem,
-          isSystem: false,
-          permissions: [],
-          permissionsExtras: [],
-          departamentoId: depto.id,
-          papelNoDepartamento: papel,
-        },
-        update: {
-          cor: depto.cor,
-          ordem,
-          departamentoId: depto.id,
-          papelNoDepartamento: papel,
-        },
+      perfilTasks.push(async () => {
+        await client.role.upsert({
+          where: { tenantId_nome: { tenantId, nome } },
+          create: {
+            tenantId,
+            nome,
+            cor: depto.cor,
+            ordem,
+            isSystem: false,
+            permissions: [],
+            permissionsExtras: [],
+            departamentoId: depto.id,
+            papelNoDepartamento: papel,
+          },
+          update: {
+            cor: depto.cor,
+            ordem,
+            departamentoId: depto.id,
+            papelNoDepartamento: papel,
+          },
+        })
       })
-      perfisArea += 1
     }
   }
+  await runTasks(concurrent, perfilTasks)
+  const perfisArea = perfilTasks.length
 
   // Sistema: owner/admin/vice → Diretoria GESTOR; member → transversal
   const systemSpecs = [
@@ -628,36 +671,36 @@ export async function upsertPerfisDepartamentoCanonicos(client, tenantId, opts =
     },
   ]
 
-  let systemUpserted = 0
-  for (const spec of systemSpecs) {
-    if (spec.nome === SYSTEM_ROLES.VICE && !incluirVice) continue
-    await client.role.upsert({
-      where: { tenantId_nome: { tenantId, nome: spec.nome } },
-      create: {
-        tenantId,
-        nome: spec.nome,
-        isSystem: true,
-        cor: spec.cor,
-        ordem: spec.ordem,
-        permissions: spec.permissions,
-        permissionsExtras: spec.permissionsExtras,
-        departamentoId: spec.departamentoId,
-        papelNoDepartamento: spec.papelNoDepartamento,
-      },
-      update: {
-        isSystem: true,
-        cor: spec.cor,
-        ordem: spec.ordem,
-        permissions: spec.permissions,
-        permissionsExtras: spec.permissionsExtras,
-        departamentoId: spec.departamentoId,
-        papelNoDepartamento: spec.papelNoDepartamento,
-      },
+  const systemTasks = systemSpecs
+    .filter((spec) => !(spec.nome === SYSTEM_ROLES.VICE && !incluirVice))
+    .map((spec) => async () => {
+      await client.role.upsert({
+        where: { tenantId_nome: { tenantId, nome: spec.nome } },
+        create: {
+          tenantId,
+          nome: spec.nome,
+          isSystem: true,
+          cor: spec.cor,
+          ordem: spec.ordem,
+          permissions: spec.permissions,
+          permissionsExtras: spec.permissionsExtras,
+          departamentoId: spec.departamentoId,
+          papelNoDepartamento: spec.papelNoDepartamento,
+        },
+        update: {
+          isSystem: true,
+          cor: spec.cor,
+          ordem: spec.ordem,
+          permissions: spec.permissions,
+          permissionsExtras: spec.permissionsExtras,
+          departamentoId: spec.departamentoId,
+          papelNoDepartamento: spec.papelNoDepartamento,
+        },
+      })
     })
-    systemUpserted += 1
-  }
+  await runTasks(concurrent, systemTasks)
 
-  return { perfisArea, systemUpserted }
+  return { perfisArea, systemUpserted: systemTasks.length }
 }
 
 /**
@@ -746,10 +789,10 @@ export async function syncMembershipFromRoles(client, { userId, tenantId }) {
  *
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} client
  * @param {string} tenantId
- * @param {{ incluirVice?: boolean }} [opts]
+ * @param {{ incluirVice?: boolean, concurrent?: boolean }} [opts]
  */
 export async function bootstrapAcessoTenant(client, tenantId, opts = {}) {
-  const deptos = await upsertDepartamentosCanonicos(client, tenantId)
+  const deptos = await upsertDepartamentosCanonicos(client, tenantId, opts)
   const perfis = await upsertPerfisDepartamentoCanonicos(client, tenantId, opts)
   return { ...deptos, ...perfis }
 }

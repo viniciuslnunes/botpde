@@ -155,6 +155,7 @@ model Tenant {
   rivalTorcidaA     RivalidadeTorcida[]   @relation("RivalTorcidaA")
   rivalTorcidaB     RivalidadeTorcida[]   @relation("RivalTorcidaB")
   financeiroLancamentos FinanceiroLancamento[]
+  patrimonioItens       PatrimonioItem[]
 
   @@map("saas_tenants")
 }
@@ -229,6 +230,8 @@ model User {
   momentosStory               MomentoStory[]
   perfilTorcedor              PerfilTorcedor?
   financeiroLancamentosCriados FinanceiroLancamento[] @relation("FinanceiroLancamentoCriadoPor")
+  patrimonioItensCriados       PatrimonioItem[]       @relation("PatrimonioItemCriadoPor")
+  patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
 
   @@map("saas_users")
 }
@@ -1739,4 +1742,54 @@ enum CategoriaFinanceiroLancamento {
   PATRIMONIO
   DOACAO
   OUTROS
+}
+
+// ─── PATRIMÔNIO (inventário) ─────────────────────────────────────────────────
+// MVP: itens físicos da torcida (instrumentos, bandeirões, etc.).
+// Baixa = status BAIXADO (não apaga o histórico operacional).
+// Sensibilidade: RESTRITO — patrimony:view / patrimony:manage.
+
+model PatrimonioItem {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome         String
+  categoria    CategoriaPatrimonioItem
+  status       StatusPatrimonioItem @default(DISPONIVEL)
+  quantidade   Int                  @default(1)
+  localizacao  String?
+  /// Valor estimado unitário (opcional) — prestação de contas informal.
+  valorEstimado Decimal? @map("valor_estimado") @db.Decimal(12, 2)
+  observacao   String?
+
+  responsavelId String? @map("responsavel_id")
+  responsavel   User?   @relation("PatrimonioItemResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  criadoPorId  String   @map("criado_por_id")
+  criadoPor    User     @relation("PatrimonioItemCriadoPor", fields: [criadoPorId], references: [id])
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([tenantId, status])
+  @@index([tenantId, categoria])
+  @@index([tenantId, nome])
+  @@map("saas_patrimonio_itens")
+}
+
+enum CategoriaPatrimonioItem {
+  INSTRUMENTO
+  BANDEIRA
+  UNIFORME
+  MOBILIARIO
+  ELETRONICO
+  ESPACO
+  OUTROS
+}
+
+enum StatusPatrimonioItem {
+  DISPONIVEL
+  EM_USO
+  MANUTENCAO
+  BAIXADO
 }
