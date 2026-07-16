@@ -12,6 +12,7 @@ import {
   UserCog,
   UserPlus,
   UserX,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -35,6 +36,8 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   MEMBRO_APROVADO: UserCheck,
   MEMBRO_REPROVADO: UserX,
   MEMBRO_SOLICITADO: UserCog,
+  COBRANCA_PENDENTE: Wallet,
+  COBRANCA_VENCIDA: Wallet,
 }
 
 export interface NotificacaoAtorInfo {

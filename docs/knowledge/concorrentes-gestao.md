@@ -1,186 +1,470 @@
-# Base de conhecimento — Concorrentes de gestão para torcidas
+# Base de conhecimento — Gaps de funcionalidade vs. concorrentes
 
-> Benchmark de produtos SaaS que vendem **gestão de torcidas organizadas**
-> (ou associação genérica posicionada para o nicho). Alimenta
-> `product-strategy`, `research-dominio` e o plano em
+> Catálogo **atômico** do que TorcidaWeb, Softaliza, TorcidasPRO e Clube Control
+> oferecem (segundo landings oficiais) e o que o Torcida SaaS **não tem** ou tem
+> só parcial. Consulta **2026-07-16**. Plano derivado:
 > `docs/product/plano-paridade-concorrentes.md`.
 >
-> **Consulta:** 2026-07-16. **Confiança:** alta para o que está no site
-> (pricing, módulos listados); média/baixa para profundidade real de
-> implementação (marketing ≠ produto). Não é aconselhamento comercial.
+> **Legenda de status nosso:** `✗` ausente · `~` parcial · `✓` existe  
+> **Legenda concorrente:** `●` afirmam ter · `·` não aparece no material público  
+> **Confiança:** MKT = só marketing/site · OBS = observado em copy detalhada /
+> FAQ / planos. Não há acesso a demos internas — tratar `●` como *claim*, não
+> como auditoria de qualidade.
 
-## Escopo e método
+Fontes:
+- [TorcidaWeb](https://torcidaweb.com.br/) (TW)
+- [Softaliza apresenta](https://www.softaliza.com.br/apresenta) + [associações](https://www.softaliza.com.br/associacoes) + [blog torcidas](https://softaliza.com.br/blog/sistema-de-gestao-torcidas-organizadas) (SF)
+- [TorcidasPRO](https://torcidas.pro/) (TP)
+- [Clube Control / torcidas](https://clubecontrol.com.br/torcidas/) (CC)
 
-Fontes primárias (sites oficiais / landing):
-
-| Produto | URL | Posicionamento declarado |
-|---|---|---|
-| [TorcidaWeb](https://torcidaweb.com.br/) | torcidaweb.com.br | Gestão de membros para torcidas / clubes / grupos |
-| Softaliza | [blog torcidas](https://softaliza.com.br/blog/sistema-de-gestao-torcidas-organizadas) + [associações](https://www.softaliza.com.br/associacoes) | Plataforma de **associações** reposicionada para torcidas |
-| [TorcidasPRO](https://torcidas.pro/) | torcidas.pro | Gestão completa + loja + financeiro (+8 anos) |
-| [Clube Control](https://clubecontrol.com.br/torcidas/) | clubecontrol.com.br/torcidas | ERP operacional sede+portaria+eventos (31+ módulos) |
-
-Critério: o que o mercado **vende como obrigatório**, o que é **diferencial de
-marketing**, e o que **nenhum** resolve bem no domínio real de organizada
-(hierarquia sede/PDE, alianças, departamentos de bateria/caravanas, LGE,
-comunidade cross-tenant).
+Inventário as-is nosso: schema + permissões + `docs/data/modulo-*.md` + rotas
+portal/admin (auditoria de código 2026-07-16).
 
 ---
 
-## A) Matriz de value prop
+## 0. Resumo: o que eles têm e nós não (por volume)
 
-| | TorcidaWeb | Softaliza | TorcidasPRO | Clube Control |
-|---|---|---|---|---|
-| **Promessa** | Membros + carteirinha + pagamentos, preço justo | Transformação digital associativa (cobrança auto) | Sócios + loja + financeiro num lugar | Substituir planilhas + WhatsApp + catracas |
-| **Persona** | Diretoria de torcida média | Associação/sindicato (torcida = canal) | Torcida com loja e mensalidade | Torcida/escolinha/clube **com sede física** |
-| **Core** | Área do sócio, carteirinha, Pix/cartão | Régua de cobrança, portal, carteirinha QR, app WL | Dashboard, loja nativa, planos, carteirinha | 21–35 módulos: CRM→portaria→bar |
-| **Prova social** | Genérica (sem logos de torcida no site) | Cases **não-torcida** (ABRAPESP, LBE…) | Bravo 18/52, Facção Brasiliense, Jovem Garra, Metal Tricolor, Pavilhão 6, Sangue Azul | Depoimentos anônimos / escolinha / liga |
-| **Ângulo legal** | “Regularização jurídica / documentos” (vago) | LGPD + associação | Pouco explícito | Assembleia / auditoria / prestação de contas |
-| **Mobile** | Web | App nativo iOS/Android white-label | Web 100% | App/PWA add-on (+R$49) |
+| Domínio | Features atômicas onde ≥1 concorrente tem e nós `✗`/`~` | Concorrente dominante |
+|---|---:|---|
+| Cobrança & adimplência | ~18 | SF, CC, TW, TP |
+| Carteirinha & identidade do sócio | ~8 | SF, CC |
+| Planos / categorias de associado | ~6 | SF, TP, CC |
+| Portal do sócio (autoatendimento financeiro) | ~7 | SF, TP, TW |
+| Comunicação externa (e-mail/WhatsApp/push) | ~10 | SF, CC |
+| Documentos / PDF / biblioteca | ~8 | SF, CC, TW |
+| Assembleia / votação formal / disciplinar | ~9 | SF, CC |
+| Eventos pagos / bilheteria / check-in QR | ~10 | CC (SF eventos científicos) |
+| Portaria / sede física / day use / bar | ~20 | **só CC** |
+| CRM / leads / captação | ~5 | CC (SF inscrição pública) |
+| App / PWA / Wallet | ~5 | SF, CC |
+| Relatórios / dashboard financeiro | ~6 | SF, TP, CC |
+| Financeiro avançado (contas, conciliação) | ~6 | SF, CC, TP |
+| **Total aproximado de gaps atômicos** | **~110+** | — |
+
+Isso **não** significa “implementar 110 features”. Significa o mapa completo do
+mercado. Priorização em `plano-paridade-concorrentes.md`.
 
 ---
 
-## B) Precificação do mercado (2026-07-16)
+## 1. Membros, planos, carteirinha, compliance
 
-| Produto | Modelo | Faixa publicada | Nota |
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Cadastro de sócios | ● | ● | ● | ● | ✓ | |
+| Categorias / planos de sócio (ouro, pleno…) | · | ● | ● | ● | ✗ | SF: categorias + troca; TP: “planos de assinatura”; CC: planos+regras |
+| Valores e periodicidade por plano | · | ● | ● | ● | ✗ | |
+| Dependentes no cadastro | · | · | · | ● | ✗ | CC explícito |
+| Taxa de adesão | · | · | · | ● | ✗ | |
+| Aceite de estatuto no ingresso | · | · | · | ● | ✗ | |
+| Formulário de cadastro customizável | · | ● | · | · | ✗ | SF |
+| Campos LGE (CPF, RG, filiação, escolaridade, profissão, nascimento, foto) | · | ~ | · | ~ | ✗ | Mercado fala “cadastro completo”; LGE explícita é nosso ângulo — e ainda gap |
+| Ficha médica (sangue, alergias, emergência) | · | · | · | ● | ✗ | CC |
+| Portal / área do sócio | ● | ● | ● | ● | ~ | Temos portal; **não** centrado em financeiro/2ª via |
+| Sócio atualiza próprios dados | · | ● | · | ● | ~ | Parcial via perfil |
+| Status adimplente em tempo real | · | ● | ● | ● | ✗ | Table stake |
+| Histórico financeiro do sócio | · | ● | ● | ● | ✗ | |
+| 2ª via de boleto/cobrança | · | ● | ● | ● | ✗ | |
+| Carteirinha digital visual | ● | ● | ● | ● | ✓ | |
+| QR Code na carteirinha | · | ● | · | ● | ✗ | SF: QR de **adimplência**; CC: QR acesso |
+| Carteirinha liga status ao pagamento | · | ● | · | ● | ✗ | |
+| Editor visual de carteirinha (templates) | · | ● | · | · | ✗ | SF |
+| Apple Wallet / Google Wallet | · | ● | · | · | ✗ | SF |
+| Cartilhado / lote de carteirinhas | ● | · | · | · | ✗ | TW nomeia “Cartilhado Sócio” |
+| Importação de base (Excel/planilha) | · | ● | · | ● | ~ | Nós: MOCK ok; CSV “em breve” |
+| Migração assistida pelo fornecedor | · | ● | · | ● | ✗ | Comercial/ops, não produto |
+| Página pública de filiação/interesse | · | ● | · | ● | ~ | Onboarding torcedor ≠ CRM lead CC |
+| Desligamento estatutário auditado | · | · | · | ~ | ✗ | CC: suspensão; nós: decisão #10 |
+| Troca de categoria de sócio | · | ● | · | · | ✗ | |
+
+### Gaps nossos neste domínio (lista explícita)
+
+1. Planos/categorias de associação com preço e regras  
+2. Status adimplente/inadimplente  
+3. Histórico financeiro + 2ª via no portal  
+4. QR verificável + vínculo pagamento↔carteirinha  
+5. Wallet (Apple/Google)  
+6. Editor/templates de carteirinha  
+7. Dependentes  
+8. Ficha médica  
+9. Taxa de adesão + aceite de estatuto  
+10. Campos LGE completos  
+11. Formulário de cadastro customizável  
+12. Cartilhado em lote  
+13. Desligamento estatutário  
+14. CSV de importação ativo  
+
+---
+
+## 2. Cobrança, pagamentos, régua, conciliação
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Pagamento Pix (sócio → torcida) | ● | ● | ● | ● | ✗ | Table stake universal |
+| Boleto | · | ● | · | ● | ✗ | SF/CC |
+| Cartão de crédito | ● | ● | · | ● | ✗ | TW+SF+CC |
+| Cartão recorrente + retentativa | · | ● | · | · | ✗ | SF |
+| Pix recorrente | · | ● | · | · | ✗ | SF |
+| Cobrança internacional (USD) | · | ● | · | · | ✗ | SF (baixo valor p/ torcida BR) |
+| Geração automática de cobranças | · | ● | · | ● | ✗ | |
+| Baixa automática via webhook | · | ● | · | ● | ✗ | |
+| Régua pré-vencimento (D−3/−7/−15) | · | ● | · | ● | ✗ | SF detalha; CC WhatsApp D−3 |
+| Régua pós-vencimento | · | ● | · | ● | ✗ | |
+| Controle de inadimplência (lista/painel) | · | ● | ● | ● | ✗ | |
+| Cupons de desconto em anuidade | · | ● | · | · | ✗ | SF (nós temos cupom só na **loja**) |
+| Validação de comprovante manual (fila) | · | ● | · | · | ✗ | SF: aprovar/recusar transferência |
+| Conciliação bancária automática | · | ● | · | · | ✗ | SF |
+| Contas bancárias no sistema | · | · | · | ● | ✗ | CC |
+| Extrato / transferências entre contas | · | · | · | ● | ✗ | CC |
+| Cobrança só de adimplentes no pricing SaaS | ● | · | · | · | · | Modelo comercial TW |
+
+### Gaps nossos (explícitos)
+
+1. Qualquer gateway (Pix/boleto/cartão)  
+2. Entidade Cobrança/Contribuição  
+3. Recorrência e retentativa  
+4. Régua completa  
+5. Painel de inadimplência  
+6. Baixa automática  
+7. Fila de comprovantes manuais  
+8. Conciliação / multi-conta  
+9. Cupom em mensalidade (não só loja)  
+
+---
+
+## 3. Financeiro & relatórios
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Livro-caixa receitas/despesas | ● | ● | ● | ● | ✓ | |
+| Fluxo de caixa consolidado | · | ● | ● | ● | ~ | Saldo derivado; sem projeção |
+| Contas a pagar (AP) | · | · | ● | · | ✗ | TP destaca |
+| Dashboard arrecadação / novos sócios | · | ● | ● | ● | ~ | KPIs parciais; sem adimplência |
+| Relatório de inadimplência | · | ● | ● | ● | ✗ | |
+| Relatório membros / crescimento | · | ● | ● | ● | ~ | |
+| Export CSV/PDF financeiro | · | ● | · | ● | ✗ | |
+| Pacote prestação de contas assembleia | · | · | · | ● | ✗ | CC âncora “assembleia” |
+| Integração loja → financeiro auto | · | · | ● | · | ✗ | TP e-commerce nativo |
+| Fechamento financeiro de evento | · | · | · | ● | ✗ | CC |
+
+### Gaps nossos
+
+1. Contas a pagar  
+2. Relatório/painel de inadimplência  
+3. Export CSV/PDF  
+4. Pacote assembleia  
+5. Lançamento automático a partir de loja/evento/cobrança  
+6. Dashboard “saúde financeira” com adimplência %  
+
+---
+
+## 4. Loja / e-commerce
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Catálogo de produtos | · | · | ● | ~ | ✓ | CC tem bar/comanda (outro eixo) |
+| Sacola / checkout | · | · | ● | · | ✓ | |
+| Cupons loja | · | · | · | · | ✓ | |
+| Pedidos com status (pago/enviado) | · | · | ● | · | ✓ | |
+| Avaliações / visualizações produto | · | · | ● | · | ✗ | TP |
+| Gateway na loja | · | · | ● | · | ✗ | TP: sem take-rate sobre venda |
+| Frete / logística avançada | · | · | ~ | · | ✗ | |
+| Desconto loja só para adimplente | · | · | · | · | ✗ | Dor citada no blog SF |
+
+### Gaps nossos
+
+1. Gateway na loja  
+2. Avaliações de produto  
+3. Gate de benefício “só adimplente” (loja + caravana)  
+
+---
+
+## 5. Eventos, caravanas, bilheteria, check-in
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Calendário / agenda | ● | ● | · | ● | ✓ | Eventos + Partida parcial |
+| Eventos gerais + RSVP | · | ● | ~ | ● | ✓ | TP menciona eventos nos termos |
+| Tipos de evento custom | · | · | · | ● | ~ | Temos GERAL/CARAVANA/ENSAIO fixos |
+| Check-in por QR | · | ● | · | ● | ✗ | SF credenciamento; CC eventos |
+| Lista de presença / embarque | · | · | · | · | ✓ | Caravanas/bateria |
+| Planejamento de viagens / caravanas | ● | · | · | · | ~ | TW marketing; nós plugin sem pagamento |
+| Compra de ingressos em grupo | ● | · | · | · | ✗ | TW |
+| Bilheteria (presencial + online) | · | · | · | ● | ✗ | |
+| Categorias ingresso (VIP/meia/cortesia) | · | · | · | ● | ✗ | |
+| Caixa de bilheteria (abertura/fechamento) | · | · | · | ● | ✗ | |
+| Pagamento de vaga em caravana | · | · | · | · | ✗ | Nenhum detalha bem; dor nossa de domínio |
+| Ônibus / mapa de assentos | · | · | · | · | ✗ | |
+| Credenciamento científico / anais | · | ● | · | · | ✗ | SF (irrelevante p/ torcida) |
+| Certificados automáticos | · | ● | · | · | ✗ | SF Academy |
+
+### Gaps nossos (relevantes ao nicho)
+
+1. Check-in via QR (reusar carteirinha)  
+2. Bilheteria / ingressos pagos  
+3. Pagamento de vaga caravana  
+4. Ingressos em grupo / viagens (TW)  
+5. Fechamento financeiro do evento  
+6. Capacidade/lotação enforced  
+
+---
+
+## 6. Comunicação
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Comunicados / boletins internos | ● | ● | · | ● | ✓ | Announcement |
+| Notificações in-app | ● | ● | · | ● | ✓ | |
+| E-mail em massa / segmentado | · | ● | · | ● | ✗ | |
+| WhatsApp Business / templates | · | · | · | ● | ✗ | CC chat integrado |
+| Push mobile | · | ● | · | ● | ✗ | |
+| Régua: boas-vindas, vencimento, aniversário | · | ● | · | ● | ✗ | SF 10+ templates |
+| Disparo multi-canal (WA+email+push) | · | · | · | ● | ✗ | CC boletins |
+| Histórico de envios + taxa abertura | · | ● | · | · | ✗ | SF |
+| Login por WhatsApp | · | ● | · | · | ✗ | SF |
+| 2FA opcional | · | ● | · | · | ✗ | SF |
+| Reset de senha por e-mail | · | ● | ● | ● | ✗ | TP “recuperação”; nós ARCHITECTURE aberto |
+
+### Gaps nossos
+
+1. E-mail transacional e broadcast  
+2. WhatsApp API  
+3. Push / PWA  
+4. Aniversariantes  
+5. Templates de régua (além de cobrança)  
+6. Reset de senha  
+7. 2FA  
+
+---
+
+## 7. Documentos, geração, biblioteca, jurídico
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Controle de documentos / regularização jurídica | ● | ● | · | ● | ✗ | TW âncora marketing |
+| Biblioteca (atas, estatuto, regulamentos) | · | ● | · | ● | ✗ | SF segmenta por adimplência |
+| Versionamento documental | · | · | · | ● | ✗ | |
+| Geração: declaração de membro | · | ● | · | ● | ✗ | |
+| Geração: recibo de pagamento | · | ● | · | ● | ✗ | |
+| Geração: contratos / termos de adesão | · | · | · | ● | ✗ | |
+| Termos de responsabilidade | · | · | · | ● | ✗ | |
+| Comprovantes de pagamento ao sócio | · | ● | · | · | ✗ | |
+| Dossiê LGE export único | · | · | · | · | ✗ | **Ninguém vende isso** — oportunidade |
+
+### Gaps nossos
+
+1. Biblioteca documental  
+2. PDFs (recibo, declaração, termo)  
+3. Segmentação doc por adimplência  
+4. Dossiê LGE (diferencial nosso a construir)  
+
+---
+
+## 8. Governança: votações, ocorrências, metas
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| Enquetes informais | · | ● | · | ● | ✓ | Feed + Meet |
+| Eleição / votação com quórum | · | ● | · | ● | ✗ | SF: chapas, ata, sigilo auditável |
+| Voto secreto auditável | · | ● | · | ● | ✗ | |
+| Ata gerada automaticamente | · | ● | · | · | ✗ | SF |
+| Pesquisas de satisfação | · | · | · | ● | ✗ | |
+| Ocorrências / advertências com histórico | · | · | · | ● | ~ | Model bot; sem módulo web |
+| Suspensão auto (ex.: inadimplência) | · | · | · | ● | ✗ | |
+| Canal de denúncias disciplinar | · | · | · | ● | ~ | Denúncia social comunidade ≠ disciplinar |
+| Achados e perdidos | · | · | · | ● | ✗ | |
+| Metas / OKRs | · | · | · | ● | ✗ | |
+| Liberações (atestados, autorizações) | · | · | · | ● | ✗ | |
+
+### Gaps nossos
+
+1. Assembleia/eleição formal  
+2. Módulo disciplinar web completo  
+3. Suspensão ligada a inadimplência  
+4. Achados e perdidos / OKRs / liberações (baixo ROI salvo sede)  
+
+---
+
+## 9. Operação de sede física (quase exclusivo Clube Control)
+
+| Feature | TW | SF | TP | CC | Nós |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Portaria (validação entrada) | · | · | · | ● | ✗ |
+| Histórico de entradas/saídas | · | · | · | ● | ✗ |
+| Convidados com cota por plano | · | · | · | ● | ✗ |
+| Compra de convites extras | · | · | · | ● | ✗ |
+| Day use (visitante pagante) | · | · | · | ● | ✗ |
+| Portal do visitante | · | · | · | ● | ✗ |
+| Reservas de espaços/quadras | · | · | · | ● | ✗ |
+| Bar / comanda eletrônica | · | · | · | ● | ✗ |
+| Atividades / turmas / aulas | · | · | · | ● | ✗ |
+| Acesso inteligente (catraca/biometria/facial) | · | · | · | ● | ✗ |
+| Bloqueio físico de inadimplente | · | · | · | ● | ✗ |
+| Hospedagem / unidades | · | · | · | ● | ✗ |
+| Taxistas / transporte institucional | · | · | · | ● | ✗ |
+| Galeria / patrocinadores / site público | · | ● | · | ● | ~ | Branding básico; sem site institucional |
+
+**Quase todo este bloco é gap nosso vs CC apenas.** Relevância depende de ICP
+com sede movimentada — não é table stake de “gestão de torcida digital”.
+
+---
+
+## 10. CRM, IA, app, white-label, API
+
+| Feature | TW | SF | TP | CC | Nós | Notas |
+|---|:-:|:-:|:-:|:-:|:-:|---|
+| CRM leads + kanban | · | · | · | ● | ✗ | |
+| Formulário público de interesse | · | ● | · | ● | ~ | |
+| Relatório de conversão lead→sócio | · | · | · | ● | ✗ | |
+| Copiloto IA gestor | · | · | · | ● | ✗ | Add-on CC |
+| Copiloto IA secretaria (chat) | · | · | · | ● | ✗ | |
+| App nativo iOS/Android white-label | · | ● | · | ~ | ✗ | CC: PWA/app +R$49 |
+| Personalização cores/logo | ● | ● | ● | ● | ✓ | |
+| Domínio / ambiente dedicado | · | · | · | ● | ~ | Subdomínio preparado |
+| API REST | · | ● | · | · | ✗ | SF Premium; nós tRPC planejado |
+| Página de perfil pública da torcida | ● | · | · | · | ~ | |
+| Academy / cursos para sócios | · | ● | · | · | ✗ | SF |
+| Site institucional da associação | · | ● | · | ● | ✗ | |
+
+### Gaps nossos
+
+1. CRM kanban  
+2. App nativo / PWA  
+3. API pública  
+4. IA (baixa prioridade)  
+5. Academy/cursos (baixo fit)  
+6. Site institucional gerado  
+
+---
+
+## 11. O que NÓS temos e o mercado tipicamente não
+
+(Para não distorcer o estudo — gaps deles.)
+
+| Feature nossa | TW | SF | TP | CC |
+|---|:-:|:-:|:-:|:-:|
+| Hierarquia Sede → Subsede → PDE multi-tenant | · | · | · | · |
+| Visibilidade cross-tenant + alianças | · | · | · | · |
+| Rivalidade como bloqueio de visibilidade | · | · | · | · |
+| Departamentos canônicos (bateria, caravanas…) + RBAC | · | · | · | · |
+| Plugin caravanas / bateria operacional | · | · | · | · |
+| Comunidade / feed / stories / seguimento | · | · | · | · |
+| Comunidade nacional por afiliação | · | · | · | · |
+| DM + grupos + canais | · | · | · | · |
+| Meet / salas de vídeo (LiveKit) | · | · | · | · |
+| Notícias curadas + Sofascore widgets | · | · | · | · |
+| Patrimônio inventário (MVP) | · | · | · | ● |
+| Grafo alianças/rivalidades (knowledge) | · | · | · | · |
+
+---
+
+## 12. Ranking de gaps por impacto comercial (só o que falta)
+
+Critério: frequência no mercado × dor da diretoria × fit com ICP “organizada”
+(não escolinha/clube social).
+
+### P0 — Table stakes (sem isso perdemos demo de caixa)
+
+| # | Gap | Quem tem | Esforço relativo |
 |---|---|---|---|
-| **TorcidaWeb** | Faixa por **sócios adimplentes** | R$ 90 (≤150) → R$ 9.200 (≤20k); ~R$0,46–0,60/membro; trial 30d | Não cobra inadimplente/inativo — alinha incentivo à cobrança |
-| **Softaliza** | Assinatura associação | A partir de **R$ 297/mês** (site associações) | Não é pricing “por torcida”; pacote associativo |
-| **TorcidasPRO** | Faixa por **sócios ativos** | R$ 199 (≤200) → R$ 899 (≤2000); custom >2000 | Loja **sem taxa** sobre vendas (só gateway) |
-| **Clube Control** | **Preço fixo** (anti-volume) | Gestão R$ 350; G+O R$ 500; app +49; acesso/IA extras | Diferencial comercial forte vs. cobrança por cabeça; impl. R$1k |
+| 1 | Planos de associação + preço | SF TP CC | M |
+| 2 | Cobranças + status adimplente | todos | G |
+| 3 | Gateway Pix (+ boleto) | todos | G |
+| 4 | Baixa automática | SF CC TP? | M |
+| 5 | Carteirinha QR ↔ adimplência | SF CC | M |
+| 6 | Histórico financeiro + 2ª via no portal | SF TP CC | M |
+| 7 | Home do sócio = status financeiro | SF | P |
+| 8 | Campos LGE | (ângulo nosso) | M |
 
-**Implicação para nós:** o mercado ancora valor em **(1) cobrança de mensalidade
-que se paga sozinha** e **(2) carteirinha com status de adimplência**. Preço por
-membro vs fixo é decisão estratégica aberta — Clube Control ataca o medo de
-“crescer e pagar mais”; TorcidaWeb/TorcidasPRO monetizam escala.
+### P1 — Fecha o ciclo associativo
 
----
-
-## C) Table stakes vs diferenciais
-
-### Table stakes (todo concorrente sério promete)
-
-1. Cadastro de sócios + área do associado  
-2. Carteirinha digital (idealmente com QR de adimplência)  
-3. Cobrança Pix (± boleto/cartão) + baixa automática  
-4. Calendário / eventos básicos  
-5. Notificações (in-app ou push)  
-6. Painel financeiro / prestação de contas  
-7. Branding (cores/logo)  
-
-### Diferenciais reais observados
-
-| Diferencial | Quem lidera | Relevância p/ organizada |
+| # | Gap | Quem tem |
 |---|---|---|
-| Loja e-commerce nativa sem take-rate | TorcidasPRO | Alta (materiais, camisas) |
-| Régua de cobrança + carteirinha Wallet | Softaliza | Alta (caixa) |
-| Portaria / catracas / day use / bar / reservas sede | Clube Control | Alta **só se** a torcida tem sede com fluxo físico |
-| CRM de interessados + IA copiloto | Clube Control | Média (captação) |
-| Votações / eleições auditáveis | Softaliza / Clube Control | Alta (assembleia estatutária) |
-| Pricing fixo + white-label dedicado | Clube Control | Comercial |
-| Clientes torcida nomeados | TorcidasPRO | Credibilidade no nicho |
-| Viagens / ingressos em grupo (marketing) | TorcidaWeb | Alta se for real (site vago) |
+| 9 | Régua de cobrança (e-mail/in-app; WA depois) | SF CC |
+| 10 | Gateway na loja | TP |
+| 11 | Export CSV/PDF + relatório inadimplência | SF CC TP |
+| 12 | Loja/cobrança → lançamento financeiro | TP SF |
+| 13 | PDF recibo + declaração de membro | SF CC |
+| 14 | Biblioteca documental básica | SF CC TW |
+| 15 | Check-in evento/caravana via QR | CC SF |
+| 16 | Desligamento / disciplinar web | CC |
+| 17 | Gate benefício só adimplente (loja/caravana) | (dor SF blog) |
+| 18 | Reset de senha / e-mail transacional | SF TP |
+| 19 | Cupom em anuidade | SF |
+| 20 | Fila comprovante manual | SF |
 
-### O que o mercado **não** resolve (gaps estruturais)
+### P2 — Diferenciação de domínio / governança
 
-Confirmado por ausência em landings e por contraste com `docs/knowledge/`:
-
-| Gap | Por que importa |
-|---|---|
-| Hierarquia **Sede → Subsede → PDE** multi-tenant | Operação real de torcidas grandes (ver `estrutura-governanca.md`) |
-| **Alianças** e visibilidade cross-tenant | Cultura do movimento; blocos nacionais |
-| Departamentos operacionais (**bateria, caravanas**, materiais) como plugins de trabalho | Não é “evento genérico” — é logística + reputação |
-| **Comunidade** / feed / mobilização digital | Concorrentes são ERP de associação, não plataforma de presença |
-| Compliance **LGE 14.597/2023** explícita (campos obrigatórios, dossiê, desligamento auditado) | Argumento de venda central (`contexto-legal.md`) — sites falam “jurídico” sem mapear a lei |
-| Rivalidade como **bloqueio** de visibilidade (não glamour) | Só faz sentido com domínio de alianças |
-
-**Confiança:** alta para “não aparece no site”; média para “não implementam
-algo escondido” — validar em demos comerciais se necessário.
-
----
-
-## D) Fichas por concorrente
-
-### 1. TorcidaWeb
-
-- **Força:** pricing transparente + trial; mensagem “só adimplente”; stack
-  clássica de sócio (carteirinha, área, admin, agenda, Pix/cartão).
-- **Fraqueza:** feature list **idêntica** em todos os planos (só muda teto);
-  copy jurídica genérica; sem prova social de torcidas nomeadas; sem loja
-  destacada; sem operação de sede/portaria.
-- **Ameaça:** entrada barata (R$90) para torcidas pequenas — floor de preço.
-- **Oportunidade nossa:** superar em hierarquia, departamentos, caravanas
-  reais, LGE e comunidade — eles vendem “gestão de membros”, nós vendemos
-  **operação de organizada**.
-
-### 2. Softaliza
-
-- **Força:** maturidade associativa (régua, Wallet, app nativo, votações,
-  conciliação); métricas de marketing fortes (↓inadimplência); preço entrada
-  ~R$297.
-- **Fraqueza:** **não é produto de torcida** — blog de torcidas sem cases do
-  nicho; vocabulário de associação/sindicato; zero hierarquia territorial /
-  alianças / bateria.
-- **Ameaça:** se uma torcida “pensa como associação”, Softaliza ganha no
-  financeiro automatizado.
-- **Oportunidade nossa:** posicionar **domínio de organizada** (LGE +
-  caravanas + PDE) acima de “mais um ERP de associados”; aprender o playbook
-  de cobrança/carteirinha QR, sem copiar o DNA de sindicato.
-
-### 3. TorcidasPRO
-
-- **Força:** +8 anos no nicho; **loja** como produto; clientes reais
-  nomeados; personalização visual; pricing claro até 2k sócios.
-- **Fraqueza:** landing não detalha caravanas/portaria/assembleia; parece
-  forte em **sócio + caixa + e-commerce**, não em mobilização territorial.
-- **Ameaça:** concorrente direto de **loja + mensalidade**; prova social no
-  Centro-Oeste/Norte (Bravo, Facção, etc.).
-- **Oportunidade nossa:** loja já temos (sem gateway); combinar loja +
-  hierarquia + comunidade + caravanas é pacote que eles não articulam.
-  Gateway + adimplência na carteirinha fecha o gap comercial.
-
-### 4. Clube Control
-
-- **Força:** mapa de módulos mais completo do sample; **sede como negócio**
-  (reservas, day use, bar, portaria, catracas); WhatsApp; votações;
-  ocorrências; preço fixo; ROI story (−50% inadimplência); implementação
-  assistida.
-- **Fraqueza:** genérico “torcida / escolinha / academia / liga” — dilui
-  identidade; hardware (catracas) = complexidade e ticket; IA copiloto é
-  add-on; ainda sem alianças/PDE/comunidade de organizada.
-- **Ameaça:** se o ICP é torcida **com sede movimentada**, eles cobrem
-  operação física que nós não temos.
-- **Oportunidade nossa:** não competir em catraca no curto prazo; competir
-  em **identidade de organizada** + digital (comunidade, alianças, LGE).
-  Portaria/QR real entra depois, como camada de presença — não como ERP de
-  clube social.
-
----
-
-## E) Onde Torcida SaaS já ganha (as-is)
-
-Inventário cruzado com o código/docs (2026-07-16):
-
-| Capacidade | Nós | Mercado típico |
+| # | Gap | Quem tem |
 |---|---|---|
-| Multi-tenant Sede→Subsede→PDE + visibility | **Liderança** | Ausente |
-| Alianças / rivalidade (moderação + bloqueio) | **Liderança** | Ausente |
-| Departamentos (bateria, caravanas, …) + RBAC | **Liderança** | Evento genérico no máximo |
-| Comunidade / feed / Meet / mensagens | **Liderança** | Quase ausente |
-| Loja operacional (sem gateway) | Paridade parcial vs TorcidasPRO | TorcidasPRO à frente no pagamento |
-| Livro-caixa manual | Abaixo | Softaliza/Clube à frente |
-| Carteirinha | Abaixo (QR placeholder) | Todos à frente |
-| Cobrança / régua / Pix | **Ausente** | Table stake |
-| Portaria / catracas | Ausente | Só Clube Control |
-| Assembleia / votação formal | Ausente (só enquetes) | Softaliza/Clube |
-| Campos LGE completos | Gap conhecido | Pouco explícito em todos |
+| 21 | Pagamento de vaga caravana + lotação | (dor domínio; TW viagens) |
+| 22 | Assembleia / eleição com quórum e ata | SF CC |
+| 23 | Dossiê LGE export | ninguém |
+| 24 | PWA + Web Push | SF CC |
+| 25 | Contas a pagar | TP |
+| 26 | Aniversariantes | SF CC |
+| 27 | Importação CSV ativa + migração | SF CC |
+
+### P3 — Sede física / nice-to-have (só com ICP)
+
+Portaria, day use, convidados, bar, reservas, catracas, ficha médica,
+dependentes, CRM kanban, OKRs, achados e perdidos, IA, Academy, site
+institucional, Wallet, editor de carteirinha, API REST pública, avaliações
+loja, bilheteria completa, hospedagem.
 
 ---
 
-## F) Protocolo de atualização
+## 13. Por concorrente: catálogo do que eles afirmam e nós não cobrimos
 
-1. Revisitar landings a cada **trimestre** ou antes de decisão de pricing.  
-2. Marcar claims novos com data + URL; separar marketing de evidência.  
-3. Demais agentes **só leem** este arquivo; quem escreve:
-   `research-dominio` (+ `product-strategy` se fechar decisão de produto).  
-4. Plano acionável de produto: `docs/product/plano-paridade-concorrentes.md`.
+### TorcidaWeb — gaps vs nós
+Área do sócio financeira · Cartilhado · Pagamentos Pix/Cartão · Notificações
+(provável push/email) · Regularização jurídica/docs · Viagens · Ingressos em
+grupo · Arrecadação de fundos · Página de perfil personalizada (pública) ·
+Calendário (se mais rico que o nosso).
+
+**Confiança:** média-baixa — lista de features idêntica em todos os planos;
+pouco detalhe.
+
+### Softaliza — gaps vs nós
+Ciclo completo de cobrança (Pix/boleto/cartão/recorrência/retentativa/USD) ·
+Régua · Conciliação · Carteirinha editor + Wallet + QR adimplência ·
+Categorias/planos · Cupom anuidade · Fila comprovantes · Votações com quórum/
+ata · Biblioteca + timeline · E-mails segmentados · Templates automáticos ·
+Academy/cursos/certificados · App nativo WL · API REST · 2FA · Login WhatsApp ·
+Página filiação pública · Migração inclusa · Eventos científicos (ignorar).
+
+**Confiança:** alta no catálogo (página `/apresenta` muito detalhada); baixa
+relevância de módulos científicos/sindicato.
+
+### TorcidasPRO — gaps vs nós
+Planos de assinatura · Status pagamento em tempo real na listagem de sócios ·
+Painel do torcedor (faturas/carteirinha) · Contas a pagar · Dashboard
+arrecadação+e-commerce · Gateway loja sem take-rate · Avaliações/visualizações
+produto · Personalização (já parcial) · Recuperação de senha.
+
+**Confiança:** média — landing curta; +8 anos e clientes nomeados aumentam
+credibilidade do núcleo sócio+loja+financeiro.
+
+### Clube Control — gaps vs nós (além do table stake de caixa)
+**Gestão:** dependentes, taxa adesão, aceite estatuto, CRM kanban, ficha médica,
+WhatsApp chat, push, aniversariantes, boletins multi-canal, docs+geração,
+votações, ocorrências, achados e perdidos, metas/OKRs, relatórios ricos,
+institucional (galeria, patrocinadores, taxistas, site), contas bancárias.
+
+**Operação:** eventos com QR e fechamento $, bilheteria, convidados, day use,
+portaria, portal visitante, bar/comanda, reservas espaços, liberações,
+atividades/turmas.
+
+**Especializados:** catracas/biometria/facial, hospedagem, copiloto IA ×2, app.
+
+**Confiança:** alta no *mapa de módulos* (landing exaustiva); qualidade real
+não auditada.
+
+---
+
+## 14. Protocolo
+
+1. Atualizar esta matriz a cada trimestre ou pós-demo comercial.  
+2. Novos claims: data + URL + marcar MKT vs OBS.  
+3. Quem escreve: `research-dominio`. Priorização: `product-strategy` via
+   `plano-paridade-concorrentes.md`.  
+4. Nunca tratar módulo CC de sede como obrigatório sem ICP.

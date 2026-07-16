@@ -156,6 +156,8 @@ model Tenant {
   rivalTorcidaB     RivalidadeTorcida[]   @relation("RivalTorcidaB")
   financeiroLancamentos FinanceiroLancamento[]
   patrimonioItens       PatrimonioItem[]
+  planosAssociacao      PlanoAssociacao[]
+  cobrancasAssociacao   CobrancaAssociacao[]
 
   @@map("saas_tenants")
 }
@@ -232,6 +234,8 @@ model User {
   financeiroLancamentosCriados FinanceiroLancamento[] @relation("FinanceiroLancamentoCriadoPor")
   patrimonioItensCriados       PatrimonioItem[]       @relation("PatrimonioItemCriadoPor")
   patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
+  cobrancasAssociacao          CobrancaAssociacao[]
+  cobrancasAssociacaoCriadas   CobrancaAssociacao[]   @relation("CobrancaAssociacaoCriadoPor")
 
   @@map("saas_users")
 }
@@ -390,9 +394,29 @@ model SaasMembro {
   imagemProva     String?      @map("imagem_prova")
   status          StatusMembro @default(PENDENTE)
 
+  // Campos LGE (Lei 14.597/2023) — sensíveis; nunca em perfil público.
+  rg             String?
+  /// Somente dígitos; único por tenant quando preenchido.
+  cpf            String?
+  filiacao       String?
+  escolaridade   String?
+  profissao      String?
+  dataNascimento DateTime? @map("data_nascimento")
+
+  /// Plano de associação da torcida (não confundir com Tenant.plano SaaS).
+  planoAssociacaoId String?           @map("plano_associacao_id")
+  planoAssociacao   PlanoAssociacao?  @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
+  /// Espelho operacional: false se há cobrança vencida/pendente relevante.
+  adimplente Boolean @default(true)
+
   aprovadoPorId   String?   @map("aprovado_por_id")
   aprovadoPorNome String?   @map("aprovado_por_nome")
   aprovadoEm      DateTime? @map("aprovado_em")
+
+  // Desligamento estatutário (MEMBERS_DISMISS) — distinto de bloqueio.
+  desligadoEm     DateTime? @map("desligado_em")
+  desligadoMotivo String?   @map("desligado_motivo")
+  desligadoPorId  String?   @map("desligado_por_id")
 
   // Referência ao registro legado do bot (para migração gradual)
   discordId  String? @map("discord_id")
@@ -414,13 +438,17 @@ model SaasMembro {
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id])
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id])
+  cobrancas CobrancaAssociacao[]
 
   @@unique([tenantId, userId])
+  @@unique([tenantId, cpf])
   @@index([sedeId])
   @@index([importacaoId])
   @@index([tenantId, status])
+  @@index([tenantId, adimplente])
+  @@index([planoAssociacaoId])
   @@map("saas_membros")
 }
 
@@ -484,6 +512,9 @@ model SaasSocio {
   validade    DateTime
   criadoEm    DateTime @default(now()) @map("criado_em")
   discordId   String?  @map("discord_id")
+  /// Segredo opaco para QR verificável (HMAC com AUTH_SECRET).
+  qrToken     String?  @unique @map("qr_token")
+  qrEmitidoEm DateTime? @map("qr_emitido_em")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id])
@@ -491,6 +522,93 @@ model SaasSocio {
   @@unique([tenantId, numeroSocio])
   @@unique([tenantId, userId])
   @@map("saas_socios")
+}
+
+// ─── PLANOS DE ASSOCIAÇÃO + COBRANÇAS (não confundir com Tenant.plano SaaS) ───
+// Ver docs/product/plano-paridade-concorrentes.md Fase A.
+
+model PlanoAssociacao {
+  id            String                     @id @default(uuid())
+  tenantId      String                     @map("tenant_id")
+  nome          String
+  descricao     String?
+  /// Valor da contribuição periódica (sempre positivo).
+  valor         Decimal                    @db.Decimal(12, 2)
+  periodicidade PeriodicidadePlanoAssociacao @default(MENSAL)
+  beneficios    String?
+  ativo         Boolean                    @default(true)
+  criadoEm      DateTime                   @default(now()) @map("criado_em")
+  atualizadoEm  DateTime                   @updatedAt @map("atualizado_em")
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membros   SaasMembro[]
+  cobrancas CobrancaAssociacao[]
+
+  @@index([tenantId, ativo])
+  @@map("saas_planos_associacao")
+}
+
+enum PeriodicidadePlanoAssociacao {
+  MENSAL
+  TRIMESTRAL
+  ANUAL
+  UNICA
+}
+
+model CobrancaAssociacao {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+  membroId String? @map("membro_id")
+
+  planoAssociacaoId String? @map("plano_associacao_id")
+  tipo              TipoCobrancaAssociacao
+  descricao         String
+  valor             Decimal @db.Decimal(12, 2)
+  vencimento        DateTime
+  status            StatusCobrancaAssociacao @default(PENDENTE)
+  pagoEm            DateTime? @map("pago_em")
+  metodoPagamento   MetodoPagamentoCobranca? @map("metodo_pagamento")
+
+  pixCopiaCola      String? @map("pix_copia_cola")
+  gatewayProvider   String? @map("gateway_provider")
+  gatewayExternalId String? @map("gateway_external_id")
+
+  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
+
+  criadoPorId  String?  @map("criado_por_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membro          SaasMembro?      @relation(fields: [membroId], references: [id], onDelete: SetNull)
+  planoAssociacao PlanoAssociacao? @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
+  criadoPor       User?            @relation("CobrancaAssociacaoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, vencimento])
+  @@index([tenantId, userId])
+  @@index([membroId])
+  @@index([gatewayExternalId])
+  @@map("saas_cobrancas_associacao")
+}
+
+enum TipoCobrancaAssociacao {
+  MENSALIDADE
+  ADESAO
+  AVULSA
+}
+
+enum StatusCobrancaAssociacao {
+  PENDENTE
+  PAGA
+  CANCELADA
+  VENCIDA
+}
+
+enum MetodoPagamentoCobranca {
+  MANUAL
+  PIX
 }
 
 // ─── BLOQUEADOS ───────────────────────────────────────────────────────────────
@@ -1380,6 +1498,8 @@ enum TipoNotificacao {
   MEMBRO_APROVADO
   MEMBRO_REPROVADO
   MEMBRO_SOLICITADO
+  COBRANCA_PENDENTE
+  COBRANCA_VENCIDA
 }
 
 // ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────

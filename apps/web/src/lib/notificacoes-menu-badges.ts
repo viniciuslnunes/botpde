@@ -13,6 +13,7 @@ export const MENU_ID_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
   ALIANCA_REJEITADA: 'aliancas',
   ALIANCA_ENCERRADA: 'aliancas',
   ALIANCA_CANCELADA: 'aliancas',
+  COBRANCA_VENCIDA: 'cobrancas',
 }
 
 /** Menu do sidebar admin associado ao tipo, se houver badge operacional. */

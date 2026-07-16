@@ -16,7 +16,7 @@
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
 | [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital, limitações inscritos vs torcedores | `research-dominio`, `product-strategy`, `ux-review` |
-| [`concorrentes-gestao.md`](concorrentes-gestao.md) | Benchmark TorcidaWeb / Softaliza / TorcidasPRO / Clube Control (pricing, table stakes, gaps) | `research-dominio`, `product-strategy` |
+| [`concorrentes-gestao.md`](concorrentes-gestao.md) | **Catálogo atômico de gaps** vs TorcidaWeb / Softaliza / TorcidasPRO / Clube Control (~110+ features; matrizes por domínio + ranking P0–P3) | `research-dominio`, `product-strategy` |
 
 **Dados operacionais relacionados** (fora de `knowledge/`):
 

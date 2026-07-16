@@ -11,6 +11,9 @@ export const PERMISSIONS = /** @type {const} */ ({
   MEMBERS_WARN: 'members:warn',
   MEMBERS_BLOCK: 'members:block',
   MEMBERS_IMPORT: 'members:import',
+  /** Desligamento estatutário (LGE) — distinto de bloqueio. */
+  MEMBERS_DISMISS: 'members:dismiss',
+  MEMBERS_EXPORT_LGE: 'members:export_lge',
 
   // Loja
   STORE_VIEW_ORDERS: 'store:view_orders',
@@ -99,6 +102,8 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
       { key: PERMISSIONS.MEMBERS_REJECT, label: 'Reprovar membros' },
       { key: PERMISSIONS.MEMBERS_WARN, label: 'Advertir membros' },
       { key: PERMISSIONS.MEMBERS_BLOCK, label: 'Bloquear membros' },
+      { key: PERMISSIONS.MEMBERS_DISMISS, label: 'Desligar associado (estatutário)' },
+      { key: PERMISSIONS.MEMBERS_EXPORT_LGE, label: 'Exportar cadastro LGE (CSV)' },
       { key: PERMISSIONS.MEMBERS_IMPORT, label: 'Importar base de associados' },
     ],
   },

@@ -5,6 +5,7 @@ import { db } from '@torcida/db'
 import {
   AtualizarLancamentoSchema,
   CriarLancamentoSchema,
+  formatDataCompetenciaInput,
   parseDataCompetencia,
   PERMISSIONS,
 } from '@torcida/types'
@@ -168,4 +169,58 @@ export async function excluirLancamentoFinanceiro(lancamentoId: string): Promise
 
   revalidateFinanceiro()
   return { ok: true }
+}
+
+function csvEscape(val: string): string {
+  if (/[",\n\r]/.test(val)) return `"${val.replace(/"/g, '""')}"`
+  return val
+}
+
+export async function exportarLancamentosCsv(): Promise<
+  { ok: true; csv: string; filename: string } | { ok: false; error: string }
+> {
+  const { tenant } = await assertPermission(PERMISSIONS.FINANCE_MANAGE)
+
+  type Row = {
+    tipo: string
+    categoria: string
+    valor: unknown
+    descricao: string
+    data: Date
+    observacao: string | null
+    criadoPor: { nome: string | null }
+  }
+
+  const rows: Row[] = await db.financeiroLancamento.findMany({
+    where: { tenantId: tenant.id },
+    orderBy: [{ data: 'desc' }, { criadoEm: 'desc' }],
+    select: {
+      tipo: true,
+      categoria: true,
+      valor: true,
+      descricao: true,
+      data: true,
+      observacao: true,
+      criadoPor: { select: { nome: true } },
+    },
+  })
+
+  const header = 'data,tipo,categoria,valor,descricao,observacao,criadoPor'
+  const lines = rows.map((r) =>
+    [
+      formatDataCompetenciaInput(r.data),
+      r.tipo,
+      r.categoria,
+      Number(r.valor),
+      r.descricao,
+      r.observacao ?? '',
+      r.criadoPor.nome ?? '',
+    ]
+      .map((v) => csvEscape(String(v)))
+      .join(','),
+  )
+
+  const csv = [header, ...lines].join('\n')
+  const filename = `financeiro-${tenant.slug}-${new Date().toISOString().slice(0, 10)}.csv`
+  return { ok: true, csv, filename }
 }

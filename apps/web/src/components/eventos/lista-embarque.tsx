@@ -1,6 +1,7 @@
 'use client'
 
 import { CheckInButton } from '@/app/admin/eventos/[id]/checkin-button'
+import { CheckInPorQr } from '@/components/eventos/checkin-por-qr'
 import { UserCheck, UserX } from 'lucide-react'
 
 export type EmbarqueRow = {
@@ -27,7 +28,7 @@ export function ListaEmbarque({
   const recusados = itens.filter((i) => i.status === 'RECUSADO')
   const embarcados = confirmados.filter((i) => i.checkedInAt).length
 
-  if (itens.length === 0) {
+  if (itens.length === 0 && !podeGerir) {
     return (
       <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
         Ninguém respondeu ainda. Peça RSVP no detalhe ou compartilhe o link.
@@ -46,6 +47,14 @@ export function ListaEmbarque({
           {confirmados.length === 1 ? '' : 's'}
         </p>
       </div>
+
+      {podeGerir && <CheckInPorQr eventoId={eventoId} />}
+
+      {itens.length === 0 ? (
+        <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Ainda sem RSVPs — você já pode registrar check-in pelo QR.
+        </p>
+      ) : null}
 
       {confirmados.length > 0 && (
         <div>

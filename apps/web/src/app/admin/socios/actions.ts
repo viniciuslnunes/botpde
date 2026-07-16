@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { novoQrTokenSocio } from '@/lib/pix-gateway'
 import { PERMISSIONS } from '@torcida/types'
 
 // Carteirinha/sócio reaproveita MEMBERS_APPROVE — não existe permissão
@@ -35,6 +36,7 @@ export async function emitirCarteirinha(formData: FormData) {
     orderBy: { numeroSocio: 'desc' },
   })
   const proximoNumero = (ultimo?.numeroSocio ?? 0) + 1
+  const qrToken = novoQrTokenSocio()
 
   const socio = await db.saasSocio.create({
     data: {
@@ -43,6 +45,8 @@ export async function emitirCarteirinha(formData: FormData) {
       numeroSocio: proximoNumero,
       nome,
       validade,
+      qrToken,
+      qrEmitidoEm: new Date(),
     },
   })
 

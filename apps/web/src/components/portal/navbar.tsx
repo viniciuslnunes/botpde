@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   ChevronDown,
+  Home,
+  Wallet,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { useNavbarContext } from '@/lib/use-navbar-context'
@@ -28,8 +30,10 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 const navLinks = [
+  { href: '/portal', label: 'Início', icon: Home, prefetch: 'hover' as const },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
+  { href: '/portal/cobrancas', label: 'Mensalidades', icon: Wallet, prefetch: 'hover' as const },
   { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: 'hover' as const },
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: 'hover' as const },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
@@ -68,11 +72,15 @@ export function PortalNavbar({
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
   const baseLinks = modoNacional
-    ? navLinks.filter((link) => link.href !== '/portal/carteirinha')
+    ? navLinks.filter(
+        (link) =>
+          link.href !== '/portal/carteirinha' && link.href !== '/portal/cobrancas',
+      )
     : navLinks
   const links = temDepartamentos ? [...baseLinks, departamentosLink] : [...baseLinks]
 
   function isActive(href: string) {
+    if (href === '/portal') return pathname === '/portal'
     return pathname.startsWith(href)
   }
 
@@ -99,7 +107,7 @@ export function PortalNavbar({
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
         <div className="app-container flex h-14 items-center gap-4">
 
-          <PortalNavLink href="/portal/comunidade" className="flex shrink-0 items-center gap-2" showSpinner={false}>
+          <PortalNavLink href="/portal" className="flex shrink-0 items-center gap-2" showSpinner={false}>
             {tenant.logoUrl ? (
               canOptimizeImageUrl(tenant.logoUrl) ? (
                 <Image

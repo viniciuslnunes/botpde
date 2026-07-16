@@ -18,6 +18,7 @@ import {
 } from '@/components/financeiro/financeiro-lancamentos-lista'
 import { FinanceiroResumoCards } from '@/components/financeiro/financeiro-resumo-cards'
 import { FinanceiroFiltros } from '@/components/financeiro/financeiro-filtros'
+import { ExportarFinanceiroButton } from '@/components/financeiro/exportar-financeiro-button'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -69,12 +70,15 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
               </p>
             </div>
           </div>
-          <Link
-            href="/portal/financeiro"
-            className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
-          >
-            Ver no portal
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportarFinanceiroButton />
+            <Link
+              href="/portal/financeiro"
+              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            >
+              Ver no portal
+            </Link>
+          </div>
         </div>
       </MotionReveal>
 

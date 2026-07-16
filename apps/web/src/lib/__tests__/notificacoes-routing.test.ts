@@ -69,6 +69,7 @@ describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
     expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('membros')
     expect(menuIdParaTipo('DENUNCIA_NOVA')).toBe('comunidade-moderacao')
     expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
+    expect(menuIdParaTipo('COBRANCA_VENCIDA')).toBe('cobrancas')
     expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
     expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
   })

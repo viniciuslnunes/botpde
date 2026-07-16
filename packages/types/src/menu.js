@@ -101,6 +101,20 @@ export const ADMIN_MENU = /** @type {const} */ ([
     secao: 'financeiro',
   },
   {
+    id: 'planos-associacao',
+    label: 'Planos de sócio',
+    href: '/admin/planos-associacao',
+    permissao: PERMISSIONS.FINANCE_MANAGE,
+    secao: 'financeiro',
+  },
+  {
+    id: 'cobrancas',
+    label: 'Cobranças',
+    href: '/admin/cobrancas',
+    permissao: PERMISSIONS.FINANCE_MANAGE,
+    secao: 'financeiro',
+  },
+  {
     id: 'patrimonio',
     label: 'Patrimônio',
     href: '/admin/patrimonio',

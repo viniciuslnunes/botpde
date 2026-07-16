@@ -188,6 +188,72 @@ export async function registrarCheckIn(eventoId: string, userId: string) {
   revalidateEventoPaths(eventoId, evento.tipo)
 }
 
+/**
+ * Check-in via QR da carteirinha (mesmo token de `/carteirinha/validar`).
+ * Exige carteirinha válida + adimplente; faz upsert de RSVP CONFIRMADO.
+ */
+export async function registrarCheckInPorQr(
+  eventoId: string,
+  payloadRaw: string,
+): Promise<{ ok: true; nome: string } | { ok: false; error: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+
+  const payload = payloadRaw.includes('t=')
+    ? (new URL(payloadRaw, 'https://local.invalid').searchParams.get('t') ?? payloadRaw)
+    : payloadRaw
+
+  const { validarCarteirinhaPorPayload } = await import('@/lib/carteirinha-qr')
+  const validacao = await validarCarteirinhaPorPayload(payload)
+  if (!validacao.ok) {
+    return { ok: false, error: validacao.motivo ?? 'QR inválido' }
+  }
+
+  type SocioLite = { userId: string; nome: string; tenantId: string }
+  const { parsePayloadQr } = await import('@/lib/carteirinha-qr')
+  const token = parsePayloadQr(payload)
+  if (!token) return { ok: false, error: 'QR inválido' }
+
+  const socio: SocioLite | null = await db.saasSocio.findFirst({
+    where: { qrToken: token, tenantId: tenant.id },
+    select: { userId: true, nome: true, tenantId: true },
+  })
+  if (!socio) return { ok: false, error: 'Carteirinha de outra torcida' }
+
+  const evento: { tenantId: string; tipo: string } | null = await db.evento.findUnique({
+    where: { id: eventoId },
+    select: { tenantId: true, tipo: true },
+  })
+  if (!evento || evento.tenantId !== tenant.id) {
+    return { ok: false, error: 'Evento não encontrado' }
+  }
+
+  await db.eventoRsvp.upsert({
+    where: { eventoId_userId: { eventoId, userId: socio.userId } },
+    update: { checkedInAt: new Date(), checkedInPorId: session.user.id, status: 'CONFIRMADO' },
+    create: {
+      eventoId,
+      userId: socio.userId,
+      status: 'CONFIRMADO',
+      checkedInAt: new Date(),
+      checkedInPorId: session.user.id,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_CHECKIN_QR',
+      entidade: 'EventoRsvp',
+      entidadeId: eventoId,
+      detalhes: { userId: socio.userId, nome: socio.nome },
+    },
+  })
+
+  revalidateEventoPaths(eventoId, evento.tipo)
+  return { ok: true, nome: socio.nome }
+}
+
 export async function excluirEvento(eventoId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 

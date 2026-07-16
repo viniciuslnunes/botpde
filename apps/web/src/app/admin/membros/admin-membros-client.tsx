@@ -122,7 +122,12 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                       </div>
                     )}
                     <div>
-                      <p className="font-medium text-[rgb(var(--foreground))]">{membro.nome}</p>
+                      <Link
+                        href={`/admin/membros/${membro.id}`}
+                        className="font-medium text-[rgb(var(--foreground))] hover:text-[rgb(var(--primary))] hover:underline"
+                      >
+                        {membro.nome}
+                      </Link>
                       {membro.discordTag && (
                         <p className="text-xs text-[rgb(var(--foreground-muted))]">{membro.discordTag}</p>
                       )}

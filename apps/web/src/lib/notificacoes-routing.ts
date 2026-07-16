@@ -43,6 +43,12 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissoesAdminOr: [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
     menuId: 'membros',
   },
+  COBRANCA_PENDENTE: { escopo: 'hibrido' },
+  COBRANCA_VENCIDA: {
+    escopo: 'hibrido',
+    permissaoAdmin: PERMISSIONS.FINANCE_MANAGE,
+    menuId: 'cobrancas',
+  },
   DENUNCIA_NOVA: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],

@@ -6,6 +6,7 @@ import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { tenantsAreRivais } from '@/lib/hierarquia'
 import { AdminMembrosTable, AdminMembrosTabs } from './admin-membros-client'
+import { ExportarLgeButton } from './exportar-lge-button'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membros — Admin' }
@@ -204,13 +205,14 @@ export default async function MembrosPage({
       {/* Cabeçalho */}
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
         <div className="app-container">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Membros</h1>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 {total} {total === 1 ? 'resultado' : 'resultados'}
               </p>
             </div>
+            <ExportarLgeButton />
           </div>
 
         <AdminMembrosTabs

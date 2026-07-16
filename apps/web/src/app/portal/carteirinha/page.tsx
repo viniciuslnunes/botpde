@@ -3,9 +3,11 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, ArrowRight, CheckCircle2, Clock } from 'lucide-react'
+import { CreditCard, ArrowRight, CheckCircle2, Clock, QrCode } from 'lucide-react'
 import { CarteirinhaValidadeAlerts } from '@/components/portal/carteirinha-validade-alerts'
 import { CarteirinhaReveal } from '@/components/portal/carteirinha-motion'
+import { CarteirinhaQrPanel } from '@/components/portal/carteirinha-qr-panel'
+import { garantirQrTokenSocio, montarPayloadQr } from '@/lib/carteirinha-qr'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha Carteirinha' }
@@ -146,6 +148,9 @@ export default async function CarteirinhaPage() {
   if (!socio) return null
 
   const vencida = isVencida(socio.validade)
+  const qrToken = await garantirQrTokenSocio(socio.id, tenant!.id)
+  const qrPayload = montarPayloadQr(qrToken)
+  const validarUrl = `/carteirinha/validar?t=${encodeURIComponent(qrPayload)}`
 
   return (
     <div className="space-y-6">
@@ -226,13 +231,9 @@ export default async function CarteirinhaPage() {
                 {socio.validade.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
               </p>
             </div>
-            {/* Placeholder QR */}
-            <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
-              <div className={`grid grid-cols-3 gap-[2px] ${textoBranco ? 'text-white/60' : 'text-black/50'}`}>
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div key={i} className={`h-2.5 w-2.5 rounded-[1px] ${[0,2,4,6,8].includes(i) ? (textoBranco ? 'bg-white/70' : 'bg-black/60') : ''}`} />
-                ))}
-              </div>
+            {/* Indicador de QR — painel completo abaixo (sem API externa) */}
+            <div className={`rounded-lg p-2 ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
+              <QrCode className={`h-8 w-8 ${textoBranco ? 'text-white' : 'text-black'}`} />
             </div>
           </div>
         </div>
@@ -244,6 +245,10 @@ export default async function CarteirinhaPage() {
       </CarteirinhaReveal>
 
       <CarteirinhaReveal index={3}>
+      <CarteirinhaQrPanel validarUrl={validarUrl} qrPayload={qrPayload} />
+      </CarteirinhaReveal>
+
+      <CarteirinhaReveal index={4}>
       <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] divide-y divide-[rgb(var(--border))]">
         {[
           { label: 'Nome', value: socio.nome },
@@ -259,7 +264,7 @@ export default async function CarteirinhaPage() {
       </div>
       </CarteirinhaReveal>
 
-      <CarteirinhaReveal index={4}>
+      <CarteirinhaReveal index={5}>
       <Link
         href="/portal"
         className="flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
