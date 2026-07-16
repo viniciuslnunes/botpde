@@ -820,34 +820,36 @@ function PassoUnidade({
   }
 
   return (
-    <div>
+    <div className="pb-20">
       <BotaoVoltar onClick={onVoltar} disabled={pending || enviando} />
-      <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+      <h1 className="text-xl font-bold text-balance text-[rgb(var(--foreground))] sm:text-2xl">
         Onde você participa na {torcida.nome}?
       </h1>
-      <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Informe a subsede ou ponto de encontro da sua região. Isso ajuda a mapear a estrutura
-        territorial da torcida com dados precisos.
-      </p>
-      {regiaoLabel && (
-        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-          Sua região informada: <span className="font-medium text-[rgb(var(--foreground))]">{regiaoLabel}</span>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">
+          Escolha a sede, subsede ou PDE da sua região.
         </p>
-      )}
+        {regiaoLabel && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground))]">
+            <MapPin className="h-3 w-3 text-[rgb(var(--color-primary))]" aria-hidden />
+            {regiaoLabel}
+          </span>
+        )}
+      </div>
 
       {!temUnidades ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Ainda não há subsedes ou pontos de encontro cadastrados para esta torcida na plataforma.
+        <div className="mt-4 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Ainda não há unidades cadastradas para esta torcida. Solicite o cadastro abaixo.
         </div>
       ) : (
-        <div className="mt-6 space-y-6">
+        <div className="mt-4 space-y-4">
           {recomendadas.length > 0 && (
             <ListaUnidades
-              titulo="Recomendadas para você"
-              subtitulo="Subsedes e pontos de encontro próximos da sua região, com a sede principal ao final"
+              titulo="Recomendadas"
               sedes={recomendadas}
               selecionada={selecionada}
               onSelecionar={selecionarUnidade}
+              priorityCount={3}
             />
           )}
           {outras.length > 0 && (
@@ -861,28 +863,12 @@ function PassoUnidade({
         </div>
       )}
 
-      {selecionada && !modoNaoListada && (
-        <div className="mt-6">
-          <BotaoPrimario onClick={avancarComUnidade} pending={pending} label="Continuar" />
-        </div>
-      )}
-
-      <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))]/60 p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
-            <FileText className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-              Unidade afiliada não listada
-            </p>
-            <p className="mt-1 max-w-2xl text-xs text-[rgb(var(--foreground-muted))]">
-              Envie dados, contato e provas de credenciamento da subsede ou PDE. A solicitação será
-              registrada e um e-mail será preparado para avaliação do time.
-            </p>
-          </div>
-        </div>
-        {!modoNaoListada ? (
+      {/* Ação secundária sempre visível perto da lista — sem card grande até expandir */}
+      {!modoNaoListada ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            Não encontrou sua unidade?
+          </p>
           <button
             type="button"
             onClick={() => {
@@ -890,14 +876,42 @@ function PassoUnidade({
               setSelecionada(null)
               onErro(null)
             }}
-            className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
           >
-            <Mail className="h-4 w-4" />
-            Solicitar cadastro de unidade afiliada
+            <Mail className="h-3.5 w-3.5" />
+            Solicitar cadastro
           </button>
-        ) : (
-          <div className="mt-5 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                  Solicitar cadastro de unidade
+                </p>
+                <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                  Dados, contato e provas de credenciamento — enviamos para avaliação.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setModoNaoListada(false)
+                onErro(null)
+              }}
+              className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Campo label="Nome da unidade" obrigatorio erros={errosUnidade.nomeUnidade}>
                 <Input
                   value={nomeUnidade}
@@ -916,7 +930,7 @@ function PassoUnidade({
               </Campo>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-[1fr_96px]">
+            <div className="grid gap-3 sm:grid-cols-[1fr_96px]">
               <Campo label="Cidade" obrigatorio erros={errosUnidade.cidade}>
                 <Input
                   value={cidadeUnidade}
@@ -941,7 +955,7 @@ function PassoUnidade({
               />
             </Campo>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Campo label="Seu nome" obrigatorio erros={errosUnidade.contatoNome}>
                 <Input
                   value={contatoNome}
@@ -967,37 +981,37 @@ function PassoUnidade({
               </Campo>
             </div>
 
-            <Campo label="Como comprova que é subsede/PDE credenciado?" obrigatorio erros={errosUnidade.vinculo}>
+            <Campo label="Como comprova o credenciamento?" obrigatorio erros={errosUnidade.vinculo}>
               <textarea
                 value={vinculo}
                 onChange={(e) => setVinculo(e.target.value)}
-                rows={4}
-                placeholder="Ex: vínculo com diretoria da sede, responsável local, redes oficiais, autorização, reuniões, faixas, carteirinhas ou comunicados."
+                rows={3}
+                placeholder="Ex: vínculo com diretoria, responsável local, redes oficiais, autorização…"
                 className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
               />
             </Campo>
 
-            <Campo label="Observações adicionais" erros={errosUnidade.observacao}>
+            <Campo label="Observações" erros={errosUnidade.observacao}>
               <textarea
                 value={observacao}
                 onChange={(e) => setObservacao(e.target.value)}
-                rows={3}
-                placeholder="Ex: horários de reunião, redes sociais, contato da liderança local..."
+                rows={2}
+                placeholder="Horários, redes sociais, contato da liderança…"
                 className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
               />
             </Campo>
 
             <div>
               <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                Imagens, registros e provas (até 5)
+                Provas (até 5 imagens)
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <label
                   htmlFor="unidade-provas-upload"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
                 >
                   {uploadProvaPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Anexar imagem
+                  Anexar
                 </label>
                 <input
                   id="unidade-provas-upload"
@@ -1012,16 +1026,16 @@ function PassoUnidade({
                 />
                 {provasUrls.length > 0 && (
                   <span className="text-xs text-emerald-600">
-                    {provasUrls.length} imagem(ns) anexada(s)
+                    {provasUrls.length} anexada(s)
                   </span>
                 )}
               </div>
               {provasUrls.length > 0 && (
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
                   {provasUrls.map((url, index) => (
                     <li
                       key={url}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-[rgb(var(--border))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
                     >
                       <span className="truncate">Prova {index + 1}</span>
                       <button
@@ -1030,7 +1044,7 @@ function PassoUnidade({
                         className="text-[rgb(var(--foreground-muted))] hover:text-red-500"
                         aria-label={`Remover prova ${index + 1}`}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </li>
                   ))}
@@ -1039,8 +1053,8 @@ function PassoUnidade({
             </div>
 
             <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-              Ao continuar, registramos a solicitação e abrimos um e-mail para os super admins com
-              os dados, contato e links das provas anexadas.
+              Registramos a solicitação e abrimos um e-mail para os super admins com os dados e
+              links das provas.
             </p>
             <BotaoPrimario
               onClick={avancarSemListagem}
@@ -1049,40 +1063,54 @@ function PassoUnidade({
               label="Enviar para avaliação"
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* CTA sticky: Continuar permanece no viewport após a seleção */}
+      {selecionada && !modoNaoListada && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[rgb(var(--border))] bg-[rgb(var(--background))]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
+          <div className="app-container flex items-center justify-between gap-3 py-3">
+            <p className="min-w-0 truncate text-xs text-[rgb(var(--foreground-muted))] sm:text-sm">
+              Unidade selecionada — avance para o vínculo.
+            </p>
+            <BotaoPrimario onClick={avancarComUnidade} pending={pending} label="Continuar" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function ListaUnidades({
   titulo,
-  subtitulo,
   sedes,
   selecionada,
   onSelecionar,
+  priorityCount = 0,
 }: {
   titulo: string
-  subtitulo?: string
   sedes: SedeOnboarding[]
   selecionada: string | null
   onSelecionar: (id: string) => void
+  /** Quantas imagens priorizar (LCP) no topo da lista. */
+  priorityCount?: number
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         {titulo}
+        <span className="ml-1.5 font-normal tabular-nums text-[rgb(var(--foreground-muted))]/80">
+          ({sedes.length})
+        </span>
       </p>
-      {subtitulo && (
-        <p className="mb-3 text-[10px] text-[rgb(var(--foreground-muted))]">{subtitulo}</p>
-      )}
-      <ul className={sedes.length === 1 ? 'grid gap-4' : 'grid gap-4 xl:grid-cols-2'}>
-        {sedes.map((s) => (
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {sedes.map((s, index) => (
           <li key={s.id}>
             <UnidadeOnboardingCard
               sede={s}
               selecionada={selecionada === s.id}
               onSelecionar={onSelecionar}
+              priority={index < priorityCount}
             />
           </li>
         ))}

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeftToLine,
   Loader2,
+  Maximize2,
   MessageSquare,
+  Minimize2,
   Users,
   Video,
   X,
@@ -30,6 +32,9 @@ type SalaPopoutClientProps = {
 
 const CHROME_IDLE_MS = 2000
 
+const panelGlass =
+  'border border-white/15 bg-zinc-950/25 shadow-2xl backdrop-blur-xl'
+
 export function SalaPopoutClient({
   salaId,
   titulo,
@@ -47,10 +52,11 @@ export function SalaPopoutClient({
   const [participantStripVisible, setParticipantStripVisible] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
-  const [onlineCount, setOnlineCount] = useState(initialParticipantes.length)
   const [chromeVisible, setChromeVisible] = useState(true)
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false)
   const idleTimerRef = useRef<number | null>(null)
   const panelHoverRef = useRef(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   const participantProfiles = Object.fromEntries(
     initialParticipantes.map((participante) => [
@@ -82,6 +88,29 @@ export function SalaPopoutClient({
     }
   }, [salaId])
 
+  const alternarFullscreen = useCallback(async () => {
+    const node = rootRef.current
+    if (!node) return
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await node.requestFullscreen()
+      }
+    } catch {
+      // Navegador pode bloquear fullscreen sem gesto do usuário — o clique já é o gesto.
+    }
+    revelarChrome()
+  }, [revelarChrome])
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      setIsBrowserFullscreen(Boolean(document.fullscreenElement))
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
   useEffect(() => {
     document.title = `${titulo} — vídeo`
     window.addEventListener('beforeunload', notificarFechamento)
@@ -104,6 +133,7 @@ export function SalaPopoutClient({
       }
       revelarChrome()
       if (event.key === 'Escape') {
+        if (document.fullscreenElement) return
         event.preventDefault()
         if (commentsOpen || membersOpen) {
           setCommentsOpen(false)
@@ -111,6 +141,11 @@ export function SalaPopoutClient({
           return
         }
         voltarParaSala()
+        return
+      }
+      if (event.key === 'f' || event.key === 'F') {
+        event.preventDefault()
+        void alternarFullscreen()
         return
       }
       if (event.key.toLowerCase() === 'c') {
@@ -131,15 +166,22 @@ export function SalaPopoutClient({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [voltarParaSala, revelarChrome, commentsOpen, membersOpen])
+  }, [voltarParaSala, revelarChrome, commentsOpen, membersOpen, alternarFullscreen])
+
+  const dockBtn = (active: boolean) =>
+    `inline-flex h-10 w-10 items-center justify-center rounded-xl transition ${
+      active
+        ? 'bg-[rgb(var(--color-primary))] text-white'
+        : 'bg-white/10 text-white hover:bg-white/18'
+    }`
 
   return (
     <div
+      ref={rootRef}
       className="relative h-dvh min-h-0 overflow-hidden bg-black text-white"
       onMouseMove={revelarChrome}
       onTouchStart={revelarChrome}
     >
-      {/* Vídeo em tela cheia — único plano visual */}
       <div className="absolute inset-0">
         <MeetRoom
           salaId={salaId}
@@ -159,73 +201,62 @@ export function SalaPopoutClient({
             setParticipantStripVisible((visible) => !visible)
             revelarChrome()
           }}
-          onOnlineCountChange={setOnlineCount}
           onLeaveCall={voltarParaSala}
         />
       </div>
 
-      {/* Chrome flutuante — some com o mouse parado */}
+      {/* Menu vertical à direita do vídeo */}
       <div
-        className={`pointer-events-none absolute inset-x-0 top-0 z-50 p-3 transition-all duration-200 ${
-          chromeVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+        className={`pointer-events-none absolute inset-y-0 right-0 z-50 flex items-center pr-3 transition-all duration-200 ${
+          chromeVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-2 opacity-0'
         }`}
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
       >
         <div
-          className={`pointer-events-auto mx-auto flex max-w-5xl items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-950/45 px-3 py-2 shadow-xl backdrop-blur-md ${
+          className={`pointer-events-auto flex flex-col gap-1.5 rounded-2xl border border-white/10 bg-zinc-950/35 p-1.5 shadow-xl backdrop-blur-md ${
             chromeVisible ? '' : 'pointer-events-none'
           }`}
         >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{titulo}</p>
-            <p className="truncate text-[11px] text-zinc-300/80">{onlineCount} online</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCommentsOpen((open) => !open)}
-              aria-pressed={commentsOpen}
-              title="Chat (C)"
-              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold transition ${
-                commentsOpen
-                  ? 'bg-[rgb(var(--color-primary))] text-white'
-                  : 'bg-white/10 text-white hover:bg-white/15'
-              }`}
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Chat</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMembersOpen((open) => !open)}
-              aria-pressed={membersOpen}
-              title="Membros (M)"
-              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold transition ${
-                membersOpen
-                  ? 'bg-[rgb(var(--color-primary))] text-white'
-                  : 'bg-white/10 text-white hover:bg-white/15'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Membros</span>
-            </button>
-            <button
-              type="button"
-              onClick={voltarParaSala}
-              title="Voltar à sala (Esc)"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-2.5 text-sm font-semibold text-white hover:bg-white/15"
-            >
-              <ArrowLeftToLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Sala</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCommentsOpen((open) => !open)}
+            aria-pressed={commentsOpen}
+            title="Chat (C)"
+            className={dockBtn(commentsOpen)}
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMembersOpen((open) => !open)}
+            aria-pressed={membersOpen}
+            title="Membros (M)"
+            className={dockBtn(membersOpen)}
+          >
+            <Users className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void alternarFullscreen()}
+            aria-pressed={isBrowserFullscreen}
+            title={isBrowserFullscreen ? 'Sair da tela cheia (F)' : 'Tela cheia (F)'}
+            className={dockBtn(isBrowserFullscreen)}
+          >
+            {isBrowserFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={voltarParaSala}
+            title="Voltar à sala (Esc)"
+            className={dockBtn(false)}
+          >
+            <ArrowLeftToLine className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      {/* Painéis translúcidos sobre o vídeo */}
       {commentsOpen ? (
         <aside
-          className="absolute bottom-24 right-3 top-20 z-40 flex w-[min(100%-1.5rem,20rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl sm:right-4"
+          className={`absolute bottom-24 right-16 top-16 z-40 flex w-[min(100%-5rem,20rem)] flex-col overflow-hidden rounded-2xl ${panelGlass}`}
           aria-label="Chat da sala"
           onMouseEnter={() => {
             panelHoverRef.current = true
@@ -238,14 +269,14 @@ export function SalaPopoutClient({
           }}
         >
           <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-200">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-100">
               <MessageSquare className="h-3.5 w-3.5" />
               Chat
             </h2>
             <button
               type="button"
               onClick={() => setCommentsOpen(false)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-200 hover:bg-white/15"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-100 hover:bg-white/15"
               aria-label="Fechar chat"
             >
               <X className="h-3.5 w-3.5" />
@@ -265,8 +296,8 @@ export function SalaPopoutClient({
 
       {membersOpen ? (
         <aside
-          className={`absolute bottom-24 top-20 z-40 flex w-[min(100%-1.5rem,16rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl ${
-            commentsOpen ? 'right-[calc(min(100%-1.5rem,20rem)+1rem)] sm:right-[21rem]' : 'right-3 sm:right-4'
+          className={`absolute bottom-24 top-16 z-40 flex w-[min(100%-5rem,16rem)] flex-col overflow-hidden rounded-2xl ${panelGlass} ${
+            commentsOpen ? 'right-[calc(min(100%-5rem,20rem)+4.5rem)]' : 'right-16'
           }`}
           aria-label="Membros online"
           onMouseEnter={() => {
@@ -280,14 +311,14 @@ export function SalaPopoutClient({
           }}
         >
           <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
-            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-200">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-100">
               <Users className="h-3.5 w-3.5" />
               Membros
             </h2>
             <button
               type="button"
               onClick={() => setMembersOpen(false)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-200 hover:bg-white/15"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-100 hover:bg-white/15"
               aria-label="Fechar membros"
             >
               <X className="h-3.5 w-3.5" />
@@ -297,7 +328,7 @@ export function SalaPopoutClient({
             <SalaParticipantes
               salaId={salaId}
               initialParticipantes={initialParticipantes}
-              onCountChange={setOnlineCount}
+              onCountChange={() => undefined}
             />
           </div>
         </aside>

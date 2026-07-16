@@ -6,11 +6,12 @@ import {
   AlertCircle,
   AppWindow,
   Bell,
-  ChevronUp,
   Hand,
   Info,
   Loader2,
   LogOut,
+  Maximize2,
+  Minimize2,
   MonitorUp,
   MonitorX,
   X,
@@ -436,7 +437,7 @@ function MeetControls({
 
   return (
     <div className={`meet-room-footer${compact ? ' meet-room-footer--compact' : ''}`}>
-      {isHost && activeScreenSharers.length > 0 && (
+      {isHost && activeScreenSharers.length > 0 && !compact && (
         <ActiveScreenShareBanner salaId={salaId} sharers={activeScreenSharers} />
       )}
 
@@ -701,13 +702,17 @@ function MeetStage({
               className="meet-room-strip-toggle"
               onClick={onToggleParticipantStrip}
               aria-expanded={showParticipantStrip}
-              title={showParticipantStrip ? 'Ocultar participantes' : 'Mostrar participantes'}
+              title={
+                showParticipantStrip
+                  ? 'Ocultar participantes (vista limpa)'
+                  : 'Mostrar participantes'
+              }
             >
-              <ChevronUp
-                className={`h-4 w-4 transition-transform duration-200 ${
-                  showParticipantStrip ? '' : 'rotate-180'
-                }`}
-              />
+              {showParticipantStrip ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
               <span className="meet-room-strip-toggle__label">
                 {showParticipantStrip ? 'Ocultar' : 'Participantes'}
               </span>

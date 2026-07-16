@@ -82,16 +82,16 @@
   display: none;
 }
 
-.meet-room-root[data-popout='true'] .meet-room-focus-badge {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+.meet-room-root[data-popout='true'] .lk-focus-toggle-button {
+  display: none !important;
 }
 
-.meet-room-root[data-popout='true'][data-chrome='false'] .meet-room-focus-badge {
-  opacity: 0;
-  transform: translateY(-6px);
-  pointer-events: none;
+.meet-room-root[data-popout='true'] .meet-room-focus-badge {
+  display: none;
+}
+
+.meet-room-root[data-popout='true'] .meet-room-screen-banner {
+  display: none;
 }
 
 .meet-room-root[data-popout='true'] .meet-room-bottom-strip-shell {
@@ -154,18 +154,6 @@
 
 .meet-room-root[data-popout='true'] .meet-room-leave {
   margin-left: 0.25rem;
-}
-
-.meet-room-root[data-popout='true'] .meet-room-screen-banner {
-  margin: 0.5rem 0.75rem 0;
-  border: 1px solid rgb(56 189 248 / 0.25);
-  border-radius: 0.875rem;
-  background: rgb(8 47 73 / 0.55);
-  backdrop-filter: blur(12px);
-}
-
-.meet-room-root[data-popout='true'] .meet-room-screen-banner__row {
-  justify-content: center;
 }
 
 .meet-room-root[data-popout='true'] .meet-room-requests {
