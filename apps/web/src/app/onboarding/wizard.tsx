@@ -56,6 +56,42 @@ const PASSOS_VISIVEIS: { key: Passo; label: string }[] = [
   { key: 'vinculo', label: 'Vínculo' },
 ]
 
+const PASSOS_HISTORICO = new Set<Passo>(['clube', 'regiao', 'torcida', 'unidade', 'vinculo'])
+
+type OnboardingHistoryState = {
+  onboardingPasso: Passo
+  vinculoModo?: 'escolha' | 'socio'
+  [key: string]: unknown
+}
+
+function isPassoHistorico(value: unknown): value is Passo {
+  return typeof value === 'string' && PASSOS_HISTORICO.has(value as Passo)
+}
+
+function urlDoPasso(passo: Passo, vinculoModo?: 'escolha' | 'socio'): string {
+  const params = new URLSearchParams()
+  params.set('passo', passo)
+  if (passo === 'vinculo' && vinculoModo === 'socio') {
+    params.set('modo', 'socio')
+  }
+  return `/onboarding?${params.toString()}`
+}
+
+function mergeHistoryState(
+  passo: Passo,
+  vinculoModo?: 'escolha' | 'socio',
+): OnboardingHistoryState {
+  const base =
+    typeof window.history.state === 'object' && window.history.state !== null
+      ? (window.history.state as Record<string, unknown>)
+      : {}
+  return {
+    ...base,
+    onboardingPasso: passo,
+    vinculoModo: passo === 'vinculo' ? vinculoModo : undefined,
+  }
+}
+
 type Props = {
   afiliacoesIniciais: AfiliacaoOnboarding[]
   regioes: RegiaoOnboarding[]
@@ -68,11 +104,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-
-  function irPara(novo: Passo, dir = 1) {
-    setSlideDir(dir)
-    setPasso(novo)
-  }
+  const [vinculoModo, setVinculoModo] = useState<'escolha' | 'socio'>('escolha')
 
   // Seleções acumuladas
   const [clube, setClube] = useState<AfiliacaoOnboarding | null>(null)
@@ -82,6 +114,74 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   const [torcida, setTorcida] = useState<TorcidaOnboarding | null>(null)
   const [unidadeId, setUnidadeId] = useState<string | null>(null)
   const [unidadeNaoListada, setUnidadeNaoListada] = useState(false)
+
+  const passoRef = useRef(passo)
+  const clubeRef = useRef(clube)
+  const torcidaRef = useRef(torcida)
+  passoRef.current = passo
+  clubeRef.current = clube
+  torcidaRef.current = torcida
+
+  /** Garante que o passo do histórico não pule dados ainda não escolhidos. */
+  function passoAlcancavel(alvo: Passo): Passo {
+    if (alvo === 'concluindo') return 'concluindo'
+    if (!clubeRef.current && alvo !== 'clube') return 'clube'
+    if (!torcidaRef.current && (alvo === 'unidade' || alvo === 'vinculo')) return 'torcida'
+    return alvo
+  }
+
+  function aplicarPasso(novo: Passo, dir: number, modo: 'escolha' | 'socio' = 'escolha') {
+    const alcancavel = passoAlcancavel(novo)
+    setSlideDir(dir)
+    setPasso(alcancavel)
+    setVinculoModo(alcancavel === 'vinculo' ? modo : 'escolha')
+    setErro(null)
+  }
+
+  /** Avança um passo e empilha no histórico do navegador (voltar do browser = Voltar). */
+  function avancarPara(novo: Passo, modo: 'escolha' | 'socio' = 'escolha') {
+    aplicarPasso(novo, 1, modo)
+    if (!PASSOS_HISTORICO.has(novo)) return
+    window.history.pushState(mergeHistoryState(novo, modo), '', urlDoPasso(novo, modo))
+  }
+
+  /** Voltar UI = mesma ação da seta do navegador. */
+  function voltarHistorico() {
+    window.history.back()
+  }
+
+  /** Corrige o passo sem empilhar (ex.: falha ao concluir). */
+  function corrigirPasso(novo: Passo, dir = -1) {
+    aplicarPasso(novo, dir)
+    if (!PASSOS_HISTORICO.has(novo)) return
+    window.history.replaceState(mergeHistoryState(novo), '', urlDoPasso(novo))
+  }
+
+  useEffect(() => {
+    window.history.replaceState(mergeHistoryState('clube'), '', urlDoPasso('clube'))
+
+    function onPopState(event: PopStateEvent) {
+      const state = event.state as OnboardingHistoryState | null
+      if (!state || !isPassoHistorico(state.onboardingPasso)) return
+
+      const alvo = passoAlcancavel(state.onboardingPasso)
+      const fromIdx = PASSOS_VISIVEIS.findIndex((p) => p.key === passoRef.current)
+      const toIdx = PASSOS_VISIVEIS.findIndex((p) => p.key === alvo)
+      const dir =
+        passoRef.current === 'vinculo' &&
+        alvo === 'vinculo' &&
+        (state.vinculoModo ?? 'escolha') === 'escolha'
+          ? -1
+          : toIdx < fromIdx
+            ? -1
+            : 1
+      aplicarPasso(alvo, dir, state.vinculoModo ?? 'escolha')
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync de histórico só no mount
+  }, [])
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
 
@@ -111,7 +211,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   function selecionarClube(afiliacao: AfiliacaoOnboarding) {
     setClube(afiliacao)
     limparErro()
-    irPara('regiao', 1)
+    avancarPara('regiao')
   }
 
   // ── Passo 2 → 3: persiste clube + região, carrega torcidas ───────────────────
@@ -127,7 +227,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
       const lista = await buscarTorcidas(clube.id)
       setTorcidas(lista)
       limparErro()
-      irPara('torcida', 1)
+      avancarPara('torcida')
     })
   }
 
@@ -137,25 +237,29 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
     setUnidadeId(null)
     setUnidadeNaoListada(false)
     limparErro()
-    irPara('unidade', 1)
+    avancarPara('unidade')
   }
 
   function confirmarUnidade(sedeId: string | null, naoListada: boolean) {
     setUnidadeId(sedeId)
     setUnidadeNaoListada(naoListada)
     limparErro()
-    irPara('vinculo', 1)
+    avancarPara('vinculo', 'escolha')
+  }
+
+  function abrirModoSocio() {
+    avancarPara('vinculo', 'socio')
   }
 
   function seguirComoTorcedorGlobal() {
     setErro(null)
-    irPara('concluindo', 1)
+    aplicarPasso('concluindo', 1)
     startTransition(async () => {
       const res = await concluirComoTorcedor()
       // Se retornou (não redirecionou), houve erro.
       if (res?.message) {
+        corrigirPasso('torcida')
         setErro(res.message)
-        irPara('torcida', -1)
       }
     })
   }
@@ -230,7 +334,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                   setLocalizacaoPrecisa(regiao)
                 }}
                 pending={pending}
-                onVoltar={() => irPara('clube', -1)}
+                onVoltar={voltarHistorico}
                 onContinuar={avancarDaRegiao}
               />
             </m.div>
@@ -252,7 +356,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 pending={pending}
                 onEscolher={escolherTorcida}
                 onTorcedorGlobal={seguirComoTorcedorGlobal}
-                onVoltar={() => irPara('regiao', -1)}
+                onVoltar={voltarHistorico}
               />
             </m.div>
           )}
@@ -275,7 +379,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 localizacao={localizacaoPrecisa ?? undefined}
                 pending={pending}
                 onConfirmar={confirmarUnidade}
-                onVoltar={() => irPara('torcida', -1)}
+                onVoltar={voltarHistorico}
                 onErro={setErro}
               />
             </m.div>
@@ -298,7 +402,9 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
-                onVoltar={() => irPara('unidade', -1)}
+                modo={vinculoModo}
+                onAbrirSocio={abrirModoSocio}
+                onVoltar={voltarHistorico}
                 onErro={setErro}
               />
             </m.div>
@@ -1200,6 +1306,8 @@ function PassoVinculo({
   regiao,
   unidadeId,
   unidadeNaoListada,
+  modo,
+  onAbrirSocio,
   onVoltar,
   onErro,
 }: {
@@ -1209,10 +1317,11 @@ function PassoVinculo({
   regiao: string | undefined
   unidadeId: string | null
   unidadeNaoListada: boolean
+  modo: 'escolha' | 'socio'
+  onAbrirSocio: () => void
   onVoltar: () => void
   onErro: (m: string | null) => void
 }) {
-  const [modo, setModo] = useState<'escolha' | 'socio'>('escolha')
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
 
@@ -1248,14 +1357,16 @@ function PassoVinculo({
 
   function abrirSocio() {
     onErro(null)
-    setModo('socio')
-    if (departamentos === null) {
-      startTransition(async () => {
-        const deps = await buscarDepartamentos(torcida.id)
-        setDepartamentos(deps)
-      })
-    }
+    onAbrirSocio()
   }
+
+  useEffect(() => {
+    if (modo !== 'socio' || departamentos !== null) return
+    startTransition(async () => {
+      const deps = await buscarDepartamentos(torcida.id)
+      setDepartamentos(deps)
+    })
+  }, [modo, departamentos, torcida.id])
 
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
@@ -1473,7 +1584,7 @@ function PassoVinculo({
     ) : (
       // Formulário de sócio
       <div>
-      <BotaoVoltar onClick={() => setModo('escolha')} disabled={pending} label="Voltar" />
+      <BotaoVoltar onClick={onVoltar} disabled={pending} label="Voltar" />
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Solicitação de sócio</h1>
