@@ -548,10 +548,11 @@ post em `buscarComunidade`) multiplicam round-trips ao Postgres remoto
 justamente nos caminhos de busca/feed. Preferir uma query `IN` batched ou
 memoizar com `React.cache` a função de checagem por item.
 
-### 5.6.1 Otimização Comunidade — ondas A–B + caches (2026-07-16)
+### 5.6.1 Otimização Comunidade — ondas A–D + C (2026-07-16)
 
-Commit de referência: `0dca679`. Documentação detalhada e plano futuro (Fases
-C–F): **`docs/data/modulo-comunidade-performance.md`**.
+Commits de referência: `0dca679` (A–B), `3999ee5`/`d6116d1` (C), `1e79e41`–
+`ff80330`/`3b5745a` (D). Fonte completa, **ganhos estimados por cenário (%)** e
+checklist: **`docs/data/modulo-comunidade-performance.md`**.
 
 | Onda | Foco |
 |------|------|
@@ -562,25 +563,13 @@ C–F): **`docs/data/modulo-comunidade-performance.md`**.
 | B6 | Busca `pg_trgm` + script `db:enable-pg-trgm` (fallback ILIKE) |
 | Pós-B | `unstable_cache` em discover, sugestões, canais, hashtags, stories, salas |
 | Chat/salas | `GET /api/conversas/resumo`; inbox só ao expandir; `listSalasAtivas` uma vez na `page.tsx` |
+| C | TanStack Query + Virtual, `revalidateTag`, prefetch hover |
+| D1–D3 | Redis SSE, fan-out async, SSE mensageria |
 
 **Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
 
-**Próximo recorte documentado (Fase C):** virtualização de feed, `revalidateTag`
-na timeline, TanStack Query, e2e de latência Comunidade — ver doc acima.
-
-**Fase C (2026-07-16):** `revalidateTag`, TanStack Query (`useInfiniteQuery`) +
-Virtual (`useWindowVirtualizer`) no feed/rede, prefetch hover, e2e budget.
-Ver `docs/data/modulo-comunidade-performance.md`.
-
-**Fase D1 (2026-07-16):** `REDIS_URL` opcional → `realtime-bus.ts` (ioredis) liga
-`feed-bus` / `notificacoes-bus` entre réplicas. Sem env = in-memory. Setup Upstash
-Free ($0): `docs/data/modulo-comunidade-performance.md`.
-
-**Fase D3 (2026-07-16):** SSE de mensagens (`mensageria-bus`) — inbox + thread;
-polling reduzido a fallback 60s. Reusa o mesmo Redis quando `REDIS_URL` está set.
-
-**Fase D2 (2026-07-16):** fan-out de timeline assíncrono (`feed-timeline-queue`) —
-autor sync; seguidores via Redis list ou fila in-process.
+**Teto zero-custo:** ~85–95% do valor do plano capturado sem domínio. F4 CDN
+espera domínio (`docs/ops/cloudflare-cdn.md`). E/F só com métrica.
 
 ### 5.7 Animações Motion (2026-07)
 

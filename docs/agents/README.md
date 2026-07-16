@@ -54,7 +54,10 @@ CDN: `docs/ops/cloudflare-cdn.md`. Use o agente `performance` para:
 - decidir se o próximo passo é código ou infra (pooler, Meilisearch, etc.);
 - **não** empurrar Fase E/F sem métrica (p95, conexões, `pg_trgm` medido).
 
-Fase C e D (zero-custo) estão entregues. Ganhos E/F exigem evidência ou custo.
+Fase C e D (zero-custo) estão entregues (~**85–95%** do valor do plano sem
+domínio). Ganhos por jornada (%) e gatilhos para reabrir: seção **Ganhos
+estimados** em `modulo-comunidade-performance.md`. E/F e CDN exigem evidência
+ou domínio próprio.
 
 ## Escudos de clubes (`Afiliacao`) — entregue (Fases A–F)
 

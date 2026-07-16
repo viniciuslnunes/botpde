@@ -4,7 +4,8 @@ Guia curto para trabalhar neste repositório. Detalhe arquitetural em `ARCHITECT
 produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/agents/README.md`);
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
 Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
-`docs/data/modulo-comunidade-performance.md`; agente `performance` para auditorias novas.
+`docs/data/modulo-comunidade-performance.md` (inclui **ganhos estimados por
+cenário %**); agente `performance` para auditorias novas.
 
 ## O que é
 

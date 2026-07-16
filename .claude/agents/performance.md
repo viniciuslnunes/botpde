@@ -17,7 +17,8 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
 ## Fontes de verdade (leia antes de opinar)
 - `ARCHITECTURE.md` §5.4 (provedor DB), §5.6 (plano de 5 fases concluído),
   §5.6.1 (Comunidade 2026-07-16).
-- `docs/data/modulo-comunidade-performance.md` — entregas A–B, padrões, Fases C–F.
+- `docs/data/modulo-comunidade-performance.md` — entregas A–D/C, padrões,
+  **ganhos estimados por cenário (%)**, Fases E–F e gatilhos para reabrir.
 - `CLAUDE.md` — convenções de cache, multi-tenant e Prisma.
 - Cache: `apps/web/src/lib/tenant.ts`, `hierarquia.ts`, `comunidade.ts`, `feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`, `stories.ts`, `salas.ts`.
@@ -80,9 +81,26 @@ na porta do estádio.
 6. Indique arquivos exatos e se precisa de `db:push` (índices/timeline) ou
    `db:enable-pg-trgm` ou só código.
 
+## Baseline Comunidade (não reabrir o plano sem gatilho)
+
+Onda A–D + C (2026-07) capturou ~**85–95%** do valor zero-custo. Tabelas de
+ganho por jornada (%) estão em `modulo-comunidade-performance.md` § “Ganhos
+estimados”. **Não** proponha Meilisearch, pooler, CDN pago ou virtualização
+extra “por hábito”. Reabra só com:
+
+1. Busca lenta **com** `pg_trgm` → E1  
+2. Contenção de conexões → F1  
+3. Domínio próprio → F4 Cloudflare (`docs/ops/cloudflare-cdn.md`)  
+4. Degradação em dia de jogo **com Redis on** → medir antes de mais código  
+
+Ao comunicar ganhos a humanos, use as faixas do doc e deixe explícito que são
+**estimativas**, não p95 de produção.
+
 ## Entregável
 - Diagnóstico com evidência (números ou caminho de request).
 - Tabela priorizada (impacto × esforço).
 - Lista de arquivos a tocar e riscos de regressão.
 - Veredito: dentro do teto da stack atual vs. precisa evolução arquitetural.
 - Handoff claro para `implementation` ou `data-model` quando aplicável.
+- Se o pedido for “mais performance Comunidade” sem gatilho: cite o baseline
+  § ganhos estimados e recomende observar, não codar.

@@ -118,6 +118,61 @@ porém mais lenta em bases grandes).
   chat colapsado = só `/api/conversas/resumo`.
 - **Comparar:** 1ª vs 2ª visita em &lt;2 min (cache `unstable_cache` quente).
 
+## Ganhos estimados (cenários) — baseline pós A–D / C3
+
+> **Estimativas de engenharia**, não lab medido em produção. Variam com
+> tamanho do tenant, 4G vs Wi‑Fi e cache quente/frio. Usar para priorizar e
+> comunicar — não como SLA. Atualizar quando houver p95 real.
+
+### Por jornada
+
+| Cenário | Antes (ordem de grandeza) | Depois | Ganho estimado |
+|---------|---------------------------|--------|----------------|
+| 1ª carga Comunidade (RSC + asides) | Queries em série / N+1 / salas 3× | Batch + caches + salas 1× + Suspense | **~40–60%** menos trabalho no servidor |
+| 2ª visita &lt;2 min (cache quente) | Quase tudo de novo no Postgres | `unstable_cache` + tags | **~50–70%** menos hits nos blocos cacheados |
+| Scroll do feed | Reload ou DOM enorme | Infinite API + Virtual + Query | **~70–90%** menos DOM após ~50 posts; sem reload de documento |
+| Chat colapsado | Inbox completa no mount | Só `/api/conversas/resumo` | **~80–95%** menos payload/queries de DM no mount |
+| Badge / nova DM | Poll 15s | SSE (+ poll 60s fallback) | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s** |
+| Publicar post (rede grande) | Fan-out sync na action | Autor sync + fila Redis | **~60–90%** menos tempo na action (∝ seguidores) |
+| SSE entre réplicas | In-memory só na réplica local | Redis pub/sub (`REDIS_URL`) | De **0%** → **~100%** dos pings cruzam réplicas |
+| Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`) | **~30–70%** em bases grandes; pouco em bases pequenas |
+| Assets estáticos (CDN) | Sempre origin Railway | Cloudflare Free | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio |
+
+### Por camada do plano
+
+| Camada | Cobertura zero-custo | Peso típico no caminho crítico |
+|--------|----------------------|--------------------------------|
+| A–B (batch, timeline, APIs, busca) | ~100% | ~45% da melhoria de servidor |
+| C (tags, Query, Virtual, prefetch) | ~100% | ~25% (percepção / client) |
+| D1–D3 (Redis SSE, mensagens, fan-out) | ~100% | ~25% (tempo real + publish) |
+| F4 CDN | runbook pronto | **0%** até haver domínio |
+| E / F1–F3 | sob métrica / $ | **0%** até evidência |
+
+**Pacote profissional sem domínio e sem infra paga:** ~**85–95%** do valor
+planejado capturado. Restante ≈ CDN + E/F sob evidência.
+
+### Modos de uso
+
+| Modo | Situação | Ordem de melhoria vs. baseline pré-ondas |
+|------|----------|------------------------------------------|
+| Dia comum, 1 réplica, Redis on | Produção típica atual | ~**2×** mais eficiente em feed/chat |
+| Dia de jogo (scroll + DMs) | SSE + Virtual + resumo | ~**3×** melhor percepção |
+| Com domínio + Cloudflare | Futuro | +**~20–30%** só no LCP de JS/CSS |
+
+### O que isso não é
+
+- Não é “site X% mais rápido” em todo clique — TTFB de HTML/RSC + Postgres
+  remoto continua dominante.
+- Sem `db:push` / `db:enable-pg-trgm`, timeline/busca **não** entregam o ganho.
+- Sem domínio, F4 permanece **0%**.
+
+### Gatilhos para reabrir o plano (não otimizar por hábito)
+
+1. Busca lenta **com** `pg_trgm` ligado (p95 / reclamações) → considerar E1.
+2. Contenção de conexões Postgres → F1.
+3. Domínio próprio comprado → ativar F4 (`docs/ops/cloudflare-cdn.md`).
+4. Várias réplicas / dia de jogo degradando com Redis já on → medir antes de D4+/F.
+
 ## Plano futuro — nível profissional
 
 Priorizado por **impacto × esforço × dependência de infra**. Cada fase exige
