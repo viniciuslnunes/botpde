@@ -25,6 +25,8 @@ interface SalaChatProps {
   isHost: boolean
   initialMensagens: SalaMensagem[]
   listClassName?: string
+  /** Painel sobre vídeo: fundos semi-transparentes */
+  glass?: boolean
 }
 
 function isMensagemTemporaria(id: string): boolean {
@@ -57,6 +59,7 @@ export function SalaChat({
   isHost,
   initialMensagens,
   listClassName = 'max-h-80 space-y-3 overflow-y-auto pr-1',
+  glass = false,
 }: SalaChatProps) {
   const [mensagens, setMensagens] = useState<SalaMensagem[]>(() => ordenarMensagens(initialMensagens))
   const [conteudo, setConteudo] = useState('')
@@ -264,7 +267,7 @@ export function SalaChat({
   }
 
   return (
-    <div>
+    <div className={glass ? 'text-white' : undefined}>
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
         <input
           value={conteudo}
@@ -273,7 +276,11 @@ export function SalaChat({
           maxLength={800}
           disabled={enviando}
           placeholder="Escreva uma mensagem para o grupo"
-          className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60"
+          className={
+            glass
+              ? 'w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-zinc-400 disabled:opacity-60'
+              : 'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] disabled:opacity-60'
+          }
         />
         <m.button
           type="submit"
@@ -294,7 +301,7 @@ export function SalaChat({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             role="alert"
-            className="mb-3 text-sm text-red-600 dark:text-red-400"
+            className="mb-3 text-sm text-red-300"
           >
             {erro}
           </m.p>
@@ -303,10 +310,14 @@ export function SalaChat({
 
       {mensagens.length === 0 ? (
         <MotionEmptyState
-          icon={<MessageSquare className="mb-2 h-6 w-6 text-[rgb(var(--foreground-muted))]" />}
+          icon={
+            <MessageSquare
+              className={`mb-2 h-6 w-6 ${glass ? 'text-zinc-400' : 'text-[rgb(var(--foreground-muted))]'}`}
+            />
+          }
           title="Sem mensagens ainda"
           description="Seja o primeiro a falar com a torcida nesta sala."
-          className="py-6 text-center"
+          className={`py-6 text-center ${glass ? 'text-zinc-300' : ''}`}
         />
       ) : (
         <div ref={listRef} className={listClassName}>
@@ -323,8 +334,10 @@ export function SalaChat({
                   exit={{ opacity: 0, x: -12, transition: { duration: 0.2 } }}
                   className={`rounded-xl border p-3 ${
                     mensagem.destacada
-                      ? 'border-amber-500/50 bg-amber-500/10'
-                      : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
+                      ? 'border-amber-400/40 bg-amber-400/10'
+                      : glass
+                        ? 'border-white/10 bg-white/10'
+                        : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
                   } ${temporaria ? 'opacity-80' : ''}`}
                 >
                   <div className="flex gap-3">
@@ -336,7 +349,10 @@ export function SalaChat({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
+                        <div
+                          className={`text-xs ${glass ? 'text-zinc-300' : 'text-[rgb(var(--foreground-muted))]'}`}
+                          suppressHydrationWarning
+                        >
                           {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
                           {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
                           {temporaria && ' · enviando…'}
@@ -351,7 +367,7 @@ export function SalaChat({
                               onClick={() =>
                                 void moderar(mensagem.id, { destacada: !mensagem.destacada })
                               }
-                              className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                              className={`rounded p-1 ${glass ? 'text-zinc-300 hover:bg-white/10' : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]'}`}
                             >
                               <Pin className="h-3.5 w-3.5" />
                             </button>
@@ -362,7 +378,7 @@ export function SalaChat({
                                 setEditandoId(mensagem.id)
                                 setEditandoTexto(mensagem.conteudo)
                               }}
-                              className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                              className={`rounded p-1 ${glass ? 'text-zinc-300 hover:bg-white/10' : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]'}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -370,7 +386,7 @@ export function SalaChat({
                               type="button"
                               title="Excluir"
                               onClick={() => void moderar(mensagem.id, {}, true)}
-                              className="rounded p-1 text-red-500 hover:bg-red-500/10"
+                              className="rounded p-1 text-red-400 hover:bg-red-500/10"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -408,7 +424,7 @@ export function SalaChat({
                             key="view"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]"
+                            className={`whitespace-pre-wrap text-sm ${glass ? 'text-zinc-50' : 'text-[rgb(var(--foreground))]'}`}
                           >
                             {mensagem.conteudo}
                           </m.p>

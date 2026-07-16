@@ -816,9 +816,11 @@ function MeetConference({
     return sharers
   }, [screenTracks, isTrackReference])
 
+  const localScreenShareActive = activeScreenSharers.some((sharer) => sharer.userId === userId)
+
   useEffect(() => {
-    onScreenShareActiveChange?.(activeScreenSharers.length > 0)
-  }, [activeScreenSharers.length, onScreenShareActiveChange])
+    onScreenShareActiveChange?.(localScreenShareActive)
+  }, [localScreenShareActive, onScreenShareActiveChange])
 
   useEffect(() => {
     if (!resumeScreenShare) return

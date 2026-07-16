@@ -18,6 +18,7 @@ interface SalaParticipantesProps {
   salaId: string
   initialParticipantes: ParticipanteSala[]
   onCountChange?: (count: number) => void
+  glass?: boolean
 }
 
 function Avatar({ nome, avatarUrl }: { nome: string | null; avatarUrl: string | null }) {
@@ -43,6 +44,7 @@ export function SalaParticipantes({
   salaId,
   initialParticipantes,
   onCountChange,
+  glass = false,
 }: SalaParticipantesProps) {
   const [participantes, setParticipantes] = useState(initialParticipantes)
   const [carregando, setCarregando] = useState(false)
@@ -106,19 +108,27 @@ export function SalaParticipantes({
   }, [salaId, onCountChange])
 
   return (
-    <div>
+    <div className={glass ? 'text-white' : undefined}>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        <p className={`text-xs ${glass ? 'text-zinc-300' : 'text-[rgb(var(--foreground-muted))]'}`}>
           {participantes.length} online agora
         </p>
-        {carregando && <Loader2 className="h-3.5 w-3.5 animate-spin text-[rgb(var(--foreground-muted))]" />}
+        {carregando && (
+          <Loader2
+            className={`h-3.5 w-3.5 animate-spin ${glass ? 'text-zinc-400' : 'text-[rgb(var(--foreground-muted))]'}`}
+          />
+        )}
       </div>
 
       {participantes.length === 0 ? (
         <MotionEmptyState
-          icon={<Users className="mb-2 h-6 w-6 text-[rgb(var(--foreground-muted))]" />}
+          icon={
+            <Users
+              className={`mb-2 h-6 w-6 ${glass ? 'text-zinc-400' : 'text-[rgb(var(--foreground-muted))]'}`}
+            />
+          }
           title="Ninguém online no momento"
-          className="py-4 text-center"
+          className={`py-4 text-center ${glass ? 'text-zinc-300' : ''}`}
         />
       ) : (
         <m.ul variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
@@ -128,14 +138,20 @@ export function SalaParticipantes({
                 key={p.userId}
                 layout
                 variants={staggerItem}
-                className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2"
+                className={
+                  glass
+                    ? 'flex items-center gap-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2'
+                    : 'flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2'
+                }
               >
                 <Avatar nome={p.nome} avatarUrl={p.avatarUrl} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                  <p
+                    className={`truncate text-sm font-medium ${glass ? 'text-zinc-50' : 'text-[rgb(var(--foreground))]'}`}
+                  >
                     {p.nome ?? 'Membro'}
                   </p>
-                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                  <p className={`text-xs ${glass ? 'text-zinc-300' : 'text-[rgb(var(--foreground-muted))]'}`}>
                     {p.papel === 'HOST' ? 'Anfitrião' : 'Participante'}
                   </p>
                 </div>
@@ -143,7 +159,10 @@ export function SalaParticipantes({
                   <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label="Anfitrião" />
                 )}
                 {p.papel !== 'HOST' && (
-                  <User className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
+                  <User
+                    className={`h-4 w-4 shrink-0 ${glass ? 'text-zinc-400' : 'text-[rgb(var(--foreground-muted))]'}`}
+                    aria-hidden
+                  />
                 )}
               </m.li>
             ))}

@@ -102,10 +102,12 @@ export function SalaAtivaClient({
   const [inCall, setInCall] = useState(true)
   const [callKey, setCallKey] = useState(0)
   const [hasActiveScreenShare, setHasActiveScreenShare] = useState(false)
+  const [resumeScreenAfterPopout, setResumeScreenAfterPopout] = useState(false)
   const [participantStripVisible, setParticipantStripVisible] = useState(true)
   const [videoPopoutOpen, setVideoPopoutOpen] = useState(false)
   const popoutRef = useRef<Window | null>(null)
   const popoutPollRef = useRef<number | null>(null)
+  const popoutClosedByMessageRef = useRef(false)
 
   const participantProfiles = Object.fromEntries(
     initialParticipantes.map((participante) => [
@@ -134,6 +136,7 @@ export function SalaAtivaClient({
 
   const handleLeaveCall = useCallback(() => {
     setInCall(false)
+    setResumeScreenAfterPopout(false)
     encerrarPopout()
   }, [encerrarPopout])
 
@@ -144,6 +147,9 @@ export function SalaAtivaClient({
 
   const handleScreenShareActiveChange = useCallback((active: boolean) => {
     setHasActiveScreenShare(active)
+    if (active) {
+      setResumeScreenAfterPopout(false)
+    }
   }, [])
 
   const abrirJanelaVideo = useCallback(() => {
@@ -152,7 +158,8 @@ export function SalaAtivaClient({
       return
     }
 
-    const resumeQuery = hasActiveScreenShare ? '?resumeScreen=1' : ''
+    const shouldResume = hasActiveScreenShare
+    const resumeQuery = shouldResume ? '?resumeScreen=1' : ''
     const popoutUrl = `/video-sala/${sala.id}${resumeQuery}`
     const popout = window.open(
       popoutUrl,
@@ -167,12 +174,18 @@ export function SalaAtivaClient({
 
     popoutRef.current = popout
     setVideoPopoutOpen(true)
+    // Só retomamos tela ao fechar o popout (mensagem), não ao abrir —
+    // o usuário pode ter clicado em "Parar tela" na janela.
+    setResumeScreenAfterPopout(false)
+    popoutClosedByMessageRef.current = false
 
     if (popoutPollRef.current !== null) window.clearInterval(popoutPollRef.current)
     popoutPollRef.current = window.setInterval(() => {
       if (!popoutRef.current || popoutRef.current.closed) {
+        const alreadyHandled = popoutClosedByMessageRef.current
         encerrarPopout()
-        setCallKey((k) => k + 1)
+        // Sem postMessage (aba fechada à força), remonta sem retomar tela.
+        if (!alreadyHandled) setCallKey((k) => k + 1)
       }
     }, 500)
   }, [encerrarPopout, hasActiveScreenShare, sala.id, videoPopoutOpen])
@@ -180,9 +193,21 @@ export function SalaAtivaClient({
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return
-      const data = event.data as { type?: string; salaId?: string }
+      const data = event.data as {
+        type?: string
+        salaId?: string
+        resumeScreen?: boolean
+        leftCall?: boolean
+      }
       if (data.type === 'sala-video-popout-closed' && data.salaId === sala.id) {
+        popoutClosedByMessageRef.current = true
         encerrarPopout()
+        if (data.leftCall) {
+          setInCall(false)
+          setResumeScreenAfterPopout(false)
+          return
+        }
+        setResumeScreenAfterPopout(Boolean(data.resumeScreen))
         setCallKey((k) => k + 1)
       }
     }
@@ -302,6 +327,7 @@ export function SalaAtivaClient({
                   }
                   onOnlineCountChange={handleCountChange}
                   onScreenShareActiveChange={handleScreenShareActiveChange}
+                  resumeScreenShare={resumeScreenAfterPopout}
                   onLeaveCall={handleLeaveCall}
                 />
               </m.section>

@@ -33,7 +33,7 @@ type SalaPopoutClientProps = {
 const CHROME_IDLE_MS = 2000
 
 const panelGlass =
-  'border border-white/15 bg-zinc-950/25 shadow-2xl backdrop-blur-xl'
+  'border border-white/20 bg-zinc-950/15 shadow-2xl backdrop-blur-md'
 
 export function SalaPopoutClient({
   salaId,
@@ -57,6 +57,9 @@ export function SalaPopoutClient({
   const idleTimerRef = useRef<number | null>(null)
   const panelHoverRef = useRef(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const screenShareActiveRef = useRef(resumeScreenShare)
+  const leaveIntentRef = useRef<'voltar' | 'sair'>('voltar')
+  const notifiedOpenerRef = useRef(false)
 
   const participantProfiles = Object.fromEntries(
     initialParticipantes.map((participante) => [
@@ -74,19 +77,45 @@ export function SalaPopoutClient({
     }, CHROME_IDLE_MS)
   }, [commentsOpen, membersOpen])
 
+  const notificarOpener = useCallback(
+    (payload: { leftCall?: boolean; resumeScreen?: boolean }) => {
+      if (notifiedOpenerRef.current) return
+      notifiedOpenerRef.current = true
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(
+          { type: 'sala-video-popout-closed', salaId, ...payload },
+          window.location.origin,
+        )
+      }
+    },
+    [salaId],
+  )
+
   const voltarParaSala = useCallback(() => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: 'sala-video-popout-closed', salaId }, window.location.origin)
-      window.opener.focus()
-    }
+    leaveIntentRef.current = 'voltar'
+    notificarOpener({ resumeScreen: screenShareActiveRef.current })
+    if (window.opener && !window.opener.closed) window.opener.focus()
     window.close()
-  }, [salaId])
+  }, [notificarOpener])
+
+  const sairDaChamada = useCallback(() => {
+    leaveIntentRef.current = 'sair'
+    notificarOpener({ leftCall: true, resumeScreen: false })
+    if (window.opener && !window.opener.closed) window.opener.focus()
+    window.close()
+  }, [notificarOpener])
 
   const notificarFechamento = useCallback(() => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: 'sala-video-popout-closed', salaId }, window.location.origin)
+    if (leaveIntentRef.current === 'sair') {
+      notificarOpener({ leftCall: true, resumeScreen: false })
+      return
     }
-  }, [salaId])
+    notificarOpener({ resumeScreen: screenShareActiveRef.current })
+  }, [notificarOpener])
+
+  const handleScreenShareActiveChange = useCallback((active: boolean) => {
+    screenShareActiveRef.current = active
+  }, [])
 
   const alternarFullscreen = useCallback(async () => {
     const node = rootRef.current
@@ -201,7 +230,8 @@ export function SalaPopoutClient({
             setParticipantStripVisible((visible) => !visible)
             revelarChrome()
           }}
-          onLeaveCall={voltarParaSala}
+          onScreenShareActiveChange={handleScreenShareActiveChange}
+          onLeaveCall={sairDaChamada}
         />
       </div>
 
@@ -288,6 +318,7 @@ export function SalaPopoutClient({
               currentUserId={userId}
               isHost={isHost}
               initialMensagens={initialMensagens}
+              glass
               listClassName="h-[calc(100%-3.25rem)] max-h-none space-y-3 overflow-y-auto pr-1"
             />
           </div>
@@ -329,6 +360,7 @@ export function SalaPopoutClient({
               salaId={salaId}
               initialParticipantes={initialParticipantes}
               onCountChange={() => undefined}
+              glass
             />
           </div>
         </aside>
