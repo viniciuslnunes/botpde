@@ -8,6 +8,7 @@ import {
   MAX_CONTEUDO_MENSAGEM,
 } from '@/lib/mensageria'
 import { assertConversaAccess } from '@/lib/mensageria-api'
+import { emitMensagemNova } from '@/lib/mensageria-bus'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
@@ -92,6 +93,15 @@ export async function POST(
       parsed.data.conteudo,
       parsed.data.midias,
       parsed.data.respostaAId,
+    )
+
+    const membros: Array<{ userId: string }> = await db.membroConversa.findMany({
+      where: { conversaId, saiuEm: null },
+      select: { userId: true },
+    })
+    emitMensagemNova(
+      conversaId,
+      membros.map((m) => m.userId),
     )
 
     return NextResponse.json({ mensagem: serializeMensagem(mensagem) })

@@ -576,6 +576,9 @@ TanStack Query/Virtual pendente de instalação de pacote no ambiente.
 `feed-bus` / `notificacoes-bus` entre réplicas. Sem env = in-memory. Setup Upstash
 Free ($0): `docs/data/modulo-comunidade-performance.md`.
 
+**Fase D3 (2026-07-16):** SSE de mensagens (`mensageria-bus`) — inbox + thread;
+polling reduzido a fallback 60s. Reusa o mesmo Redis quando `REDIS_URL` está set.
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em

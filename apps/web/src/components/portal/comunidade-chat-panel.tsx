@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { useInboxStream } from '@/lib/use-mensagem-stream'
 import { MensagensShell } from './mensagens-shell'
 
 const STORAGE_KEY = 'comunidade-chat-expanded'
@@ -119,7 +120,12 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
   useVisibleInterval(() => {
     if (expanded) return
     void carregarResumo()
-  }, 15000)
+  }, 60_000)
+
+  useInboxStream(() => {
+    if (expanded) return
+    void carregarResumo()
+  })
 
   useEffect(() => {
     if (!expanded) return

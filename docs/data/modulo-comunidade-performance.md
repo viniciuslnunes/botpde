@@ -159,8 +159,13 @@ no free tier (256 MB · 500k comandos/mês).
 |---|---------|---------|---------|--------|
 | D1 | **Redis pub/sub** para `feed-bus` e `notificacoes-bus` | SSE in-memory não cruza réplicas | Médio | ✅ código; ativar com env |
 | D2 | **Worker assíncrono** para fan-out pesado (`fanoutPostParaRede` em fila) | Post com rede grande não bloqueia request HTTP | Alto | pendente |
-| D3 | **SSE/WebSocket mensageria** substituindo polling 15s no shell | Menos requests; melhor em dia de jogo | Alto | pendente |
+| D3 | **SSE mensageria** (inbox + thread) + polling lento como fallback | Menos requests; melhor em dia de jogo | Médio | ✅ 2026-07-16 |
 | D4 | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia | Médio | parcial (C2 tags) |
+
+**D3:** `mensageria-bus` + `GET /api/conversas/stream` e `/api/conversas/[id]/stream`.
+Ao enviar mensagem, ping na thread e na inbox de cada membro. Clients
+(`MensagensShell`, `MensagemThread`, chat da comunidade, navbar) escutam SSE;
+polling caiu de 4–15s para 15–60s como rede de segurança.
 
 ### Fase E — busca e descoberta avançada
 
@@ -212,6 +217,7 @@ no free tier (256 MB · 500k comandos/mês).
 | Stories | `apps/web/src/lib/stories.ts` |
 | SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |
 | SSE notif | `apps/web/src/lib/notificacoes-bus.ts`, `realtime-bus.ts` |
+| SSE mensagens | `apps/web/src/lib/mensageria-bus.ts`, `use-mensagem-stream.ts` |
 | Chat resumo | `apps/web/src/app/api/conversas/resumo/route.ts` |
 | Scripts DB | `packages/db/scripts/enable-pg-trgm.js` |
 | Schema | `packages/db/prisma/schema.prisma` (`FeedTimeline`, índices `Post`) |

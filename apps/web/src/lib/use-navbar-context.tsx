@@ -6,6 +6,7 @@ import { toast } from '@torcida/ui'
 import type { NotificationItem } from '@/components/portal/notification-bell'
 import { criarVigiaDeNotificacoes } from '@/lib/notification-toast'
 import { useNotificationStream } from '@/lib/use-notification-stream'
+import { useInboxStream } from '@/lib/use-mensagem-stream'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 
 interface NavbarContext {
@@ -132,6 +133,7 @@ export function useNavbarContext() {
   }, CACHE_MS)
 
   useNotificationStream(() => refresh(true))
+  useInboxStream(() => refresh(true))
 
   return { ...ctx, refresh }
 }

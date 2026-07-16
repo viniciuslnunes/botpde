@@ -29,6 +29,7 @@ import { formatRelative } from '@/lib/format-datetime'
 import { fadeUp, collapsePanel, springSnappy, staggerContainer, menuItemStagger } from '@/lib/motion-presets'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useVisibleInterval, useVisibleBackoffInterval } from '@/lib/use-visible-interval'
+import { useConversaStream } from '@/lib/use-mensagem-stream'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -184,8 +185,11 @@ export function MensagemThread({
     marcarLidaRef.current()
   }, [conversaId])
 
-  useVisibleBackoffInterval(() => carregarRef.current(false), 4000, 15000)
-  useVisibleInterval(() => void carregarRef.current(true), 30000)
+  useVisibleBackoffInterval(() => carregarRef.current(false), 15_000, 60_000)
+  useVisibleInterval(() => void carregarRef.current(true), 60_000)
+  useConversaStream(conversaId, () => {
+    void carregarRef.current(false)
+  })
 
   function insertEmoji(emoji: string) {
     const el = inputRef.current

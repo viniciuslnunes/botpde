@@ -12,6 +12,7 @@ import {
 } from '@/lib/mensageria-client'
 import { formatRelative } from '@/lib/format-datetime'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
+import { useInboxStream } from '@/lib/use-mensagem-stream'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import {
   lightboxBackdrop,
@@ -105,7 +106,9 @@ export function MensagensShell({
     return () => window.clearTimeout(timer)
   }, [inboxPreloaded, initialConversas.length, atualizarInbox])
 
-  useVisibleInterval(() => void atualizarInbox(), 15000)
+  // SSE: atualiza inbox na hora; polling 60s só como fallback se o stream cair.
+  useInboxStream(() => void atualizarInbox())
+  useVisibleInterval(() => void atualizarInbox(), 60_000)
 
   const zerarNaoLidas = useCallback((conversaId: string) => {
     setConversas((prev) =>
