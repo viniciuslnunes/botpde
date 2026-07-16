@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { getEstadoOnboarding } from '@/lib/onboarding'
-import { usuarioPrecisaNickname } from '@/lib/tenant-context'
+import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 
@@ -18,16 +18,22 @@ export default async function PortalLayout({
     redirect('/entrar')
   }
 
-  if (await usuarioPrecisaNickname(session.user.id)) {
+  const isSuperAdmin = isSuperAdminEmail(session.user.email)
+
+  // Operadores (super-admin) não precisam de @ nem passam pelo onboarding de
+  // torcedor — mesma exceção já aplicada em admin/layout.tsx.
+  if (!isSuperAdmin && (await usuarioPrecisaNickname(session.user.id))) {
     redirect('/definir-apelido')
   }
 
   // Gate de onboarding: quem ainda não concluiu e não tem vínculo é direcionado
   // ao hub. Membros existentes (temMembro) e quem já concluiu são poupados
   // (grandfather). O /onboarding tem layout próprio, fora do portal → sem loop.
-  const estado = await getEstadoOnboarding(session.user.id)
-  if (!estado.perfil?.onboardingConcluidoEm && !estado.temMembro) {
-    redirect('/onboarding')
+  if (!isSuperAdmin) {
+    const estado = await getEstadoOnboarding(session.user.id)
+    if (!estado.perfil?.onboardingConcluidoEm && !estado.temMembro) {
+      redirect('/onboarding')
+    }
   }
 
   // Contexto pode ser torcida ativa ou comunidade nacional (torcedor global).
