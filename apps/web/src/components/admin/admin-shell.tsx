@@ -19,6 +19,7 @@ import {
 } from '@/components/portal/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { useAdminNavbarContext } from '@/lib/use-admin-navbar-context'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
@@ -68,6 +69,7 @@ function AdminTopbar({
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
   const firstName = userName?.split(' ')[0] ?? 'Admin'
+  const liveNotifications = useAdminNavbarContext(notifications)
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -120,7 +122,7 @@ function AdminTopbar({
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell
             key={tenantSlug}
-            initialItems={notifications}
+            initialItems={liveNotifications}
             verTodasHref="/admin/notificacoes"
             verTodasLabel="Ver alertas operacionais"
           />

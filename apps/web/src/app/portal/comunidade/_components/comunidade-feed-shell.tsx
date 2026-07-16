@@ -9,6 +9,7 @@ import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
+import { FeedLiveBanner } from './feed-live-banner'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -268,6 +269,8 @@ export function ComunidadeFeedShell({
         <Suspense fallback={<ComunicadosFallback />}>
           <ComunidadeComunicadosSection tenantId={tenant.id} currentUserId={currentUser.id} />
         </Suspense>
+
+        <FeedLiveBanner filtro={filtro} />
 
         <Suspense fallback={<PostsFallback />}>
           <ComunidadePostsSection

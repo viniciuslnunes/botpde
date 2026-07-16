@@ -10,6 +10,7 @@ import { db } from '@torcida/db'
 import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoPublicoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { emitFeedPing } from '@/lib/feed-bus'
 import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { criarNotificacao } from '@/lib/notificacoes'
@@ -178,6 +179,7 @@ export async function publicarPost(
     ])
 
     revalidatePath('/portal/comunidade')
+    emitFeedPing(tenant.id)
     return { success: true, token: post.id }
   } catch (error) {
     console.error('[publicarPost]', error)
@@ -237,6 +239,7 @@ export async function publicarPostComoTorcedorGlobal(
   })
 
   revalidatePath('/portal/comunidade')
+  emitFeedPing(tenant.id)
 }
 
 export async function solicitarSeguir(userId: string): Promise<void> {
@@ -696,6 +699,7 @@ export async function publicarEnquete(
   ])
 
   revalidatePath('/portal/comunidade')
+  emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
 
@@ -896,6 +900,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   })
 
   revalidatePath('/portal/comunidade')
+  emitFeedPing(tenant.id)
 }
 
 export async function repostarComunicado(comunicadoId: string, comentario?: string): Promise<void> {
@@ -938,6 +943,7 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
   })
 
   revalidatePath('/portal/comunidade')
+  emitFeedPing(tenant.id)
 }
 
 export async function publicarPostEvento(
@@ -1008,6 +1014,7 @@ export async function publicarPostEvento(
   })
 
   revalidatePath('/portal/comunidade')
+  emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
 

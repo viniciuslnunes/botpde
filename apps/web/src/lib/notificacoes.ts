@@ -8,6 +8,7 @@ import {
 } from '@torcida/types'
 import { cache } from 'react'
 import { superAdminEmails } from '@/lib/env'
+import { emitNotificacaoPing } from './notificacoes-bus'
 
 export type CriarNotificacaoInput = {
   userId: string
@@ -25,7 +26,7 @@ export type CriarNotificacaoInput = {
  * Preferir `notificarSafe` / helpers em lote nas Server Actions.
  */
 export async function criarNotificacao(input: CriarNotificacaoInput): Promise<Notificacao> {
-  return db.notificacao.create({
+  const created: Notificacao = await db.notificacao.create({
     data: {
       userId: input.userId,
       tenantId: input.tenantId,
@@ -36,6 +37,8 @@ export async function criarNotificacao(input: CriarNotificacaoInput): Promise<No
       atorId: input.atorId,
     },
   })
+  emitNotificacaoPing(created.tenantId, created.userId)
+  return created
 }
 
 export async function criarNotificacoesEmLote(inputs: CriarNotificacaoInput[]): Promise<number> {
@@ -51,6 +54,9 @@ export async function criarNotificacoesEmLote(inputs: CriarNotificacaoInput[]): 
       atorId: input.atorId ?? null,
     })),
   })
+  for (const input of inputs) {
+    emitNotificacaoPing(input.tenantId, input.userId)
+  }
   return result.count
 }
 
@@ -360,19 +366,28 @@ export const reconciliarPropostasAliancaPendentes = cache(async function reconci
     const targets = await listarDestinatariosAdmin(tenantId, PERMISSIONS.ALLIANCES_MANAGE)
     if (targets.length === 0) return 0
 
+    // Uma única query para todas as propostas pendentes (evita N+1 no loop).
+    const titulos = pendentes.map((al) => `Proposta de aliança de ${al.tenantOrigem.nome}`)
+    const existentes: Array<{ userId: string; titulo: string }> = await db.notificacao.findMany({
+      where: {
+        tenantId,
+        tipo: 'ALIANCA_PROPOSTA',
+        titulo: { in: titulos },
+        userId: { in: targets },
+      },
+      select: { userId: true, titulo: true },
+    })
+    const jaTemPorTitulo = new Map<string, Set<string>>()
+    for (const e of existentes) {
+      const set = jaTemPorTitulo.get(e.titulo) ?? new Set<string>()
+      set.add(e.userId)
+      jaTemPorTitulo.set(e.titulo, set)
+    }
+
     let criadas = 0
     for (const al of pendentes) {
       const titulo = `Proposta de aliança de ${al.tenantOrigem.nome}`
-      const existentes: Array<{ userId: string }> = await db.notificacao.findMany({
-        where: {
-          tenantId,
-          tipo: 'ALIANCA_PROPOSTA',
-          titulo,
-          userId: { in: targets },
-        },
-        select: { userId: true },
-      })
-      const jaTem = new Set(existentes.map((e) => e.userId))
+      const jaTem = jaTemPorTitulo.get(titulo) ?? new Set<string>()
       const faltando = targets.filter((id) => !jaTem.has(id))
       if (faltando.length === 0) continue
 
