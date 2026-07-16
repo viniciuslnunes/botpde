@@ -158,14 +158,17 @@ no free tier (256 MB · 500k comandos/mês).
 | # | Recorte | Por quê | Esforço | Status |
 |---|---------|---------|---------|--------|
 | D1 | **Redis pub/sub** para `feed-bus` e `notificacoes-bus` | SSE in-memory não cruza réplicas | Médio | ✅ código; ativar com env |
-| D2 | **Worker assíncrono** para fan-out pesado (`fanoutPostParaRede` em fila) | Post com rede grande não bloqueia request HTTP | Alto | pendente |
+| D2 | **Worker assíncrono** para fan-out (`scheduleFanoutPostParaRede`) | Post com rede grande não bloqueia request HTTP | Médio | ✅ 2026-07-16 |
 | D3 | **SSE mensageria** (inbox + thread) + polling lento como fallback | Menos requests; melhor em dia de jogo | Médio | ✅ 2026-07-16 |
 | D4 | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia | Médio | parcial (C2 tags) |
 
+**D2:** ao publicar, `materializarTimelineAutor` (sync, 1 row) + fila
+`torcida:queue:fanout-timeline` (Redis LPUSH/BRPOP se `REDIS_URL`; senão
+in-process). Worker consome `fanoutSeguidoresPostParaRede`. Sem custo extra.
+
 **D3:** `mensageria-bus` + `GET /api/conversas/stream` e `/api/conversas/[id]/stream`.
 Ao enviar mensagem, ping na thread e na inbox de cada membro. Clients
-(`MensagensShell`, `MensagemThread`, chat da comunidade, navbar) escutam SSE;
-polling caiu de 4–15s para 15–60s como rede de segurança.
+escutam SSE; polling 60s como rede de segurança.
 
 ### Fase E — busca e descoberta avançada
 
@@ -212,7 +215,7 @@ polling caiu de 4–15s para 15–60s como rede de segurança.
 | Windowing | `apps/web/src/lib/use-feed-window.ts` |
 | Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
 | Feed + ranking | `apps/web/src/lib/feed.ts` |
-| Timeline | `apps/web/src/lib/feed-timeline.ts` |
+| Timeline | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts` |
 | Busca | `apps/web/src/lib/comunidade-busca.ts` |
 | Stories | `apps/web/src/lib/stories.ts` |
 | SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |

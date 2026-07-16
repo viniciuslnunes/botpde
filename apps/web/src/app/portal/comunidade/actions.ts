@@ -34,14 +34,25 @@ import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 import {
   backfillTimelineDoAutorParaViewer,
-  fanoutPostParaRede,
+  materializarTimelineAutor,
   removerTimelineDoAutorParaViewer,
 } from '@/lib/feed-timeline'
+import { scheduleFanoutPostParaRede } from '@/lib/feed-timeline-queue'
 
 const MAX_MIDIAS = 10
 
 function invalidarLeituraComunidade(tenantId: string): void {
   invalidarCachesComunidadeFeed(tenantId)
+}
+
+/** Autor na timeline na hora; seguidores via fila (Redis ou in-process). */
+async function publicarNaTimelineRede(seed: {
+  postId: string
+  autorId: string
+  criadoEm: Date
+}): Promise<void> {
+  await materializarTimelineAutor(seed)
+  scheduleFanoutPostParaRede(seed)
 }
 
 async function getSessionAndPortalTenant() {
@@ -188,7 +199,7 @@ export async function publicarPost(
         postId: post.id,
         link: linkPostComunidade(post.id),
       }),
-      fanoutPostParaRede({
+      publicarNaTimelineRede({
         postId: post.id,
         autorId: session.user.id,
         criadoEm: post.criadoEm,
@@ -256,7 +267,7 @@ export async function publicarPostComoTorcedorGlobal(
     },
   })
 
-  await fanoutPostParaRede({
+  await publicarNaTimelineRede({
     postId: post.id,
     autorId: session.user.id,
     criadoEm: post.criadoEm,
@@ -769,7 +780,7 @@ export async function publicarEnquete(
       postId: post.id,
       link: linkPostComunidade(post.id),
     }),
-    fanoutPostParaRede({
+    publicarNaTimelineRede({
       postId: post.id,
       autorId: session.user.id,
       criadoEm: post.criadoEm,
@@ -978,7 +989,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
     },
   })
 
-  await fanoutPostParaRede({
+  await publicarNaTimelineRede({
     postId: repost.id,
     autorId: session.user.id,
     criadoEm: repost.criadoEm,
@@ -1028,7 +1039,7 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
     },
   })
 
-  await fanoutPostParaRede({
+  await publicarNaTimelineRede({
     postId: repost.id,
     autorId: session.user.id,
     criadoEm: repost.criadoEm,
@@ -1093,7 +1104,7 @@ export async function publicarPostEvento(
       postId: post.id,
       link: linkPostComunidade(post.id),
     }),
-    fanoutPostParaRede({
+    publicarNaTimelineRede({
       postId: post.id,
       autorId: session.user.id,
       criadoEm: post.criadoEm,

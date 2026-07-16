@@ -40,6 +40,19 @@ export async function fanoutPostParaRede(seed: TimelineSeed): Promise<void> {
   )
 }
 
+/** Só seguidores — autor já materializado no request. */
+export async function fanoutSeguidoresPostParaRede(seed: TimelineSeed): Promise<void> {
+  const seguidores: Array<{ seguidorId: string }> = await db.seguimento.findMany({
+    where: { seguidoId: seed.autorId, status: 'APROVADO' },
+    select: { seguidorId: true },
+  })
+  if (seguidores.length === 0) return
+  await createTimelineEntries(
+    seguidores.map((row) => row.seguidorId),
+    seed,
+  )
+}
+
 /** Backfill histórico dos posts do autor para um viewer recém-aprovado. */
 export async function backfillTimelineDoAutorParaViewer(
   viewerId: string,
@@ -129,4 +142,13 @@ export async function garantirTimelineDaRedeDoViewer(viewerId: string): Promise<
   if (existente) return
   await reconstruirTimelineDaRedeDoViewer(viewerId)
 }
+
+/**
+ * Materializa só o autor na timeline (rápido) — seguidores vão via
+ * `scheduleFanoutPostParaRede` (fila Redis / in-process).
+ */
+export async function materializarTimelineAutor(seed: TimelineSeed): Promise<void> {
+  await createTimelineEntries([seed.autorId], seed)
+}
+
 
