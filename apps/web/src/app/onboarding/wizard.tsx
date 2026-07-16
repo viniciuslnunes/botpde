@@ -3,9 +3,8 @@
 import { useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, TrendingUp } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
-import { ClubeOnboardingCard } from '@/components/onboarding/clube-onboarding-card'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
@@ -382,33 +381,25 @@ function PassoClube({
 
   function onBusca(valor: string) {
     setBusca(valor)
-    recarregar(valor, ufFiltro)
+    if (valor.trim()) {
+      setUfFiltro('')
+      recarregar(valor, '')
+      return
+    }
+    recarregar('', ufFiltro)
   }
 
   function onUfFiltro(uf: string) {
     setUfFiltro(uf)
-    recarregar(busca, uf)
+    if (uf) setBusca('')
+    recarregar('', uf)
   }
 
-  const tituloGrid = busca.trim()
-    ? `Resultados para "${busca}"`
-    : null
-
-  const clubesDestaque = useMemo(() => {
-    return [...afiliacoesIniciais]
-      .sort((a, b) => {
-        const pesoEscudo = (c: AfiliacaoOnboarding) => (c.escudoUrl ? 0 : 1)
-        const valor = (c: AfiliacaoOnboarding) =>
-          c.torcedoresEstimadosTipo === 'LIMITE_ATE' ? -1 : (c.torcedoresEstimados ?? 0)
-        const d = pesoEscudo(a) - pesoEscudo(b)
-        if (d !== 0) return d
-        return valor(b) - valor(a)
-      })
-      .slice(0, 10)
-  }, [afiliacoesIniciais])
-
-  const mostrarDestaques = !busca.trim() && !ufFiltro
-  const mostrarGradeBusca = Boolean(busca.trim())
+  function limparPainelMapa() {
+    setBusca('')
+    setUfFiltro('')
+    recarregar('', '')
+  }
 
   return (
     <div>
@@ -448,87 +439,13 @@ function PassoClube({
             ufSelecionada={ufFiltro}
             onUfSelecionar={onUfFiltro}
             onSelecionarClube={onSelecionar}
+            busca={busca}
+            resultadosBusca={lista}
+            buscando={buscando}
+            onLimparPainel={limparPainelMapa}
           />
         </div>
       )}
-
-      {buscando ? (
-        <div className="flex items-center justify-center py-16 text-[rgb(var(--foreground-muted))]">
-          <Loader2 className="h-6 w-6 animate-spin" />
-        </div>
-      ) : mostrarGradeBusca ? (
-        lista.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-dashed border-[rgb(var(--border))] p-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum clube encontrado para &ldquo;{busca}&rdquo;. Tente outro nome.
-          </div>
-        ) : (
-          <>
-            {tituloGrid && (
-              <p className="mt-6 text-sm font-medium text-[rgb(var(--foreground-muted))]">{tituloGrid}</p>
-            )}
-            <m.ul
-              className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${tituloGrid ? 'mt-3' : 'mt-5'}`}
-              initial="hidden"
-              animate="show"
-              key={busca}
-              variants={{
-                hidden: {},
-                show: { transition: { staggerChildren: 0.03, delayChildren: 0.02 } },
-              }}
-            >
-              {lista.map((a, i) => (
-                <m.li
-                  key={a.id}
-                  variants={{
-                    hidden: { opacity: 0, y: 10 },
-                    show: {
-                      opacity: 1,
-                      y: 0,
-                      transition: { ...springGentle, delay: Math.min(i, 12) * 0.025 },
-                    },
-                  }}
-                >
-                  <ClubeOnboardingCard clube={a} onSelecionar={onSelecionar} />
-                </m.li>
-              ))}
-            </m.ul>
-          </>
-        )
-      ) : mostrarDestaques ? (
-        <m.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springGentle}
-          className="mt-6"
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-[rgb(var(--color-primary))]" />
-            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-              Clubes em destaque
-            </h2>
-            <span className="text-xs text-[rgb(var(--foreground-muted))]">
-              — ou explore pelo mapa acima
-            </span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {clubesDestaque.map((a, i) => (
-              <m.div
-                key={a.id}
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ...springGentle, delay: i * 0.04 }}
-                className="w-[min(72vw,220px)] shrink-0 sm:w-[200px]"
-              >
-                <ClubeOnboardingCard clube={a} onSelecionar={onSelecionar} />
-              </m.div>
-            ))}
-          </div>
-          <p className="mt-4 text-center text-xs text-[rgb(var(--foreground-muted))]">
-            Prefere ir direto? Role os destaques ou{' '}
-            <span className="text-[rgb(var(--color-primary))]">clique num estado no mapa</span>.
-          </p>
-        </m.section>
-      ) : null}
     </div>
   )
 }

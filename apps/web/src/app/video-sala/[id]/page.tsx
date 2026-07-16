@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
-import nextDynamic from 'next/dynamic'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { isLiveKitConfigured, requireLiveKitConfig } from '@/lib/env'
@@ -8,15 +7,10 @@ import { createRoomToken } from '@/lib/livekit'
 import { getSalaById } from '@/lib/salas'
 import { listParticipantesAtivos } from '@/lib/salas-presenca'
 import { getTenantFromHost } from '@/lib/tenant'
-import { SalaPopoutLoading } from '@/components/portal/sala-popout-client'
+import { SalaPopoutShell } from '@/components/portal/sala-popout-shell'
 
 export const metadata: Metadata = { title: 'Vídeo da sala' }
 export const dynamic = 'force-dynamic'
-
-const SalaPopoutClientLazy = nextDynamic(
-  () => import('@/components/portal/sala-popout-client').then((mod) => mod.SalaPopoutClient),
-  { ssr: false, loading: () => <SalaPopoutLoading /> },
-)
 
 export default async function VideoSalaPage({
   params,
@@ -46,7 +40,7 @@ export default async function VideoSalaPage({
   const livekitUrl = requireLiveKitConfig().url
 
   return (
-    <SalaPopoutClientLazy
+    <SalaPopoutShell
       salaId={sala.id}
       titulo={sala.titulo}
       hostId={sala.hostId}
