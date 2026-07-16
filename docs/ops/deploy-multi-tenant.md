@@ -36,12 +36,16 @@ Após alterar env vars, redeploy do serviço.
 
 ## 2. DNS
 
-No registrador do domínio:
+No registrador do domínio **ou via Cloudflare Free** (recomendado — CDN +
+Brotli a $0; runbook completo em [`docs/ops/cloudflare-cdn.md`](cloudflare-cdn.md)):
 
 | Tipo | Nome | Destino |
 |---|---|---|
 | CNAME | `@` | host fornecido pelo Railway (apex) |
 | CNAME | `*` | mesmo host (wildcard) |
+
+Se usar Cloudflare: nameservers do CF + registros **Proxied** (nuvem laranja);
+SSL **Full (strict)**.
 
 No Railway → serviço `torcida-web` → **Settings → Networking → Custom Domain**:
 

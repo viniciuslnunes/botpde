@@ -27,6 +27,29 @@ const nextConfig: NextConfig = {
       allowedOrigins: serverActionOrigins,
     },
   },
+  // CDN (Cloudflare Free): origin respeitado na edge — ver docs/ops/cloudflare-cdn.md
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/stickers/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+    ]
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     // Stickers locais — Next 16 exige localPatterns explícito para assets em public/.

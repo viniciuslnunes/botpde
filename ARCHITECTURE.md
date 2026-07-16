@@ -598,8 +598,9 @@ grátis”): PgBouncer/Accelerate, Redis, WebSocket, SWR/React Query global,
 migração Vercel+Neon, virtualização de listas longas. Ver §5.4 para critérios
 de quando pooler faria sentido.
 
-**Passo manual opcional (infra, zero código):** Cloudflare Free na frente do
-domínio — cache de `/_next/static` e Brotli; documentado em `apps/web/src/lib/env.ts`.
+**Passo manual opcional (infra, zero código além de headers):** Cloudflare Free
+na frente do domínio — cache de `/_next/static` e Brotli. Runbook:
+**`docs/ops/cloudflare-cdn.md`**. Headers imutáveis em `apps/web/next.config.ts`.
 
 Agente responsável por auditorias e novos recortes: `performance` (ver
 `docs/agents/README.md`).

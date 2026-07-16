@@ -183,7 +183,28 @@ escutam SSE; polling 60s como rede de segurança.
 | F1 | **PgBouncer / Prisma Accelerate** | Contenção de conexões ou p95 de query &gt; SLA | Médio–Alto |
 | F2 | **Read replica** para feeds e buscas | CPU do primary &gt; 70% sustentado | Alto |
 | F3 | **OpenTelemetry** — span por rota Comunidade + contagem Prisma exportada | Debug em produção sem adivinhar | Médio |
-| F4 | **CDN** (Cloudflare já documentado) + cache de avatar/mídia estática | LCP em 4G no dia de jogo | Baixo (config) |
+| F4 | **CDN** Cloudflare Free | LCP em 4G no dia de jogo | Baixo | ✅ runbook `docs/ops/cloudflare-cdn.md` + headers origin |
+
+### Checklist pós-deploy (produção)
+
+Rodar uma vez após merge das ondas A–D / C3:
+
+```bash
+pnpm --filter @torcida/db db:push
+pnpm --filter @torcida/db db:enable-pg-trgm
+```
+
+| Check | Como |
+|-------|------|
+| `REDIS_URL` | Upstash Free ligado; logs sem `[realtime-bus] Redis … error` |
+| Timeline / índices | `db:push` ok |
+| Busca | `db:enable-pg-trgm` ok; senão fallback ILIKE |
+| CDN | Cloudflare Free + `cf-cache-status: HIT` em `/_next/static` |
+| Mensagens SSE | Enviar DM → badge/inbox atualiza sem esperar 60s |
+| Feed | Scroll infinite sem reload; Network só `/api/comunidade/feed` |
+
+**E1 (Meilisearch):** só se, após `pg_trgm` em produção, busca continuar lenta
+com evidência (p95 / reclamações). Não contratar engine sem medir.
 
 ### Critérios de decisão (não pular fases)
 
