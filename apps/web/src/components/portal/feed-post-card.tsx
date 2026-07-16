@@ -109,9 +109,9 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
       {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
 
       {post.midiaUrls.length > 0 ? (
-        <PostMedia urls={post.midiaUrls} />
+        <PostMedia urls={post.midiaUrls} caption={post.conteudo} />
       ) : (
-        post.imagemUrl && <PostLegacyImage src={post.imagemUrl} />
+        post.imagemUrl && <PostLegacyImage src={post.imagemUrl} caption={post.conteudo} />
       )}
 
       <PostEngagement

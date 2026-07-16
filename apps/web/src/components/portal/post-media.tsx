@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
   classifyMedia,
   cloudinaryVideoPoster,
@@ -44,9 +45,10 @@ function loadScript(src: string): Promise<void> {
 
 interface PostMediaProps {
   urls: string[]
+  caption?: string | null
 }
 
-export function PostMedia({ urls }: PostMediaProps) {
+export function PostMedia({ urls, caption }: PostMediaProps) {
   const { media, embeds } = classifyMedia(urls)
   const slides = media.filter((m) => m.type !== 'sticker')
   const stickers = media.filter((m) => m.type === 'sticker')
@@ -54,7 +56,7 @@ export function PostMedia({ urls }: PostMediaProps) {
 
   return (
     <div className="mt-3 space-y-3">
-      {slides.length > 0 && <MediaCarousel slides={slides} />}
+      {slides.length > 0 && <MediaCarousel slides={slides} caption={caption} />}
       {stickers.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {stickers.map((s) =>
@@ -81,7 +83,15 @@ export function PostMedia({ urls }: PostMediaProps) {
   )
 }
 
-function Slide({ item, className }: { item: MediaAttachment; className: string }) {
+function Slide({
+  item,
+  className,
+  onOpen,
+}: {
+  item: MediaAttachment
+  className: string
+  onOpen?: () => void
+}) {
   const [broken, setBroken] = useState(false)
 
   if (broken) {
@@ -109,6 +119,9 @@ function Slide({ item, className }: { item: MediaAttachment; className: string }
       />
     )
   }
+
+  const imageClassName = onOpen ? `${className} cursor-zoom-in` : className
+
   if (canOptimizeImageUrl(item.url)) {
     return (
       <Image
@@ -117,7 +130,8 @@ function Slide({ item, className }: { item: MediaAttachment; className: string }
         width={1200}
         height={800}
         sizes="(max-width: 768px) 100vw, 640px"
-        className={className}
+        className={imageClassName}
+        onClick={onOpen}
         onError={() => setBroken(true)}
       />
     )
@@ -127,24 +141,46 @@ function Slide({ item, className }: { item: MediaAttachment; className: string }
     <img
       src={item.url}
       alt=""
-      className={className}
+      className={imageClassName}
       loading="lazy"
       decoding="async"
+      onClick={onOpen}
       onError={() => setBroken(true)}
     />
   )
 }
 
-function MediaCarousel({ slides }: { slides: MediaAttachment[] }) {
+function MediaCarousel({ slides, caption }: { slides: MediaAttachment[]; caption?: string | null }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+
+  const imageUrls = slides.filter((s) => s.type === 'image').map((s) => s.url)
+
+  function openLightbox(url: string) {
+    const i = imageUrls.indexOf(url)
+    if (i >= 0) setLightboxIdx(i)
+  }
 
   if (slides.length === 1) {
+    const only = slides[0]
     return (
-      <Slide
-        item={slides[0]}
-        className="max-h-[32rem] w-full rounded-xl border border-[rgb(var(--border))] object-contain"
-      />
+      <>
+        <Slide
+          item={only}
+          className="max-h-[32rem] w-full rounded-xl border border-[rgb(var(--border))] object-contain"
+          onOpen={only.type === 'image' ? () => openLightbox(only.url) : undefined}
+        />
+        {lightboxIdx != null && (
+          <MediaLightbox
+            urls={imageUrls}
+            index={lightboxIdx}
+            caption={caption}
+            onClose={() => setLightboxIdx(null)}
+            onIndexChange={setLightboxIdx}
+          />
+        )}
+      </>
     )
   }
 
@@ -174,9 +210,20 @@ function MediaCarousel({ slides }: { slides: MediaAttachment[] }) {
             key={i}
             item={item}
             className="h-[22rem] w-full shrink-0 snap-center bg-black object-contain sm:h-[28rem]"
+            onOpen={item.type === 'image' ? () => openLightbox(item.url) : undefined}
           />
         ))}
       </div>
+
+      {lightboxIdx != null && (
+        <MediaLightbox
+          urls={imageUrls}
+          index={lightboxIdx}
+          caption={caption}
+          onClose={() => setLightboxIdx(null)}
+          onIndexChange={setLightboxIdx}
+        />
+      )}
 
       {index > 0 && (
         <button
