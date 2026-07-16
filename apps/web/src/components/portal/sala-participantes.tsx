@@ -27,6 +27,7 @@ function Avatar({ nome, avatarUrl }: { nome: string | null; avatarUrl: string | 
       <img
         src={avatarUrl}
         alt={nome ?? 'Membro'}
+        referrerPolicy="no-referrer"
         className="h-9 w-9 rounded-full object-cover ring-2 ring-[rgb(var(--border))]"
       />
     )

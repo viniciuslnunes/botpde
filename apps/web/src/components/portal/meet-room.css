@@ -164,9 +164,11 @@
   backdrop-filter: blur(12px);
 }
 
-/* Esconde silhueta padrão do LiveKit quando usamos avatar customizado */
+/* Esconde silhueta padrão do LiveKit quando usamos avatar customizado
+   ou quando a câmera está off (evita flash da silhueta entre re-renders). */
 .meet-room-root .lk-participant-tile[data-meet-room-custom-avatar='true'] .lk-participant-placeholder,
-.meet-room-root .lk-participant-tile:has(.meet-room-avatar-fallback) .lk-participant-placeholder {
+.meet-room-root .lk-participant-tile:has(.meet-room-avatar-fallback) .lk-participant-placeholder,
+.meet-room-root .lk-participant-tile[data-lk-video-muted='true'] .lk-participant-placeholder {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;

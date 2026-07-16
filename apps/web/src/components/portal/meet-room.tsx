@@ -542,6 +542,11 @@ function resolveParticipantProfile(
   const isLocal = tile.getAttribute('data-lk-local-participant') === 'true'
   if (isLocal && participantProfiles[userId]) return participantProfiles[userId]
 
+  const identity =
+    tile.getAttribute('data-lk-identity')?.trim() ||
+    tile.getAttribute('data-lk-participant-identity')?.trim()
+  if (identity && participantProfiles[identity]) return participantProfiles[identity]
+
   const attrName = tile.getAttribute('data-lk-participant-name')?.trim()
   const labelName = tile.querySelector('.lk-participant-name')?.textContent?.trim()
   const candidateName = attrName || labelName
@@ -560,6 +565,77 @@ function resolveParticipantProfile(
   }
 
   return isLocal ? participantProfiles[userId] ?? null : null
+}
+
+function isCameraLiveOnTile(tile: Element): boolean {
+  // Só esconde o avatar quando a câmera está explicitamente ligada.
+  // LiveKit costuma manter <video> no DOM mesmo com câmera off — isso fazia
+  // o fallback sumir/aparecer (silhueta padrão ↔ foto).
+  return tile.getAttribute('data-lk-video-muted') === 'false'
+}
+
+function ensureTileAvatarFallback(
+  tile: Element,
+  userId: string,
+  participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>,
+) {
+  const source = tile.getAttribute('data-lk-source')
+  if (source === 'screen_share') return
+
+  const existing = tile.querySelector('.meet-room-avatar-fallback') as HTMLElement | null
+
+  if (isCameraLiveOnTile(tile)) {
+    existing?.remove()
+    tile.removeAttribute('data-meet-room-custom-avatar')
+    return
+  }
+
+  const profile = resolveParticipantProfile(tile, userId, participantProfiles)
+  const participantName =
+    tile.getAttribute('data-lk-participant-name')?.trim() ||
+    tile.querySelector('.lk-participant-name')?.textContent?.trim() ||
+    profile?.nome ||
+    'Membro'
+  const avatarUrl = profile?.avatarUrl ?? ''
+
+  tile.setAttribute('data-meet-room-custom-avatar', 'true')
+
+  if (
+    existing &&
+    existing.dataset.avatarUrl === avatarUrl &&
+    existing.dataset.participantName === participantName
+  ) {
+    return
+  }
+
+  const fallback = existing ?? document.createElement('div')
+  fallback.className = 'meet-room-avatar-fallback'
+  fallback.dataset.avatarUrl = avatarUrl
+  fallback.dataset.participantName = participantName
+
+  if (avatarUrl) {
+    const currentImg = fallback.querySelector('img.meet-room-avatar-fallback__image') as HTMLImageElement | null
+    if (currentImg && currentImg.getAttribute('src') === avatarUrl) {
+      currentImg.alt = participantName
+    } else {
+      fallback.replaceChildren()
+      const img = document.createElement('img')
+      img.src = avatarUrl
+      img.alt = participantName
+      img.decoding = 'async'
+      img.referrerPolicy = 'no-referrer'
+      img.className = 'meet-room-avatar-fallback__image'
+      fallback.appendChild(img)
+    }
+  } else {
+    fallback.replaceChildren()
+    const initial = document.createElement('span')
+    initial.className = 'meet-room-avatar-fallback__initial'
+    initial.textContent = participantName.charAt(0).toUpperCase() || 'M'
+    fallback.appendChild(initial)
+  }
+
+  if (!existing) tile.appendChild(fallback)
 }
 
 function MeetStage({
@@ -636,49 +712,42 @@ function MeetStage({
     const stage = stageRef.current
     if (!stage) return
 
-    for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
-      const source = tile.getAttribute('data-lk-source')
-      if (source === 'screen_share') continue
-
-      const videoMuted = tile.getAttribute('data-lk-video-muted') === 'true'
-      const hasLiveVideo = Boolean(tile.querySelector('video, canvas')) && !videoMuted
-      const existing = tile.querySelector('.meet-room-avatar-fallback')
-
-      if (hasLiveVideo) {
-        existing?.remove()
-        tile.removeAttribute('data-meet-room-custom-avatar')
-        continue
+    function syncAvatars() {
+      for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
+        ensureTileAvatarFallback(tile, userId, participantProfiles)
       }
-
-      const profile = resolveParticipantProfile(tile, userId, participantProfiles)
-      const participantName =
-        tile.getAttribute('data-lk-participant-name')?.trim() ||
-        tile.querySelector('.lk-participant-name')?.textContent?.trim() ||
-        profile?.nome ||
-        'Membro'
-
-      tile.setAttribute('data-meet-room-custom-avatar', 'true')
-
-      const fallback = existing ?? document.createElement('div')
-      fallback.className = 'meet-room-avatar-fallback'
-      fallback.replaceChildren()
-
-      if (profile?.avatarUrl) {
-        const img = document.createElement('img')
-        img.src = profile.avatarUrl
-        img.alt = participantName
-        img.className = 'meet-room-avatar-fallback__image'
-        fallback.appendChild(img)
-      } else {
-        const initial = document.createElement('span')
-        initial.className = 'meet-room-avatar-fallback__initial'
-        initial.textContent = participantName.charAt(0).toUpperCase() || 'M'
-        fallback.appendChild(initial)
-      }
-
-      if (!existing) tile.appendChild(fallback)
     }
-  }, [participantProfiles, tracks, userId])
+
+    syncAvatars()
+
+    let frame = 0
+    const scheduleSync = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => {
+        frame = 0
+        syncAvatars()
+      })
+    }
+
+    const observer = new MutationObserver(scheduleSync)
+    observer.observe(stage, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: [
+        'data-lk-video-muted',
+        'data-lk-source',
+        'data-lk-local-participant',
+        'data-lk-participant-name',
+        'data-lk-identity',
+      ],
+    })
+
+    return () => {
+      observer.disconnect()
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [participantProfiles, userId, showParticipantStrip, focusTrack])
 
   if (focusTrack) {
     return (
