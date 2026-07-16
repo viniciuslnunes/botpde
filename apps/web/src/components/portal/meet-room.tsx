@@ -4,17 +4,15 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { AnimatePresence, m } from 'motion/react'
 import {
   AlertCircle,
+  AppWindow,
   Bell,
+  ChevronUp,
   Hand,
   Info,
   Loader2,
   LogOut,
-  Maximize2,
-  Minimize2,
   MonitorUp,
   MonitorX,
-  PanelsLeftBottom,
-  PanelsTopLeft,
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -51,10 +49,10 @@ type MeetRoomProps = {
   userId: string
   userName: string
   participantProfiles?: Record<string, { nome: string | null; avatarUrl: string | null }>
-  presentationMode?: boolean
+  popoutMode?: boolean
   showParticipantStrip?: boolean
-  canTogglePresentation?: boolean
-  onTogglePresentation?: () => void
+  canOpenVideoPopout?: boolean
+  onOpenVideoPopout?: () => void
   onToggleParticipantStrip?: () => void
   onOnlineCountChange?: (count: number) => void
   onScreenShareActiveChange?: (active: boolean) => void
@@ -528,16 +526,17 @@ function MeetStage({
   lk,
   participantProfiles,
   showParticipantStrip,
+  onToggleParticipantStrip,
 }: {
   lk: LiveKitModule
   participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
   showParticipantStrip: boolean
+  onToggleParticipantStrip?: () => void
 }) {
   const {
     GridLayout,
     ParticipantTile,
     FocusLayout,
-    FocusLayoutContainer,
     CarouselLayout,
     useLayoutContext,
     usePinnedTracks,
@@ -600,17 +599,32 @@ function MeetStage({
     )
 
     for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
+      const source = tile.getAttribute('data-lk-source')
+      if (source === 'screen_share') continue
+
       const hasMedia = Boolean(tile.querySelector('video, canvas'))
       const existing = tile.querySelector('.meet-room-avatar-fallback')
+      const placeholder = tile.querySelector('.lk-participant-placeholder')
 
       if (hasMedia) {
         existing?.remove()
+        tile.removeAttribute('data-meet-room-custom-avatar')
         continue
       }
 
+      const identity =
+        tile.getAttribute('data-lk-participant-identity') ??
+        tile.closest('[data-lk-participant-identity]')?.getAttribute('data-lk-participant-identity') ??
+        null
       const labelNode = tile.querySelector('.lk-participant-metadata, .lk-participant-name')
       const participantName = labelNode?.textContent?.trim() || 'Membro'
-      const profile = fallbackByName.get(participantName) ?? null
+      const profile =
+        (identity ? participantProfiles[identity] : null) ??
+        fallbackByName.get(participantName) ??
+        null
+
+      tile.setAttribute('data-meet-room-custom-avatar', 'true')
+      if (placeholder) placeholder.setAttribute('aria-hidden', 'true')
 
       if (!existing) {
         const fallback = document.createElement('div')
@@ -625,7 +639,7 @@ function MeetStage({
         } else {
           const initial = document.createElement('span')
           initial.className = 'meet-room-avatar-fallback__initial'
-          initial.textContent = participantName.charAt(0).toUpperCase() || 'M'
+          initial.textContent = (profile?.nome ?? participantName).charAt(0).toUpperCase() || 'M'
           fallback.appendChild(initial)
         }
 
@@ -637,21 +651,54 @@ function MeetStage({
   if (focusTrack) {
     return (
       <div ref={stageRef} className="meet-room-focus-wrapper">
-        {showParticipantStrip ? (
-          <FocusLayoutContainer className="meet-room-focus">
-            <CarouselLayout tracks={carouselTracks} className="meet-room-carousel">
-              <ParticipantTile />
-            </CarouselLayout>
-            <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
-          </FocusLayoutContainer>
-        ) : (
-          <div className="meet-room-focus meet-room-focus--solo">
-            <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
+        <div className="meet-room-spotlight">
+          <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
+          <div className="meet-room-focus-badge">
+            <MonitorUp className="h-3.5 w-3.5" />
+            Tela de {focusTrack.participant.name ?? 'participante'}
           </div>
-        )}
-        <div className="meet-room-focus-badge">
-          <MonitorUp className="h-3.5 w-3.5" />
-          Tela de {focusTrack.participant.name ?? 'participante'}
+        </div>
+
+        <div
+          className={`meet-room-bottom-strip-shell${
+            showParticipantStrip ? '' : ' meet-room-bottom-strip-shell--collapsed'
+          }`}
+        >
+          {onToggleParticipantStrip ? (
+            <button
+              type="button"
+              className="meet-room-strip-toggle"
+              onClick={onToggleParticipantStrip}
+              aria-expanded={showParticipantStrip}
+              title={showParticipantStrip ? 'Ocultar participantes' : 'Mostrar participantes'}
+            >
+              <ChevronUp
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  showParticipantStrip ? '' : 'rotate-180'
+                }`}
+              />
+              <span className="meet-room-strip-toggle__label">
+                {showParticipantStrip ? 'Ocultar' : 'Participantes'}
+              </span>
+            </button>
+          ) : null}
+
+          <AnimatePresence initial={false}>
+            {showParticipantStrip && carouselTracks.length > 0 ? (
+              <m.div
+                key="bottom-strip"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={springSnappy}
+                className="meet-room-bottom-strip-track"
+              >
+                <CarouselLayout tracks={carouselTracks} className="meet-room-bottom-strip">
+                  <ParticipantTile />
+                </CarouselLayout>
+              </m.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
     )
@@ -674,10 +721,10 @@ function MeetConference({
   userId,
   userName,
   participantProfiles,
-  presentationMode,
+  popoutMode,
   showParticipantStrip,
-  canTogglePresentation,
-  onTogglePresentation,
+  canOpenVideoPopout,
+  onOpenVideoPopout,
   onToggleParticipantStrip,
   onScreenShareActiveChange,
   onLeaveCall,
@@ -689,10 +736,10 @@ function MeetConference({
   userId: string
   userName: string
   participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
-  presentationMode: boolean
+  popoutMode: boolean
   showParticipantStrip: boolean
-  canTogglePresentation: boolean
-  onTogglePresentation?: () => void
+  canOpenVideoPopout: boolean
+  onOpenVideoPopout?: () => void
   onToggleParticipantStrip?: () => void
   onScreenShareActiveChange?: (active: boolean) => void
   onLeaveCall?: () => void
@@ -771,34 +818,20 @@ function MeetConference({
                   lk={lk}
                   participantProfiles={participantProfiles}
                   showParticipantStrip={showParticipantStrip}
+                  onToggleParticipantStrip={onToggleParticipantStrip}
                 />
               </m.div>
             )}
           </AnimatePresence>
 
-          {conectado && canTogglePresentation && onTogglePresentation && !presentationMode ? (
+          {conectado && canOpenVideoPopout && onOpenVideoPopout && !popoutMode ? (
             <div className="meet-room-stage-actions">
               <TooltipIconButton
-                label={presentationMode ? 'Sair da tela cheia com comentários' : 'Abrir tela cheia com comentários'}
-                active={presentationMode}
-                onClick={onTogglePresentation}
+                label="Abrir vídeo em nova janela"
+                onClick={onOpenVideoPopout}
               >
-                {presentationMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <AppWindow className="h-4 w-4" />
               </TooltipIconButton>
-
-              {onToggleParticipantStrip ? (
-                <TooltipIconButton
-                  label={showParticipantStrip ? 'Ocultar participantes laterais' : 'Mostrar participantes laterais'}
-                  active={!showParticipantStrip}
-                  onClick={onToggleParticipantStrip}
-                >
-                  {showParticipantStrip ? (
-                    <PanelsLeftBottom className="h-4 w-4" />
-                  ) : (
-                    <PanelsTopLeft className="h-4 w-4" />
-                  )}
-                </TooltipIconButton>
-              ) : null}
             </div>
           ) : null}
 
@@ -834,10 +867,10 @@ export function MeetRoom({
   userId,
   userName,
   participantProfiles = {},
-  presentationMode = false,
+  popoutMode = false,
   showParticipantStrip = true,
-  canTogglePresentation = false,
-  onTogglePresentation,
+  canOpenVideoPopout = false,
+  onOpenVideoPopout,
   onToggleParticipantStrip,
   onOnlineCountChange,
   onScreenShareActiveChange,
@@ -892,10 +925,10 @@ export function MeetRoom({
       userId,
       userName,
       participantProfiles,
-      presentationMode,
+      popoutMode,
       showParticipantStrip,
-      canTogglePresentation,
-      onTogglePresentation,
+      canOpenVideoPopout,
+      onOpenVideoPopout,
       onToggleParticipantStrip,
       onScreenShareActiveChange,
       onLeaveCall,
@@ -908,10 +941,10 @@ export function MeetRoom({
       userId,
       userName,
       participantProfiles,
-      presentationMode,
+      popoutMode,
       showParticipantStrip,
-      canTogglePresentation,
-      onTogglePresentation,
+      canOpenVideoPopout,
+      onOpenVideoPopout,
       onToggleParticipantStrip,
       onScreenShareActiveChange,
       onLeaveCall,
@@ -951,7 +984,7 @@ export function MeetRoom({
     <div
       className="meet-room-root"
       data-lk-theme="default"
-      data-presentation={presentationMode ? 'true' : 'false'}
+      data-popout={popoutMode ? 'true' : 'false'}
     >
       <AnimatePresence>
         {mediaHint && (
