@@ -817,33 +817,38 @@ function MeetConference({
   }, [screenTracks, isTrackReference])
 
   const localScreenShareActive = activeScreenSharers.some((sharer) => sharer.userId === userId)
+  const resumeScreenAttemptedRef = useRef(false)
+  const roomConnected = room.state === ConnectionState.Connected
 
   useEffect(() => {
     onScreenShareActiveChange?.(localScreenShareActive)
   }, [localScreenShareActive, onScreenShareActiveChange])
 
   useEffect(() => {
-    if (!resumeScreenShare) return
-    if (room.state !== ConnectionState.Connected) return
-    if (localParticipant.isScreenShareEnabled) return
-
-    let cancelled = false
-    void localParticipant
-      .setScreenShareEnabled(true, { audio: true })
-      .catch(() => {
-        if (!cancelled) {
-          toast.info('Reative o compartilhamento de tela nesta janela para continuar a apresentação.')
-        }
-      })
-
-    return () => {
-      cancelled = true
+    if (!resumeScreenShare) {
+      resumeScreenAttemptedRef.current = false
+      return
     }
-  }, [resumeScreenShare, room.state, localParticipant])
+    if (!roomConnected) return
+    if (resumeScreenAttemptedRef.current) return
+
+    const participant = room.localParticipant
+    if (participant.isScreenShareEnabled) {
+      resumeScreenAttemptedRef.current = true
+      return
+    }
+
+    // Uma única tentativa: re-disparar abre o picker do Chrome em loop
+    // (re-renders durante o getDisplayMedia reexecutavam o efeito).
+    resumeScreenAttemptedRef.current = true
+    void participant.setScreenShareEnabled(true, { audio: true }).catch(() => {
+      toast.info('Reative o compartilhamento de tela nesta janela para continuar a apresentação.')
+    })
+  }, [resumeScreenShare, roomConnected, room])
 
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
-  const conectado = room.state === ConnectionState.Connected
+  const conectado = roomConnected
 
   return (
     <LayoutContextProvider value={layoutContext}>
