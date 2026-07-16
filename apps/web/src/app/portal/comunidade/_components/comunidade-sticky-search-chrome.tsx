@@ -19,7 +19,7 @@ export function ComunidadeStickySearchChrome({ children }: { children?: ReactNod
 
   return (
     <m.div
-      className="sticky top-14 z-20 -mx-4 min-w-0 overflow-hidden bg-[rgb(var(--background-subtle))]/90 backdrop-blur-md lg:top-16 lg:mx-0"
+      className="sticky top-14 z-20 -mx-4 min-w-0 bg-[rgb(var(--background-subtle))]/90 backdrop-blur-md lg:top-16 lg:mx-0"
       initial={false}
       animate={
         visible
@@ -31,7 +31,7 @@ export function ComunidadeStickySearchChrome({ children }: { children?: ReactNod
             }
       }
       transition={reduceMotion ? { duration: 0 } : springSnappy}
-      style={{ pointerEvents: visible ? 'auto' : 'none' }}
+      style={{ pointerEvents: visible ? 'auto' : 'none', overflow: visible ? 'visible' : 'hidden' }}
       aria-hidden={!visible}
       onFocusCapture={() => setFocusLocked(true)}
       onBlurCapture={(event) => {

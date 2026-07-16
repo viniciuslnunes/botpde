@@ -1,7 +1,7 @@
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
-import { canFollowUser, getSeguimentoStatus } from './social'
-import { getContagensSeguimento, getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
+import { canFollowUser } from './social'
+import { getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
 import { normalizarHashtag } from './comunidade-social'
 import { postInclude, projetarPost, podeVerPost, type PostSocialItem, type PostRaw } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
@@ -77,39 +77,53 @@ export async function buscarMembrosComunidade(
   })
 
   const vistos = new Set<string>()
-  const membros: MembroBuscaItem[] = []
-
+  const candidatos: MembroRow[] = []
   for (const r of rows) {
     if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
     vistos.add(r.userId)
+    candidatos.push(r)
+    if (candidatos.length >= 20) break
+  }
+  if (candidatos.length === 0) return []
 
-    const perfil: { perfilPrivado: boolean; avatarUrl: string | null } | null =
-      await db.perfilMembro.findUnique({
-        where: { userId_tenantId: { userId: r.userId, tenantId } },
-        select: { perfilPrivado: true, avatarUrl: true },
-      })
+  const candidatoIds = candidatos.map((c) => c.userId)
 
-    const [statusSeguimento, contagens, podeSeguir] = await Promise.all([
-      getSeguimentoStatus(userId, r.userId),
-      getContagensSeguimento(r.userId, tenantId),
-      canFollowUser(userId, r.userId, tenantId),
-    ])
+  const [perfis, seguimentos, contagensRows, podeSeguirLista] = await Promise.all([
+    db.perfilMembro.findMany({
+      where: { tenantId, userId: { in: candidatoIds } },
+      select: { userId: true, perfilPrivado: true, avatarUrl: true },
+    }) as Promise<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }[]>,
+    db.seguimento.findMany({
+      where: { seguidorId: userId, seguidoId: { in: candidatoIds } },
+      select: { seguidoId: true, status: true },
+    }) as Promise<
+      { seguidoId: string; status: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' }[]
+    >,
+    db.seguimento.groupBy({
+      by: ['seguidoId'],
+      where: { seguidoId: { in: candidatoIds }, status: 'APROVADO' },
+      _count: { _all: true },
+    }) as Promise<{ seguidoId: string; _count: { _all: number } }[]>,
+    Promise.all(candidatoIds.map((id) => canFollowUser(userId, id, tenantId))),
+  ])
 
-    membros.push({
+  const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
+  const statusPorId = new Map(seguimentos.map((s) => [s.seguidoId, s.status]))
+  const seguidoresPorId = new Map(contagensRows.map((c) => [c.seguidoId, c._count._all]))
+
+  return candidatos.map((r, i) => {
+    const perfil = perfilPorId.get(r.userId)
+    return {
       id: r.user.id,
       nome: r.user.nome,
-      avatarUrl: resolverAvatarSocial(perfil?.avatarUrl, r.user.avatarUrl),
+      avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
       tenantNome: r.tenant.nome,
       perfilPrivado: perfil?.perfilPrivado ?? true,
-      statusSeguimento,
-      seguidores: contagens.seguidores,
-      podeSeguir,
-    })
-
-    if (membros.length >= 20) break
-  }
-
-  return membros
+      statusSeguimento: statusPorId.get(r.userId) ?? null,
+      seguidores: seguidoresPorId.get(r.userId) ?? 0,
+      podeSeguir: podeSeguirLista[i],
+    }
+  })
 }
 
 export async function buscarComunidade(

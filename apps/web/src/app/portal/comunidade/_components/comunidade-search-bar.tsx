@@ -21,6 +21,7 @@ export function ComunidadeSearchBar() {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [aberto, setAberto] = useState(false)
@@ -30,6 +31,7 @@ export function ComunidadeSearchBar() {
     posts: [],
   })
   const [carregando, setCarregando] = useState(false)
+  const [ativo, setAtivo] = useState(-1)
   const [, startTransition] = useTransition()
 
   useEffect(() => {
@@ -38,13 +40,19 @@ export function ComunidadeSearchBar() {
   }, [q])
 
   const buscar = useCallback(async (termo: string) => {
+    abortRef.current?.abort()
+    setAtivo(-1)
     if (termo.length < 2) {
       setResultado({ membros: [], hashtags: [], posts: [] })
       return
     }
+    const controller = new AbortController()
+    abortRef.current = controller
     setCarregando(true)
     try {
-      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`)
+      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`, {
+        signal: controller.signal,
+      })
       if (!res.ok) return
       const data = (await res.json()) as BuscaRapidaResponse
       setResultado({
@@ -52,8 +60,10 @@ export function ComunidadeSearchBar() {
         hashtags: data.hashtags.slice(0, 4),
         posts: data.posts.slice(0, 3),
       })
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
     } finally {
-      setCarregando(false)
+      if (abortRef.current === controller) setCarregando(false)
     }
   }, [])
 
@@ -61,6 +71,8 @@ export function ComunidadeSearchBar() {
     if (!aberto) return
     startTransition(() => void buscar(debounced))
   }, [debounced, buscar, aberto])
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
@@ -74,6 +86,21 @@ export function ComunidadeSearchBar() {
 
   const temResultados =
     resultado.membros.length > 0 || resultado.hashtags.length > 0 || resultado.posts.length > 0
+
+  const flatItems = [
+    ...resultado.membros.map((membro) => ({
+      optionId: `busca-opt-membro-${membro.id}`,
+      href: `/portal/comunidade/perfil/${membro.id}`,
+    })),
+    ...resultado.hashtags.map((h) => ({
+      optionId: `busca-opt-hashtag-${h.tag}`,
+      href: `/portal/comunidade/hashtag/${encodeURIComponent(h.tag)}`,
+    })),
+    ...resultado.posts.map((p) => ({
+      optionId: `busca-opt-post-${p.id}`,
+      href: linkPostComunidade(p.id),
+    })),
+  ]
 
   function irParaBuscaCompleta() {
     const termo = q.trim()
@@ -104,9 +131,23 @@ export function ComunidadeSearchBar() {
           }}
           onFocus={() => setAberto(true)}
           onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' && flatItems.length > 0) {
+              e.preventDefault()
+              setAtivo((prev) => (prev + 1 >= flatItems.length ? 0 : prev + 1))
+            }
+            if (e.key === 'ArrowUp' && flatItems.length > 0) {
+              e.preventDefault()
+              setAtivo((prev) => (prev - 1 < 0 ? flatItems.length - 1 : prev - 1))
+            }
             if (e.key === 'Enter') {
               e.preventDefault()
-              irParaBuscaCompleta()
+              const selecionado = ativo >= 0 ? flatItems[ativo] : undefined
+              if (selecionado) {
+                setAberto(false)
+                router.push(selecionado.href)
+              } else {
+                irParaBuscaCompleta()
+              }
             }
             if (e.key === 'Escape') {
               setAberto(false)
@@ -119,6 +160,7 @@ export function ComunidadeSearchBar() {
           aria-haspopup="listbox"
           aria-expanded={aberto}
           aria-controls="comunidade-busca-rapida"
+          aria-activedescendant={ativo >= 0 ? flatItems[ativo]?.optionId : undefined}
           className={[
             'h-11 w-full rounded-xl border bg-[rgb(var(--surface))] pl-10 pr-10 text-sm text-[rgb(var(--foreground))] outline-none transition-colors duration-200',
             aberto
@@ -154,6 +196,8 @@ export function ComunidadeSearchBar() {
           <m.div
             id="comunidade-busca-rapida"
             key="busca-panel"
+            role="listbox"
+            aria-label="Resultados da busca"
             variants={popoverPanel}
             initial="hidden"
             animate="show"
@@ -209,9 +253,16 @@ export function ComunidadeSearchBar() {
                       {resultado.membros.map((membro, i) => (
                         <m.div key={membro.id} custom={i} variants={menuItemStagger}>
                           <Link
+                            id={`busca-opt-membro-${membro.id}`}
+                            role="option"
+                            aria-selected={ativo === i}
                             href={`/portal/comunidade/perfil/${membro.id}`}
                             onClick={() => setAberto(false)}
-                            className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                            onMouseEnter={() => setAtivo(i)}
+                            className={[
+                              'flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                              ativo === i ? 'bg-[rgb(var(--background-subtle))]' : '',
+                            ].join(' ')}
                           >
                             <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="sm" />
                             <div className="min-w-0">
@@ -232,22 +283,32 @@ export function ComunidadeSearchBar() {
                         Hashtags
                       </p>
                       <div className="flex flex-wrap gap-1.5 px-2 pb-1">
-                        {resultado.hashtags.map((h, i) => (
+                        {resultado.hashtags.map((h, i) => {
+                          const idx = resultado.membros.length + i
+                          return (
                           <m.div
                             key={h.tag}
-                            custom={resultado.membros.length + i}
+                            custom={idx}
                             variants={menuItemStagger}
                           >
                             <Link
+                              id={`busca-opt-hashtag-${h.tag}`}
+                              role="option"
+                              aria-selected={ativo === idx}
                               href={`/portal/comunidade/hashtag/${encodeURIComponent(h.tag)}`}
                               onClick={() => setAberto(false)}
-                              className="inline-flex items-center gap-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--surface))]"
+                              onMouseEnter={() => setAtivo(idx)}
+                              className={[
+                                'inline-flex items-center gap-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--surface))]',
+                                ativo === idx ? 'bg-[rgb(var(--surface))]' : '',
+                              ].join(' ')}
                             >
                               <Hash className="h-3 w-3" />
                               {h.tag}
                             </Link>
                           </m.div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </section>
                   )}
@@ -257,22 +318,32 @@ export function ComunidadeSearchBar() {
                       <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                         Posts
                       </p>
-                      {resultado.posts.map((p, i) => (
+                      {resultado.posts.map((p, i) => {
+                        const idx = resultado.membros.length + resultado.hashtags.length + i
+                        return (
                         <m.div
                           key={p.id}
-                          custom={resultado.membros.length + resultado.hashtags.length + i}
+                          custom={idx}
                           variants={menuItemStagger}
                         >
                           <Link
+                            id={`busca-opt-post-${p.id}`}
+                            role="option"
+                            aria-selected={ativo === idx}
                             href={linkPostComunidade(p.id)}
                             onClick={() => setAberto(false)}
-                            className="block rounded-lg px-2 py-2 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                            onMouseEnter={() => setAtivo(idx)}
+                            className={[
+                              'block rounded-lg px-2 py-2 transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                              ativo === idx ? 'bg-[rgb(var(--background-subtle))]' : '',
+                            ].join(' ')}
                           >
                             <p className="text-xs text-[rgb(var(--foreground-muted))]">{p.autor.nome ?? 'Membro'}</p>
                             <p className="line-clamp-1 text-sm text-[rgb(var(--foreground))]">{p.conteudo}</p>
                           </Link>
                         </m.div>
-                      ))}
+                        )
+                      })}
                     </section>
                   )}
                 </m.div>

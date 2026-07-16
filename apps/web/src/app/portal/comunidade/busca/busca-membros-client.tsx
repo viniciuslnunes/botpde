@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
@@ -38,6 +38,7 @@ export function BuscaMembrosClient() {
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 300)
@@ -45,14 +46,19 @@ export function BuscaMembrosClient() {
   }, [q])
 
   const buscar = useCallback(async (termo: string) => {
+    abortRef.current?.abort()
     if (termo.length < 2) {
       setResultado({ membros: [], hashtags: [], posts: [], canais: [], unidades: [] })
       return
     }
+    const controller = new AbortController()
+    abortRef.current = controller
     setCarregando(true)
     setErro(null)
     try {
-      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`)
+      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`, {
+        signal: controller.signal,
+      })
       if (!res.ok) {
         const body = (await res.json()) as { error?: string }
         throw new Error(body.error ?? 'Erro na busca')
@@ -60,16 +66,19 @@ export function BuscaMembrosClient() {
       const data = (await res.json()) as BuscaResponse
       setResultado(data)
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
       setErro(e instanceof Error ? e.message : 'Erro na busca')
       setResultado({ membros: [], hashtags: [], posts: [], canais: [], unidades: [] })
     } finally {
-      setCarregando(false)
+      if (abortRef.current === controller) setCarregando(false)
     }
   }, [])
 
   useEffect(() => {
     startTransition(() => void buscar(debounced))
   }, [debounced, buscar])
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const vazio =
     !carregando &&
