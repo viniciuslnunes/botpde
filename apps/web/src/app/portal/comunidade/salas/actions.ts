@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isLiveKitConfigured } from '@/lib/env'
+import { deleteLiveKitRoom } from '@/lib/livekit-room'
 import { createSala, encerrarSala as encerrarSalaNoBanco } from '@/lib/salas'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { db } from '@torcida/db'
@@ -130,6 +131,7 @@ export async function encerrarSala(salaId: string) {
     select: {
       id: true,
       titulo: true,
+      livekitRoomName: true,
       encerradaEm: true,
       _count: { select: { participantes: true } },
     },
@@ -139,6 +141,14 @@ export async function encerrarSala(salaId: string) {
 
   const encerrada = await encerrarSalaNoBanco(tenant.id, parsed.data.salaId)
   if (!encerrada) throw new Error('Não foi possível encerrar a sala.')
+
+  if (isLiveKitConfigured()) {
+    try {
+      await deleteLiveKitRoom(sala.livekitRoomName)
+    } catch (error) {
+      console.error('[encerrarSala] Falha ao encerrar sala LiveKit:', error)
+    }
+  }
 
   const participantes = sala._count.participantes
   const recap = await db.post.create({

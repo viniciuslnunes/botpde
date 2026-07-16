@@ -10,6 +10,7 @@ import {
   Loader2,
   LogOut,
   MonitorUp,
+  MonitorX,
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -26,6 +27,8 @@ import '@livekit/components-styles'
 import {
   decodeSalaModeracaoMessage,
   encodeSalaModeracaoMessage,
+  isTrustedMediaRequest,
+  isTrustedMediaResponse,
   permissionAllowsScreen,
   permissionAllowsSpeak,
   SALA_MOD_TOPIC,
@@ -39,10 +42,12 @@ type MeetRoomProps = {
   salaId: string
   token: string
   serverUrl: string
+  hostId: string
   isHost: boolean
   userId: string
   userName: string
   onOnlineCountChange?: (count: number) => void
+  onScreenShareActiveChange?: (active: boolean) => void
   onLeaveCall?: () => void
 }
 
@@ -54,6 +59,24 @@ type MediaRequest = {
   userName: string
   kind: MidiaSalaKind
 }
+
+type TrackRef = {
+  participant: { identity: string; name?: string }
+  source: Track.Source
+  publication?: { trackSid?: string; source?: Track.Source; isSubscribed?: boolean }
+}
+
+type LayoutPinContext = {
+  pin: {
+    dispatch?: (action: { msg: 'set_pin'; trackReference: TrackRef } | { msg: 'clear_pin' }) => void
+    state?: TrackRef[]
+  }
+}
+
+const ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+} as const
 
 function requestKindLabel(kind: MidiaSalaKind): string {
   return kind === 'speak' ? 'falar' : 'compartilhar tela'
@@ -103,6 +126,15 @@ function canUseScreenShare(participant: LocalParticipant, isHost: boolean): bool
   return permissionAllowsScreen(permissions.canPublishSources)
 }
 
+function isSameTrackRef(a: TrackRef, b: TrackRef | undefined): boolean {
+  if (!b) return false
+  return (
+    a.participant.identity === b.participant.identity &&
+    a.source === b.source &&
+    (a.publication?.trackSid === b.publication?.trackSid || (!a.publication?.trackSid && !b.publication?.trackSid))
+  )
+}
+
 async function registrarPresenca(salaId: string, method: 'POST' | 'DELETE'): Promise<number | null> {
   try {
     const res = await fetch(`/api/salas/${salaId}/participantes`, { method, cache: 'no-store' })
@@ -139,6 +171,7 @@ function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
       disabled={pending}
       data-active={enabled ? 'true' : 'false'}
       className="meet-room-action-wide"
+      aria-pressed={enabled}
     >
       <MonitorUp className="h-4 w-4 shrink-0" />
       <span>{pending ? 'Aguarde…' : enabled ? 'Parar tela' : 'Compartilhar tela'}</span>
@@ -146,19 +179,82 @@ function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
   )
 }
 
+function ActiveScreenShareBanner({
+  salaId,
+  sharers,
+}: {
+  salaId: string
+  sharers: Array<{ userId: string; userName: string }>
+}) {
+  const [revoking, setRevoking] = useState<string | null>(null)
+
+  async function interromper(userId: string) {
+    if (revoking) return
+    setRevoking(userId)
+    try {
+      const res = await fetch(`/api/salas/${salaId}/midia`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, kind: 'screen' }),
+      })
+      if (!res.ok) {
+        toast.error('Não foi possível interromper o compartilhamento.')
+        return
+      }
+      toast.success('Compartilhamento de tela interrompido.')
+    } catch {
+      toast.error('Não foi possível interromper o compartilhamento.')
+    } finally {
+      setRevoking(null)
+    }
+  }
+
+  if (sharers.length === 0) return null
+
+  return (
+    <div className="meet-room-screen-banner" role="status">
+      {sharers.map((sharer) => (
+        <div key={sharer.userId} className="meet-room-screen-banner__row">
+          <span className="meet-room-screen-banner__label">
+            <MonitorUp className="h-4 w-4 shrink-0 text-sky-400" />
+            <strong>{sharer.userName}</strong> está compartilhando a tela
+          </span>
+          <button
+            type="button"
+            onClick={() => void interromper(sharer.userId)}
+            disabled={revoking === sharer.userId}
+            className="meet-room-screen-banner__revoke"
+          >
+            {revoking === sharer.userId ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MonitorX className="h-3.5 w-3.5" />
+            )}
+            Interromper
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function MeetControls({
   lk,
   salaId,
+  hostId,
   isHost,
   userId,
   userName,
+  activeScreenSharers,
   onLeaveCall,
 }: {
   lk: LiveKitModule
   salaId: string
+  hostId: string
   isHost: boolean
   userId: string
   userName: string
+  activeScreenSharers: Array<{ userId: string; userName: string }>
   onLeaveCall?: () => void
 }) {
   const { useLocalParticipant, useRoomContext, TrackToggle } = lk
@@ -170,13 +266,31 @@ function MeetControls({
   const [saindo, setSaindo] = useState(false)
   const [pulseRequests, setPulseRequests] = useState(false)
   const knownRequestIdsRef = useRef<Set<string>>(new Set())
+  const hadSpeakRef = useRef(false)
+  const hadScreenRef = useRef(false)
 
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
 
   const syncPermissions = useCallback(() => {
     if (isHost) return
-    if (canUseSpeak(localParticipant, false) || canUseScreenShare(localParticipant, false)) {
+
+    const speakNow = canUseSpeak(localParticipant, false)
+    const screenNow = canUseScreenShare(localParticipant, false)
+
+    if (speakNow && !hadSpeakRef.current) {
+      notifyGuestResponse('speak', true)
+      setPendingKind(null)
+    }
+    if (screenNow && !hadScreenRef.current) {
+      notifyGuestResponse('screen', true)
+      setPendingKind(null)
+    }
+
+    hadSpeakRef.current = speakNow
+    hadScreenRef.current = screenNow
+
+    if (speakNow || screenNow) {
       setPendingKind(null)
     }
   }, [isHost, localParticipant])
@@ -195,6 +309,7 @@ function MeetControls({
       if (!message) return
 
       if (message.type === 'media_request' && isHost) {
+        if (!isTrustedMediaRequest(participant?.identity, message)) return
         setRequests((prev) => {
           if (prev.some((r) => r.requestId === message.requestId)) return prev
           if (!knownRequestIdsRef.current.has(message.requestId)) {
@@ -208,14 +323,12 @@ function MeetControls({
         return
       }
 
-      if (message.type === 'media_response' && message.userId === userId) {
-        notifyGuestResponse(message.kind, message.approved)
-        if (message.approved) syncPermissions()
-        setPendingKind(null)
-      }
-
-      if (message.type === 'media_request' && !isHost && participant) {
-        // eco ignorado
+      if (message.type === 'media_response' && !isHost && message.userId === userId) {
+        if (!isTrustedMediaResponse(participant?.identity, hostId, message)) return
+        if (!message.approved) {
+          notifyGuestResponse(message.kind, false)
+          setPendingKind(null)
+        }
       }
     }
 
@@ -223,7 +336,7 @@ function MeetControls({
     return () => {
       room.off(RoomEvent.DataReceived, onData)
     }
-  }, [room, isHost, userId, syncPermissions])
+  }, [room, isHost, userId, hostId])
 
   async function enviarSolicitacao(kind: MidiaSalaKind) {
     if (pendingKind) return
@@ -243,13 +356,14 @@ function MeetControls({
   }
 
   async function responderSolicitacao(request: MediaRequest, approved: boolean) {
-    if (approved) {
-      const res = await fetch(`/api/salas/${salaId}/midia`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: request.userId, kind: request.kind }),
-      })
-      if (!res.ok) return
+    const res = await fetch(`/api/salas/${salaId}/midia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: request.userId, kind: request.kind, approved }),
+    })
+    if (!res.ok) {
+      toast.error('Não foi possível processar a solicitação.')
+      return
     }
 
     const response: SalaModeracaoMessage = {
@@ -276,6 +390,10 @@ function MeetControls({
 
   return (
     <div className="meet-room-footer">
+      {isHost && activeScreenSharers.length > 0 && (
+        <ActiveScreenShareBanner salaId={salaId} sharers={activeScreenSharers} />
+      )}
+
       {isHost && requests.length > 0 && (
         <div
           className={`meet-room-requests${pulseRequests ? ' meet-room-requests--pulse' : ''}`}
@@ -368,88 +486,202 @@ function MeetControls({
   )
 }
 
-function MeetConference({
-  lk,
-  salaId,
-  isHost,
-  userId,
-  userName,
-  onLeaveCall,
-}: {
-  lk: LiveKitModule
-  salaId: string
-  isHost: boolean
-  userId: string
-  userName: string
-  onLeaveCall?: () => void
-}) {
-  const { GridLayout, ParticipantTile, RoomAudioRenderer, useTracks, useLocalParticipant, useRoomContext } =
-    lk
+function MeetStage({ lk }: { lk: LiveKitModule }) {
+  const {
+    GridLayout,
+    ParticipantTile,
+    FocusLayout,
+    FocusLayoutContainer,
+    CarouselLayout,
+    useLayoutContext,
+    usePinnedTracks,
+    useTracks,
+    isTrackReference,
+  } = lk
 
-  const room = useRoomContext()
-  const { localParticipant } = useLocalParticipant()
+  const layoutContext = useLayoutContext() as LayoutPinContext
+  const lastAutoFocusedScreenShareRef = useRef<TrackRef | null>(null)
+
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
-    { onlySubscribed: false },
+    { onlySubscribed: false, updateOnlyOn: [RoomEvent.ActiveSpeakersChanged] },
+  ) as TrackRef[]
+
+  const screenShareTracks = tracks.filter(
+    (track) => isTrackReference(track) && track.publication?.source === Track.Source.ScreenShare,
   )
+
+  const focusTrack = (usePinnedTracks(layoutContext) as TrackRef[])[0]
+  const carouselTracks = tracks.filter((track) => !isSameTrackRef(track, focusTrack))
+
+  const screenShareKey = screenShareTracks
+    .map((t) => `${t.publication?.trackSid ?? ''}_${t.publication?.isSubscribed ? '1' : '0'}`)
+    .join(',')
+
+  useEffect(() => {
+    const pin = layoutContext.pin.dispatch
+    if (!pin) return
+
+    const subscribedScreen = screenShareTracks.find((t) => t.publication?.isSubscribed)
+
+    if (subscribedScreen && !lastAutoFocusedScreenShareRef.current) {
+      pin({ msg: 'set_pin', trackReference: subscribedScreen })
+      lastAutoFocusedScreenShareRef.current = subscribedScreen
+      return
+    }
+
+    if (
+      lastAutoFocusedScreenShareRef.current &&
+      !screenShareTracks.some(
+        (t) => t.publication?.trackSid === lastAutoFocusedScreenShareRef.current?.publication?.trackSid,
+      )
+    ) {
+      pin({ msg: 'clear_pin' })
+      lastAutoFocusedScreenShareRef.current = null
+    }
+  }, [layoutContext.pin.dispatch, screenShareKey, screenShareTracks])
+
+  if (focusTrack) {
+    return (
+      <div className="meet-room-focus-wrapper">
+        <FocusLayoutContainer className="meet-room-focus">
+          <CarouselLayout tracks={carouselTracks} className="meet-room-carousel">
+            <ParticipantTile />
+          </CarouselLayout>
+          <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
+        </FocusLayoutContainer>
+        <div className="meet-room-focus-badge">
+          <MonitorUp className="h-3.5 w-3.5" />
+          Tela de {focusTrack.participant.name ?? 'participante'}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <GridLayout tracks={tracks} className="meet-room-grid">
+      <ParticipantTile />
+    </GridLayout>
+  )
+}
+
+function MeetConference({
+  lk,
+  salaId,
+  hostId,
+  isHost,
+  userId,
+  userName,
+  onScreenShareActiveChange,
+  onLeaveCall,
+}: {
+  lk: LiveKitModule
+  salaId: string
+  hostId: string
+  isHost: boolean
+  userId: string
+  userName: string
+  onScreenShareActiveChange?: (active: boolean) => void
+  onLeaveCall?: () => void
+}) {
+  const {
+    RoomAudioRenderer,
+    useTracks,
+    useLocalParticipant,
+    useRoomContext,
+    LayoutContextProvider,
+    useCreateLayoutContext,
+    isTrackReference,
+  } = lk
+
+  const layoutContext = useCreateLayoutContext() as LayoutPinContext
+  const room = useRoomContext()
+  const { localParticipant } = useLocalParticipant()
+
+  const screenTracks = useTracks([{ source: Track.Source.ScreenShare, withPlaceholder: false }], {
+    onlySubscribed: true,
+  }) as TrackRef[]
+
+  const activeScreenSharers = useMemo(() => {
+    const seen = new Set<string>()
+    const sharers: Array<{ userId: string; userName: string }> = []
+    for (const track of screenTracks) {
+      if (!isTrackReference(track)) continue
+      const id = track.participant.identity
+      if (seen.has(id)) continue
+      seen.add(id)
+      sharers.push({
+        userId: id,
+        userName: track.participant.name ?? 'Participante',
+      })
+    }
+    return sharers
+  }, [screenTracks, isTrackReference])
+
+  useEffect(() => {
+    onScreenShareActiveChange?.(activeScreenSharers.length > 0)
+  }, [activeScreenSharers.length, onScreenShareActiveChange])
+
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
   const conectado = room.state === ConnectionState.Connected
 
   return (
-    <div className="meet-room-layout">
-      <div className="meet-room-stage">
-        <AnimatePresence mode="wait">
-          {!conectado ? (
-            <m.div
-              key="connecting"
-              variants={fadeScale}
-              initial="hidden"
-              animate="show"
-              exit="hidden"
-              transition={springSnappy}
-              className="meet-room-connecting"
-            >
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span>Conectando à sala…</span>
-            </m.div>
-          ) : (
-            <m.div
-              key="grid"
-              variants={fadeScale}
-              initial="hidden"
-              animate="show"
-              exit="hidden"
-              transition={springSnappy}
-              className="h-full w-full"
-            >
-              <GridLayout tracks={tracks} className="meet-room-grid">
-                <ParticipantTile />
-              </GridLayout>
-            </m.div>
+    <LayoutContextProvider value={layoutContext}>
+      <div className="meet-room-layout">
+        <div className="meet-room-stage">
+          <AnimatePresence mode="wait">
+            {!conectado ? (
+              <m.div
+                key="connecting"
+                variants={fadeScale}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+                transition={springSnappy}
+                className="meet-room-connecting"
+              >
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span>Conectando à sala…</span>
+              </m.div>
+            ) : (
+              <m.div
+                key="stage"
+                variants={fadeScale}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+                transition={springSnappy}
+                className="h-full w-full"
+              >
+                <MeetStage lk={lk} />
+              </m.div>
+            )}
+          </AnimatePresence>
+
+          {conectado && !isHost && !canSpeak && !canScreen && (
+            <div className="meet-room-local-status">
+              Sem permissão de voz, câmera ou tela — use os botões abaixo para solicitar ao anfitrião.
+            </div>
           )}
-        </AnimatePresence>
+        </div>
 
-        {conectado && !isHost && !canSpeak && !canScreen && (
-          <div className="meet-room-local-status">
-            Sem permissão de voz, câmera ou tela — use os botões abaixo para solicitar ao anfitrião.
-          </div>
-        )}
+        <MeetControls
+          lk={lk}
+          salaId={salaId}
+          hostId={hostId}
+          isHost={isHost}
+          userId={userId}
+          userName={userName}
+          activeScreenSharers={activeScreenSharers}
+          onLeaveCall={onLeaveCall}
+        />
+        <RoomAudioRenderer />
       </div>
-
-      <MeetControls
-        lk={lk}
-        salaId={salaId}
-        isHost={isHost}
-        userId={userId}
-        userName={userName}
-        onLeaveCall={onLeaveCall}
-      />
-      <RoomAudioRenderer />
-    </div>
+    </LayoutContextProvider>
   )
 }
 
@@ -457,10 +689,12 @@ export function MeetRoom({
   salaId,
   token,
   serverUrl,
+  hostId,
   isHost,
   userId,
   userName,
   onOnlineCountChange,
+  onScreenShareActiveChange,
   onLeaveCall,
 }: MeetRoomProps) {
   const [lk, setLk] = useState<LiveKitModule | null>(null)
@@ -504,8 +738,8 @@ export function MeetRoom({
   }, [salaId])
 
   const conferenceProps = useMemo(
-    () => ({ lk: lk!, salaId, isHost, userId, userName, onLeaveCall }),
-    [lk, salaId, isHost, userId, userName, onLeaveCall],
+    () => ({ lk: lk!, salaId, hostId, isHost, userId, userName, onScreenShareActiveChange, onLeaveCall }),
+    [lk, salaId, hostId, isHost, userId, userName, onScreenShareActiveChange, onLeaveCall],
   )
 
   if (loadError) {
@@ -551,18 +785,18 @@ export function MeetRoom({
             className="meet-room-alert overflow-hidden"
             role="status"
           >
-          <div className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{mediaHint}</span>
-            <button
-              type="button"
-              onClick={() => setMediaHint(null)}
-              className="ml-auto text-amber-200/80 hover:text-amber-100"
-              aria-label="Fechar aviso"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{mediaHint}</span>
+              <button
+                type="button"
+                onClick={() => setMediaHint(null)}
+                className="ml-auto text-amber-200/80 hover:text-amber-100"
+                aria-label="Fechar aviso"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </m.div>
         )}
       </AnimatePresence>
@@ -579,6 +813,7 @@ export function MeetRoom({
         connect
         audio={false}
         video={false}
+        options={ROOM_OPTIONS}
         data-lk-theme="default"
         className="flex min-h-0 flex-1 flex-col"
         onConnected={() => void handleConnected()}

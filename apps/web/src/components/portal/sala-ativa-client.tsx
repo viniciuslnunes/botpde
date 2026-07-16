@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { ArrowLeft, MessageSquare, Phone, Power, Users, Video } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Maximize2, MessageSquare, Minimize2, Phone, Power, Users, Video } from 'lucide-react'
 import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
@@ -46,6 +46,41 @@ function callStateKey(
   return 'left'
 }
 
+function SalaChatPanel({
+  salaId,
+  userId,
+  isHost,
+  initialMensagens,
+  compact = false,
+}: {
+  salaId: string
+  userId: string
+  isHost: boolean
+  initialMensagens: SalaMensagem[]
+  compact?: boolean
+}) {
+  return (
+    <section
+      className={`rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] ${
+        compact ? 'flex h-full min-h-0 flex-col p-4' : 'p-5'
+      }`}
+    >
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+        <MessageSquare className="h-4 w-4" />
+        Chat da sala
+      </h2>
+      <div className={compact ? 'min-h-0 flex-1 overflow-hidden' : ''}>
+        <SalaChat
+          salaId={salaId}
+          currentUserId={userId}
+          isHost={isHost}
+          initialMensagens={initialMensagens}
+        />
+      </div>
+    </section>
+  )
+}
+
 export function SalaAtivaClient({
   sala,
   isHost,
@@ -61,6 +96,10 @@ export function SalaAtivaClient({
   const [onlineCount, setOnlineCount] = useState(initialParticipantes.length)
   const [inCall, setInCall] = useState(true)
   const [callKey, setCallKey] = useState(0)
+  const [hasActiveScreenShare, setHasActiveScreenShare] = useState(false)
+  const [presentationMode, setPresentationMode] = useState(false)
+  const [presentationCommentsOpen, setPresentationCommentsOpen] = useState(true)
+  const presentationActive = presentationMode && inCall && hasActiveScreenShare
 
   const handleCountChange = useCallback((count: number) => {
     setOnlineCount(count)
@@ -68,11 +107,26 @@ export function SalaAtivaClient({
 
   const handleLeaveCall = useCallback(() => {
     setInCall(false)
+    setPresentationMode(false)
   }, [])
 
   const handleRejoinCall = useCallback(() => {
     setCallKey((k) => k + 1)
     setInCall(true)
+  }, [])
+
+  const handleScreenShareActiveChange = useCallback((active: boolean) => {
+    setHasActiveScreenShare(active)
+    if (!active) setPresentationMode(false)
+  }, [])
+
+  const abrirModoApresentacao = useCallback(() => {
+    setPresentationMode(true)
+    setPresentationCommentsOpen(true)
+  }, [])
+
+  const fecharModoApresentacao = useCallback(() => {
+    setPresentationMode(false)
   }, [])
 
   const stateKey = callStateKey(Boolean(sala.encerradaEm), livekitOk, inCall, Boolean(token && livekitUrl))
@@ -153,27 +207,49 @@ export function SalaAtivaClient({
             </p>
           </m.div>
         ) : stateKey === 'call' ? (
-          <m.section
-            key="call"
-            variants={fadeScale}
-            initial="hidden"
-            animate="show"
-            exit="hidden"
-            transition={springSnappy}
-            className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
-          >
-            <MeetRoom
-              key={callKey}
-              salaId={sala.id}
-              token={token!}
-              serverUrl={livekitUrl!}
-              isHost={isHost}
-              userId={userId}
-              userName={userName}
-              onOnlineCountChange={handleCountChange}
-              onLeaveCall={handleLeaveCall}
-            />
-          </m.section>
+          <div key="call" className={presentationActive ? 'space-y-0' : 'space-y-3'}>
+            {hasActiveScreenShare && (
+              <div className="flex justify-end">
+                <m.button
+                  type="button"
+                  onClick={presentationActive ? fecharModoApresentacao : abrirModoApresentacao}
+                  whileTap={{ scale: 0.96 }}
+                  transition={springSnappy}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  {presentationActive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {presentationActive ? 'Sair da apresentação' : 'Tela cheia com comentários'}
+                </m.button>
+              </div>
+            )}
+
+            <m.section
+              variants={fadeScale}
+              initial="hidden"
+              animate="show"
+              exit="hidden"
+              transition={springSnappy}
+              className={
+                presentationActive
+                  ? 'fixed inset-0 z-0 overflow-hidden rounded-none border-none bg-black'
+                  : 'overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm'
+              }
+            >
+              <MeetRoom
+                key={callKey}
+                salaId={sala.id}
+                token={token!}
+                serverUrl={livekitUrl!}
+                hostId={sala.host.id}
+                isHost={isHost}
+                userId={userId}
+                userName={userName}
+                onOnlineCountChange={handleCountChange}
+                onScreenShareActiveChange={handleScreenShareActiveChange}
+                onLeaveCall={handleLeaveCall}
+              />
+            </m.section>
+          </div>
         ) : (
           <m.section
             key="left"
@@ -210,6 +286,81 @@ export function SalaAtivaClient({
       {!sala.encerradaEm && (
         <>
           <AnimatePresence>
+            {presentationActive && (
+              <m.div
+                key="presentation-mode"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={springSnappy}
+                className="fixed inset-0 z-50 pointer-events-none p-3 md:p-5"
+              >
+                <div className="flex h-full min-h-0 flex-col gap-3 pointer-events-auto">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-950/90 px-4 py-3 text-white">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{sala.titulo}</p>
+                      <p className="text-xs text-zinc-400">
+                        Modo apresentação · {presentationCommentsOpen ? 'comentários visíveis' : 'comentários ocultos'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPresentationCommentsOpen((open) => !open)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        {presentationCommentsOpen ? (
+                          <>
+                            <ChevronRight className="h-4 w-4" />
+                            Ocultar comentários
+                          </>
+                        ) : (
+                          <>
+                            <ChevronLeft className="h-4 w-4" />
+                            Mostrar comentários
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={fecharModoApresentacao}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white"
+                      >
+                        <Minimize2 className="h-4 w-4" />
+                        Sair da tela cheia
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex min-h-0 flex-1 gap-3">
+                    <div className="hidden flex-1 lg:block" aria-hidden />
+                    <AnimatePresence initial={false}>
+                      {presentationCommentsOpen && (
+                        <m.div
+                          key="presentation-comments"
+                          initial={{ opacity: 0, x: 24 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 24 }}
+                          transition={springSnappy}
+                          className="h-full min-h-0 w-full lg:w-[380px]"
+                        >
+                          <SalaChatPanel
+                            salaId={sala.id}
+                            userId={userId}
+                            isHost={isHost}
+                            initialMensagens={initialMensagens}
+                            compact
+                          />
+                        </m.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </m.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
             {!inCall && (
               <m.section
                 key="participantes-full"
@@ -232,62 +383,60 @@ export function SalaAtivaClient({
             )}
           </AnimatePresence>
 
-          <SalaEnquete salaId={sala.id} isHost={isHost} />
+          {!presentationActive && (
+            <>
+              <SalaEnquete salaId={sala.id} isHost={isHost} />
 
-          <div className={`grid gap-4 ${inCall ? 'lg:grid-cols-[1fr_320px]' : 'lg:grid-cols-2'}`}>
-            <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                <MessageSquare className="h-4 w-4" />
-                Chat da sala
-              </h2>
-              <SalaChat
-                salaId={sala.id}
-                currentUserId={userId}
-                isHost={isHost}
-                initialMensagens={initialMensagens}
-              />
-            </section>
+              <div className={`grid gap-4 ${inCall ? 'lg:grid-cols-[1fr_320px]' : 'lg:grid-cols-2'}`}>
+                <SalaChatPanel
+                  salaId={sala.id}
+                  userId={userId}
+                  isHost={isHost}
+                  initialMensagens={initialMensagens}
+                />
 
-            <AnimatePresence>
-              {inCall && (
-                <m.aside
-                  key="sidebar"
-                  initial={{ opacity: 0, x: 16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 16 }}
-                  transition={springSnappy}
-                  className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
-                >
-                  <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    <Users className="h-4 w-4" />
-                    Participantes online
-                  </h2>
-                  <SalaParticipantes
-                    salaId={sala.id}
-                    initialParticipantes={initialParticipantes}
-                    onCountChange={handleCountChange}
-                  />
+                <AnimatePresence>
+                  {inCall && (
+                    <m.aside
+                      key="sidebar"
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 16 }}
+                      transition={springSnappy}
+                      className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
+                    >
+                      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                        <Users className="h-4 w-4" />
+                        Participantes online
+                      </h2>
+                      <SalaParticipantes
+                        salaId={sala.id}
+                        initialParticipantes={initialParticipantes}
+                        onCountChange={handleCountChange}
+                      />
 
-                  <dl className="mt-6 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm">
-                    <div>
-                      <dt className="text-[rgb(var(--foreground-muted))]">Convite</dt>
-                      <dd className="font-mono text-[rgb(var(--foreground))]">{sala.linkConvite}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
-                      <dd className="text-[rgb(var(--foreground))]" suppressHydrationWarning>
-                        {sala.criadoEmFormatado}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[rgb(var(--foreground-muted))]">Tipo</dt>
-                      <dd className="text-[rgb(var(--foreground))]">{sala.tipo}</dd>
-                    </div>
-                  </dl>
-                </m.aside>
-              )}
-            </AnimatePresence>
-          </div>
+                      <dl className="mt-6 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm">
+                        <div>
+                          <dt className="text-[rgb(var(--foreground-muted))]">Convite</dt>
+                          <dd className="font-mono text-[rgb(var(--foreground))]">{sala.linkConvite}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[rgb(var(--foreground-muted))]">Criada em</dt>
+                          <dd className="text-[rgb(var(--foreground))]" suppressHydrationWarning>
+                            {sala.criadoEmFormatado}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[rgb(var(--foreground-muted))]">Tipo</dt>
+                          <dd className="text-[rgb(var(--foreground))]">{sala.tipo}</dd>
+                        </div>
+                      </dl>
+                    </m.aside>
+                  )}
+                </AnimatePresence>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

@@ -1,22 +1,26 @@
+import { z } from 'zod'
+
 export const SALA_MOD_TOPIC = 'sala-moderacao'
 
 export type MidiaSalaKind = 'speak' | 'screen'
 
-export type SalaModeracaoMessage =
-  | {
-      type: 'media_request'
-      requestId: string
-      userId: string
-      userName: string
-      kind: MidiaSalaKind
-    }
-  | {
-      type: 'media_response'
-      requestId: string
-      userId: string
-      approved: boolean
-      kind: MidiaSalaKind
-    }
+const mediaRequestSchema = z.object({
+  type: z.literal('media_request'),
+  requestId: z.string().uuid(),
+  userId: z.string().uuid(),
+  userName: z.string().min(1).max(120),
+  kind: z.enum(['speak', 'screen']),
+})
+
+const mediaResponseSchema = z.object({
+  type: z.literal('media_response'),
+  requestId: z.string().uuid(),
+  userId: z.string().uuid(),
+  approved: z.boolean(),
+  kind: z.enum(['speak', 'screen']),
+})
+
+export type SalaModeracaoMessage = z.infer<typeof mediaRequestSchema> | z.infer<typeof mediaResponseSchema>
 
 export function encodeSalaModeracaoMessage(message: SalaModeracaoMessage): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(message))
@@ -25,11 +29,28 @@ export function encodeSalaModeracaoMessage(message: SalaModeracaoMessage): Uint8
 export function decodeSalaModeracaoMessage(payload: Uint8Array): SalaModeracaoMessage | null {
   try {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(payload))
-    if (typeof parsed !== 'object' || parsed === null || !('type' in parsed)) return null
-    return parsed as SalaModeracaoMessage
+    const asRequest = mediaRequestSchema.safeParse(parsed)
+    if (asRequest.success) return asRequest.data
+    const asResponse = mediaResponseSchema.safeParse(parsed)
+    if (asResponse.success) return asResponse.data
+    return null
   } catch {
     return null
   }
+}
+
+/** Solicitação válida: remetente deve ser o próprio usuário declarado. */
+export function isTrustedMediaRequest(senderIdentity: string | undefined, message: SalaModeracaoMessage): boolean {
+  return message.type === 'media_request' && senderIdentity === message.userId
+}
+
+/** Resposta válida: somente o anfitrião pode responder. */
+export function isTrustedMediaResponse(
+  senderIdentity: string | undefined,
+  hostId: string,
+  message: SalaModeracaoMessage,
+): boolean {
+  return message.type === 'media_response' && senderIdentity === hostId
 }
 
 export function permissionAllowsSpeak(sources: readonly number[] | undefined): boolean {

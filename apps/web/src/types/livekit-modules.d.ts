@@ -16,13 +16,26 @@ declare module 'livekit-server-sdk' {
 
   export class RoomServiceClient {
     constructor(host: string, apiKey: string, apiSecret: string)
-    listParticipants(room: string): Promise<Array<{ identity: string; permission?: { canPublishSources?: number[] } }>>
+    listParticipants(room: string): Promise<
+      Array<{
+        identity: string
+        permission?: { canPublishSources?: number[] }
+        tracks?: Array<{ sid?: string; source?: number }>
+      }>
+    >
     updateParticipant(
       room: string,
       identity: string,
       metadata?: string,
       permission?: Record<string, unknown>,
     ): Promise<unknown>
+    mutePublishedTrack(
+      room: string,
+      identity: string,
+      trackSid: string,
+      muted: boolean,
+    ): Promise<unknown>
+    deleteRoom(room: string): Promise<void>
   }
 }
 
@@ -38,6 +51,7 @@ declare module '@livekit/components-react' {
     connect?: boolean
     video?: boolean
     audio?: boolean
+    options?: Record<string, unknown>
     className?: string
     children?: ReactNode
     onConnected?: () => void
@@ -45,6 +59,28 @@ declare module '@livekit/components-react' {
     onMediaDeviceFailure?: (failure: MediaDeviceFailure) => void
     onError?: (error: Error) => void
   }): ReactNode
+
+  export function LayoutContextProvider(props: {
+    value?: unknown
+    children?: ReactNode
+  }): ReactNode
+  export function FocusLayoutContainer(props: {
+    className?: string
+    children?: ReactNode
+  }): ReactNode
+  export function FocusLayout(props: {
+    trackRef?: unknown
+    className?: string
+  }): ReactNode
+  export function CarouselLayout(props: {
+    tracks: unknown[]
+    className?: string
+    children?: ReactNode
+  }): ReactNode
+  export function useCreateLayoutContext(): unknown
+  export function useLayoutContext(): unknown
+  export function usePinnedTracks(layoutContext?: unknown): unknown[]
+  export function isTrackReference(track: unknown): boolean
 
   export function VideoConference(): ReactNode
   export function RoomAudioRenderer(): ReactNode
@@ -65,7 +101,7 @@ declare module '@livekit/components-react' {
   }): ReactNode
   export function useTracks(
     sources: unknown[],
-    options?: { onlySubscribed?: boolean },
+    options?: { onlySubscribed?: boolean; updateOnlyOn?: unknown[] },
   ): unknown[]
   export function useTrackToggle(props: { source: unknown }): {
     buttonProps: Record<string, unknown>

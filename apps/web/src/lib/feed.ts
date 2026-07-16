@@ -3,7 +3,14 @@ import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
 import { getVisibleTenantIds } from './hierarquia'
-import { getAutoresSemAcesso, getContagensSeguimentoEmLote, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
+import {
+  getAutoresSemAcesso,
+  getContagensSeguimentoEmLote,
+  resolverAvatarSocial,
+  podeVerConteudoSocial,
+  resolverPerfilPrivadoEfetivo,
+  type VinculoPrivacidadePerfil,
+} from './perfil-social'
 import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
@@ -486,21 +493,82 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
     },
   })
 
-  if (perfisPublicos.length > 0) {
+  const sugestoes: SugestaoAutorAside[] = []
+  const candidatosDePerfil = perfisPublicos.slice(0, 4)
+  if (candidatosDePerfil.length > 0) {
+    // Proteção extra contra dados antigos: filtra por privacidade efetiva (sócio aprovado pode ter perfil_privado=false no banco).
+    const memberInfos: Array<NonNullable<VinculoPrivacidadePerfil> & {
+      userId: string
+    }> = await db.saasMembro.findMany({
+      where: {
+        tenantId,
+        userId: { in: candidatosDePerfil.map((p) => p.userId) },
+      },
+      select: { userId: true, tipo: true, status: true },
+    })
+    const memberMap = new Map(memberInfos.map((m) => [m.userId, m]))
+
+    const candidatosEfetivamentePublicos = candidatosDePerfil.filter((p) => {
+      const membro = memberMap.get(p.userId) ?? null
+      return !resolverPerfilPrivadoEfetivo(false, membro ? { tipo: membro.tipo, status: membro.status } : null)
+    })
+
     const contagensMap = await getContagensSeguimentoEmLote(
-      perfisPublicos.slice(0, 4).map((p) => p.userId),
+      candidatosEfetivamentePublicos.map((p) => p.userId),
       tenantId,
     )
-    return perfisPublicos.slice(0, 4).map((p) => {
+    for (const p of candidatosEfetivamentePublicos) {
       const contagens = contagensMap.get(p.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
-      return {
+      sugestoes.push({
         id: p.user.id,
         nome: p.user.nome,
         avatarUrl: resolverAvatarSocial(p.avatarUrl, p.user.avatarUrl),
         seguidores: contagens.seguidores,
-      }
-    })
+      })
+    }
   }
+
+  // Torcedores podem ser públicos mesmo se ainda não tiverem PerfilMembro criado
+  // (ex.: antes do backfill). Preenche sugestões com torcedores aprovados.
+  if (sugestoes.length < 4) {
+    const jaIndicados = new Set(sugestoes.map((s) => s.id))
+    const restantes = 4 - sugestoes.length
+    const candidatosTorcedores: Array<{
+      userId: string
+      user: { id: string; nome: string | null; avatarUrl: string | null }
+    }> = await db.saasMembro.findMany({
+      where: {
+        tenantId,
+        tipo: 'TORCEDOR',
+        status: 'APROVADO',
+        userId: { notIn: [...redeIds, ...jaIndicados] },
+      },
+      orderBy: { criadoEm: 'desc' },
+      take: restantes,
+      select: {
+        userId: true,
+        user: { select: { id: true, nome: true, avatarUrl: true } },
+      },
+    })
+
+    if (candidatosTorcedores.length > 0) {
+      const contagensMap = await getContagensSeguimentoEmLote(
+        candidatosTorcedores.map((m) => m.userId),
+        tenantId,
+      )
+      for (const m of candidatosTorcedores) {
+        const contagens = contagensMap.get(m.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+        sugestoes.push({
+          id: m.user.id,
+          nome: m.user.nome,
+          avatarUrl: m.user.avatarUrl,
+          seguidores: contagens.seguidores,
+        })
+      }
+    }
+  }
+
+  if (sugestoes.length > 0) return sugestoes
 
   const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
     await db.post.findMany({

@@ -4,12 +4,30 @@ import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
-import { grantParticipantMedia, type MidiaSalaKind } from '@/lib/livekit-room'
+import {
+  grantParticipantMedia,
+  revokeParticipantMedia,
+  type MidiaSalaKind,
+} from '@/lib/livekit-room'
+import { excedeuLimiteMidiaSala, registrarAcaoMidiaSala } from '@/lib/sala-midia-rate-limit'
 
-const aprovarSchema = z.object({
+const midiaSchema = z.object({
   userId: z.string().uuid(),
   kind: z.enum(['speak', 'screen']),
+  approved: z.boolean().optional(),
 })
+
+async function assertHostSala(salaId: string, userId: string, tenantId: string) {
+  const sala = await db.salaReuniao.findFirst({
+    where: { id: salaId, tenantId, encerradaEm: null },
+    select: { id: true, hostId: true, livekitRoomName: true },
+  })
+  if (!sala) return { error: NextResponse.json({ error: 'Sala indisponível.' }, { status: 404 }) }
+  if (sala.hostId !== userId) {
+    return { error: NextResponse.json({ error: 'Somente o anfitrião pode moderar mídia.' }, { status: 403 }) }
+  }
+  return { sala }
+}
 
 export async function POST(
   request: NextRequest,
@@ -24,19 +42,16 @@ export async function POST(
 
     await assertMembroAtivo(tenant.id, session.user.id)
 
-    const sala = await db.salaReuniao.findFirst({
-      where: { id: salaId, tenantId: tenant.id, encerradaEm: null },
-      select: { id: true, hostId: true, livekitRoomName: true },
-    })
-    if (!sala) {
-      return NextResponse.json({ error: 'Sala indisponível.' }, { status: 404 })
-    }
-    if (sala.hostId !== session.user.id) {
-      return NextResponse.json({ error: 'Somente o anfitrião pode aprovar.' }, { status: 403 })
+    const hostCheck = await assertHostSala(salaId, session.user.id, tenant.id)
+    if ('error' in hostCheck && hostCheck.error) return hostCheck.error
+    const { sala } = hostCheck
+
+    if (excedeuLimiteMidiaSala(session.user.id)) {
+      return NextResponse.json({ error: 'Muitas ações em pouco tempo. Aguarde um momento.' }, { status: 429 })
     }
 
     const body: unknown = await request.json()
-    const parsed = aprovarSchema.safeParse(body)
+    const parsed = midiaSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' },
@@ -44,15 +59,82 @@ export async function POST(
       )
     }
 
-    await grantParticipantMedia(
-      sala.livekitRoomName,
-      parsed.data.userId,
-      parsed.data.kind as MidiaSalaKind,
-    )
+    const approved = parsed.data.approved ?? true
+    const kind = parsed.data.kind as MidiaSalaKind
 
-    return NextResponse.json({ ok: true, kind: parsed.data.kind, userId: parsed.data.userId })
+    if (approved) {
+      await grantParticipantMedia(sala.livekitRoomName, parsed.data.userId, kind)
+    }
+
+    registrarAcaoMidiaSala(session.user.id)
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: approved ? 'SALA_MIDIA_APROVADA' : 'SALA_MIDIA_NEGADA',
+        entidade: 'SalaReuniao',
+        entidadeId: sala.id,
+        detalhes: { userId: parsed.data.userId, kind, approved },
+      },
+    })
+
+    return NextResponse.json({ ok: true, kind, userId: parsed.data.userId, approved })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao aprovar mídia.'
+    const message = error instanceof Error ? error.message : 'Erro ao moderar mídia.'
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id: salaId } = await context.params
+    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+    if (!session?.user?.id || !tenant) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+
+    await assertMembroAtivo(tenant.id, session.user.id)
+
+    const hostCheck = await assertHostSala(salaId, session.user.id, tenant.id)
+    if ('error' in hostCheck && hostCheck.error) return hostCheck.error
+    const { sala } = hostCheck
+
+    if (excedeuLimiteMidiaSala(session.user.id)) {
+      return NextResponse.json({ error: 'Muitas ações em pouco tempo. Aguarde um momento.' }, { status: 429 })
+    }
+
+    const body: unknown = await request.json()
+    const parsed = midiaSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' },
+        { status: 400 },
+      )
+    }
+
+    const kind = parsed.data.kind as MidiaSalaKind
+    await revokeParticipantMedia(sala.livekitRoomName, parsed.data.userId, kind)
+
+    registrarAcaoMidiaSala(session.user.id)
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'SALA_MIDIA_REVOGADA',
+        entidade: 'SalaReuniao',
+        entidadeId: sala.id,
+        detalhes: { userId: parsed.data.userId, kind },
+      },
+    })
+
+    return NextResponse.json({ ok: true, kind, userId: parsed.data.userId })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro ao revogar mídia.'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }

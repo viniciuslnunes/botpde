@@ -53,9 +53,20 @@ export function SalaParticipantes({
 
   useEffect(() => {
     let active = true
+    let delayMs = 8000
+    let timerId: number | undefined
+
+    function schedule(delay: number) {
+      timerId = window.setTimeout(() => void poll(), delay)
+    }
 
     async function poll() {
-      if (document.visibilityState !== 'visible') return
+      if (!active) return
+      if (document.visibilityState !== 'visible') {
+        schedule(delayMs)
+        return
+      }
+
       setCarregando(true)
       try {
         const res = await fetch(`/api/salas/${salaId}/participantes`, { cache: 'no-store' })
@@ -65,27 +76,32 @@ export function SalaParticipantes({
           total?: number
         }
         if (data.participantes) {
-          setParticipantes(
-            data.participantes.map((p) => ({
+          setParticipantes((anteriores) => {
+            const normalizados = data.participantes!.map((p) => ({
               ...p,
               entrouEm:
                 typeof p.entrouEm === 'string' ? p.entrouEm : new Date(p.entrouEm).toISOString(),
-            })),
-          )
+            }))
+            const mudou =
+              normalizados.length !== anteriores.length ||
+              normalizados.some((p, i) => p.userId !== anteriores[i]?.userId)
+            delayMs = mudou ? 8000 : Math.min(delayMs * 2, 20000)
+            return normalizados
+          })
           if (typeof data.total === 'number') onCountChange?.(data.total)
         }
       } catch {
         // polling silencioso
       } finally {
         if (active) setCarregando(false)
+        schedule(delayMs)
       }
     }
 
-    void poll()
-    const id = window.setInterval(poll, 15000)
+    schedule(0)
     return () => {
       active = false
-      window.clearInterval(id)
+      if (timerId !== undefined) window.clearTimeout(timerId)
     }
   }, [salaId, onCountChange])
 
@@ -114,22 +130,22 @@ export function SalaParticipantes({
                 variants={staggerItem}
                 className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2"
               >
-              <Avatar nome={p.nome} avatarUrl={p.avatarUrl} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                  {p.nome ?? 'Membro'}
-                </p>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                  {p.papel === 'HOST' ? 'Anfitrião' : 'Participante'}
-                </p>
-              </div>
-              {p.papel === 'HOST' && (
-                <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label="Anfitrião" />
-              )}
-              {p.papel !== 'HOST' && (
-                <User className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
-              )}
-            </m.li>
+                <Avatar nome={p.nome} avatarUrl={p.avatarUrl} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                    {p.nome ?? 'Membro'}
+                  </p>
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {p.papel === 'HOST' ? 'Anfitrião' : 'Participante'}
+                  </p>
+                </div>
+                {p.papel === 'HOST' && (
+                  <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label="Anfitrião" />
+                )}
+                {p.papel !== 'HOST' && (
+                  <User className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" aria-hidden />
+                )}
+              </m.li>
             ))}
           </AnimatePresence>
         </m.ul>
