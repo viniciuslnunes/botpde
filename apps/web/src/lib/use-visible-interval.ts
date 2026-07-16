@@ -3,14 +3,19 @@
 import { useEffect, useRef } from 'react'
 
 /** setInterval que só executa quando a aba está visível. */
-export function useVisibleInterval(callback: () => void, intervalMs: number): void {
+export function useVisibleInterval(
+  callback: () => void,
+  intervalMs: number,
+  enabled = true,
+): void {
   useEffect(() => {
+    if (!enabled) return
     function tick() {
       if (document.visibilityState === 'visible') callback()
     }
     const id = window.setInterval(tick, intervalMs)
     return () => window.clearInterval(id)
-  }, [callback, intervalMs])
+  }, [callback, intervalMs, enabled])
 }
 
 /**
@@ -23,6 +28,7 @@ export function useVisibleBackoffInterval(
   callback: () => Promise<boolean> | boolean,
   baseMs: number,
   maxMs: number,
+  enabled = true,
 ): { reset: () => void } {
   const callbackRef = useRef(callback)
   const delayRef = useRef(baseMs)
@@ -33,6 +39,11 @@ export function useVisibleBackoffInterval(
   }, [callback])
 
   useEffect(() => {
+    if (!enabled) {
+      resetRef.current = () => {}
+      return
+    }
+
     let cancelled = false
     let timerId: number | undefined
 
@@ -69,7 +80,7 @@ export function useVisibleBackoffInterval(
       cancelled = true
       if (timerId !== undefined) window.clearTimeout(timerId)
     }
-  }, [baseMs, maxMs])
+  }, [baseMs, maxMs, enabled])
 
   return { reset: () => resetRef.current() }
 }

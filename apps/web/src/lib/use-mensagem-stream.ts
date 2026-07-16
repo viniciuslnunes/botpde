@@ -7,13 +7,17 @@ import { useServerSentPing } from '@/lib/use-server-sent-ping'
  * Ping SSE da inbox — refetch lista/resumo/badge.
  * Polling mais lento permanece como fallback.
  */
-export function useInboxStream(onPing: () => void): void {
+export function useInboxStream(onPing: () => void, enabled = true): void {
   const debounceRef = useRef<number | null>(null)
 
-  useServerSentPing('/api/conversas/stream', () => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current)
-    debounceRef.current = window.setTimeout(() => onPing(), 250)
-  })
+  useServerSentPing(
+    '/api/conversas/stream',
+    () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current)
+      debounceRef.current = window.setTimeout(() => onPing(), 250)
+    },
+    enabled,
+  )
 
   useEffect(() => {
     return () => {
@@ -25,13 +29,21 @@ export function useInboxStream(onPing: () => void): void {
 /**
  * Ping SSE da thread aberta — fetch incremental de mensagens.
  */
-export function useConversaStream(conversaId: string, onPing: () => void): void {
+export function useConversaStream(
+  conversaId: string,
+  onPing: () => void,
+  enabled = true,
+): void {
   const debounceRef = useRef<number | null>(null)
 
-  useServerSentPing(`/api/conversas/${conversaId}/stream`, () => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current)
-    debounceRef.current = window.setTimeout(() => onPing(), 150)
-  })
+  useServerSentPing(
+    `/api/conversas/${conversaId}/stream`,
+    () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current)
+      debounceRef.current = window.setTimeout(() => onPing(), 150)
+    },
+    enabled && Boolean(conversaId),
+  )
 
   useEffect(() => {
     return () => {

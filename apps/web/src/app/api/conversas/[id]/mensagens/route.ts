@@ -20,11 +20,16 @@ const midiaSchema = z
     'Tipo de anexo não permitido',
   )
 
-const enviarSchema = z.object({
-  conteudo: z.string().trim().min(1, 'Mensagem vazia').max(MAX_CONTEUDO_MENSAGEM),
-  midias: z.array(midiaSchema).max(10).default([]),
-  respostaAId: z.string().uuid().optional(),
-})
+const enviarSchema = z
+  .object({
+    conteudo: z.string().trim().max(MAX_CONTEUDO_MENSAGEM).default(''),
+    midias: z.array(midiaSchema).max(10).default([]),
+    respostaAId: z.string().uuid().optional(),
+  })
+  .refine((d) => d.conteudo.length > 0 || d.midias.length > 0, {
+    message: 'Mensagem vazia',
+    path: ['conteudo'],
+  })
 
 export async function GET(
   request: NextRequest,
@@ -36,14 +41,21 @@ export async function GET(
 
     const full = request.nextUrl.searchParams.get('full') === '1'
     const after = request.nextUrl.searchParams.get('after')
+    const before = request.nextUrl.searchParams.get('before')
     const afterDate = after ? new Date(after) : null
-    const valido = afterDate && !Number.isNaN(afterDate.getTime())
+    const beforeDate = before ? new Date(before) : null
+    const afterValido = afterDate && !Number.isNaN(afterDate.getTime())
+    const beforeValido = beforeDate && !Number.isNaN(beforeDate.getTime())
 
-    const mensagens = await listMensagens(conversaId, {
-      after: full || !valido ? undefined : afterDate!,
+    const { mensagens, hasMore } = await listMensagens(conversaId, {
+      after: !full && afterValido ? afterDate! : undefined,
+      before: !full && !afterValido && beforeValido ? beforeDate! : undefined,
     })
 
-    return NextResponse.json({ mensagens: mensagens.map(serializeMensagem) })
+    return NextResponse.json({
+      mensagens: mensagens.map(serializeMensagem),
+      hasMore,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao carregar mensagens.'
     return NextResponse.json({ error: message }, { status: 400 })

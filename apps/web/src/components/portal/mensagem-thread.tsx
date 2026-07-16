@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   ArrowLeft,
+  ChevronDown,
   Flag,
   ImagePlus,
   Loader2,
   LogOut,
+  Plus,
   Send,
   Smile,
   Sticker as StickerIcon,
@@ -25,11 +27,25 @@ import {
   type MembroConversaDto,
   type MensagemDto,
 } from '@/lib/mensageria-client'
+import {
+  clearMensagemDraft,
+  getMensagemDraft,
+  setMensagemDraft,
+} from '@/lib/mensagem-draft-store'
 import { formatRelative } from '@/lib/format-datetime'
-import { fadeUp, collapsePanel, springSnappy, staggerContainer, menuItemStagger } from '@/lib/motion-presets'
+import {
+  fadeUp,
+  collapsePanel,
+  springSnappy,
+  springGentle,
+  staggerContainer,
+  menuItemStagger,
+  popoverPanel,
+} from '@/lib/motion-presets'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { useVisibleInterval, useVisibleBackoffInterval } from '@/lib/use-visible-interval'
+import { useVisibleBackoffInterval } from '@/lib/use-visible-interval'
 import { useConversaStream } from '@/lib/use-mensagem-stream'
+import { useMensagemListWindow } from '@/lib/use-mensagem-list-window'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -43,6 +59,12 @@ interface MensagemThreadProps {
   onBack: () => void
   onLida: (conversaId: string) => void
   onSaiu: (conversaId: string) => void
+  /** Sempre mostra voltar (ex.: painel embutido da comunidade, onde a lista some). */
+  showBackButton?: boolean
+  /** Quando false, pausa SSE/polling da thread. */
+  active?: boolean
+  /** Atualiza preview da inbox sem esperar SSE/polling. */
+  onMensagemEnviada?: (preview: { conteudo: string; criadoEm: string }) => void
 }
 
 function isTemp(id: string): boolean {
@@ -61,6 +83,11 @@ function ultimaDoServidor(lista: MensagemDto[]): string | null {
   return server[server.length - 1]?.criadoEm ?? null
 }
 
+function primeiraDoServidor(lista: MensagemDto[]): string | null {
+  const server = lista.filter((m) => !isTemp(m.id))
+  return server[0]?.criadoEm ?? null
+}
+
 interface MediaItem {
   id: string
   kind: 'image' | 'video' | 'sticker'
@@ -75,25 +102,46 @@ export function MensagemThread({
   onBack,
   onLida,
   onSaiu,
+  showBackButton = false,
+  active = true,
+  onMensagemEnviada,
 }: MensagemThreadProps) {
   const [mensagens, setMensagens] = useState<MensagemDto[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false)
+  const [hasMoreHistorico, setHasMoreHistorico] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const [texto, setTexto] = useState('')
+  const [texto, setTexto] = useState(() => getMensagemDraft(conversa.id))
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [enviando, setEnviando] = useState(false)
+  const [anexoMenuOpen, setAnexoMenuOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
   const [denunciandoId, setDenunciandoId] = useState<string | null>(null)
   const [motivoDenuncia, setMotivoDenuncia] = useState('')
   const [painelMembros, setPainelMembros] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  const [novasPendentes, setNovasPendentes] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const anexoMenuRef = useRef<HTMLDivElement>(null)
   const lastCriadoEmRef = useRef<string | null>(null)
+  const oldestCriadoEmRef = useRef<string | null>(null)
+  const nearBottomRef = useRef(true)
+  const pollResetRef = useRef<() => void>(() => {})
+  const prependingRef = useRef(false)
+  const historicoSentinelRef = useRef<HTMLDivElement>(null)
+  const carregandoHistoricoRef = useRef(false)
+  const textoRef = useRef(texto)
+  textoRef.current = texto
 
   const conversaId = conversa.id
+  const getScrollElement = useCallback(() => listRef.current, [])
+  const listWindow = useMensagemListWindow(mensagens.length, getScrollElement)
   const uploadPendente = medias.some((m) => m.url === null && !m.error)
+  const podeEnviar =
+    !enviando && !uploadPendente && (texto.trim().length > 0 || medias.some((m) => Boolean(m.url)))
   const { confirmDiscard } = useUnsavedChangesContext()
 
   const draftChanges = useMemo(() => {
@@ -112,17 +160,97 @@ export function MensagemThread({
 
   async function handleBack() {
     const ok = await confirmDiscard()
-    if (ok) onBack()
+    if (!ok) return
+    clearMensagemDraft(conversaId)
+    textoRef.current = ''
+    onBack()
   }
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((force = false) => {
     const el = listRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    if (!force && !nearBottomRef.current) return
+    el.scrollTop = el.scrollHeight
+    nearBottomRef.current = true
+    setAtBottom(true)
+    setNovasPendentes(0)
+  }, [])
+
+  const atualizarPosicaoScroll = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 96
+    nearBottomRef.current = near
+    setAtBottom((prev) => (prev === near ? prev : near))
+    if (near) setNovasPendentes(0)
+  }, [])
+
+  const ajustarAlturaInput = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const next = Math.min(el.scrollHeight, 128) // max-h-32
+    el.style.height = `${next}px`
+    el.style.overflowY = el.scrollHeight > 128 ? 'auto' : 'hidden'
   }, [])
 
   useEffect(() => {
+    if (prependingRef.current) {
+      prependingRef.current = false
+      return
+    }
     scrollToBottom()
   }, [mensagens, scrollToBottom])
+
+  useEffect(() => {
+    ajustarAlturaInput()
+  }, [texto, ajustarAlturaInput])
+
+  useEffect(() => {
+    nearBottomRef.current = true
+    setAtBottom(true)
+    setNovasPendentes(0)
+    setHasMoreHistorico(false)
+    setCarregandoHistorico(false)
+    carregandoHistoricoRef.current = false
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }, [conversaId])
+
+  // Persiste rascunho ao sair da conversa (troca de thread remonta o componente).
+  useEffect(() => {
+    return () => {
+      setMensagemDraft(conversaId, textoRef.current)
+    }
+  }, [conversaId])
+
+  useEffect(() => {
+    if (!anexoMenuOpen) return
+    function onDown(e: MouseEvent) {
+      if (anexoMenuRef.current && !anexoMenuRef.current.contains(e.target as Node)) {
+        setAnexoMenuOpen(false)
+      }
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAnexoMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [anexoMenuOpen])
+
+  // Revoga blob URLs ao desmontar / trocar conversa (evita leak de memória).
+  const mediasRef = useRef(medias)
+  mediasRef.current = medias
+  useEffect(() => {
+    return () => {
+      for (const m of mediasRef.current) {
+        if (m.localUrl.startsWith('blob:')) URL.revokeObjectURL(m.localUrl)
+      }
+    }
+  }, [conversaId])
 
   const marcarLida = useCallback(() => {
     void fetch(`/api/conversas/${conversaId}/ler`, { method: 'POST' }).then(() =>
@@ -144,9 +272,12 @@ export function MensagemThread({
           if (full) setErro('Não foi possível carregar a conversa.')
           return false
         }
-        const data = (await res.json()) as { mensagens?: MensagemDto[] }
+        const data = (await res.json()) as { mensagens?: MensagemDto[]; hasMore?: boolean }
         if (!data.mensagens) return false
         const novas = data.mensagens
+        const deOutros = !full
+          ? novas.filter((m) => m.autor.id !== currentUserId).length
+          : 0
         setMensagens((prev) => {
           const pendentes = prev.filter((m) => isTemp(m.id))
           const base = full ? novas : [...prev.filter((m) => !isTemp(m.id)), ...novas]
@@ -154,10 +285,17 @@ export function MensagemThread({
           for (const m of base) dedup.set(m.id, m)
           const merged = ordenar([...dedup.values(), ...pendentes])
           const last = ultimaDoServidor(merged)
+          const first = primeiraDoServidor(merged)
           if (last) lastCriadoEmRef.current = last
+          if (full && first) oldestCriadoEmRef.current = first
           return merged
         })
-        if (novas.length > 0) marcarLida()
+        if (full) setHasMoreHistorico(Boolean(data.hasMore))
+        if (deOutros > 0 && !nearBottomRef.current) {
+          setNovasPendentes((n) => n + deOutros)
+        }
+        // Incremental: marca lida só quando chega mensagem nova (abertura já marca 1×).
+        if (!full && novas.length > 0) marcarLida()
         return novas.length > 0
       } catch {
         // polling silencioso
@@ -166,8 +304,52 @@ export function MensagemThread({
       }
       return false
     },
-    [conversaId, marcarLida],
+    [conversaId, currentUserId, marcarLida],
   )
+
+  const carregarHistorico = useCallback(async () => {
+    if (!hasMoreHistorico || carregandoHistoricoRef.current) return
+    const before = oldestCriadoEmRef.current
+    if (!before) return
+
+    const el = listRef.current
+    const prevHeight = el?.scrollHeight ?? 0
+    const prevTop = el?.scrollTop ?? 0
+
+    carregandoHistoricoRef.current = true
+    setCarregandoHistorico(true)
+    try {
+      const res = await fetch(
+        `/api/conversas/${conversaId}/mensagens?before=${encodeURIComponent(before)}`,
+        { cache: 'no-store' },
+      )
+      if (!res.ok) return
+      const data = (await res.json()) as { mensagens?: MensagemDto[]; hasMore?: boolean }
+      if (!data.mensagens || data.mensagens.length === 0) {
+        setHasMoreHistorico(false)
+        return
+      }
+      prependingRef.current = true
+      setMensagens((prev) => {
+        const dedup = new Map<string, MensagemDto>()
+        for (const m of data.mensagens!) dedup.set(m.id, m)
+        for (const m of prev) dedup.set(m.id, m)
+        const merged = ordenar([...dedup.values()])
+        const first = primeiraDoServidor(merged)
+        if (first) oldestCriadoEmRef.current = first
+        return merged
+      })
+      setHasMoreHistorico(Boolean(data.hasMore))
+      requestAnimationFrame(() => {
+        const list = listRef.current
+        if (!list) return
+        list.scrollTop = prevTop + (list.scrollHeight - prevHeight)
+      })
+    } finally {
+      carregandoHistoricoRef.current = false
+      setCarregandoHistorico(false)
+    }
+  }, [conversaId, hasMoreHistorico])
 
   const carregarRef = useRef(carregar)
   const marcarLidaRef = useRef(marcarLida)
@@ -181,15 +363,49 @@ export function MensagemThread({
   // atualiza o inbox do shell pai.
   useEffect(() => {
     lastCriadoEmRef.current = null
-    void carregarRef.current(true)
-    marcarLidaRef.current()
+    oldestCriadoEmRef.current = null
+    void carregarRef.current(true).then(() => marcarLidaRef.current())
   }, [conversaId])
 
-  useVisibleBackoffInterval(() => carregarRef.current(false), 15_000, 60_000)
-  useVisibleInterval(() => void carregarRef.current(true), 60_000)
-  useConversaStream(conversaId, () => {
-    void carregarRef.current(false)
-  })
+  // SSE + polling incremental com backoff. Sem full reload periódico (caro e redundante com SSE).
+  const { reset: resetPoll } = useVisibleBackoffInterval(
+    () => carregarRef.current(false),
+    15_000,
+    90_000,
+    active,
+  )
+  pollResetRef.current = resetPoll
+  useConversaStream(
+    conversaId,
+    () => {
+      pollResetRef.current()
+      void carregarRef.current(false)
+    },
+    active,
+  )
+
+  const carregarHistoricoRef = useRef(carregarHistorico)
+  useEffect(() => {
+    carregarHistoricoRef.current = carregarHistorico
+  }, [carregarHistorico])
+
+  // Infinite scroll no topo — carrega histórico ao chegar perto do início.
+  useEffect(() => {
+    if (!hasMoreHistorico || carregando || !active) return
+    const sentinel = historicoSentinelRef.current
+    const root = listRef.current
+    if (!sentinel || !root) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void carregarHistoricoRef.current()
+        }
+      },
+      { root, rootMargin: '80px 0px 0px 0px', threshold: 0 },
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  }, [hasMoreHistorico, carregando, active, mensagens.length])
 
   function insertEmoji(emoji: string) {
     const el = inputRef.current
@@ -199,6 +415,37 @@ export function MensagemThread({
     requestAnimationFrame(() => {
       el?.focus()
       if (el) el.selectionStart = el.selectionEnd = start + emoji.length
+    })
+  }
+
+  function fecharAnexos() {
+    setAnexoMenuOpen(false)
+  }
+
+  function abrirEmoji() {
+    fecharAnexos()
+    setStickerOpen(false)
+    setEmojiOpen(true)
+  }
+
+  function abrirSticker() {
+    fecharAnexos()
+    setEmojiOpen(false)
+    setStickerOpen(true)
+  }
+
+  function abrirImagem() {
+    fecharAnexos()
+    setEmojiOpen(false)
+    setStickerOpen(false)
+    fileInputRef.current?.click()
+  }
+
+  function removerMedia(id: string) {
+    setMedias((prev) => {
+      const alvo = prev.find((m) => m.id === id)
+      if (alvo?.localUrl.startsWith('blob:')) URL.revokeObjectURL(alvo.localUrl)
+      return prev.filter((m) => m.id !== id)
     })
   }
 
@@ -229,10 +476,12 @@ export function MensagemThread({
   async function enviar(event: React.FormEvent) {
     event.preventDefault()
     const conteudo = texto.trim()
-    const midias = medias.filter((m) => m.url).map((m) => m.url as string)
-    if (!conteudo || enviando || uploadPendente) return
+    const midiasProntas = medias.filter((m) => m.url)
+    const midias = midiasProntas.map((m) => m.url as string)
+    if ((!conteudo && midias.length === 0) || enviando || uploadPendente) return
 
     const tempId = `temp-${Date.now()}`
+    const criadoEm = new Date().toISOString()
     const otimista: MensagemDto = {
       id: tempId,
       conversaId,
@@ -241,13 +490,20 @@ export function MensagemThread({
       respostaAId: null,
       editadaEm: null,
       removida: false,
-      criadoEm: new Date().toISOString(),
+      criadoEm,
       autor: { id: currentUserId, nome: 'Você', avatarUrl: null },
     }
+    const snapshotMedias = medias
     setTexto('')
+    clearMensagemDraft(conversaId)
     setMedias([])
     setEnviando(true)
+    nearBottomRef.current = true
+    setAtBottom(true)
+    setNovasPendentes(0)
     setMensagens((prev) => ordenar([...prev, otimista]))
+    onMensagemEnviada?.({ conteudo, criadoEm })
+    pollResetRef.current()
 
     try {
       const res = await fetch(`/api/conversas/${conversaId}/mensagens`, {
@@ -257,6 +513,9 @@ export function MensagemThread({
       })
       const data = (await res.json()) as { mensagem?: MensagemDto; error?: string }
       if (!res.ok || !data.mensagem) throw new Error(data.error ?? 'Erro ao enviar.')
+      for (const m of snapshotMedias) {
+        if (m.localUrl.startsWith('blob:')) URL.revokeObjectURL(m.localUrl)
+      }
       setMensagens((prev) => {
         const next = ordenar(prev.filter((m) => m.id !== tempId).concat(data.mensagem!))
         const last = ultimaDoServidor(next)
@@ -266,6 +525,7 @@ export function MensagemThread({
     } catch (error) {
       setMensagens((prev) => prev.filter((m) => m.id !== tempId))
       setTexto(conteudo)
+      setMedias(snapshotMedias)
       toast.error(error instanceof Error ? error.message : 'Erro ao enviar mensagem.')
     } finally {
       setEnviando(false)
@@ -326,7 +586,10 @@ export function MensagemThread({
           type="button"
           onClick={() => void handleBack()}
           aria-label="Voltar às conversas"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] md:hidden"
+          className={[
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+            showBackButton ? '' : 'md:hidden',
+          ].join(' ')}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -382,126 +645,111 @@ export function MensagemThread({
       )}
 
       {/* Mensagens */}
-      <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {carregando ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
-          </div>
-        ) : erro ? (
-          <p className="py-10 text-center text-sm text-red-600 dark:text-red-400">{erro}</p>
-        ) : mensagens.length === 0 ? (
-          <MotionEmptyState
-            title="Comece a conversa — diga um oi 👋"
-            className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
-          />
-        ) : (
-          mensagens.map((msg) => {
-            const minha = msg.autor.id === currentUserId
-            return (
-              <m.div
-                key={msg.id}
-                layout
-                variants={fadeUp}
-                initial="hidden"
-                animate="show"
-                className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}
-              >
-                {!minha && <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />}
-                <div className={['max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
-                  <div
-                    className={[
-                      'rounded-2xl px-3.5 py-2',
-                      minha
-                        ? 'rounded-br-md bg-[rgb(var(--primary))] text-white'
-                        : 'rounded-bl-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
-                    ].join(' ')}
-                  >
-                    {isConversaGrupoLike(conversa.tipo) && !minha && (
-                      <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--primary))]">
-                        {msg.autor.nome ?? 'Membro'}
-                      </p>
-                    )}
-                    {msg.removida ? (
-                      <p className="text-sm italic opacity-70">Mensagem removida</p>
-                    ) : (
-                      <>
-                        <p className="whitespace-pre-wrap break-words text-sm">{msg.conteudo}</p>
-                        {msg.midiaUrls.length > 0 && <PostMedia urls={msg.midiaUrls} />}
-                      </>
-                    )}
-                  </div>
-                  <div
-                    className={[
-                      'mt-0.5 flex items-center gap-2 text-[11px] text-[rgb(var(--foreground-muted))]',
-                      minha ? 'justify-end' : 'justify-start',
-                    ].join(' ')}
-                  >
-                    <span suppressHydrationWarning>
-                      {formatRelative(new Date(msg.criadoEm))}
-                      {isTemp(msg.id) && ' · enviando…'}
-                      {msg.editadaEm && ' · editada'}
-                    </span>
-                    {!isTemp(msg.id) && !msg.removida && (
-                      <span className="hidden gap-1 group-hover:flex">
-                        {minha ? (
-                          <button
-                            type="button"
-                            title="Remover mensagem"
-                            onClick={() => void removerMensagem(msg.id)}
-                            className="rounded p-0.5 text-red-500 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            title="Denunciar mensagem"
-                            onClick={() => {
-                              setDenunciandoId(denunciandoId === msg.id ? null : msg.id)
-                              setMotivoDenuncia('')
-                            }}
-                            className="rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                          >
-                            <Flag className="h-3 w-3" />
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <AnimatePresence>
-                    {denunciandoId === msg.id && (
-                      <m.form
-                        key="denuncia"
-                        variants={collapsePanel}
-                        initial="hidden"
-                        animate="show"
-                        exit="exit"
-                        transition={springSnappy}
-                        className="mt-1 flex gap-1.5 overflow-hidden"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          void denunciar(msg.id)
-                        }}
-                      >
-                        <input
-                          value={motivoDenuncia}
-                          onChange={(e) => setMotivoDenuncia(e.target.value)}
-                          maxLength={500}
-                          autoFocus
-                          placeholder="Motivo da denúncia"
-                          className="w-52 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
-                        />
-                        <button type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
-                          Enviar
-                        </button>
-                      </m.form>
-                    )}
-                  </AnimatePresence>
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          onScroll={atualizarPosicaoScroll}
+          className="h-full space-y-3 overflow-y-auto px-4 py-4"
+        >
+          {carregando ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
+            </div>
+          ) : erro ? (
+            <p className="py-10 text-center text-sm text-red-600 dark:text-red-400">{erro}</p>
+          ) : mensagens.length === 0 ? (
+            <MotionEmptyState
+              title="Comece a conversa — diga um oi 👋"
+              className="py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
+            />
+          ) : (
+            <>
+              {(hasMoreHistorico || carregandoHistorico) && (
+                <div ref={historicoSentinelRef} className="flex justify-center py-2">
+                  {carregandoHistorico ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-[rgb(var(--foreground-muted))]" />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void carregarHistorico()}
+                      className="rounded-lg px-3 py-1 text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+                    >
+                      Carregar mensagens anteriores
+                    </button>
+                  )}
                 </div>
-              </m.div>
-            )
-          })
-        )}
+              )}
+              {listWindow.enabled && listWindow.virtualItems ? (
+                <div
+                  className="relative w-full"
+                  style={{ height: listWindow.totalSize }}
+                >
+                  {listWindow.virtualItems.map((vi) => {
+                    const msg = mensagens[vi.index]
+                    if (!msg) return null
+                    return (
+                      <div
+                        key={msg.id}
+                        data-index={vi.index}
+                        ref={listWindow.measureElement}
+                        className="absolute left-0 top-0 w-full pb-3"
+                        style={{ transform: `translateY(${vi.start}px)` }}
+                      >
+                        <MensagemBubble
+                          msg={msg}
+                          conversaTipo={conversa.tipo}
+                          currentUserId={currentUserId}
+                          denunciandoId={denunciandoId}
+                          motivoDenuncia={motivoDenuncia}
+                          animate={false}
+                          onDenunciandoId={setDenunciandoId}
+                          onMotivoDenuncia={setMotivoDenuncia}
+                          onRemover={() => void removerMensagem(msg.id)}
+                          onDenunciar={() => void denunciar(msg.id)}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                mensagens.map((msg) => (
+                  <MensagemBubble
+                    key={msg.id}
+                    msg={msg}
+                    conversaTipo={conversa.tipo}
+                    currentUserId={currentUserId}
+                    denunciandoId={denunciandoId}
+                    motivoDenuncia={motivoDenuncia}
+                    animate
+                    onDenunciandoId={setDenunciandoId}
+                    onMotivoDenuncia={setMotivoDenuncia}
+                    onRemover={() => void removerMensagem(msg.id)}
+                    onDenunciar={() => void denunciar(msg.id)}
+                  />
+                ))
+              )}
+            </>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {novasPendentes > 0 && !atBottom && (
+            <m.button
+              key="novas-msgs"
+              type="button"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={springSnappy}
+              onClick={() => scrollToBottom(true)}
+              className="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:opacity-90"
+            >
+              {novasPendentes > 99 ? '99+' : novasPendentes}{' '}
+              {novasPendentes === 1 ? 'nova' : 'novas'}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </m.button>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Composer */}
@@ -539,7 +787,7 @@ export function MensagemThread({
                   )}
                   <button
                     type="button"
-                    onClick={() => setMedias((prev) => prev.filter((x) => x.id !== media.id))}
+                    onClick={() => removerMedia(media.id)}
                     aria-label="Remover anexo"
                     className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white"
                   >
@@ -551,53 +799,116 @@ export function MensagemThread({
           )}
         </AnimatePresence>
         <div className="flex items-end gap-1.5">
-          <div className="relative flex items-center">
-            <button
+          <div ref={anexoMenuRef} className="relative shrink-0">
+            <m.button
               type="button"
               onClick={() => {
-                setEmojiOpen((v) => !v)
+                setAnexoMenuOpen((v) => !v)
+                setEmojiOpen(false)
                 setStickerOpen(false)
               }}
-              aria-label="Emojis"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              aria-label="Anexar"
+              aria-expanded={anexoMenuOpen}
+              whileTap={{ scale: 0.92 }}
+              transition={springSnappy}
+              className={[
+                'flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
+                anexoMenuOpen || emojiOpen || stickerOpen
+                  ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  : '',
+              ].join(' ')}
             >
-              <Smile className="h-5 w-5" />
-            </button>
-            {emojiOpen && <EmojiPicker onSelect={insertEmoji} onClose={() => setEmojiOpen(false)} />}
+              <m.span
+                animate={{ rotate: anexoMenuOpen ? 45 : 0 }}
+                transition={springSnappy}
+                className="inline-flex"
+              >
+                <Plus className="h-5 w-5" />
+              </m.span>
+            </m.button>
+
+            <AnimatePresence>
+              {anexoMenuOpen && (
+                <m.div
+                  key="anexo-menu"
+                  role="menu"
+                  aria-label="Opções de anexo"
+                  variants={popoverPanel}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  transition={springGentle}
+                  className="card-soft absolute bottom-full left-0 z-30 mb-2 min-w-[11rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-xl"
+                >
+                  <m.button
+                    type="button"
+                    role="menuitem"
+                    custom={0}
+                    variants={menuItemStagger}
+                    initial="hidden"
+                    animate="show"
+                    onClick={abrirEmoji}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  >
+                    <Smile className="h-4 w-4 shrink-0" />
+                    Emoji
+                  </m.button>
+                  <m.button
+                    type="button"
+                    role="menuitem"
+                    custom={1}
+                    variants={menuItemStagger}
+                    initial="hidden"
+                    animate="show"
+                    onClick={abrirSticker}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  >
+                    <StickerIcon className="h-4 w-4 shrink-0" />
+                    Sticker
+                  </m.button>
+                  <m.button
+                    type="button"
+                    role="menuitem"
+                    custom={2}
+                    variants={menuItemStagger}
+                    initial="hidden"
+                    animate="show"
+                    onClick={abrirImagem}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                  >
+                    <ImagePlus className="h-4 w-4 shrink-0" />
+                    Imagem ou vídeo
+                  </m.button>
+                </m.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {emojiOpen && (
+                <EmojiPicker
+                  key="emoji"
+                  onSelect={insertEmoji}
+                  onClose={() => setEmojiOpen(false)}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {stickerOpen && (
+                <StickerPicker
+                  key="sticker"
+                  onSelect={(url) => {
+                    setStickerOpen(false)
+                    setMedias((prev) => [
+                      ...prev,
+                      { id: `${Date.now()}`, kind: 'sticker', localUrl: url, url, error: null },
+                    ])
+                  }}
+                  onClose={() => setStickerOpen(false)}
+                />
+              )}
+            </AnimatePresence>
           </div>
-          <div className="relative flex items-center">
-            <button
-              type="button"
-              onClick={() => {
-                setStickerOpen((v) => !v)
-                setEmojiOpen(false)
-              }}
-              aria-label="Stickers"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-            >
-              <StickerIcon className="h-5 w-5" />
-            </button>
-            {stickerOpen && (
-              <StickerPicker
-                onSelect={(url) => {
-                  setStickerOpen(false)
-                  setMedias((prev) => [
-                    ...prev,
-                    { id: `${Date.now()}`, kind: 'sticker', localUrl: url, url, error: null },
-                  ])
-                }}
-                onClose={() => setStickerOpen(false)}
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Anexar foto ou vídeo"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
-          >
-            <ImagePlus className="h-5 w-5" />
-          </button>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -630,12 +941,12 @@ export function MensagemThread({
             }}
             rows={1}
             maxLength={2000}
-            placeholder="Escreva uma mensagem"
-            className="max-h-32 min-h-[36px] flex-1 resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+            placeholder="Escreva"
+            className="max-h-32 min-h-[36px] flex-1 resize-none overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
           />
           <m.button
             type="submit"
-            disabled={enviando || uploadPendente || !texto.trim()}
+            disabled={!podeEnviar}
             whileTap={{ scale: 0.94 }}
             transition={springSnappy}
             aria-label="Enviar mensagem"
@@ -650,6 +961,143 @@ export function MensagemThread({
         </div>
       </form>
     </m.div>
+  )
+}
+
+function MensagemBubble({
+  msg,
+  conversaTipo,
+  currentUserId,
+  denunciandoId,
+  motivoDenuncia,
+  animate,
+  onDenunciandoId,
+  onMotivoDenuncia,
+  onRemover,
+  onDenunciar,
+}: {
+  msg: MensagemDto
+  conversaTipo: InboxItemDto['tipo']
+  currentUserId: string
+  denunciandoId: string | null
+  motivoDenuncia: string
+  animate: boolean
+  onDenunciandoId: (id: string | null) => void
+  onMotivoDenuncia: (v: string) => void
+  onRemover: () => void
+  onDenunciar: () => void
+}) {
+  const minha = msg.autor.id === currentUserId
+  const Wrapper = animate ? m.div : 'div'
+  const motionProps = animate
+    ? {
+        layout: true,
+        variants: fadeUp,
+        initial: 'hidden' as const,
+        animate: 'show' as const,
+      }
+    : {}
+
+  return (
+    <Wrapper
+      {...motionProps}
+      className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}
+    >
+      {!minha && <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />}
+      <div className={['max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
+        <div
+          className={[
+            'rounded-2xl px-3.5 py-2',
+            minha
+              ? 'rounded-br-md bg-[rgb(var(--primary))] text-white'
+              : 'rounded-bl-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
+          ].join(' ')}
+        >
+          {isConversaGrupoLike(conversaTipo) && !minha && (
+            <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--primary))]">
+              {msg.autor.nome ?? 'Membro'}
+            </p>
+          )}
+          {msg.removida ? (
+            <p className="text-sm italic opacity-70">Mensagem removida</p>
+          ) : (
+            <>
+              {msg.conteudo ? (
+                <p className="whitespace-pre-wrap break-words text-sm">{msg.conteudo}</p>
+              ) : null}
+              {msg.midiaUrls.length > 0 && <PostMedia urls={msg.midiaUrls} />}
+            </>
+          )}
+        </div>
+        <div
+          className={[
+            'mt-0.5 flex items-center gap-2 text-[11px] text-[rgb(var(--foreground-muted))]',
+            minha ? 'justify-end' : 'justify-start',
+          ].join(' ')}
+        >
+          <span suppressHydrationWarning>
+            {formatRelative(new Date(msg.criadoEm))}
+            {isTemp(msg.id) && ' · enviando…'}
+            {msg.editadaEm && ' · editada'}
+          </span>
+          {!isTemp(msg.id) && !msg.removida && (
+            <span className="hidden gap-1 group-hover:flex">
+              {minha ? (
+                <button
+                  type="button"
+                  title="Remover mensagem"
+                  onClick={onRemover}
+                  className="rounded p-0.5 text-red-500 hover:bg-red-500/10"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  title="Denunciar mensagem"
+                  onClick={() => {
+                    onDenunciandoId(denunciandoId === msg.id ? null : msg.id)
+                    onMotivoDenuncia('')
+                  }}
+                  className="rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <Flag className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+        <AnimatePresence>
+          {denunciandoId === msg.id && (
+            <m.form
+              key="denuncia"
+              variants={collapsePanel}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              transition={springSnappy}
+              className="mt-1 flex gap-1.5 overflow-hidden"
+              onSubmit={(e) => {
+                e.preventDefault()
+                onDenunciar()
+              }}
+            >
+              <input
+                value={motivoDenuncia}
+                onChange={(e) => onMotivoDenuncia(e.target.value)}
+                maxLength={500}
+                autoFocus
+                placeholder="Motivo da denúncia"
+                className="w-52 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
+              />
+              <button type="submit" className="text-xs font-semibold text-red-600 dark:text-red-400">
+                Enviar
+              </button>
+            </m.form>
+          )}
+        </AnimatePresence>
+      </div>
+    </Wrapper>
   )
 }
 

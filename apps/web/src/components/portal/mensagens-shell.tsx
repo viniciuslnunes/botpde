@@ -42,6 +42,8 @@ interface MensagensShellProps {
   variant?: 'full' | 'embedded'
   /** Pai já buscou a inbox (evita bootstrap duplicado no embed da comunidade). */
   inboxPreloaded?: boolean
+  /** Quando false, pausa SSE/polling (painel colapsado). */
+  active?: boolean
   onInboxChange?: (conversas: InboxItemDto[]) => void
 }
 
@@ -53,6 +55,7 @@ export function MensagensShell({
   currentUserId,
   variant = 'full',
   inboxPreloaded = false,
+  active = true,
   onInboxChange,
 }: MensagensShellProps) {
   const embedded = variant === 'embedded'
@@ -107,8 +110,8 @@ export function MensagensShell({
   }, [inboxPreloaded, initialConversas.length, atualizarInbox])
 
   // SSE: atualiza inbox na hora; polling 60s só como fallback se o stream cair.
-  useInboxStream(() => void atualizarInbox())
-  useVisibleInterval(() => void atualizarInbox(), 60_000)
+  useInboxStream(() => void atualizarInbox(), active)
+  useVisibleInterval(() => void atualizarInbox(), 60_000, active)
 
   const zerarNaoLidas = useCallback((conversaId: string) => {
     setConversas((prev) =>
@@ -281,6 +284,31 @@ export function MensagensShell({
             onBack={() => setSelecionadaId(null)}
             onLida={zerarNaoLidas}
             onSaiu={removerDaLista}
+            showBackButton={embedded}
+            active={active}
+            onMensagemEnviada={(preview) => {
+              setConversas((prev) => {
+                const next = prev.map((c) =>
+                  c.id === selecionada.id
+                    ? {
+                        ...c,
+                        atualizadoEm: preview.criadoEm,
+                        ultimaMensagem: {
+                          conteudo: preview.conteudo || '📎 Anexo',
+                          autorNome: 'Você',
+                          criadoEm: preview.criadoEm,
+                          removida: false,
+                        },
+                        naoLidas: 0,
+                      }
+                    : c,
+                )
+                return [...next].sort(
+                  (a, b) =>
+                    new Date(b.atualizadoEm).getTime() - new Date(a.atualizadoEm).getTime(),
+                )
+              })
+            }}
           />
         ) : (
           !embedded && (

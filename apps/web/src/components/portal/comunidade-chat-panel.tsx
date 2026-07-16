@@ -118,14 +118,12 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
   }, [carregarResumo])
 
   useVisibleInterval(() => {
-    if (expanded) return
     void carregarResumo()
-  }, 60_000)
+  }, 60_000, !expanded)
 
   useInboxStream(() => {
-    if (expanded) return
     void carregarResumo()
-  })
+  }, !expanded)
 
   useEffect(() => {
     if (!expanded) return
@@ -202,6 +200,7 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
             initialSelecionadaId={null}
             currentUserId={currentUserId}
             inboxPreloaded
+            active={expanded}
             onInboxChange={onInboxAtualizada}
           />
         )}

@@ -268,7 +268,7 @@ export async function criarGrupoConversa(
 export async function listConversas(userId: string): Promise<ConversaInboxItem[]> {
   interface InboxRow extends MembroAtivoRow {
     conversa: MembroAtivoRow['conversa'] & {
-      membros: { userId: string; saiuEm: Date | null; user: AutorLite }[]
+      _count: { membros: number }
       mensagens: {
         conteudo: string
         criadoEm: Date
@@ -278,6 +278,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
     }
   }
 
+  // Sem nested `membros[]` completo — grupos grandes inflavam a payload (N membros × 50 conversas).
   const rows: InboxRow[] = await db.membroConversa.findMany({
     where: { userId, saiuEm: null },
     select: {
@@ -293,12 +294,8 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
           nome: true,
           avatarUrl: true,
           atualizadoEm: true,
-          membros: {
-            select: {
-              userId: true,
-              saiuEm: true,
-              user: { select: { id: true, nome: true, avatarUrl: true } },
-            },
+          _count: {
+            select: { membros: { where: { saiuEm: null } } },
           },
           mensagens: {
             orderBy: { criadoEm: 'desc' },
@@ -317,15 +314,36 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
     take: 50,
   })
 
-  const naoLidasMap = await contarNaoLidasPorConversa(userId, {
-    conversaIds: rows.map((row) => row.conversa.id),
-  })
+  const conversaIds = rows.map((row) => row.conversa.id)
+  const dmIds = rows
+    .filter((row) => row.conversa.tipo === 'DIRETA')
+    .map((row) => row.conversa.id)
+
+  const [naoLidasMap, outrosDm] = await Promise.all([
+    contarNaoLidasPorConversa(userId, { conversaIds }),
+    dmIds.length === 0
+      ? Promise.resolve(
+          [] as Array<{ conversaId: string; user: AutorLite }>,
+        )
+      : db.membroConversa.findMany({
+          where: {
+            conversaId: { in: dmIds },
+            userId: { not: userId },
+            saiuEm: null,
+          },
+          select: {
+            conversaId: true,
+            user: { select: { id: true, nome: true, avatarUrl: true } },
+          },
+        }),
+  ])
+
+  const outroPorConversa = new Map<string, AutorLite>()
+  for (const row of outrosDm) {
+    outroPorConversa.set(row.conversaId, row.user)
+  }
 
   return rows.map((row) => {
-    const ativos = row.conversa.membros.filter((m) => m.saiuEm === null)
-    const outro = row.conversa.tipo === 'DIRETA'
-      ? (ativos.find((m) => m.userId !== userId)?.user ?? null)
-      : null
     const ultima = row.conversa.mensagens[0] ?? null
     return {
       id: row.conversa.id,
@@ -335,8 +353,11 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       atualizadoEm: row.conversa.atualizadoEm,
       meuPapel: row.papel,
       silenciada: row.silenciada,
-      totalMembros: ativos.length,
-      outroMembro: outro,
+      totalMembros: row.conversa._count.membros,
+      outroMembro:
+        row.conversa.tipo === 'DIRETA'
+          ? (outroPorConversa.get(row.conversa.id) ?? null)
+          : null,
       ultimaMensagem: ultima
         ? {
             conteudo: ultima.removidaEm ? 'Mensagem removida' : ultima.conteudo,
@@ -350,29 +371,48 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
   })
 }
 
-/** Mensagens da conversa (ascendente). `after` = polling incremental. */
+/** Mensagens da conversa (ascendente).
+ * - sem cursor: página mais recente
+ * - `after`: polling incremental (novas)
+ * - `before`: histórico mais antigo (paginação no topo)
+ */
 export async function listMensagens(
   conversaId: string,
-  opts: { after?: Date; take?: number } = {},
-): Promise<MensagemItem[]> {
-  const take = Math.min(opts.take ?? 100, 200)
+  opts: { after?: Date; before?: Date; take?: number } = {},
+): Promise<{ mensagens: MensagemItem[]; hasMore: boolean }> {
+  const take = Math.min(opts.take ?? 40, 100)
 
   if (opts.after) {
-    return db.mensagemDireta.findMany({
+    const mensagens: MensagemItem[] = await db.mensagemDireta.findMany({
       where: { conversaId, criadoEm: { gt: opts.after } },
       orderBy: { criadoEm: 'asc' },
       take,
       select: MENSAGEM_SELECT,
     })
+    return { mensagens, hasMore: false }
+  }
+
+  if (opts.before) {
+    const recentes: MensagemItem[] = await db.mensagemDireta.findMany({
+      where: { conversaId, criadoEm: { lt: opts.before } },
+      orderBy: { criadoEm: 'desc' },
+      take: take + 1,
+      select: MENSAGEM_SELECT,
+    })
+    const hasMore = recentes.length > take
+    const pagina = hasMore ? recentes.slice(0, take) : recentes
+    return { mensagens: pagina.reverse(), hasMore }
   }
 
   const recentes: MensagemItem[] = await db.mensagemDireta.findMany({
     where: { conversaId },
     orderBy: { criadoEm: 'desc' },
-    take,
+    take: take + 1,
     select: MENSAGEM_SELECT,
   })
-  return recentes.reverse()
+  const hasMore = recentes.length > take
+  const pagina = hasMore ? recentes.slice(0, take) : recentes
+  return { mensagens: pagina.reverse(), hasMore }
 }
 
 /** Cria mensagem e bumpa `atualizadoEm` da conversa (ordena a inbox). */
