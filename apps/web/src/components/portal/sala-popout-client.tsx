@@ -1,10 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeftToLine,
-  Eye,
-  EyeOff,
   Loader2,
   MessageSquare,
   Users,
@@ -30,6 +28,8 @@ type SalaPopoutClientProps = {
   initialMensagens: SalaMensagem[]
 }
 
+const CHROME_IDLE_MS = 2000
+
 export function SalaPopoutClient({
   salaId,
   titulo,
@@ -44,10 +44,13 @@ export function SalaPopoutClient({
   initialParticipantes,
   initialMensagens,
 }: SalaPopoutClientProps) {
-  const [participantStripVisible, setParticipantStripVisible] = useState(true)
-  const [commentsOpen, setCommentsOpen] = useState(true)
+  const [participantStripVisible, setParticipantStripVisible] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const [onlineCount, setOnlineCount] = useState(initialParticipantes.length)
+  const [chromeVisible, setChromeVisible] = useState(true)
+  const idleTimerRef = useRef<number | null>(null)
+  const panelHoverRef = useRef(false)
 
   const participantProfiles = Object.fromEntries(
     initialParticipantes.map((participante) => [
@@ -55,6 +58,15 @@ export function SalaPopoutClient({
       { nome: participante.nome, avatarUrl: participante.avatarUrl },
     ]),
   )
+
+  const revelarChrome = useCallback(() => {
+    setChromeVisible(true)
+    if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+    if (panelHoverRef.current || commentsOpen || membersOpen) return
+    idleTimerRef.current = window.setTimeout(() => {
+      setChromeVisible(false)
+    }, CHROME_IDLE_MS)
+  }, [commentsOpen, membersOpen])
 
   const voltarParaSala = useCallback(() => {
     if (window.opener && !window.opener.closed) {
@@ -76,8 +88,13 @@ export function SalaPopoutClient({
     return () => {
       window.removeEventListener('beforeunload', notificarFechamento)
       notificarFechamento()
+      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
     }
   }, [titulo, notificarFechamento])
+
+  useEffect(() => {
+    revelarChrome()
+  }, [commentsOpen, membersOpen, revelarChrome])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -85,8 +102,14 @@ export function SalaPopoutClient({
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return
       }
+      revelarChrome()
       if (event.key === 'Escape') {
         event.preventDefault()
+        if (commentsOpen || membersOpen) {
+          setCommentsOpen(false)
+          setMembersOpen(false)
+          return
+        }
         voltarParaSala()
         return
       }
@@ -98,146 +121,187 @@ export function SalaPopoutClient({
       if (event.key.toLowerCase() === 'm') {
         event.preventDefault()
         setMembersOpen((open) => !open)
+        return
+      }
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        setParticipantStripVisible((visible) => !visible)
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [voltarParaSala])
+  }, [voltarParaSala, revelarChrome, commentsOpen, membersOpen])
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-black text-white">
-      <header className="relative z-50 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-zinc-950 px-4 py-2.5">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{titulo}</p>
-          <p className="text-xs text-zinc-400">
-            Janela de vídeo · {onlineCount} online · atalhos Esc / C / M
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCommentsOpen((open) => !open)}
-            aria-pressed={commentsOpen}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-              commentsOpen
-                ? 'border-transparent bg-[rgb(var(--color-primary))] text-white'
-                : 'border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10'
-            }`}
-            title="Mostrar ou ocultar chat (C)"
-          >
-            {commentsOpen ? <EyeOff className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
-            Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => setMembersOpen((open) => !open)}
-            aria-pressed={membersOpen}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-              membersOpen
-                ? 'border-transparent bg-[rgb(var(--color-primary))] text-white'
-                : 'border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10'
-            }`}
-            title="Mostrar ou ocultar membros (M)"
-          >
-            <Users className="h-4 w-4" />
-            Membros
-          </button>
-          <button
-            type="button"
-            onClick={voltarParaSala}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white"
-            title="Voltar à visualização da sala (Esc)"
-          >
-            <ArrowLeftToLine className="h-4 w-4" />
-            Voltar à sala
-          </button>
-        </div>
-      </header>
-
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-          <MeetRoom
-            salaId={salaId}
-            token={token}
-            serverUrl={livekitUrl}
-            hostId={hostId}
-            isHost={isHost}
-            userId={userId}
-            userName={userName}
-            userAvatarUrl={userAvatarUrl}
-            participantProfiles={participantProfiles}
-            popoutMode
-            resumeScreenShare={resumeScreenShare}
-            showParticipantStrip={participantStripVisible}
-            onToggleParticipantStrip={() => setParticipantStripVisible((visible) => !visible)}
-            onOnlineCountChange={setOnlineCount}
-            onLeaveCall={voltarParaSala}
-          />
-        </main>
-
-        {commentsOpen ? (
-          <aside
-            className="absolute inset-y-0 right-0 z-40 flex w-[min(100%,22rem)] flex-col border-l border-white/10 bg-zinc-950 shadow-2xl sm:w-[22rem]"
-            aria-label="Chat da sala"
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
-                <MessageSquare className="h-4 w-4" />
-                Chat da sala
-              </h2>
-              <button
-                type="button"
-                onClick={() => setCommentsOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-300 hover:bg-white/10"
-                aria-label="Fechar chat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden p-4">
-              <SalaChat
-                salaId={salaId}
-                currentUserId={userId}
-                isHost={isHost}
-                initialMensagens={initialMensagens}
-                listClassName="h-[calc(100%-3.5rem)] max-h-none space-y-3 overflow-y-auto pr-1"
-              />
-            </div>
-          </aside>
-        ) : null}
-
-        {membersOpen ? (
-          <aside
-            className={`absolute inset-y-0 z-40 flex w-[min(100%,18rem)] flex-col border-l border-white/10 bg-zinc-950 shadow-2xl sm:w-[18rem] ${
-              commentsOpen ? 'right-[min(100%,22rem)] sm:right-[22rem]' : 'right-0'
-            }`}
-            aria-label="Membros online"
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
-                <Users className="h-4 w-4" />
-                Membros online
-              </h2>
-              <button
-                type="button"
-                onClick={() => setMembersOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-300 hover:bg-white/10"
-                aria-label="Fechar membros"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <SalaParticipantes
-                salaId={salaId}
-                initialParticipantes={initialParticipantes}
-                onCountChange={setOnlineCount}
-              />
-            </div>
-          </aside>
-        ) : null}
+    <div
+      className="relative h-dvh min-h-0 overflow-hidden bg-black text-white"
+      onMouseMove={revelarChrome}
+      onTouchStart={revelarChrome}
+    >
+      {/* Vídeo em tela cheia — único plano visual */}
+      <div className="absolute inset-0">
+        <MeetRoom
+          salaId={salaId}
+          token={token}
+          serverUrl={livekitUrl}
+          hostId={hostId}
+          isHost={isHost}
+          userId={userId}
+          userName={userName}
+          userAvatarUrl={userAvatarUrl}
+          participantProfiles={participantProfiles}
+          popoutMode
+          chromeVisible={chromeVisible}
+          resumeScreenShare={resumeScreenShare}
+          showParticipantStrip={participantStripVisible}
+          onToggleParticipantStrip={() => {
+            setParticipantStripVisible((visible) => !visible)
+            revelarChrome()
+          }}
+          onOnlineCountChange={setOnlineCount}
+          onLeaveCall={voltarParaSala}
+        />
       </div>
+
+      {/* Chrome flutuante — some com o mouse parado */}
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 z-50 p-3 transition-all duration-200 ${
+          chromeVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+        }`}
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
+      >
+        <div
+          className={`pointer-events-auto mx-auto flex max-w-5xl items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-950/45 px-3 py-2 shadow-xl backdrop-blur-md ${
+            chromeVisible ? '' : 'pointer-events-none'
+          }`}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{titulo}</p>
+            <p className="truncate text-[11px] text-zinc-300/80">{onlineCount} online</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCommentsOpen((open) => !open)}
+              aria-pressed={commentsOpen}
+              title="Chat (C)"
+              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold transition ${
+                commentsOpen
+                  ? 'bg-[rgb(var(--color-primary))] text-white'
+                  : 'bg-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMembersOpen((open) => !open)}
+              aria-pressed={membersOpen}
+              title="Membros (M)"
+              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold transition ${
+                membersOpen
+                  ? 'bg-[rgb(var(--color-primary))] text-white'
+                  : 'bg-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Membros</span>
+            </button>
+            <button
+              type="button"
+              onClick={voltarParaSala}
+              title="Voltar à sala (Esc)"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-2.5 text-sm font-semibold text-white hover:bg-white/15"
+            >
+              <ArrowLeftToLine className="h-4 w-4" />
+              <span className="hidden sm:inline">Sala</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Painéis translúcidos sobre o vídeo */}
+      {commentsOpen ? (
+        <aside
+          className="absolute bottom-24 right-3 top-20 z-40 flex w-[min(100%-1.5rem,20rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl sm:right-4"
+          aria-label="Chat da sala"
+          onMouseEnter={() => {
+            panelHoverRef.current = true
+            setChromeVisible(true)
+            if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+          }}
+          onMouseLeave={() => {
+            panelHoverRef.current = false
+            revelarChrome()
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-200">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Chat
+            </h2>
+            <button
+              type="button"
+              onClick={() => setCommentsOpen(false)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-200 hover:bg-white/15"
+              aria-label="Fechar chat"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden p-3">
+            <SalaChat
+              salaId={salaId}
+              currentUserId={userId}
+              isHost={isHost}
+              initialMensagens={initialMensagens}
+              listClassName="h-[calc(100%-3.25rem)] max-h-none space-y-3 overflow-y-auto pr-1"
+            />
+          </div>
+        </aside>
+      ) : null}
+
+      {membersOpen ? (
+        <aside
+          className={`absolute bottom-24 top-20 z-40 flex w-[min(100%-1.5rem,16rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl ${
+            commentsOpen ? 'right-[calc(min(100%-1.5rem,20rem)+1rem)] sm:right-[21rem]' : 'right-3 sm:right-4'
+          }`}
+          aria-label="Membros online"
+          onMouseEnter={() => {
+            panelHoverRef.current = true
+            setChromeVisible(true)
+            if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+          }}
+          onMouseLeave={() => {
+            panelHoverRef.current = false
+            revelarChrome()
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+            <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-200">
+              <Users className="h-3.5 w-3.5" />
+              Membros
+            </h2>
+            <button
+              type="button"
+              onClick={() => setMembersOpen(false)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-zinc-200 hover:bg-white/15"
+              aria-label="Fechar membros"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <SalaParticipantes
+              salaId={salaId}
+              initialParticipantes={initialParticipantes}
+              onCountChange={setOnlineCount}
+            />
+          </div>
+        </aside>
+      ) : null}
     </div>
   )
 }

@@ -51,6 +51,7 @@ type MeetRoomProps = {
   userAvatarUrl?: string | null
   participantProfiles?: Record<string, { nome: string | null; avatarUrl: string | null }>
   popoutMode?: boolean
+  chromeVisible?: boolean
   resumeScreenShare?: boolean
   showParticipantStrip?: boolean
   canOpenVideoPopout?: boolean
@@ -289,6 +290,7 @@ function MeetControls({
   userId,
   userName,
   activeScreenSharers,
+  compact = false,
   onLeaveCall,
 }: {
   lk: LiveKitModule
@@ -298,6 +300,7 @@ function MeetControls({
   userId: string
   userName: string
   activeScreenSharers: Array<{ userId: string; userName: string }>
+  compact?: boolean
   onLeaveCall?: () => void
 }) {
   const { useLocalParticipant, useRoomContext, TrackToggle } = lk
@@ -432,7 +435,7 @@ function MeetControls({
   }
 
   return (
-    <div className="meet-room-footer">
+    <div className={`meet-room-footer${compact ? ' meet-room-footer--compact' : ''}`}>
       {isHost && activeScreenSharers.length > 0 && (
         <ActiveScreenShareBanner salaId={salaId} sharers={activeScreenSharers} />
       )}
@@ -520,9 +523,10 @@ function MeetControls({
           onClick={() => void sairDaChamada()}
           disabled={saindo}
           className="meet-room-leave"
+          title="Sair da chamada"
         >
           {saindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-          Sair da chamada
+          {compact ? 'Sair' : 'Sair da chamada'}
         </button>
       </div>
     </div>
@@ -901,6 +905,7 @@ function MeetConference({
           userId={userId}
           userName={userName}
           activeScreenSharers={activeScreenSharers}
+          compact={popoutMode}
           onLeaveCall={onLeaveCall}
         />
         <RoomAudioRenderer />
@@ -920,6 +925,7 @@ export function MeetRoom({
   userAvatarUrl = null,
   participantProfiles = {},
   popoutMode = false,
+  chromeVisible = true,
   resumeScreenShare = false,
   showParticipantStrip = true,
   canOpenVideoPopout = false,
@@ -1050,6 +1056,7 @@ export function MeetRoom({
       className="meet-room-root"
       data-lk-theme="default"
       data-popout={popoutMode ? 'true' : 'false'}
+      data-chrome={chromeVisible ? 'true' : 'false'}
     >
       <AnimatePresence>
         {mediaHint && (
