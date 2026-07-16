@@ -27,7 +27,7 @@
     "seed:torcidas-tenants": "node scripts/seed-torcidas-tenants.js",
     "seed:sedes-onboarding": "node scripts/seed-sedes-onboarding.js",
     "report:sedes-catalogo": "node scripts/generate-sedes-from-catalogo.js",
-    "coleta:sedes-geocode": "node scripts/coleta-sedes-geocode.js",
+    "coleta:sedes-geocode": "node --use-system-ca scripts/coleta-sedes-geocode.js",
     "seed:torcidas-conhecidas": "node --use-system-ca scripts/seed-torcidas-conhecidas.js",
     "scrape:organizadas": "node --use-system-ca scripts/scrape-organizadas.mjs",
     "test:afiliacoes": "node scripts/test-afiliacoes.js",
