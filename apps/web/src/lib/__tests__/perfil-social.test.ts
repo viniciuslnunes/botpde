@@ -4,6 +4,7 @@ import {
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
   socioAprovadoPrivacidadeObrigatoria,
+  torcedorAprovadoPublicoObrigatorio,
 } from '@/lib/perfil-social'
 
 describe('resolverAvatarSocial', () => {
@@ -37,13 +38,16 @@ describe('resolverPerfilPrivadoEfetivo', () => {
     ).toBe(true)
   })
 
-  it('torcedor aprovado usa preferência gravada', () => {
+  it('torcedor é sempre público', () => {
     expect(
       resolverPerfilPrivadoEfetivo(false, { tipo: 'TORCEDOR', status: 'APROVADO' }),
     ).toBe(false)
     expect(
       resolverPerfilPrivadoEfetivo(true, { tipo: 'TORCEDOR', status: 'APROVADO' }),
-    ).toBe(true)
+    ).toBe(false)
+    expect(
+      resolverPerfilPrivadoEfetivo(true, { tipo: 'TORCEDOR', status: 'PENDENTE' }),
+    ).toBe(false)
   })
 
   it('sem vínculo assume público', () => {
@@ -60,6 +64,21 @@ describe('socioAprovadoPrivacidadeObrigatoria', () => {
       false,
     )
     expect(socioAprovadoPrivacidadeObrigatoria(null)).toBe(false)
+  })
+})
+
+describe('torcedorAprovadoPublicoObrigatorio', () => {
+  it('identifica torcedor aprovado', () => {
+    expect(
+      torcedorAprovadoPublicoObrigatorio({ tipo: 'TORCEDOR', status: 'APROVADO' }),
+    ).toBe(true)
+    expect(
+      torcedorAprovadoPublicoObrigatorio({ tipo: 'TORCEDOR', status: 'PENDENTE' }),
+    ).toBe(true)
+    expect(
+      torcedorAprovadoPublicoObrigatorio({ tipo: 'SOCIO', status: 'APROVADO' }),
+    ).toBe(false)
+    expect(torcedorAprovadoPublicoObrigatorio(null)).toBe(false)
   })
 })
 

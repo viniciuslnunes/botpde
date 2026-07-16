@@ -1,11 +1,10 @@
 import { ComunidadeSalasPanel } from '@/components/portal/comunidade-salas-panel'
-import { listSalasAtivas } from '@/lib/salas'
+import type { SalaAtivaListItem } from '@/lib/salas'
 
 interface ComunidadeSalasAsideProps {
-  tenantId: string
+  salas: SalaAtivaListItem[]
 }
 
-export async function ComunidadeSalasAside({ tenantId }: ComunidadeSalasAsideProps) {
-  const salas = await listSalasAtivas(tenantId)
+export function ComunidadeSalasAside({ salas }: ComunidadeSalasAsideProps) {
   return <ComunidadeSalasPanel salas={salas} />
 }

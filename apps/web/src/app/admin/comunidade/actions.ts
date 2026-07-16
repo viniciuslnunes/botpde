@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidateComunicadosCache } from '@/lib/comunidade'
-import { notificarMembrosAprovados } from '@/lib/notificacoes'
+import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 
@@ -207,7 +207,7 @@ export async function criarComunicado(
   })
 
   if (prioridade === 'URGENTE') {
-    await notificarMembrosAprovados({
+    await notificarComunicadoUrgente({
       tenantId: tenant.id,
       tipo: 'COMUNICADO_URGENTE',
       titulo: `Urgente: ${titulo}`,

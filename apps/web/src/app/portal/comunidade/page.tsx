@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { checarPodePublicarNoFeed } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
@@ -14,6 +13,7 @@ import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
+import { listSalasAtivas } from '@/lib/salas'
 
 const ComunidadeChatPanel = dynamic(
   () =>
@@ -26,10 +26,6 @@ const ComunidadeChatPanel = dynamic(
 )
 
 export const metadata: Metadata = { title: 'Comunidade' }
-
-function SalasFallback() {
-  return <div className="h-40 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-}
 
 export default async function ComunidadePage({
   searchParams,
@@ -60,6 +56,7 @@ export default async function ComunidadePage({
   }
 
   const tenant = ctx.tenant
+  const salasAtivas = await listSalasAtivas(tenant.id)
   const currentUser = {
     id: session?.user?.id ?? '',
     nome: session?.user?.name ?? null,
@@ -133,13 +130,12 @@ export default async function ComunidadePage({
         filtro={filtro}
         clubeNacional={ctx.afiliacao}
         afiliacaoSlug={ctx.afiliacao?.slug ?? null}
+        salasAtivas={salasAtivas}
       />
 
       <aside className="hidden xl:block">
         <div className="sticky top-20 space-y-4">
-          <Suspense fallback={<SalasFallback />}>
-            <ComunidadeSalasAside tenantId={tenant.id} />
-          </Suspense>
+          <ComunidadeSalasAside salas={salasAtivas} />
           {currentUser.id && <ComunidadeChatPanel currentUserId={currentUser.id} />}
         </div>
       </aside>

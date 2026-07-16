@@ -5,7 +5,7 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isSuperAdminEmail, listarTorcidasParaSelecao, listarTorcidasParaTransferencia } from '@/lib/tenant-context'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
-import { ArrowRight, Building2, Settings, Users } from 'lucide-react'
+import { ArrowRight, Building2, FileSearch, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 import { TransferirOwnerPainel } from './transferir-owner-painel'
 
@@ -88,6 +88,27 @@ export default async function TorcidasPage() {
           </code>
         </div>
       )}
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+              <FileSearch className="h-4 w-4" />
+              Relatórios operacionais
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Abra o relatório de perfis de torcedores marcados como privados por torcida ou clube.
+            </p>
+          </div>
+          <Link
+            href="/super-admin/relatorios/perfis-torcedores-privados"
+            className="inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-950 transition-opacity hover:opacity-90"
+          >
+            Abrir relatório
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">

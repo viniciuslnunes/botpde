@@ -15,6 +15,7 @@ import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao } from '@/lib/notificacoes'
+import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
@@ -30,6 +31,11 @@ import {
 } from '@/lib/canais'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
+import {
+  backfillTimelineDoAutorParaViewer,
+  fanoutPostParaRede,
+  removerTimelineDoAutorParaViewer,
+} from '@/lib/feed-timeline'
 
 const MAX_MIDIAS = 10
 
@@ -177,6 +183,11 @@ export async function publicarPost(
         postId: post.id,
         link: linkPostComunidade(post.id),
       }),
+      fanoutPostParaRede({
+        postId: post.id,
+        autorId: session.user.id,
+        criadoEm: post.criadoEm,
+      }),
     ])
 
     revalidatePath('/portal/comunidade')
@@ -228,7 +239,7 @@ export async function publicarPostComoTorcedorGlobal(
   }
   registrarAcaoEngajamento(limiterKey)
 
-  await db.post.create({
+  const post = await db.post.create({
     data: {
       tenantId: tenant.id,
       autorId: session.user.id,
@@ -237,6 +248,12 @@ export async function publicarPostComoTorcedorGlobal(
       conteudo: parsed.data.conteudo,
       midiaUrls: parsed.data.midias,
     },
+  })
+
+  await fanoutPostParaRede({
+    postId: post.id,
+    autorId: session.user.id,
+    criadoEm: post.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
@@ -297,6 +314,10 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
     update: { status: statusInicial, tenantContextoId },
   })
 
+  if (statusInicial === 'APROVADO') {
+    await backfillTimelineDoAutorParaViewer(session.user.id, userId)
+  }
+
   if (statusInicial === 'PENDENTE') {
     await criarNotificacao({
       userId,
@@ -352,6 +373,8 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
     where: { id: seguimento.id },
     data: { status: 'APROVADO' },
   })
+
+  await backfillTimelineDoAutorParaViewer(seguimento.seguidorId, session.user.id)
 
   const tenantNotif = tenant?.id ?? seguimento.tenantContextoId
   await marcarNotificacoesSeguimentoPendentesLidas(
@@ -417,6 +440,8 @@ export async function deixarDeSeguir(userId: string): Promise<void> {
       status: 'APROVADO',
     },
   })
+
+  await removerTimelineDoAutorParaViewer(session.user.id, userId)
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
@@ -534,17 +559,6 @@ export async function excluirPost(postId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
-}
-
-async function listarModeradoresIds(tenantId: string): Promise<string[]> {
-  const rows: { userId: string }[] = await db.userRole.findMany({
-    where: {
-      tenantId,
-      role: { permissions: { has: PERMISSIONS.COMMUNITY_MODERATE } },
-    },
-    select: { userId: true },
-  })
-  return [...new Set(rows.map((row) => row.userId))]
 }
 
 export interface ComentarioPostItem {
@@ -739,6 +753,11 @@ export async function publicarEnquete(
       tenantId: tenant.id,
       postId: post.id,
       link: linkPostComunidade(post.id),
+    }),
+    fanoutPostParaRede({
+      postId: post.id,
+      autorId: session.user.id,
+      criadoEm: post.criadoEm,
     }),
   ])
 
@@ -943,6 +962,12 @@ export async function repostarPost(postId: string, comentario?: string): Promise
     },
   })
 
+  await fanoutPostParaRede({
+    postId: repost.id,
+    autorId: session.user.id,
+    criadoEm: repost.criadoEm,
+  })
+
   revalidatePath('/portal/comunidade')
   emitFeedPing(tenant.id)
 }
@@ -984,6 +1009,12 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
       entidadeId: repost.id,
       detalhes: { comunicadoOrigemId: comunicado.id },
     },
+  })
+
+  await fanoutPostParaRede({
+    postId: repost.id,
+    autorId: session.user.id,
+    criadoEm: repost.criadoEm,
   })
 
   revalidatePath('/portal/comunidade')
@@ -1043,6 +1074,11 @@ export async function publicarPostEvento(
       tenantId: tenant.id,
       postId: post.id,
       link: linkPostComunidade(post.id),
+    }),
+    fanoutPostParaRede({
+      postId: post.id,
+      autorId: session.user.id,
+      criadoEm: post.criadoEm,
     }),
   ])
 
@@ -1496,23 +1532,11 @@ export async function denunciarPost(postId: string, motivo: string): Promise<voi
     },
   })
 
-  const moderadores = (await listarModeradoresIds(tenant.id)).filter((id) => id !== session.user.id)
-  if (moderadores.length > 0) {
-    await db.$transaction(
-      moderadores.map((moderadorId) =>
-        db.notificacao.create({
-          data: {
-            userId: moderadorId,
-            tenantId: tenant.id,
-            tipo: 'DENUNCIA_NOVA',
-            titulo: 'Nova denúncia pendente',
-            corpo: parsed.data.motivo.slice(0, 140),
-            link: '/admin/comunidade/moderacao',
-          },
-        }),
-      ),
-    )
-  }
+  await notificarDenunciaPost({
+    tenantId: tenant.id,
+    motivo: parsed.data.motivo,
+    denuncianteUserId: session.user.id,
+  })
 
   await db.auditLog.create({
     data: {

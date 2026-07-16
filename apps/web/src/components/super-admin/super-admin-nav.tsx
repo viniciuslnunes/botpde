@@ -2,10 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, PlusCircle } from 'lucide-react'
+import { Building2, PlusCircle, Users } from 'lucide-react'
 
 const links = [
   { href: '/super-admin/torcidas', label: 'Torcidas', icon: Building2 },
+  {
+    href: '/super-admin/relatorios/perfis-torcedores-privados',
+    label: 'Relatórios',
+    icon: Users,
+  },
   { href: '/super-admin/setup', label: 'Criar torcida', icon: PlusCircle },
 ]
 

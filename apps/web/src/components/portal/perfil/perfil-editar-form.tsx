@@ -409,7 +409,9 @@ export function PerfilEditarForm({
           onChange={(e) => setPerfilPrivado(e.target.checked)}
         />
         {privacidadeBloqueada
-          ? 'Perfil privado (obrigatório para sócios aprovados)'
+          ? perfilPrivado
+            ? 'Perfil privado (obrigatório para sócios aprovados)'
+            : 'Perfil público (obrigatório para torcedores)'
           : 'Perfil privado (só seguidores veem suas publicações e atividade)'}
       </label>
 

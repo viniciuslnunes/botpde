@@ -1,4 +1,5 @@
 import 'server-only'
+import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
 import { generateInviteSlug } from '@/lib/invite-slug'
@@ -51,17 +52,31 @@ type CreateSalaInput = {
 }
 
 export async function listSalasAtivas(tenantId: string): Promise<SalaAtivaListItem[]> {
-  const salas: SalaAtivaListItem[] = await (db.salaReuniao.findMany({
-    where: { tenantId, encerradaEm: null },
-    include: {
-      host: { select: { id: true, nome: true, avatarUrl: true } },
-      evento: { select: { id: true, titulo: true, data: true } },
-      _count: { select: { participantes: true } },
-    },
-    orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
-  }) as Promise<SalaAtivaListItem[]>)
+  const salas = await unstable_cache(
+    async () =>
+      (db.salaReuniao.findMany({
+        where: { tenantId, encerradaEm: null },
+        include: {
+          host: { select: { id: true, nome: true, avatarUrl: true } },
+          evento: { select: { id: true, titulo: true, data: true } },
+          _count: { select: { participantes: true } },
+        },
+        orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
+      }) as Promise<SalaAtivaListItem[]>),
+    ['salas-ativas', tenantId],
+    { revalidate: 15 },
+  )()
 
-  return salas
+  return salas.map((sala) => ({
+    ...sala,
+    criadoEm: sala.criadoEm instanceof Date ? sala.criadoEm : new Date(sala.criadoEm),
+    evento: sala.evento
+      ? {
+          ...sala.evento,
+          data: sala.evento.data instanceof Date ? sala.evento.data : new Date(sala.evento.data),
+        }
+      : null,
+  }))
 }
 
 export async function getSalaById(tenantId: string, salaId: string): Promise<SalaDetalhe | null> {

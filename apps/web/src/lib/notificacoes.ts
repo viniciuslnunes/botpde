@@ -303,6 +303,17 @@ export async function notificarSafe(input: CriarNotificacaoInput): Promise<void>
   }
 }
 
+export async function contarNotificacoesNaoLidas(
+  tenantId: string,
+  userId: string,
+  tipos: TipoNotificacao[],
+): Promise<number> {
+  if (tipos.length === 0) return 0
+  return db.notificacao.count({
+    where: { tenantId, userId, lida: false, tipo: { in: tipos } },
+  })
+}
+
 export async function listarNotificacoesRecentes(
   tenantId: string,
   userId: string,

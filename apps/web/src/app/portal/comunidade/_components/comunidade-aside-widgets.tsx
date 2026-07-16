@@ -3,7 +3,7 @@ import { Newspaper, Users, Hash, Calendar } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getProximoEvento } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
-import { listSalasAtivas } from '@/lib/salas'
+import type { SalaAtivaListItem } from '@/lib/salas'
 import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
@@ -17,6 +17,7 @@ interface ComunidadeAsideWidgetsProps {
   /** Slug do clube (Afiliacao) para widgets Sofascore; sem slug, seção não aparece. */
   afiliacaoSlug?: string | null
   currentUserId?: string
+  salasAoVivo?: SalaAtivaListItem[]
 }
 
 export async function ComunidadeAsideWidgets({
@@ -24,15 +25,15 @@ export async function ComunidadeAsideWidgets({
   afiliacaoId,
   afiliacaoSlug = null,
   currentUserId,
+  salasAoVivo = [],
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, sugestoes, hashtags, proximoEvento, salasAoVivo] = await Promise.all([
+  const [noticias, sugestoes, hashtags, proximoEvento] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
       : Promise.resolve([] as SugestaoAutorAside[]),
     getHashtagsEmAlta(tenantId, 5),
     getProximoEvento(tenantId, currentUserId),
-    listSalasAtivas(tenantId),
   ])
 
   let widgetIndex = 0

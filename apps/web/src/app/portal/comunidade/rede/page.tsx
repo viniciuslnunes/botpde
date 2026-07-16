@@ -1,10 +1,9 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Users, Heart } from 'lucide-react'
+import { Heart } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getPostsDaRede } from '@/lib/feed'
-import { ComunidadePostsAnimated } from '../_components/comunidade-posts-animated'
+import { getPostIdsSalvos, getPostsDaRede } from '@/lib/feed'
+import { ComunidadeRedeInfinite } from '../_components/comunidade-rede-infinite'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -28,6 +27,8 @@ export default async function RedeComunidadePage({
     take: 20,
   })
 
+  const salvoIds = await getPostIdsSalvos(session.user.id, tenant.id)
+
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
@@ -42,37 +43,14 @@ export default async function RedeComunidadePage({
         subtitulo="Publicações de quem você segue e as suas"
       />
 
-      <ComunidadePostsAnimated
-        posts={posts}
-        currentUser={currentUser}
+      <ComunidadeRedeInfinite
         tenantId={tenant.id}
-        showTenantBadge="auto"
-        emptyIcon={<Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
-        emptyTitle="Sua rede ainda está vazia"
-        emptyDescription={
-          <>
-            Siga outros membros ou publique algo para ver atividade aqui.{' '}
-            <Link
-              href="/portal/comunidade/busca"
-              className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
-            >
-              Buscar membros
-            </Link>
-          </>
-        }
-        emptyClassName="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] py-14 text-center"
+        currentUser={currentUser}
+        initialPosts={posts}
+        initialPageInfo={pageInfo}
+        initialCursor={params.cursor ?? null}
+        salvoIds={[...salvoIds]}
       />
-
-      {pageInfo.hasMore && pageInfo.nextCursor && (
-        <div className="flex justify-center pt-2">
-          <Link
-            href={`/portal/comunidade/rede?cursor=${encodeURIComponent(pageInfo.nextCursor)}`}
-            className="rounded-full border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-          >
-            Carregar mais
-          </Link>
-        </div>
-      )}
     </div>
   )
 }

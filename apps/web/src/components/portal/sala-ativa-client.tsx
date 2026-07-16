@@ -1,9 +1,21 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { ArrowLeft, ChevronLeft, ChevronRight, Maximize2, MessageSquare, Minimize2, Phone, Power, Users, Video } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  Minimize2,
+  Phone,
+  Power,
+  Users,
+  Video,
+} from 'lucide-react'
 import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
@@ -46,35 +58,101 @@ function callStateKey(
   return 'left'
 }
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const onChange = () => setMatches(media.matches)
+    onChange()
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [query])
+
+  return matches
+}
+
+const PRESENTATION_DOCK_BOTTOM =
+  'calc(var(--lk-control-bar-height, 4.25rem) + env(safe-area-inset-bottom, 0px) + 0.5rem)'
+
 function SalaChatPanel({
   salaId,
   userId,
   isHost,
   initialMensagens,
   compact = false,
+  translucent = false,
+  bottomSheet = false,
+  commentsOpen = true,
+  onToggleComments,
+  listClassName,
 }: {
   salaId: string
   userId: string
   isHost: boolean
   initialMensagens: SalaMensagem[]
   compact?: boolean
+  translucent?: boolean
+  bottomSheet?: boolean
+  commentsOpen?: boolean
+  onToggleComments?: () => void
+  listClassName?: string
 }) {
   return (
     <section
-      className={`rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] ${
-        compact ? 'flex h-full min-h-0 flex-col p-4' : 'p-5'
+      className={`border border-[rgb(var(--border))] bg-[rgb(var(--surface))] ${
+        bottomSheet
+          ? 'flex max-h-[min(52dvh,28rem)] min-h-0 flex-col rounded-t-2xl border-b-0 p-4 shadow-2xl'
+          : `rounded-2xl ${compact ? 'flex h-full min-h-0 flex-col p-4' : 'p-5'}`
+      } ${
+        translucent ? 'border-white/10 bg-zinc-950/72 text-white shadow-2xl backdrop-blur-md' : ''
       }`}
     >
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-        <MessageSquare className="h-4 w-4" />
-        Chat da sala
-      </h2>
-      <div className={compact ? 'min-h-0 flex-1 overflow-hidden' : ''}>
+      {bottomSheet ? (
+        <div
+          className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-white/20"
+          aria-hidden
+        />
+      ) : null}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2
+          className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide ${
+            translucent ? 'text-zinc-300' : 'text-[rgb(var(--foreground-muted))]'
+          }`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Chat da sala
+        </h2>
+        {onToggleComments ? (
+          <button
+            type="button"
+            onClick={onToggleComments}
+            title={commentsOpen ? 'Ocultar comentários' : 'Mostrar comentários'}
+            aria-label={commentsOpen ? 'Ocultar comentários' : 'Mostrar comentários'}
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+              translucent
+                ? 'border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10'
+                : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]'
+            }`}
+          >
+            {commentsOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        ) : null}
+      </div>
+      <div className={compact || bottomSheet ? 'min-h-0 flex-1 overflow-hidden' : ''}>
         <SalaChat
           salaId={salaId}
           currentUserId={userId}
           isHost={isHost}
           initialMensagens={initialMensagens}
+          listClassName={
+            listClassName ??
+            (bottomSheet
+              ? 'max-h-[min(36dvh,18rem)] space-y-3 overflow-y-auto pr-1'
+              : compact
+                ? 'h-full max-h-none space-y-3 overflow-y-auto pr-1'
+                : undefined)
+          }
         />
       </div>
     </section>
@@ -99,7 +177,17 @@ export function SalaAtivaClient({
   const [hasActiveScreenShare, setHasActiveScreenShare] = useState(false)
   const [presentationMode, setPresentationMode] = useState(false)
   const [presentationCommentsOpen, setPresentationCommentsOpen] = useState(true)
+  const [presentationParticipantsVisible, setPresentationParticipantsVisible] = useState(true)
+  const [presentationChromeVisible, setPresentationChromeVisible] = useState(true)
+  const idleTimerRef = useRef<number | null>(null)
+  const isCompactPresentation = useMediaQuery('(max-width: 1023px)')
   const presentationActive = presentationMode && inCall && hasActiveScreenShare
+  const participantProfiles = Object.fromEntries(
+    initialParticipantes.map((participante) => [
+      participante.userId,
+      { nome: participante.nome, avatarUrl: participante.avatarUrl },
+    ]),
+  )
 
   const handleCountChange = useCallback((count: number) => {
     setOnlineCount(count)
@@ -108,6 +196,11 @@ export function SalaAtivaClient({
   const handleLeaveCall = useCallback(() => {
     setInCall(false)
     setPresentationMode(false)
+    setPresentationChromeVisible(true)
+    if (idleTimerRef.current !== null) {
+      window.clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
   }, [])
 
   const handleRejoinCall = useCallback(() => {
@@ -117,52 +210,116 @@ export function SalaAtivaClient({
 
   const handleScreenShareActiveChange = useCallback((active: boolean) => {
     setHasActiveScreenShare(active)
-    if (!active) setPresentationMode(false)
+    if (!active) {
+      setPresentationMode(false)
+      setPresentationChromeVisible(true)
+    }
   }, [])
 
   const abrirModoApresentacao = useCallback(() => {
+    const compact = window.matchMedia('(max-width: 1023px)').matches
     setPresentationMode(true)
-    setPresentationCommentsOpen(true)
+    setPresentationCommentsOpen(!compact)
+    setPresentationParticipantsVisible(!compact)
+    setPresentationChromeVisible(true)
   }, [])
 
   const fecharModoApresentacao = useCallback(() => {
     setPresentationMode(false)
+    setPresentationChromeVisible(true)
+    if (idleTimerRef.current !== null) {
+      window.clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
   }, [])
+
+  const revelarChromeApresentacao = useCallback(() => {
+    setPresentationChromeVisible(true)
+    if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = window.setTimeout(() => {
+      setPresentationChromeVisible(false)
+    }, 1600)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!presentationActive) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [presentationActive])
+
+  useEffect(() => {
+    if (!presentationActive || isCompactPresentation) return
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        fecharModoApresentacao()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault()
+        setPresentationCommentsOpen((open) => !open)
+        revelarChromeApresentacao()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        setPresentationParticipantsVisible((visible) => !visible)
+        revelarChromeApresentacao()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [presentationActive, isCompactPresentation, fecharModoApresentacao, revelarChromeApresentacao])
 
   const stateKey = callStateKey(Boolean(sala.encerradaEm), livekitOk, inCall, Boolean(token && livekitUrl))
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link
-            href="/portal/comunidade/salas"
-            className="mb-2 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para salas
-          </Link>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{sala.titulo}</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Anfitrião: {sala.host.nome ?? 'Membro'} · {onlineCount} participante(s) online
-          </p>
-        </div>
-
-        {isHost && !sala.encerradaEm && (
-          <form action={encerrarSalaAction}>
-            <m.button
-              whileTap={{ scale: 0.96 }}
-              transition={springSnappy}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+    <div className={presentationActive ? 'fixed inset-0 z-40 overflow-hidden bg-black' : 'space-y-6'}>
+      {!presentationActive && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <Link
+              href="/portal/comunidade/salas"
+              className="mb-2 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
             >
-              <Power className="h-4 w-4" />
-              Encerrar sala
-            </m.button>
-          </form>
-        )}
-      </div>
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para salas
+            </Link>
+            <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{sala.titulo}</h1>
+            <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
+              Anfitrião: {sala.host.nome ?? 'Membro'} · {onlineCount} participante(s) online
+            </p>
+          </div>
 
-      {sala.evento && (
+          {isHost && !sala.encerradaEm && (
+            <form action={encerrarSalaAction}>
+              <m.button
+                whileTap={{ scale: 0.96 }}
+                transition={springSnappy}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+              >
+                <Power className="h-4 w-4" />
+                Encerrar sala
+              </m.button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {!presentationActive && sala.evento && (
         <m.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -208,21 +365,6 @@ export function SalaAtivaClient({
           </m.div>
         ) : stateKey === 'call' ? (
           <div key="call" className={presentationActive ? 'space-y-0' : 'space-y-3'}>
-            {hasActiveScreenShare && (
-              <div className="flex justify-end">
-                <m.button
-                  type="button"
-                  onClick={presentationActive ? fecharModoApresentacao : abrirModoApresentacao}
-                  whileTap={{ scale: 0.96 }}
-                  transition={springSnappy}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  {presentationActive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                  {presentationActive ? 'Sair da apresentação' : 'Tela cheia com comentários'}
-                </m.button>
-              </div>
-            )}
-
             <m.section
               variants={fadeScale}
               initial="hidden"
@@ -244,6 +386,14 @@ export function SalaAtivaClient({
                 isHost={isHost}
                 userId={userId}
                 userName={userName}
+                participantProfiles={participantProfiles}
+                presentationMode={presentationActive}
+                showParticipantStrip={presentationParticipantsVisible}
+                canTogglePresentation={hasActiveScreenShare}
+                onTogglePresentation={presentationActive ? fecharModoApresentacao : abrirModoApresentacao}
+                onToggleParticipantStrip={() =>
+                  setPresentationParticipantsVisible((visible) => !visible)
+                }
                 onOnlineCountChange={handleCountChange}
                 onScreenShareActiveChange={handleScreenShareActiveChange}
                 onLeaveCall={handleLeaveCall}
@@ -293,56 +443,101 @@ export function SalaAtivaClient({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={springSnappy}
-                className="fixed inset-0 z-50 pointer-events-none p-3 md:p-5"
+                className="fixed inset-0 z-50 pointer-events-none"
+                style={{
+                  paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+                }}
+                onMouseMove={revelarChromeApresentacao}
+                onMouseEnter={revelarChromeApresentacao}
+                onTouchStart={revelarChromeApresentacao}
               >
-                <div className="flex h-full min-h-0 flex-col gap-3 pointer-events-auto">
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-950/90 px-4 py-3 text-white">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{sala.titulo}</p>
-                      <p className="text-xs text-zinc-400">
-                        Modo apresentação · {presentationCommentsOpen ? 'comentários visíveis' : 'comentários ocultos'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPresentationCommentsOpen((open) => !open)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                <div className="hidden h-full p-3 md:p-5 lg:flex lg:flex-col lg:gap-3">
+                  <AnimatePresence initial={false}>
+                    {presentationChromeVisible && (
+                      <m.div
+                        key="presentation-topbar-desktop"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={springSnappy}
+                        className="pointer-events-auto flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-950/72 px-4 py-3 text-white shadow-xl backdrop-blur-md"
                       >
-                        {presentationCommentsOpen ? (
-                          <>
-                            <ChevronRight className="h-4 w-4" />
-                            Ocultar comentários
-                          </>
-                        ) : (
-                          <>
-                            <ChevronLeft className="h-4 w-4" />
-                            Mostrar comentários
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={fecharModoApresentacao}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white"
-                      >
-                        <Minimize2 className="h-4 w-4" />
-                        Sair da tela cheia
-                      </button>
-                    </div>
-                  </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{sala.titulo}</p>
+                          <p className="text-xs text-zinc-400">
+                            Modo apresentação ·{' '}
+                            {presentationCommentsOpen ? 'comentários visíveis' : 'comentários ocultos'}
+                          </p>
+                          <p className="mt-1 text-[11px] text-zinc-500">
+                            Atalhos:{' '}
+                            <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">Esc</kbd> sair,{' '}
+                            <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">C</kbd> comentários,{' '}
+                            <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">P</kbd> participantes
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            title={
+                              presentationParticipantsVisible
+                                ? 'Ocultar participantes laterais (P)'
+                                : 'Mostrar participantes laterais (P)'
+                            }
+                            onClick={() =>
+                              setPresentationParticipantsVisible((visible) => !visible)
+                            }
+                            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+                          >
+                            {presentationParticipantsVisible ? (
+                              <>
+                                <ChevronLeft className="h-4 w-4" />
+                                Tela 100%
+                              </>
+                            ) : (
+                              <>
+                                <ChevronRight className="h-4 w-4" />
+                                Mostrar participantes
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            title="Sair da tela cheia (Esc)"
+                            onClick={fecharModoApresentacao}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            <Minimize2 className="h-4 w-4" />
+                            Sair da tela cheia
+                          </button>
+                        </div>
+                      </m.div>
+                    )}
+                  </AnimatePresence>
 
                   <div className="flex min-h-0 flex-1 gap-3">
                     <div className="hidden flex-1 lg:block" aria-hidden />
+                    {!presentationCommentsOpen && (
+                      <div className="pointer-events-auto flex h-full items-start">
+                        <button
+                          type="button"
+                          title="Mostrar comentários (C)"
+                          onClick={() => setPresentationCommentsOpen(true)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-950/66 px-3 py-2 text-sm font-semibold text-white shadow-xl backdrop-blur-md transition hover:bg-zinc-900/80"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Mostrar comentários
+                        </button>
+                      </div>
+                    )}
                     <AnimatePresence initial={false}>
                       {presentationCommentsOpen && (
                         <m.div
-                          key="presentation-comments"
+                          key="presentation-comments-desktop"
                           initial={{ opacity: 0, x: 24 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 24 }}
                           transition={springSnappy}
-                          className="h-full min-h-0 w-full lg:w-[380px]"
+                          className="pointer-events-auto h-full min-h-0 w-[380px]"
                         >
                           <SalaChatPanel
                             salaId={sala.id}
@@ -350,10 +545,145 @@ export function SalaAtivaClient({
                             isHost={isHost}
                             initialMensagens={initialMensagens}
                             compact
+                            translucent
+                            commentsOpen={presentationCommentsOpen}
+                            onToggleComments={() => setPresentationCommentsOpen((open) => !open)}
                           />
                         </m.div>
                       )}
                     </AnimatePresence>
+                  </div>
+                </div>
+
+                <div className="flex h-full flex-col lg:hidden">
+                  <AnimatePresence initial={false}>
+                    {presentationChromeVisible && (
+                      <m.div
+                        key="presentation-topbar-mobile"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={springSnappy}
+                        className="pointer-events-auto mx-3 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-950/72 px-3 py-2.5 text-white shadow-xl backdrop-blur-md"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{sala.titulo}</p>
+                          <p className="truncate text-xs text-zinc-400">Modo apresentação</p>
+                        </div>
+                        <button
+                          type="button"
+                          title="Sair da tela cheia"
+                          aria-label="Sair da tela cheia"
+                          onClick={fecharModoApresentacao}
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary))] text-white"
+                        >
+                          <Minimize2 className="h-4 w-4" />
+                        </button>
+                      </m.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="flex-1" aria-hidden />
+
+                  <AnimatePresence initial={false}>
+                    {presentationCommentsOpen && (
+                      <>
+                        <m.button
+                          key="presentation-chat-backdrop"
+                          type="button"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={springSnappy}
+                          aria-label="Fechar comentários"
+                          className="pointer-events-auto fixed inset-0 bg-black/45"
+                          style={{ bottom: PRESENTATION_DOCK_BOTTOM }}
+                          onClick={() => setPresentationCommentsOpen(false)}
+                        />
+                        <m.div
+                          key="presentation-comments-mobile"
+                          initial={{ opacity: 0, y: 24 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 24 }}
+                          transition={springSnappy}
+                          className="pointer-events-auto fixed inset-x-0 z-10 px-2"
+                          style={{ bottom: PRESENTATION_DOCK_BOTTOM }}
+                        >
+                          <SalaChatPanel
+                            salaId={sala.id}
+                            userId={userId}
+                            isHost={isHost}
+                            initialMensagens={initialMensagens}
+                            compact
+                            translucent
+                            bottomSheet
+                            commentsOpen={presentationCommentsOpen}
+                            onToggleComments={() => setPresentationCommentsOpen((open) => !open)}
+                          />
+                        </m.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+
+                  <div
+                    className="pointer-events-auto fixed inset-x-0 z-20 px-3"
+                    style={{ bottom: PRESENTATION_DOCK_BOTTOM }}
+                  >
+                    <div className="mx-auto flex max-w-md items-center justify-center gap-2 rounded-2xl border border-white/10 bg-zinc-950/82 p-1.5 shadow-2xl backdrop-blur-md">
+                      <button
+                        type="button"
+                        title={presentationCommentsOpen ? 'Ocultar comentários' : 'Mostrar comentários'}
+                        aria-label={presentationCommentsOpen ? 'Ocultar comentários' : 'Mostrar comentários'}
+                        aria-pressed={presentationCommentsOpen}
+                        onClick={() => {
+                          setPresentationCommentsOpen((open) => !open)
+                          revelarChromeApresentacao()
+                        }}
+                        className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+                          presentationCommentsOpen
+                            ? 'bg-[rgb(var(--color-primary))] text-white'
+                            : 'bg-white/5 text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        title={
+                          presentationParticipantsVisible
+                            ? 'Ocultar participantes'
+                            : 'Mostrar participantes'
+                        }
+                        aria-label={
+                          presentationParticipantsVisible
+                            ? 'Ocultar participantes'
+                            : 'Mostrar participantes'
+                        }
+                        aria-pressed={!presentationParticipantsVisible}
+                        onClick={() => {
+                          setPresentationParticipantsVisible((visible) => !visible)
+                          revelarChromeApresentacao()
+                        }}
+                        className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+                          !presentationParticipantsVisible
+                            ? 'bg-[rgb(var(--color-primary))] text-white'
+                            : 'bg-white/5 text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <Users className="h-4 w-4" />
+                        {presentationParticipantsVisible ? 'Tela 100%' : 'Participantes'}
+                      </button>
+                      <button
+                        type="button"
+                        title="Sair da tela cheia"
+                        aria-label="Sair da tela cheia"
+                        onClick={fecharModoApresentacao}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      >
+                        <Minimize2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </m.div>

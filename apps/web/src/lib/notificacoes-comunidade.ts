@@ -1,37 +1,12 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import type { TipoNotificacao } from '@torcida/db'
+import {
+  TIPOS_NOTIFICACAO_ADMIN,
+  TIPOS_NOTIFICACAO_SOCIAL,
+} from '@/lib/notificacoes-routing'
 
-/**
- * Tipos exibidos na central social da Comunidade / sino do portal.
- * NOVA_MENSAGEM fica de fora: mensagens diretas já têm inbox e badge
- * próprios (ícone de chat na navbar) — não duplicam no sino.
- */
-export const TIPOS_NOTIFICACAO_SOCIAL: TipoNotificacao[] = [
-  'MENCAO',
-  'REPOST',
-  'NOVO_COMENTARIO',
-  'NOVA_REACAO',
-  'SEGUIMENTO_PENDENTE',
-  'SEGUIMENTO_APROVADO',
-  'COMUNICADO_URGENTE',
-  'MEMBRO_APROVADO',
-  'MEMBRO_REPROVADO',
-  'MEMBRO_SOLICITADO',
-]
-
-/** Tipos operacionais do admin (alianças, denúncias…). */
-export const TIPOS_NOTIFICACAO_ADMIN: TipoNotificacao[] = [
-  'ALIANCA_PROPOSTA',
-  'ALIANCA_ACEITA',
-  'ALIANCA_REJEITADA',
-  'ALIANCA_ENCERRADA',
-  'ALIANCA_CANCELADA',
-  'DENUNCIA_NOVA',
-  'COMUNICADO_URGENTE',
-  'MEMBRO_APROVADO',
-  'MEMBRO_REPROVADO',
-]
+export { TIPOS_NOTIFICACAO_ADMIN, TIPOS_NOTIFICACAO_SOCIAL }
 
 export type FiltroNotificacaoSocial = 'todas' | 'mencoes' | 'reposts' | 'reacoes' | 'seguimento'
 
@@ -58,6 +33,12 @@ function tiposDoFiltro(filtro: FiltroNotificacaoSocial): TipoNotificacao[] {
   return FILTRO_POR_TIPO[filtro]
 }
 
+/** Tipos do sino do portal: sociais + operacionais se o usuário tem acesso admin. */
+export function tiposInboxPortal(incluirAdmin: boolean): TipoNotificacao[] {
+  if (!incluirAdmin) return [...TIPOS_NOTIFICACAO_SOCIAL]
+  return [...new Set<TipoNotificacao>([...TIPOS_NOTIFICACAO_SOCIAL, ...TIPOS_NOTIFICACAO_ADMIN])]
+}
+
 export const contarNotificacoesSociaisNaoLidas = cache(
   async function contarNotificacoesSociaisNaoLidas(
     tenantId: string,
@@ -73,6 +54,33 @@ export const contarNotificacoesSociaisNaoLidas = cache(
     })
   },
 )
+
+export const contarNotificacoesAdminNaoLidas = cache(
+  async function contarNotificacoesAdminNaoLidas(
+    tenantId: string,
+    userId: string,
+  ): Promise<number> {
+    return db.notificacao.count({
+      where: {
+        tenantId,
+        userId,
+        lida: false,
+        tipo: { in: TIPOS_NOTIFICACAO_ADMIN },
+      },
+    })
+  },
+)
+
+export async function contarNotificacoesPortalNaoLidas(
+  tenantId: string,
+  userId: string,
+  incluirAdmin: boolean,
+): Promise<number> {
+  const tipos = tiposInboxPortal(incluirAdmin)
+  return db.notificacao.count({
+    where: { tenantId, userId, lida: false, tipo: { in: tipos } },
+  })
+}
 
 export const contarSolicitacoesSeguimentoPendentes = cache(
   async function contarSolicitacoesSeguimentoPendentes(

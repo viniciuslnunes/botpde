@@ -15,7 +15,7 @@ import {
 } from '@/lib/onboarding'
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -594,16 +594,25 @@ export async function solicitarVinculo(
     update: { onboardingConcluidoEm: new Date() },
   })
 
+  // Torcedor entra APROVADO e seu perfil social deve ser público na torcida escolhida.
+  // Criamos (ou reforçamos) PerfilMembro para não depender de interações futuras.
+  if (data.tipo === 'TORCEDOR') {
+    await db.perfilMembro.upsert({
+      where: { userId_tenantId: { userId, tenantId: tenant.id } },
+      create: { userId, tenantId: tenant.id, perfilPrivado: false },
+      update: { perfilPrivado: false },
+    })
+  }
+
   // Avisa o solicitante do fluxo até a aprovação — só SOCIO fica PENDENTE
   // (TORCEDOR já nasce APROVADO, sem fila).
   if (statusInicial === 'PENDENTE') {
-    await notificarSafe({
-      userId,
+    await notificarNovoMembroPendente({
       tenantId: tenant.id,
-      tipo: 'MEMBRO_SOLICITADO',
-      titulo: 'Solicitação de sócio enviada',
-      corpo: `Sua solicitação para ${tenant.nome} está em análise pela diretoria. Enquanto isso, você acompanha a Comunidade Nacional do clube — assim que for aprovado ou reprovado, você é avisado aqui.`,
-      link: '/portal/comunidade',
+      tenantNome: tenant.nome,
+      solicitanteUserId: userId,
+      solicitanteNome: data.nome,
+      tipoVinculo: data.tipo,
     })
   }
 

@@ -39,6 +39,9 @@ interface MensagensShellProps {
   initialSelecionadaId: string | null
   currentUserId: string
   variant?: 'full' | 'embedded'
+  /** Pai já buscou a inbox (evita bootstrap duplicado no embed da comunidade). */
+  inboxPreloaded?: boolean
+  onInboxChange?: (conversas: InboxItemDto[]) => void
 }
 
 type Modal = 'nenhum' | 'dm' | 'grupo'
@@ -48,21 +51,30 @@ export function MensagensShell({
   initialSelecionadaId,
   currentUserId,
   variant = 'full',
+  inboxPreloaded = false,
+  onInboxChange,
 }: MensagensShellProps) {
   const embedded = variant === 'embedded'
   const [conversas, setConversas] = useState<InboxItemDto[]>(initialConversas)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(initialSelecionadaId)
   const [modal, setModal] = useState<Modal>('nenhum')
-  const [carregando, setCarregando] = useState(initialConversas.length === 0)
+  const [carregando, setCarregando] = useState(!inboxPreloaded && initialConversas.length === 0)
 
   useEffect(() => {
+    if (inboxPreloaded) {
+      startTransition(() => {
+        setConversas(initialConversas)
+        setCarregando(false)
+      })
+      return
+    }
     if (initialConversas.length > 0) {
       startTransition(() => {
         setConversas(initialConversas)
         setCarregando(false)
       })
     }
-  }, [initialConversas])
+  }, [inboxPreloaded, initialConversas])
 
   const selecionada = conversas.find((c) => c.id === selecionadaId) ?? null
 
@@ -74,6 +86,7 @@ export function MensagensShell({
       if (data.conversas) {
         startTransition(() => {
           setConversas(data.conversas!)
+          onInboxChange?.(data.conversas!)
           if (initialSelecionadaId && data.conversas!.some((c) => c.id === initialSelecionadaId)) {
             setSelecionadaId(initialSelecionadaId)
           }
@@ -84,14 +97,13 @@ export function MensagensShell({
     } finally {
       startTransition(() => setCarregando(false))
     }
-  }, [initialSelecionadaId])
+  }, [initialSelecionadaId, onInboxChange])
 
   useEffect(() => {
-    if (initialConversas.length === 0) {
-      const timer = window.setTimeout(() => void atualizarInbox(), 0)
-      return () => window.clearTimeout(timer)
-    }
-  }, [initialConversas.length, atualizarInbox])
+    if (inboxPreloaded || initialConversas.length > 0) return
+    const timer = window.setTimeout(() => void atualizarInbox(), 0)
+    return () => window.clearTimeout(timer)
+  }, [inboxPreloaded, initialConversas.length, atualizarInbox])
 
   useVisibleInterval(() => void atualizarInbox(), 15000)
 

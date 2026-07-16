@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { canViewRecurso, SYSTEM_ROLES } from '@torcida/types'
 import { getTenantRelation } from './hierarquia'
@@ -129,51 +130,69 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
   userId: string,
 ): Promise<CanalItem[]> {
   const visibleTenantIds = await getVisibleTenantIds(viewerTenantId, 'comunidade')
+  const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
 
-  const rows: Array<{
-    id: string
-    tenantId: string
-    nome: string | null
-    descricao: string | null
-    avatarUrl: string | null
-    institucional: boolean
-    canalOficial: boolean
-    visibilidadeCanal: VisibilidadeCanal
-    somenteAdminPublica: boolean
-    publica: boolean
-    tenant: { nome: string }
-    _count: { membros: number }
-    membros: Array<{ papel: 'ADMIN' | 'MEMBRO' }>
-  }> = await db.conversa.findMany({
-    where: { tenantId: { in: visibleTenantIds }, tipo: 'CANAL' },
-    orderBy: [{ canalOficial: 'desc' }, { atualizadoEm: 'desc' }],
-    take: 80,
-    select: {
-      id: true,
-      tenantId: true,
-      nome: true,
-      descricao: true,
-      avatarUrl: true,
-      institucional: true,
-      canalOficial: true,
-      visibilidadeCanal: true,
-      somenteAdminPublica: true,
-      publica: true,
-      tenant: { select: { nome: true } },
-      _count: { select: { membros: { where: { saiuEm: null } } } },
-      membros: {
-        where: { userId, saiuEm: null },
-        select: { papel: true },
-        take: 1,
+  const rows = await unstable_cache(
+    async (): Promise<
+      Array<{
+        id: string
+        tenantId: string
+        nome: string | null
+        descricao: string | null
+        avatarUrl: string | null
+        institucional: boolean
+        canalOficial: boolean
+        visibilidadeCanal: VisibilidadeCanal
+        somenteAdminPublica: boolean
+        publica: boolean
+        tenant: { nome: string }
+        _count: { membros: number }
+      }>
+    > =>
+      db.conversa.findMany({
+        where: { tenantId: { in: visibleTenantIds }, tipo: 'CANAL' },
+        orderBy: [{ canalOficial: 'desc' }, { atualizadoEm: 'desc' }],
+        take: 80,
+        select: {
+          id: true,
+          tenantId: true,
+          nome: true,
+          descricao: true,
+          avatarUrl: true,
+          institucional: true,
+          canalOficial: true,
+          visibilidadeCanal: true,
+          somenteAdminPublica: true,
+          publica: true,
+          tenant: { select: { nome: true } },
+          _count: { select: { membros: { where: { saiuEm: null } } } },
+        },
+      }),
+    ['canais-visiveis-base', viewerTenantId, visibleTenantIdsKey],
+    { revalidate: 120 },
+  )()
+
+  const memberships: Array<{ conversaId: string; papel: 'ADMIN' | 'MEMBRO' }> =
+    await db.membroConversa.findMany({
+      where: {
+        userId,
+        saiuEm: null,
+        conversaId: { in: rows.map((row) => row.id) },
       },
-    },
-  })
+      select: { conversaId: true, papel: true },
+    })
+  const membershipMap = new Map(
+    memberships.map((item: { conversaId: string; papel: 'ADMIN' | 'MEMBRO' }) => [
+      item.conversaId,
+      item,
+    ]),
+  )
 
   const result: CanalItem[] = []
   for (const row of rows) {
     const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
     if (!podeVer) continue
-    const membro = row.membros[0]
+    const membro = membershipMap.get(row.id)
     result.push({
       id: row.id,
       tenantId: row.tenantId,
@@ -418,11 +437,12 @@ export async function buscarCanaisEUnidades(
   viewerTenantId: string,
   userId: string,
   q: string,
+  opts: { visibleTenantIds?: string[] } = {},
 ): Promise<{ canais: CanalItem[]; unidades: UnidadeBuscaItem[] }> {
   const termo = q.trim()
   if (termo.length < 2) return { canais: [], unidades: [] }
 
-  const visibleIds = await getVisibleTenantIds(viewerTenantId, 'comunidade')
+  const visibleIds = opts.visibleTenantIds ?? (await getVisibleTenantIds(viewerTenantId, 'comunidade'))
 
   const [canalRows, tenantRows]: [
     Array<{

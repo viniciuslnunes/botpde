@@ -61,7 +61,8 @@ export function PortalNavbar({
   modoNacional = false,
 }: PortalNavbarProps) {
   const pathname = usePathname()
-  const { unreadMessages, isAdmin, notifications } = useNavbarContext()
+  const { unreadMessages, unreadNotifications, hasAdminAreaAccess, isAdmin, notifications } =
+    useNavbarContext()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
 
@@ -167,7 +168,10 @@ export function PortalNavbar({
                 </span>
               )}
             </PortalNavLink>
-            <NotificationBell initialItems={notifications} />
+            <NotificationBell
+              initialItems={notifications}
+              unreadCount={unreadNotifications}
+            />
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
@@ -217,7 +221,7 @@ export function PortalNavbar({
                       <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                       Meu Perfil
                     </Link>
-                    {isAdmin && (
+                    {hasAdminAreaAccess && (
                       <Link
                         href="/admin"
                         prefetch={false}

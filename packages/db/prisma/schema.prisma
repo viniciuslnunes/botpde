@@ -224,6 +224,7 @@ model User {
   votosEnquetePost            VotoEnquetePost[]
   perfilDestaques             PerfilDestaque[]
   postsSalvos                 PostSalvo[]
+  feedTimeline                FeedTimeline[]
   momentosStory               MomentoStory[]
   perfilTorcedor              PerfilTorcedor?
 
@@ -1041,6 +1042,7 @@ model Post {
   hashtags    PostHashtag[]
   destaqueItens PerfilDestaqueItem[]
   salvos      PostSalvo[]
+  feedTimeline FeedTimeline[]
 
   @@index([tenantId, criadoEm])
   @@index([tenantId, oculto])
@@ -1256,6 +1258,25 @@ model PostSalvo {
   @@unique([userId, postId])
   @@index([userId, tenantId])
   @@map("saas_post_salvos")
+}
+
+/// Timeline materializada da rede ("Minha rede" / filtro seguindo).
+/// Guarda o fan-out do post para o viewer no momento da publicação/aprovação.
+model FeedTimeline {
+  id       String   @id @default(uuid())
+  viewerId String   @map("viewer_id")
+  postId   String   @map("post_id")
+  autorId  String   @map("autor_id")
+  criadoEm DateTime @map("criado_em")
+
+  viewer User @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([viewerId, postId])
+  @@index([viewerId, criadoEm])
+  @@index([viewerId, autorId])
+  @@index([postId])
+  @@map("saas_feed_timeline")
 }
 
 /// Momento efêmero estilo story (expira em 24h).

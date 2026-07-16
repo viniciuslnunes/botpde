@@ -10,6 +10,9 @@ import { useVisibleInterval } from '@/lib/use-visible-interval'
 
 interface NavbarContext {
   unreadMessages: number
+  unreadNotifications: number
+  hasAdminAreaAccess: boolean
+  /** @deprecated Use hasAdminAreaAccess */
   isAdmin: boolean
   notifications: NotificationItem[]
 }
@@ -56,12 +59,20 @@ function notificarMensagemNova(
 async function fetchNavbarContext(): Promise<NavbarContext> {
   const res = await fetch('/api/portal/navbar-context', { cache: 'no-store' })
   if (!res.ok) {
-    return { unreadMessages: 0, isAdmin: false, notifications: [] }
+    return {
+      unreadMessages: 0,
+      unreadNotifications: 0,
+      hasAdminAreaAccess: false,
+      isAdmin: false,
+      notifications: [],
+    }
   }
-  const data = (await res.json()) as NavbarContext
+  const data = (await res.json()) as NavbarContext & { isAdmin?: boolean }
   return {
     unreadMessages: data.unreadMessages ?? 0,
-    isAdmin: data.isAdmin ?? false,
+    unreadNotifications: data.unreadNotifications ?? 0,
+    hasAdminAreaAccess: data.hasAdminAreaAccess ?? data.isAdmin ?? false,
+    isAdmin: data.hasAdminAreaAccess ?? data.isAdmin ?? false,
     notifications: data.notifications ?? [],
   }
 }
@@ -93,6 +104,8 @@ export function useNavbarContext() {
 
   const [ctx, setCtx] = useState<NavbarContext>({
     unreadMessages: cached?.unreadMessages ?? 0,
+    unreadNotifications: cached?.unreadNotifications ?? 0,
+    hasAdminAreaAccess: cached?.hasAdminAreaAccess ?? false,
     isAdmin: cached?.isAdmin ?? false,
     notifications: cached?.notifications ?? [],
   })

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { contarMensagensNaoLidas } from '@/lib/mensageria'
 import { listarNotificacoesRecentes } from '@/lib/notificacoes'
-import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
+import {
+  contarNotificacoesPortalNaoLidas,
+  tiposInboxPortal,
+} from '@/lib/notificacoes-comunidade'
+import { calculateEffectivePermissions, hasAdminAreaAccess } from '@torcida/types'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 export async function GET() {
   const session = await auth()
@@ -18,24 +22,27 @@ export async function GET() {
   }
 
   const userId = session.user.id
+  const isSuperAdmin = isSuperAdminEmail(session.user.email)
 
-  const [unreadMessages, notifications, isAdmin] = await Promise.all([
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenant.id)
+  const effectivePermissions = calculateEffectivePermissions(rolePermissions, overrides)
+  const hasAdminAreaAccessFlag =
+    isSuperAdmin || hasAdminAreaAccess(effectivePermissions)
+
+  const tiposInbox = tiposInboxPortal(hasAdminAreaAccessFlag)
+
+  const [unreadMessages, notifications, unreadNotifications] = await Promise.all([
     contarMensagensNaoLidas(userId).catch((): number => 0),
-    listarNotificacoesRecentes(tenant.id, userId, 8, TIPOS_NOTIFICACAO_SOCIAL),
-    db.userRole
-      .findFirst({
-        where: {
-          userId,
-          tenantId: tenant.id,
-          role: { isSystem: true, nome: { in: ['owner', 'admin'] } },
-        },
-      })
-      .then((role: { id: string } | null) => !!role),
+    listarNotificacoesRecentes(tenant.id, userId, 8, tiposInbox),
+    contarNotificacoesPortalNaoLidas(tenant.id, userId, hasAdminAreaAccessFlag),
   ])
 
   return NextResponse.json({
     unreadMessages,
-    isAdmin,
+    unreadNotifications,
+    hasAdminAreaAccess: hasAdminAreaAccessFlag,
+    /** @deprecated Use hasAdminAreaAccess — mantido para compatibilidade do client. */
+    isAdmin: hasAdminAreaAccessFlag,
     notifications: notifications.map((n: (typeof notifications)[number]) => ({
       ...n,
       criadoEm: n.criadoEm.toISOString(),

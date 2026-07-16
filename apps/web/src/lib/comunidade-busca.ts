@@ -1,4 +1,5 @@
-import { db } from '@torcida/db'
+import { cache } from 'react'
+import { db, Prisma } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
 import { canFollowUsers } from './social'
 import { getAutoresSemAcesso, resolverAvatarSocial, resolverPerfilPrivadoEfetivo } from './perfil-social'
@@ -26,47 +27,162 @@ export interface BuscaComunidadeResult {
   unidades: UnidadeBuscaItem[]
 }
 
-export async function buscarMembrosComunidade(
+type MembroBuscaRaw = {
+  userId: string
+  tenantId: string
+  tipo: 'SOCIO' | 'TORCEDOR'
+  user: { id: string; nome: string | null; avatarUrl: string | null }
+  tenant: { nome: string }
+}
+
+function isPgTrgmUnavailableError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (/pg_trgm/i.test(error.message) ||
+      /similarity/i.test(error.message) ||
+      /operator does not exist/i.test(error.message) ||
+      /function .*similarity/i.test(error.message))
+  )
+}
+
+async function buscarCandidatosMembrosPorTrgm(
   tenantId: string,
   userId: string,
+  visibleIds: string[],
   q: string,
-): Promise<MembroBuscaItem[]> {
-  if (q.length < 2) return []
+): Promise<string[] | null> {
+  if (visibleIds.length === 0) return []
+  const termoLike = `%${q}%`
 
-  const visibleIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  try {
+    const rows = await db.$queryRaw<Array<{ userId: string }>>`
+      SELECT DISTINCT m.user_id AS "userId"
+      FROM saas_membros m
+      INNER JOIN saas_users u ON u.id = m.user_id
+      LEFT JOIN saas_perfis_membro pm
+        ON pm.user_id = m.user_id
+       AND pm.tenant_id = ${tenantId}
+      WHERE m.status = 'APROVADO'
+        AND m.tenant_id IN (${Prisma.join(visibleIds)})
+        AND m.user_id <> ${userId}
+        AND (
+          u.nome ILIKE ${termoLike}
+          OR COALESCE(pm.bio, '') ILIKE ${termoLike}
+        )
+      ORDER BY GREATEST(
+        similarity(lower(COALESCE(u.nome, '')), lower(${q})),
+        similarity(lower(COALESCE(pm.bio, '')), lower(${q}))
+      ) DESC,
+      u.nome ASC NULLS LAST
+      LIMIT 40
+    `
+    return rows.map((row: { userId: string }) => row.userId)
+  } catch (error) {
+    if (isPgTrgmUnavailableError(error)) return null
+    throw error
+  }
+}
 
+async function buscarHashtagsPorTrgm(
+  visibleTenantIds: string[],
+  normalizedTag: string,
+): Promise<Array<{ tag: string; total: number }> | null> {
+  if (visibleTenantIds.length === 0 || normalizedTag.length < 2) return []
+  const termoLike = `%${normalizedTag}%`
+
+  try {
+    const rows = await db.$queryRaw<Array<{ tag: string; total: number }>>`
+      SELECT h.tag AS tag, COUNT(ph.id)::int AS total
+      FROM saas_hashtags h
+      LEFT JOIN saas_post_hashtags ph ON ph.hashtag_id = h.id
+      WHERE h.tenant_id IN (${Prisma.join(visibleTenantIds)})
+        AND h.tag ILIKE ${termoLike}
+      GROUP BY h.id, h.tag
+      ORDER BY similarity(lower(h.tag), lower(${normalizedTag})) DESC, total DESC, h.tag ASC
+      LIMIT 20
+    `
+    return rows
+  } catch (error) {
+    if (isPgTrgmUnavailableError(error)) return null
+    throw error
+  }
+}
+
+async function buscarPostIdsPorTrgm(
+  visibleTenantIds: string[],
+  termo: string,
+): Promise<string[] | null> {
+  if (visibleTenantIds.length === 0) return []
+  const termoLike = `%${termo}%`
+
+  try {
+    const rows = await db.$queryRaw<Array<{ id: string }>>`
+      SELECT p.id AS id
+      FROM saas_posts p
+      WHERE p.tenant_id IN (${Prisma.join(visibleTenantIds)})
+        AND p.tipo = 'MEMBRO'
+        AND p.oculto = false
+        AND p.visibilidade = 'PUBLICO'
+        AND p.conversa_id IS NULL
+        AND p.conteudo ILIKE ${termoLike}
+      ORDER BY similarity(lower(p.conteudo), lower(${termo})) DESC, p.criado_em DESC, p.id DESC
+      LIMIT 15
+    `
+    return rows.map((row: { id: string }) => row.id)
+  } catch (error) {
+    if (isPgTrgmUnavailableError(error)) return null
+    throw error
+  }
+}
+
+const getBloqueadosDoUsuario = cache(async (userId: string): Promise<Set<string>> => {
   const bloqueios: { bloqueadorId: string; bloqueadoId: string }[] =
     await db.bloqueioUsuario.findMany({
       where: { OR: [{ bloqueadorId: userId }, { bloqueadoId: userId }] },
       select: { bloqueadorId: true, bloqueadoId: true },
     })
-  const bloqueadosIds = new Set(
+
+  return new Set(
     bloqueios.map((b) => (b.bloqueadorId === userId ? b.bloqueadoId : b.bloqueadorId)),
   )
+})
 
-  interface MembroRow {
-    userId: string
-    tenantId: string
-    tipo: 'SOCIO' | 'TORCEDOR'
-    user: { id: string; nome: string | null; avatarUrl: string | null }
-    tenant: { nome: string }
-  }
+export async function buscarMembrosComunidade(
+  tenantId: string,
+  userId: string,
+  q: string,
+  opts: { visibleTenantIds?: string[] } = {},
+): Promise<MembroBuscaItem[]> {
+  if (q.length < 2) return []
 
-  const rows: MembroRow[] = await db.saasMembro.findMany({
+  const visibleIds = opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
+  const bloqueadosIds = await getBloqueadosDoUsuario(userId)
+
+  const trigramCandidateIds = await buscarCandidatosMembrosPorTrgm(tenantId, userId, visibleIds, q)
+
+  const rows: MembroBuscaRaw[] = await db.saasMembro.findMany({
     where: {
       status: 'APROVADO',
       tenantId: { in: visibleIds },
-      userId: { not: userId },
-      user: {
-        OR: [
-          { nome: { contains: q, mode: 'insensitive' } },
-          {
-            perfisMembro: {
-              some: { bio: { contains: q, mode: 'insensitive' }, tenantId },
-            },
-          },
-        ],
+      userId: {
+        ...(trigramCandidateIds !== null
+          ? { in: trigramCandidateIds.length > 0 ? trigramCandidateIds : ['__never__'] }
+          : { not: userId }),
       },
+      ...(trigramCandidateIds === null
+        ? {
+            user: {
+              OR: [
+                { nome: { contains: q, mode: 'insensitive' } },
+                {
+                  perfisMembro: {
+                    some: { bio: { contains: q, mode: 'insensitive' }, tenantId },
+                  },
+                },
+              ],
+            },
+          }
+        : {}),
     },
     select: {
       userId: true,
@@ -78,9 +194,16 @@ export async function buscarMembrosComunidade(
     take: 40,
   })
 
+  const orderedRows =
+    trigramCandidateIds !== null
+      ? [...rows].sort(
+          (a, b) => trigramCandidateIds.indexOf(a.userId) - trigramCandidateIds.indexOf(b.userId),
+        )
+      : rows
+
   const vistos = new Set<string>()
-  const candidatos: MembroRow[] = []
-  for (const r of rows) {
+  const candidatos: MembroBuscaRaw[] = []
+  for (const r of orderedRows) {
     if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
     vistos.add(r.userId)
     candidatos.push(r)
@@ -144,22 +267,45 @@ export async function buscarComunidade(
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
   const normalizedTag = normalizarHashtag(termo.replace(/^#/, ''))
 
-  const [membros, hashtagRows, postsRaw, canaisUnidades]: [
+  const [membros, hashtagRowsTrgm, postIdsTrgm, canaisUnidades]: [
     MembroBuscaItem[],
-    Array<{ tag: string; _count: { posts: number } }>,
-    PostRaw[],
+    Array<{ tag: string; total: number }> | null,
+    string[] | null,
     { canais: CanalItem[]; unidades: UnidadeBuscaItem[] },
   ] = await Promise.all([
-    buscarMembrosComunidade(tenantId, userId, termo),
-    db.hashtag.findMany({
-      where: {
-        tenantId: { in: visibleTenantIds },
-        tag: { contains: normalizedTag, mode: 'insensitive' },
-      },
-      select: { tag: true, _count: { select: { posts: true } } },
-      take: 20,
-    }),
-    db.post.findMany({
+    buscarMembrosComunidade(tenantId, userId, termo, { visibleTenantIds }),
+    buscarHashtagsPorTrgm(visibleTenantIds, normalizedTag),
+    buscarPostIdsPorTrgm(visibleTenantIds, termo),
+    buscarCanaisEUnidades(tenantId, userId, termo, { visibleTenantIds }),
+  ])
+
+  let hashtagRows: Array<{ tag: string; total: number }>
+  if (hashtagRowsTrgm !== null) {
+    hashtagRows = hashtagRowsTrgm
+  } else {
+    const hashtagFallback: Array<{ tag: string; _count: { posts: number } }> =
+      await db.hashtag.findMany({
+        where: {
+          tenantId: { in: visibleTenantIds },
+          tag: { contains: normalizedTag, mode: 'insensitive' },
+        },
+        select: { tag: true, _count: { select: { posts: true } } },
+        take: 20,
+      })
+    hashtagRows = hashtagFallback.map((h) => ({ tag: h.tag, total: h._count.posts }))
+  }
+
+  let postsRaw: PostRaw[]
+  if (postIdsTrgm !== null) {
+    postsRaw =
+      postIdsTrgm.length === 0
+        ? []
+        : ((await db.post.findMany({
+            where: { id: { in: postIdsTrgm } },
+            include: postInclude(userId),
+          })) as PostRaw[])
+  } else {
+    postsRaw = (await db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
@@ -171,11 +317,13 @@ export async function buscarComunidade(
       orderBy: { criadoEm: 'desc' },
       take: 15,
       include: postInclude(userId),
-    }) as Promise<PostRaw[]>,
-    buscarCanaisEUnidades(tenantId, userId, termo),
-  ])
+    })) as PostRaw[]
+  }
 
   let posts = postsRaw.map(projetarPost)
+  if (postIdsTrgm !== null) {
+    posts = posts.sort((a, b) => postIdsTrgm.indexOf(a.id) - postIdsTrgm.indexOf(b.id))
+  }
   const autorIds = posts.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
   posts = posts.filter((p) => !semAcesso.has(p.autorId)).slice(0, 10)
@@ -185,9 +333,9 @@ export async function buscarComunidade(
   return {
     membros,
     hashtags: hashtagRows
-      .sort((a, b) => b._count.posts - a._count.posts)
+      .sort((a, b) => b.total - a.total)
       .slice(0, 10)
-      .map((h) => ({ tag: h.tag, total: h._count.posts })),
+      .map((h) => ({ tag: h.tag, total: h.total })),
     posts: postsComBadges,
     canais: canaisUnidades.canais,
     unidades: canaisUnidades.unidades,

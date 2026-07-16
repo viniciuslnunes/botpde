@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import Link from 'next/link'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { MensagensShell } from './mensagens-shell'
 
 const STORAGE_KEY = 'comunidade-chat-expanded'
@@ -44,17 +45,49 @@ interface ComunidadeChatPanelProps {
   currentUserId: string
 }
 
+type BloqueioInbox = 'nenhum' | 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
+
+function aplicarBloqueioResumo(data: {
+  cadastroPendente?: boolean
+  semVinculo?: boolean
+  cadastroReprovado?: boolean
+}): BloqueioInbox {
+  if (data.cadastroPendente) return 'cadastro_pendente'
+  if (data.semVinculo) return 'sem_vinculo'
+  if (data.cadastroReprovado) return 'cadastro_reprovado'
+  return 'nenhum'
+}
+
 export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
-  const [bloqueioInbox, setBloqueioInbox] = useState<
-    'nenhum' | 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
-  >('nenhum')
-  const [carregando, setCarregando] = useState(false)
-  const carregouRef = useRef(false)
+  const [naoLidas, setNaoLidas] = useState(0)
+  const [bloqueioInbox, setBloqueioInbox] = useState<BloqueioInbox>('nenhum')
+  const [carregandoInbox, setCarregandoInbox] = useState(false)
+  const [inboxCarregada, setInboxCarregada] = useState(false)
+  const inboxCarregandoRef = useRef(false)
 
-  const carregar = useCallback(async (mostrarSkeleton: boolean) => {
-    if (mostrarSkeleton) setCarregando(true)
+  const carregarResumo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversas/resumo', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        naoLidas?: number
+        cadastroPendente?: boolean
+        semVinculo?: boolean
+        cadastroReprovado?: boolean
+      }
+      setBloqueioInbox(aplicarBloqueioResumo(data))
+      if (typeof data.naoLidas === 'number') setNaoLidas(data.naoLidas)
+    } catch {
+      // silencioso
+    }
+  }, [])
+
+  const carregarInboxCompleta = useCallback(async (mostrarSkeleton: boolean) => {
+    if (inboxCarregandoRef.current) return
+    inboxCarregandoRef.current = true
+    if (mostrarSkeleton) setCarregandoInbox(true)
     try {
       const res = await fetch('/api/conversas', { cache: 'no-store' })
       if (!res.ok) return
@@ -64,37 +97,47 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
         semVinculo?: boolean
         cadastroReprovado?: boolean
       }
-      if (data.cadastroPendente) setBloqueioInbox('cadastro_pendente')
-      else if (data.semVinculo) setBloqueioInbox('sem_vinculo')
-      else if (data.cadastroReprovado) setBloqueioInbox('cadastro_reprovado')
-      else setBloqueioInbox('nenhum')
-      if (data.conversas) setConversas(data.conversas)
+      setBloqueioInbox(aplicarBloqueioResumo(data))
+      if (data.conversas) {
+        setConversas(data.conversas)
+        setNaoLidas(data.conversas.reduce((acc, c) => acc + c.naoLidas, 0))
+      }
+      setInboxCarregada(true)
     } catch {
       // silencioso
     } finally {
-      setCarregando(false)
+      inboxCarregandoRef.current = false
+      setCarregandoInbox(false)
     }
   }, [])
 
-  // Badge + dados iniciais sem esperar expandir
   useEffect(() => {
-    void carregar(!carregouRef.current)
-    carregouRef.current = true
-  }, [carregar])
+    const timer = window.setTimeout(() => void carregarResumo(), 0)
+    return () => window.clearTimeout(timer)
+  }, [carregarResumo])
 
-  // Ao reexpandir, atualiza em background sem desmontar o shell
+  useVisibleInterval(() => {
+    if (expanded) return
+    void carregarResumo()
+  }, 15000)
+
   useEffect(() => {
-    if (!expanded || !carregouRef.current) return
-    void carregar(false)
-  }, [expanded, carregar])
+    if (!expanded) return
+    if (bloqueioInbox !== 'nenhum') return
+    const timer = window.setTimeout(() => void carregarInboxCompleta(!inboxCarregada), 0)
+    return () => window.clearTimeout(timer)
+  }, [expanded, inboxCarregada, bloqueioInbox, carregarInboxCompleta])
 
-  const naoLidas = conversas.reduce((acc, c) => acc + c.naoLidas, 0)
+  const onInboxAtualizada = useCallback((itens: InboxItemDto[]) => {
+    setConversas(itens)
+    setNaoLidas(itens.reduce((acc, c) => acc + c.naoLidas, 0))
+  }, [])
 
   const toggleExpanded = useCallback(() => {
     setStoredExpanded(!getSnapshot())
   }, [])
 
-  const shellPronto = conversas.length > 0 || !carregando
+  const shellPronto = bloqueioInbox !== 'nenhum' || (inboxCarregada && !carregandoInbox)
 
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
@@ -152,6 +195,8 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
             initialConversas={conversas}
             initialSelecionadaId={null}
             currentUserId={currentUserId}
+            inboxPreloaded
+            onInboxChange={onInboxAtualizada}
           />
         )}
       </div>

@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
@@ -14,6 +15,7 @@ import {
 import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
+import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 
@@ -301,12 +303,99 @@ function buildCursorWhere(cursor: FeedCursor | null) {
   }
 }
 
+function buildTimelineCursorWhere(cursor: FeedCursor | null) {
+  if (!cursor) return undefined
+  const data = new Date(cursor.criadoEmIso)
+  if (Number.isNaN(data.getTime())) return undefined
+  return {
+    OR: [{ criadoEm: { lt: data } }, { criadoEm: data, postId: { lt: cursor.id } }],
+  }
+}
+
 function asDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value)
 }
 
 function sortPostsDesc(a: { criadoEm: Date | string }, b: { criadoEm: Date | string }): number {
   return asDate(b.criadoEm).getTime() - asDate(a.criadoEm).getTime()
+}
+
+function scoreDescobrirPost(post: PostSocialItem, tenantId: string): number {
+  const now = Date.now()
+  const ageHours = Math.max(0, (now - asDate(post.criadoEm).getTime()) / 3_600_000)
+  const freshness = Math.max(0, 72 - ageHours) * 1.5
+  const engagement = post.totalReacoes * 1.25 + post.totalComentarios * 2.25
+  const localBoost = post.tenantId === tenantId ? 6 : 0
+  const mediaBoost = post.midiaUrls.length > 0 || post.imagemUrl ? 1.5 : 0
+  const pollBoost = post.enquete ? 2 : 0
+  return freshness + engagement + localBoost + mediaBoost + pollBoost
+}
+
+function rankDescobrirPosts(posts: PostSocialItem[], tenantId: string): PostSocialItem[] {
+  return [...posts].sort((a, b) => {
+    const diff = scoreDescobrirPost(b, tenantId) - scoreDescobrirPost(a, tenantId)
+    if (diff !== 0) return diff
+    return sortPostsDesc(a, b)
+  })
+}
+
+function revivePostSocialItem(post: PostSocialItem): PostSocialItem {
+  return {
+    ...post,
+    criadoEm: asDate(post.criadoEm),
+    evento: post.evento ? { ...post.evento, data: asDate(post.evento.data) } : null,
+  }
+}
+
+/** Candidatos públicos do Descobrir — sem estado do viewer (reação/voto/RSVP). */
+async function getDescobrirPostsBaseCached(
+  tenantId: string,
+  visibleTenantIds: string[],
+  cursor: FeedCursor | null,
+  fetchLimit: number,
+): Promise<PostSocialItem[]> {
+  const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
+  const cursorKey = cursor ? `${cursor.criadoEmIso}:${cursor.id}` : 'start'
+
+  const cached = await unstable_cache(
+    async () => {
+      const cursorWhere = buildCursorWhere(cursor)
+      const postsRaw = (await db.post.findMany({
+        where: {
+          tenantId: { in: visibleTenantIds },
+          tipo: 'MEMBRO',
+          visibilidade: 'PUBLICO',
+          oculto: false,
+          ...escopoFeedPrincipal,
+          ...cursorWhere,
+        },
+        orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+        take: fetchLimit,
+        include: postInclude(),
+      })) as PostRaw[]
+      return postsRaw.map(projetarPost)
+    },
+    ['feed-descobrir-base', tenantId, visibleTenantIdsKey, cursorKey, String(fetchLimit)],
+    { revalidate: 60 },
+  )()
+
+  return cached.map(revivePostSocialItem)
+}
+
+async function hidratarPostsDoUsuario(
+  posts: PostSocialItem[],
+  userId: string,
+): Promise<PostSocialItem[]> {
+  if (posts.length === 0) return posts
+
+  const ids = posts.map((p) => p.id)
+  const postsRaw = (await db.post.findMany({
+    where: { id: { in: ids } },
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const porId = new Map(postsRaw.map((p) => [p.id, projetarPost(p)]))
+  return posts.map((p) => porId.get(p.id) ?? p)
 }
 
 export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
@@ -371,26 +460,21 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       : Promise.resolve([] as SeguimentoLite[]),
   ])
 
+  const fetchLimit = (take + 1) * 3
+
   if (!userId) {
-    const sugeridosRaw = (await db.post.findMany({
-      where: {
-        tenantId: { in: visibleTenantIds },
-        tipo: 'MEMBRO',
-        visibilidade: 'PUBLICO',
-        oculto: false,
-        ...escopoFeedPrincipal,
-        ...cursorWhere,
-      },
-      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-      take: (take + 1) * 3,
-      include: postInclude(),
-    })) as PostRaw[]
-    const sugeridos: PostSocialItem[] = sugeridosRaw.map(projetarPost)
+    const sugeridos = await getDescobrirPostsBaseCached(
+      tenantId,
+      visibleTenantIds,
+      decodedCursor,
+      fetchLimit,
+    )
     const autorIds = sugeridos.map((p) => p.autorId)
     const semAcesso = await getAutoresSemAcesso(undefined, tenantId, autorIds)
     const visiveis = sugeridos.filter((p) => !semAcesso.has(p.autorId))
-    const slice = await finalizarPosts(visiveis.slice(0, take))
-    const hasMore = visiveis.length > take
+    const ranqueados = rankDescobrirPosts(visiveis, tenantId)
+    const slice = await finalizarPosts(ranqueados.slice(0, take))
+    const hasMore = ranqueados.length > take
     return {
       postsSeguindo: [],
       postsSugeridos: slice,
@@ -404,36 +488,35 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
   const redeSet = new Set(redeIds)
 
-  // Uma query em vez de duas (rede + descoberta) — menos round-trips no Postgres remoto.
-  const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      tipo: 'MEMBRO',
-      oculto: false,
-      ...escopoFeedPrincipal,
-      ...cursorWhere,
-      OR: [
-        { autorId: { in: redeIds } },
-        { autorId: { notIn: redeIds }, visibilidade: 'PUBLICO' },
-      ],
-    },
-    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-    take: (take + 1) * 2,
-    include: postInclude(userId),
-  })) as PostRaw[]
+  const [postsRedeRaw, discoverBase] = await Promise.all([
+    db.post.findMany({
+      where: {
+        tenantId: { in: visibleTenantIds },
+        tipo: 'MEMBRO',
+        oculto: false,
+        ...escopoFeedPrincipal,
+        ...cursorWhere,
+        autorId: { in: redeIds },
+      },
+      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      include: postInclude(userId),
+    }) as Promise<PostRaw[]>,
+    getDescobrirPostsBaseCached(tenantId, visibleTenantIds, decodedCursor, fetchLimit),
+  ])
 
-  const dedup = new Map<string, PostSocialItem>()
-  for (const post of postsRaw.map(projetarPost)) {
-    if (!dedup.has(post.id)) dedup.set(post.id, post)
-  }
-  let ordenados = [...dedup.values()].sort(sortPostsDesc)
+  const seguindoOrdenados = postsRedeRaw.map(projetarPost).sort(sortPostsDesc)
 
-  const autorIdsExternos = ordenados.filter((p) => !redeSet.has(p.autorId)).map((p) => p.autorId)
+  const discoverExternos = discoverBase.filter((p) => !redeSet.has(p.autorId))
+  const autorIdsExternos = discoverExternos.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIdsExternos)
-  ordenados = ordenados.filter((p) => redeSet.has(p.autorId) || !semAcesso.has(p.autorId))
+  const discoverVisiveis = discoverExternos.filter((p) => !semAcesso.has(p.autorId))
+  const sugeridosOrdenados = rankDescobrirPosts(discoverVisiveis, tenantId)
 
-  const hasMore = ordenados.length > take
-  const pagina = await finalizarPosts(ordenados.slice(0, take))
+  const candidatos = [...sugeridosOrdenados, ...seguindoOrdenados]
+  const hasMore = candidatos.length > take
+  const paginaBruta = candidatos.slice(0, take)
+  const pagina = await finalizarPosts(await hidratarPostsDoUsuario(paginaBruta, userId))
   const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
 
   return {
@@ -459,6 +542,56 @@ export interface SugestaoAutorAside {
   nome: string | null
   avatarUrl: string | null
   seguidores: number
+}
+
+interface SugestaoAutorBaseRow {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+  seguidores: number
+}
+
+async function getSugestoesAutoresBaseCached(
+  tenantId: string,
+  visibleTenantIds: string[],
+): Promise<SugestaoAutorBaseRow[]> {
+  const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
+
+  return unstable_cache(
+    async () => {
+      const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
+        await db.post.findMany({
+          where: {
+            tenantId: { in: visibleTenantIds },
+            tipo: 'MEMBRO',
+            visibilidade: 'PUBLICO',
+            oculto: false,
+            ...escopoFeedPrincipal,
+          },
+          orderBy: { criadoEm: 'desc' },
+          take: 24,
+          distinct: ['autorId'],
+          select: {
+            autor: { select: { id: true, nome: true, avatarUrl: true } },
+          },
+        })
+
+      const autorIds = posts.map((p) => p.autor.id)
+      const contagensMap = await getContagensSeguimentoEmLote(autorIds, tenantId)
+
+      return posts.map((p) => {
+        const contagens = contagensMap.get(p.autor.id) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+        return {
+          userId: p.autor.id,
+          nome: p.autor.nome,
+          avatarUrl: p.autor.avatarUrl,
+          seguidores: contagens.seguidores,
+        }
+      })
+    },
+    ['feed-sugestoes-base', tenantId, visibleTenantIdsKey],
+    { revalidate: 120 },
+  )()
 }
 
 export const getSugestoesAutoresParaAside = cache(async function getSugestoesAutoresParaAside(
@@ -570,38 +703,22 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
 
   if (sugestoes.length > 0) return sugestoes
 
-  const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
-    await db.post.findMany({
-      where: {
-        tenantId: { in: visibleTenantIds },
-        tipo: 'MEMBRO',
-        visibilidade: 'PUBLICO',
-        oculto: false,
-        ...escopoFeedPrincipal,
-        autorId: { notIn: redeIds },
-      },
-      orderBy: { criadoEm: 'desc' },
-      take: 12,
-      distinct: ['autorId'],
-      select: {
-        autor: { select: { id: true, nome: true, avatarUrl: true } },
-      },
-    })
+  const sugestoesBase = await getSugestoesAutoresBaseCached(tenantId, visibleTenantIds)
+  const posts = sugestoesBase
+    .filter((p) => !redeIds.includes(p.userId))
+    .map((p) => ({ autor: { id: p.userId, nome: p.nome, avatarUrl: p.avatarUrl } }))
 
   const autorIds = posts.map((p) => p.autor.id)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
   const elegiveis = posts.filter((p) => !semAcesso.has(p.autor.id)).slice(0, 4)
-  const contagensMap = await getContagensSeguimentoEmLote(
-    elegiveis.map((p) => p.autor.id),
-    tenantId,
-  )
+  const baseMap = new Map(sugestoesBase.map((item) => [item.userId, item]))
   return elegiveis.map((p) => {
-    const contagens = contagensMap.get(p.autor.id) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+    const base = baseMap.get(p.autor.id)
     return {
       id: p.autor.id,
       nome: p.autor.nome,
       avatarUrl: p.autor.avatarUrl,
-      seguidores: contagens.seguidores,
+      seguidores: base?.seguidores ?? 0,
     }
   })
 })
@@ -771,35 +888,62 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
 ): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const decodedCursor = decodeCursor(opts.cursor)
-  const cursorWhere = buildCursorWhere(decodedCursor)
+  const cursorWhere = buildTimelineCursorWhere(decodedCursor)
 
-  const [visibleTenantIds, seguindo]: [string[], SeguimentoLite[]] = await Promise.all([
-    getVisibleTenantIds(tenantId, 'comunidade'),
-    db.seguimento.findMany({
-      where: { seguidorId: userId, status: 'APROVADO' },
-      select: { seguidoId: true },
-    }),
-  ])
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  await garantirTimelineDaRedeDoViewer(userId)
 
-  const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
+  const batchSize = Math.max((take + 1) * 3, 24)
+  let timelineCursor = decodedCursor
+  let hasMoreTimeline = true
+  let loops = 0
+  const ordenados: PostSocialItem[] = []
+  const seen = new Set<string>()
 
-  const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      tipo: 'MEMBRO',
-      oculto: false,
-      autorId: { in: redeIds },
-      ...escopoFeedPrincipal,
-      ...cursorWhere,
-    },
-    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-    take: take + 1,
-    include: postInclude(userId),
-  })) as PostRaw[]
+  while (ordenados.length < take + 1 && hasMoreTimeline && loops < 4) {
+    const timelineRows: Array<{ postId: string; criadoEm: Date }> = await db.feedTimeline.findMany({
+      where: {
+        viewerId: userId,
+        ...(loops === 0 ? cursorWhere : buildTimelineCursorWhere(timelineCursor)),
+      },
+      orderBy: [{ criadoEm: 'desc' }, { postId: 'desc' }],
+      take: batchSize,
+      select: { postId: true, criadoEm: true },
+    })
 
-  const posts = postsRaw.map(projetarPost)
-  const hasMore = posts.length > take
-  const pagina = await finalizarPosts(posts.slice(0, take))
+    if (timelineRows.length === 0) {
+      hasMoreTimeline = false
+      break
+    }
+
+    const postsRaw = (await db.post.findMany({
+      where: {
+        id: { in: timelineRows.map((row) => row.postId) },
+        tenantId: { in: visibleTenantIds },
+        tipo: 'MEMBRO',
+        oculto: false,
+        ...escopoFeedPrincipal,
+      },
+      include: postInclude(userId),
+    })) as PostRaw[]
+
+    const byId = new Map(postsRaw.map((raw) => [raw.id, projetarPost(raw)]))
+    for (const row of timelineRows) {
+      const post = byId.get(row.postId)
+      if (!post || seen.has(post.id)) continue
+      seen.add(post.id)
+      ordenados.push(post)
+      if (ordenados.length >= take + 1) break
+    }
+
+    hasMoreTimeline = timelineRows.length === batchSize
+    const last = timelineRows[timelineRows.length - 1]
+    timelineCursor = last ? { id: last.postId, criadoEmIso: last.criadoEm.toISOString() } : null
+    loops += 1
+  }
+
+  const hasMore = ordenados.length > take || hasMoreTimeline
+  const pagina = await finalizarPosts(ordenados.slice(0, take))
 
   return {
     posts: pagina,
@@ -876,33 +1020,43 @@ export async function getHashtagsEmAlta(
   limite = 5,
 ): Promise<HashtagEmAlta[]> {
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
 
-  const grouped: Array<{ hashtagId: string; _count: { postId: number } }> = await db.postHashtag.groupBy({
-    by: ['hashtagId'],
-    where: {
-      post: {
-        criadoEm: { gte: since },
-        oculto: false,
-        visibilidade: 'PUBLICO',
-        tenantId: { in: visibleTenantIds },
-      },
+  const cached = await unstable_cache(
+    async (): Promise<HashtagEmAlta[]> => {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+      const grouped: Array<{ hashtagId: string; _count: { postId: number } }> = await db.postHashtag.groupBy({
+        by: ['hashtagId'],
+        where: {
+          post: {
+            criadoEm: { gte: since },
+            oculto: false,
+            visibilidade: 'PUBLICO',
+            tenantId: { in: visibleTenantIds },
+          },
+        },
+        _count: { postId: true },
+      })
+
+      const top = grouped.sort((a, b) => b._count.postId - a._count.postId).slice(0, limite)
+      if (top.length === 0) return []
+
+      const hashtags: Array<{ id: string; tag: string }> = await db.hashtag.findMany({
+        where: { id: { in: top.map((g) => g.hashtagId) } },
+        select: { id: true, tag: true },
+      })
+      const tagPorId = new Map(hashtags.map((h) => [h.id, h.tag]))
+
+      return top
+        .map((g) => ({ tag: tagPorId.get(g.hashtagId), total: g._count.postId }))
+        .filter((h): h is HashtagEmAlta => h.tag != null)
     },
-    _count: { postId: true },
-  })
+    ['feed-hashtags-alta', tenantId, visibleTenantIdsKey, String(limite)],
+    { revalidate: 120 },
+  )()
 
-  const top = grouped.sort((a, b) => b._count.postId - a._count.postId).slice(0, limite)
-  if (top.length === 0) return []
-
-  const hashtags: Array<{ id: string; tag: string }> = await db.hashtag.findMany({
-    where: { id: { in: top.map((g) => g.hashtagId) } },
-    select: { id: true, tag: true },
-  })
-  const tagPorId = new Map(hashtags.map((h) => [h.id, h.tag]))
-
-  return top
-    .map((g) => ({ tag: tagPorId.get(g.hashtagId), total: g._count.postId }))
-    .filter((h): h is HashtagEmAlta => h.tag != null)
+  return cached
 }
 
 export interface TorcidaComunidadePublica {

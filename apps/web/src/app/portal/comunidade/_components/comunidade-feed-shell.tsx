@@ -11,6 +11,7 @@ import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeFeedNav, ComunidadeFeedNavFallback } from './comunidade-feed-nav'
+import type { SalaAtivaListItem } from '@/lib/salas'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -51,6 +52,7 @@ interface ComunidadeFeedShellProps {
   afiliacaoSlug?: string | null
   /** COMMUNITY_POST_NACIONAL — libera "Torcida e torcedores" no composer. */
   podePublicarNacional?: boolean
+  salasAtivas?: SalaAtivaListItem[]
 }
 
 function ComunicadosFallback() {
@@ -89,6 +91,7 @@ export function ComunidadeFeedShell({
   clubeNacional = null,
   afiliacaoSlug = null,
   podePublicarNacional = false,
+  salasAtivas = [],
 }: ComunidadeFeedShellProps) {
   const numeroExibido =
     userCard.numeroSocio != null
@@ -151,6 +154,7 @@ export function ComunidadeFeedShell({
               afiliacaoId={tenant.afiliacaoId}
               afiliacaoSlug={afiliacaoSlug}
               currentUserId={currentUser.id || undefined}
+              salasAoVivo={salasAtivas}
             />
           </Suspense>
         </div>
@@ -189,7 +193,7 @@ export function ComunidadeFeedShell({
         </nav>
 
         <Suspense fallback={null}>
-          <ComunidadeSalasMobile tenantId={tenant.id} />
+          <ComunidadeSalasMobile salas={salasAtivas} />
         </Suspense>
 
         {currentUser.id && (

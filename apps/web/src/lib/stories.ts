@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
 import { getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
@@ -20,6 +21,16 @@ export interface StoryRingItem {
   avatarUrl: string | null
   momentos: MomentoStoryItem[]
   temNovo: boolean
+}
+
+interface StoryRowCached {
+  id: string
+  userId: string
+  midiaUrl: string
+  conteudo: string | null
+  criadoEm: string
+  expiraEm: string
+  user: { id: string; nome: string | null; avatarUrl: string | null }
 }
 
 export function calcularExpiraStory(criadoEm = new Date()): Date {
@@ -65,32 +76,44 @@ export const getStoryRings = cache(async function getStoryRings(
   viewerId: string,
 ): Promise<StoryRingItem[]> {
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
-  const agora = new Date()
+  const visibleTenantIdsKey = [...visibleTenantIds].sort().join(',')
+  const rows = await unstable_cache(
+    async (): Promise<StoryRowCached[]> => {
+      const agora = new Date()
+      const raw: Array<{
+        id: string
+        userId: string
+        midiaUrl: string
+        conteudo: string | null
+        criadoEm: Date
+        expiraEm: Date
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+      }> = await db.momentoStory.findMany({
+        where: {
+          tenantId: { in: visibleTenantIds },
+          expiraEm: { gt: agora },
+        },
+        orderBy: { criadoEm: 'asc' },
+        select: {
+          userId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+          id: true,
+          midiaUrl: true,
+          conteudo: true,
+          criadoEm: true,
+          expiraEm: true,
+        },
+      })
 
-  const rows: Array<{
-    id: string
-    userId: string
-    midiaUrl: string
-    conteudo: string | null
-    criadoEm: Date
-    expiraEm: Date
-    user: { id: string; nome: string | null; avatarUrl: string | null }
-  }> = await db.momentoStory.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      expiraEm: { gt: agora },
+      return raw.map((row) => ({
+        ...row,
+        criadoEm: row.criadoEm.toISOString(),
+        expiraEm: row.expiraEm.toISOString(),
+      }))
     },
-    orderBy: { criadoEm: 'asc' },
-    select: {
-      userId: true,
-      user: { select: { id: true, nome: true, avatarUrl: true } },
-      id: true,
-      midiaUrl: true,
-      conteudo: true,
-      criadoEm: true,
-      expiraEm: true,
-    },
-  })
+    ['stories-rings-base', tenantId, visibleTenantIdsKey],
+    { revalidate: 60 },
+  )()
 
   const porAutor = new Map<string, StoryRingItem>()
 
@@ -118,8 +141,8 @@ export const getStoryRings = cache(async function getStoryRings(
       userId: row.userId,
       midiaUrl: row.midiaUrl,
       conteudo: row.conteudo,
-      criadoEm: row.criadoEm.toISOString(),
-      expiraEm: row.expiraEm.toISOString(),
+      criadoEm: row.criadoEm,
+      expiraEm: row.expiraEm,
     }
 
     const existente = porAutor.get(row.userId)

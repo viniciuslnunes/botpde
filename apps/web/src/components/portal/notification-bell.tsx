@@ -26,10 +26,13 @@ function formatarData(data: Date | string) {
 
 export function NotificationBell({
   initialItems,
+  unreadCount: unreadCountProp,
   verTodasHref = '/portal/comunidade/notificacoes',
   verTodasLabel = 'Ver todas as notificações',
 }: {
   initialItems: NotificationItem[]
+  /** Contagem server-side de não lidas (pode exceder itens carregados no dropdown). */
+  unreadCount?: number
   verTodasHref?: string
   verTodasLabel?: string
 }) {
@@ -47,7 +50,8 @@ export function NotificationBell({
     setItems(initialItems)
   }, [initialSignature, initialItems])
 
-  const unreadCount = useMemo(() => items.filter((item) => !item.lida).length, [items])
+  const unreadFromItems = useMemo(() => items.filter((item) => !item.lida).length, [items])
+  const unreadCount = unreadCountProp ?? unreadFromItems
 
   function marcarLida(item: NotificationItem) {
     if (item.lida) return

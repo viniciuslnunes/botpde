@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
 
@@ -52,12 +53,12 @@ export interface EventoComposerItem {
 }
 
 /** Eventos futuros visíveis para vincular a um post no composer. */
-export async function getEventosParaComposer(
+const getEventosFuturosVisiveis = cache(async function getEventosFuturosVisiveis(
   tenantId: string,
   userId?: string,
-): Promise<EventoComposerItem[]> {
+): Promise<Array<{ id: string; titulo: string; data: Date; local: string | null }>> {
   const escopo = await getEscopoEventosVisiveis(tenantId, userId)
-  const eventos = await db.evento.findMany({
+  return db.evento.findMany({
     where: {
       ...escopo,
       data: { gte: new Date() },
@@ -66,6 +67,14 @@ export async function getEventosParaComposer(
     take: 8,
     select: { id: true, titulo: true, data: true, local: true },
   })
+})
+
+/** Eventos futuros visíveis para vincular a um post no composer. */
+export async function getEventosParaComposer(
+  tenantId: string,
+  userId?: string,
+): Promise<EventoComposerItem[]> {
+  const eventos = await getEventosFuturosVisiveis(tenantId, userId)
   return eventos.map((e: { id: string; titulo: string; data: Date; local: string | null }) => ({
     id: e.id,
     titulo: e.titulo,
@@ -79,14 +88,6 @@ export async function getProximoEvento(
   tenantId: string,
   userId?: string,
 ): Promise<ProximoEventoItem | null> {
-  const escopo = await getEscopoEventosVisiveis(tenantId, userId)
-  const evento: ProximoEventoItem | null = await db.evento.findFirst({
-    where: {
-      ...escopo,
-      data: { gte: new Date() },
-    },
-    orderBy: { data: 'asc' },
-    select: { id: true, titulo: true, data: true, local: true },
-  })
-  return evento
+  const eventos = await getEventosFuturosVisiveis(tenantId, userId)
+  return eventos[0] ?? null
 }

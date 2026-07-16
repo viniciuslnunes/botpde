@@ -33,7 +33,10 @@
     "test:afiliacoes": "node scripts/test-afiliacoes.js",
     "db:repair-afiliacoes-torcidas": "node scripts/repair-afiliacoes-torcidas.js",
     "audit:clube-torcidas": "node scripts/audit-clube-torcidas.js",
-    "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js"
+    "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js",
+    "backfill:perfis-torcedores-publicos": "node scripts/backfill-perfis-torcedores-publicos.js",
+    "audit:perfis-torcedores-privados": "node scripts/audit-perfis-torcedores-privados.js",
+    "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"

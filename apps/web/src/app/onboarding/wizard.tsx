@@ -6,7 +6,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { ClubeOnboardingCard } from '@/components/onboarding/clube-onboarding-card'
-import { MapaBrasilIsometrico } from '@/components/onboarding/mapa-brasil-isometrico'
+import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { TorcidaOnboardingMeta } from '@/components/onboarding/torcida-onboarding-meta'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
 import { Input, Select } from '@torcida/ui'
@@ -18,8 +18,6 @@ import {
 } from '@/lib/motion-presets'
 import {
   NOME_UF,
-  REGIOES_BRASIL,
-  type RegiaoBrasilId,
 } from '@/lib/regioes-brasil'
 import {
   salvarClubeRegiao,
@@ -372,8 +370,6 @@ function PassoClube({
 }) {
   const [busca, setBusca] = useState('')
   const [ufFiltro, setUfFiltro] = useState('')
-  const [regiaoAtiva, setRegiaoAtiva] = useState<RegiaoBrasilId | null>(null)
-  const [ufHover, setUfHover] = useState<string | null>(null)
   const [lista, setLista] = useState(afiliacoesIniciais)
   const [buscando, startBusca] = useTransition()
 
@@ -390,73 +386,30 @@ function PassoClube({
   }
 
   function onUfFiltro(uf: string) {
-    const prox = ufFiltro === uf ? '' : uf
-    setUfFiltro(prox)
-    recarregar(busca, prox)
+    setUfFiltro(uf)
+    recarregar(busca, uf)
   }
 
-  function onRegiao(id: RegiaoBrasilId | null) {
-    setRegiaoAtiva(id)
-    setUfHover(null)
-    if (ufFiltro) {
-      setUfFiltro('')
-      recarregar(busca, '')
-    }
-  }
-
-  const metaRegiaoAtiva = regiaoAtiva
-    ? REGIOES_BRASIL.find((r) => r.id === regiaoAtiva) ?? null
+  const tituloGrid = busca.trim()
+    ? `Resultados para "${busca}"`
     : null
 
-  /** Listagem agrupada por UF quando a região está ativa e não há busca textual. */
-  const gruposPorEstado = useMemo(() => {
-    if (!metaRegiaoAtiva || busca.trim()) return null
-    const fonte = ufFiltro
-      ? lista.filter((a) => a.estado?.toUpperCase() === ufFiltro)
-      : lista.filter((a) => {
-          const uf = a.estado?.toUpperCase()
-          return uf != null && metaRegiaoAtiva.ufs.includes(uf)
-        })
-
-    const map = new Map<string, AfiliacaoOnboarding[]>()
-    for (const uf of metaRegiaoAtiva.ufs) {
-      if (ufFiltro && uf !== ufFiltro) continue
-      map.set(uf, [])
-    }
-    for (const a of fonte) {
-      const uf = a.estado?.toUpperCase()
-      if (!uf || !map.has(uf)) continue
-      map.get(uf)!.push(a)
-    }
-    return [...map.entries()].filter(([, clubes]) => clubes.length > 0)
-  }, [metaRegiaoAtiva, lista, ufFiltro, busca])
-
-  const tituloGrid =
-    ufFiltro && !busca
-      ? `Clubes em ${NOME_UF[ufFiltro] ?? ufFiltro}`
-      : busca
-        ? `Resultados para "${busca}"`
-        : metaRegiaoAtiva
-          ? `Clubes · ${metaRegiaoAtiva.nome}`
-          : null
+  /** Grade abaixo: busca textual ou listagem geral (sem estado selecionado). */
+  const mostrarGradeAbaixo = Boolean(busca.trim()) || !ufFiltro
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Qual clube você torce?</h1>
       <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-        Escolha o time do seu coração. Explore o mapa por região ou busque pelo nome.
+        Escolha o time do seu coração. Clique num estado no mapa ou busque pelo nome.
       </p>
 
       {regioes.length > 0 && (
         <div className="mt-5">
-          <MapaBrasilIsometrico
+          <MapaBrasilEstados
             afiliacoes={afiliacoesIniciais}
             regioes={regioes}
-            regiaoAtiva={regiaoAtiva}
-            ufHover={ufHover}
             ufSelecionada={ufFiltro}
-            onRegiao={onRegiao}
-            onUfHover={setUfHover}
             onUfSelecionar={onUfFiltro}
             onSelecionarClube={onSelecionar}
           />
@@ -478,72 +431,10 @@ function PassoClube({
         <div className="flex items-center justify-center py-16 text-[rgb(var(--foreground-muted))]">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
-      ) : lista.length === 0 ? (
+      ) : !mostrarGradeAbaixo ? null : lista.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-[rgb(var(--border))] p-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
           Nenhum clube encontrado
-          {busca ? ` para "${busca}"` : ufFiltro ? ` em ${ufFiltro}` : ''}. Tente outro filtro ou nome.
-        </div>
-      ) : gruposPorEstado ? (
-        <div className="mt-5 space-y-6">
-          {tituloGrid && (
-            <p className="text-sm font-medium text-[rgb(var(--foreground-muted))]">{tituloGrid}</p>
-          )}
-          <AnimatePresence mode="popLayout">
-            {gruposPorEstado.map(([uf, clubes]) => (
-              <m.section
-                key={uf}
-                layout
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={springGentle}
-                onMouseEnter={() => setUfHover(uf)}
-                onMouseLeave={() => setUfHover(null)}
-                className={`rounded-2xl border p-3 transition-colors sm:p-4 ${
-                  ufHover === uf || ufFiltro === uf
-                    ? 'border-[rgb(var(--color-primary))]/60 bg-[rgb(var(--color-primary))]/5'
-                    : 'border-[rgb(var(--border))] bg-transparent'
-                }`}
-              >
-                <header className="mb-3 flex items-baseline justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                    {NOME_UF[uf] ?? uf}
-                    <span className="ml-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                      {uf}
-                    </span>
-                  </h2>
-                  <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
-                    {clubes.length} {clubes.length === 1 ? 'clube' : 'clubes'}
-                  </span>
-                </header>
-                <m.ul
-                  className="grid grid-cols-2 gap-3 sm:grid-cols-3"
-                  initial="hidden"
-                  animate="show"
-                  variants={{
-                    hidden: {},
-                    show: { transition: { staggerChildren: 0.03, delayChildren: 0.02 } },
-                  }}
-                >
-                  {clubes.map((a, i) => (
-                    <m.li
-                      key={a.id}
-                      variants={{
-                        hidden: { opacity: 0, y: 10 },
-                        show: {
-                          opacity: 1,
-                          y: 0,
-                          transition: { ...springGentle, delay: Math.min(i, 8) * 0.03 },
-                        },
-                      }}
-                    >
-                      <ClubeOnboardingCard clube={a} onSelecionar={onSelecionar} />
-                    </m.li>
-                  ))}
-                </m.ul>
-              </m.section>
-            ))}
-          </AnimatePresence>
+          {busca ? ` para "${busca}"` : ''}. Tente outro nome.
         </div>
       ) : (
         <>

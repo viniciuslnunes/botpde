@@ -6,6 +6,7 @@ import { Loader2, MessageSquare, Pin, Send, Trash2, Pencil } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { Avatar } from '@/components/portal/avatar'
 import { collapsePanel, fadeUp, springSnappy } from '@/lib/motion-presets'
 
 export type SalaMensagem = {
@@ -23,6 +24,7 @@ interface SalaChatProps {
   currentUserId: string
   isHost: boolean
   initialMensagens: SalaMensagem[]
+  listClassName?: string
 }
 
 function isMensagemTemporaria(id: string): boolean {
@@ -49,7 +51,13 @@ function ultimaMensagemServidor(lista: SalaMensagem[]): string | null {
   )[0]?.criadoEm ?? null
 }
 
-export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: SalaChatProps) {
+export function SalaChat({
+  salaId,
+  currentUserId,
+  isHost,
+  initialMensagens,
+  listClassName = 'max-h-80 space-y-3 overflow-y-auto pr-1',
+}: SalaChatProps) {
   const [mensagens, setMensagens] = useState<SalaMensagem[]>(() => ordenarMensagens(initialMensagens))
   const [conteudo, setConteudo] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -301,7 +309,7 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
           className="py-6 text-center"
         />
       ) : (
-        <div ref={listRef} className="max-h-80 space-y-3 overflow-y-auto pr-1">
+        <div ref={listRef} className={listClassName}>
           <AnimatePresence mode="popLayout" initial={false}>
             {mensagens.map((mensagem) => {
               const temporaria = isMensagemTemporaria(mensagem.id)
@@ -319,85 +327,95 @@ export function SalaChat({ salaId, currentUserId, isHost, initialMensagens }: Sa
                       : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]'
                   } ${temporaria ? 'opacity-80' : ''}`}
                 >
-                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
-                      {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
-                      {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
-                      {temporaria && ' · enviando…'}
-                      {mensagem.editadaEm && ' · editada'}
-                      {mensagem.destacada && ' · destacada'}
-                    </div>
-                    {isHost && !temporaria && (
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          title={mensagem.destacada ? 'Remover destaque' : 'Destacar'}
-                          onClick={() =>
-                            void moderar(mensagem.id, { destacada: !mensagem.destacada })
-                          }
-                          className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-                        >
-                          <Pin className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Editar"
-                          onClick={() => {
-                            setEditandoId(mensagem.id)
-                            setEditandoTexto(mensagem.conteudo)
-                          }}
-                          className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Excluir"
-                          onClick={() => void moderar(mensagem.id, {}, true)}
-                          className="rounded p-1 text-red-500 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                  <div className="flex gap-3">
+                    <Avatar
+                      nome={mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')}
+                      avatarUrl={mensagem.autor.avatarUrl}
+                      size="sm"
+                      className="mt-0.5 ring-1 ring-[rgb(var(--border))]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs text-[rgb(var(--foreground-muted))]" suppressHydrationWarning>
+                          {mensagem.autor.id === currentUserId ? 'Você' : (mensagem.autor.nome ?? 'Membro')} ·{' '}
+                          {mensagem.criadoEmFormatado ?? formatDateTimeShort(mensagem.criadoEm)}
+                          {temporaria && ' · enviando…'}
+                          {mensagem.editadaEm && ' · editada'}
+                          {mensagem.destacada && ' · destacada'}
+                        </div>
+                        {isHost && !temporaria && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              title={mensagem.destacada ? 'Remover destaque' : 'Destacar'}
+                              onClick={() =>
+                                void moderar(mensagem.id, { destacada: !mensagem.destacada })
+                              }
+                              className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                            >
+                              <Pin className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Editar"
+                              onClick={() => {
+                                setEditandoId(mensagem.id)
+                                setEditandoTexto(mensagem.conteudo)
+                              }}
+                              className="rounded p-1 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Excluir"
+                              onClick={() => void moderar(mensagem.id, {}, true)}
+                              className="rounded p-1 text-red-500 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  <AnimatePresence mode="wait">
-                    {editandoId === mensagem.id ? (
-                      <m.form
-                        key="edit"
-                        variants={collapsePanel}
-                        initial="hidden"
-                        animate="show"
-                        exit="exit"
-                        transition={springSnappy}
-                        className="flex gap-2 overflow-hidden"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          void moderar(mensagem.id, { conteudo: editandoTexto.trim() })
-                        }}
-                      >
-                        <input
-                          value={editandoTexto}
-                          onChange={(e) => setEditandoTexto(e.target.value)}
-                          maxLength={800}
-                          className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
-                        />
-                        <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary))]">
-                          Salvar
-                        </button>
-                      </m.form>
-                    ) : (
-                      <m.p
-                        key="view"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]"
-                      >
-                        {mensagem.conteudo}
-                      </m.p>
-                    )}
-                  </AnimatePresence>
+                      <AnimatePresence mode="wait">
+                        {editandoId === mensagem.id ? (
+                          <m.form
+                            key="edit"
+                            variants={collapsePanel}
+                            initial="hidden"
+                            animate="show"
+                            exit="exit"
+                            transition={springSnappy}
+                            className="flex gap-2 overflow-hidden"
+                            onSubmit={(e) => {
+                              e.preventDefault()
+                              void moderar(mensagem.id, { conteudo: editandoTexto.trim() })
+                            }}
+                          >
+                            <input
+                              value={editandoTexto}
+                              onChange={(e) => setEditandoTexto(e.target.value)}
+                              maxLength={800}
+                              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
+                            />
+                            <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary))]">
+                              Salvar
+                            </button>
+                          </m.form>
+                        ) : (
+                          <m.p
+                            key="view"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="whitespace-pre-wrap text-sm text-[rgb(var(--foreground))]"
+                          >
+                            {mensagem.conteudo}
+                          </m.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
                 </m.div>
               )
             })}

@@ -14,12 +14,14 @@ const sedeFindMany = vi.hoisted(() => vi.fn())
 const departamentoFindFirst = vi.hoisted(() => vi.fn())
 const userDepartamentoUpsert = vi.hoisted(() => vi.fn())
 const auditLogCreate = vi.hoisted(() => vi.fn())
+const perfilMembroUpsert = vi.hoisted(() => vi.fn())
 const authFn = vi.hoisted(() => vi.fn())
 const redirectFn = vi.hoisted(() => vi.fn(() => { throw new Error('REDIRECT') }))
 
 vi.mock('@torcida/db', () => ({
   db: {
     perfilTorcedor: { findUnique: perfilFindUnique, upsert: perfilUpsert },
+    perfilMembro: { upsert: perfilMembroUpsert },
     saasMembro: { findFirst: membroFindFirst, findUnique: membroFindUnique, create: membroCreate, update: membroUpdate },
     afiliacao: { findUnique: afiliacaoFindUnique },
     tenant: { findFirst: tenantFindFirst, findMany: tenantFindMany },

@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import { notificarDenunciaMensagem } from '@/lib/notificacoes-routing'
 
 const denunciaSchema = z.object({
   motivo: z.string().trim().min(5, 'Motivo deve ter ao menos 5 caracteres').max(500),
 })
-
-async function listarModeradoresMensagens(tenantId: string): Promise<string[]> {
-  const rows: { userId: string }[] = await db.userRole.findMany({
-    where: {
-      tenantId,
-      role: { permissions: { has: PERMISSIONS.MESSAGES_MODERATE } },
-    },
-    select: { userId: true },
-  })
-  return [...new Set(rows.map((row) => row.userId))]
-}
 
 export async function POST(
   request: NextRequest,
@@ -58,8 +47,6 @@ export async function POST(
 
     registrarAcaoEngajamento(limiterKey)
 
-    // A denúncia é registrada no tenant da CONVERSA — é a moderação daquela
-    // torcida que arbitra o conteúdo trocado no contexto dela.
     const denuncia: { id: string } = await db.denunciaMensagem.create({
       data: {
         tenantId: conversa.tenantId,
@@ -70,25 +57,11 @@ export async function POST(
       select: { id: true },
     })
 
-    const moderadores = (await listarModeradoresMensagens(conversa.tenantId)).filter(
-      (id) => id !== userId,
-    )
-    if (moderadores.length > 0) {
-      await db.$transaction(
-        moderadores.map((moderadorId) =>
-          db.notificacao.create({
-            data: {
-              userId: moderadorId,
-              tenantId: conversa.tenantId,
-              tipo: 'DENUNCIA_NOVA',
-              titulo: 'Nova denúncia de mensagem',
-              corpo: parsed.data.motivo.slice(0, 140),
-              link: '/admin/comunidade/moderacao',
-            },
-          }),
-        ),
-      )
-    }
+    await notificarDenunciaMensagem({
+      tenantId: conversa.tenantId,
+      motivo: parsed.data.motivo,
+      denuncianteUserId: userId,
+    })
 
     await db.auditLog.create({
       data: {

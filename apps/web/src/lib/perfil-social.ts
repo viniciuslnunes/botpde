@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getSeguimentoStatus } from './social'
 
@@ -57,17 +58,30 @@ export type VinculoPrivacidadePerfil = {
   status: string
 } | null
 
-/** Sócio aprovado é sempre privado; torcedores usam preferência gravada (default público). */
+/**
+ * Privacidade efetiva por vínculo:
+ * - Sócio aprovado é sempre privado.
+ * - Torcedor aprovado é sempre público.
+ * - Caso sem vínculo/situação diversa: usa preferência gravada (fallback público).
+ */
 export function resolverPerfilPrivadoEfetivo(
   perfilPrivado: boolean | null | undefined,
   vinculo: VinculoPrivacidadePerfil,
 ): boolean {
   if (vinculo?.tipo === 'SOCIO' && vinculo.status === 'APROVADO') return true
+  // Torcedor sempre pública: não importa se está APROVADO ou PENDENTE.
+  if (vinculo?.tipo === 'TORCEDOR') return false
   return perfilPrivado ?? false
 }
 
 export function socioAprovadoPrivacidadeObrigatoria(vinculo: VinculoPrivacidadePerfil): boolean {
   return vinculo?.tipo === 'SOCIO' && vinculo.status === 'APROVADO'
+}
+
+export function torcedorAprovadoPublicoObrigatorio(
+  vinculo: VinculoPrivacidadePerfil,
+): boolean {
+  return vinculo?.tipo === 'TORCEDOR'
 }
 
 /** Versão síncrona para testes e uso interno. */
@@ -114,51 +128,62 @@ export async function podeVerConteudoSocial(
 }
 
 /** IDs de autores cujo conteúdo o viewer não pode ver (perfil privado sem follow). */
+const getAutoresSemAcessoIdsCached = cache(
+  async (viewerId: string, tenantId: string, autorIdsKey: string): Promise<string[]> => {
+    const unique = autorIdsKey.length > 0 ? autorIdsKey.split(',') : []
+    if (unique.length === 0) return []
+
+    const [perfis, membros]: [
+      Array<{ userId: string; perfilPrivado: boolean }>,
+      Array<{ userId: string; tipo: 'SOCIO' | 'TORCEDOR'; status: string }>,
+    ] = await Promise.all([
+      db.perfilMembro.findMany({
+        where: { userId: { in: unique }, tenantId },
+        select: { userId: true, perfilPrivado: true },
+      }),
+      db.saasMembro.findMany({
+        where: { userId: { in: unique }, tenantId },
+        select: { userId: true, tipo: true, status: true },
+      }),
+    ])
+    const perfilMap = new Map(perfis.map((p) => [p.userId, p.perfilPrivado]))
+    const membroMap = new Map(membros.map((m) => [m.userId, m]))
+
+    const candidatosPrivados = unique.filter((id) =>
+      resolverPerfilPrivadoEfetivo(perfilMap.get(id), membroMap.get(id) ?? null),
+    )
+    if (candidatosPrivados.length === 0) return []
+
+    const aprovados: Array<{ seguidoId: string }> = await db.seguimento.findMany({
+      where: {
+        seguidorId: viewerId,
+        seguidoId: { in: candidatosPrivados },
+        status: 'APROVADO',
+      },
+      select: { seguidoId: true },
+    })
+    const seguidos = new Set(aprovados.map((s) => s.seguidoId))
+
+    const bloqueados: string[] = []
+    for (const id of candidatosPrivados) {
+      if (!seguidos.has(id)) bloqueados.push(id)
+    }
+    return bloqueados
+  },
+)
+
 export async function getAutoresSemAcesso(
   viewerId: string | undefined,
   tenantId: string,
   autorIds: string[],
 ): Promise<Set<string>> {
-  if (!viewerId) return new Set(autorIds)
   const unique = [...new Set(autorIds)].filter((id) => id !== viewerId)
+  if (!viewerId) return new Set(unique)
   if (unique.length === 0) return new Set()
 
-  const [perfis, membros]: [
-    Array<{ userId: string; perfilPrivado: boolean }>,
-    Array<{ userId: string; tipo: 'SOCIO' | 'TORCEDOR'; status: string }>,
-  ] = await Promise.all([
-    db.perfilMembro.findMany({
-      where: { userId: { in: unique }, tenantId },
-      select: { userId: true, perfilPrivado: true },
-    }),
-    db.saasMembro.findMany({
-      where: { userId: { in: unique }, tenantId },
-      select: { userId: true, tipo: true, status: true },
-    }),
-  ])
-  const perfilMap = new Map(perfis.map((p) => [p.userId, p.perfilPrivado]))
-  const membroMap = new Map(membros.map((m) => [m.userId, m]))
-
-  const candidatosPrivados = unique.filter((id) =>
-    resolverPerfilPrivadoEfetivo(perfilMap.get(id), membroMap.get(id) ?? null),
-  )
-  if (candidatosPrivados.length === 0) return new Set()
-
-  const aprovados: Array<{ seguidoId: string }> = await db.seguimento.findMany({
-    where: {
-      seguidorId: viewerId,
-      seguidoId: { in: candidatosPrivados },
-      status: 'APROVADO',
-    },
-    select: { seguidoId: true },
-  })
-  const seguidos = new Set(aprovados.map((s) => s.seguidoId))
-
-  const bloqueados = new Set<string>()
-  for (const id of candidatosPrivados) {
-    if (!seguidos.has(id)) bloqueados.add(id)
-  }
-  return bloqueados
+  const autorIdsKey = [...unique].sort().join(',')
+  const bloqueados = await getAutoresSemAcessoIdsCached(viewerId, tenantId, autorIdsKey)
+  return new Set(bloqueados)
 }
 
 export async function getPerfilSocial(

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   AlertCircle,
@@ -9,8 +9,12 @@ import {
   Info,
   Loader2,
   LogOut,
+  Maximize2,
+  Minimize2,
   MonitorUp,
   MonitorX,
+  PanelsLeftBottom,
+  PanelsTopLeft,
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -46,6 +50,12 @@ type MeetRoomProps = {
   isHost: boolean
   userId: string
   userName: string
+  participantProfiles?: Record<string, { nome: string | null; avatarUrl: string | null }>
+  presentationMode?: boolean
+  showParticipantStrip?: boolean
+  canTogglePresentation?: boolean
+  onTogglePresentation?: () => void
+  onToggleParticipantStrip?: () => void
   onOnlineCountChange?: (count: number) => void
   onScreenShareActiveChange?: (active: boolean) => void
   onLeaveCall?: () => void
@@ -71,6 +81,34 @@ type LayoutPinContext = {
     dispatch?: (action: { msg: 'set_pin'; trackReference: TrackRef } | { msg: 'clear_pin' }) => void
     state?: TrackRef[]
   }
+}
+
+function TooltipIconButton({
+  label,
+  active = false,
+  onClick,
+  children,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className="meet-room-overlay-action group"
+    >
+      {children}
+      <span className="meet-room-tooltip" role="tooltip">
+        {label}
+      </span>
+    </button>
+  )
 }
 
 const ROOM_OPTIONS = {
@@ -486,7 +524,15 @@ function MeetControls({
   )
 }
 
-function MeetStage({ lk }: { lk: LiveKitModule }) {
+function MeetStage({
+  lk,
+  participantProfiles,
+  showParticipantStrip,
+}: {
+  lk: LiveKitModule
+  participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
+  showParticipantStrip: boolean
+}) {
   const {
     GridLayout,
     ParticipantTile,
@@ -501,6 +547,7 @@ function MeetStage({ lk }: { lk: LiveKitModule }) {
 
   const layoutContext = useLayoutContext() as LayoutPinContext
   const lastAutoFocusedScreenShareRef = useRef<TrackRef | null>(null)
+  const stageRef = useRef<HTMLDivElement | null>(null)
 
   const tracks = useTracks(
     [
@@ -544,15 +591,64 @@ function MeetStage({ lk }: { lk: LiveKitModule }) {
     }
   }, [layoutContext.pin.dispatch, screenShareKey, screenShareTracks])
 
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    const fallbackByName = new Map(
+      Object.values(participantProfiles).map((profile) => [profile.nome ?? 'Membro', profile]),
+    )
+
+    for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
+      const hasMedia = Boolean(tile.querySelector('video, canvas'))
+      const existing = tile.querySelector('.meet-room-avatar-fallback')
+
+      if (hasMedia) {
+        existing?.remove()
+        continue
+      }
+
+      const labelNode = tile.querySelector('.lk-participant-metadata, .lk-participant-name')
+      const participantName = labelNode?.textContent?.trim() || 'Membro'
+      const profile = fallbackByName.get(participantName) ?? null
+
+      if (!existing) {
+        const fallback = document.createElement('div')
+        fallback.className = 'meet-room-avatar-fallback'
+
+        if (profile?.avatarUrl) {
+          const img = document.createElement('img')
+          img.src = profile.avatarUrl
+          img.alt = participantName
+          img.className = 'meet-room-avatar-fallback__image'
+          fallback.appendChild(img)
+        } else {
+          const initial = document.createElement('span')
+          initial.className = 'meet-room-avatar-fallback__initial'
+          initial.textContent = participantName.charAt(0).toUpperCase() || 'M'
+          fallback.appendChild(initial)
+        }
+
+        tile.appendChild(fallback)
+      }
+    }
+  }, [participantProfiles, tracks])
+
   if (focusTrack) {
     return (
-      <div className="meet-room-focus-wrapper">
-        <FocusLayoutContainer className="meet-room-focus">
-          <CarouselLayout tracks={carouselTracks} className="meet-room-carousel">
-            <ParticipantTile />
-          </CarouselLayout>
-          <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
-        </FocusLayoutContainer>
+      <div ref={stageRef} className="meet-room-focus-wrapper">
+        {showParticipantStrip ? (
+          <FocusLayoutContainer className="meet-room-focus">
+            <CarouselLayout tracks={carouselTracks} className="meet-room-carousel">
+              <ParticipantTile />
+            </CarouselLayout>
+            <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
+          </FocusLayoutContainer>
+        ) : (
+          <div className="meet-room-focus meet-room-focus--solo">
+            <FocusLayout trackRef={focusTrack} className="meet-room-focus-main" />
+          </div>
+        )}
         <div className="meet-room-focus-badge">
           <MonitorUp className="h-3.5 w-3.5" />
           Tela de {focusTrack.participant.name ?? 'participante'}
@@ -562,9 +658,11 @@ function MeetStage({ lk }: { lk: LiveKitModule }) {
   }
 
   return (
-    <GridLayout tracks={tracks} className="meet-room-grid">
-      <ParticipantTile />
-    </GridLayout>
+    <div ref={stageRef} className="h-full">
+      <GridLayout tracks={tracks} className="meet-room-grid">
+        <ParticipantTile />
+      </GridLayout>
+    </div>
   )
 }
 
@@ -575,6 +673,12 @@ function MeetConference({
   isHost,
   userId,
   userName,
+  participantProfiles,
+  presentationMode,
+  showParticipantStrip,
+  canTogglePresentation,
+  onTogglePresentation,
+  onToggleParticipantStrip,
   onScreenShareActiveChange,
   onLeaveCall,
 }: {
@@ -584,6 +688,12 @@ function MeetConference({
   isHost: boolean
   userId: string
   userName: string
+  participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
+  presentationMode: boolean
+  showParticipantStrip: boolean
+  canTogglePresentation: boolean
+  onTogglePresentation?: () => void
+  onToggleParticipantStrip?: () => void
   onScreenShareActiveChange?: (active: boolean) => void
   onLeaveCall?: () => void
 }) {
@@ -657,10 +767,40 @@ function MeetConference({
                 transition={springSnappy}
                 className="h-full w-full"
               >
-                <MeetStage lk={lk} />
+                <MeetStage
+                  lk={lk}
+                  participantProfiles={participantProfiles}
+                  showParticipantStrip={showParticipantStrip}
+                />
               </m.div>
             )}
           </AnimatePresence>
+
+          {conectado && canTogglePresentation && onTogglePresentation && !presentationMode ? (
+            <div className="meet-room-stage-actions">
+              <TooltipIconButton
+                label={presentationMode ? 'Sair da tela cheia com comentários' : 'Abrir tela cheia com comentários'}
+                active={presentationMode}
+                onClick={onTogglePresentation}
+              >
+                {presentationMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </TooltipIconButton>
+
+              {onToggleParticipantStrip ? (
+                <TooltipIconButton
+                  label={showParticipantStrip ? 'Ocultar participantes laterais' : 'Mostrar participantes laterais'}
+                  active={!showParticipantStrip}
+                  onClick={onToggleParticipantStrip}
+                >
+                  {showParticipantStrip ? (
+                    <PanelsLeftBottom className="h-4 w-4" />
+                  ) : (
+                    <PanelsTopLeft className="h-4 w-4" />
+                  )}
+                </TooltipIconButton>
+              ) : null}
+            </div>
+          ) : null}
 
           {conectado && !isHost && !canSpeak && !canScreen && (
             <div className="meet-room-local-status">
@@ -693,6 +833,12 @@ export function MeetRoom({
   isHost,
   userId,
   userName,
+  participantProfiles = {},
+  presentationMode = false,
+  showParticipantStrip = true,
+  canTogglePresentation = false,
+  onTogglePresentation,
+  onToggleParticipantStrip,
   onOnlineCountChange,
   onScreenShareActiveChange,
   onLeaveCall,
@@ -738,8 +884,38 @@ export function MeetRoom({
   }, [salaId])
 
   const conferenceProps = useMemo(
-    () => ({ lk: lk!, salaId, hostId, isHost, userId, userName, onScreenShareActiveChange, onLeaveCall }),
-    [lk, salaId, hostId, isHost, userId, userName, onScreenShareActiveChange, onLeaveCall],
+    () => ({
+      lk: lk!,
+      salaId,
+      hostId,
+      isHost,
+      userId,
+      userName,
+      participantProfiles,
+      presentationMode,
+      showParticipantStrip,
+      canTogglePresentation,
+      onTogglePresentation,
+      onToggleParticipantStrip,
+      onScreenShareActiveChange,
+      onLeaveCall,
+    }),
+    [
+      lk,
+      salaId,
+      hostId,
+      isHost,
+      userId,
+      userName,
+      participantProfiles,
+      presentationMode,
+      showParticipantStrip,
+      canTogglePresentation,
+      onTogglePresentation,
+      onToggleParticipantStrip,
+      onScreenShareActiveChange,
+      onLeaveCall,
+    ],
   )
 
   if (loadError) {
@@ -772,7 +948,11 @@ export function MeetRoom({
   const { LiveKitRoom } = lk
 
   return (
-    <div className="meet-room-root" data-lk-theme="default">
+    <div
+      className="meet-room-root"
+      data-lk-theme="default"
+      data-presentation={presentationMode ? 'true' : 'false'}
+    >
       <AnimatePresence>
         {mediaHint && (
           <m.div
