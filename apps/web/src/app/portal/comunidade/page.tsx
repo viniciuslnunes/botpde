@@ -13,7 +13,6 @@ import { ComunidadeNacionalShell } from './_components/comunidade-nacional-shell
 import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
-import { getResumoBadgesComunidade } from '@/lib/notificacoes-comunidade'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 
 const ComunidadeChatPanel = dynamic(
@@ -67,9 +66,8 @@ export default async function ComunidadePage({
     avatarUrl: session?.user?.image ?? null,
   }
 
-  let perfilPrivado = true
+  let perfilPrivado = false
   let eventosComposer: EventoComposerItem[] = []
-  let navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 }
   let bloqueioPublicacao: string | null = null
   let somentePublico = false
   let podePublicarNacional = false
@@ -81,11 +79,10 @@ export default async function ComunidadePage({
   } = { numeroSocio: null, numeroAssociado: null, tipo: null, departamentos: [] }
 
   if (session?.user?.id != null) {
-    const [perfil, eventos, badges, bloqueio, membro, socio, deptos, { rolePermissions, overrides }] =
+    const [perfil, eventos, bloqueio, membro, socio, deptos, { rolePermissions, overrides }] =
       await Promise.all([
         getPerfilMembroForPortal(session.user.id, tenant.id),
         getEventosParaComposer(tenant.id, session.user.id),
-        getResumoBadgesComunidade(tenant.id, session.user.id),
         checarPodePublicarNoFeed(session.user.id, tenant.id),
         db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
@@ -104,7 +101,6 @@ export default async function ComunidadePage({
       ])
     perfilPrivado = perfil.perfilPrivado
     eventosComposer = eventos
-    navBadges = badges
     bloqueioPublicacao = bloqueio
     somentePublico = bloqueio === null && membro?.status !== 'APROVADO'
     podePublicarNacional = hasPermission(
@@ -131,7 +127,6 @@ export default async function ComunidadePage({
         cursor={params.cursor}
         perfilPrivado={perfilPrivado}
         eventosComposer={eventosComposer}
-        navBadges={navBadges}
         bloqueioPublicacao={bloqueioPublicacao}
         somentePublico={somentePublico}
         podePublicarNacional={podePublicarNacional}

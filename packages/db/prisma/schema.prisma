@@ -1044,6 +1044,8 @@ model Post {
 
   @@index([tenantId, criadoEm])
   @@index([tenantId, oculto])
+  @@index([autorId, criadoEm])
+  @@index([tenantId, tipo, oculto, conversaId, criadoEm])
   @@index([postOrigemId])
   @@index([comunicadoOrigemId])
   @@index([eventoId])
@@ -1067,7 +1069,7 @@ model PerfilMembro {
   userId        String  @map("user_id")
   tenantId      String  @map("tenant_id")
   bio           String?
-  perfilPrivado Boolean @default(true) @map("perfil_privado")
+  perfilPrivado Boolean @default(false) @map("perfil_privado")
   avatarUrl     String? @map("avatar_url")
   bannerUrl     String? @map("banner_url")
   bannerPos     Int?    @map("banner_pos") // enquadramento vertical do banner (object-position Y, 0–100)
@@ -1101,6 +1103,7 @@ model Seguimento {
 
   @@unique([seguidorId, seguidoId])
   @@index([seguidoId, status])
+  @@index([seguidorId, status])
   @@map("saas_seguimentos")
 }
 

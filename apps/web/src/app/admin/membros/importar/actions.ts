@@ -5,6 +5,7 @@ import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, ImportacaoLoteSchema } from '@torcida/types'
 import { dedupKey, mockSource, type MembroImportInput } from '@/lib/importacao'
+import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { z } from 'zod'
 
 /**
@@ -114,6 +115,9 @@ async function processarLote(
           importacaoId,
         },
       })
+      if (input.tipo === 'SOCIO') {
+        await privatizarPerfilAoAprovarSocio(userId, tenantId)
+      }
       importados++
     } catch (e) {
       erros.push({ linha: i + 1, motivo: e instanceof Error ? e.message : 'Erro desconhecido' })

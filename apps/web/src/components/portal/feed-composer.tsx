@@ -33,7 +33,7 @@ interface FeedComposerProps {
   podePublicarNacional?: boolean
 }
 
-export function FeedComposer({ userName, userAvatar, perfilPrivado = true, eventos = [], bloqueioPublicacao = null, somentePublico = false, podePublicarNacional = false }: FeedComposerProps) {
+export function FeedComposer({ userName, userAvatar, perfilPrivado = false, eventos = [], bloqueioPublicacao = null, somentePublico = false, podePublicarNacional = false }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -54,7 +54,7 @@ export function FeedComposer({ userName, userAvatar, perfilPrivado = true, event
   )
 }
 
-function FeedComposerActive({ userName, userAvatar, perfilPrivado = true, eventos = [], somentePublico = false, podePublicarNacional = false }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
+function FeedComposerActive({ userName, userAvatar, perfilPrivado = false, eventos = [], somentePublico = false, podePublicarNacional = false }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,

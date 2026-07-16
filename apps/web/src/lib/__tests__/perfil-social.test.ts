@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   podeVerConteudoSocialSync,
   resolverAvatarSocial,
+  resolverPerfilPrivadoEfetivo,
+  socioAprovadoPrivacidadeObrigatoria,
 } from '@/lib/perfil-social'
 
 describe('resolverAvatarSocial', () => {
@@ -13,6 +15,51 @@ describe('resolverAvatarSocial', () => {
 
   it('usa fallback OAuth quando perfil não tem avatar', () => {
     expect(resolverAvatarSocial(null, 'https://oauth.jpg')).toBe('https://oauth.jpg')
+  })
+})
+
+describe('resolverPerfilPrivadoEfetivo', () => {
+  it('sócio aprovado é sempre privado', () => {
+    expect(
+      resolverPerfilPrivadoEfetivo(false, { tipo: 'SOCIO', status: 'APROVADO' }),
+    ).toBe(true)
+    expect(
+      resolverPerfilPrivadoEfetivo(undefined, { tipo: 'SOCIO', status: 'APROVADO' }),
+    ).toBe(true)
+  })
+
+  it('sócio pendente respeita preferência (default público)', () => {
+    expect(
+      resolverPerfilPrivadoEfetivo(undefined, { tipo: 'SOCIO', status: 'PENDENTE' }),
+    ).toBe(false)
+    expect(
+      resolverPerfilPrivadoEfetivo(true, { tipo: 'SOCIO', status: 'PENDENTE' }),
+    ).toBe(true)
+  })
+
+  it('torcedor aprovado usa preferência gravada', () => {
+    expect(
+      resolverPerfilPrivadoEfetivo(false, { tipo: 'TORCEDOR', status: 'APROVADO' }),
+    ).toBe(false)
+    expect(
+      resolverPerfilPrivadoEfetivo(true, { tipo: 'TORCEDOR', status: 'APROVADO' }),
+    ).toBe(true)
+  })
+
+  it('sem vínculo assume público', () => {
+    expect(resolverPerfilPrivadoEfetivo(undefined, null)).toBe(false)
+  })
+})
+
+describe('socioAprovadoPrivacidadeObrigatoria', () => {
+  it('identifica sócio aprovado', () => {
+    expect(socioAprovadoPrivacidadeObrigatoria({ tipo: 'SOCIO', status: 'APROVADO' })).toBe(
+      true,
+    )
+    expect(socioAprovadoPrivacidadeObrigatoria({ tipo: 'TORCEDOR', status: 'APROVADO' })).toBe(
+      false,
+    )
+    expect(socioAprovadoPrivacidadeObrigatoria(null)).toBe(false)
   })
 })
 

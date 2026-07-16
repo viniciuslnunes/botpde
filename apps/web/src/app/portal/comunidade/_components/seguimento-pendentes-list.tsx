@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import { Avatar } from '@/components/portal/avatar'
@@ -11,6 +11,7 @@ import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 export interface SeguimentoPendenteItem {
   id: string
   criadoEm: string
+  podeSeguirDeVolta: boolean
   seguidor: {
     id: string
     nome: string | null
@@ -22,6 +23,7 @@ interface SeguimentoPendentesListProps {
   itensIniciais: SeguimentoPendenteItem[]
   onAprovar: (id: string) => Promise<void>
   onRejeitar: (id: string) => Promise<void>
+  onSeguirDeVolta: (userId: string) => Promise<'APROVADO' | 'PENDENTE'>
 }
 
 function formatarData(iso: string): string {
@@ -34,32 +36,24 @@ export function SeguimentoPendentesList({
   itensIniciais,
   onAprovar,
   onRejeitar,
+  onSeguirDeVolta,
 }: SeguimentoPendentesListProps) {
   const [itens, setItens] = useState(itensIniciais)
-  const [, startTransition] = useTransition()
 
   function remover(id: string) {
     setItens((prev) => prev.filter((item) => item.id !== id))
   }
 
   function aprovar(id: string): Promise<void> {
-    return new Promise((resolve) => {
-      startTransition(async () => {
-        await onAprovar(id)
-        remover(id)
-        resolve()
-      })
-    })
+    return onAprovar(id)
   }
 
   function rejeitar(id: string): Promise<void> {
-    return new Promise((resolve) => {
-      startTransition(async () => {
-        await onRejeitar(id)
-        remover(id)
-        resolve()
-      })
-    })
+    return onRejeitar(id)
+  }
+
+  function seguirDeVolta(userId: string): Promise<'APROVADO' | 'PENDENTE'> {
+    return onSeguirDeVolta(userId)
   }
 
   if (itens.length === 0) {
@@ -107,8 +101,12 @@ export function SeguimentoPendentesList({
             </div>
             <SeguimentoReviewButtons
               seguimentoId={item.id}
+              seguidorId={item.seguidor.id}
+              podeSeguirDeVolta={item.podeSeguirDeVolta}
               onAprovar={aprovar}
               onRejeitar={rejeitar}
+              onSeguirDeVolta={seguirDeVolta}
+              onResolved={() => remover(item.id)}
             />
           </m.div>
         ))}

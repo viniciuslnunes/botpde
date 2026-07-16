@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Rss, UserCircle2, UserPlus, Video, Search, Users, Heart, Bookmark, Bell, Radio } from 'lucide-react'
+import { Video, Users, Heart, Bookmark, UserPlus, Radio } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -10,6 +10,7 @@ import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { FeedLiveBanner } from './feed-live-banner'
+import { ComunidadeFeedNav, ComunidadeFeedNavFallback } from './comunidade-feed-nav'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -41,7 +42,6 @@ interface ComunidadeFeedShellProps {
   perfilPrivado?: boolean
   /** `data` em ISO — serializado na page antes de cruzar para o FeedComposer (client). */
   eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
-  navBadges?: { notificacoesNaoLidas: number; solicitacoesPendentes: number }
   bloqueioPublicacao?: string | null
   somentePublico?: boolean
   filtro?: 'descobrir' | 'seguindo'
@@ -81,9 +81,8 @@ export function ComunidadeFeedShell({
   currentUser,
   userCard = { numeroSocio: null, numeroAssociado: null, tipo: null, departamentos: [] },
   cursor,
-  perfilPrivado = true,
+  perfilPrivado = false,
   eventosComposer = [],
-  navBadges = { notificacoesNaoLidas: 0, solicitacoesPendentes: 0 },
   bloqueioPublicacao = null,
   somentePublico = false,
   filtro = 'descobrir',
@@ -97,41 +96,6 @@ export function ComunidadeFeedShell({
       : userCard.numeroAssociado?.trim() || null
   const departamentosLabel =
     userCard.departamentos.length > 0 ? userCard.departamentos.join(' · ') : null
-
-  const navItems = [
-    { href: '/portal/comunidade', label: 'Feed', icon: Rss, active: true, badge: 0 },
-    { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart, active: false, badge: 0 },
-    { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark, active: false, badge: 0 },
-    { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search, active: false, badge: 0 },
-    { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video, active: false, badge: 0 },
-    { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users, active: false, badge: 0 },
-    { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio, active: false, badge: 0 },
-    {
-      href: '/portal/comunidade/notificacoes',
-      label: 'Notificações',
-      icon: Bell,
-      active: false,
-      badge: navBadges.notificacoesNaoLidas,
-    },
-    {
-      href: '/portal/comunidade/seguindo',
-      label: 'Solicitações',
-      icon: UserPlus,
-      active: false,
-      badge: navBadges.solicitacoesPendentes,
-    },
-    ...(currentUser.id
-      ? [
-          {
-            href: `/portal/comunidade/perfil/${currentUser.id}`,
-            label: 'Meu perfil',
-            icon: UserCircle2,
-            active: false,
-            badge: 0,
-          },
-        ]
-      : []),
-  ]
 
   return (
     <>
@@ -171,31 +135,15 @@ export function ComunidadeFeedShell({
             </Link>
           </div>
 
-          <nav className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={[
-                    'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                    item.active
-                      ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
-                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-                  ].join(' ')}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="flex-1">{item.label}</span>
-                  {item.badge > 0 && (
-                    <span className="min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[10px] font-bold leading-5 text-white">
-                      {item.badge > 9 ? '9+' : item.badge}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
+          {currentUser.id ? (
+            <Suspense fallback={<ComunidadeFeedNavFallback />}>
+              <ComunidadeFeedNav
+                tenantId={tenant.id}
+                userId={currentUser.id}
+                currentUserId={currentUser.id}
+              />
+            </Suspense>
+          ) : null}
 
           <Suspense fallback={<AsideWidgetsFallback />}>
             <ComunidadeAsideWidgets

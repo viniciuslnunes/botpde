@@ -112,9 +112,13 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
           onClick={() =>
             startTransition(async () => {
               try {
-                await solicitarSeguir(userId)
-                setLocalStatus('PENDENTE')
-                toast.success('Solicitação enviada.')
+                const status = await solicitarSeguir(userId)
+                setLocalStatus(status)
+                toast.success(
+                  status === 'APROVADO'
+                    ? 'Você começou a seguir este membro.'
+                    : 'Solicitação enviada.',
+                )
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : 'Não foi possível seguir.')
               }
@@ -133,36 +137,123 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
 
 interface SeguimentoReviewButtonsProps {
   seguimentoId: string
+  seguidorId: string
+  podeSeguirDeVolta: boolean
   onAprovar: (id: string) => Promise<void>
   onRejeitar: (id: string) => Promise<void>
+  onSeguirDeVolta: (userId: string) => Promise<'APROVADO' | 'PENDENTE'>
+  onResolved: () => void
 }
 
 export function SeguimentoReviewButtons({
   seguimentoId,
+  seguidorId,
+  podeSeguirDeVolta,
   onAprovar,
   onRejeitar,
+  onSeguirDeVolta,
+  onResolved,
 }: SeguimentoReviewButtonsProps) {
   const [pending, startTransition] = useTransition()
-  const [resolved, setResolved] = useState<'aprovar' | 'rejeitar' | null>(null)
+  const [resolved, setResolved] = useState<'aprovar' | 'rejeitar' | 'seguindo' | 'pendente' | null>(null)
+
+  function concluir() {
+    onResolved()
+  }
 
   return (
     <AnimatePresence mode="wait">
       {resolved === 'aprovar' ? (
+        podeSeguirDeVolta ? (
+          <m.div
+            key="seguir-de-volta"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={springSnappy}
+            className="flex flex-col items-end gap-2"
+          >
+            <span className="text-xs font-semibold text-emerald-600">Aprovado</span>
+            <div className="flex items-center gap-2">
+              <m.button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    try {
+                      const status = await onSeguirDeVolta(seguidorId)
+                      if (status === 'APROVADO') {
+                        setResolved('seguindo')
+                        toast.success('Você começou a seguir este membro.')
+                      } else {
+                        setResolved('pendente')
+                        toast.success('Solicitação enviada — aguardando aprovação deles.')
+                      }
+                      window.setTimeout(concluir, 600)
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error ? e.message : 'Não foi possível seguir de volta.',
+                      )
+                    }
+                  })
+                }
+                whileTap={{ scale: 0.94 }}
+                transition={springSnappy}
+                className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                Seguir de volta
+              </m.button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={concluir}
+                className="text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-60"
+              >
+                Agora não
+              </button>
+            </div>
+          </m.div>
+        ) : (
+          <m.span
+            key="aprovado"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={springSnappy}
+            onAnimationComplete={concluir}
+            className="text-xs font-semibold text-emerald-600"
+          >
+            Aprovado
+          </m.span>
+        )
+      ) : resolved === 'seguindo' ? (
         <m.span
-          key="aprovado"
+          key="seguindo"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={springSnappy}
           className="text-xs font-semibold text-emerald-600"
         >
-          Aprovado
+          Seguindo
+        </m.span>
+      ) : resolved === 'pendente' ? (
+        <m.span
+          key="pendente-volta"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={springSnappy}
+          className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+        >
+          Solicitação enviada
         </m.span>
       ) : resolved === 'rejeitar' ? (
         <m.span
           key="rejeitado"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
           transition={springSnappy}
+          onAnimationComplete={concluir}
           className="text-xs font-semibold text-[rgb(var(--foreground-muted))]"
         >
           Rejeitado
@@ -174,8 +265,14 @@ export function SeguimentoReviewButtons({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await onAprovar(seguimentoId)
-                setResolved('aprovar')
+                try {
+                  await onAprovar(seguimentoId)
+                  setResolved('aprovar')
+                } catch (e) {
+                  toast.error(
+                    e instanceof Error ? e.message : 'Não foi possível aprovar a solicitação.',
+                  )
+                }
               })
             }
             whileTap={{ scale: 0.94 }}
@@ -189,8 +286,14 @@ export function SeguimentoReviewButtons({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await onRejeitar(seguimentoId)
-                setResolved('rejeitar')
+                try {
+                  await onRejeitar(seguimentoId)
+                  setResolved('rejeitar')
+                } catch (e) {
+                  toast.error(
+                    e instanceof Error ? e.message : 'Não foi possível rejeitar a solicitação.',
+                  )
+                }
               })
             }
             whileTap={{ scale: 0.94 }}

@@ -11,6 +11,8 @@ interface PerfilEditarFormProps {
   tenantId: string
   bio: string
   perfilPrivado: boolean
+  /** Sócio aprovado não pode tornar o perfil público. */
+  privacidadeBloqueada?: boolean
   exibirCidade: boolean
   exibirSede: boolean
   exibirDesde: boolean
@@ -47,6 +49,7 @@ export function PerfilEditarForm({
   tenantId,
   bio: bioInicial,
   perfilPrivado: privadoInicial,
+  privacidadeBloqueada = false,
   exibirCidade: cidadeInicial,
   exibirSede: sedeInicial,
   exibirDesde: desdeInicial,
@@ -402,9 +405,12 @@ export function PerfilEditarForm({
         <input
           type="checkbox"
           checked={perfilPrivado}
+          disabled={privacidadeBloqueada}
           onChange={(e) => setPerfilPrivado(e.target.checked)}
         />
-        Perfil privado (só seguidores veem suas publicações e atividade)
+        {privacidadeBloqueada
+          ? 'Perfil privado (obrigatório para sócios aprovados)'
+          : 'Perfil privado (só seguidores veem suas publicações e atividade)'}
       </label>
 
       <div className="space-y-2 rounded-lg border border-[rgb(var(--border))] p-3">

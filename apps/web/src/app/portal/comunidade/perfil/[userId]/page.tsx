@@ -4,14 +4,15 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
-import { canFollowUser, getSeguimentoStatus } from '@/lib/social'
+import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
 import {
   getAtividadeDoAutor,
   getContagensSeguimento,
   getFotosDoAutor,
   podeVerConteudoSocial,
   resolverAvatarSocial,
-  segueMutuamente,
+  resolverPerfilPrivadoEfetivo,
+  socioAprovadoPrivacidadeObrigatoria,
 } from '@/lib/perfil-social'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
@@ -98,9 +99,9 @@ export default async function PerfilComunidadePage({
     select: perfilSelect,
   })
 
-  const perfil = perfilAtual ?? {
+  const perfilBase = perfilAtual ?? {
     bio: null,
-    perfilPrivado: true,
+    perfilPrivado: false,
     avatarUrl: null,
     bannerUrl: null,
     bannerPos: null,
@@ -108,15 +109,23 @@ export default async function PerfilComunidadePage({
     exibirSede: false,
     exibirDesde: true,
   }
+  const perfilPrivadoEfetivo = resolverPerfilPrivadoEfetivo(
+    perfilBase.perfilPrivado,
+    membro ? { tipo: membro.tipo, status: membro.status } : null,
+  )
+  const privacidadeBloqueada = socioAprovadoPrivacidadeObrigatoria(
+    membro ? { tipo: membro.tipo, status: membro.status } : null,
+  )
+  const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
-  const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoce] = isSelf
+  const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge] = isSelf
     ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false]
     : await Promise.all([
         canFollowUser(session.user.id, userId, tenant.id),
         getSeguimentoStatus(session.user.id, userId),
         podeVerConteudoSocial(session.user.id, userId, tenant.id),
         getContagensSeguimento(userId, tenant.id),
-        segueMutuamente(userId, session.user.id),
+        usuarioSegueVoce(session.user.id, userId),
       ])
 
   let bloqueadoPorMim = false
@@ -199,7 +208,7 @@ export default async function PerfilComunidadePage({
         bannerPos={perfil.bannerPos}
         perfilPrivado={perfil.perfilPrivado}
         tenantNome={tenant.nome}
-        segueVoce={segueVoce}
+        segueVoce={segueVoceBadge}
         isSelf={isSelf}
         acoes={acoes}
       />
@@ -237,6 +246,7 @@ export default async function PerfilComunidadePage({
                   tenantId={tenant.id}
                   bio={perfil.bio ?? ''}
                   perfilPrivado={perfil.perfilPrivado}
+                  privacidadeBloqueada={privacidadeBloqueada}
                   exibirCidade={perfil.exibirCidade}
                   exibirSede={perfil.exibirSede}
                   exibirDesde={perfil.exibirDesde}

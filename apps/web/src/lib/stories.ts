@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
-import { podeVerConteudoSocial, resolverAvatarSocial } from './perfil-social'
+import { getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -94,18 +94,25 @@ export const getStoryRings = cache(async function getStoryRings(
 
   const porAutor = new Map<string, StoryRingItem>()
 
+  const autorIds = [...new Set(rows.map((r) => r.userId))].filter((id) => id !== viewerId)
+  const semAcesso = await getAutoresSemAcesso(viewerId, tenantId, autorIds)
+
+  const perfis: Array<{ userId: string; avatarUrl: string | null }> =
+    [...new Set(rows.map((r) => r.userId))].length > 0
+      ? await db.perfilMembro.findMany({
+          where: {
+            userId: { in: [...new Set(rows.map((r) => r.userId))] },
+            tenantId,
+          },
+          select: { userId: true, avatarUrl: true },
+        })
+      : []
+  const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
+
   for (const row of rows) {
-    const podeVer =
-      row.userId === viewerId ||
-      (await podeVerConteudoSocial(viewerId, row.userId, tenantId))
-    if (!podeVer) continue
+    if (row.userId !== viewerId && semAcesso.has(row.userId)) continue
 
-    const perfil: { avatarUrl: string | null } | null = await db.perfilMembro.findUnique({
-      where: { userId_tenantId: { userId: row.userId, tenantId } },
-      select: { avatarUrl: true },
-    })
-
-    const existente = porAutor.get(row.userId)
+    const perfil = perfilPorId.get(row.userId)
     const momento: MomentoStoryItem = {
       id: row.id,
       userId: row.userId,
@@ -115,6 +122,7 @@ export const getStoryRings = cache(async function getStoryRings(
       expiraEm: row.expiraEm.toISOString(),
     }
 
+    const existente = porAutor.get(row.userId)
     if (existente) {
       existente.momentos.push(momento)
       if (new Date(momento.criadoEm) > new Date(Date.now() - 6 * 60 * 60 * 1000)) {
@@ -124,7 +132,7 @@ export const getStoryRings = cache(async function getStoryRings(
       porAutor.set(row.userId, {
         userId: row.userId,
         nome: row.user.nome,
-        avatarUrl: resolverAvatarSocial(perfil?.avatarUrl, row.user.avatarUrl),
+        avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, row.user.avatarUrl),
         momentos: [momento],
         temNovo: row.userId !== viewerId,
       })

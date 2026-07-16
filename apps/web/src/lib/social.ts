@@ -1,5 +1,6 @@
-import { db } from '@torcida/db'
+import { db, type Prisma } from '@torcida/db'
 import { saoRivais } from '@torcida/types'
+import { resolverPerfilPrivadoEfetivo } from './perfil-social'
 import { getAlliedTenantIds, getTenantRelation, tenantsAreAllied } from './hierarquia'
 
 interface PerfilMembroLite {
@@ -23,11 +24,32 @@ export async function getPerfilMembroForPortal(
   userId: string,
   tenantId: string,
 ): Promise<Pick<PerfilMembroLite, 'perfilPrivado'>> {
-  const perfil: { perfilPrivado: boolean } | null = await db.perfilMembro.findUnique({
+  const [perfil, membro] = await Promise.all([
+    db.perfilMembro.findUnique({
+      where: { userId_tenantId: { userId, tenantId } },
+      select: { perfilPrivado: true },
+    }),
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { tipo: true, status: true },
+    }),
+  ])
+  return {
+    perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, membro),
+  }
+}
+
+/** Sócios aprovados entram com perfil privado (torcedores permanecem públicos). */
+export async function privatizarPerfilAoAprovarSocio(
+  userId: string,
+  tenantId: string,
+  client: Prisma.TransactionClient | typeof db = db,
+): Promise<void> {
+  await client.perfilMembro.upsert({
     where: { userId_tenantId: { userId, tenantId } },
-    select: { perfilPrivado: true },
+    create: { userId, tenantId, perfilPrivado: true },
+    update: { perfilPrivado: true },
   })
-  return { perfilPrivado: perfil?.perfilPrivado ?? true }
 }
 
 export async function getOrCreatePerfilMembro(
@@ -68,26 +90,19 @@ async function getTenantsDoClubeDoTorcedor(userId: string): Promise<string[]> {
   return getTenantIdsPorAfiliacao(perfil.afiliacaoId)
 }
 
-export async function canFollowUser(
+type VinculoMembro = { userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }
+
+async function avaliarCanFollowComDados(
   seguidorId: string,
   seguidoId: string,
   tenantContextoId: string | null,
+  aliadosContexto: string[],
+  vinculos: VinculoMembro[],
+  tenantsClubeCache: Map<string, string[]>,
+  relationCache: Map<string, Awaited<ReturnType<typeof getTenantRelation>>>,
 ): Promise<boolean> {
   if (seguidorId === seguidoId) return false
 
-  const [aliadosContexto, vinculos] = await Promise.all([
-    tenantContextoId ? getAlliedTenantIds(tenantContextoId) : Promise.resolve([] as string[]),
-    db.saasMembro.findMany({
-      where: {
-        status: 'APROVADO',
-        userId: { in: [seguidorId, seguidoId] },
-      },
-      select: { userId: true, tenantId: true, tipo: true },
-    }) as Promise<{ userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }[]>,
-  ])
-
-  // Sem tenant de contexto (ator é torcedor global) não há recorte de
-  // visibilidade — a interseção por clube/aliança abaixo já limita o alcance.
   const visiveisNoContexto: Set<string> | null = tenantContextoId
     ? new Set([tenantContextoId, ...aliadosContexto])
     : null
@@ -97,30 +112,34 @@ export async function canFollowUser(
   const seguidorVinculos = vinculos.filter((v) => v.userId === seguidorId && noContexto(v.tenantId))
   const seguidoVinculos = vinculos.filter((v) => v.userId === seguidoId && noContexto(v.tenantId))
 
-  // Torcedor global: sem vínculo real, o "conjunto de tenants" do lado é o das
-  // torcidas do clube dele — segue/é seguido por qualquer torcida do mesmo clube.
-  const seguidorTenants =
-    seguidorVinculos.length > 0
-      ? seguidorVinculos.map((v) => v.tenantId)
-      : await getTenantsDoClubeDoTorcedor(seguidorId)
-  const seguidoTenants =
-    seguidoVinculos.length > 0
-      ? seguidoVinculos.map((v) => v.tenantId)
-      : await getTenantsDoClubeDoTorcedor(seguidoId)
+  async function tenantsDoUsuario(userId: string, vinculosUsuario: VinculoMembro[]): Promise<string[]> {
+    if (vinculosUsuario.length > 0) return vinculosUsuario.map((v) => v.tenantId)
+    if (tenantsClubeCache.has(userId)) return tenantsClubeCache.get(userId)!
+    const tenants = await getTenantsDoClubeDoTorcedor(userId)
+    tenantsClubeCache.set(userId, tenants)
+    return tenants
+  }
+
+  const [seguidorTenants, seguidoTenants] = await Promise.all([
+    tenantsDoUsuario(seguidorId, seguidorVinculos),
+    tenantsDoUsuario(seguidoId, seguidoVinculos),
+  ])
 
   if (seguidorTenants.length === 0 || seguidoTenants.length === 0) return false
 
-  // Bloqueio de rivalidade (spec-onboarding §3.2): SOMENTE quando AMBOS os
-  // lados são sócios (tipo SOCIO, status APROVADO — o where já filtra) de
-  // torcidas rivais. Torcedores se relacionam livremente, inclusive entre
-  // rivais. canMessageUser delega para cá — este é o ponto único do funil.
   for (const vinculoSeguidor of seguidorVinculos) {
     if (vinculoSeguidor.tipo !== 'SOCIO') continue
     for (const vinculoSeguido of seguidoVinculos) {
       if (vinculoSeguido.tipo !== 'SOCIO') continue
       if (vinculoSeguidor.tenantId === vinculoSeguido.tenantId) continue
-      const relation = await getTenantRelation(vinculoSeguidor.tenantId, vinculoSeguido.tenantId)
-      if (saoRivais(relation)) return false
+      const key = [vinculoSeguidor.tenantId, vinculoSeguido.tenantId].sort().join(':')
+      if (!relationCache.has(key)) {
+        relationCache.set(
+          key,
+          await getTenantRelation(vinculoSeguidor.tenantId, vinculoSeguido.tenantId),
+        )
+      }
+      if (saoRivais(relationCache.get(key)!)) return false
     }
   }
 
@@ -138,6 +157,60 @@ export async function canFollowUser(
   return false
 }
 
+export async function canFollowUser(
+  seguidorId: string,
+  seguidoId: string,
+  tenantContextoId: string | null,
+): Promise<boolean> {
+  const map = await canFollowUsers(seguidorId, [seguidoId], tenantContextoId)
+  return map.get(seguidoId) ?? false
+}
+
+/** Avalia `canFollowUser` para vários alvos com queries compartilhadas. */
+export async function canFollowUsers(
+  seguidorId: string,
+  seguidoIds: string[],
+  tenantContextoId: string | null,
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>()
+  const alvos = [...new Set(seguidoIds)].filter((id) => id !== seguidorId)
+  for (const id of seguidoIds) {
+    if (id === seguidorId) result.set(id, false)
+  }
+  if (alvos.length === 0) return result
+
+  const [aliadosContexto, vinculos] = await Promise.all([
+    tenantContextoId ? getAlliedTenantIds(tenantContextoId) : Promise.resolve([] as string[]),
+    db.saasMembro.findMany({
+      where: {
+        status: 'APROVADO',
+        userId: { in: [seguidorId, ...alvos] },
+      },
+      select: { userId: true, tenantId: true, tipo: true },
+    }) as Promise<VinculoMembro[]>,
+  ])
+
+  const tenantsClubeCache = new Map<string, string[]>()
+  const relationCache = new Map<string, Awaited<ReturnType<typeof getTenantRelation>>>()
+
+  await Promise.all(
+    alvos.map(async (seguidoId) => {
+      const ok = await avaliarCanFollowComDados(
+        seguidorId,
+        seguidoId,
+        tenantContextoId,
+        aliadosContexto,
+        vinculos,
+        tenantsClubeCache,
+        relationCache,
+      )
+      result.set(seguidoId, ok)
+    }),
+  )
+
+  return result
+}
+
 export async function getSeguimentoStatus(
   seguidorId: string,
   seguidoId: string,
@@ -147,4 +220,44 @@ export async function getSeguimentoStatus(
     select: { status: true },
   })
   return seguimento?.status ?? null
+}
+
+/** O alvo segue o viewer com status APROVADO (badge "Segue você"). */
+export async function segueVoce(viewerId: string, donoPerfilId: string): Promise<boolean> {
+  const seguimento: { id: string } | null = await db.seguimento.findFirst({
+    where: { seguidorId: donoPerfilId, seguidoId: viewerId, status: 'APROVADO' },
+    select: { id: true },
+  })
+  return seguimento !== null
+}
+
+/** Mapa seguidorId → pode exibir "Seguir de volta" após aprovar a solicitação dele. */
+export async function getPodeSeguirDeVoltaPorSeguidor(
+  viewerId: string,
+  seguidorIds: string[],
+  tenantContextoId: string,
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>()
+  for (const id of seguidorIds) result.set(id, false)
+  if (seguidorIds.length === 0) return result
+
+  const reversos: { seguidoId: string; status: SeguimentoStatus }[] = await db.seguimento.findMany({
+    where: { seguidorId: viewerId, seguidoId: { in: seguidorIds } },
+    select: { seguidoId: true, status: true },
+  })
+  const statusPorSeguidor = new Map(reversos.map((r) => [r.seguidoId, r.status]))
+
+  const candidatos = seguidorIds.filter((id) => {
+    const status = statusPorSeguidor.get(id)
+    return status !== 'APROVADO' && status !== 'PENDENTE' && status !== 'BLOQUEADO'
+  })
+
+  await Promise.all(
+    candidatos.map(async (id) => {
+      const pode = await canFollowUser(viewerId, id, tenantContextoId)
+      if (pode) result.set(id, true)
+    }),
+  )
+
+  return result
 }

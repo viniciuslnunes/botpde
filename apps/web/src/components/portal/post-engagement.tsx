@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2, Bookmark } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -114,13 +114,6 @@ export function PostEngagement({
       setCarregandoComentarios(false)
     }
   }, [postId])
-
-  useEffect(() => {
-    if (totalComentarios > 0) {
-      const timer = window.setTimeout(() => void carregarComentarios(), 0)
-      return () => window.clearTimeout(timer)
-    }
-  }, [totalComentarios, carregarComentarios])
 
   function handleReacao(tipo: TipoReacaoSocial) {
     const anterior = reacao

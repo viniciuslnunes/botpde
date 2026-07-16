@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { atualizarPerfilSocialSchema } from '@torcida/types'
 import { assertMembroAtivo } from '@/lib/authz'
+import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { isCloudinaryUrl } from '@/lib/social-embed'
 
 export interface PerfilSocialSalvo {
@@ -29,6 +30,13 @@ export async function salvarPerfilSocial(
 
   await assertMembroAtivo(tenant.id, userId)
 
+  const membro: { tipo: 'SOCIO' | 'TORCEDOR'; status: string } | null =
+    await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId } },
+      select: { tipo: true, status: true },
+    })
+  const perfilPrivado = resolverPerfilPrivadoEfetivo(parsed.data.perfilPrivado, membro)
+
   const bannerUrl = parsed.data.bannerUrl ?? null
   const bannerPos = parsed.data.bannerPos ?? null
   const avatarUrl = parsed.data.avatarUrl ?? null
@@ -46,7 +54,7 @@ export async function salvarPerfilSocial(
       userId,
       tenantId: tenant.id,
       bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
+      perfilPrivado,
       exibirCidade: parsed.data.exibirCidade,
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,
@@ -56,7 +64,7 @@ export async function salvarPerfilSocial(
     },
     update: {
       bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
+      perfilPrivado,
       exibirCidade: parsed.data.exibirCidade,
       exibirSede: parsed.data.exibirSede,
       exibirDesde: parsed.data.exibirDesde,

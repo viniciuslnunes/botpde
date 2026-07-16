@@ -52,6 +52,24 @@ export function resolverAvatarSocial(
   return perfilAvatar ?? userAvatar ?? null
 }
 
+export type VinculoPrivacidadePerfil = {
+  tipo: 'SOCIO' | 'TORCEDOR'
+  status: string
+} | null
+
+/** Sócio aprovado é sempre privado; torcedores usam preferência gravada (default público). */
+export function resolverPerfilPrivadoEfetivo(
+  perfilPrivado: boolean | null | undefined,
+  vinculo: VinculoPrivacidadePerfil,
+): boolean {
+  if (vinculo?.tipo === 'SOCIO' && vinculo.status === 'APROVADO') return true
+  return perfilPrivado ?? false
+}
+
+export function socioAprovadoPrivacidadeObrigatoria(vinculo: VinculoPrivacidadePerfil): boolean {
+  return vinculo?.tipo === 'SOCIO' && vinculo.status === 'APROVADO'
+}
+
 /** Versão síncrona para testes e uso interno. */
 export function podeVerConteudoSocialSync(
   viewerId: string | undefined,
@@ -74,16 +92,23 @@ export async function podeVerConteudoSocial(
   if (!viewerId) return false
   if (viewerId === autorId) return true
 
-  const perfil: { perfilPrivado: boolean } | null = await db.perfilMembro.findUnique({
-    where: { userId_tenantId: { userId: autorId, tenantId } },
-    select: { perfilPrivado: true },
-  })
+  const [perfil, membro, status] = await Promise.all([
+    db.perfilMembro.findUnique({
+      where: { userId_tenantId: { userId: autorId, tenantId } },
+      select: { perfilPrivado: true },
+    }),
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId: autorId } },
+      select: { tipo: true, status: true },
+    }),
+    getSeguimentoStatus(viewerId, autorId),
+  ])
 
-  const status = await getSeguimentoStatus(viewerId, autorId)
+  const perfilPrivado = resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, membro)
   return podeVerConteudoSocialSync(
     viewerId,
     autorId,
-    perfil?.perfilPrivado ?? true,
+    perfilPrivado,
     status === 'APROVADO',
   )
 }
@@ -98,13 +123,25 @@ export async function getAutoresSemAcesso(
   const unique = [...new Set(autorIds)].filter((id) => id !== viewerId)
   if (unique.length === 0) return new Set()
 
-  const perfis: Array<{ userId: string; perfilPrivado: boolean }> = await db.perfilMembro.findMany({
-    where: { userId: { in: unique }, tenantId },
-    select: { userId: true, perfilPrivado: true },
-  })
+  const [perfis, membros]: [
+    Array<{ userId: string; perfilPrivado: boolean }>,
+    Array<{ userId: string; tipo: 'SOCIO' | 'TORCEDOR'; status: string }>,
+  ] = await Promise.all([
+    db.perfilMembro.findMany({
+      where: { userId: { in: unique }, tenantId },
+      select: { userId: true, perfilPrivado: true },
+    }),
+    db.saasMembro.findMany({
+      where: { userId: { in: unique }, tenantId },
+      select: { userId: true, tipo: true, status: true },
+    }),
+  ])
   const perfilMap = new Map(perfis.map((p) => [p.userId, p.perfilPrivado]))
+  const membroMap = new Map(membros.map((m) => [m.userId, m]))
 
-  const candidatosPrivados = unique.filter((id) => perfilMap.get(id) ?? true)
+  const candidatosPrivados = unique.filter((id) =>
+    resolverPerfilPrivadoEfetivo(perfilMap.get(id), membroMap.get(id) ?? null),
+  )
   if (candidatosPrivados.length === 0) return new Set()
 
   const aprovados: Array<{ seguidoId: string }> = await db.seguimento.findMany({
@@ -147,6 +184,51 @@ export async function getContagensSeguimento(
     }),
   ])
   return { seguidores, seguindo, publicacoes }
+}
+
+/** Contagens em lote para aside / sugestões — evita N+1 de getContagensSeguimento. */
+export async function getContagensSeguimentoEmLote(
+  userIds: string[],
+  tenantId: string,
+): Promise<Map<string, ContagensSeguimento>> {
+  const result = new Map<string, ContagensSeguimento>()
+  const unique = [...new Set(userIds)]
+  if (unique.length === 0) return result
+
+  const [seguidoresRows, seguindoRows, publicacoesRows]: [
+    Array<{ seguidoId: string; _count: { _all: number } }>,
+    Array<{ seguidorId: string; _count: { _all: number } }>,
+    Array<{ autorId: string; _count: { _all: number } }>,
+  ] = await Promise.all([
+    db.seguimento.groupBy({
+      by: ['seguidoId'],
+      where: { seguidoId: { in: unique }, status: 'APROVADO' },
+      _count: { _all: true },
+    }),
+    db.seguimento.groupBy({
+      by: ['seguidorId'],
+      where: { seguidorId: { in: unique }, status: 'APROVADO' },
+      _count: { _all: true },
+    }),
+    db.post.groupBy({
+      by: ['autorId'],
+      where: { autorId: { in: unique }, tenantId, tipo: 'MEMBRO', oculto: false },
+      _count: { _all: true },
+    }),
+  ])
+
+  const seguidoresMap = new Map(seguidoresRows.map((r) => [r.seguidoId, r._count._all]))
+  const seguindoMap = new Map(seguindoRows.map((r) => [r.seguidorId, r._count._all]))
+  const publicacoesMap = new Map(publicacoesRows.map((r) => [r.autorId, r._count._all]))
+
+  for (const id of unique) {
+    result.set(id, {
+      seguidores: seguidoresMap.get(id) ?? 0,
+      seguindo: seguindoMap.get(id) ?? 0,
+      publicacoes: publicacoesMap.get(id) ?? 0,
+    })
+  }
+  return result
 }
 
 export async function podeVerListasRede(
@@ -196,12 +278,21 @@ export async function listarRedeSocial(
   const slice = rows.slice(0, take)
   const userIds = slice.map((r) => (tipo === 'seguidores' ? r.seguidorId : r.seguidoId))
 
-  const perfis: Array<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }> =
-    await db.perfilMembro.findMany({
+  const [perfis, vinculosSaas]: [
+    Array<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }>,
+    Array<{ userId: string; tipo: 'SOCIO' | 'TORCEDOR'; status: string }>,
+  ] = await Promise.all([
+    db.perfilMembro.findMany({
       where: { userId: { in: userIds }, tenantId },
       select: { userId: true, perfilPrivado: true, avatarUrl: true },
-    })
+    }),
+    db.saasMembro.findMany({
+      where: { userId: { in: userIds }, tenantId },
+      select: { userId: true, tipo: true, status: true },
+    }),
+  ])
   const perfilMap = new Map(perfis.map((p) => [p.userId, p]))
+  const membroMap = new Map(vinculosSaas.map((m) => [m.userId, m]))
 
   let segueViewer: Set<string> = new Set()
   if (viewerId && tipo === 'seguidores') {
@@ -219,7 +310,10 @@ export async function listarRedeSocial(
       userId: user.id,
       nome: user.nome,
       avatarUrl: resolverAvatarSocial(perfil?.avatarUrl, user.avatarUrl),
-      perfilPrivado: perfil?.perfilPrivado ?? true,
+      perfilPrivado: resolverPerfilPrivadoEfetivo(
+        perfil?.perfilPrivado,
+        membroMap.get(user.id) ?? null,
+      ),
       segueVoce: segueViewer.has(user.id),
     }
   })

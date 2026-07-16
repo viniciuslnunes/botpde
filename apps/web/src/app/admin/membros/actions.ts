@@ -1,9 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { notificarSafe } from '@/lib/notificacoes'
+import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { PERMISSIONS } from '@torcida/types'
 
 /**
@@ -15,14 +16,18 @@ import { PERMISSIONS } from '@torcida/types'
  * vive em SaasMembro.tipo; departamentos reais (Financeiro, Comunicação…)
  * são atribuídos depois pelo admin.
  */
-async function concederAcessoBasico(tenantId: string, userId: string) {
-  const memberRole = await db.role.findFirst({
+async function concederAcessoBasico(
+  tenantId: string,
+  userId: string,
+  client: Prisma.TransactionClient | typeof db = db,
+) {
+  const memberRole = await client.role.findFirst({
     where: { tenantId, nome: 'member', isSystem: true },
   })
 
   if (!memberRole) return
 
-  await db.userRole.upsert({
+  await client.userRole.upsert({
     where: { userId_tenantId_roleId: { userId, tenantId, roleId: memberRole.id } },
     create: { userId, tenantId, roleId: memberRole.id },
     update: {},
@@ -32,17 +37,25 @@ async function concederAcessoBasico(tenantId: string, userId: string) {
 export async function aprovarMembro(membroId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  const membro = await db.saasMembro.update({
-    where: { id: membroId, tenantId: tenant.id },
-    data: {
-      status: 'APROVADO',
-      aprovadoPorId: session.user.id,
-      aprovadoPorNome: session.user.name ?? 'Admin',
-      aprovadoEm: new Date(),
-    },
-  })
+  const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const atualizado = await tx.saasMembro.update({
+      where: { id: membroId, tenantId: tenant.id },
+      data: {
+        status: 'APROVADO',
+        aprovadoPorId: session.user.id,
+        aprovadoPorNome: session.user.name ?? 'Admin',
+        aprovadoEm: new Date(),
+      },
+    })
 
-  await concederAcessoBasico(tenant.id, membro.userId)
+    await concederAcessoBasico(tenant.id, atualizado.userId, tx)
+
+    if (atualizado.tipo === 'SOCIO') {
+      await privatizarPerfilAoAprovarSocio(atualizado.userId, tenant.id, tx)
+    }
+
+    return atualizado
+  })
 
   await db.auditLog.create({
     data: {
@@ -65,6 +78,8 @@ export async function aprovarMembro(membroId: string) {
 
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
+  revalidatePath('/portal/comunidade')
+  revalidatePath(`/portal/comunidade/perfil/${membro.userId}`)
 }
 
 export async function reprovarMembro(membroId: string, motivo?: string) {

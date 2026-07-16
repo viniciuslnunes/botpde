@@ -20,7 +20,11 @@ export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' }
 
   function verNovos() {
     setNovos(0)
-    router.push(filtro === 'seguindo' ? '/portal/comunidade?filtro=seguindo' : '/portal/comunidade')
+    const href =
+      filtro === 'seguindo' ? '/portal/comunidade?filtro=seguindo' : '/portal/comunidade'
+    router.push(href)
+    router.refresh()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (

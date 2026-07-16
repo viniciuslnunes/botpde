@@ -13,6 +13,7 @@ import { linkPostComunidade } from '@/lib/comunidade-social'
 import { emitFeedPing } from '@/lib/feed-bus'
 import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
+import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao } from '@/lib/notificacoes'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
@@ -242,7 +243,9 @@ export async function publicarPostComoTorcedorGlobal(
   emitFeedPing(tenant.id)
 }
 
-export async function solicitarSeguir(userId: string): Promise<void> {
+export type SeguimentoResultado = 'APROVADO' | 'PENDENTE'
+
+export async function solicitarSeguir(userId: string): Promise<SeguimentoResultado> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
@@ -254,7 +257,7 @@ export async function solicitarSeguir(userId: string): Promise<void> {
   }
 
   const statusAtual = await getSeguimentoStatus(session.user.id, userId)
-  if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') return
+  if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') return statusAtual
 
   // Seguimento.tenantContextoId é FK obrigatória: sem tenant do ator (torcedor
   // global), usa o tenant do alvo. Dois torcedores globais entre si ficam de fora.
@@ -308,7 +311,27 @@ export async function solicitarSeguir(userId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
+  revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath('/portal/comunidade/seguindo')
+
+  return statusInicial
+}
+
+async function marcarNotificacoesSeguimentoPendentesLidas(
+  userId: string,
+  tenantId: string,
+  atorId: string,
+): Promise<void> {
+  await db.notificacao.updateMany({
+    where: {
+      userId,
+      tenantId,
+      atorId,
+      tipo: 'SEGUIMENTO_PENDENTE',
+      lida: false,
+    },
+    data: { lida: true },
+  })
 }
 
 export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
@@ -330,9 +353,16 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
     data: { status: 'APROVADO' },
   })
 
+  const tenantNotif = tenant?.id ?? seguimento.tenantContextoId
+  await marcarNotificacoesSeguimentoPendentesLidas(
+    session.user.id,
+    tenantNotif,
+    seguimento.seguidorId,
+  )
+
   await criarNotificacao({
     userId: seguimento.seguidorId,
-    tenantId: tenant?.id ?? seguimento.tenantContextoId,
+    tenantId: tenantNotif,
     tipo: 'SEGUIMENTO_APROVADO',
     titulo: 'Solicitação aprovada',
     corpo: `${session.user.name ?? 'Um membro'} aceitou você.`,
@@ -343,6 +373,7 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
   revalidatePath('/portal/comunidade/seguindo')
+  revalidatePath('/portal/comunidade/notificacoes')
 }
 
 export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
@@ -353,7 +384,7 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
     where: tenant
       ? { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id }
       : { id: seguimentoId, seguidoId: session.user.id },
-    select: { id: true, seguidorId: true },
+    select: { id: true, seguidorId: true, tenantContextoId: true },
   })
   if (!seguimento) throw new Error('Solicitação não encontrada')
 
@@ -362,8 +393,16 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
     data: { status: 'REJEITADO' },
   })
 
+  await marcarNotificacoesSeguimentoPendentesLidas(
+    session.user.id,
+    tenant?.id ?? seguimento.tenantContextoId,
+    seguimento.seguidorId,
+  )
+
   revalidatePath('/portal/comunidade/seguindo')
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
+  revalidatePath('/portal/comunidade/notificacoes')
+  revalidatePath('/portal/comunidade')
 }
 
 export async function deixarDeSeguir(userId: string): Promise<void> {
@@ -411,17 +450,22 @@ export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Prom
   await assertMembroAtivo(tenant.id, session.user.id)
   const parsed = perfilSchema.safeParse({ bio, perfilPrivado })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
+  const membro: { tipo: 'SOCIO' | 'TORCEDOR'; status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { tipo: true, status: true },
+  })
+  const perfilPrivadoGravado = resolverPerfilPrivadoEfetivo(parsed.data.perfilPrivado, membro)
   await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId: session.user.id, tenantId: tenant.id } },
     create: {
       userId: session.user.id,
       tenantId: tenant.id,
       bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
+      perfilPrivado: perfilPrivadoGravado,
     },
     update: {
       bio: parsed.data.bio?.trim() || null,
-      perfilPrivado: parsed.data.perfilPrivado,
+      perfilPrivado: perfilPrivadoGravado,
     },
   })
   revalidatePath('/portal/comunidade')

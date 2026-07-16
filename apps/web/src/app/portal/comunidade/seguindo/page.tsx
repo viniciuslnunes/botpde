@@ -3,8 +3,9 @@ import { UserPlus } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
+import { getPodeSeguirDeVoltaPorSeguidor } from '@/lib/social'
 import { SeguimentoPendentesList } from '../_components/seguimento-pendentes-list'
-import { aprovarSeguimento, rejeitarSeguimento } from '@/app/portal/comunidade/actions'
+import { aprovarSeguimento, rejeitarSeguimento, solicitarSeguir } from '@/app/portal/comunidade/actions'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
 
@@ -43,10 +44,18 @@ export default async function SeguindoPage() {
     },
   })
 
+  const seguidorIds = pendentes.map((item) => item.seguidor.id)
+  const podeSeguirMap = await getPodeSeguirDeVoltaPorSeguidor(
+    session.user.id,
+    seguidorIds,
+    tenant.id,
+  )
+
   const itens = pendentes.map((item) => ({
     id: item.id,
     criadoEm: item.criadoEm.toISOString(),
     seguidor: item.seguidor,
+    podeSeguirDeVolta: podeSeguirMap.get(item.seguidor.id) ?? false,
   }))
 
   return (
@@ -61,6 +70,7 @@ export default async function SeguindoPage() {
         itensIniciais={itens}
         onAprovar={aprovarSeguimento}
         onRejeitar={rejeitarSeguimento}
+        onSeguirDeVolta={solicitarSeguir}
       />
     </div>
   )

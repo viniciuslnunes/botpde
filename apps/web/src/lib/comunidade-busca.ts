@@ -1,9 +1,9 @@
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
-import { canFollowUser } from './social'
-import { getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
+import { canFollowUsers } from './social'
+import { getAutoresSemAcesso, resolverAvatarSocial, resolverPerfilPrivadoEfetivo } from './perfil-social'
 import { normalizarHashtag } from './comunidade-social'
-import { postInclude, projetarPost, podeVerPost, type PostSocialItem, type PostRaw } from './feed'
+import { postInclude, projetarPost, type PostSocialItem, type PostRaw } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
 
@@ -47,6 +47,7 @@ export async function buscarMembrosComunidade(
   interface MembroRow {
     userId: string
     tenantId: string
+    tipo: 'SOCIO' | 'TORCEDOR'
     user: { id: string; nome: string | null; avatarUrl: string | null }
     tenant: { nome: string }
   }
@@ -70,6 +71,7 @@ export async function buscarMembrosComunidade(
     select: {
       userId: true,
       tenantId: true,
+      tipo: true,
       user: { select: { id: true, nome: true, avatarUrl: true } },
       tenant: { select: { nome: true } },
     },
@@ -104,24 +106,27 @@ export async function buscarMembrosComunidade(
       where: { seguidoId: { in: candidatoIds }, status: 'APROVADO' },
       _count: { _all: true },
     }) as Promise<{ seguidoId: string; _count: { _all: number } }[]>,
-    Promise.all(candidatoIds.map((id) => canFollowUser(userId, id, tenantId))),
+    canFollowUsers(userId, candidatoIds, tenantId),
   ])
 
   const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
   const statusPorId = new Map(seguimentos.map((s) => [s.seguidoId, s.status]))
   const seguidoresPorId = new Map(contagensRows.map((c) => [c.seguidoId, c._count._all]))
 
-  return candidatos.map((r, i) => {
+  return candidatos.map((r) => {
     const perfil = perfilPorId.get(r.userId)
     return {
       id: r.user.id,
       nome: r.user.nome,
       avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
       tenantNome: r.tenant.nome,
-      perfilPrivado: perfil?.perfilPrivado ?? true,
+      perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
+        tipo: r.tipo,
+        status: 'APROVADO',
+      }),
       statusSeguimento: statusPorId.get(r.userId) ?? null,
       seguidores: seguidoresPorId.get(r.userId) ?? 0,
-      podeSeguir: podeSeguirLista[i],
+      podeSeguir: podeSeguirLista.get(r.userId) ?? false,
     }
   })
 }
@@ -173,21 +178,9 @@ export async function buscarComunidade(
   let posts = postsRaw.map(projetarPost)
   const autorIds = posts.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
-  posts = posts.filter((p) => !semAcesso.has(p.autorId))
+  posts = posts.filter((p) => !semAcesso.has(p.autorId)).slice(0, 10)
 
-  const visiveis: PostSocialItem[] = []
-  for (const post of posts) {
-    const ok = await podeVerPost(userId, {
-      autorId: post.autorId,
-      tenantId: post.tenantId,
-      visibilidade: post.visibilidade,
-      oculto: false,
-    })
-    if (ok) visiveis.push(post)
-    if (visiveis.length >= 10) break
-  }
-
-  const postsComBadges = await enriquecerPostsComBadges(visiveis)
+  const postsComBadges = await enriquecerPostsComBadges(posts)
 
   return {
     membros,

@@ -3,7 +3,7 @@ import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
 import { getVisibleTenantIds } from './hierarquia'
-import { getAutoresSemAcesso, getContagensSeguimento, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
+import { getAutoresSemAcesso, getContagensSeguimentoEmLote, resolverAvatarSocial, podeVerConteudoSocial } from './perfil-social'
 import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
@@ -487,17 +487,19 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
   })
 
   if (perfisPublicos.length > 0) {
-    const result: SugestaoAutorAside[] = []
-    for (const p of perfisPublicos.slice(0, 4)) {
-      const contagens = await getContagensSeguimento(p.userId, tenantId)
-      result.push({
+    const contagensMap = await getContagensSeguimentoEmLote(
+      perfisPublicos.slice(0, 4).map((p) => p.userId),
+      tenantId,
+    )
+    return perfisPublicos.slice(0, 4).map((p) => {
+      const contagens = contagensMap.get(p.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+      return {
         id: p.user.id,
         nome: p.user.nome,
         avatarUrl: resolverAvatarSocial(p.avatarUrl, p.user.avatarUrl),
         seguidores: contagens.seguidores,
-      })
-    }
-    return result
+      }
+    })
   }
 
   const posts: Array<{ autor: { id: string; nome: string | null; avatarUrl: string | null } }> =
@@ -520,19 +522,20 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
 
   const autorIds = posts.map((p) => p.autor.id)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
-  const result: SugestaoAutorAside[] = []
-  for (const p of posts) {
-    if (semAcesso.has(p.autor.id)) continue
-    const contagens = await getContagensSeguimento(p.autor.id, tenantId)
-    result.push({
+  const elegiveis = posts.filter((p) => !semAcesso.has(p.autor.id)).slice(0, 4)
+  const contagensMap = await getContagensSeguimentoEmLote(
+    elegiveis.map((p) => p.autor.id),
+    tenantId,
+  )
+  return elegiveis.map((p) => {
+    const contagens = contagensMap.get(p.autor.id) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+    return {
       id: p.autor.id,
       nome: p.autor.nome,
       avatarUrl: p.autor.avatarUrl,
       seguidores: contagens.seguidores,
-    })
-    if (result.length >= 4) break
-  }
-  return result
+    }
+  })
 })
 
 export interface GrupoPublicoItem {
@@ -596,6 +599,75 @@ export async function podeVerPost(
   }
   const status = await getSeguimentoStatus(viewerId, post.autorId)
   return status === 'APROVADO'
+}
+
+type PostVisibilidadeInput = {
+  autorId: string
+  tenantId: string
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+  oculto?: boolean
+}
+
+/** Filtra posts visíveis ao viewer em batch (perfil + visibilidade do post). */
+export async function filtrarPostsVisiveis<T extends PostVisibilidadeInput>(
+  viewerId: string,
+  posts: T[],
+): Promise<T[]> {
+  if (posts.length === 0) return []
+
+  const porTenant = new Map<string, string[]>()
+  for (const post of posts) {
+    if (post.oculto === true) continue
+    const ids = porTenant.get(post.tenantId) ?? []
+    ids.push(post.autorId)
+    porTenant.set(post.tenantId, ids)
+  }
+
+  const bloqueados = new Set<string>()
+  await Promise.all(
+    [...porTenant.entries()].map(async ([tenantId, autorIds]) => {
+      const semAcesso = await getAutoresSemAcesso(viewerId, tenantId, autorIds)
+      for (const autorId of semAcesso) bloqueados.add(`${tenantId}:${autorId}`)
+    }),
+  )
+
+  const candidatos = posts.filter(
+    (p) => p.oculto !== true && !bloqueados.has(`${p.tenantId}:${p.autorId}`),
+  )
+  if (candidatos.length === 0) return []
+
+  const privadoAutorIds = [
+    ...new Set(
+      candidatos.filter((p) => p.visibilidade === 'PRIVADO' && p.autorId !== viewerId).map((p) => p.autorId),
+    ),
+  ]
+  const seguimentosAprovados = new Set<string>()
+  if (privadoAutorIds.length > 0) {
+    const rows: Array<{ seguidoId: string }> = await db.seguimento.findMany({
+      where: { seguidorId: viewerId, seguidoId: { in: privadoAutorIds }, status: 'APROVADO' },
+      select: { seguidoId: true },
+    })
+    for (const row of rows) seguimentosAprovados.add(row.seguidoId)
+  }
+
+  const tenantIdsSocio = [
+    ...new Set(
+      candidatos.filter((p) => p.visibilidade === 'TENANT' && p.autorId !== viewerId).map((p) => p.tenantId),
+    ),
+  ]
+  const podeSocioPorTenant = new Map<string, boolean>()
+  await Promise.all(
+    tenantIdsSocio.map(async (tenantId) => {
+      podeSocioPorTenant.set(tenantId, await podeVerFeedSocios(viewerId, tenantId))
+    }),
+  )
+
+  return candidatos.filter((post) => {
+    if (viewerId === post.autorId) return true
+    if (post.visibilidade === 'PUBLICO') return true
+    if (post.visibilidade === 'TENANT') return podeSocioPorTenant.get(post.tenantId) ?? false
+    return seguimentosAprovados.has(post.autorId)
+  })
 }
 
 export async function getPostPorId(
@@ -738,7 +810,8 @@ export async function getHashtagsEmAlta(
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const links: Array<{ hashtag: { tag: string } }> = await db.postHashtag.findMany({
+  const grouped: Array<{ hashtagId: string; _count: { postId: number } }> = await db.postHashtag.groupBy({
+    by: ['hashtagId'],
     where: {
       post: {
         criadoEm: { gte: since },
@@ -747,20 +820,21 @@ export async function getHashtagsEmAlta(
         tenantId: { in: visibleTenantIds },
       },
     },
-    select: { hashtag: { select: { tag: true } } },
-    take: 800,
+    _count: { postId: true },
   })
 
-  const counts = new Map<string, number>()
-  for (const link of links) {
-    const tag = link.hashtag.tag
-    counts.set(tag, (counts.get(tag) ?? 0) + 1)
-  }
+  const top = grouped.sort((a, b) => b._count.postId - a._count.postId).slice(0, limite)
+  if (top.length === 0) return []
 
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limite)
-    .map(([tag, total]) => ({ tag, total }))
+  const hashtags: Array<{ id: string; tag: string }> = await db.hashtag.findMany({
+    where: { id: { in: top.map((g) => g.hashtagId) } },
+    select: { id: true, tag: true },
+  })
+  const tagPorId = new Map(hashtags.map((h) => [h.id, h.tag]))
+
+  return top
+    .map((g) => ({ tag: tagPorId.get(g.hashtagId), total: g._count.postId }))
+    .filter((h): h is HashtagEmAlta => h.tag != null)
 }
 
 export interface TorcidaComunidadePublica {
@@ -1039,19 +1113,11 @@ export async function getPostsSalvos(
   })) as PostRaw[]
 
   const byId = new Map(postsRaw.map((r) => [r.id, projetarPost(r)]))
-  const result: PostSocialItem[] = []
-  for (const row of salvoRows) {
-    const post = byId.get(row.postId)
-    if (!post) continue
-    const ok = await podeVerPost(userId, {
-      autorId: post.autorId,
-      tenantId: post.tenantId,
-      visibilidade: post.visibilidade,
-      oculto: false,
-    })
-    if (ok) result.push(post)
-  }
-  return finalizarPosts(result)
+  const ordenados = salvoRows
+    .map((row) => byId.get(row.postId))
+    .filter((p): p is PostSocialItem => p != null)
+  const visiveis = await filtrarPostsVisiveis(userId, ordenados)
+  return finalizarPosts(visiveis)
 }
 
 export async function getDestaquesPerfil(
@@ -1095,17 +1161,9 @@ export async function getDestaquesPerfil(
       include: postInclude(viewerId),
     })) as PostRaw[]
 
-    for (const raw of postsRaw) {
-      const post = projetarPost(raw)
-      if (await podeVerPost(viewerId, {
-        autorId: post.autorId,
-        tenantId: post.tenantId,
-        visibilidade: post.visibilidade,
-        oculto: false,
-      })) {
-        postsMap.set(post.id, post)
-      }
-    }
+    const projetados = postsRaw.map(projetarPost)
+    const visiveis = await filtrarPostsVisiveis(viewerId, projetados)
+    for (const post of visiveis) postsMap.set(post.id, post)
   }
 
   return rows.map((d) => ({
