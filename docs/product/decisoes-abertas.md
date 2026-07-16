@@ -26,6 +26,8 @@ auto-relação de `Sede`.
 | 10 | Permissão dedicada de desligamento estatutário de associado | Nova permissão `MEMBERS_DISMISS` (ou similar) com AuditLog próprio, vs. reusar `MEMBERS_BLOCK`/`MEMBERS_WARN` | Desligamento é figura estatutária distinta de bloqueio/advertência; hoje sem par dedicado. Achado da auditoria de 2026-07-16 (agentes `rbac`/`research-dominio`) |
 | 11 | Lock otimista no estoque da Loja | Adicionar campo `version`/lock otimista aos itens de estoque JSON, vs. manter read-modify-write | Sob concorrência real (duas compras simultâneas do mesmo item) o mapa de estoque pode ser sobrescrito. Achado da auditoria de 2026-07-16 (agente `loja`) |
 | 12 | Remover `fazerPedido` (deprecated) | Remover quando não houver mais chamador do fluxo single-item antigo | Hoje delega a `adicionarAoCarrinho`; resquício do fluxo pré multi-item. Achado da auditoria de 2026-07-16 (agente `loja`) |
+| 13 | Modelo de preço do SaaS vs mercado | Preço **fixo** (estilo Clube Control R$350–500) vs faixa por **sócios ativos/adimplentes** (TorcidaWeb / TorcidasPRO) | Benchmark 2026-07-16 em `docs/knowledge/concorrentes-gestao.md`; impacta GTM antes de vender cobrança como ROI |
+| 14 | Provedor de gateway (Pix/boleto/cartão) | Asaas vs Mercado Pago vs PagBank (ou outro) — spike técnico | Pré-requisito Fase A do `plano-paridade-concorrentes.md`; mesmo provedor deve servir mensalidade e Loja (Fase B) |
 
 ## Já decididas antes (referência — ver `ARCHITECTURE.md` §5)
 

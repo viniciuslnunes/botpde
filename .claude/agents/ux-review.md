@@ -37,6 +37,13 @@ responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
   (banimento coletivo — `contexto-legal.md`). Telas de comunidade devem tratar
   denúncia/moderação como fluxo de primeira classe, sem tom policialesco.
 
+## Home do associado (paridade comercial)
+Benchmark 2026-07-16: Softaliza/TorcidaWeb centram o portal em **status de
+adimplência** + atalhos (carteirinha, pagar, eventos). Ao revisar Home / carteirinha:
+1º “estou em dia?”, 2º próxima ação/evento, 3º comunidade. Ver
+`docs/product/plano-paridade-concorrentes.md` (A5–A6). QR da carteirinha deve
+comunicar validação real (não placeholder decorativo).
+
 ## O que você verifica
 - Jornada: a tela deixa claro **status, próxima ação e contexto local**?
 - Carga cognitiva: redundância de cards, excesso de opções, hierarquia fraca.

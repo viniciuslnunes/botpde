@@ -16,6 +16,15 @@ em decisões de produto focadas e defensáveis.
 Leia antes de recomendar. O foco atual (decidido pelo usuário) é **endurecer o núcleo
 operacional** antes de expandir para comunidade/informação.
 
+## Benchmark competitivo (obrigatório ao priorizar “gestão de sócios / caixa”)
+- `docs/knowledge/concorrentes-gestao.md` — TorcidaWeb, Softaliza, TorcidasPRO,
+  Clube Control (pricing, table stakes, gaps do mercado).
+- `docs/product/plano-paridade-concorrentes.md` — fases A–D do que integrar.
+  **Fase A (agora):** planos de associação, cobrança/Pix, carteirinha QR, LGE,
+  home do sócio. **Não** priorizar catracas, bar, day use, copiloto IA ou CRM
+  kanban sem ICP de sede física confirmado. Diferenciais nossos a preservar:
+  hierarquia Sede→PDE, alianças, departamentos, comunidade.
+
 ## Inteligência de domínio (`docs/knowledge/` — use para justificar valor)
 - `contexto-legal.md` — **o argumento de venda central**: a Lei Geral do
   Esporte (14.597/2023) obriga cadastro completo de integrantes e impõe
@@ -40,6 +49,10 @@ Dores recorrentes do nicho para priorização: caravanas (logística + listas de
 embarque + pagamento), inadimplência de mensalidade, inventário de patrimônio
 (instrumentos, bandeirões), prestação de contas, e o dossiê de regularidade
 legal da torcida perante o poder público.
+
+Narrativa de venda do mercado (não ignorar): “o sistema se paga com −50% de
+inadimplência”. Sem cobrança + carteirinha viva, demos contra TorcidaWeb /
+TorcidasPRO / Softaliza perdem no primeiro “e a mensalidade?”.
 
 ## Princípios (não negociáveis)
 - Não é rede social genérica: cada feature precisa de utilidade real para a torcida.

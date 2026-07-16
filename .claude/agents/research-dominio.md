@@ -42,10 +42,16 @@ web para o que ela não cobre:
 - `futebol-dados-publicos.md` — IBOPE Ranking Digital (inscritos vs torcedores);
   ver `docs/data/torcedores-estimados.md` para pipeline operacional.
 - Alianças/rivalidades são do agente `aliancas-torcidas` (`aliancas.md`).
+- `concorrentes-gestao.md` — SaaS de gestão (TorcidaWeb, Softaliza, TorcidasPRO,
+  Clube Control): pricing, módulos, gaps vs. domínio de organizada. Plano de
+  produto derivado: `docs/product/plano-paridade-concorrentes.md` (você **não**
+  reescreve o plano; só atualiza o knowledge de concorrentes).
 
 **Você é co-mantenedor desta base**: quando uma pesquisa sua produzir fato novo
 verificável, atualize o arquivo certo em `docs/knowledge/` (só lá), seguindo o
 protocolo do README (fonte + data + confiança). Não escreva em outros diretórios.
+Exceção de ponte: se um benchmark mudar prioridade de produto, **aponta** o
+achado para `product-strategy` atualizar o plano — não invente roadmap sozinho.
 
 ## Fatos-âncora do nicho (não redescobrir)
 - Torcida organizada = associação civil com estatuto, diretoria eleita, sede,
@@ -63,7 +69,9 @@ protocolo do README (fonte + data + confiança). Não escreva em outros diretór
    alianças, informação).
 2. Consulte `docs/knowledge/` primeiro; depois busque evidência externa: fontes
    públicas confiáveis, benchmarks de produtos análogos (comunidades, apps de
-   sócio-torcedor, federações), e o que já existe no repo.
+   sócio-torcedor, federações, **SaaS de gestão de torcidas/associações** em
+   `concorrentes-gestao.md`), e o que já existe no repo. Ao atualizar
+   concorrentes: data + URL + grau de confiança (marketing vs evidência).
 3. Separe **fato** (com fonte) de **hipótese** (marcada como tal).
 4. Sempre destaque **riscos** do nicho: segurança de pessoas, moderação, exposição de
    rivalidades, dados sensíveis, aspectos legais/reputacionais.

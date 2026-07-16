@@ -16,6 +16,7 @@
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
 | [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital, limitações inscritos vs torcedores | `research-dominio`, `product-strategy`, `ux-review` |
+| [`concorrentes-gestao.md`](concorrentes-gestao.md) | Benchmark TorcidaWeb / Softaliza / TorcidasPRO / Clube Control (pricing, table stakes, gaps) | `research-dominio`, `product-strategy` |
 
 **Dados operacionais relacionados** (fora de `knowledge/`):
 
@@ -24,6 +25,7 @@
 | [`docs/data/escudos-afiliacoes.md`](../data/escudos-afiliacoes.md) | Escudos de `Afiliacao` (Soccer Wiki, Ogol, Cloudinary) |
 | [`docs/data/torcedores-estimados.md`](../data/torcedores-estimados.md) | Base digital IBOPE + teto conservador no onboarding |
 | [`docs/data/modulo-comunidade-performance.md`](../data/modulo-comunidade-performance.md) | Feed, timeline, busca, caches e plano futuro Comunidade |
+| [`docs/product/plano-paridade-concorrentes.md`](../product/plano-paridade-concorrentes.md) | O que integrar do mercado (fases A–D: caixa, LGE, QR, sede) |
 
 ## Protocolo de manutenção
 

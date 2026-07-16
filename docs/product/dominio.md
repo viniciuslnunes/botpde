@@ -17,7 +17,7 @@ Não é rede social genérica — cada recurso resolve uma dor real da torcida.
 
 | Domínio | Núcleo | Estado |
 |---|---|---|
-| Operação | membros, sócios, carteirinha, sedes/subsedes/PDE, departamentos (colaborador/gestor), RBAC, auditoria | Existe |
+| Operação | membros, sócios, carteirinha, sedes/subsedes/PDE, departamentos (colaborador/gestor), RBAC, auditoria | Existe — **gap comercial:** planos de associação, cobrança/Pix e QR de adimplência (ver `plano-paridade-concorrentes.md`) |
 | Mobilização | eventos, RSVP, check-in, presença | Existe |
 | Comunidade | comunicados oficiais, mural/posts por unidade, feed social (perfil, seguir, enquetes, canais), **Comunidade Nacional** (feed cross-tenant por afiliação), notificações sociais, salas de vídeo ao vivo (Meet) | **Entregue além do previsto** — deixou de ser intra-tenant (2026-07-16: reconciliar com `roadmap.md`) |
 | Alianças | relação curada torcida↔torcida; visibilidade pública cross-tenant; recomendações automáticas; rivalidade como bloqueio técnico de visibilidade | **Entregue** — ver `docs/knowledge/aliancas.md` |

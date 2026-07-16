@@ -88,6 +88,18 @@ Agentes: `research-dominio` (atualizar knowledge), `data-model` (enum/campos),
 (`test:torcedores-estimados`, Vitest format-contagem).
 
 
+## Benchmark competitivo (gestão de torcidas) — 2026-07-16
+
+Inteligência de mercado em `docs/knowledge/concorrentes-gestao.md` (TorcidaWeb,
+Softaliza, TorcidasPRO, Clube Control). Plano acionável de paridade/diferenciação
+em `docs/product/plano-paridade-concorrentes.md`.
+
+**Regra para o time:** table stakes de **caixa + carteirinha QR + LGE** (Fase A)
+antes de módulos de sede física (catracas, bar, day use). Não copiar o mapa de
+31 módulos do Clube Control sem ICP de sede. Agentes: `research-dominio`
+mantém o knowledge; `product-strategy` prioriza pelo plano; `data-model` /
+`rbac` / `loja` / `ux-review` executam fases A–B.
+
 ## Princípios
 
 - Não implementar antes de o plano estar fechado e aprovado.
@@ -95,3 +107,5 @@ Agentes: `research-dominio` (atualizar knowledge), `data-model` (enum/campos),
 - Autorização sempre no servidor; auditar toda mutação.
 - Cada feature justificada pelo domínio — nada de recurso "bonito" sem valor.
 - Performance: medir antes de otimizar; preservar cache, Suspense e `useVisibleInterval`.
+- Concorrência: fechar table stakes de associação (cobrança/carteirinha) sem
+  abandonar diferenciais de organizada (hierarquia, alianças, departamentos).

@@ -21,6 +21,10 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
   (feed social, `FeedTimeline`, índices e busca),
   `docs/data/escudos-afiliacoes.md` (pipeline de escudos de `Afiliacao`) e
   `docs/data/torcedores-estimados.md` (base digital IBOPE + enum `TorcedoresEstimadosTipo`).
+- Cobrança / planos de sócio / LGE (próximo núcleo): `docs/product/plano-paridade-concorrentes.md`
+  Fase A — entidades candidatas `PlanoAssociacao`, `Cobranca`/`Contribuicao`;
+  **não** reusar `Tenant.plano` (tier SaaS FREE/BASIC/PREMIUM). Campos LGE em
+  `SaasMembro` (decisão aberta #9). Carteirinha: QR verificável em `SaasSocio`.
 - Diagrama: `docs/data/schema.dbml` (DBML, regenerar quando o schema mudar).
 - O projeto usa **`db push`** (não há pasta de migrations). Mudança de schema é
   sincronizada, não versionada em migration files.

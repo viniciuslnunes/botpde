@@ -12,6 +12,10 @@ Sprints de 2 semanas. Cada item precisa de critério de aceite (ver DoR/DoD no
 4. **Importação da base de associados** (`ImportacaoMembros`) — prioridade #1 de dados,
    habilita métricas reais.
 5. Decidir permissão dedicada de "sócio" (hoje reusa `MEMBERS_APPROVE`).
+6. **Paridade comercial (Fase A)** — planos de associação, cobrança/Pix, carteirinha
+   QR verificável, campos LGE: ver `docs/product/plano-paridade-concorrentes.md`
+   e benchmark `docs/knowledge/concorrentes-gestao.md` (2026-07-16). Não abrir
+   portaria/catracas/bar antes do caixa.
 
 **Entregue fora de ordem:** Salas de vídeo (Meet) — reuniões ao vivo com chat, presença e
 enquetes via LiveKit/WebRTC (permissão `MEETINGS_HOST`). Ver `docs/data/modulo-salas.md`.
