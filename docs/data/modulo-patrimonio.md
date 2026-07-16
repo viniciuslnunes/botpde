@@ -43,3 +43,14 @@ Enums:
 - Admin: `/admin/patrimonio`
 - Schemas: `packages/types/src/patrimonio.js`
 - Lib: `apps/web/src/lib/patrimonio.ts`
+
+## Seed / sync
+
+```bash
+pnpm --filter @torcida/db db:generate
+pnpm --filter @torcida/db db:push
+pnpm --filter @torcida/db seed:departamentos
+```
+
+O Railway só roda `prisma generate` no build — `db:push` e o seed de departamentos
+precisam ser manuais após mudar o schema ou o canônico de permissões.
