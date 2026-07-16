@@ -195,6 +195,11 @@ function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
     setPending(true)
     try {
       await localParticipant.setScreenShareEnabled(!enabled, { audio: true })
+      if (!enabled) {
+        toast.info(
+          'Dica: compartilhe a tela inteira ou outra janela — não a janela de vídeo desta sala.',
+        )
+      }
     } catch {
       toast.error('Não foi possível compartilhar a tela. Verifique a permissão do navegador.')
     } finally {
@@ -592,7 +597,12 @@ function MeetStage({
     (track) => isTrackReference(track) && track.publication?.source === Track.Source.ScreenShare,
   )
 
-  const focusTrack = (usePinnedTracks(layoutContext) as TrackRef[])[0]
+  const pinnedTrack = (usePinnedTracks(layoutContext) as TrackRef[])[0]
+  // Sempre prioriza a tela compartilhada no palco — pin do LiveKit às vezes
+  // falha para track local (isSubscribed/timing) e deixa a área preta.
+  const activeScreenShare =
+    screenShareTracks.find((t) => t.publication?.isSubscribed) ?? screenShareTracks[0] ?? null
+  const focusTrack = activeScreenShare ?? pinnedTrack
   const carouselTracks = tracks.filter((track) => !isSameTrackRef(track, focusTrack))
 
   const screenShareKey = screenShareTracks
@@ -603,24 +613,19 @@ function MeetStage({
     const pin = layoutContext.pin.dispatch
     if (!pin) return
 
-    const subscribedScreen = screenShareTracks.find((t) => t.publication?.isSubscribed)
-
-    if (subscribedScreen && !lastAutoFocusedScreenShareRef.current) {
-      pin({ msg: 'set_pin', trackReference: subscribedScreen })
-      lastAutoFocusedScreenShareRef.current = subscribedScreen
+    if (activeScreenShare) {
+      if (!isSameTrackRef(activeScreenShare, lastAutoFocusedScreenShareRef.current ?? undefined)) {
+        pin({ msg: 'set_pin', trackReference: activeScreenShare })
+        lastAutoFocusedScreenShareRef.current = activeScreenShare
+      }
       return
     }
 
-    if (
-      lastAutoFocusedScreenShareRef.current &&
-      !screenShareTracks.some(
-        (t) => t.publication?.trackSid === lastAutoFocusedScreenShareRef.current?.publication?.trackSid,
-      )
-    ) {
+    if (lastAutoFocusedScreenShareRef.current) {
       pin({ msg: 'clear_pin' })
       lastAutoFocusedScreenShareRef.current = null
     }
-  }, [layoutContext.pin.dispatch, screenShareKey, screenShareTracks])
+  }, [layoutContext.pin.dispatch, screenShareKey, activeScreenShare])
 
   useEffect(() => {
     const stage = stageRef.current
@@ -1086,7 +1091,7 @@ export function MeetRoom({
         video={false}
         options={ROOM_OPTIONS}
         data-lk-theme="default"
-        className="flex min-h-0 flex-1 flex-col"
+        className="flex h-full min-h-0 flex-1 flex-col"
         onConnected={() => void handleConnected()}
         onDisconnected={() => void handleDisconnected()}
         onMediaDeviceFailure={handleMediaDeviceFailure}

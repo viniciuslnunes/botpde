@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Users,
   Video,
+  X,
 } from 'lucide-react'
 import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
@@ -104,7 +105,7 @@ export function SalaPopoutClient({
 
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-black text-white">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-zinc-950 px-4 py-2.5">
+      <header className="relative z-50 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-zinc-950 px-4 py-2.5">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{titulo}</p>
           <p className="text-xs text-zinc-400">
@@ -115,6 +116,7 @@ export function SalaPopoutClient({
           <button
             type="button"
             onClick={() => setCommentsOpen((open) => !open)}
+            aria-pressed={commentsOpen}
             className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
               commentsOpen
                 ? 'border-transparent bg-[rgb(var(--color-primary))] text-white'
@@ -128,6 +130,7 @@ export function SalaPopoutClient({
           <button
             type="button"
             onClick={() => setMembersOpen((open) => !open)}
+            aria-pressed={membersOpen}
             className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
               membersOpen
                 ? 'border-transparent bg-[rgb(var(--color-primary))] text-white'
@@ -150,8 +153,8 @@ export function SalaPopoutClient({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <main className="relative min-h-0 min-w-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
           <MeetRoom
             salaId={salaId}
             token={token}
@@ -172,96 +175,79 @@ export function SalaPopoutClient({
         </main>
 
         <AnimatePresence initial={false}>
-          {commentsOpen && (
+          {commentsOpen ? (
             <m.aside
               key="popout-chat"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 360, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={{ x: 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 24, opacity: 0 }}
               transition={springSnappy}
-              className="hidden h-full min-h-0 shrink-0 overflow-hidden border-l border-white/10 bg-zinc-950/95 md:block"
+              className="absolute inset-y-0 right-0 z-40 flex w-[min(100%,22rem)] flex-col border-l border-white/10 bg-zinc-950 shadow-2xl sm:w-[22rem]"
             >
-              <div className="flex h-full min-h-0 w-[360px] flex-col p-4">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+                <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
                   <MessageSquare className="h-4 w-4" />
                   Chat da sala
                 </h2>
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <SalaChat
-                    salaId={salaId}
-                    currentUserId={userId}
-                    isHost={isHost}
-                    initialMensagens={initialMensagens}
-                    listClassName="h-full max-h-none space-y-3 overflow-y-auto pr-1"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setCommentsOpen(false)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-300 hover:bg-white/10"
+                  aria-label="Fechar chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden p-4">
+                <SalaChat
+                  salaId={salaId}
+                  currentUserId={userId}
+                  isHost={isHost}
+                  initialMensagens={initialMensagens}
+                  listClassName="h-[calc(100%-3.5rem)] max-h-none space-y-3 overflow-y-auto pr-1"
+                />
               </div>
             </m.aside>
-          )}
+          ) : null}
         </AnimatePresence>
 
         <AnimatePresence initial={false}>
-          {membersOpen && (
+          {membersOpen ? (
             <m.aside
               key="popout-members"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 280, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={{ x: 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 24, opacity: 0 }}
               transition={springSnappy}
-              className="hidden h-full min-h-0 shrink-0 overflow-hidden border-l border-white/10 bg-zinc-950/95 lg:block"
+              className={`absolute inset-y-0 z-40 flex w-[min(100%,18rem)] flex-col border-l border-white/10 bg-zinc-950 shadow-2xl sm:w-[18rem] ${
+                commentsOpen ? 'right-[min(100%,22rem)] sm:right-[22rem]' : 'right-0'
+              }`}
             >
-              <div className="flex h-full min-h-0 w-[280px] flex-col p-4">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+                <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
                   <Users className="h-4 w-4" />
                   Membros online
                 </h2>
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <SalaParticipantes
-                    salaId={salaId}
-                    initialParticipantes={initialParticipantes}
-                    onCountChange={setOnlineCount}
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setMembersOpen(false)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-300 hover:bg-white/10"
+                  aria-label="Fechar membros"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <SalaParticipantes
+                  salaId={salaId}
+                  initialParticipantes={initialParticipantes}
+                  onCountChange={setOnlineCount}
+                />
               </div>
             </m.aside>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
-
-      {/* Mobile: bottom sheets for chat/members */}
-      <AnimatePresence>
-        {commentsOpen && (
-          <m.div
-            key="mobile-chat"
-            initial={{ y: 24, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 24, opacity: 0 }}
-            transition={springSnappy}
-            className="fixed inset-x-0 bottom-0 z-30 max-h-[48dvh] border-t border-white/10 bg-zinc-950 p-4 md:hidden"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
-                <MessageSquare className="h-4 w-4" />
-                Chat
-              </h2>
-              <button
-                type="button"
-                onClick={() => setCommentsOpen(false)}
-                className="rounded-lg border border-white/10 px-2 py-1 text-xs text-zinc-300"
-              >
-                Fechar
-              </button>
-            </div>
-            <SalaChat
-              salaId={salaId}
-              currentUserId={userId}
-              isHost={isHost}
-              initialMensagens={initialMensagens}
-              listClassName="max-h-[28dvh] space-y-3 overflow-y-auto pr-1"
-            />
-          </m.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
