@@ -47,6 +47,14 @@ const serverSchema = z.object({
     .refine((v) => !v || v.startsWith('wss://') || v.startsWith('ws://'), {
       message: 'LIVEKIT_URL deve usar ws:// ou wss://',
     }),
+  // Redis (SSE multi-réplica) — opcional; Upstash Free com rediss://
+  // Ausente = buses feed/notificações ficam in-memory (1 réplica).
+  REDIS_URL: z
+    .string()
+    .optional()
+    .refine((v) => !v || v.startsWith('redis://') || v.startsWith('rediss://'), {
+      message: 'REDIS_URL deve usar redis:// ou rediss:// (Upstash → Connect → Redis URL)',
+    }),
   NOTICIAS_INGEST_KEY: z.string().optional(),
 
   // Runtime
@@ -86,6 +94,7 @@ function validateEnv() {
       LIVEKIT_API_KEY: undefined,
       LIVEKIT_API_SECRET: undefined,
       LIVEKIT_URL: undefined,
+      REDIS_URL: undefined,
       NOTICIAS_INGEST_KEY: undefined,
       NODE_ENV: 'development' as const,
       PORT: 3000,
@@ -156,6 +165,21 @@ export function isLiveKitConfigured(): boolean {
   const secret = env.LIVEKIT_API_SECRET?.trim()
   const url = env.LIVEKIT_URL?.trim()
   return Boolean(key && secret && url)
+}
+
+/** Redis opcional para SSE cross-réplica (Upstash Free / Redis protocol). */
+export function isRedisConfigured(): boolean {
+  const url = env.REDIS_URL?.trim()
+  return Boolean(url && (url.startsWith('redis://') || url.startsWith('rediss://')))
+}
+
+export function getRedisUrl(): string {
+  if (!isRedisConfigured()) {
+    throw new Error(
+      'Redis não configurado. Defina REDIS_URL (redis:// ou rediss://) — Upstash Free em upstash.com.',
+    )
+  }
+  return env.REDIS_URL!.trim()
 }
 
 export function requireLiveKitConfig(): {

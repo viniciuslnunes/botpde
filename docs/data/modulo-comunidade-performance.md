@@ -142,12 +142,25 @@ C4 e2e budget Comunidade; C6 hashtags com TTL 300s + invalidação on-write.
 
 ### Fase D — tempo quase real e consistência multi-instância
 
-| # | Recorte | Por quê | Esforço |
-|---|---------|---------|---------|
-| D1 | **Redis pub/sub** (ou equivalente gerenciado) para `feed-bus` e `notificacoes-bus` | SSE in-memory não cruza réplicas Railway | Alto |
-| D2 | **Worker assíncrono** para fan-out pesado (`fanoutPostParaRede` em fila) | Post com rede grande não bloqueia request HTTP | Alto |
-| D3 | **SSE/WebSocket mensageria** substituindo polling 15s no shell | Menos requests; melhor em dia de jogo | Alto |
-| D4 | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia | Médio |
+**D1 entregue (2026-07-16):** bridge `realtime-bus.ts` com `REDIS_URL` opcional
+(ioredis + Upstash Free). Sem env → in-memory (1 réplica). Com `rediss://` →
+pub/sub cruzando réplicas; eco da própria instância é ignorado. **Custo: $0**
+no free tier (256 MB · 500k comandos/mês).
+
+#### Setup Upstash Free (produção)
+
+1. Criar DB em [upstash.com](https://upstash.com) → Redis → Free.
+2. **Connect** → copiar **Redis URL** (`rediss://default:…@….upstash.io:6379`).
+3. Railway → serviço web → Variables → `REDIS_URL=<cole a URL>`.
+4. Redeploy. Logs: ausência de `[realtime-bus] Redis … error` = ok.
+5. Sem `REDIS_URL` o app segue igual (fallback in-memory).
+
+| # | Recorte | Por quê | Esforço | Status |
+|---|---------|---------|---------|--------|
+| D1 | **Redis pub/sub** para `feed-bus` e `notificacoes-bus` | SSE in-memory não cruza réplicas | Médio | ✅ código; ativar com env |
+| D2 | **Worker assíncrono** para fan-out pesado (`fanoutPostParaRede` em fila) | Post com rede grande não bloqueia request HTTP | Alto | pendente |
+| D3 | **SSE/WebSocket mensageria** substituindo polling 15s no shell | Menos requests; melhor em dia de jogo | Alto | pendente |
+| D4 | **Invalidação coordenada** de caches `unstable_cache` via tags por tenant | Evitar TTL fixo como única estratégia | Médio | parcial (C2 tags) |
 
 ### Fase E — busca e descoberta avançada
 
@@ -197,7 +210,8 @@ C4 e2e budget Comunidade; C6 hashtags com TTL 300s + invalidação on-write.
 | Timeline | `apps/web/src/lib/feed-timeline.ts` |
 | Busca | `apps/web/src/lib/comunidade-busca.ts` |
 | Stories | `apps/web/src/lib/stories.ts` |
-| SSE feed | `apps/web/src/lib/feed-bus.ts`, `use-feed-stream.ts` |
+| SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |
+| SSE notif | `apps/web/src/lib/notificacoes-bus.ts`, `realtime-bus.ts` |
 | Chat resumo | `apps/web/src/app/api/conversas/resumo/route.ts` |
 | Scripts DB | `packages/db/scripts/enable-pg-trgm.js` |
 | Schema | `packages/db/prisma/schema.prisma` (`FeedTimeline`, índices `Post`) |

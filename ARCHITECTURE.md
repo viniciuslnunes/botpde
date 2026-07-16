@@ -572,6 +572,10 @@ na timeline, TanStack Query, e2e de latência Comunidade — ver doc acima.
 windowing (`useFeedWindow`), hook infinite compartilhado, prefetch hover, e2e budget.
 TanStack Query/Virtual pendente de instalação de pacote no ambiente.
 
+**Fase D1 (2026-07-16):** `REDIS_URL` opcional → `realtime-bus.ts` (ioredis) liga
+`feed-bus` / `notificacoes-bus` entre réplicas. Sem env = in-memory. Setup Upstash
+Free ($0): `docs/data/modulo-comunidade-performance.md`.
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em

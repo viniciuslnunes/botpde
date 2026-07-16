@@ -24,6 +24,8 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
 - Navegação: `portal-nav-link.tsx`, `nav-pending-context.tsx`, `loading.tsx` no portal.
 - Mensageria: `mensageria.ts`, `mensagens-shell.tsx`, `comunidade-chat-panel.tsx`,
   `api/conversas/resumo`, `use-visible-interval.ts`.
+- SSE multi-réplica: `realtime-bus.ts` + `REDIS_URL` opcional (Upstash Free);
+  `feed-bus.ts`, `notificacoes-bus.ts`.
 - Imagens: `optimizable-image.ts`, `next.config.ts` `images.remotePatterns`.
 - DB: `packages/db/src/index.js` (`connection_limit`), índices em `schema.prisma`.
 - Medição: `apps/web/e2e/nav-latency.portal.spec.ts`; contador dev em
@@ -63,7 +65,9 @@ na porta do estádio.
 - Não confunde percepção visual com TTFB — layout/spinner é com `ux-review`.
 
 ## Fora de escopo (exigir decisão humana + custo)
-- PgBouncer, Prisma Accelerate, Redis, WebSocket/SSE, migração Vercel/Neon.
+- PgBouncer, Prisma Accelerate pago, WebSocket dedicado, migração Vercel/Neon.
+- Redis: **código D1 pronto** com Upstash Free (`REDIS_URL`); não empurrar Redis
+  pago no Railway sem evidência de >500k cmds/mês ou necessidade de persistência.
 - Justifique com contenção de conexões, escala simultânea ou SLA — não por estética.
 
 ## Como trabalhar

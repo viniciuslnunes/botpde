@@ -1,29 +1,16 @@
-import { EventEmitter } from 'node:events'
+import { feedBusKey, publishRealtime, subscribeRealtime } from '@/lib/realtime-bus'
 
 /**
- * Bus de push do feed da Comunidade — mesmo padrão de notificacoes-bus.ts:
- * em memória, assume UMA única instância do processo Node (Railway, sem
- * numReplicas configurado; o padrão é 1). Se o web escalar horizontalmente,
- * este bus deixa de alcançar conexões em outras réplicas e precisa migrar
- * para Postgres LISTEN/NOTIFY ou Redis pub/sub. Canal por tenant: todo mundo
- * com o feed daquele tenant aberto recebe o ping (não por usuário, como nas
- * notificações — o feed é compartilhado).
+ * Bus de push do feed da Comunidade.
+ *
+ * Sem REDIS_URL: EventEmitter in-memory (1 réplica).
+ * Com REDIS_URL (Upstash Free): pub/sub cruzando réplicas Railway.
+ * Ver `docs/data/modulo-comunidade-performance.md` (Fase D1).
  */
-const bus = new EventEmitter()
-bus.setMaxListeners(0)
-
-function channelKey(tenantId: string): string {
-  return `feed:${tenantId}`
-}
-
-/** Avisa as conexões SSE do tenant que há post novo no feed. */
 export function emitFeedPing(tenantId: string): void {
-  bus.emit(channelKey(tenantId))
+  publishRealtime(feedBusKey(tenantId))
 }
 
-/** Inscreve um listener de ping; retorna a função de unsubscribe. */
 export function subscribeFeedPing(tenantId: string, onPing: () => void): () => void {
-  const key = channelKey(tenantId)
-  bus.on(key, onPing)
-  return () => bus.off(key, onPing)
+  return subscribeRealtime(feedBusKey(tenantId), onPing)
 }

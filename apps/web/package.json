@@ -21,6 +21,7 @@
     "@torcida/types": "workspace:*",
     "@torcida/ui": "workspace:*",
     "bcryptjs": "^3.0.3",
+    "ioredis": "^5.11.1",
     "livekit-client": "^2.15.7",
     "livekit-server-sdk": "^2.13.0",
     "lucide-react": "^1.22.0",
