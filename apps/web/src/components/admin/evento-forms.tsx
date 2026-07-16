@@ -6,9 +6,12 @@ import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/ap
 import { Loader2, Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
+import { TIPO_EVENTO_LABEL } from '@torcida/types'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+
+const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
 
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
@@ -16,8 +19,39 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function TipoSelect({ defaultValue = 'GERAL' }: { defaultValue?: string }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Tipo
+      </label>
+      <select
+        name="tipo"
+        defaultValue={defaultValue}
+        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+      >
+        {TIPOS.map((t) => (
+          <option key={t} value={t}>
+            {TIPO_EVENTO_LABEL[t]}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 /* ── Criar ─────────────────────────────────────────────────────────────────── */
-export function CriarEventoForm() {
+export function CriarEventoForm({
+  defaultTipo = 'GERAL',
+  redirectTo,
+  submitLabel = 'Criar evento',
+  lockTipo = false,
+}: {
+  defaultTipo?: string
+  redirectTo?: string
+  submitLabel?: string
+  lockTipo?: boolean
+}) {
   const [state, setState] = useState<EventoState>({})
   const { formRef } = useTrackedForm({ title: 'Novo evento' })
 
@@ -36,6 +70,13 @@ export function CriarEventoForm() {
       }}
       className="space-y-4"
     >
+      {redirectTo && <input type="hidden" name="redirectTo" value={redirectTo} />}
+      {lockTipo ? (
+        <input type="hidden" name="tipo" value={defaultTipo} />
+      ) : (
+        <TipoSelect defaultValue={defaultTipo} />
+      )}
+
       <AnimatePresence>
         {state.message && (
           <m.div
@@ -96,7 +137,7 @@ export function CriarEventoForm() {
         <FieldError errors={state.errors?.descricao} />
       </div>
 
-      <SubmitButton label="Criar evento" icon={<CalendarPlus className="h-4 w-4" />} />
+      <SubmitButton label={submitLabel} icon={<CalendarPlus className="h-4 w-4" />} />
     </form>
   )
 }
@@ -108,6 +149,7 @@ type EventoData = {
   descricao: string | null
   data: Date
   local: string | null
+  tipo?: string
 }
 
 export function EditarEventoForm({ evento }: { evento: EventoData }) {
@@ -142,6 +184,8 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
           </m.div>
         )}
       </AnimatePresence>
+
+      <TipoSelect defaultValue={evento.tipo ?? 'GERAL'} />
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">

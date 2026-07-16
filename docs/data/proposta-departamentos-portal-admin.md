@@ -1,6 +1,7 @@
 # Proposta — Departamentos: Portal (membros) × Admin (gestores / presidência)
 
-> Status: **Fases 0–4** (2026-07-16) — hub Abrir área / Gestão / Operação;
+> Status: **Fases 0–4** (shell) + **Fase 3 plugins** Financeiro, Patrimônio,
+> Caravanas e Bateria (2026-07-16) — hub Abrir área / Gestão / Operação;
 > home `/portal/departamentos/[slug]`; equipe com `canManageDepartamento`;
 > pacotes **membro** apertados; menu admin Eventos/Financeiro/Patrimônio exige `*:manage`;
 > Diretoria (gestor): fila de pendentes **no portal** (aprovar/reprovar reusa actions admin).
@@ -181,7 +182,7 @@ Delegação: `canManageDepartamento` sem `ROLES_MANAGE` — UI no portal (Fase 1
 - Testes: “Membro · X não vê itens admin indevidos”
 
 ### Fase 3 — Plugins de domínio (um por vez)
-1. Financeiro → 2. Patrimônio → 3. Bateria / Caravanas → 4. thin wrappers
+1. Financeiro ✓ → 2. Patrimônio ✓ → 3. Caravanas / Bateria ✓ (compor `Evento.tipo`) → 4. thin wrappers (Feminino/Carnaval)
 
 ### Fase 4 — Diretoria
 - Home com KPIs leves

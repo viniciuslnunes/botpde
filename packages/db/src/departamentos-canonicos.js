@@ -205,7 +205,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Bateria / ensaios — membro no portal; criar/gerir ensaios = gestor.
     nome: 'Bateria',
     cor: '#be123c',
-    moduloPortal: 'eventos',
+    moduloPortal: 'bateria',
     permissions: [
       PERMISSIONS.COMMUNITY_POST,
       PERMISSIONS.MESSAGES_SEND,
@@ -230,7 +230,7 @@ export const DEPARTAMENTOS_CANONICOS = [
     // Viagens / jogos fora — membro no portal; operação = gestor.
     nome: 'Caravanas',
     cor: '#c2410c',
-    moduloPortal: 'eventos',
+    moduloPortal: 'caravanas',
     permissions: [
       PERMISSIONS.MESSAGES_SEND,
       PERMISSIONS.GROUPS_CREATE,

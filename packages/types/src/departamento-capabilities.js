@@ -59,13 +59,13 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
   },
   {
     slug: 'bateria',
-    moduloPortal: 'eventos',
+    moduloPortal: 'bateria',
     features: ['equipe', 'modulo', 'ensaios', 'agenda'],
     portalPanel: 'bateria',
   },
   {
     slug: 'caravanas',
-    moduloPortal: 'eventos',
+    moduloPortal: 'caravanas',
     features: ['equipe', 'modulo', 'agenda'],
     portalPanel: 'caravanas',
   },

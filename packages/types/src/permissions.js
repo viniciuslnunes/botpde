@@ -229,6 +229,8 @@ export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
   { key: 'sedes', label: 'Sedes e subsedes' },
   { key: 'financeiro', label: 'Financeiro' },
   { key: 'patrimonio', label: 'Patrimônio' },
+  { key: 'caravanas', label: 'Caravanas' },
+  { key: 'bateria', label: 'Bateria' },
   { key: 'membros', label: 'Membros' },
 ])
 
@@ -247,6 +249,8 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   membros: { href: null, disponivel: false },
   financeiro: { href: '/portal/financeiro', disponivel: true },
   patrimonio: { href: '/portal/patrimonio', disponivel: true },
+  caravanas: { href: '/portal/caravanas', disponivel: true },
+  bateria: { href: '/portal/bateria', disponivel: true },
 })
 
 /**
@@ -261,6 +265,8 @@ export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   membros: '/admin/membros',
   financeiro: '/admin/financeiro',
   patrimonio: '/admin/patrimonio',
+  caravanas: '/admin/eventos?tipo=CARAVANA',
+  bateria: '/admin/eventos?tipo=ENSAIO',
 })
 
 /**

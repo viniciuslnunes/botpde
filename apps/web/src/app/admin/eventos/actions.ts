@@ -3,20 +3,39 @@
 import { db } from '@torcida/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { z } from 'zod'
+import { CriarEventoSchema, PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { PERMISSIONS } from '@torcida/types'
-
-const eventoSchema = z.object({
-  titulo: z.string().min(3, 'Título muito curto').max(100),
-  descricao: z.string().max(1000).optional().transform((v) => v || undefined),
-  data: z.string().min(1, 'Data obrigatória'),
-  local: z.string().max(200).optional().transform((v) => v || undefined),
-})
 
 export type EventoState = {
+  ok?: boolean
   errors?: Record<string, string[]>
   message?: string
+}
+
+function revalidateEventoPaths(eventoId?: string, tipo?: string) {
+  revalidatePath('/admin/eventos')
+  revalidatePath('/portal/eventos')
+  revalidatePath('/portal/caravanas')
+  revalidatePath('/portal/bateria')
+  revalidatePath('/portal/departamentos', 'layout')
+  if (eventoId) {
+    revalidatePath(`/admin/eventos/${eventoId}`)
+    revalidatePath(`/portal/eventos/${eventoId}`)
+    revalidatePath(`/portal/caravanas/${eventoId}`)
+    revalidatePath(`/portal/bateria/${eventoId}`)
+  }
+  if (tipo === 'CARAVANA') revalidatePath('/portal/departamentos/caravanas')
+  if (tipo === 'ENSAIO') revalidatePath('/portal/departamentos/bateria')
+}
+
+function formToEvento(formData: FormData) {
+  return {
+    titulo: formData.get('titulo'),
+    descricao: formData.get('descricao') || undefined,
+    data: formData.get('data'),
+    local: formData.get('local') || undefined,
+    tipo: formData.get('tipo') || 'GERAL',
+  }
 }
 
 export async function criarEvento(
@@ -28,29 +47,29 @@ export async function criarEvento(
     PERMISSIONS.EVENTS_MANAGE,
   ])
 
-  const raw = {
-    titulo: formData.get('titulo') as string,
-    descricao: formData.get('descricao') as string,
-    data: formData.get('data') as string,
-    local: formData.get('local') as string,
-  }
-
-  const parsed = eventoSchema.safeParse(raw)
+  const parsed = CriarEventoSchema.safeParse(formToEvento(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local } = parsed.data
+  const { titulo, descricao, data, local, tipo } = parsed.data
+  const dataComp = new Date(data)
+  if (Number.isNaN(dataComp.getTime())) {
+    return { errors: { data: ['Data inválida'] } }
+  }
 
+  const redirectTo = formData.get('redirectTo')
   const evento = await db.evento.create({
     data: {
       tenantId: tenant.id,
+      tipo,
       titulo,
-      descricao,
-      data: new Date(data),
-      local,
+      descricao: descricao ?? null,
+      data: dataComp,
+      local: local ?? null,
       criadoPorId: session.user.id,
     },
+    select: { id: true, tipo: true },
   })
 
   await db.auditLog.create({
@@ -60,11 +79,14 @@ export async function criarEvento(
       acao: 'EVENTO_CRIADO',
       entidade: 'Evento',
       entidadeId: evento.id,
+      detalhes: { tipo: evento.tipo },
     },
   })
 
-  revalidatePath('/admin/eventos')
-  revalidatePath('/portal/eventos')
+  revalidateEventoPaths(evento.id, evento.tipo)
+  if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
+    redirect(redirectTo)
+  }
   redirect('/admin/eventos')
 }
 
@@ -75,23 +97,20 @@ export async function editarEvento(
 ): Promise<EventoState> {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
-  const raw = {
-    titulo: formData.get('titulo') as string,
-    descricao: formData.get('descricao') as string,
-    data: formData.get('data') as string,
-    local: formData.get('local') as string,
-  }
-
-  const parsed = eventoSchema.safeParse(raw)
+  const parsed = CriarEventoSchema.safeParse(formToEvento(formData))
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local } = parsed.data
+  const { titulo, descricao, data, local, tipo } = parsed.data
+  const dataComp = new Date(data)
+  if (Number.isNaN(dataComp.getTime())) {
+    return { errors: { data: ['Data inválida'] } }
+  }
 
-  const existing = await db.evento.findUnique({
+  const existing: { id: string; tenantId: string } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { tenantId: true },
+    select: { id: true, tenantId: true },
   })
 
   if (!existing || existing.tenantId !== tenant.id) {
@@ -99,8 +118,14 @@ export async function editarEvento(
   }
 
   await db.evento.update({
-    where: { id: eventoId },
-    data: { titulo, descricao, data: new Date(data), local },
+    where: { id: existing.id },
+    data: {
+      titulo,
+      descricao: descricao ?? null,
+      data: dataComp,
+      local: local ?? null,
+      tipo,
+    },
   })
 
   await db.auditLog.create({
@@ -110,11 +135,15 @@ export async function editarEvento(
       acao: 'EVENTO_EDITADO',
       entidade: 'Evento',
       entidadeId: eventoId,
+      detalhes: { tipo },
     },
   })
 
-  revalidatePath('/admin/eventos')
-  revalidatePath('/portal/eventos')
+  const redirectTo = formData.get('redirectTo')
+  revalidateEventoPaths(eventoId, tipo)
+  if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
+    redirect(redirectTo)
+  }
   redirect('/admin/eventos')
 }
 
@@ -127,7 +156,10 @@ export async function editarEvento(
 export async function registrarCheckIn(eventoId: string, userId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
-  const evento = await db.evento.findUnique({ where: { id: eventoId }, select: { tenantId: true } })
+  const evento: { tenantId: string; tipo: string } | null = await db.evento.findUnique({
+    where: { id: eventoId },
+    select: { tenantId: true, tipo: true },
+  })
   if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado.')
 
   await db.eventoRsvp.upsert({
@@ -153,22 +185,23 @@ export async function registrarCheckIn(eventoId: string, userId: string) {
     },
   })
 
-  revalidatePath(`/admin/eventos/${eventoId}`)
+  revalidateEventoPaths(eventoId, evento.tipo)
 }
 
 export async function excluirEvento(eventoId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
-  const existing = await db.evento.findUnique({
-    where: { id: eventoId },
-    select: { tenantId: true },
-  })
+  const existing: { id: string; tenantId: string; tipo: string } | null =
+    await db.evento.findUnique({
+      where: { id: eventoId },
+      select: { id: true, tenantId: true, tipo: true },
+    })
 
   if (!existing || existing.tenantId !== tenant.id) {
     throw new Error('Evento não encontrado.')
   }
 
-  await db.evento.delete({ where: { id: eventoId } })
+  await db.evento.delete({ where: { id: existing.id } })
 
   await db.auditLog.create({
     data: {
@@ -177,9 +210,9 @@ export async function excluirEvento(eventoId: string) {
       acao: 'EVENTO_EXCLUIDO',
       entidade: 'Evento',
       entidadeId: eventoId,
+      detalhes: { tipo: existing.tipo },
     },
   })
 
-  revalidatePath('/admin/eventos')
-  revalidatePath('/portal/eventos')
+  revalidateEventoPaths(eventoId, existing.tipo)
 }

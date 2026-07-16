@@ -15,7 +15,6 @@ import {
 } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import {
   DepartamentoEquipe,
   type MembroEquipe,
@@ -36,6 +35,15 @@ import {
   PatrimonioInventarioAside,
   PatrimonioInventarioSkeleton,
 } from '../_components/patrimonio-inventario-aside'
+import {
+  CaravanasAgendaAside,
+  CaravanasAgendaSkeleton,
+} from '../_components/caravanas-agenda-aside'
+import {
+  BateriaEnsaiosAside,
+  BateriaEnsaiosSkeleton,
+} from '../_components/bateria-ensaios-aside'
+import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import {
   ArrowLeft,
   ArrowRight,
@@ -124,6 +132,23 @@ export default async function DepartamentoHomePage({
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.FINANCE_VIEW)
   const podeVerPatrimonio =
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.PATRIMONY_VIEW)
+
+  const acessoCaravanas = await resolveAcessoPluginEvento(
+    session.user.id,
+    tenant.id,
+    'caravanas',
+    rolePermissions,
+    overrides,
+    isSuperAdmin,
+  )
+  const acessoBateria = await resolveAcessoPluginEvento(
+    session.user.id,
+    tenant.id,
+    'bateria',
+    rolePermissions,
+    overrides,
+    isSuperAdmin,
+  )
 
   const membrosRaw: Array<{
     userId: string
@@ -280,7 +305,11 @@ export default async function DepartamentoHomePage({
                 ? podeVerFinanceiro
                 : panel === 'patrimonio'
                   ? podeVerPatrimonio
-                  : true) && (
+                  : panel === 'caravanas'
+                    ? acessoCaravanas.podeVer
+                    : panel === 'bateria'
+                      ? acessoBateria.podeVer
+                      : true) && (
               <Link
                 href={moduloHref}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
@@ -346,6 +375,28 @@ export default async function DepartamentoHomePage({
                 podeVerPatrimonio={podeVerPatrimonio}
               />
             </Suspense>
+          ) : panel === 'caravanas' ? (
+            <Suspense fallback={<CaravanasAgendaSkeleton />}>
+              <CaravanasAgendaAside
+                tenantId={tenant.id}
+                nome={depto.nome}
+                isGestor={isGestor}
+                moduloHref={moduloHref}
+                operacaoHref={operacaoHref}
+                podeVer={acessoCaravanas.podeVer}
+              />
+            </Suspense>
+          ) : panel === 'bateria' ? (
+            <Suspense fallback={<BateriaEnsaiosSkeleton />}>
+              <BateriaEnsaiosAside
+                tenantId={tenant.id}
+                nome={depto.nome}
+                isGestor={isGestor}
+                moduloHref={moduloHref}
+                operacaoHref={operacaoHref}
+                podeVer={acessoBateria.podeVer}
+              />
+            </Suspense>
           ) : (
             <PainelDominio
               panel={panel}
@@ -393,20 +444,6 @@ function PainelDominio({
           </Link>
         )}
       </div>
-    )
-  }
-  if (panel === 'bateria' || panel === 'caravanas') {
-    return (
-      <MotionEmptyState
-        icon={<Briefcase className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
-        title="Fluxos específicos em breve"
-        description={
-          panel === 'bateria'
-            ? 'Ensaios e presença serão plugins desta área.'
-            : 'Listas de embarque e custo de caravana serão plugins desta área.'
-        }
-        className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-10 text-center"
-      />
     )
   }
 

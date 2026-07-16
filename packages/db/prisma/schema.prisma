@@ -570,6 +570,8 @@ model Evento {
   tenantId String @map("tenant_id")
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  /// Classifica o uso no portal (caravana, ensaio) sem duplicar o módulo.
+  tipo      TipoEvento @default(GERAL)
   titulo    String
   descricao String?
   data      DateTime
@@ -590,6 +592,7 @@ model Evento {
   @@index([tenantId])
   @@index([sedeId])
   @@index([tenantId, data])
+  @@index([tenantId, tipo, data])
   @@map("saas_eventos")
 }
 
@@ -615,6 +618,12 @@ model EventoRsvp {
 enum RsvpStatus {
   CONFIRMADO
   RECUSADO
+}
+
+enum TipoEvento {
+  GERAL
+  CARAVANA
+  ENSAIO
 }
 
 // ─── LOJA SaaS ────────────────────────────────────────────────────────────────

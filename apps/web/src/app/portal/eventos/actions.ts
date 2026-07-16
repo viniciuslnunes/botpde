@@ -32,5 +32,9 @@ export async function responderRsvp(eventoId: string, status: 'CONFIRMADO' | 'RE
 
   revalidatePath(`/portal/eventos/${eventoId}`)
   revalidatePath('/portal/eventos')
+  revalidatePath('/portal/caravanas')
+  revalidatePath('/portal/bateria')
+  revalidatePath(`/portal/caravanas/${eventoId}`)
+  revalidatePath(`/portal/bateria/${eventoId}`)
   revalidatePath('/portal')
 }

@@ -98,6 +98,8 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
   portal `/portal/patrimonio`, admin `/admin/patrimonio`.
+- **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`):
+  `docs/data/modulo-caravanas.md`, `docs/data/modulo-bateria.md`.
 - **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
   `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
