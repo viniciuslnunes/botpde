@@ -43,6 +43,10 @@ import {
   BateriaEnsaiosAside,
   BateriaEnsaiosSkeleton,
 } from '../_components/bateria-ensaios-aside'
+import {
+  DepartamentoThinAside,
+  DepartamentoThinSkeleton,
+} from '../_components/departamento-thin-aside'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import {
   ArrowLeft,
@@ -397,13 +401,23 @@ export default async function DepartamentoHomePage({
                 podeVer={acessoBateria.podeVer}
               />
             </Suspense>
-          ) : (
+          ) : panel === 'diretoria' ? (
             <PainelDominio
-              panel={panel}
               isGestor={isGestor}
               operacaoHref={operacaoHref}
               totalPendentes={totalPendentes}
             />
+          ) : (
+            <Suspense fallback={<DepartamentoThinSkeleton />}>
+              <DepartamentoThinAside
+                tenantId={tenant.id}
+                slug={depto.slug}
+                nome={depto.nome}
+                isGestor={isGestor}
+                moduloHref={moduloHref}
+                operacaoHref={operacaoHref}
+              />
+            </Suspense>
           )}
         </aside>
       </div>
@@ -412,48 +426,34 @@ export default async function DepartamentoHomePage({
 }
 
 function PainelDominio({
-  panel,
   isGestor,
   operacaoHref,
   totalPendentes,
 }: {
-  panel: string
   isGestor: boolean
   operacaoHref: string | null
   totalPendentes: number
 }) {
-  if (panel === 'diretoria') {
-    return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Diretoria</h2>
-        <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-          {isGestor
-            ? totalPendentes > 0
-              ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila à esquerda. Aprove ou reprove sem sair do portal.`
-              : 'Fila de solicitações à esquerda. Quando alguém pedir ingresso, aparece aqui.'
-            : 'Você é membro desta área. A gestão da Diretoria é feita pelos gestores.'}
-        </p>
-        {isGestor && operacaoHref && (
-          <Link
-            href={operacaoHref}
-            prefetch={false}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-          >
-            <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
-            Operação completa (admin)
-          </Link>
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-      <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Sobre a área</h2>
+      <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Diretoria</h2>
       <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-        Use a equipe ao lado e o módulo vinculado quando disponível. Gestores podem incluir
-        pessoas e abrir a operação admin do domínio.
+        {isGestor
+          ? totalPendentes > 0
+            ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila à esquerda. Aprove ou reprove sem sair do portal.`
+            : 'Fila de solicitações à esquerda. Quando alguém pedir ingresso, aparece aqui.'
+          : 'Você é membro desta área. A gestão da Diretoria é feita pelos gestores.'}
       </p>
+      {isGestor && operacaoHref && (
+        <Link
+          href={operacaoHref}
+          prefetch={false}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+        >
+          <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
+          Operação completa (admin)
+        </Link>
+      )}
     </div>
   )
 }

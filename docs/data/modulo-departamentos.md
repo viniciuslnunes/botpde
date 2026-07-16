@@ -128,6 +128,10 @@ ver `docs/data/proposta-departamentos-portal-admin.md`.
 `PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).
 Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).
 
+**Thin wrappers** (`portalPanel: generico`): Feminino, Carnaval, Social e eventos,
+Materiais/Loja e Comunicação não ganham app próprio — copy + CTA para o módulo
+portal (`departamento-thin.js`) e, em Social/Carnaval, prévia de próximos eventos.
+
 ## Decisões fechadas
 
 1. Perfil de área **vincula** departamento (membro/gestor); pacote é ao vivo.

@@ -1,10 +1,10 @@
 # Proposta — Departamentos: Portal (membros) × Admin (gestores / presidência)
 
-> Status: **Fases 0–4** (shell) + **Fase 3 plugins** Financeiro, Patrimônio,
-> Caravanas e Bateria (2026-07-16) — hub Abrir área / Gestão / Operação;
+> Status: **Fases 0–4 concluídas** (2026-07-16) — hub Abrir área / Gestão / Operação;
 > home `/portal/departamentos/[slug]`; equipe com `canManageDepartamento`;
 > pacotes **membro** apertados; menu admin Eventos/Financeiro/Patrimônio exige `*:manage`;
-> Diretoria (gestor): fila de pendentes **no portal** (aprovar/reprovar reusa actions admin).
+> plugins: Financeiro, Patrimônio, Caravanas/Bateria (`Evento.tipo`); thin wrappers
+> (Feminino/Carnaval/Social/Loja/Comunicação); Diretoria (fila + KPIs no portal).
 > Complementa `modulo-departamentos.md`.
 
 ## 1. Respostas diretas
@@ -182,9 +182,9 @@ Delegação: `canManageDepartamento` sem `ROLES_MANAGE` — UI no portal (Fase 1
 - Testes: “Membro · X não vê itens admin indevidos”
 
 ### Fase 3 — Plugins de domínio (um por vez)
-1. Financeiro ✓ → 2. Patrimônio ✓ → 3. Caravanas / Bateria ✓ (compor `Evento.tipo`) → 4. thin wrappers (Feminino/Carnaval)
+1. Financeiro ✓ → 2. Patrimônio ✓ → 3. Caravanas / Bateria ✓ (compor `Evento.tipo`) → 4. thin wrappers ✓ (Feminino/Carnaval + Social/Loja/Comunicação — copy + deep-link; agenda em Social/Carnaval)
 
-### Fase 4 — Diretoria
+### Fase 4 — Diretoria ✓
 - Home com KPIs leves
 - Fila de aprovação de membros no portal (gestor) ou deep-link admin só-gestor
 

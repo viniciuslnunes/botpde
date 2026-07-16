@@ -89,6 +89,27 @@ export const carregarPainelEventosTipo = cache(async function carregarPainelEven
   }
 })
 
+export const listarProximosEventosTenant = cache(async function listarProximosEventosTenant(
+  tenantId: string,
+  limite = 5,
+): Promise<EventoPorTipoLite[]> {
+  const rows: EventoPorTipoLite[] = await db.evento.findMany({
+    where: { tenantId, data: { gte: new Date() } },
+    orderBy: { data: 'asc' },
+    take: limite,
+    select: {
+      id: true,
+      tipo: true,
+      titulo: true,
+      descricao: true,
+      data: true,
+      local: true,
+      _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+    },
+  })
+  return rows
+})
+
 export const getEventoEmbarque = cache(async function getEventoEmbarque(
   tenantId: string,
   eventoId: string,
