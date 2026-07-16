@@ -1360,19 +1360,12 @@ function PassoVinculo({
             disabled={pending || unidadePendente}
             className="group flex h-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <div className="flex w-[6.5rem] shrink-0 flex-col items-center justify-center gap-2.5 self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
+            <div className="flex w-[6.5rem] shrink-0 items-center justify-center self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
               <EscudoClube
                 nome={nomeClube}
                 apelido={clube?.apelido}
                 escudoUrl={clube?.escudoUrl}
-                size="lg"
-                shape="circle"
-                priority
-              />
-              <EscudoClube
-                nome={torcida.nome}
-                escudoUrl={torcida.logoUrl}
-                size="lg"
+                size="xl"
                 shape="circle"
                 priority
               />
