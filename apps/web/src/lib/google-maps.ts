@@ -26,6 +26,17 @@ function queryLocal(sede: {
   return partes.join(', ')
 }
 
+/** Query de endereço para geocode/Street View (sem preferir lat/lng já conhecidos). */
+export function buildGeocodeQuery(sede: {
+  endereco?: string | null
+  cidade?: string | null
+  estado?: string | null
+}): string | null {
+  const partes = [sede.endereco, sede.cidade, sede.estado, 'Brasil'].filter(Boolean)
+  if (partes.length <= 1) return null
+  return partes.join(', ')
+}
+
 /** Imagem estática Street View (fachada) quando há cobertura. */
 export function buildStreetViewImageUrl(
   sede: {
@@ -74,6 +85,7 @@ type GeocodeAddressComponent = {
 
 type GeocodeResult = {
   address_components?: GeocodeAddressComponent[]
+  geometry?: { location?: { lat: number; lng: number } }
 }
 
 type GeocodeResponse = {
@@ -122,4 +134,106 @@ export async function reverseGeocodeRegion(
 
   if (!cidade || !estado) return null
   return { cidade, estado, lat: coords.lat, lng: coords.lng }
+}
+
+/**
+ * Resolve lat/lng a partir de cidade + UF (seleção manual no onboarding).
+ * Necessário para recomendações por proximidade sem GPS do navegador.
+ */
+export async function forwardGeocodeRegion(
+  cidade: string,
+  estado: string,
+): Promise<GoogleMapsRegion | null> {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const cidadeNorm = cidade.trim()
+  const estadoNorm = estado.trim().toUpperCase()
+  if (!key || !cidadeNorm || !estadoNorm) return null
+
+  const params = new URLSearchParams({
+    address: `${cidadeNorm}, ${estadoNorm}, Brasil`,
+    key,
+    language: 'pt-BR',
+    region: 'br',
+    components: `country:BR|administrative_area:${estadoNorm}`,
+  })
+  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`)
+  if (!res.ok) return null
+
+  const data = (await res.json()) as GeocodeResponse
+  const loc = data.results?.[0]?.geometry?.location
+  if (data.status !== 'OK' || !loc) return null
+
+  return { cidade: cidadeNorm, estado: estadoNorm, lat: loc.lat, lng: loc.lng }
+}
+
+const geocodeCache = new Map<string, Promise<{ lat: number; lng: number } | null>>()
+
+/** Geocodifica um endereço livre (com cache em memória por query). */
+export function geocodeLatLng(address: string): Promise<{ lat: number; lng: number } | null> {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  const addressNorm = address.trim()
+  if (!key || !addressNorm) return Promise.resolve(null)
+
+  const cached = geocodeCache.get(addressNorm)
+  if (cached) return cached
+
+  const pending = (async () => {
+    const params = new URLSearchParams({
+      address: addressNorm,
+      key,
+      language: 'pt-BR',
+      region: 'br',
+    })
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`)
+    if (!res.ok) return null
+    const data = (await res.json()) as GeocodeResponse
+    const loc = data.results?.[0]?.geometry?.location
+    if (data.status !== 'OK' || !loc) return null
+    return { lat: loc.lat, lng: loc.lng }
+  })()
+
+  geocodeCache.set(addressNorm, pending)
+  return pending
+}
+
+/**
+ * Preenche lat/lng ausentes a partir do endereço/cidade da unidade.
+ * Necessário enquanto o banco ainda não tem coordenadas persistidas.
+ */
+export async function enrichSedesComCoordenadas<
+  T extends {
+    lat: number | null
+    lng: number | null
+    endereco?: string | null
+    cidade?: string | null
+    estado?: string | null
+  },
+>(sedes: T[]): Promise<T[]> {
+  if (!isGoogleMapsConfigured()) return sedes
+
+  const results: T[] = new Array(sedes.length)
+  let cursor = 0
+  const concurrency = Math.min(4, sedes.length)
+
+  async function worker() {
+    while (cursor < sedes.length) {
+      const idx = cursor
+      cursor += 1
+      const sede = sedes[idx]!
+      if (sede.lat != null && sede.lng != null) {
+        results[idx] = sede
+        continue
+      }
+      const query = buildGeocodeQuery(sede)
+      if (!query) {
+        results[idx] = sede
+        continue
+      }
+      const coords = await geocodeLatLng(query)
+      results[idx] = coords ? { ...sede, lat: coords.lat, lng: coords.lng } : sede
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()))
+  return results
 }

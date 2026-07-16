@@ -9,6 +9,9 @@ const SIZES = {
   sm: { box: 'h-11 w-11', px: 44, icon: 'h-4 w-4', text: 'text-sm' },
   md: { box: 'h-14 w-14', px: 56, icon: 'h-5 w-5', text: 'text-lg' },
   lg: { box: 'h-16 w-16', px: 64, icon: 'h-6 w-6', text: 'text-xl' },
+  xl: { box: 'h-20 w-20', px: 80, icon: 'h-7 w-7', text: 'text-2xl' },
+  /** Preenche o pai (ex.: painel à direita do card de torcida). */
+  fill: { box: 'h-full w-full', px: 128, icon: 'h-8 w-8', text: 'text-3xl' },
 } as const
 
 export type EscudoClubeSize = keyof typeof SIZES

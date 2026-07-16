@@ -1,10 +1,18 @@
 import type { SedeOnboarding } from '@/lib/onboarding'
 
+/** Raio máximo (km) para promover uma unidade territorial às recomendações. */
+export const RAIO_RECOMENDACAO_KM = 120
+
+export type SedeOnboardingComDistancia = SedeOnboarding & {
+  /** Distância em km até a região do usuário; null se faltar coordenada. */
+  distanciaKm: number | null
+}
+
 export type SedesAgrupadasOnboarding = {
-  /** Subsedes/PDEs da região + sede principal ao final */
-  recomendadas: SedeOnboarding[]
-  /** Demais unidades territoriais */
-  outras: SedeOnboarding[]
+  /** Sede principal (1ª) + unidade mais próxima (2ª), quando houver. */
+  recomendadas: SedeOnboardingComDistancia[]
+  /** Demais unidades territoriais, ordenadas por proximidade. */
+  outras: SedeOnboardingComDistancia[]
 }
 
 export type LocalizacaoOnboarding = {
@@ -52,7 +60,7 @@ export function compararSedesOnboarding(a: SedeOnboarding, b: SedeOnboarding): n
   return a.nome.localeCompare(b.nome, 'pt-BR')
 }
 
-function distanciaKm(
+export function distanciaKm(
   origem: LocalizacaoOnboarding,
   destino: { lat: number | null; lng: number | null },
 ): number | null {
@@ -68,10 +76,22 @@ function distanciaKm(
   return 2 * raioTerraKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function sedeProxima(sede: SedeOnboarding, localizacao?: LocalizacaoOnboarding): boolean {
-  if (!localizacao) return false
-  const distancia = distanciaKm(localizacao, sede)
-  return distancia != null && distancia <= 120
+/** Formata distância para UI (ex.: "8,4 km", "47 km"). */
+export function formatarDistanciaKm(km: number): string {
+  if (km < 10) {
+    return `${km.toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 0 })} km`
+  }
+  return `${Math.round(km).toLocaleString('pt-BR')} km`
+}
+
+function comDistancia(
+  sede: SedeOnboarding,
+  localizacao?: LocalizacaoOnboarding,
+): SedeOnboardingComDistancia {
+  return {
+    ...sede,
+    distanciaKm: localizacao ? distanciaKm(localizacao, sede) : null,
+  }
 }
 
 function compararPorProximidade(
@@ -91,8 +111,10 @@ function compararPorProximidade(
 
 /**
  * Agrupa unidades para o passo territorial:
- * 1. Recomendadas: subsedes/PDEs da região (prioridade) + sede principal
- * 2. Outras: demais subsedes/PDEs fora da região
+ * 1. Recomendadas: sede principal (sempre 1ª) + unidade mais próxima (2ª)
+ * 2. Outras: demais unidades, ordenadas por proximidade
+ *
+ * Sem coordenadas: promove unidades que combinam com UF/cidade da região.
  */
 export function agruparSedesPorRegiao(
   sedes: SedeOnboarding[],
@@ -102,18 +124,38 @@ export function agruparSedesPorRegiao(
 ): SedesAgrupadasOnboarding {
   const sedeNacional = sedes.find((s) => s.tipo === 'SEDE') ?? null
   const territoriais = sedes.filter((s) => s.tipo !== 'SEDE')
-  const combina = (sede: SedeOnboarding) =>
-    sedeProxima(sede, localizacao) || sedeCombinaRegiao(sede, uf, cidade)
+  const ordenadas = [...territoriais].sort(compararPorProximidade(localizacao))
 
-  const regional = territoriais
-    .filter(combina)
-    .sort(compararPorProximidade(localizacao))
-  const fora = territoriais
-    .filter((s) => !combina(s))
-    .sort(compararPorProximidade(localizacao))
+  let segunda: SedeOnboarding | null = null
 
-  const recomendadas: SedeOnboarding[] = [...regional]
-  if (sedeNacional) recomendadas.push(sedeNacional)
+  if (localizacao) {
+    const candidatas = ordenadas.filter((s) => {
+      const d = distanciaKm(localizacao, s)
+      return d != null && d <= RAIO_RECOMENDACAO_KM
+    })
+    segunda = candidatas[0] ?? null
+  }
 
-  return { recomendadas, outras: fora }
+  if (!segunda) {
+    const regionais = ordenadas.filter((s) => sedeCombinaRegiao(s, uf, cidade))
+    segunda = regionais[0] ?? null
+  }
+
+  const recomendadasIds = new Set<string>()
+  const recomendadas: SedeOnboardingComDistancia[] = []
+
+  if (sedeNacional) {
+    recomendadas.push(comDistancia(sedeNacional, localizacao))
+    recomendadasIds.add(sedeNacional.id)
+  }
+  if (segunda && !recomendadasIds.has(segunda.id)) {
+    recomendadas.push(comDistancia(segunda, localizacao))
+    recomendadasIds.add(segunda.id)
+  }
+
+  const outras: SedeOnboardingComDistancia[] = ordenadas
+    .filter((s) => !recomendadasIds.has(s.id))
+    .map((s) => comDistancia(s, localizacao))
+
+  return { recomendadas, outras }
 }

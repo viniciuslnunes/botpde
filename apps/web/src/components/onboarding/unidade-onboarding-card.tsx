@@ -7,9 +7,12 @@ import {
   buildStreetViewImageUrl,
   isGoogleMapsConfigured,
 } from '@/lib/google-maps'
-import type { SedeOnboarding } from '@/lib/onboarding'
+import {
+  formatarDistanciaKm,
+  type SedeOnboardingComDistancia,
+} from '@/lib/onboarding-unidade'
 
-const TIPO_LABEL: Record<SedeOnboarding['tipo'], string> = {
+const TIPO_LABEL: Record<SedeOnboardingComDistancia['tipo'], string> = {
   SEDE: 'Sede principal',
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'Ponto de encontro',
@@ -20,7 +23,7 @@ const THUMB_W = 240
 const THUMB_H = 180
 
 type Props = {
-  sede: SedeOnboarding
+  sede: SedeOnboardingComDistancia
   selecionada: boolean
   onSelecionar: (id: string) => void
   /** Prioriza LCP nas primeiras recomendações acima da dobra. */
@@ -40,6 +43,8 @@ export function UnidadeOnboardingCard({
       ? buildStreetViewImageUrl(sede, { width: THUMB_W, height: THUMB_H })
       : null)
   const local = [sede.cidade, sede.estado].filter(Boolean).join(' · ')
+  const distanciaLabel =
+    sede.distanciaKm != null ? formatarDistanciaKm(sede.distanciaKm) : null
 
   return (
     <button
@@ -91,6 +96,7 @@ export function UnidadeOnboardingCard({
           <p className="mt-0.5 truncate text-[11px] text-[rgb(var(--foreground-muted))]">
             {TIPO_LABEL[sede.tipo]}
             {local ? ` · ${local}` : ''}
+            {distanciaLabel ? ` · ${distanciaLabel}` : ''}
           </p>
           {sede.endereco && (
             <p className="mt-0.5 line-clamp-1 text-[11px] text-[rgb(var(--foreground-muted))]">

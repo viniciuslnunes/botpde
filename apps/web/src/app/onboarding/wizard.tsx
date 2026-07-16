@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
@@ -29,8 +29,14 @@ import {
   registrarInteresseUnidade,
 } from './actions'
 import { ComboboxCidade } from './combobox-cidade'
-import { agruparSedesPorRegiao, normalizarTexto } from '@/lib/onboarding-unidade'
-import { buildGoogleMapsUrl, reverseGeocodeRegion, type GoogleMapsRegion } from '@/lib/google-maps'
+import { agruparSedesPorRegiao, normalizarTexto, type SedeOnboardingComDistancia } from '@/lib/onboarding-unidade'
+import {
+  buildGoogleMapsUrl,
+  enrichSedesComCoordenadas,
+  forwardGeocodeRegion,
+  reverseGeocodeRegion,
+  type GoogleMapsRegion,
+} from '@/lib/google-maps'
 import type {
   AfiliacaoOnboarding,
   TorcidaOnboarding,
@@ -214,7 +220,10 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                   setCidade('')
                   setLocalizacaoPrecisa(null)
                 }}
-                onCidade={setCidade}
+                onCidade={(v) => {
+                  setCidade(v)
+                  setLocalizacaoPrecisa(null)
+                }}
                 onLocalizacao={(regiao) => {
                   setUf(regiao.estado)
                   setCidade(regiao.cidade)
@@ -477,6 +486,17 @@ function PassoRegiao({
 }) {
   const [localizando, setLocalizando] = useState(false)
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null)
+  const geocodeSeq = useRef(0)
+
+  function selecionarCidade(cidadeSel: string) {
+    onCidade(cidadeSel)
+    if (!cidadeSel.trim() || !uf) return
+    const seq = ++geocodeSeq.current
+    void forwardGeocodeRegion(cidadeSel, uf).then((regiao) => {
+      if (seq !== geocodeSeq.current || !regiao) return
+      onLocalizacao(regiao)
+    })
+  }
 
   function usarLocalizacao() {
     setErroLocalizacao(null)
@@ -539,8 +559,8 @@ function PassoRegiao({
                 Recomendações por proximidade
               </p>
               <p className="mt-0.5 max-w-xl text-xs text-[rgb(var(--foreground-muted))]">
-                Use sua localização para priorizar subsedes e pontos de encontro realmente próximos.
-                Se preferir, preencha cidade e estado manualmente.
+                Use sua localização ou escolha a cidade para priorizar subsedes e pontos de
+                encontro próximos, com distância em km.
               </p>
             </div>
           </div>
@@ -568,7 +588,14 @@ function PassoRegiao({
           <label htmlFor="uf" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Estado
           </label>
-          <Select id="uf" value={uf} onChange={(e) => onUf(e.target.value)}>
+          <Select
+            id="uf"
+            value={uf}
+            onChange={(e) => {
+              geocodeSeq.current += 1
+              onUf(e.target.value)
+            }}
+          >
             <option value="">Selecione o estado</option>
             {ufs.map((u) => (
               <option key={u} value={u}>
@@ -581,7 +608,7 @@ function PassoRegiao({
           <label htmlFor="cidade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Cidade
           </label>
-          <ComboboxCidade uf={uf} value={cidade} onChange={onCidade} disabled={pending} />
+          <ComboboxCidade uf={uf} value={cidade} onChange={selecionarCidade} disabled={pending} />
         </div>
       </div>
 
@@ -630,18 +657,18 @@ function PassoTorcida({
         type="button"
         onClick={onTorcedorGlobal}
         disabled={pending}
-        className="mt-6 flex w-full items-center gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 sm:p-5"
+        className="mt-6 flex w-full items-center gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 sm:gap-5 sm:p-5"
       >
         {pending ? (
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-            <Loader2 className="h-5 w-5 animate-spin text-[rgb(var(--foreground-muted))]" />
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+            <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
           </div>
         ) : (
           <EscudoClube
             nome={nomeClube}
             apelido={clube?.apelido}
             escudoUrl={clube?.escudoUrl}
-            size="md"
+            size="xl"
             shape="circle"
             priority
           />
@@ -650,7 +677,7 @@ function PassoTorcida({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
             Sem organizada
           </p>
-          <p className="mt-0.5 text-base font-semibold text-[rgb(var(--foreground))]">
+          <p className="mt-0.5 text-base font-semibold text-[rgb(var(--foreground))] sm:text-lg">
             Sou só torcedor do {nomeClube}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
@@ -680,7 +707,7 @@ function PassoTorcida({
             <div className="h-px flex-1 bg-[rgb(var(--border))]" />
           </div>
 
-          <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+          <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {torcidas.map((t, i) => (
               <li key={t.id}>
                 <MotionReveal index={i} className="h-full">
@@ -739,9 +766,44 @@ function PassoUnidade({
   const [uploadProvaPend, setUploadProvaPend] = useState(false)
   const [errosUnidade, setErrosUnidade] = useState<Record<string, string[]>>({})
   const [enviando, startEnvio] = useTransition()
+  const [localizacaoEfetiva, setLocalizacaoEfetiva] = useState(localizacao)
+  const [sedesResolvidas, setSedesResolvidas] = useState(torcida.sedes)
 
-  const { recomendadas, outras } = agruparSedesPorRegiao(torcida.sedes, uf, cidade, localizacao)
-  const temUnidades = torcida.sedes.length > 0
+  // Garante coords mesmo se o usuário avançou antes do geocode da cidade terminar.
+  useEffect(() => {
+    if (localizacao) {
+      setLocalizacaoEfetiva(localizacao)
+      return
+    }
+    if (!cidade.trim() || !uf.trim()) return
+    let ativo = true
+    void forwardGeocodeRegion(cidade, uf).then((regiao) => {
+      if (ativo && regiao) setLocalizacaoEfetiva(regiao)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [localizacao, cidade, uf])
+
+  // Banco ainda pode estar sem lat/lng — geocodifica endereço/cidade no cliente.
+  useEffect(() => {
+    let ativo = true
+    setSedesResolvidas(torcida.sedes)
+    void enrichSedesComCoordenadas(torcida.sedes).then((sedes) => {
+      if (ativo) setSedesResolvidas(sedes)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [torcida.sedes])
+
+  const { recomendadas, outras } = agruparSedesPorRegiao(
+    sedesResolvidas,
+    uf,
+    cidade,
+    localizacaoEfetiva,
+  )
+  const temUnidades = sedesResolvidas.length > 0
 
   function selecionarUnidade(id: string) {
     setModoNaoListada(false)
@@ -1079,7 +1141,7 @@ function ListaUnidades({
   priorityCount = 0,
 }: {
   titulo: string
-  sedes: SedeOnboarding[]
+  sedes: SedeOnboardingComDistancia[]
   selecionada: string | null
   onSelecionar: (id: string) => void
   /** Quantas imagens priorizar (LCP) no topo da lista. */
@@ -1290,64 +1352,68 @@ function PassoVinculo({
           className="mt-4"
         />
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {/* Card 1: Torcedor da torcida */}
           <button
             type="button"
             onClick={() => enviar('TORCEDOR')}
             disabled={pending || unidadePendente}
-            className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+            className="group flex h-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <div className="flex items-center">
+            <div className="flex w-[6.5rem] shrink-0 flex-col items-center justify-center gap-2.5 self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
               <EscudoClube
                 nome={nomeClube}
                 apelido={clube?.apelido}
                 escudoUrl={clube?.escudoUrl}
-                size="sm"
-                className="relative z-10 ring-2 ring-[rgb(var(--surface))]"
+                size="lg"
+                shape="circle"
+                priority
               />
               <EscudoClube
                 nome={torcida.nome}
                 escudoUrl={torcida.logoUrl}
-                size="sm"
-                className="relative -ml-2.5 ring-2 ring-[rgb(var(--surface))]"
+                size="lg"
+                shape="circle"
+                priority
               />
             </div>
 
-            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
-              Entrada imediata
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
-              Torcedor da torcida
-            </p>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-              Entra agora nas duas comunidades — sem aprovação nem comprovante.
-            </p>
+            <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
+                Entrada imediata
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
+                Torcedor da torcida
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                Entra agora nas duas comunidades — sem aprovação nem comprovante.
+              </p>
 
-            <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-              <li className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
-                <span>
-                  Comunidade do <strong>{nomeClube}</strong> (feed nacional)
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
-                <span>
-                  Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
-                  novidades)
-                </span>
-              </li>
-              <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
-                <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                <span>Sem mural exclusivo de sócios</span>
-              </li>
-            </ul>
+              <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
+                <li className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <span>
+                    Comunidade do <strong>{nomeClube}</strong> (feed nacional)
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <span>
+                    Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
+                    novidades)
+                  </span>
+                </li>
+                <li className="flex gap-2 text-[rgb(var(--foreground-muted))]">
+                  <X className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
+                  <span>Sem mural exclusivo de sócios</span>
+                </li>
+              </ul>
 
-            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary))]">
-              Entrar agora
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </span>
+              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+                Entrar agora
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </div>
           </button>
 
           {/* Card 2: Sócio da organizada */}
@@ -1355,51 +1421,59 @@ function PassoVinculo({
             type="button"
             onClick={abrirSocio}
             disabled={pending}
-            className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 text-left transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+            className="group flex h-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
           >
-            <div className="relative w-fit">
-              <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="sm" />
+            <div className="relative flex w-[6.5rem] shrink-0 items-center justify-center self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 sm:w-[7.5rem]">
+              <EscudoClube
+                nome={torcida.nome}
+                escudoUrl={torcida.logoUrl}
+                size="xl"
+                shape="circle"
+                priority
+              />
               <span
-                className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
+                className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-white shadow-sm ring-2 ring-[rgb(var(--surface))]"
                 aria-hidden
               >
                 <Shield className="h-3.5 w-3.5" />
               </span>
             </div>
 
-            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Requer aprovação
-            </p>
-            <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
-              Sócio da organizada
-            </p>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-              Acesso interno de sócios, com comprovante e análise da liderança.
-            </p>
+            <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Requer aprovação
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
+                Sócio da organizada
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
+                Acesso interno de sócios, com comprovante e análise da liderança.
+              </p>
 
-            <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
-              <li className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
-                <span>
-                  Comunidade do <strong>{nomeClube}</strong>
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
-                <span>
-                  Mural interno de sócios da <strong>{torcida.nome}</strong>
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
-                <span>Carteirinha, benefícios e posts exclusivos</span>
-              </li>
-            </ul>
+              <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
+                <li className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <span>
+                    Comunidade do <strong>{nomeClube}</strong>
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <span>
+                    Mural interno de sócios da <strong>{torcida.nome}</strong>
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <span>Carteirinha, benefícios e posts exclusivos</span>
+                </li>
+              </ul>
 
-            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[rgb(var(--color-primary))]">
-              Solicitar vínculo
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </span>
+              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+                Solicitar vínculo
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </div>
           </button>
         </div>
       </div>
@@ -1414,7 +1488,7 @@ function PassoVinculo({
             Preencha seus dados. A liderança da {torcida.nome} vai analisar.
           </p>
         </div>
-        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="md" />
+        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="xl" shape="circle" />
       </div>
 
       <div className="mt-6 space-y-4">
