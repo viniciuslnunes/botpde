@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
@@ -8,6 +8,8 @@ import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
+import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
+import { useFeedWindow } from '@/lib/use-feed-window'
 
 interface CurrentUser {
   id: string
@@ -18,18 +20,6 @@ interface CurrentUser {
 interface PageInfo {
   hasMore: boolean
   nextCursor: string | null
-}
-
-type ApiPage = {
-  posts: PostSocialItem[]
-  pageInfo: PageInfo
-}
-
-const pageCache = new Map<string, ApiPage>()
-const MAX_CACHED_PAGES = 12
-
-function cacheKey(params: { tenantId: string; viewerId: string; cursor: string | null }) {
-  return `${params.tenantId}:${params.viewerId}:${params.cursor ?? ''}`
 }
 
 export function ComunidadeRedeInfinite({
@@ -49,21 +39,26 @@ export function ComunidadeRedeInfinite({
 }) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
 
-  const [posts, setPosts] = useState<PostSocialItem[]>(initialPosts)
-  const [pageInfo, setPageInfo] = useState<PageInfo>(initialPageInfo)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    posts,
+    pageInfo,
+    currentCursor,
+    loadingMore,
+    error,
+    loadMore,
+    refreshCurrentPage,
+  } = useComunidadeInfiniteFeed<PostSocialItem>({
+    endpoint: '/api/comunidade/rede',
+    tenantId,
+    viewerId: currentUser.id,
+    initialPosts,
+    initialPageInfo,
+    initialCursor,
+  })
 
-  const abortRef = useRef<AbortController | null>(null)
-  const loadedCursorsRef = useRef<Set<string | null>>(new Set([initialCursor]))
+  const { start, end, topSpacer, bottomSpacer } = useFeedWindow(posts.length)
 
-  // “cursor” representa o trecho atualmente exibido (por deep link). SSE deve atualizar esse trecho.
-  const currentCursorRef = useRef<string | null>(initialCursor)
-
-  const refreshLockRef = useRef(false)
   const refreshDebounceRef = useRef<number | null>(null)
-
-  const endpointBase = '/api/comunidade/rede'
 
   const replaceUrlCursor = useCallback((nextCursor: string) => {
     const url = new URL(window.location.href)
@@ -71,149 +66,15 @@ export function ComunidadeRedeInfinite({
     window.history.replaceState({}, '', url.toString())
   }, [])
 
-  const loadMore = useCallback(async () => {
-    if (!pageInfo.hasMore || !pageInfo.nextCursor) return
-    if (loadingMore) return
-    if (loadedCursorsRef.current.has(pageInfo.nextCursor)) return
-
-    const cursor = pageInfo.nextCursor
-    loadedCursorsRef.current.add(cursor)
-
-    const key = cacheKey({ tenantId, viewerId: currentUser.id, cursor })
-    if (pageCache.has(key)) {
-      const cached = pageCache.get(key)
-      if (cached) {
-        setPosts((prev) => {
-          const existing = new Set(prev.map((p) => p.id))
-          const deduped = cached.posts.filter((p) => !existing.has(p.id))
-          return [...prev, ...deduped]
-        })
-        setPageInfo(cached.pageInfo)
-      }
-      return
-    }
-
-    setLoadingMore(true)
-    setError(null)
-
-    abortRef.current?.abort()
-    const ac = new AbortController()
-    abortRef.current = ac
-
-    try {
-      const url = new URL(endpointBase, window.location.origin)
-      url.searchParams.set('take', '20')
-      url.searchParams.set('cursor', cursor)
-
-      const res = await fetch(url.toString(), {
-        method: 'GET',
-        signal: ac.signal,
-        credentials: 'include',
-      })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Erro ao carregar mais posts.')
-      }
-
-      const data = (await res.json()) as ApiPage
-
-      // Deeplink: mantém na URL o cursor do trecho que acabou de entrar.
-      replaceUrlCursor(cursor)
-
-      setPosts((prev) => {
-        const existing = new Set(prev.map((p) => p.id))
-        const deduped = data.posts.filter((p) => !existing.has(p.id))
-        return [...prev, ...deduped]
-      })
-      setPageInfo(data.pageInfo)
-      currentCursorRef.current = cursor
-
-      if (pageCache.size >= MAX_CACHED_PAGES) {
-        const firstKey = pageCache.keys().next().value as string | undefined
-        if (firstKey) pageCache.delete(firstKey)
-      }
-      pageCache.set(key, data)
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      setError(e instanceof Error ? e.message : 'Erro ao carregar mais posts.')
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [
-    currentUser.id,
-    endpointBase,
-    loadingMore,
-    pageInfo.hasMore,
-    pageInfo.nextCursor,
-    replaceUrlCursor,
-    tenantId,
-  ])
-
-  useEffect(() => {
-    return () => abortRef.current?.abort()
-  }, [])
-
-  const refreshCurrentPage = useCallback(async () => {
-    if (refreshLockRef.current) return
-    if (loadingMore) return
-
-    refreshLockRef.current = true
-    setError(null)
-
-    try {
-      abortRef.current?.abort()
-      const ac = new AbortController()
-      abortRef.current = ac
-
-      const cursor = currentCursorRef.current
-      const url = new URL(endpointBase, window.location.origin)
-      url.searchParams.set('take', '20')
-      if (cursor) url.searchParams.set('cursor', cursor)
-
-      const res = await fetch(url.toString(), {
-        method: 'GET',
-        signal: ac.signal,
-        credentials: 'include',
-      })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? 'Erro ao atualizar feed.')
-      }
-
-      const data = (await res.json()) as ApiPage
-
-      setPosts((prev) => {
-        const refreshedById = new Map(data.posts.map((p) => [p.id, p]))
-        // Atualiza somente itens que fazem parte do trecho refinado; evita “pular” conteúdo.
-        const updated = prev.map((p) => refreshedById.get(p.id) ?? p)
-
-        // Se chegaram itens novos dentro do recorte, prepend para consistência.
-        const prevIds = new Set(updated.map((p) => p.id))
-        const newPosts = data.posts.filter((p) => !prevIds.has(p.id))
-        return [...newPosts, ...updated]
-      })
-      setPageInfo(data.pageInfo)
-
-      const key = cacheKey({
-        tenantId,
-        viewerId: currentUser.id,
-        cursor: currentCursorRef.current,
-      })
-      pageCache.set(key, data)
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      setError(e instanceof Error ? e.message : 'Erro ao atualizar feed.')
-    } finally {
-      refreshLockRef.current = false
-    }
-  }, [currentUser.id, endpointBase, loadingMore, tenantId])
+  const loadMoreWithDeeplink = useCallback(async () => {
+    const cursor = await loadMore()
+    if (typeof cursor === 'string') replaceUrlCursor(cursor)
+  }, [loadMore, replaceUrlCursor])
 
   useFeedStream(() => {
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
     refreshDebounceRef.current = window.setTimeout(() => {
-      void refreshCurrentPage()
+      void refreshCurrentPage(currentCursor)
     }, 800)
   })
 
@@ -227,14 +88,14 @@ export function ComunidadeRedeInfinite({
       (entries) => {
         const visible = entries.some((x) => x.isIntersecting)
         if (!visible) return
-        void loadMore()
+        void loadMoreWithDeeplink()
       },
       { root: null, rootMargin: '300px' },
     )
 
     obs.observe(el)
     return () => obs.disconnect()
-  }, [loadMore])
+  }, [loadMoreWithDeeplink])
 
   if (posts.length === 0) {
     return (
@@ -256,19 +117,25 @@ export function ComunidadeRedeInfinite({
     )
   }
 
+  const visiblePosts = posts.slice(start, end)
+
   return (
     <>
       <section className="space-y-4">
-        {posts.map((post, index) => (
-          <MotionReveal key={post.id} index={index}>
-            <FeedPostCard
-              post={post}
-              currentUser={currentUser}
-              salvo={salvoSet.has(post.id)}
-              showTenantBadge={post.tenantId !== tenantId}
-            />
+        {topSpacer > 0 ? <div aria-hidden style={{ height: topSpacer }} /> : null}
+        {visiblePosts.map((post, index) => (
+          <MotionReveal key={post.id} index={start + index}>
+            <div className="feed-post-window">
+              <FeedPostCard
+                post={post}
+                currentUser={currentUser}
+                salvo={salvoSet.has(post.id)}
+                showTenantBadge={post.tenantId !== tenantId}
+              />
+            </div>
           </MotionReveal>
         ))}
+        {bottomSpacer > 0 ? <div aria-hidden style={{ height: bottomSpacer }} /> : null}
       </section>
 
       {error && (
@@ -287,4 +154,3 @@ export function ComunidadeRedeInfinite({
     </>
   )
 }
-

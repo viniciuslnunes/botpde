@@ -125,6 +125,12 @@ aprovação humana antes de implementação (`product-strategy` + `performance`)
 
 ### Fase C — refinamento zero-infra (próximos 2–4 sprints)
 
+**Entregue parcialmente (2026-07-16):** C2 `revalidateTag` + tags em caches;
+C1 windowing (`useFeedWindow` + `content-visibility`); C3 hook compartilhado
+`useComunidadeInfiniteFeed` (substitui Map duplicado); C5 `ComunidadePrefetchLink`;
+C4 e2e budget Comunidade; C6 hashtags com TTL 300s + invalidação on-write.
+**Pendente:** TanStack Query/Virtual quando `@tanstack/*` instalável no ambiente.
+
 | # | Recorte | Por quê | Esforço |
 |---|---------|---------|---------|
 | C1 | **Virtualização** de listas longas (`@tanstack/react-virtual` ou equivalente) em feed infinite, notificações e inbox | DOM e hidratação custam mais que query após ~50 cards | Médio |
@@ -183,6 +189,10 @@ aprovação humana antes de implementação (`product-strategy` + `performance`)
 
 | Área | Caminho |
 |------|---------|
+| Cache tags | `apps/web/src/lib/comunidade-cache.ts` |
+| Infinite hook | `apps/web/src/lib/use-comunidade-infinite-feed.ts` |
+| Windowing | `apps/web/src/lib/use-feed-window.ts` |
+| Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
 | Feed + ranking | `apps/web/src/lib/feed.ts` |
 | Timeline | `apps/web/src/lib/feed-timeline.ts` |
 | Busca | `apps/web/src/lib/comunidade-busca.ts` |

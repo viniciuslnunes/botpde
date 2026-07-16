@@ -2,6 +2,7 @@ import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
+import { tagSalasAtivas } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
 
 export type SalaAtivaListItem = {
@@ -64,7 +65,7 @@ export async function listSalasAtivas(tenantId: string): Promise<SalaAtivaListIt
         orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
       }) as Promise<SalaAtivaListItem[]>),
     ['salas-ativas', tenantId],
-    { revalidate: 15 },
+    { revalidate: 15, tags: [tagSalasAtivas(tenantId)] },
   )()
 
   return salas.map((sala) => ({

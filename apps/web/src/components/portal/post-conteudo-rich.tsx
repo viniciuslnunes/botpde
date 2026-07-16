@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import Link from 'next/link'
+import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { MENCAO_REGEX, HASHTAG_REGEX } from '@torcida/types'
 
 interface PostConteudoRichProps {
@@ -22,24 +22,24 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
       const nome = m[1]
       const userId = m[2]
       nodes.push(
-        <Link
+        <ComunidadePrefetchLink
           key={`${keyPrefix}-m-${i}`}
           href={`/portal/comunidade/perfil/${userId}`}
           className="font-semibold text-[rgb(var(--primary))] hover:underline"
         >
           @{nome}
-        </Link>,
+        </ComunidadePrefetchLink>,
       )
     } else if (m[0].startsWith('#')) {
       const tag = m[1].toLowerCase()
       nodes.push(
-        <Link
+        <ComunidadePrefetchLink
           key={`${keyPrefix}-h-${i}`}
           href={`/portal/comunidade/hashtag/${encodeURIComponent(tag)}`}
           className="font-semibold text-[rgb(var(--primary))] hover:underline"
         >
           #{m[1]}
-        </Link>,
+        </ComunidadePrefetchLink>,
       )
     }
     last = m.index + m[0].length

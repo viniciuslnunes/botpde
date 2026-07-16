@@ -4,6 +4,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { canViewRecurso, SYSTEM_ROLES } from '@torcida/types'
+import { tagCanaisVisiveis } from './comunidade-cache'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
 import { getEscopoEventosVisiveis } from './eventos'
@@ -169,7 +170,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
         },
       }),
     ['canais-visiveis-base', viewerTenantId, visibleTenantIdsKey],
-    { revalidate: 120 },
+    { revalidate: 120, tags: [tagCanaisVisiveis(viewerTenantId)] },
   )()
 
   const memberships: Array<{ conversaId: string; papel: 'ADMIN' | 'MEMBRO' }> =

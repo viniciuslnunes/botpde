@@ -53,6 +53,42 @@ test.describe('Navegação portal — latência percebida', () => {
     console.log(`[nav-benchmark] Comunidade conteúdo: ${Date.now() - start}ms`)
   })
 
+  test('Comunidade: chat colapsado não dispara inbox completa', async ({ page }) => {
+    const inboxRequests: string[] = []
+    page.on('request', (req) => {
+      const url = req.url()
+      if (url.includes('/api/conversas') && !url.includes('/resumo')) {
+        inboxRequests.push(url)
+      }
+    })
+
+    await page.goto('/portal/comunidade', { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(1500)
+
+    expect(inboxRequests).toHaveLength(0)
+  })
+
+  test('Comunidade: budget de API no mount', async ({ page }) => {
+    const feedApiHits: string[] = []
+    const resumoHits: string[] = []
+
+    page.on('request', (req) => {
+      const url = req.url()
+      if (url.includes('/api/comunidade/feed')) feedApiHits.push(url)
+      if (url.includes('/api/conversas/resumo')) resumoHits.push(url)
+    })
+
+    await page.goto('/portal/comunidade', { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(1200)
+
+    console.log(
+      `[nav-benchmark] Comunidade mount: feed=${feedApiHits.length} resumo=${resumoHits.length}`,
+    )
+
+    // SSR entrega HTML; client não deve disparar tempestade de feed no mount.
+    expect(feedApiHits.length).toBeLessThanOrEqual(2)
+  })
+
   test('Mensagens: shell em <1s após navegação', async ({ page }) => {
     const start = Date.now()
     await page.getByRole('link', { name: /Mensagens/i }).first().click()

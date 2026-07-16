@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
+import { tagStoriesRings } from './comunidade-cache'
 import { getAutoresSemAcesso, resolverAvatarSocial } from './perfil-social'
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000
@@ -112,7 +113,7 @@ export const getStoryRings = cache(async function getStoryRings(
       }))
     },
     ['stories-rings-base', tenantId, visibleTenantIdsKey],
-    { revalidate: 60 },
+    { revalidate: 60, tags: [tagStoriesRings(tenantId)] },
   )()
 
   const porAutor = new Map<string, StoryRingItem>()

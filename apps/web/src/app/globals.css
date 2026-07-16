@@ -281,3 +281,9 @@ body {
     height: 1.75rem !important;
   }
 }
+
+/* Comunidade — windowing nativo (Fase C1): pula paint fora da viewport */
+.feed-post-window {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}

@@ -568,6 +568,10 @@ C–F): **`docs/data/modulo-comunidade-performance.md`**.
 **Próximo recorte documentado (Fase C):** virtualização de feed, `revalidateTag`
 na timeline, TanStack Query, e2e de latência Comunidade — ver doc acima.
 
+**Fase C parcial (2026-07-16):** `revalidateTag` em caches (`comunidade-cache.ts`),
+windowing (`useFeedWindow`), hook infinite compartilhado, prefetch hover, e2e budget.
+TanStack Query/Virtual pendente de instalação de pacote no ambiente.
+
 ### 5.7 Animações Motion (2026-07)
 
 Pacote [`motion`](https://motion.dev/) v12 com `LazyMotion` + presets em

@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { Repeat2, Pin, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
@@ -27,17 +27,17 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
-        <Link href={`/portal/comunidade/perfil/${post.autor.id}`}>
+        <ComunidadePrefetchLink href={`/portal/comunidade/perfil/${post.autor.id}`}>
           <Avatar nome={post.autor.nome} avatarUrl={post.autor.avatarUrl} size="md" />
-        </Link>
+        </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2">
-            <Link
+            <ComunidadePrefetchLink
               href={`/portal/comunidade/perfil/${post.autor.id}`}
               className="text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
             >
               {post.autor.nome ?? 'Membro'}
-            </Link>
+            </ComunidadePrefetchLink>
             {showTenantBadge && (
               <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--primary))]">
                 {post.tenant.nome}
@@ -61,19 +61,19 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
             )}
           </div>
           {post.autor.nickname && (
-            <Link
+            <ComunidadePrefetchLink
               href={`/portal/comunidade/perfil/${post.autor.id}`}
               className="block truncate text-xs text-[rgb(var(--foreground-muted))] hover:underline"
             >
               @{post.autor.nickname}
-            </Link>
+            </ComunidadePrefetchLink>
           )}
-          <Link
+          <ComunidadePrefetchLink
             href={linkPostComunidade(post.id)}
             className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
           >
             {formatRelative(post.criadoEm)}
-          </Link>
+          </ComunidadePrefetchLink>
         </div>
         {author && (
           <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} fixado={post.fixado} />

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
@@ -38,6 +39,10 @@ import {
 } from '@/lib/feed-timeline'
 
 const MAX_MIDIAS = 10
+
+function invalidarLeituraComunidade(tenantId: string): void {
+  invalidarCachesComunidadeFeed(tenantId)
+}
 
 async function getSessionAndPortalTenant() {
   const session = await auth()
@@ -191,6 +196,7 @@ export async function publicarPost(
     ])
 
     revalidatePath('/portal/comunidade')
+    invalidarLeituraComunidade(tenant.id)
     emitFeedPing(tenant.id)
     return { success: true, token: post.id }
   } catch (error) {
@@ -257,6 +263,7 @@ export async function publicarPostComoTorcedorGlobal(
   })
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   emitFeedPing(tenant.id)
 }
 
@@ -334,6 +341,7 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath('/portal/comunidade/seguindo')
+  invalidarLeituraComunidade(tenantContextoId)
 
   return statusInicial
 }
@@ -397,6 +405,7 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
   revalidatePath('/portal/comunidade/seguindo')
   revalidatePath('/portal/comunidade/notificacoes')
+  invalidarLeituraComunidade(tenantNotif)
 }
 
 export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
@@ -426,11 +435,14 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
   revalidatePath('/portal/comunidade/notificacoes')
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant?.id ?? seguimento.tenantContextoId)
 }
 
 export async function deixarDeSeguir(userId: string): Promise<void> {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
 
   // Só apaga o próprio seguimento (seguidorId = sessão) — não precisa de tenant.
   await db.seguimento.deleteMany({
@@ -446,6 +458,7 @@ export async function deixarDeSeguir(userId: string): Promise<void> {
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+  if (tenant?.id) invalidarLeituraComunidade(tenant.id)
 }
 
 export interface AtualizarPerfilSocialInput {
@@ -530,6 +543,7 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+  invalidarLeituraComunidade(tenant.id)
 }
 
 export async function excluirPost(postId: string): Promise<void> {
@@ -559,6 +573,7 @@ export async function excluirPost(postId: string): Promise<void> {
 
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
+  invalidarLeituraComunidade(tenant.id)
 }
 
 export interface ComentarioPostItem {
@@ -762,6 +777,7 @@ export async function publicarEnquete(
   ])
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
@@ -969,6 +985,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   })
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   emitFeedPing(tenant.id)
 }
 
@@ -1018,6 +1035,7 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
   })
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   emitFeedPing(tenant.id)
 }
 
@@ -1094,6 +1112,7 @@ export async function publicarPostEvento(
   })
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   emitFeedPing(tenant.id)
   return { success: true, token: post.id }
 }
@@ -1249,6 +1268,7 @@ export async function publicarMomentoStory(
   })
 
   revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
   return { success: true }
 }
 

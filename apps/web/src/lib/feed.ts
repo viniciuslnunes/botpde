@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
+import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes } from './comunidade-cache'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
 import { getVisibleTenantIds } from './hierarquia'
 import {
@@ -376,7 +377,7 @@ async function getDescobrirPostsBaseCached(
       return postsRaw.map(projetarPost)
     },
     ['feed-descobrir-base', tenantId, visibleTenantIdsKey, cursorKey, String(fetchLimit)],
-    { revalidate: 60 },
+    { revalidate: 60, tags: [tagFeedDescobrir(tenantId)] },
   )()
 
   return cached.map(revivePostSocialItem)
@@ -590,7 +591,7 @@ async function getSugestoesAutoresBaseCached(
       })
     },
     ['feed-sugestoes-base', tenantId, visibleTenantIdsKey],
-    { revalidate: 120 },
+    { revalidate: 120, tags: [tagFeedSugestoes(tenantId)] },
   )()
 }
 
@@ -1053,7 +1054,7 @@ export async function getHashtagsEmAlta(
         .filter((h): h is HashtagEmAlta => h.tag != null)
     },
     ['feed-hashtags-alta', tenantId, visibleTenantIdsKey, String(limite)],
-    { revalidate: 120 },
+    { revalidate: 300, tags: [tagFeedHashtags(tenantId)] },
   )()
 
   return cached
