@@ -48,8 +48,10 @@ type MeetRoomProps = {
   isHost: boolean
   userId: string
   userName: string
+  userAvatarUrl?: string | null
   participantProfiles?: Record<string, { nome: string | null; avatarUrl: string | null }>
   popoutMode?: boolean
+  resumeScreenShare?: boolean
   showParticipantStrip?: boolean
   canOpenVideoPopout?: boolean
   onOpenVideoPopout?: () => void
@@ -522,13 +524,43 @@ function MeetControls({
   )
 }
 
+function resolveParticipantProfile(
+  tile: Element,
+  userId: string,
+  participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>,
+): { nome: string | null; avatarUrl: string | null } | null {
+  const isLocal = tile.getAttribute('data-lk-local-participant') === 'true'
+  if (isLocal && participantProfiles[userId]) return participantProfiles[userId]
+
+  const attrName = tile.getAttribute('data-lk-participant-name')?.trim()
+  const labelName = tile.querySelector('.lk-participant-name')?.textContent?.trim()
+  const candidateName = attrName || labelName
+
+  if (candidateName) {
+    const byExactName = Object.values(participantProfiles).find(
+      (profile) => (profile.nome ?? '').trim() === candidateName,
+    )
+    if (byExactName) return byExactName
+
+    const byLooseName = Object.values(participantProfiles).find((profile) => {
+      const nome = (profile.nome ?? '').trim().toLowerCase()
+      return nome.length > 0 && candidateName.toLowerCase().includes(nome)
+    })
+    if (byLooseName) return byLooseName
+  }
+
+  return isLocal ? participantProfiles[userId] ?? null : null
+}
+
 function MeetStage({
   lk,
+  userId,
   participantProfiles,
   showParticipantStrip,
   onToggleParticipantStrip,
 }: {
   lk: LiveKitModule
+  userId: string
   participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
   showParticipantStrip: boolean
   onToggleParticipantStrip?: () => void
@@ -594,59 +626,49 @@ function MeetStage({
     const stage = stageRef.current
     if (!stage) return
 
-    const fallbackByName = new Map(
-      Object.values(participantProfiles).map((profile) => [profile.nome ?? 'Membro', profile]),
-    )
-
     for (const tile of Array.from(stage.querySelectorAll('.lk-participant-tile'))) {
       const source = tile.getAttribute('data-lk-source')
       if (source === 'screen_share') continue
 
-      const hasMedia = Boolean(tile.querySelector('video, canvas'))
+      const videoMuted = tile.getAttribute('data-lk-video-muted') === 'true'
+      const hasLiveVideo = Boolean(tile.querySelector('video, canvas')) && !videoMuted
       const existing = tile.querySelector('.meet-room-avatar-fallback')
-      const placeholder = tile.querySelector('.lk-participant-placeholder')
 
-      if (hasMedia) {
+      if (hasLiveVideo) {
         existing?.remove()
         tile.removeAttribute('data-meet-room-custom-avatar')
         continue
       }
 
-      const identity =
-        tile.getAttribute('data-lk-participant-identity') ??
-        tile.closest('[data-lk-participant-identity]')?.getAttribute('data-lk-participant-identity') ??
-        null
-      const labelNode = tile.querySelector('.lk-participant-metadata, .lk-participant-name')
-      const participantName = labelNode?.textContent?.trim() || 'Membro'
-      const profile =
-        (identity ? participantProfiles[identity] : null) ??
-        fallbackByName.get(participantName) ??
-        null
+      const profile = resolveParticipantProfile(tile, userId, participantProfiles)
+      const participantName =
+        tile.getAttribute('data-lk-participant-name')?.trim() ||
+        tile.querySelector('.lk-participant-name')?.textContent?.trim() ||
+        profile?.nome ||
+        'Membro'
 
       tile.setAttribute('data-meet-room-custom-avatar', 'true')
-      if (placeholder) placeholder.setAttribute('aria-hidden', 'true')
 
-      if (!existing) {
-        const fallback = document.createElement('div')
-        fallback.className = 'meet-room-avatar-fallback'
+      const fallback = existing ?? document.createElement('div')
+      fallback.className = 'meet-room-avatar-fallback'
+      fallback.replaceChildren()
 
-        if (profile?.avatarUrl) {
-          const img = document.createElement('img')
-          img.src = profile.avatarUrl
-          img.alt = participantName
-          img.className = 'meet-room-avatar-fallback__image'
-          fallback.appendChild(img)
-        } else {
-          const initial = document.createElement('span')
-          initial.className = 'meet-room-avatar-fallback__initial'
-          initial.textContent = (profile?.nome ?? participantName).charAt(0).toUpperCase() || 'M'
-          fallback.appendChild(initial)
-        }
-
-        tile.appendChild(fallback)
+      if (profile?.avatarUrl) {
+        const img = document.createElement('img')
+        img.src = profile.avatarUrl
+        img.alt = participantName
+        img.className = 'meet-room-avatar-fallback__image'
+        fallback.appendChild(img)
+      } else {
+        const initial = document.createElement('span')
+        initial.className = 'meet-room-avatar-fallback__initial'
+        initial.textContent = participantName.charAt(0).toUpperCase() || 'M'
+        fallback.appendChild(initial)
       }
+
+      if (!existing) tile.appendChild(fallback)
     }
-  }, [participantProfiles, tracks])
+  }, [participantProfiles, tracks, userId])
 
   if (focusTrack) {
     return (
@@ -722,6 +744,7 @@ function MeetConference({
   userName,
   participantProfiles,
   popoutMode,
+  resumeScreenShare,
   showParticipantStrip,
   canOpenVideoPopout,
   onOpenVideoPopout,
@@ -737,6 +760,7 @@ function MeetConference({
   userName: string
   participantProfiles: Record<string, { nome: string | null; avatarUrl: string | null }>
   popoutMode: boolean
+  resumeScreenShare: boolean
   showParticipantStrip: boolean
   canOpenVideoPopout: boolean
   onOpenVideoPopout?: () => void
@@ -782,6 +806,25 @@ function MeetConference({
     onScreenShareActiveChange?.(activeScreenSharers.length > 0)
   }, [activeScreenSharers.length, onScreenShareActiveChange])
 
+  useEffect(() => {
+    if (!resumeScreenShare) return
+    if (room.state !== ConnectionState.Connected) return
+    if (localParticipant.isScreenShareEnabled) return
+
+    let cancelled = false
+    void localParticipant
+      .setScreenShareEnabled(true, { audio: true })
+      .catch(() => {
+        if (!cancelled) {
+          toast.info('Reative o compartilhamento de tela nesta janela para continuar a apresentação.')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [resumeScreenShare, room.state, localParticipant])
+
   const canSpeak = canUseSpeak(localParticipant, isHost)
   const canScreen = canUseScreenShare(localParticipant, isHost)
   const conectado = room.state === ConnectionState.Connected
@@ -816,6 +859,7 @@ function MeetConference({
               >
                 <MeetStage
                   lk={lk}
+                  userId={userId}
                   participantProfiles={participantProfiles}
                   showParticipantStrip={showParticipantStrip}
                   onToggleParticipantStrip={onToggleParticipantStrip}
@@ -866,8 +910,10 @@ export function MeetRoom({
   isHost,
   userId,
   userName,
+  userAvatarUrl = null,
   participantProfiles = {},
   popoutMode = false,
+  resumeScreenShare = false,
   showParticipantStrip = true,
   canOpenVideoPopout = false,
   onOpenVideoPopout,
@@ -879,6 +925,16 @@ export function MeetRoom({
   const [lk, setLk] = useState<LiveKitModule | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [mediaHint, setMediaHint] = useState<string | null>(null)
+
+  const profilesWithLocal = useMemo(() => {
+    const next = { ...participantProfiles }
+    const existing = next[userId]
+    next[userId] = {
+      nome: existing?.nome ?? userName,
+      avatarUrl: userAvatarUrl ?? existing?.avatarUrl ?? null,
+    }
+    return next
+  }, [participantProfiles, userAvatarUrl, userId, userName])
 
   useEffect(() => {
     let active = true
@@ -924,8 +980,9 @@ export function MeetRoom({
       isHost,
       userId,
       userName,
-      participantProfiles,
+      participantProfiles: profilesWithLocal,
       popoutMode,
+      resumeScreenShare,
       showParticipantStrip,
       canOpenVideoPopout,
       onOpenVideoPopout,
@@ -940,8 +997,9 @@ export function MeetRoom({
       isHost,
       userId,
       userName,
-      participantProfiles,
+      profilesWithLocal,
       popoutMode,
+      resumeScreenShare,
       showParticipantStrip,
       canOpenVideoPopout,
       onOpenVideoPopout,

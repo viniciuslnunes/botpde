@@ -35,6 +35,7 @@ type SalaAtivaClientProps = {
   isHost: boolean
   userId: string
   userName: string
+  userAvatarUrl?: string | null
   livekitOk: boolean
   token: string | null
   livekitUrl: string | null
@@ -89,6 +90,7 @@ export function SalaAtivaClient({
   isHost,
   userId,
   userName,
+  userAvatarUrl = null,
   livekitOk,
   token,
   livekitUrl,
@@ -108,7 +110,12 @@ export function SalaAtivaClient({
   const participantProfiles = Object.fromEntries(
     initialParticipantes.map((participante) => [
       participante.userId,
-      { nome: participante.nome, avatarUrl: participante.avatarUrl },
+      {
+        nome: participante.nome,
+        avatarUrl:
+          participante.avatarUrl ??
+          (participante.userId === userId ? userAvatarUrl : null),
+      },
     ]),
   )
 
@@ -145,11 +152,12 @@ export function SalaAtivaClient({
       return
     }
 
-    const popoutUrl = `/video-sala/${sala.id}`
+    const resumeQuery = hasActiveScreenShare ? '?resumeScreen=1' : ''
+    const popoutUrl = `/video-sala/${sala.id}${resumeQuery}`
     const popout = window.open(
       popoutUrl,
       VIDEO_POPOUT_NAME,
-      'popup=yes,width=1280,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no',
+      'popup=yes,width=1440,height=900,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes',
     )
 
     if (!popout) {
@@ -167,7 +175,7 @@ export function SalaAtivaClient({
         setCallKey((k) => k + 1)
       }
     }, 500)
-  }, [encerrarPopout, sala.id, videoPopoutOpen])
+  }, [encerrarPopout, hasActiveScreenShare, sala.id, videoPopoutOpen])
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -284,9 +292,10 @@ export function SalaAtivaClient({
                   isHost={isHost}
                   userId={userId}
                   userName={userName}
+                  userAvatarUrl={userAvatarUrl}
                   participantProfiles={participantProfiles}
                   showParticipantStrip={participantStripVisible}
-                  canOpenVideoPopout={hasActiveScreenShare}
+                  canOpenVideoPopout
                   onOpenVideoPopout={abrirJanelaVideo}
                   onToggleParticipantStrip={() =>
                     setParticipantStripVisible((visible) => !visible)

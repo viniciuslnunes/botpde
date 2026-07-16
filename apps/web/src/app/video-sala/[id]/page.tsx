@@ -7,6 +7,7 @@ import { createRoomToken } from '@/lib/livekit'
 import { getSalaById } from '@/lib/salas'
 import { listParticipantesAtivos } from '@/lib/salas-presenca'
 import { getTenantFromHost } from '@/lib/tenant'
+import { formatDateTimeShort } from '@/lib/format-datetime'
 import { SalaPopoutShell } from '@/components/portal/sala-popout-shell'
 
 export const metadata: Metadata = { title: 'Vídeo da sala' }
@@ -14,10 +15,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function VideoSalaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ resumeScreen?: string }>
 }) {
   const { id } = await params
+  const query = await searchParams
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
@@ -47,14 +51,25 @@ export default async function VideoSalaPage({
       isHost={isHost}
       userId={session.user.id}
       userName={session.user.name ?? 'Torcedor'}
+      userAvatarUrl={session.user.image ?? null}
       token={token}
       livekitUrl={livekitUrl}
+      resumeScreenShare={query.resumeScreen === '1'}
       initialParticipantes={participantesAtivos.map((p) => ({
         userId: p.userId,
         nome: p.nome,
-        avatarUrl: p.avatarUrl,
+        avatarUrl: p.avatarUrl ?? (p.userId === session.user.id ? session.user.image ?? null : null),
         papel: p.papel,
         entrouEm: p.entrouEm.toISOString(),
+      }))}
+      initialMensagens={sala.mensagens.map((m) => ({
+        id: m.id,
+        conteudo: m.conteudo,
+        criadoEm: m.criadoEm.toISOString(),
+        criadoEmFormatado: formatDateTimeShort(m.criadoEm),
+        editadaEm: m.editadaEm?.toISOString() ?? null,
+        destacada: m.destacada,
+        autor: m.autor,
       }))}
     />
   )

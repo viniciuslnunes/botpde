@@ -63,13 +63,14 @@ export default async function SalaDetailPage({
       isHost={isHost}
       userId={session.user.id}
       userName={session.user.name ?? 'Torcedor'}
+      userAvatarUrl={session.user.image ?? null}
       livekitOk={livekitOk}
       token={token}
       livekitUrl={livekitUrl}
       initialParticipantes={participantesAtivos.map((p) => ({
         userId: p.userId,
         nome: p.nome,
-        avatarUrl: p.avatarUrl,
+        avatarUrl: p.avatarUrl ?? (p.userId === session.user.id ? session.user.image ?? null : null),
         papel: p.papel,
         entrouEm: p.entrouEm.toISOString(),
       }))}
