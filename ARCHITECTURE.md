@@ -539,7 +539,9 @@ banner/busca/painel lateral):**
   autocomplete futuro (Loja, membros admin).
 - **Scroll chrome com rAF-throttle**: listeners de scroll sempre `passive`,
   coalescidos por `requestAnimationFrame` (nunca `setState` cru no handler de
-  scroll). Referência: `use-scroll-chrome-visibility.ts`.
+  scroll). Referência: `use-scroll-chrome-visibility.ts` (Comunidade) e
+  `use-persist-bar-visibility.ts` + `StickyPersistBar` (admin/loja/onboarding —
+  Salvar/Cancelar fixos; **não** na Comunidade).
 
 **Alerta de anti-padrão — fan-out N+1 em checagens por item:** checagens de
 visibilidade/seguimento chamadas em `map`/`for` por item de uma lista (ex.:

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useTransition, useRef, useState } from 'react'
+import { useActionState, useTransition, useRef, useState, useId } from 'react'
 import { criarProduto, editarProduto, alterarStatusProduto, atualizarStatusPedido } from '@/app/admin/loja/actions'
 import type { ProdutoState } from '@/app/admin/loja/actions'
 import { useCallback } from 'react'
@@ -10,6 +10,7 @@ import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import { StickyPersistBar } from '@/components/sticky-persist-bar'
 
 const TAMANHOS_OPCOES = ['PP', 'P', 'M', 'G', 'GG', 'EXG', 'XG', 'G1', 'G2', 'G3', 'UN']
 
@@ -288,7 +289,8 @@ const initialState: ProdutoState = {}
 export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: string; nome: string }[] }) {
   const [state, action, pending] = useActionState(criarProduto, initialState)
   const [open, setOpen] = useState(false)
-  const { formRef, markPristine } = useTrackedForm({
+  const formId = useId()
+  const { formRef, markPristine, isDirty, changes } = useTrackedForm({
     title: 'Novo produto',
     enabled: open,
   })
@@ -320,17 +322,20 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
             <h3 className="font-semibold text-[rgb(var(--foreground))]">Novo produto</h3>
             <button type="button" onClick={() => void closeForm()} className="text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">✕</button>
           </div>
-          <form ref={formRef} action={action} className="space-y-4">
+          <form
+            id={formId}
+            ref={formRef}
+            action={action}
+            data-persist-bar-root=""
+            className="space-y-4"
+          >
             <ProdutoFormFields state={state} categorias={categorias} />
             {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950 dark:text-red-400">{state.error}</p>}
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={pending}
-                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {pending ? 'Salvando...' : 'Criar produto'}
-              </button>
+            <StickyPersistBar
+              locked={pending || isDirty}
+              dirtyLabel={isDirty ? (changes.length === 1 ? changes[0] : `${changes.length} campos alterados`) : undefined}
+              hint="Preencha os dados do produto e confirme a criação."
+            >
               <button
                 type="button"
                 onClick={() => void closeForm()}
@@ -338,7 +343,15 @@ export function CriarProdutoForm({ categorias = [] }: { categorias?: { id: strin
               >
                 Cancelar
               </button>
-            </div>
+              <button
+                type="submit"
+                form={formId}
+                disabled={pending}
+                className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {pending ? 'Salvando...' : 'Criar produto'}
+              </button>
+            </StickyPersistBar>
           </form>
         </div>
       )}
@@ -371,14 +384,21 @@ export function EditarProdutoForm({
 }) {
   const boundAction = editarProduto.bind(null, id)
   const [state, action, pending] = useActionState(boundAction, initialState)
-  const { formRef, markPristine } = useTrackedForm({
+  const formId = useId()
+  const { formRef, markPristine, isDirty, changes } = useTrackedForm({
     id: `editar-produto-${id}`,
     title: 'Editar produto',
   })
   useActionStateToast(state, pending, 'Produto atualizado.', { onSuccess: markPristine })
 
   return (
-    <form ref={formRef} action={action} className="space-y-4">
+    <form
+      id={formId}
+      ref={formRef}
+      action={action}
+      data-persist-bar-root=""
+      className="space-y-4"
+    >
       <ProdutoFormFields
         state={state}
         categorias={categorias}
@@ -398,13 +418,26 @@ export function EditarProdutoForm({
       />
       {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-950">{state.error}</p>}
       {state.success && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950">Produto atualizado!</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+      <StickyPersistBar
+        locked={pending || isDirty}
+        dirtyLabel={
+          isDirty
+            ? changes.length === 1
+              ? changes[0]
+              : `${changes.length} campos alterados`
+            : undefined
+        }
+        hint="Altere os campos e salve. Sem mudanças, a barra some ao parar de rolar."
       >
-        {pending ? 'Salvando...' : 'Salvar alterações'}
-      </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending}
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {pending ? 'Salvando...' : 'Salvar alterações'}
+        </button>
+      </StickyPersistBar>
     </form>
   )
 }

@@ -70,6 +70,38 @@ Arquivo: `apps/web/src/lib/motion-presets.ts` — **fonte única** de timings e 
 |------------|---------|-------------|
 | `MotionReveal` | `components/motion/motion-reveal.tsx` | Um item em lista SSR; prop `index` limita delay (máx. 0,28s) |
 | `MotionEmptyState` | `components/motion/motion-empty-state.tsx` | Estados vazios com `icon`, `title`, `description` |
+| `StickyPersistBar` | `components/sticky-persist-bar.tsx` | Rodapé Salvar/Cancelar fixo no viewport (ver padrão abaixo) |
+
+### Barra de persistência (`StickyPersistBar`)
+
+**Regra da aplicação** em admin, departamentos (cargos/áreas), loja e onboarding.
+**Não usar na Comunidade** (lá o chrome sticky é busca/tabs/dock via
+`useScrollChromeVisibility`).
+
+Comportamento (`usePersistBarVisibility`):
+
+- sem alterações: começa **oculta** (sem flash); scroll → aparece; idle (~1,8s) ou
+  clique fora do form → some
+- `locked` (dirty / pending / foco na barra) → permanece, com borda de destaque
+- Ctrl/Cmd+S salva quando `saveShortcut` (default) e há `type="submit"`
+- spacer de conteúdo é interno (não precisa de `StickyPersistBarSpacer`)
+
+```tsx
+<form id={formId} data-persist-bar-root="" …>
+  {/* campos */}
+  <StickyPersistBar
+    locked={isDirty || pending}
+    dirtyLabel={isDirty ? `${n} alterações` : undefined}
+    hint="…"
+  >
+    <button type="button">Cancelar</button>
+    <button type="submit" form={formId}>Salvar</button>
+  </StickyPersistBar>
+</form>
+```
+
+O submit usa `form={formId}` porque a barra renderiza via portal em `document.body`.
+CTAs sem save (ex.: onboarding Continuar) usam `saveShortcut={false}`.
 
 ### Componentes da Comunidade (modelo para outros módulos)
 

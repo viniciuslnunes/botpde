@@ -24,6 +24,7 @@ import { AccessPermissionCompare } from '@/components/admin/access-permission-pr
 import { AccessPermissionWorktree, type PermissaoOrigem } from '@/components/admin/access-permission-worktree'
 import { runPersistAction } from '@/lib/toast-action'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import { StickyPersistBar } from '@/components/sticky-persist-bar'
 
 export interface AccessRoleOpt {
   id: string
@@ -512,9 +513,13 @@ export function AccessUserPanel({
     { id: 'adicionais', label: 'Permissões adicionais', count: totalExtras },
   ]
 
+  const formId = `acesso-usuario-form-${usuario.id}`
+
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit}
+      data-persist-bar-root=""
       className="flex w-full flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
     >
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-4 sm:px-6">
@@ -738,34 +743,40 @@ export function AccessUserPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 sm:px-6">
-        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-          Alterações só valem após salvar. Áreas seguem os perfis marcados.
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void handleClose()}
-            disabled={pending || salvandoPerfil}
-            className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-          >
-            <X className="h-3.5 w-3.5" />
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={pending || salvandoPerfil}
-            className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {pending || salvandoPerfil ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Check className="h-3.5 w-3.5" />
-            )}
-            Salvar acesso
-          </button>
-        </div>
-      </div>
+      <StickyPersistBar
+        locked={unsavedChanges.length > 0 || pending || salvandoPerfil}
+        dirtyLabel={
+          unsavedChanges.length > 0
+            ? unsavedChanges.length === 1
+              ? unsavedChanges[0]
+              : `${unsavedChanges.length} alterações — ${unsavedChanges.slice(0, 2).join(', ')}${unsavedChanges.length > 2 ? '…' : ''}`
+            : undefined
+        }
+        hint="Role para explorar. Ao alterar perfis ou permissões, salve aqui."
+      >
+        <button
+          type="button"
+          onClick={() => void handleClose()}
+          disabled={pending || salvandoPerfil}
+          className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        >
+          <X className="h-3.5 w-3.5" />
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending || salvandoPerfil}
+          className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending || salvandoPerfil ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Check className="h-3.5 w-3.5" />
+          )}
+          Salvar acesso
+        </button>
+      </StickyPersistBar>
 
       {modalNovoPerfil && (
         <div
