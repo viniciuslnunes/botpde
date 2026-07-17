@@ -141,26 +141,12 @@ function statusClass(status: AliancaListItem['status']): string {
   return 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
 }
 
-function confiancaClass(confianca: RecomendacaoAliancaListItem['confianca']): string {
-  if (confianca === 'ALTA') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-  if (confianca === 'MEDIA') return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-  return 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-}
-
-function confiancaLabel(confianca: RecomendacaoAliancaListItem['confianca']): string {
-  if (confianca === 'ALTA') return 'Alta confiança'
-  if (confianca === 'MEDIA') return 'Média confiança'
-  return 'Baixa confiança'
-}
-
-function tipoBadge(item: RecomendacaoAliancaListItem): { label: string; className: string } {
-  if (item.tipo === 'CO_IRMA') {
-    return {
-      label: 'Co-irmã',
-      className: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-    }
-  }
-  return { label: confiancaLabel(item.confianca), className: confiancaClass(item.confianca) }
+function CoIrmaBadge() {
+  return (
+    <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+      Co-irmã
+    </span>
+  )
 }
 
 function afiliacaoLabel(tenant: TenantOption): string | null {
@@ -521,14 +507,7 @@ export function AliancaForms({
                           ) : null}
                         </div>
                       </TorcidaIdentityLink>
-                      <span
-                        className={[
-                          'rounded-full px-2.5 py-1 text-xs font-semibold',
-                          tipoBadge(item).className,
-                        ].join(' ')}
-                      >
-                        {tipoBadge(item).label}
-                      </span>
+                      {item.tipo === 'CO_IRMA' ? <CoIrmaBadge /> : null}
                     </div>
                     {item.observacao && item.tipo !== 'CO_IRMA' ? (
                       <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">{item.observacao}</p>
