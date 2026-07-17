@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Clock, MapPin } from 'lucide-react'
+import { MapPin, Navigation } from 'lucide-react'
 import {
   buildStreetViewImageUrl,
   isGoogleMapsConfigured,
@@ -24,6 +24,8 @@ type Props = {
   onSelect: () => void
   /** Primeiras linhas da lista (acima da dobra). */
   priority?: boolean
+  /** Destaque da sede mais próxima quando há geolocalização. */
+  maisProxima?: boolean
 }
 
 export function SedeExplorerCard({
@@ -32,6 +34,7 @@ export function SedeExplorerCard({
   distanciaKm,
   onSelect,
   priority = false,
+  maisProxima = false,
 }: Props) {
   const streetViewUrl =
     sede.fotoUrl ??
@@ -52,7 +55,7 @@ export function SedeExplorerCard({
       onClick={onSelect}
       aria-pressed={selected}
       data-sede-id={sede.id}
-      className={`flex w-full items-stretch gap-0 overflow-hidden rounded-xl border text-left transition-[border-color,background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
+      className={`group flex w-full items-stretch gap-0 overflow-hidden rounded-xl border text-left transition-[border-color,background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
         selected
           ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/5 shadow-sm'
           : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary))]/45'
@@ -75,30 +78,40 @@ export function SedeExplorerCard({
             <MapPin className="h-4 w-4 opacity-50" aria-hidden />
           </div>
         )}
+        {maisProxima && (
+          <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+            Mais perto
+          </span>
+        )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[sede.tipo]}`}>
+      <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[sede.tipo]}`}>
             {TIPO_LABEL[sede.tipo]}
           </span>
-          {distanciaLabel && (
-            <span className="text-[10px] font-medium tabular-nums text-[rgb(var(--color-primary))]">
-              {distanciaLabel}
-            </span>
+          <p className="truncate text-sm font-semibold leading-snug text-[rgb(var(--foreground))]">
+            {sede.nome}
+          </p>
+          {enderecoLinha && (
+            <p className="line-clamp-1 text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+              {enderecoLinha}
+            </p>
           )}
         </div>
-        <p className="truncate text-sm font-semibold leading-snug text-[rgb(var(--foreground))]">
-          {sede.nome}
-        </p>
-        {enderecoLinha && (
-          <p className="line-clamp-1 text-[11px] text-[rgb(var(--foreground-muted))]">{enderecoLinha}</p>
-        )}
-        {sede.horarios && (
-          <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[rgb(var(--foreground-muted))]">
-            <Clock className="h-2.5 w-2.5 shrink-0" aria-hidden />
-            <span className="truncate">{sede.horarios}</span>
-          </p>
+
+        {distanciaLabel && (
+          <span
+            className={`flex shrink-0 flex-col items-end gap-0.5 rounded-lg px-2 py-1.5 tabular-nums ${
+              selected || maisProxima
+                ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
+                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]'
+            }`}
+            title={`Aproximadamente ${distanciaLabel}`}
+          >
+            <Navigation className="h-3 w-3 opacity-70" aria-hidden />
+            <span className="text-xs font-semibold leading-none">{distanciaLabel}</span>
+          </span>
         )}
       </div>
     </button>

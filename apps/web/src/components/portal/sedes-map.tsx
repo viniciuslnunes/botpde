@@ -17,6 +17,8 @@ type Props = {
   sedes: MapPoint[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Posição do usuário — pin azul “você está aqui”. */
+  userLocation?: { lat: number; lng: number } | null
   className?: string
 }
 
@@ -43,10 +45,35 @@ function markerIcon(
   }
 }
 
-export function SedesMap({ sedes, selectedId, onSelect, className }: Props) {
+function userLocationIcon(g: GoogleMapsNamespace): {
+  path: number
+  scale: number
+  fillColor: string
+  fillOpacity: number
+  strokeColor: string
+  strokeWeight: number
+} {
+  return {
+    path: g.maps.SymbolPath.CIRCLE,
+    scale: 9,
+    fillColor: '#2563eb',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 2.5,
+  }
+}
+
+export function SedesMap({
+  sedes,
+  selectedId,
+  onSelect,
+  userLocation = null,
+  className,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<GoogleMapInstance | null>(null)
   const markersRef = useRef<Map<string, GoogleMarkerInstance>>(new Map())
+  const userMarkerRef = useRef<GoogleMarkerInstance | null>(null)
   const gRef = useRef<GoogleMapsNamespace | null>(null)
   const onSelectRef = useRef(onSelect)
   const fittedKeyRef = useRef<string>('')
@@ -105,6 +132,8 @@ export function SedesMap({ sedes, selectedId, onSelect, className }: Props) {
         marker.setMap(null)
       }
       markersRef.current.clear()
+      userMarkerRef.current?.setMap(null)
+      userMarkerRef.current = null
       mapRef.current = null
       gRef.current = null
       setMapReady(false)
@@ -192,6 +221,32 @@ export function SedesMap({ sedes, selectedId, onSelect, className }: Props) {
     }
     prevSelectedRef.current = selectedId
   }, [mapReady, selectedId])
+
+  // Pin da localização do usuário
+  useEffect(() => {
+    const map = mapRef.current
+    const g = gRef.current
+    if (!mapReady || !map || !g) return
+
+    if (!userLocation) {
+      userMarkerRef.current?.setMap(null)
+      userMarkerRef.current = null
+      return
+    }
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = new g.maps.Marker({
+        map,
+        position: userLocation,
+        title: 'Você está aqui',
+        icon: userLocationIcon(g),
+        zIndex: 20,
+      })
+    } else {
+      userMarkerRef.current.setPosition(userLocation)
+      userMarkerRef.current.setMap(map)
+    }
+  }, [mapReady, userLocation])
 
   if (!configured || loadFailed) {
     return (

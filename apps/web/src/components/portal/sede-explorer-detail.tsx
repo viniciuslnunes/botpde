@@ -52,6 +52,9 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
     ...(enderecoCompleto
       ? [{ icon: MapPin, label: 'Endereço', value: enderecoCompleto }]
       : []),
+    ...(distanciaLabel
+      ? [{ icon: Navigation, label: 'Distância', value: `cerca de ${distanciaLabel}` }]
+      : []),
     ...(sede.responsavel
       ? [{ icon: Users, label: 'Responsável', value: sede.responsavel }]
       : []),
@@ -80,18 +83,19 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
             <span className="text-xs">Sem imagem da fachada</span>
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent p-4 pt-12">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-4 pt-14">
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TIPO_CLASS[sede.tipo]}`}>
               {TIPO_LABEL[sede.tipo]}
             </span>
             {distanciaLabel && (
-              <span className="rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary))] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                <Navigation className="h-2.5 w-2.5" aria-hidden />
                 {distanciaLabel}
               </span>
             )}
           </div>
-          <h2 className="mt-1 text-balance text-lg font-bold text-white sm:text-xl">{sede.nome}</h2>
+          <h2 className="mt-1.5 text-balance text-lg font-bold text-white sm:text-xl">{sede.nome}</h2>
           {sede.sedePai && (
             <p className="mt-0.5 text-xs text-white/80">
               Pertence a{' '}
@@ -109,17 +113,6 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
 
       <div className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap gap-2">
-          {mapsUrl && (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Abrir no Maps
-            </a>
-          )}
           {directionsUrl && (
             <a
               href={directionsUrl}
@@ -129,6 +122,17 @@ export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) 
             >
               <Navigation className="h-3.5 w-3.5" />
               Como chegar
+            </a>
+          )}
+          {mapsUrl && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Abrir no Maps
             </a>
           )}
           {sede.telefone && (

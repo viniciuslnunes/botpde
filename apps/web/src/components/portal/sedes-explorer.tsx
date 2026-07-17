@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Crosshair, Loader2, Search, X } from 'lucide-react'
+import { AlertCircle, Crosshair, Loader2, MapPin, Search, X } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { SedeExplorerCard } from '@/components/portal/sede-explorer-card'
 import { SedeExplorerDetail } from '@/components/portal/sede-explorer-detail'
@@ -15,6 +15,7 @@ import {
 import { enrichSedesComCoordenadas, isGoogleMapsConfigured } from '@/lib/google-maps'
 import {
   distanciaKm,
+  formatarDistanciaKm,
   normalizarTexto,
   type LocalizacaoOnboarding,
 } from '@/lib/onboarding-unidade'
@@ -37,6 +38,40 @@ const FILTROS: Array<{ id: FiltroTipo; label: string }> = [
   { id: 'SUBSEDE', label: TIPO_LABEL.SUBSEDE },
   { id: 'PONTO_ENCONTRO', label: TIPO_LABEL.PONTO_ENCONTRO },
 ]
+
+const GEO_STORAGE_KEY = 'portal:sedes:geo'
+
+function lerGeoSalva(): LocalizacaoOnboarding | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(GEO_STORAGE_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'lat' in parsed &&
+      'lng' in parsed &&
+      typeof (parsed as { lat: unknown }).lat === 'number' &&
+      typeof (parsed as { lng: unknown }).lng === 'number'
+    ) {
+      return { lat: (parsed as { lat: number }).lat, lng: (parsed as { lng: number }).lng }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function salvarGeo(loc: LocalizacaoOnboarding | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (loc) sessionStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(loc))
+    else sessionStorage.removeItem(GEO_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
 
 type Props = {
   sedes: SedeExplorerItem[]
@@ -62,6 +97,42 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   const [geoStatus, setGeoStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [enriching, setEnriching] = useState(false)
   const [, startTransition] = useTransition()
+
+  // Restaura geo da sessão; se a permissão já foi concedida, atualiza em silêncio
+  useEffect(() => {
+    const salva = lerGeoSalva()
+    if (salva) setLocalizacao(salva)
+
+    let cancelled = false
+    function aplicarPosicao(pos: GeolocationPosition) {
+      if (cancelled) return
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setLocalizacao(next)
+      salvarGeo(next)
+      setGeoStatus('idle')
+    }
+
+    if (!navigator.geolocation) return
+
+    const permissions = navigator.permissions
+    if (permissions?.query) {
+      void permissions
+        .query({ name: 'geolocation' })
+        .then((status) => {
+          if (cancelled || status.state !== 'granted') return
+          navigator.geolocation.getCurrentPosition(aplicarPosicao, () => undefined, {
+            enableHighAccuracy: false,
+            timeout: 8_000,
+            maximumAge: 120_000,
+          })
+        })
+        .catch(() => undefined)
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!isGoogleMapsConfigured() || enrichedOnce.current) return
@@ -102,7 +173,23 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
     }
   }
 
+  function aplicarLocalizacao(loc: LocalizacaoOnboarding) {
+    setLocalizacao(loc)
+    salvarGeo(loc)
+    setGeoStatus('idle')
+  }
+
+  function limparLocalizacao() {
+    setLocalizacao(null)
+    salvarGeo(null)
+    setGeoStatus('idle')
+  }
+
   function pedirLocalizacao() {
+    if (localizacao) {
+      limparLocalizacao()
+      return
+    }
     if (!navigator.geolocation) {
       setGeoStatus('error')
       return
@@ -110,8 +197,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
     setGeoStatus('loading')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLocalizacao({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setGeoStatus('idle')
+        aplicarLocalizacao({ lat: pos.coords.latitude, lng: pos.coords.longitude })
       },
       () => setGeoStatus('error'),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
@@ -154,6 +240,13 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
     return list
   }, [sedes, filtro, buscaDeferred, localizacao])
 
+  const maisProximaId = useMemo(() => {
+    if (!localizacao || filtradas.length === 0) return null
+    const first = filtradas[0]
+    if (!first || distanciaKm(localizacao, first) == null) return null
+    return first.id
+  }, [localizacao, filtradas])
+
   // Mapa sempre com o universo completo (pins estáveis); lista reflete filtros
   const mapPoints = useMemo(
     () => sedes.map((s) => ({ id: s.id, nome: s.nome, lat: s.lat, lng: s.lng })),
@@ -164,6 +257,10 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   const selectedDist =
     selected && localizacao ? distanciaKm(localizacao, selected) : null
   const buscaPendente = busca !== buscaDeferred
+  const maisProximaDist =
+    maisProximaId && localizacao
+      ? distanciaKm(localizacao, filtradas[0]!)
+      : null
 
   if (sedes.length === 0) {
     return (
@@ -178,7 +275,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       <section className="flex min-h-0 flex-col gap-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]">
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
             <input
@@ -226,24 +323,41 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                 </button>
               )
             })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={pedirLocalizacao}
               disabled={geoStatus === 'loading'}
               aria-pressed={localizacao != null}
-              className={`ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60 ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
                 localizacao
-                  ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
-                  : 'border-[rgb(var(--border))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50'
+                  ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))] text-white'
+                  : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50'
               }`}
             >
               {geoStatus === 'loading' ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Crosshair className="h-3 w-3" />
+                <Crosshair className="h-3.5 w-3.5" />
               )}
-              Perto de mim
+              {localizacao ? 'Perto de mim · ativo' : 'Perto de mim'}
             </button>
+            {localizacao && (
+              <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                Ordenado por proximidade
+                {maisProximaDist != null && (
+                  <>
+                    {' '}
+                    · mais perto a{' '}
+                    <span className="font-medium tabular-nums text-[rgb(var(--foreground))]">
+                      {formatarDistanciaKm(maisProximaDist)}
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[11px] text-[rgb(var(--foreground-muted))]">
@@ -289,6 +403,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                     distanciaKm={localizacao ? distanciaKm(localizacao, sede) : null}
                     onSelect={() => selecionar(sede.id)}
                     priority={index < 4}
+                    maisProxima={sede.id === maisProximaId}
                   />
                 </li>
               ))}
@@ -297,12 +412,13 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
         </div>
       </section>
 
-      <section ref={mapPanelRef} className="flex min-w-0 flex-col gap-4 scroll-mt-20">
+      <section ref={mapPanelRef} className="flex min-w-0 flex-col gap-3 scroll-mt-20">
         <SedesMap
           sedes={mapPoints}
           selectedId={selectedId}
           onSelect={selecionar}
-          className="h-[14rem] w-full sm:h-[18rem] lg:sticky lg:top-20 lg:h-[22rem] lg:z-10"
+          userLocation={localizacao}
+          className="h-[14rem] w-full sm:h-[18rem] lg:sticky lg:top-20 lg:h-[min(28rem,42vh)] lg:z-10"
         />
 
         {selected ? (
@@ -327,13 +443,47 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
             />
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/50 px-5 py-10 text-center">
-            <p className="text-sm font-medium text-[rgb(var(--foreground))]">
-              Selecione uma sede na lista ou no mapa
-            </p>
-            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-              Veja fachada, endereço, horários, rotas e próximos eventos
-            </p>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-5 py-8 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]">
+              <MapPin className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                Selecione uma sede na lista ou no mapa
+              </p>
+              <p className="mt-1 max-w-sm text-xs text-[rgb(var(--foreground-muted))]">
+                Veja fachada, endereço, horários, rotas e próximos eventos
+              </p>
+            </div>
+            {!localizacao && (
+              <button
+                type="button"
+                onClick={pedirLocalizacao}
+                disabled={geoStatus === 'loading'}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
+              >
+                {geoStatus === 'loading' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Crosshair className="h-3.5 w-3.5" />
+                )}
+                Encontrar sedes perto de mim
+              </button>
+            )}
+            {localizacao && maisProximaId && (
+              <button
+                type="button"
+                onClick={() => selecionar(maisProximaId)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Ver a mais próxima
+                {maisProximaDist != null && (
+                  <span className="tabular-nums opacity-90">
+                    · {formatarDistanciaKm(maisProximaDist)}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         )}
       </section>

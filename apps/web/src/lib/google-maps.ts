@@ -152,6 +152,7 @@ export type GoogleMarkerInstance = {
   setMap: (map: GoogleMapInstance | null) => void
   setIcon: (icon: object) => void
   setZIndex: (z: number) => void
+  setPosition: (latLng: { lat: number; lng: number }) => void
   addListener: (eventName: string, handler: () => void) => { remove: () => void }
 }
 
