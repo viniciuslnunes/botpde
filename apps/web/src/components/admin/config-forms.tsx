@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition, useId } from 'react'
 import Link from 'next/link'
 import { Loader2, Plus, Pencil, Trash2, X, Check, Shield, Search, ChevronDown, Eye } from 'lucide-react'
 import {
@@ -26,6 +26,7 @@ import {
 } from '@/app/admin/configuracoes/actions'
 import { toast } from '@torcida/ui'
 import { runPersistAction } from '@/lib/toast-action'
+import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import {
   useTrackedForm,
   useUnsavedChanges,
@@ -564,6 +565,7 @@ function RoleForm({
   pending: boolean
 }) {
   const formRef = useRef<HTMLFormElement>(null)
+  const formId = useId()
   const [cor, setCor] = useState(initialCor)
   const [selected, setSelected] = useState<Set<string>>(new Set(initialPermissions))
   const [departamentoId, setDepartamentoId] = useState<string>(initialDepartamentoId ?? '')
@@ -680,7 +682,13 @@ function RoleForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+    <form
+      id={formId}
+      ref={formRef}
+      onSubmit={handleSubmit}
+      data-persist-bar-root=""
+      className="space-y-4"
+    >
       <div className="flex gap-3">
         <div className="flex-1">
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Nome</label>
@@ -843,15 +851,21 @@ function RoleForm({
         </p>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={pending || (!departamentoId && selected.size === 0) || isSystem}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-        >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          {initialNome ? 'Salvar' : 'Criar cargo'}
-        </button>
+      <StickyPersistBar
+        locked={roleUnsaved.length > 0 || pending}
+        dirtyLabel={
+          roleUnsaved.length > 0
+            ? roleUnsaved.length === 1
+              ? roleUnsaved[0]
+              : `${roleUnsaved.length} alterações`
+            : undefined
+        }
+        hint={
+          isEdit
+            ? 'Role para revisar permissões. Alterações só valem após salvar.'
+            : 'Revise as permissões e confirme a criação do cargo.'
+        }
+      >
         <button
           type="button"
           onClick={() => {
@@ -864,7 +878,16 @@ function RoleForm({
         >
           Cancelar
         </button>
-      </div>
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending || (!departamentoId && selected.size === 0) || isSystem}
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+          {initialNome ? 'Salvar' : 'Criar cargo'}
+        </button>
+      </StickyPersistBar>
     </form>
   )
 }
@@ -1098,6 +1121,7 @@ function DepartamentoForm({
   const [selectedGestor, setSelectedGestor] = useState<Set<string>>(
     new Set(initialPermissionsGestor),
   )
+  const formId = useId()
   const { confirmDiscard } = useUnsavedChangesContext()
 
   const isEdit = initialNome !== ''
@@ -1221,7 +1245,12 @@ function DepartamentoForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      id={formId}
+      onSubmit={handleSubmit}
+      data-persist-bar-root=""
+      className="space-y-4"
+    >
       <div className="flex gap-3">
         <div className="flex-1">
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Nome</label>
@@ -1299,15 +1328,21 @@ function DepartamentoForm({
         </p>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-        >
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          {isEdit ? 'Salvar' : 'Criar departamento'}
-        </button>
+      <StickyPersistBar
+        locked={deptoUnsaved.length > 0 || pending}
+        dirtyLabel={
+          deptoUnsaved.length > 0
+            ? deptoUnsaved.length === 1
+              ? deptoUnsaved[0]
+              : `${deptoUnsaved.length} alterações`
+            : undefined
+        }
+        hint={
+          isEdit
+            ? 'Role para revisar permissões. Alterações só valem após salvar.'
+            : 'Revise membro/gestor e confirme a criação da área.'
+        }
+      >
         <button
           type="button"
           onClick={() => {
@@ -1319,7 +1354,16 @@ function DepartamentoForm({
         >
           <X className="h-3 w-3" /> Cancelar
         </button>
-      </div>
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending}
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+          {isEdit ? 'Salvar' : 'Criar departamento'}
+        </button>
+      </StickyPersistBar>
     </form>
   )
 }

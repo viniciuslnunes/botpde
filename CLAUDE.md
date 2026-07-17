@@ -59,7 +59,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   silenciosamente neste schema (ver `ARCHITECTURE.md` §5.2). Sem `any` (`no-any`).
 - **Visibilidade**: use `resolveVisibility`/`canViewRecurso` de `packages/types/src/visibility.js`.
   `self`/`ancestor` = tudo; `descendant` e `allied` = só PÚBLICO; `unrelated` = nada.
-- **UX**: cubra estados de vazio, erro e loading.
+- **UX**: cubra estados de vazio, erro e loading. Formulários longos de
+  admin/departamentos/loja/onboarding usam `StickyPersistBar` (Salvar/Cancelar
+  fixos; somem no idle/clique fora; ficam se dirty). Comunidade não herda isso.
 - **Performance** (páginas com muitas queries, feed ou polling): siga `ARCHITECTURE.md`
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` — `React.cache`/`unstable_cache`,
   Suspense, prefetch on-hover, `useVisibleInterval`, `next/image` quando aplicável.

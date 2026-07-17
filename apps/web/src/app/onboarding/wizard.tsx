@@ -8,6 +8,7 @@ import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { Input, Select } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
@@ -1226,14 +1227,14 @@ function PassoUnidade({
 
       {/* CTA sticky: Continuar permanece no viewport após a seleção */}
       {selecionada && !modoNaoListada && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[rgb(var(--border))] bg-[rgb(var(--background))]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
-          <div className="app-container flex items-center justify-between gap-3 py-3">
-            <p className="min-w-0 truncate text-xs text-[rgb(var(--foreground-muted))] sm:text-sm">
-              Unidade selecionada — avance para o vínculo.
-            </p>
-            <BotaoPrimario onClick={avancarComUnidade} pending={pending} label="Continuar" />
-          </div>
-        </div>
+        <StickyPersistBar
+          locked
+          saveShortcut={false}
+          hint="Unidade selecionada — avance para o vínculo."
+          className="max-w-5xl"
+        >
+          <BotaoPrimario onClick={avancarComUnidade} pending={pending} label="Continuar" />
+        </StickyPersistBar>
       )}
     </div>
   )
