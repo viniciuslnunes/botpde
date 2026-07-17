@@ -101,6 +101,36 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
 6. **Uma leitura, vários consumidores** — dados compartilhados (ex.: salas)
    buscados no nível `page`/shell e passados por props.
 7. **Tipos explícitos em queries Prisma** — ver `ARCHITECTURE.md` §5.2.
+8. **Overlay de engajamento sem `revalidatePath` do feed** — reação/comentário
+   são estado otimista no cliente (`PostEngagement`). Revalidar
+   `/portal/comunidade` a cada clique força RSC do feed inteiro (dezenas–
+   centenas de queries) e mascara erros de Server Action em produção como
+   *“An error occurred in the Server Components render”*. Notificações e
+   `AuditLog` de comentário saem via `after()` + `notificarSafe`.
+
+## Engajamento — hot path (2026-07-17)
+
+Correção de produção + otimização em `reagirPost` / `comentarPost`
+(`comunidade/actions.ts`). Escopo de produto/visibilidade:
+`docs/data/modulo-comunidade.md` § engajamento.
+
+| Técnica | Efeito |
+|---------|--------|
+| Sem `revalidatePath('/portal/comunidade')` (nem `/portal`) na reação; comentário também sem revalidate de feed | POST deixa de esperar RSC do feed |
+| Authz + `findUnique` do post em `Promise.all` | Menos waterfall |
+| `podeEngajarPostVisivel` (fast-path tenant/clube; fallback hierarquia) | Evita resolver todos os tenants visíveis no caso comum (CN / mesmo clube) |
+| `resolverContextoEngajamento`: 1× `SaasMembro`; carteirinha + permissões em paralelo | −1 query vs `assertMembroAtivo` duplicado |
+| Reação: `deleteMany` (descurtir) / `upsert` (add·troca) | 1 RTT no toggle-off |
+| Comentário: `create` sem `include` do autor (usa sessão); audit + notifs em `after()` | Menos join + resposta imediata |
+| Notificação de reação/comentário/menção em `after()` | Fora do caminho crítico |
+
+**Teto deste fluxo:** auth + post em paralelo → 1–2 writes. Próximo salto
+(API dedicada, contadores denormalizados) só com p95 pedindo — não otimizar
+por hábito.
+
+| Cenário | Antes | Depois | Ganho estimado |
+|---------|-------|--------|----------------|
+| Curtir / comentar no feed (mesmo tenant ou CN) | Action + `revalidatePath` do feed (RSC completo) | Mutação leve + UI otimista | **~70–95%** menos trabalho no POST (∝ tamanho do feed) |
 
 ## Pós-deploy (obrigatório em produção)
 
@@ -142,6 +172,7 @@ porém mais lenta em bases grandes).
 | SSE entre réplicas | In-memory só na réplica local | Redis pub/sub (`REDIS_URL`) | De **0%** → **~100%** dos pings cruzam réplicas |
 | Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`) | **~30–70%** em bases grandes; pouco em bases pequenas |
 | Assets estáticos (CDN) | Sempre origin Railway | Cloudflare Free | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio |
+| Reação / comentário no feed | `revalidatePath` + RSC do feed | Overlay otimista + mutação leve (`after` notifs) | **~70–95%** menos trabalho no POST |
 
 ### Por camada do plano
 

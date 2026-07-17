@@ -5,6 +5,7 @@ import { ImagePlus, Loader2, Send, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostComoTorcedorGlobal } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { emitirPostPublicado } from '@/lib/feed-live-refresh'
 import { Avatar } from '@/components/portal/avatar'
 
 const MAX_CONTEUDO = 3000
@@ -61,9 +62,10 @@ export function ComunidadeNacionalComposer({ currentUser }: Props) {
   function handlePublicar() {
     startTransition(async () => {
       try {
-        await publicarPostComoTorcedorGlobal(conteudo, midias)
+        const preview = await publicarPostComoTorcedorGlobal(conteudo, midias)
         setConteudo('')
         setMidias([])
+        emitirPostPublicado({ preview })
         toast.success('Post publicado na comunidade do clube!')
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Não foi possível publicar.')

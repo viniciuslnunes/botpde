@@ -40,18 +40,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ posts, pageInfo })
     }
 
-    const [{ postsSeguindo, postsSugeridos, pageInfo }] = await Promise.all([
+    const [{ posts, pageInfo }] = await Promise.all([
       getPostsParaFeed(tenant.id, session.user.id, {
         cursor: parsed.data.cursor,
         take: parsed.data.take ?? 20,
       }),
     ])
 
-    const stream =
-      postsSugeridos.length > 0 ? postsSugeridos : postsSeguindo
-
     return NextResponse.json({
-      posts: stream,
+      posts,
       pageInfo,
     })
   } catch (error) {

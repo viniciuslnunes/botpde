@@ -59,6 +59,11 @@ na porta do estádio.
   base pública; privacidade sempre em batch (`getAutoresSemAcesso`).
 - Feed live: ping só pós-fan-out; refetch automático **só** perto do scroll top;
   banner “novos posts” quando o usuário está rolando (não saltar a lista).
+- **Engajamento (reação/comentário):** nunca `revalidatePath('/portal/comunidade')`
+  no hot path — UI é otimista (`PostEngagement`). Authz + post em paralelo;
+  `podeEngajarPostVisivel` (CN/sintético); notifs/`AuditLog` de comentário via
+  `after()`. Detalhe: `docs/data/modulo-comunidade-performance.md` § engajamento.
+  Regressão clássica: POST com digest RSC ao curtir post da Comunidade Nacional.
 - Chat embutido: resumo em `/api/conversas/resumo`; inbox completa só ao expandir.
 - Salas ao vivo: uma leitura na `page.tsx`, distribuída por props.
 - Prefetch on-hover na navbar — não voltar a `prefetch={true}` em todas as rotas.

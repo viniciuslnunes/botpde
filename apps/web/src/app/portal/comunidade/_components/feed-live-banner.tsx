@@ -8,7 +8,8 @@ import { isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
 
 /**
  * Banner "N novos posts" quando o usuário está longe do topo.
- * No topo, o infinite feed já refetcha sozinho — aqui só reforça scroll/RSC.
+ * No topo, o infinite feed já refetcha via API — não chamar `router.refresh()`
+ * aqui (dispara RSC de navbar/salas/conversas junto com o feed).
  */
 export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' }) {
   const router = useRouter()
@@ -17,8 +18,6 @@ export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' }
   useFeedStream(() => {
     if (isComunidadeFeedNearTop()) {
       setNovos(0)
-      router.refresh()
-      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
     setNovos((n) => n + 1)

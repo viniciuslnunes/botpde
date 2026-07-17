@@ -406,7 +406,12 @@ export async function finalizarPosts(posts: PostSocialItem[]): Promise<PostSocia
   return enriquecerPostsComBadges(posts)
 }
 
-async function resolveVisibleTenantIdsForFeed(
+/**
+ * Tenants cujos posts aparecem no feed do viewer — inclui o tenant sintético
+ * da Comunidade Nacional do clube. Usado também em reagir/comentar para o
+ * engajamento cobrir o mesmo conjunto que a UI lista.
+ */
+export async function resolveVisibleTenantIdsForFeed(
   tenantId: string,
   userId: string | undefined,
 ): Promise<string[]> {
@@ -449,7 +454,12 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   tenantId: string,
   userId: string | undefined,
   opts: FeedOpts = {},
-): Promise<Pick<FeedPersonalizadoResult, 'postsSeguindo' | 'postsSugeridos' | 'pageInfo'>> {
+): Promise<
+  Pick<FeedPersonalizadoResult, 'postsSeguindo' | 'postsSugeridos' | 'pageInfo'> & {
+    /** Página Descobrir já misturada na ordem do ranking. */
+    posts: PostSocialItem[]
+  }
+> {
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
@@ -480,6 +490,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
     const slice = await finalizarPosts(ranqueados.slice(0, take))
     const hasMore = ranqueados.length > take
     return {
+      posts: slice,
       postsSeguindo: [],
       postsSugeridos: slice,
       pageInfo: {
@@ -515,15 +526,16 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const autorIdsExternos = discoverExternos.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIdsExternos)
   const discoverVisiveis = discoverExternos.filter((p) => !semAcesso.has(p.autorId))
-  const sugeridosOrdenados = rankDescobrirPosts(discoverVisiveis, tenantId)
 
-  const candidatos = [...sugeridosOrdenados, ...seguindoOrdenados]
+  // Ranking único: rede (inclui o autor) + externos — post fresco do viewer sobe no Descobrir.
+  const candidatos = rankDescobrirPosts([...discoverVisiveis, ...seguindoOrdenados], tenantId)
   const hasMore = candidatos.length > take
   const paginaBruta = candidatos.slice(0, take)
   const pagina = await finalizarPosts(await hidratarPostsDoUsuario(paginaBruta, userId))
   const nextCursor = hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null
 
   return {
+    posts: pagina,
     postsSeguindo: pagina.filter((post) => redeSet.has(post.autorId)),
     postsSugeridos: pagina.filter((post) => !redeSet.has(post.autorId)),
     pageInfo: { nextCursor, hasMore },

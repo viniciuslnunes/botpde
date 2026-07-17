@@ -8,7 +8,13 @@ import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
-import { FEED_SSE_DEBOUNCE_MS, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
+import {
+  COMUNIDADE_POST_PUBLICADO_EVENT,
+  FEED_SSE_DEBOUNCE_MS,
+  isComunidadeFeedNearTop,
+  type PostPublicadoEventDetail,
+  type PostPublicadoPreview,
+} from '@/lib/feed-live-refresh'
 
 interface CurrentUser {
   id: string
@@ -22,6 +28,41 @@ interface PageInfo {
 }
 
 type Filtro = 'descobrir' | 'seguindo'
+
+function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
+  return {
+    id: preview.id,
+    tenantId: preview.tenantId,
+    titulo: null,
+    conteudo: preview.conteudo,
+    imagemUrl: preview.midiaUrls[0] ?? null,
+    midiaUrls: preview.midiaUrls,
+    tipo: 'MEMBRO',
+    visibilidade: preview.visibilidade,
+    fixado: false,
+    criadoEm: new Date(preview.criadoEm),
+    autorId: preview.autor.id,
+    postOrigemId: null,
+    comunicadoOrigemId: null,
+    eventoId: null,
+    tenant: { nome: preview.tenantNome },
+    autor: {
+      id: preview.autor.id,
+      nome: preview.autor.nome,
+      nickname: null,
+      avatarUrl: preview.autor.avatarUrl,
+      sedeNome: null,
+      cargoNome: null,
+    },
+    totalReacoes: 0,
+    totalComentarios: 0,
+    minhaReacao: null,
+    postOrigem: null,
+    comunicadoOrigem: null,
+    evento: null,
+    enquete: null,
+  }
+}
 
 export function ComunidadeFeedInfinite({
   tenantId,
@@ -49,6 +90,7 @@ export function ComunidadeFeedInfinite({
     error,
     loadMore,
     refreshCurrentPage,
+    prependPost,
   } = useComunidadeInfiniteFeed<PostSocialItem>({
     endpoint: '/api/comunidade/feed',
     tenantId,
@@ -84,9 +126,30 @@ export function ComunidadeFeedInfinite({
     if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
     refreshDebounceRef.current = window.setTimeout(() => {
-      void refreshCurrentPage(initialCursor)
+      void refreshCurrentPage(null)
     }, FEED_SSE_DEBOUNCE_MS)
   })
+
+  // Publicação própria: prepend otimista + hydrate em background (sem bloquear UI).
+  useEffect(() => {
+    function onPostPublicado(ev: Event) {
+      const detail = (ev as CustomEvent<PostPublicadoEventDetail>).detail
+      if (detail?.preview) {
+        prependPost(previewParaPostSocial(detail.preview))
+      }
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('cursor')) {
+        url.searchParams.delete('cursor')
+        window.history.replaceState({}, '', url.toString())
+      }
+      // Hydrate badges/enquete após o cache de tags aquecer — não compete com o prepend.
+      window.setTimeout(() => {
+        void refreshCurrentPage(null)
+      }, 600)
+    }
+    window.addEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
+    return () => window.removeEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
+  }, [prependPost, refreshCurrentPage])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 

@@ -5,7 +5,8 @@ produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/ag
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
 Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
 `docs/data/modulo-comunidade-performance.md` (inclui **ganhos estimados por
-cenário %** e live UX: ping pós-fan-out / auto-refetch no topo); agente
+cenário %**, live UX: ping pós-fan-out / auto-refetch no topo, e **engajamento
+overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário); agente
 `performance` para auditorias novas.
 
 ## O que é
@@ -105,7 +106,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
   `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
-  `feed-timeline.ts`, `comunidade-busca.ts`; ver `docs/data/modulo-comunidade.md` e
+  `feed-timeline.ts`, `comunidade-busca.ts`; engajamento (reação/comentário CN):
+  `comunidade/actions.ts` (`resolverContextoEngajamento`, `podeEngajarPostVisivel`);
+  ver `docs/data/modulo-comunidade.md` e
   `docs/data/modulo-comunidade-performance.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,

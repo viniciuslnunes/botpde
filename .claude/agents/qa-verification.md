@@ -33,7 +33,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] Documentação atualizada quando o impacto é estrutural.
 - [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` (cache, Suspense,
-  `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat).
+  `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat,
+  overlay de engajamento sem `revalidatePath` do feed).
 
 ## Compliance de domínio (`docs/knowledge/contexto-legal.md`)
 Em mudanças que tocam membros/cadastro, verifique também:
@@ -57,6 +58,15 @@ Em mudanças que tocam membros/cadastro, verifique também:
   `apps/web/e2e/nav-latency.portal.spec.ts` se disponível; em Comunidade, validar que
   chat colapsado não dispara inbox completa e scroll usa `/api/comunidade/feed` (não reload).
   Conferir que não há waterfall client desnecessário (SSR + API duplicada) nem `setInterval` cru.
+- Login autenticado (Playwright / browser): credenciais em
+  `apps/web/e2e/CREDENTIALS.local.md` (gitignored) e
+  `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` em `apps/web/.env.local`. Conta = super-admin
+  de teste. Template: `CREDENTIALS.local.example.md`. Nunca cole senha em PR/issue.
+- Engajamento (reação/comentário): `reagirPost`/`comentarPost` usam
+  `resolverContextoEngajamento` + `podeEngajarPostVisivel` (não
+  `tenantId: tenant.id` isolado); sem `revalidatePath` do feed no hot path;
+  UI otimista em `PostEngagement`. Smoke: curtir post badge “Comunidade Nacional”
+  (sócio e torcedor global) sem digest RSC genérico.
 - Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
   (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
   inscritos digitais com torcedores presenciais.

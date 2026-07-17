@@ -83,6 +83,24 @@ visibilidade do post).
 Notificações de menção, comentário, reação e repost apontam para
 `/portal/comunidade/post/[id]` via `linkPostComunidade()`.
 
+### Engajamento (`reagirPost` / `comentarPost`) — invariantes (2026-07-17)
+
+O feed (torcida **e** Comunidade Nacional) lista posts cujo `tenantId` pode ser
+o tenant sintético do clube (`Tenant.sintetico`) ou outra unidade da mesma
+afiliação — **não** só o tenant ativo do viewer. Mutações de overlay devem
+cobrir o mesmo conjunto.
+
+| Regra | Detalhe |
+|-------|---------|
+| Contexto | `resolverContextoEngajamento()` — sócio `APROVADO` com `COMMUNITY_POST`, **ou** torcedor global / preview sem vínculo (escopo = `afiliacaoId` do clube). Não usar só `assertPermission` + `tenantId` do viewer. |
+| Gate do post | `podeEngajarPostVisivel` — fast-path: próprio tenant, ou mesmo clube (sintético / `PUBLICO`); fallback: `resolveVisibleTenantIdsForFeed` (exportado de `feed.ts`). |
+| Leitura de comentários | `listarComentariosPost` — gate pela **visibilidade do post**, sem exigir tenant do viewer (torcedor global lê comentários de posts `PUBLICO`). |
+| UI | `PostEngagement` é otimista; o servidor confirma / reverte no catch. |
+| Sintoma clássico de regressão | POST em `/portal/comunidade` com *“An error occurred in the Server Components render”* ao curtir post da CN → lookup com `tenantId: tenant.id` ou authz sem tenant. |
+
+Helpers e actions: `apps/web/src/app/portal/comunidade/actions.ts`.
+Performance do hot path: `docs/data/modulo-comunidade-performance.md` § engajamento.
+
 ## Integração torcida (Sprint 4)
 
 - **Repost de comunicados**: botão "Compartilhar" nos comunicados oficiais; embed no feed via `PostComunicadoEmbed`.

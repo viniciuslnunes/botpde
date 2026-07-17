@@ -61,6 +61,13 @@ Comunidade — feed/timeline/busca: `feed.ts`, `feed-timeline.ts`, `feed-timelin
 `comunidade-busca.ts`, `feed-live-refresh.ts`;
 padrões: batch privacidade, SSE ping **pós-fan-out** (não na action de publicar),
 auto-refetch só no topo, banner se rolado, salas únicas na page.
+**Engajamento (reação/comentário):** escopo = o que o feed lista (incl. tenant
+sintético da CN). Use `resolverContextoEngajamento` + `podeEngajarPostVisivel`
+em `comunidade/actions.ts` — **não** `findFirst({ tenantId: tenant.id })` nem
+só `assertPermission` (quebra torcedor global e posts da CN). Sem
+`revalidatePath` do feed no hot path; notifs em `after()`; UI otimista em
+`PostEngagement`. Ver `docs/data/modulo-comunidade.md` § engajamento e
+`modulo-comunidade-performance.md` § engajamento.
 Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
 Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
 `seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Coleta mensual:

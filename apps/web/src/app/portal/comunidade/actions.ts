@@ -1,8 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -14,13 +16,15 @@ import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
-import { criarNotificacao } from '@/lib/notificacoes'
+import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
+import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
-import { getPostPorId, podeVerFeedSocios } from '@/lib/feed'
+import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
@@ -42,6 +46,219 @@ const MAX_MIDIAS = 10
 
 function invalidarLeituraComunidade(tenantId: string): void {
   invalidarCachesComunidadeFeed(tenantId)
+}
+
+/**
+ * Trabalho pós-resposta: hashtags, menções, audit e perfil.
+ * Mantém o caminho crítico = auth + create + timeline do autor.
+ */
+function agendarPosPublicacaoFeed(opts: {
+  postId: string
+  tenantId: string
+  autorId: string
+  autorNome: string | null
+  conteudo: string
+  ensurePerfil?: boolean
+  audit?: { acao: string; detalhes?: Record<string, unknown> }
+}): void {
+  after(() => {
+    void (async () => {
+      try {
+        const tasks: Array<Promise<unknown>> = [
+          sincronizarHashtagsDoPost(opts.postId, opts.tenantId, opts.conteudo),
+          notificarMencoesDoPost({
+            conteudo: opts.conteudo,
+            autorId: opts.autorId,
+            autorNome: opts.autorNome,
+            tenantId: opts.tenantId,
+            postId: opts.postId,
+            link: linkPostComunidade(opts.postId),
+          }),
+        ]
+        if (opts.ensurePerfil) {
+          tasks.push(getOrCreatePerfilMembro(opts.autorId, opts.tenantId))
+        }
+        if (opts.audit) {
+          tasks.push(
+            db.auditLog.create({
+              data: {
+                tenantId: opts.tenantId,
+                atorId: opts.autorId,
+                acao: opts.audit.acao,
+                entidade: 'Post',
+                entidadeId: opts.postId,
+                detalhes: opts.audit.detalhes ?? {},
+              },
+            }),
+          )
+        }
+        await Promise.all(tasks)
+      } catch (err) {
+        console.error('[pos-publicacao]', opts.postId, err)
+      }
+    })()
+  })
+}
+
+function previewDoPost(opts: {
+  post: { id: string; tenantId: string; conteudo: string; midiaUrls: string[]; visibilidade: string; criadoEm: Date }
+  autorId: string
+  autorNome: string | null
+  autorAvatar: string | null
+  tenantNome: string
+}): PostPublicadoPreview {
+  return {
+    id: opts.post.id,
+    tenantId: opts.post.tenantId,
+    conteudo: opts.post.conteudo,
+    midiaUrls: opts.post.midiaUrls,
+    visibilidade: opts.post.visibilidade as PostPublicadoPreview['visibilidade'],
+    criadoEm: opts.post.criadoEm.toISOString(),
+    autor: {
+      id: opts.autorId,
+      nome: opts.autorNome,
+      avatarUrl: opts.autorAvatar,
+    },
+    tenantNome: opts.tenantNome,
+  }
+}
+
+/**
+ * Contexto de engajamento (reação/comentário): sócio APROVADO com tenant ativo
+ * OU torcedor global da Comunidade Nacional. O feed lista posts do tenant
+ * sintético do clube — o lookup de engajamento precisa cobrir o mesmo conjunto
+ * (produção quebrava com 500: assertPermission sem tenant, ou post CN fora de
+ * getVisibleTenantIds).
+ */
+async function resolverContextoEngajamento(): Promise<{
+  session: Session
+  viewerId: string
+  /** Tenant do viewer (sócio) ou null (torcedor global / CN). */
+  tenantId: string | null
+  /** Clube do viewer — rate-limit e escopo de posts engajáveis na CN. */
+  afiliacaoId: string | null
+}> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado')
+
+  const viewerId = session.user.id
+  const tenant = await getActiveTenant(viewerId, session.user.email)
+
+  if (tenant && !tenant.sintetico) {
+    const membro: { status: string; tipo: string } | null = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: viewerId } },
+      select: { status: true, tipo: true },
+    })
+
+    if (membro?.status === 'APROVADO') {
+      if (isSuperAdminEmail(session.user.email)) {
+        return {
+          session,
+          viewerId,
+          tenantId: tenant.id,
+          afiliacaoId: tenant.afiliacaoId,
+        }
+      }
+
+      // Uma leitura de membro já feita — valida carteirinha + permissão em paralelo
+      // (evita o 2º find de assertMembroAtivo no hot path de reação/comentário).
+      const permPromise = getUserPermissionsInTenant(viewerId, tenant.id)
+      const carteirinhaPromise =
+        membro.tipo === 'SOCIO'
+          ? db.saasSocio.findUnique({
+              where: { tenantId_userId: { tenantId: tenant.id, userId: viewerId } },
+              select: { validade: true },
+            })
+          : Promise.resolve(null)
+
+      const [{ rolePermissions, overrides }, socio] = await Promise.all([
+        permPromise,
+        carteirinhaPromise,
+      ])
+      if (socio && socio.validade < new Date()) {
+        throw new Error('Sua carteirinha está vencida. Regularize para continuar.')
+      }
+      const effective = calculateEffectivePermissions(rolePermissions, overrides)
+      if (!hasPermission(effective, PERMISSIONS.COMMUNITY_POST)) {
+        throw new Error('Sem permissão')
+      }
+      return {
+        session,
+        viewerId,
+        tenantId: tenant.id,
+        afiliacaoId: tenant.afiliacaoId,
+      }
+    }
+
+    // Cookie/preview de torcida sem vínculo APROVADO — engaja como CN do clube.
+    if (tenant.afiliacaoId) {
+      return {
+        session,
+        viewerId,
+        tenantId: null,
+        afiliacaoId: tenant.afiliacaoId,
+      }
+    }
+  }
+
+  const perfil: {
+    onboardingConcluidoEm: Date | null
+    afiliacaoId: string | null
+  } | null = await db.perfilTorcedor.findUnique({
+    where: { userId: viewerId },
+    select: { onboardingConcluidoEm: true, afiliacaoId: true },
+  })
+  if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) {
+    throw new Error('Não autorizado')
+  }
+
+  return {
+    session,
+    viewerId,
+    tenantId: null,
+    afiliacaoId: perfil.afiliacaoId,
+  }
+}
+
+type PostEngajavelLite = {
+  id: string
+  autorId: string
+  tenantId: string
+  oculto: boolean
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+  tenant: { afiliacaoId: string | null; sintetico: boolean }
+}
+
+/**
+ * Gate alinhado ao feed: fast-path no próprio tenant / mesmo clube (CN
+ * sintético ou PUBLICO); só resolve hierarquia/alianças no fallback.
+ */
+async function podeEngajarPostVisivel(
+  ctx: { viewerId: string; tenantId: string | null; afiliacaoId: string | null },
+  post: PostEngajavelLite,
+): Promise<boolean> {
+  if (post.oculto) return false
+
+  if (!ctx.tenantId) {
+    return (
+      post.visibilidade === 'PUBLICO' &&
+      ctx.afiliacaoId != null &&
+      post.tenant.afiliacaoId === ctx.afiliacaoId
+    )
+  }
+
+  if (post.tenantId === ctx.tenantId) return true
+
+  if (
+    ctx.afiliacaoId &&
+    post.tenant.afiliacaoId === ctx.afiliacaoId &&
+    (post.tenant.sintetico || post.visibilidade === 'PUBLICO')
+  ) {
+    return true
+  }
+
+  const ids = await resolveVisibleTenantIdsForFeed(ctx.tenantId, ctx.viewerId)
+  return ids.includes(post.tenantId)
 }
 
 /**
@@ -129,6 +346,8 @@ export interface PublicarPostState {
   success?: boolean
   /** Muda a cada publicação — usado no cliente para remontar/limpar o composer. */
   token?: string
+  /** Prepend otimista no feed — evita esperar o refetch da API. */
+  preview?: PostPublicadoPreview
 }
 
 export async function publicarPost(
@@ -160,8 +379,6 @@ export async function publicarPost(
     const erroMencoes = erroMencoesExcessivas(conteudo)
     if (erroMencoes) return { message: erroMencoes }
 
-    await getOrCreatePerfilMembro(session.user.id, tenant.id)
-
     // Servidor é a única fonte de verdade da permissão — o cliente só sugere.
     let alcanceNacional = false
     if (alcanceNacionalPedido && visibilidade === 'PUBLICO') {
@@ -185,38 +402,36 @@ export async function publicarPost(
       },
     })
 
-    await db.auditLog.create({
-      data: {
-        tenantId: tenant.id,
-        atorId: session.user.id,
-        acao: 'POST_SOCIAL_PUBLICADO',
-        entidade: 'Post',
-        entidadeId: post.id,
-        detalhes: { tipo: 'MEMBRO' },
-      },
+    // Caminho crítico: autor na timeline. Hashtags/menções/audit/perfil → after().
+    await publicarNaTimelineRede({
+      postId: post.id,
+      autorId: session.user.id,
+      tenantId: tenant.id,
+      criadoEm: post.criadoEm,
     })
 
-    await Promise.all([
-      sincronizarHashtagsDoPost(post.id, tenant.id, conteudo),
-      notificarMencoesDoPost({
-        conteudo,
+    agendarPosPublicacaoFeed({
+      postId: post.id,
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      conteudo,
+      ensurePerfil: true,
+      audit: { acao: 'POST_SOCIAL_PUBLICADO', detalhes: { tipo: 'MEMBRO' } },
+    })
+
+    invalidarLeituraComunidade(tenant.id)
+    return {
+      success: true,
+      token: post.id,
+      preview: previewDoPost({
+        post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
-        tenantId: tenant.id,
-        postId: post.id,
-        link: linkPostComunidade(post.id),
+        autorAvatar: session.user.image ?? null,
+        tenantNome: tenant.nome,
       }),
-      publicarNaTimelineRede({
-        postId: post.id,
-        autorId: session.user.id,
-        tenantId: tenant.id,
-        criadoEm: post.criadoEm,
-      }),
-    ])
-
-    revalidatePath('/portal/comunidade')
-    invalidarLeituraComunidade(tenant.id)
-    return { success: true, token: post.id }
+    }
   } catch (error) {
     console.error('[publicarPost]', error)
     return { message: 'Não foi possível publicar. Tente novamente.' }
@@ -232,16 +447,21 @@ export async function publicarPost(
 export async function publicarPostComoTorcedorGlobal(
   conteudo: string,
   midias: string[],
-): Promise<void> {
+): Promise<PostPublicadoPreview> {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
   const perfil: {
     onboardingConcluidoEm: Date | null
     afiliacaoId: string | null
+    afiliacao: { nome: string; apelido: string | null } | null
   } | null = await db.perfilTorcedor.findUnique({
     where: { userId: session.user.id },
-    select: { onboardingConcluidoEm: true, afiliacaoId: true },
+    select: {
+      onboardingConcluidoEm: true,
+      afiliacaoId: true,
+      afiliacao: { select: { nome: true, apelido: true } },
+    },
   })
   if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) {
     throw new Error('Conclua o onboarding do torcedor para publicar.')
@@ -281,8 +501,22 @@ export async function publicarPostComoTorcedorGlobal(
     criadoEm: post.criadoEm,
   })
 
-  revalidatePath('/portal/comunidade')
+  agendarPosPublicacaoFeed({
+    postId: post.id,
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    autorNome: session.user.name ?? null,
+    conteudo: parsed.data.conteudo,
+  })
+
   invalidarLeituraComunidade(tenant.id)
+  return previewDoPost({
+    post,
+    autorId: session.user.id,
+    autorNome: session.user.name ?? null,
+    autorAvatar: session.user.image ?? null,
+    tenantNome: perfil.afiliacao?.apelido ?? perfil.afiliacao?.nome ?? 'Comunidade',
+  })
 }
 
 export type SeguimentoResultado = 'APROVADO' | 'PENDENTE'
@@ -657,73 +891,96 @@ export async function comentarPost(
   postId: string,
   conteudo: string,
 ): Promise<ComentarioPostItem> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
   const parsed = comentarioSchema.safeParse({ postId, conteudo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Comentário inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
 
-  const limiterKey = `comment:${tenant.id}:${session.user.id}`
+  const [ctx, post] = await Promise.all([
+    resolverContextoEngajamento(),
+    db.post.findUnique({
+      where: { id: parsed.data.postId },
+      select: {
+        id: true,
+        autorId: true,
+        tenantId: true,
+        oculto: true,
+        visibilidade: true,
+        tenant: { select: { afiliacaoId: true, sintetico: true } },
+      },
+    }) as Promise<PostEngajavelLite | null>,
+  ])
+
+  if (!post || !(await podeEngajarPostVisivel(ctx, post))) {
+    throw new Error('Post não encontrado')
+  }
+
+  const { session, viewerId, tenantId, afiliacaoId } = ctx
+  const limiterKey = `comment:${tenantId ?? `nacional:${afiliacaoId}`}:${viewerId}`
   if (excedeuLimiteEngajamento(limiterKey)) {
     throw new Error('Você está comentando rápido demais. Aguarde um pouco.')
   }
   registrarAcaoEngajamento(limiterKey)
 
-  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
-  const post = await db.post.findFirst({
-    where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
-    select: { id: true, autorId: true, titulo: true, tenantId: true },
-  })
-  if (!post) throw new Error('Post não encontrado')
+  const notifTenantId = tenantId ?? post.tenantId
+  const link = linkPostComunidade(post.id)
 
-  const comentario = await db.comentario.create({
-    data: { postId: post.id, autorId: session.user.id, conteudo: parsed.data.conteudo },
-    include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
+  const comentario: { id: string; conteudo: string; criadoEm: Date } = await db.comentario.create({
+    data: { postId: post.id, autorId: viewerId, conteudo: parsed.data.conteudo },
+    select: { id: true, conteudo: true, criadoEm: true },
   })
 
-  if (post.autorId !== session.user.id) {
-    await criarNotificacao({
-      userId: post.autorId,
-      tenantId: tenant.id,
-      tipo: 'NOVO_COMENTARIO',
-      titulo: 'Novo comentário no seu post',
-      corpo: parsed.data.conteudo.slice(0, 140),
-      link: linkPostComunidade(post.id),
-      atorId: session.user.id,
+  // Audit + notificações fora do caminho crítico (UI já é otimista).
+  const corpoNotif = parsed.data.conteudo.slice(0, 140)
+  const autorNome = session.user.name ?? null
+  const conteudoMencoes = parsed.data.conteudo
+  after(() => {
+    if (tenantId) {
+      void db.auditLog
+        .create({
+          data: {
+            tenantId,
+            atorId: viewerId,
+            acao: 'POST_COMENTARIO_CRIADO',
+            entidade: 'Comentario',
+            entidadeId: comentario.id,
+            detalhes: { postId: post.id },
+          },
+        })
+        .catch(() => undefined)
+    }
+    if (post.autorId !== viewerId) {
+      void notificarSafe({
+        userId: post.autorId,
+        tenantId: notifTenantId,
+        tipo: 'NOVO_COMENTARIO',
+        titulo: 'Novo comentário no seu post',
+        corpo: corpoNotif,
+        link,
+        atorId: viewerId,
+      })
+    }
+    void notificarMencoesDoPost({
+      conteudo: conteudoMencoes,
+      autorId: viewerId,
+      autorNome,
+      tenantId: notifTenantId,
+      postId: post.id,
+      link,
     })
-  }
-
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'POST_COMENTARIO_CRIADO',
-      entidade: 'Comentario',
-      entidadeId: comentario.id,
-      detalhes: { postId: post.id },
-    },
   })
 
-  await notificarMencoesDoPost({
-    conteudo: parsed.data.conteudo,
-    autorId: session.user.id,
-    autorNome: session.user.name ?? null,
-    tenantId: tenant.id,
-    postId: post.id,
-    link: linkPostComunidade(post.id),
-  })
-
-  revalidatePath('/portal/comunidade')
-  revalidatePath(`/portal/comunidade/post/${post.id}`)
-
+  // Sem revalidatePath: lista no cliente é otimista (feed e página do post).
   return {
     id: comentario.id,
     conteudo: comentario.conteudo,
     criadoEm: comentario.criadoEm.toISOString(),
-    autor: comentario.autor,
+    autor: {
+      id: viewerId,
+      nome: session.user.name ?? null,
+      avatarUrl: session.user.image ?? null,
+    },
   }
 }
 
@@ -758,8 +1015,6 @@ export async function publicarEnquete(
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
-  await getOrCreatePerfilMembro(session.user.id, tenant.id)
-
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
@@ -777,27 +1032,34 @@ export async function publicarEnquete(
     },
   })
 
-  await Promise.all([
-    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
-    notificarMencoesDoPost({
-      conteudo: parsed.data.conteudo,
+  await publicarNaTimelineRede({
+    postId: post.id,
+    autorId: session.user.id,
+    tenantId: tenant.id,
+    criadoEm: post.criadoEm,
+  })
+
+  agendarPosPublicacaoFeed({
+    postId: post.id,
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    autorNome: session.user.name ?? null,
+    conteudo: parsed.data.conteudo,
+    ensurePerfil: true,
+  })
+
+  invalidarLeituraComunidade(tenant.id)
+  return {
+    success: true,
+    token: post.id,
+    preview: previewDoPost({
+      post,
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
-      tenantId: tenant.id,
-      postId: post.id,
-      link: linkPostComunidade(post.id),
+      autorAvatar: session.user.image ?? null,
+      tenantNome: tenant.nome,
     }),
-    publicarNaTimelineRede({
-      postId: post.id,
-      autorId: session.user.id,
-      tenantId: tenant.id,
-      criadoEm: post.criadoEm,
-    }),
-  ])
-
-  revalidatePath('/portal/comunidade')
-  invalidarLeituraComunidade(tenant.id)
-  return { success: true, token: post.id }
+  }
 }
 
 export async function votarEnquetePost(enqueteId: string, opcaoId: string): Promise<void> {
@@ -1088,8 +1350,6 @@ export async function publicarPostEvento(
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
-  await getOrCreatePerfilMembro(session.user.id, tenant.id)
-
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
@@ -1101,38 +1361,35 @@ export async function publicarPostEvento(
     },
   })
 
-  await Promise.all([
-    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
-    notificarMencoesDoPost({
-      conteudo: parsed.data.conteudo,
-      autorId: session.user.id,
-      autorNome: session.user.name ?? null,
-      tenantId: tenant.id,
-      postId: post.id,
-      link: linkPostComunidade(post.id),
-    }),
-    publicarNaTimelineRede({
-      postId: post.id,
-      autorId: session.user.id,
-      tenantId: tenant.id,
-      criadoEm: post.criadoEm,
-    }),
-  ])
-
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'POST_EVENTO_PUBLICADO',
-      entidade: 'Post',
-      entidadeId: post.id,
-      detalhes: { eventoId: evento.id },
-    },
+  await publicarNaTimelineRede({
+    postId: post.id,
+    autorId: session.user.id,
+    tenantId: tenant.id,
+    criadoEm: post.criadoEm,
   })
 
-  revalidatePath('/portal/comunidade')
+  agendarPosPublicacaoFeed({
+    postId: post.id,
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    autorNome: session.user.name ?? null,
+    conteudo: parsed.data.conteudo,
+    ensurePerfil: true,
+    audit: { acao: 'POST_EVENTO_PUBLICADO', detalhes: { eventoId: evento.id } },
+  })
+
   invalidarLeituraComunidade(tenant.id)
-  return { success: true, token: post.id }
+  return {
+    success: true,
+    token: post.id,
+    preview: previewDoPost({
+      post,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      autorAvatar: session.user.image ?? null,
+      tenantNome: tenant.nome,
+    }),
+  }
 }
 
 export async function criarGrupoPublico(nome: string, descricao?: string): Promise<{ id: string }> {
@@ -1482,64 +1739,81 @@ export async function criarDestaquePerfil(titulo: string, postIds: string[]): Pr
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
 }
 
-export async function reagirPost(postId: string, tipo: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE'): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
+export async function reagirPost(
+  postId: string,
+  tipo: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE',
+): Promise<{ minhaReacao: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE' | null }> {
   const parsed = reacaoSchema.safeParse({ postId, tipo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Reação inválida')
 
-  const limiterKey = `reaction:${tenant.id}:${session.user.id}`
+  // Authz + post em paralelo — evita serializar hierarquia antes de saber se o post existe.
+  const [ctx, post] = await Promise.all([
+    resolverContextoEngajamento(),
+    db.post.findUnique({
+      where: { id: parsed.data.postId },
+      select: {
+        id: true,
+        autorId: true,
+        tenantId: true,
+        oculto: true,
+        visibilidade: true,
+        tenant: { select: { afiliacaoId: true, sintetico: true } },
+      },
+    }) as Promise<PostEngajavelLite | null>,
+  ])
+
+  if (!post || !(await podeEngajarPostVisivel(ctx, post))) {
+    throw new Error('Post não encontrado')
+  }
+
+  const { viewerId, tenantId, afiliacaoId } = ctx
+  const limiterKey = `reaction:${tenantId ?? `nacional:${afiliacaoId}`}:${viewerId}`
   if (excedeuLimiteEngajamento(limiterKey)) {
     throw new Error('Você está reagindo rápido demais. Aguarde um pouco.')
   }
   registrarAcaoEngajamento(limiterKey)
 
-  const post = await db.post.findFirst({
-    where: { id: parsed.data.postId, tenantId: tenant.id, oculto: false },
-    select: { id: true, autorId: true, titulo: true },
+  // 1 RTT no descurtir (deleteMany); add/troca = deleteMany(0) + upsert.
+  // Evita o findUnique prévio que sempre somava um round-trip.
+  const removidos: { count: number } = await db.reacao.deleteMany({
+    where: { postId: post.id, userId: viewerId, tipo: parsed.data.tipo },
   })
-  if (!post) throw new Error('Post não encontrado')
+  const removendo = removidos.count > 0
 
-  const existente = await db.reacao.findUnique({
-    where: { postId_userId: { postId: post.id, userId: session.user.id } },
-    select: { id: true, tipo: true },
-  })
-
-  const removendo = existente?.tipo === parsed.data.tipo
-
-  if (removendo) {
-    await db.reacao.delete({ where: { id: existente!.id } })
-  } else if (existente) {
-    await db.reacao.update({ where: { id: existente.id }, data: { tipo: parsed.data.tipo } })
-  } else {
-    await db.reacao.create({
-      data: { postId: post.id, userId: session.user.id, tipo: parsed.data.tipo },
+  if (!removendo) {
+    await db.reacao.upsert({
+      where: { postId_userId: { postId: post.id, userId: viewerId } },
+      create: { postId: post.id, userId: viewerId, tipo: parsed.data.tipo },
+      update: { tipo: parsed.data.tipo },
     })
   }
 
-  // Só notifica ao adicionar/trocar reação — remover a própria reação não gera alerta.
-  if (!removendo && post.autorId !== session.user.id) {
-    await criarNotificacao({
-      userId: post.autorId,
-      tenantId: tenant.id,
-      tipo: 'NOVA_REACAO',
-      titulo: 'Nova reação no seu post',
-      corpo:
-        parsed.data.tipo === 'FORCA'
-          ? 'Recebeu uma reação de Força.'
-          : parsed.data.tipo === 'VAMOS'
-            ? 'Recebeu um Vamos!'
-            : parsed.data.tipo === 'PRESENTE'
-              ? 'Marcou presença no seu post.'
-              : 'Recebeu uma curtida.',
-      link: linkPostComunidade(post.id),
-      atorId: session.user.id,
+  // Notificação fora do caminho crítico — UI já é otimista.
+  if (!removendo && post.autorId !== viewerId) {
+    const notifTenantId = tenantId ?? post.tenantId
+    const corpo =
+      parsed.data.tipo === 'FORCA'
+        ? 'Recebeu uma reação de Força.'
+        : parsed.data.tipo === 'VAMOS'
+          ? 'Recebeu um Vamos!'
+          : parsed.data.tipo === 'PRESENTE'
+            ? 'Marcou presença no seu post.'
+            : 'Recebeu uma curtida.'
+    after(() => {
+      void notificarSafe({
+        userId: post.autorId,
+        tenantId: notifTenantId,
+        tipo: 'NOVA_REACAO',
+        titulo: 'Nova reação no seu post',
+        corpo,
+        link: linkPostComunidade(post.id),
+        atorId: viewerId,
+      })
     })
   }
 
-  revalidatePath('/portal/comunidade')
-  revalidatePath('/portal')
+  // Sem revalidatePath: overlay de reação é estado do cliente (otimista).
+  return { minhaReacao: removendo ? null : parsed.data.tipo }
 }
 
 export async function denunciarPost(postId: string, motivo: string): Promise<void> {

@@ -133,6 +133,22 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         queryClient.setQueryData(
           queryKey,
           (prev: { pages: ComunidadeFeedPage<TPost>[]; pageParams: Array<string | null> } | undefined) => {
+            // Refetch do topo: mescla otimistas locais que a API ainda não devolveu.
+            if (cursor == null) {
+              const freshIds = new Set(fresh.posts.map((p) => p.id))
+              const kept =
+                prev?.pages[0]?.posts.filter((p) => !freshIds.has(p.id)) ?? []
+              return {
+                pages: [
+                  {
+                    posts: [...kept, ...fresh.posts],
+                    pageInfo: fresh.pageInfo,
+                  },
+                ],
+                pageParams: [null],
+              }
+            }
+
             if (!prev || prev.pages.length === 0) {
               return {
                 pages: [fresh],
@@ -163,6 +179,29 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     [endpoint, filtro, initialCursor, queryClient, queryKey, take],
   )
 
+  const prependPost = useCallback(
+    (post: TPost) => {
+      queryClient.setQueryData(
+        queryKey,
+        (prev: { pages: ComunidadeFeedPage<TPost>[]; pageParams: Array<string | null> } | undefined) => {
+          if (!prev || prev.pages.length === 0) {
+            return {
+              pages: [{ posts: [post], pageInfo: { hasMore: false, nextCursor: null } }],
+              pageParams: [null],
+            }
+          }
+          const first = prev.pages[0]
+          if (first.posts.some((p) => p.id === post.id)) return prev
+          return {
+            ...prev,
+            pages: [{ ...first, posts: [post, ...first.posts] }, ...prev.pages.slice(1)],
+          }
+        },
+      )
+    },
+    [queryClient, queryKey],
+  )
+
   return {
     posts,
     pageInfo,
@@ -171,5 +210,6 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     error: query.error instanceof Error ? query.error.message : null,
     loadMore,
     refreshCurrentPage,
+    prependPost,
   }
 }

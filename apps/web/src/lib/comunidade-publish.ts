@@ -13,19 +13,26 @@ export async function sincronizarHashtagsDoPost(
   await db.postHashtag.deleteMany({ where: { postId } })
   if (tags.length === 0) return
 
-  for (const tag of tags) {
-    const hashtag: { id: string } = await db.hashtag.upsert({
-      where: { tenantId_tag: { tenantId, tag } },
-      create: { tenantId, tag },
-      update: {},
-      select: { id: true },
-    })
-    await db.postHashtag.upsert({
-      where: { postId_hashtagId: { postId, hashtagId: hashtag.id } },
-      create: { postId, hashtagId: hashtag.id },
-      update: {},
-    })
-  }
+  const hashtags: Array<{ id: string }> = await Promise.all(
+    tags.map((tag) =>
+      db.hashtag.upsert({
+        where: { tenantId_tag: { tenantId, tag } },
+        create: { tenantId, tag },
+        update: {},
+        select: { id: true },
+      }),
+    ),
+  )
+
+  await Promise.all(
+    hashtags.map((hashtag) =>
+      db.postHashtag.upsert({
+        where: { postId_hashtagId: { postId, hashtagId: hashtag.id } },
+        create: { postId, hashtagId: hashtag.id },
+        update: {},
+      }),
+    ),
+  )
 }
 
 export async function notificarMencoesDoPost(opts: {
@@ -47,15 +54,17 @@ export async function notificarMencoesDoPost(opts: {
 
   registrarAcaoEngajamento(limiterKey)
 
-  for (const m of mencoes) {
-    await criarNotificacao({
-      userId: m.userId,
-      tenantId: opts.tenantId,
-      tipo: 'MENCAO',
-      titulo: 'Você foi mencionado',
-      corpo: `${opts.autorNome ?? 'Um membro'} mencionou você em uma publicação.`,
-      link: opts.link,
-      atorId: opts.autorId,
-    })
-  }
+  await Promise.all(
+    mencoes.map((m) =>
+      criarNotificacao({
+        userId: m.userId,
+        tenantId: opts.tenantId,
+        tipo: 'MENCAO',
+        titulo: 'Você foi mencionado',
+        corpo: `${opts.autorNome ?? 'Um membro'} mencionou você em uma publicação.`,
+        link: opts.link,
+        atorId: opts.autorId,
+      }),
+    ),
+  )
 }

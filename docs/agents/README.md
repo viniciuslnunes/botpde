@@ -48,6 +48,9 @@ arquitetura, registre nos docs que os agentes leem (este é o protocolo de
 As Fases 1–5 de otimização web estão documentadas em `ARCHITECTURE.md` §5.6
 (commits `99443a7` → `82ae6f3`). **Comunidade (2026-07-16):** ondas A–B, C, D1–D3
 e F4 (Cloudflare) em `docs/data/modulo-comunidade-performance.md`.
+**Engajamento overlay (2026-07-17):** reação/comentário sem `revalidatePath` do
+feed; gate CN em `modulo-comunidade.md` § engajamento — agente `performance` /
+`implementation` / `rbac` / `qa-verification` devem preservar o padrão.
 CDN: `docs/ops/cloudflare-cdn.md`. Use o agente `performance` para:
 - validar que uma feature nova não reintroduz N+1 ou prefetch agressivo;
 - propor recortes quando navegação ou demo voltarem a degradar;

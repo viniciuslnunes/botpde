@@ -568,6 +568,7 @@ checklist: **`docs/data/modulo-comunidade-performance.md`**.
 | C | TanStack Query + Virtual, `revalidateTag`, prefetch hover |
 | D1–D3 | Redis SSE, fan-out async (+ ping SSE **após** fan-out), SSE mensageria |
 | Live UX | Auto-refetch no topo (~250ms); banner “novos posts” só se rolado |
+| Engajamento (2026-07-17) | Overlay reação/comentário sem `revalidatePath` do feed; gate CN via `resolverContextoEngajamento` + `podeEngajarPostVisivel`; notifs em `after()` |
 
 **Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
 

@@ -117,6 +117,7 @@ export function PostEngagement({
 
   function handleReacao(tipo: TipoReacaoSocial) {
     const anterior = reacao
+    const totalAnterior = totalR
     if (anterior === tipo) {
       setReacao(null)
       setTotalR((n) => Math.max(0, n - 1))
@@ -126,10 +127,11 @@ export function PostEngagement({
     }
     startTransition(async () => {
       try {
-        await reagirPost(postId, tipo)
+        const { minhaReacao } = await reagirPost(postId, tipo)
+        setReacao(minhaReacao)
       } catch (e) {
         setReacao(anterior)
-        setTotalR(totalReacoes)
+        setTotalR(totalAnterior)
         toast.error(e instanceof Error ? e.message : 'Não foi possível reagir.')
       }
     })

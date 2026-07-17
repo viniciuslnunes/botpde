@@ -22,6 +22,9 @@ Credentials (e-mail/senha) usando `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` de
 dois valores no `.env.local`, `test:e2e` falha com uma mensagem explicando o
 que falta.
 
+Documentação local da conta (super-admin de teste, **gitignored**):
+`e2e/CREDENTIALS.local.md` — template em `e2e/CREDENTIALS.local.example.md`.
+
 `e2e/.auth/user.json` (sessão) e `e2e/screenshots/` (PNGs) **não são commitados**
 (ver `.gitignore`) — são artefato local para revisão, não fixture de CI.
 

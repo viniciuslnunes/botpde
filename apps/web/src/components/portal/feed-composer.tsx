@@ -8,6 +8,7 @@ import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostSta
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
+import { emitirPostPublicado } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -74,6 +75,24 @@ function FeedComposerActive({ userName, userAvatar, perfilPrivado = false, event
     : pollState.token || pollState.success
       ? pollState
       : eventState
+
+  // Feed infinite: prepend otimista com preview da action (sem esperar refetch).
+  useEffect(() => {
+    const preview = postState.preview ?? pollState.preview ?? eventState.preview
+    if (postState.success || pollState.success || eventState.success) {
+      emitirPostPublicado(preview ? { preview } : undefined)
+    }
+  }, [
+    postState.success,
+    postState.token,
+    postState.preview,
+    pollState.success,
+    pollState.token,
+    pollState.preview,
+    eventState.success,
+    eventState.token,
+    eventState.preview,
+  ])
 
   return (
     <ComposerBody

@@ -11,7 +11,7 @@ interface ComunidadePostsSectionProps {
   tenantId: string
   currentUser: CurrentUser
   cursor?: string
-  /** 'descobrir' = stream sugerido; 'seguindo' = só quem o membro segue. */
+  /** 'descobrir' = ranking misto (rede + externos); 'seguindo' = timeline da rede. */
   filtro?: 'descobrir' | 'seguindo'
 }
 
@@ -41,15 +41,13 @@ export async function ComunidadePostsSection({
   }
 
   const feed = await getPostsParaFeed(tenantId, currentUser.id || undefined, { cursor, take: 20 })
-  const stream =
-    feed.postsSugeridos.length > 0 ? feed.postsSugeridos : feed.postsSeguindo
 
   return (
     <ComunidadeFeedInfinite
       tenantId={tenantId}
       currentUser={currentUser}
       filtro={filtro}
-      initialPosts={stream}
+      initialPosts={feed.posts}
       initialPageInfo={feed.pageInfo}
       initialCursor={cursor ?? null}
       salvoIds={[...salvoIds]}

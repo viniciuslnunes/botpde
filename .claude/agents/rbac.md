@@ -34,6 +34,23 @@ Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de ac
 - Cache de dados (`unstable_cache`) **não substitui** checagem de permissão no request
   de mutação — só acelera leituras já públicas ou pós-gate.
 
+## Comunidade Nacional / engajamento cross-tenant
+Posts da CN vivem em `Tenant.sintetico` (e posts `PUBLICO` / `alcanceNacional` da
+mesma afiliação). O viewer pode ser sócio de uma torcida real **ou** torcedor
+global sem `SaasMembro` aprovado. Mutações de overlay (`reagirPost`,
+`comentarPost`) **não** podem exigir `tenantId === post.tenantId` do viewer.
+
+Padrão canônico (`comunidade/actions.ts`):
+- `resolverContextoEngajamento()` — sócio APROVADO + `COMMUNITY_POST`, ou
+  afiliação do `PerfilTorcedor` / preview (tenantId `null`, escopo = clube).
+- `podeEngajarPostVisivel` — alinhado a `resolveVisibleTenantIdsForFeed`
+  (exportado de `feed.ts`); fast-path mesmo clube / sintético.
+- `listarComentariosPost` — gate pela visibilidade do post, sem tenant do viewer.
+
+Ver `docs/data/modulo-comunidade.md` § engajamento. Ao propor gates novos no
+feed social, teste: sócio reagindo a post da CN; torcedor global reagindo/
+comentando; POST sem digest RSC genérico em produção.
+
 ## Exemplo de referência: módulo Salas (Meet)
 Uma única permissão, `MEETINGS_HOST` (`meetings:host`, grupo Comunidade), autoriza criar/
 encerrar sala e toda moderação (editar/destacar/excluir mensagem, criar/encerrar enquete,
