@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
-import { Video, Users, Heart, Bookmark, UserPlus, Radio } from 'lucide-react'
+import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
@@ -48,8 +48,6 @@ interface ComunidadeFeedShellProps {
   filtro?: 'descobrir' | 'seguindo'
   /** Clube do torcedor global (banner quando feed usa tenant proxy). */
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
-  /** Slug do clube (Afiliacao) para widgets Sofascore contextualizados. */
-  afiliacaoSlug?: string | null
   /** COMMUNITY_POST_NACIONAL — libera "Torcida e torcedores" no composer. */
   podePublicarNacional?: boolean
   salasAtivas?: SalaAtivaListItem[]
@@ -89,7 +87,6 @@ export function ComunidadeFeedShell({
   somentePublico = false,
   filtro = 'descobrir',
   clubeNacional = null,
-  afiliacaoSlug = null,
   podePublicarNacional = false,
   salasAtivas = [],
 }: ComunidadeFeedShellProps) {
@@ -152,7 +149,6 @@ export function ComunidadeFeedShell({
             <ComunidadeAsideWidgets
               tenantId={tenant.id}
               afiliacaoId={tenant.afiliacaoId}
-              afiliacaoSlug={afiliacaoSlug}
               currentUserId={currentUser.id || undefined}
               salasAoVivo={salasAtivas}
             />
@@ -179,6 +175,7 @@ export function ComunidadeFeedShell({
             { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart },
             { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users },
             { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio },
+            { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
             { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
             { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
           ].map(({ href, label, icon: Icon }) => (

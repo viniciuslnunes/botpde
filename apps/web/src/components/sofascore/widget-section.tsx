@@ -10,6 +10,10 @@ interface WidgetSectionProps {
   jogadorId?: string | null
   limit?: number
   titulo?: string
+  /** Repassado ao iframe — `eager` na página Classificação. */
+  loading?: 'lazy' | 'eager'
+  /** Omite o título interno do card quando a página já tem header. */
+  hideTitulo?: boolean
 }
 
 /**
@@ -24,6 +28,8 @@ export async function WidgetSection({
   jogadorId,
   limit,
   titulo,
+  loading,
+  hideTitulo,
 }: WidgetSectionProps) {
   const widgets = getWidgetsForContexto({ contexto, afiliacaoSlug, competicaoSlug, jogadorId, limit })
   if (widgets.length === 0) return null
@@ -44,6 +50,8 @@ export async function WidgetSection({
             alturaPx={w.alturaPx}
             creditoUrl={w.creditoUrl}
             creditoTexto={w.creditoTexto}
+            loading={loading}
+            hideTitulo={hideTitulo}
           />
         </MotionReveal>
       ))}

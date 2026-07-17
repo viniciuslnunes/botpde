@@ -26,9 +26,22 @@ Passo a passo:
 1. Acesse https://widgets.sofascore.com (painel oficial da Sofascore).
 2. Escolha o widget desejado (fixtures, standings, top players, power rankings, player,
    cup tree) para o time/competição/jogador.
-3. Copie a URL do iframe que a Sofascore gera e cole em `embedSrc`.
-4. Preencha `afiliacaoSlug` com o `Afiliacao.slug` do clube dono do widget.
-5. Marque `ativo: true` e escolha `contextos` + `prioridade`.
+3. Se o gerador oferecer opção de tema/appearance (ex. dark), selecione-a **antes** de
+   copiar o snippet — o tema fica embutido na URL gerada.
+4. Copie a URL do iframe que a Sofascore gera e cole em `embedSrc`.
+5. Preencha `afiliacaoSlug` com o `Afiliacao.slug` do clube dono do widget.
+6. Marque `ativo: true` e escolha `contextos` + `prioridade`.
+
+## Tema / dark mode
+
+O iframe Sofascore é **cross-origin**: CSS da app (`--surface`, `next-themes`) **não**
+pinta o interior do widget. Não injetar estilos no documento do embed.
+
+- Tema claro/escuro do widget vem **só** da URL oficial gerada em widgets.sofascore.com.
+- Não inventar query params (`theme=dark` etc.) nem sincronizar automaticamente com o
+  toggle de tema da app.
+- O card wrapper (`SofascoreWidgetFrame`) usa tokens da app; só o iframe interno pode
+  permanecer light se a `embedSrc` for light.
 
 ## Lógica de filtragem (`getWidgetsForContexto`)
 
@@ -37,7 +50,7 @@ Chave de tudo é o **`afiliacaoSlug`** — sem clube resolvido, retorna `[]`.
 | Campo | Regra |
 |---|---|
 | `ativo` | só `true` aparece |
-| `contextos` | widget precisa listar o contexto solicitado (`home`, `clube`, `campeonato`, `jogador`, `artigo`) |
+| `contextos` | widget precisa listar o contexto solicitado (`home`, `clube`, `campeonato`, `jogador`, `artigo`, `classificacao`) |
 | `afiliacaoSlug` | igualdade estrita com o slug do clube do usuário |
 | `competicaoSlug` | filtra **só** se o chamador informou E o widget define; widget sem o campo é "do clube em geral" e passa |
 | `jogadorId` | mesma lógica de `competicaoSlug` |
@@ -68,7 +81,7 @@ export const SOFASCORE_WIDGETS = [
     titulo: 'Classificação — Brasileirão',
     afiliacaoSlug: 'corinthians',
     competicaoSlug: 'brasileirao-serie-a',
-    contextos: ['clube', 'campeonato'],
+    contextos: ['classificacao'],
     prioridade: 2,
     ativo: false,
     embedSrc: 'https://widgets.sofascore.com/embed/COLE_AQUI_A_URL_OFICIAL',
@@ -93,15 +106,15 @@ Componente server: `apps/web/src/components/sofascore/widget-section.tsx`. Rende
 no padrão visual da comunidade (via `SofascoreWidgetFrame` + `MotionReveal`).
 
 ```tsx
-// home — aside da comunidade (já integrado em comunidade-aside-widgets.tsx)
-<WidgetSection contexto="home" afiliacaoSlug={afiliacaoSlug} limit={2} />
-
-// clube — shell nacional do torcedor global (já integrado em comunidade-nacional-shell.tsx)
-<WidgetSection contexto="clube" afiliacaoSlug={afiliacao.slug} limit={4} titulo="Sofascore" />
+// classificacao — página dedicada (torcida e nacional)
+// apps/web/src/app/portal/comunidade/classificacao/page.tsx
+// Menu: ComunidadeFeedNav + chips mobile em comunidade-feed-shell
+<WidgetSection contexto="classificacao" afiliacaoSlug={afiliacaoSlug} />
 
 // artigo — detalhe de post (já integrado em post/[id]/page.tsx)
 <WidgetSection contexto="artigo" afiliacaoSlug={afiliacaoSlug} limit={1} />
 
+// home / clube — reservados para widgets futuros no aside/feed (não usados pelo standings piloto)
 // campeonato — EXEMPLO ILUSTRATIVO (ainda não há rota de campeonato na comunidade)
 <WidgetSection contexto="campeonato" afiliacaoSlug={slug} competicaoSlug="brasileirao-serie-a" />
 
@@ -110,21 +123,25 @@ no padrão visual da comunidade (via `SofascoreWidgetFrame` + `MotionReveal`).
 ```
 
 Resolução do slug: `resolverAfiliacaoSlugContexto(afiliacaoId)` em
-`apps/web/src/lib/sofascore.ts` (React `cache`, `id → slug`); quem decide qual
+`apps/web/src/lib/sofascore-server.ts` (React `cache`, `id → slug`); quem decide qual
 `afiliacaoId` usar (tenant vs torcedor nacional) é a página, via
 `resolverContextoComunidade` (`comunidade-contexto.ts`, que já expõe `afiliacao.slug`).
 
+Na comunidade nacional, o feed mostra só um CTA “Classificação” apontando para
+`/portal/comunidade/classificacao` (sem iframe inline).
+
 ## Testes
 
-`apps/web/src/lib/__tests__/sofascore-widgets.test.ts` — filtragem por clube/contexto,
-ativo, prioridade, limit, competição/jogador, e `[]` sem slug.
+`apps/web/src/lib/__tests__/sofascore-widgets.test.ts` — filtragem por clube/contexto
+(incl. `classificacao`), ativo, prioridade, limit, competição/jogador, e `[]` sem slug.
 
 ## Checklist de validação
 
 - [ ] iframe carrega o widget oficial (URL gerada em widgets.sofascore.com).
 - [ ] Card **some por completo** quando não há widget configurado para o clube (sem placeholder).
-- [ ] Contraste/cores batem com os demais cards da comunidade (CSS vars `--border`/`--surface`).
-- [ ] Responsivo mobile (iframe `w-full`, `minHeight: 360`).
+- [ ] Contraste/cores do **card wrapper** batem com a comunidade (CSS vars `--border`/`--surface`).
+- [ ] Tema do iframe: se dark for necessário, regenerar `embedSrc` no painel Sofascore.
+- [ ] Responsivo mobile (iframe `w-full`, altura do cadastro).
 - [ ] Sem CLS visível (altura mínima reservada + `loading="lazy"`).
 - [ ] `pnpm --filter @torcida/web test` passa.
 - [ ] `pnpm --filter @torcida/web lint` e `tsc --noEmit` passam.

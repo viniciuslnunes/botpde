@@ -1,10 +1,10 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getPostsFeedNacional } from '@/lib/feed'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
-import { Clock, Users } from 'lucide-react'
-import { WidgetSection } from '@/components/sofascore/widget-section'
+import { Clock, ListOrdered, Users } from 'lucide-react'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
@@ -76,7 +76,22 @@ export async function ComunidadeNacionalShell({
         </div>
       )}
 
-      <WidgetSection contexto="clube" afiliacaoSlug={afiliacao.slug} limit={4} titulo="Sofascore" />
+      {afiliacao.slug && (
+        <Link
+          href="/portal/comunidade/classificacao"
+          className="flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]">
+            <ListOrdered className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Classificação</p>
+            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Tabela ao vivo do campeonato de {nomeClube}
+            </p>
+          </div>
+        </Link>
+      )}
 
       <ComunidadeNacionalComposer currentUser={currentUser} />
 

@@ -14,7 +14,13 @@ export type SofascoreWidgetTipo =
   | 'cupTree'
 
 /** Contexto de exibição (espelha WIDGET_CONTEXTOS de @torcida/types). */
-export type SofascoreWidgetContexto = 'home' | 'clube' | 'campeonato' | 'jogador' | 'artigo'
+export type SofascoreWidgetContexto =
+  | 'home'
+  | 'clube'
+  | 'campeonato'
+  | 'jogador'
+  | 'artigo'
+  | 'classificacao'
 
 export function isEmbedConfigured(embedSrc: string | null | undefined): boolean {
   return Boolean(embedSrc?.trim())

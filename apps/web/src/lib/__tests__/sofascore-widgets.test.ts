@@ -105,4 +105,17 @@ describe('sofascore — getWidgetsForContexto', () => {
     })
     expect(r.map((w) => w.id).sort()).toEqual(['geral', 'j10'])
   })
+
+  it('retorna widget no contexto classificacao', () => {
+    const widgets = [
+      widget({ id: 'tabela', tipo: 'standings', contextos: ['classificacao'] }),
+      widget({ id: 'jogos', contextos: ['home', 'clube'] }),
+    ]
+    const r = getWidgetsForContexto({
+      contexto: 'classificacao',
+      afiliacaoSlug: 'corinthians',
+      widgets,
+    })
+    expect(r.map((w) => w.id)).toEqual(['tabela'])
+  })
 })

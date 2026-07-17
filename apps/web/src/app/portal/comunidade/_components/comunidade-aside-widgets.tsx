@@ -9,13 +9,10 @@ import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { ComunidadeSalasLiveWidget } from '@/components/portal/comunidade-salas-live-widget'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { WidgetSection } from '@/components/sofascore/widget-section'
 
 interface ComunidadeAsideWidgetsProps {
   tenantId: string
   afiliacaoId: string | null
-  /** Slug do clube (Afiliacao) para widgets Sofascore; sem slug, seção não aparece. */
-  afiliacaoSlug?: string | null
   currentUserId?: string
   salasAoVivo?: SalaAtivaListItem[]
 }
@@ -23,7 +20,6 @@ interface ComunidadeAsideWidgetsProps {
 export async function ComunidadeAsideWidgets({
   tenantId,
   afiliacaoId,
-  afiliacaoSlug = null,
   currentUserId,
   salasAoVivo = [],
 }: ComunidadeAsideWidgetsProps) {
@@ -94,8 +90,6 @@ export async function ComunidadeAsideWidgets({
           </div>
         </MotionReveal>
       )}
-
-      <WidgetSection contexto="home" afiliacaoSlug={afiliacaoSlug} limit={2} />
 
       {hashtags.length > 0 && (
         <MotionReveal index={widgetIndex++}>

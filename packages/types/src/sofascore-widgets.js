@@ -7,7 +7,7 @@
 
 export const WIDGET_TIPOS = ['fixtures', 'standings', 'topPlayers', 'powerRankings', 'player', 'cupTree']
 
-export const WIDGET_CONTEXTOS = ['home', 'clube', 'campeonato', 'jogador', 'artigo']
+export const WIDGET_CONTEXTOS = ['home', 'clube', 'campeonato', 'jogador', 'artigo', 'classificacao']
 
 /**
  * @typedef {Object} SofascoreWidgetConfig
@@ -17,7 +17,7 @@ export const WIDGET_CONTEXTOS = ['home', 'clube', 'campeonato', 'jogador', 'arti
  * @property {string} afiliacaoSlug clube dono do widget (`Afiliacao.slug`) — obrigatório
  * @property {string} [competicaoSlug] competição específica (opcional)
  * @property {string} [jogadorId] jogador específico (opcional)
- * @property {('home'|'clube'|'campeonato'|'jogador'|'artigo')[]} contextos onde esse widget pode aparecer
+ * @property {('home'|'clube'|'campeonato'|'jogador'|'artigo'|'classificacao')[]} contextos onde esse widget pode aparecer
  * @property {number} prioridade menor = mais relevante
  * @property {boolean} ativo
  * @property {string} embedSrc URL do iframe oficial gerado pela Sofascore
@@ -66,7 +66,7 @@ export const SOFASCORE_WIDGETS = [
     titulo: 'Classificação',
     afiliacaoSlug: 'sport-club-corinthians-paulista-sp',
     competicaoSlug: 'brasileirao-serie-a-2026',
-    contextos: ['home', 'clube'],
+    contextos: ['classificacao'],
     prioridade: 2,
     ativo: true,
     // Embed oficial colado do painel Sofascore (torneio 83 / temporada 87678 —

@@ -129,7 +129,6 @@ export default async function ComunidadePage({
         podePublicarNacional={podePublicarNacional}
         filtro={filtro}
         clubeNacional={ctx.afiliacao}
-        afiliacaoSlug={ctx.afiliacao?.slug ?? null}
         salasAtivas={salasAtivas}
       />
 
