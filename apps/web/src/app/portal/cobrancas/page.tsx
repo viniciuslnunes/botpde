@@ -35,8 +35,11 @@ export default async function PortalCobrancasPage() {
               Cobranças da sua associação em {tenant.nome}
             </p>
           </div>
-          <Link href="/portal" className="text-sm font-medium text-[rgb(var(--primary))] hover:underline">
-            Início
+          <Link
+            href="/portal/carteirinha"
+            className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+          >
+            Carteirinha
           </Link>
         </div>
       </MotionReveal>

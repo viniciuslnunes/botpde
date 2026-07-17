@@ -64,7 +64,7 @@ Implementação: `docs/data/modulo-associacao.md`.
 
 | ID | Gap | Notas |
 |---|---|---|
-| C1 | Pagamento vaga caravana + lotação | Dor #1 logística; TW “viagens” |
+| C1 | Pagamento vaga caravana + lotação | MVP: `Evento.valorVaga` + cobranca AVULSA `eventoId`; lotação via sede.capacidade |
 | C2 | Assembleia/eleição (quórum, sigilo, ata) | SF CC |
 | C3 | Dossiê LGE export único | Ninguém tem — diferencial |
 | C4 | PWA + Web Push | Antes de RN/Expo |

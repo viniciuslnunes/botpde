@@ -291,7 +291,7 @@ describe('filterMenuByPermissions com OR', () => {
   it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Eventos', () => {
     expect(
       filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.FINANCE_MANAGE]).map((i) => i.id),
-    ).toEqual(['dashboard', 'financeiro'])
+    ).toEqual(['dashboard', 'financeiro', 'planos-associacao', 'cobrancas'])
     expect(
       filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_MANAGE]).map((i) => i.id),
     ).toEqual(['dashboard', 'eventos'])

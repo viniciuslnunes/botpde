@@ -1,10 +1,7 @@
 # Proposta — Departamentos: Portal (membros) × Admin (gestores / presidência)
 
-> Status: **Fases 0–4 concluídas** (2026-07-16) — hub Abrir área / Gestão / Operação;
-> home `/portal/departamentos/[slug]`; equipe com `canManageDepartamento`;
-> pacotes **membro** apertados; menu admin Eventos/Financeiro/Patrimônio exige `*:manage`;
-> plugins: Financeiro, Patrimônio, Caravanas/Bateria (`Evento.tipo`); thin wrappers
-> (Feminino/Carnaval/Social/Loja/Comunicação); Diretoria (fila + KPIs no portal).
+> Status: **Fases 0–5** — shell + plugins + thin wrappers; Fase 5 = cockpit da área
+> (missão, subáreas, próxima ação) + widgets de domínio. Ver §6.
 > Complementa `modulo-departamentos.md`.
 
 ## 1. Respostas diretas
@@ -188,6 +185,34 @@ Delegação: `canManageDepartamento` sem `ROLES_MANAGE` — UI no portal (Fase 1
 - Home com KPIs leves
 - Fila de aprovação de membros no portal (gestor) ou deep-link admin só-gestor
 
+### Fase 5 — Enriquecimento shell + subáreas (2026-07-17)
+
+**Princípio:** um shell cockpit + registry (`mission`, `subareas`, tipo Plugin/Compõe);
+não clonar Loja/Comunidade/Eventos.
+
+**Onda 1 — Shell**
+- Home `/[slug]`: hero (missão) + próxima ação + nav de subáreas (#âncoras) + equipe + widget
+- Hub: badge Plugin vs Compõe; contadores leves só quando baratos (sem misturar com notif admin)
+- Registry: `mission`, `subareas[]`, `kind: plugin | thin`
+
+**Onda 2 — Plugins**
+- Financeiro: inadimplência + planos na home
+- Caravanas: lotação / checklist embarque
+- Bateria: presença no último ensaio
+
+**Onda 3 — Thin ricos**
+- Comunicação: último comunicado + denúncias (perm)
+- Loja: pedidos abertos (perm)
+- Feminino / Carnaval / Social: agenda filtrada + missão forte
+
+**Onda 4 — Só com evidência (MVP 2026-07-17)**
+- Canal oficial por depto: `Departamento.canalConversaId` → deep-link `/portal/mensagens?c=`
+  (gestor vincula canal existente)
+- Caravana paga (C1): `Evento.valorVaga` + `CobrancaAssociacao.eventoId` (AVULSA); CTA na
+  ficha da caravana após RSVP confirmado
+- Carnaval barracão: plugin leve (`portalPanel: carnaval`) com checklist em
+  `Departamento.meta` — sem ERP de escola
+
 ---
 
 ## 7. Fora de escopo / anti-padrões
@@ -208,4 +233,5 @@ sobre um shell portal único, com RBAC existente.
 **Admin** = configuração institucional + operação pesada de domínio.  
 **Portal Departamentos** = casa do membro e do gestor no dia a dia da área.
 
-Próximo passo de implementação sugerido: **Fase 0 + Fase 1**.
+**Próximo passo** após Fase 5 Onda 4 MVP: refinar C1 (gate adimplência na lotação,
+régua de vaga) e canal automático por área se ICP pedir.

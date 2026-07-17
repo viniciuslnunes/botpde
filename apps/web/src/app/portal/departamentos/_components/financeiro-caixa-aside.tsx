@@ -7,6 +7,8 @@ import {
   TIPO_FINANCEIRO_LABEL,
 } from '@torcida/types'
 import { carregarPainelFinanceiro } from '@/lib/financeiro'
+import { db } from '@torcida/db'
+import { sincronizarCobrancasVencidas } from '@/lib/cobrancas'
 
 export async function FinanceiroCaixaAside({
   tenantId,
@@ -48,7 +50,31 @@ export async function FinanceiroCaixaAside({
     )
   }
 
-  const { resumo, recentes } = await carregarPainelFinanceiro(tenantId, 5)
+  await sincronizarCobrancasVencidas(tenantId)
+
+  type PlanoLite = { id: string; nome: string; valor: { toNumber(): number } | number }
+  const [painel, planosAtivos, abertas, vencidas]: [
+    Awaited<ReturnType<typeof carregarPainelFinanceiro>>,
+    PlanoLite[],
+    number,
+    number,
+  ] = await Promise.all([
+    carregarPainelFinanceiro(tenantId, 5),
+    db.planoAssociacao.findMany({
+      where: { tenantId, ativo: true },
+      orderBy: { nome: 'asc' },
+      take: 5,
+      select: { id: true, nome: true, valor: true },
+    }),
+    db.cobrancaAssociacao.count({
+      where: { tenantId, status: { in: ['PENDENTE', 'VENCIDA'] } },
+    }),
+    db.cobrancaAssociacao.count({
+      where: { tenantId, status: 'VENCIDA' },
+    }),
+  ])
+
+  const { resumo, recentes } = painel
 
   return (
     <div className="space-y-4">
@@ -96,12 +122,9 @@ export async function FinanceiroCaixaAside({
             {recentes.map((l) => (
               <li key={l.id} className="flex items-start justify-between gap-2 text-xs">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-[rgb(var(--foreground))]">
-                    {l.descricao}
-                  </p>
+                  <p className="truncate font-medium text-[rgb(var(--foreground))]">{l.descricao}</p>
                   <p className="text-[rgb(var(--foreground-muted))]">
-                    {TIPO_FINANCEIRO_LABEL[l.tipo]} ·{' '}
-                    {CATEGORIA_FINANCEIRO_LABEL[l.categoria]} ·{' '}
+                    {TIPO_FINANCEIRO_LABEL[l.tipo]} · {CATEGORIA_FINANCEIRO_LABEL[l.categoria]} ·{' '}
                     {formatDataCompetenciaInput(l.data).split('-').reverse().join('/')}
                   </p>
                 </div>
@@ -119,6 +142,52 @@ export async function FinanceiroCaixaAside({
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Associação</h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-[rgb(var(--foreground-muted))]">Cobranças abertas</dt>
+            <dd className="font-semibold tabular-nums">{abertas}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-[rgb(var(--foreground-muted))]">Vencidas</dt>
+            <dd
+              className={[
+                'font-semibold tabular-nums',
+                vencidas > 0 ? 'text-red-600 dark:text-red-400' : '',
+              ].join(' ')}
+            >
+              {vencidas}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-[rgb(var(--foreground-muted))]">Planos ativos</dt>
+            <dd className="font-semibold tabular-nums">{planosAtivos.length}</dd>
+          </div>
+        </dl>
+        {planosAtivos.length > 0 && (
+          <ul className="mt-3 space-y-1 border-t border-[rgb(var(--border))] pt-3 text-xs">
+            {planosAtivos.map((p) => (
+              <li key={p.id} className="flex justify-between gap-2">
+                <span className="truncate text-[rgb(var(--foreground))]">{p.nome}</span>
+                <span className="tabular-nums text-[rgb(var(--foreground-muted))]">
+                  {formatarMoedaBRL(typeof p.valor === 'number' ? p.valor : p.valor.toNumber())}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {isGestor && (
+          <Link
+            href="/admin/planos-associacao"
+            prefetch={false}
+            className="mt-3 block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+          >
+            Gerir planos →
+          </Link>
         )}
       </div>
 
@@ -163,6 +232,7 @@ export function FinanceiroCaixaSkeleton() {
           <div className="h-4 w-2/3 rounded bg-[rgb(var(--border))]" />
         </div>
       </div>
+      <div className="h-28 rounded-2xl bg-[rgb(var(--border))]" />
       <div className="h-10 rounded-lg bg-[rgb(var(--border))]" />
     </div>
   )

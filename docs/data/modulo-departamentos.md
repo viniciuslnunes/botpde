@@ -133,9 +133,16 @@ caravanas, bateria e financeiro **não** ficam na topbar — abrem por este hub.
 `PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).
 Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).
 
-**Thin wrappers** (`portalPanel: generico`): Feminino, Carnaval, Social e eventos,
+**Thin wrappers** (`portalPanel: generico` / `kind: thin`): Feminino, Carnaval, Social e eventos,
 Materiais/Loja e Comunicação não ganham app próprio — copy + CTA para o módulo
-portal (`departamento-thin.js`) e, em Social/Carnaval, prévia de próximos eventos.
+portal (`departamento-thin.js`) e widgets compostos (agenda, comunicados, pedidos).
+
+**Fase 5 — Cockpit:** cada home de área tem missão (registry), nav de subáreas por
+âncora, próxima ação contextual e badge Plugin vs Compõe no hub. Detalhe:
+`proposta-departamentos-portal-admin.md` § Fase 5.
+
+**Onda 4 (MVP):** canal da área (vínculo a `Conversa` CANAL), vaga paga em caravana
+(`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).
 
 ## Decisões fechadas
 

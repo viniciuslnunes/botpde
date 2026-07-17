@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { ArrowRight, Bus, Shield } from 'lucide-react'
-import { carregarPainelEventosTipo } from '@/lib/eventos-tipo'
+import { formatarMoedaBRL } from '@torcida/types'
+import { db } from '@torcida/db'
+import { carregarPainelEventosTipo, getEventoEmbarque } from '@/lib/eventos-tipo'
 
 export async function CaravanasAgendaAside({
   tenantId,
@@ -38,6 +40,28 @@ export async function CaravanasAgendaAside({
     5,
   )
 
+  const proxima = proximos[0] ?? null
+  const embarque = proxima
+    ? await getEventoEmbarque(tenantId, proxima.id, 'CARAVANA')
+    : null
+  const confirmados = embarque?.rsvps.filter((r) => r.status === 'CONFIRMADO') ?? []
+  const embarcados = confirmados.filter((r) => r.checkedInAt).length
+  const capacidade = embarque?.sede?.capacidade ?? null
+
+  const valorVagaNum =
+    proxima?.valorVaga == null
+      ? null
+      : typeof proxima.valorVaga === 'number'
+        ? proxima.valorVaga
+        : proxima.valorVaga.toNumber()
+
+  const vagasPagas =
+    proxima && valorVagaNum != null && valorVagaNum > 0
+      ? await db.cobrancaAssociacao.count({
+          where: { tenantId, eventoId: proxima.id, status: 'PAGA' },
+        })
+      : null
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
@@ -58,6 +82,41 @@ export async function CaravanasAgendaAside({
                   {confirmadosProximos}
                 </dd>
               </div>
+              {proxima && capacidade != null && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[rgb(var(--foreground-muted))]">
+                    Lotação · {proxima.titulo}
+                  </dt>
+                  <dd
+                    className={[
+                      'font-semibold tabular-nums',
+                      confirmados.length >= capacidade
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : '',
+                    ].join(' ')}
+                  >
+                    {confirmados.length}/{capacidade}
+                  </dd>
+                </div>
+              )}
+              {proxima && valorVagaNum != null && valorVagaNum > 0 && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[rgb(var(--foreground-muted))]">
+                    Vaga · {formatarMoedaBRL(valorVagaNum)}
+                  </dt>
+                  <dd className="font-semibold tabular-nums">
+                    {vagasPagas ?? 0}/{confirmados.length} pagas
+                  </dd>
+                </div>
+              )}
+              {proxima && (
+                <div className="flex justify-between gap-3 border-t border-[rgb(var(--border))] pt-2">
+                  <dt className="text-[rgb(var(--foreground-muted))]">Checklist embarque</dt>
+                  <dd className="font-semibold tabular-nums">
+                    {embarcados}/{confirmados.length}
+                  </dd>
+                </div>
+              )}
             </dl>
             <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
               {proximos.map((e) => (

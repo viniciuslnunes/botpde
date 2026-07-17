@@ -324,6 +324,11 @@ model Departamento {
   permissionsGestor String[] @default([]) @map("permissions_gestor")
   cor          String   @default("#6b7280")
   ordem        Int      @default(0)
+  /// Canal (Conversa tipo CANAL) oficial da área — deep-link no portal.
+  canalConversaId String? @unique @map("canal_conversa_id")
+  canalConversa   Conversa? @relation("DepartamentoCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
+  /// Meta de área (ex.: checklist barracão do Carnaval). Não é RBAC.
+  meta         Json?
   criadoEm     DateTime @default(now()) @map("criado_em")
 
   membros  UserDepartamento[]
@@ -562,6 +567,8 @@ model CobrancaAssociacao {
   membroId String? @map("membro_id")
 
   planoAssociacaoId String? @map("plano_associacao_id")
+  /// Vaga de caravana / cobrança vinculada a evento (paridade C1).
+  eventoId          String? @map("evento_id")
   tipo              TipoCobrancaAssociacao
   descricao         String
   valor             Decimal @db.Decimal(12, 2)
@@ -584,12 +591,15 @@ model CobrancaAssociacao {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   membro          SaasMembro?      @relation(fields: [membroId], references: [id], onDelete: SetNull)
   planoAssociacao PlanoAssociacao? @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
+  evento          Evento?          @relation(fields: [eventoId], references: [id], onDelete: SetNull)
   criadoPor       User?            @relation("CobrancaAssociacaoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, vencimento])
   @@index([tenantId, userId])
   @@index([membroId])
+  @@index([eventoId])
   @@index([gatewayExternalId])
+  @@unique([eventoId, userId])
   @@map("saas_cobrancas_associacao")
 }
 
@@ -698,14 +708,17 @@ model Evento {
   sede      Sede?    @relation(fields: [sedeId], references: [id])
   lat       Float?
   lng       Float?
+  /// Valor da vaga (caravana paga). Null = caravana sem cobrança.
+  valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
 
   criadoPorId      String?  @map("criado_por_id")
   criadoEm         DateTime @default(now()) @map("criado_em")
   discordMessageId String?  @map("discord_message_id")
 
-  rsvps EventoRsvp[]
-  salas SalaReuniao[]
-  posts Post[]
+  rsvps     EventoRsvp[]
+  salas     SalaReuniao[]
+  posts     Post[]
+  cobrancas CobrancaAssociacao[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -1538,6 +1551,7 @@ model Conversa {
   membros   MembroConversa[]
   mensagens MensagemDireta[]
   posts     Post[]
+  departamentoCanal Departamento? @relation("DepartamentoCanal")
 
   @@index([tenantId, atualizadoEm])
   @@index([tenantId, tipo, canalOficial])

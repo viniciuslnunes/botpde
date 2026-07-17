@@ -185,7 +185,7 @@ function AdminTopbar({
                     Meu Perfil
                   </Link>
                   <Link
-                    href="/portal"
+                    href="/portal/comunidade"
                     onClick={() => setUserDropOpen(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                   >

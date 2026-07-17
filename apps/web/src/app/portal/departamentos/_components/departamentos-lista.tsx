@@ -8,6 +8,7 @@ import {
   hrefHomeDepartamento,
   hrefModuloPortal,
   hrefOperacaoAdmin,
+  kindDepartamento,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
 } from '@torcida/types'
@@ -136,6 +137,7 @@ export async function DepartamentosSection() {
           const moduloHref = hrefModuloPortal(moduloKey)
           const operacaoHref = hrefOperacaoAdmin(moduloKey)
           const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
+          const kind = kindDepartamento(depto.slug)
           const papelLabel = depto.visaoDiretoria
             ? 'visão Diretoria'
             : depto.isGestor
@@ -152,10 +154,22 @@ export async function DepartamentosSection() {
                   >
                     <Briefcase className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                      {depto.nome}
-                    </h2>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                        {depto.nome}
+                      </h2>
+                      <span
+                        className={[
+                          'rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                          kind === 'plugin'
+                            ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                        ].join(' ')}
+                      >
+                        {kind === 'plugin' ? 'Plugin' : 'Compõe'}
+                      </span>
+                    </div>
                     <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
                       {areaLabel}
                       {' · '}

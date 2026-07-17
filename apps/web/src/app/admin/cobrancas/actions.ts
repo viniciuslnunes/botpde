@@ -27,7 +27,7 @@ export type CobrancaActionState = {
 
 function revalidateCobrancas() {
   revalidatePath('/admin/cobrancas')
-  revalidatePath('/portal')
+  revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cobrancas')
 }
 

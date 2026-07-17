@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowRight, Music2, Shield } from 'lucide-react'
-import { carregarPainelEventosTipo } from '@/lib/eventos-tipo'
+import { carregarPainelEventosTipo, getEventoEmbarque, listarEventosPorTipo } from '@/lib/eventos-tipo'
 
 export async function BateriaEnsaiosAside({
   tenantId,
@@ -32,11 +32,22 @@ export async function BateriaEnsaiosAside({
     )
   }
 
-  const { proximos, totalProximos, confirmadosProximos } = await carregarPainelEventosTipo(
-    tenantId,
-    'ENSAIO',
-    5,
-  )
+  const [{ proximos, totalProximos, confirmadosProximos }, recentes] = await Promise.all([
+    carregarPainelEventosTipo(tenantId, 'ENSAIO', 5),
+    listarEventosPorTipo(tenantId, 'ENSAIO', { futuros: false, limite: 1 }),
+  ])
+
+  const ultimo = recentes[0] ?? null
+  const ultimoDetalhe = ultimo
+    ? await getEventoEmbarque(tenantId, ultimo.id, 'ENSAIO')
+    : null
+  const ultimoConfirmados =
+    ultimoDetalhe?.rsvps.filter((r) => r.status === 'CONFIRMADO') ?? []
+  const ultimoPresentes = ultimoConfirmados.filter((r) => r.checkedInAt).length
+  const pctPresenca =
+    ultimoConfirmados.length > 0
+      ? Math.round((ultimoPresentes / ultimoConfirmados.length) * 100)
+      : null
 
   return (
     <div className="space-y-4">
@@ -45,7 +56,7 @@ export async function BateriaEnsaiosAside({
           <Music2 className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Ensaios</h2>
         </div>
-        {totalProximos > 0 ? (
+        {totalProximos > 0 || pctPresenca != null ? (
           <>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
@@ -58,6 +69,14 @@ export async function BateriaEnsaiosAside({
                   {confirmadosProximos}
                 </dd>
               </div>
+              {pctPresenca != null && ultimo && (
+                <div className="flex justify-between gap-3 border-t border-[rgb(var(--border))] pt-2">
+                  <dt className="text-[rgb(var(--foreground-muted))]">
+                    Presença · {ultimo.titulo}
+                  </dt>
+                  <dd className="font-semibold tabular-nums">{pctPresenca}%</dd>
+                </div>
+              )}
             </dl>
             <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
               {proximos.map((e) => (
@@ -95,6 +114,13 @@ export async function BateriaEnsaiosAside({
           <ArrowRight className="h-4 w-4" />
         </Link>
       )}
+      <Link
+        href="/portal/patrimonio"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+      >
+        Patrimônio da área
+        <ArrowRight className="h-4 w-4" />
+      </Link>
       {isGestor && operacaoHref && (
         <Link
           href={operacaoHref}

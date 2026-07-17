@@ -78,13 +78,14 @@ export async function aprovarMembro(membroId: string) {
     tipo: 'MEMBRO_APROVADO',
     titulo: 'Sua solicitação foi aprovada',
     corpo: `Você agora é membro de ${tenant.nome}.`,
-    link: '/portal',
+    link: '/portal/carteirinha',
   })
 
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/carteirinha')
   revalidatePath(`/portal/comunidade/perfil/${membro.userId}`)
 }
 
@@ -120,12 +121,13 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     corpo: motivo?.trim()
       ? motivo.trim()
       : `Sua solicitação de ingresso em ${tenant.nome} não foi aprovada.`,
-    link: '/portal',
+    link: '/portal/carteirinha',
   })
 
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
+  revalidatePath('/portal/carteirinha')
 }
 
 export async function reverterMembro(membroId: string) {

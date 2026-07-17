@@ -53,7 +53,7 @@ export async function confirmarPixMock(cobrancaId: string): Promise<PortalCobran
     },
   })
 
-  revalidatePath('/portal')
+  revalidatePath('/portal/carteirinha')
   revalidatePath('/portal/cobrancas')
   revalidatePath(`/portal/cobrancas/${cob.id}`)
   return { ok: true }

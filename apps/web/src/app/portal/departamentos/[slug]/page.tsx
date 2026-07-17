@@ -10,9 +10,11 @@ import {
   hasPermission,
   hrefModuloPortal,
   hrefOperacaoAdmin,
+  missionDepartamento,
   PERMISSIONS,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
+  subareasDepartamento,
 } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -28,6 +30,9 @@ import {
   DepartamentoDiretoriaKpis,
   type DiretoriaKpis,
 } from '../_components/departamento-diretoria-kpis'
+import { DepartamentoSubareasNav } from '../_components/departamento-subareas-nav'
+import { DepartamentoProximaAcao } from '../_components/departamento-proxima-acao'
+import { resolverProximaAcaoArea } from '../_components/departamento-proxima-acao-data'
 import {
   FinanceiroCaixaAside,
   FinanceiroCaixaSkeleton,
@@ -48,6 +53,11 @@ import {
   DepartamentoThinAside,
   DepartamentoThinSkeleton,
 } from '../_components/departamento-thin-aside'
+import {
+  CarnavalBarracaoAside,
+  CarnavalBarracaoSkeleton,
+} from '../_components/carnaval-barracao-aside'
+import { DepartamentoCanalBlock } from '../_components/departamento-canal-block'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import { podeAbrirDepartamentoPortal } from '@/lib/departamentos-portal-access'
 import {
@@ -66,6 +76,9 @@ type DeptoRow = {
   moduloPortal: string | null
   permissions: string[]
   permissionsGestor: string[]
+  meta: unknown
+  canalConversaId: string | null
+  canalConversa: { id: string; nome: string | null } | null
 }
 
 type Params = { slug: string }
@@ -103,6 +116,9 @@ export default async function DepartamentoHomePage({
       moduloPortal: true,
       permissions: true,
       permissionsGestor: true,
+      meta: true,
+      canalConversaId: true,
+      canalConversa: { select: { id: true, nome: true } },
     },
   })
   if (!depto) notFound()
@@ -143,6 +159,10 @@ export default async function DepartamentoHomePage({
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.FINANCE_VIEW)
   const podeVerPatrimonio =
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.PATRIMONY_VIEW)
+  const podeVerPedidos =
+    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.STORE_VIEW_ORDERS)
+  const podeModerar =
+    isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.COMMUNITY_MODERATE)
 
   const acessoCaravanas = await resolveAcessoPluginEvento(
     session.user.id,
@@ -211,6 +231,8 @@ export default async function DepartamentoHomePage({
   const moduloHref = hrefModuloPortal(moduloKey)
   const operacaoHref = isGestor ? hrefOperacaoAdmin(moduloKey) : null
   const moduloLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
+  const mission = missionDepartamento(depto.slug)
+  const subareas = subareasDepartamento(depto.slug)
   const panel = capability?.portalPanel ?? 'generico'
 
   let pendentes: PendenteLite[] = []
@@ -281,6 +303,32 @@ export default async function DepartamentoHomePage({
     }
   }
 
+  const proximaAcao = await resolverProximaAcaoArea({
+    tenantId: tenant.id,
+    slug: depto.slug,
+    panel,
+    isGestor,
+    totalPendentes,
+    podeVerFinanceiro,
+  })
+
+  type CanalOpcao = { id: string; nome: string | null }
+  const canaisDisponiveis: CanalOpcao[] = isGestor
+    ? await db.conversa.findMany({
+        where: { tenantId: tenant.id, tipo: 'CANAL' },
+        orderBy: { nome: 'asc' },
+        select: { id: true, nome: true },
+        take: 40,
+      })
+    : []
+
+  let carnavalProximos = 0
+  if (panel === 'carnaval') {
+    carnavalProximos = await db.evento.count({
+      where: { tenantId: tenant.id, tipo: 'GERAL', data: { gte: new Date() } },
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -314,6 +362,7 @@ export default async function DepartamentoHomePage({
                 ? ` · ${totalPendentes} pendente${totalPendentes === 1 ? '' : 's'}`
                 : ''}
             </p>
+            <p className="mt-2 max-w-2xl text-sm text-[rgb(var(--foreground-muted))]">{mission}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {moduloHref &&
@@ -348,24 +397,48 @@ export default async function DepartamentoHomePage({
         </header>
       </MotionReveal>
 
+      <DepartamentoSubareasNav subareas={subareas} />
+      <DepartamentoProximaAcao acao={proximaAcao} />
+
+      <DepartamentoCanalBlock
+        departamentoId={depto.id}
+        slug={depto.slug}
+        isGestor={isGestor}
+        canal={depto.canalConversa}
+        canaisDisponiveis={canaisDisponiveis}
+      />
+
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-6">
           {panel === 'diretoria' && isGestor && podeAprovar && (
-            <DepartamentoFilaMembros
-              pendentes={pendentes}
-              totalPendentes={totalPendentes}
-            />
+            <div id="fila">
+              <DepartamentoFilaMembros
+                pendentes={pendentes}
+                totalPendentes={totalPendentes}
+              />
+            </div>
           )}
-          <DepartamentoEquipe
-            departamentoId={depto.id}
-            slug={depto.slug}
-            membros={membros}
-            isGestor={isGestor}
-            currentUserId={session.user.id}
-          />
+          <div id="equipe">
+            <DepartamentoEquipe
+              departamentoId={depto.id}
+              slug={depto.slug}
+              membros={membros}
+              isGestor={isGestor}
+              currentUserId={session.user.id}
+            />
+          </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside id="dominio" className="space-y-4 scroll-mt-20">
+          <div id="caixa" className="scroll-mt-20" />
+          <div id="mensalidades" className="scroll-mt-20" />
+          <div id="inventario" className="scroll-mt-20" />
+          <div id="ensaios" className="scroll-mt-20" />
+          <div id="agenda" className="scroll-mt-20" />
+          <div id="embarque" className="scroll-mt-20" />
+          <div id="barracao" className="scroll-mt-20" />
+          <div id="avisos" className="scroll-mt-20" />
+          <div id="pedidos" className="scroll-mt-20" />
           {panel === 'diretoria' && isGestor && kpis && (
             <DepartamentoDiretoriaKpis kpis={kpis} />
           )}
@@ -413,6 +486,17 @@ export default async function DepartamentoHomePage({
                 podeVer={acessoBateria.podeVer}
               />
             </Suspense>
+          ) : panel === 'carnaval' ? (
+            <Suspense fallback={<CarnavalBarracaoSkeleton />}>
+              <CarnavalBarracaoAside
+                departamentoId={depto.id}
+                slug={depto.slug}
+                nome={depto.nome}
+                isGestor={isGestor}
+                meta={depto.meta}
+                proximosCount={carnavalProximos}
+              />
+            </Suspense>
           ) : panel === 'diretoria' ? (
             <PainelDominio
               isGestor={isGestor}
@@ -428,6 +512,8 @@ export default async function DepartamentoHomePage({
                 isGestor={isGestor}
                 moduloHref={moduloHref}
                 operacaoHref={operacaoHref}
+                podeVerPedidos={podeVerPedidos}
+                podeModerar={podeModerar}
               />
             </Suspense>
           )}

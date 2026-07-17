@@ -17,9 +17,11 @@ export type HomeAssociadoSnapshot = {
   } | null
   socio: {
     id: string
+    nome: string
     numeroSocio: number
     validade: Date
     qrToken: string | null
+    criadoEm: Date
   } | null
   cobrancaAberta: {
     id: string
@@ -50,9 +52,11 @@ export const carregarHomeAssociado = cache(async function carregarHomeAssociado(
   }
   type SocioLite = {
     id: string
+    nome: string
     numeroSocio: number
     validade: Date
     qrToken: string | null
+    criadoEm: Date
   }
   type CobLite = {
     id: string
@@ -83,7 +87,14 @@ export const carregarHomeAssociado = cache(async function carregarHomeAssociado(
     }),
     db.saasSocio.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
-      select: { id: true, numeroSocio: true, validade: true, qrToken: true },
+      select: {
+        id: true,
+        nome: true,
+        numeroSocio: true,
+        validade: true,
+        qrToken: true,
+        criadoEm: true,
+      },
     }),
     db.cobrancaAssociacao.findMany({
       where: {

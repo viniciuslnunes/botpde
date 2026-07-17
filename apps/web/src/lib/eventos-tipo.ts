@@ -10,6 +10,7 @@ export type EventoPorTipoLite = {
   descricao: string | null
   data: Date
   local: string | null
+  valorVaga: { toNumber(): number } | number | null
   _count: { rsvps: number }
 }
 
@@ -20,6 +21,8 @@ export type EventoEmbarqueLite = {
   descricao: string | null
   data: Date
   local: string | null
+  valorVaga: { toNumber(): number } | number | null
+  sede: { capacidade: number | null } | null
   rsvps: Array<{
     id: string
     status: 'CONFIRMADO' | 'RECUSADO'
@@ -54,6 +57,7 @@ export const listarEventosPorTipo = cache(async function listarEventosPorTipo(
       descricao: true,
       data: true,
       local: true,
+      valorVaga: true,
       _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
@@ -92,9 +96,15 @@ export const carregarPainelEventosTipo = cache(async function carregarPainelEven
 export const listarProximosEventosTenant = cache(async function listarProximosEventosTenant(
   tenantId: string,
   limite = 5,
+  tipos?: TipoEvento[],
 ): Promise<EventoPorTipoLite[]> {
+  const where: Prisma.EventoWhereInput = {
+    tenantId,
+    data: { gte: new Date() },
+    ...(tipos && tipos.length > 0 ? { tipo: { in: tipos } } : {}),
+  }
   const rows: EventoPorTipoLite[] = await db.evento.findMany({
-    where: { tenantId, data: { gte: new Date() } },
+    where,
     orderBy: { data: 'asc' },
     take: limite,
     select: {
@@ -104,6 +114,7 @@ export const listarProximosEventosTenant = cache(async function listarProximosEv
       descricao: true,
       data: true,
       local: true,
+      valorVaga: true,
       _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
@@ -128,6 +139,8 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
       descricao: true,
       data: true,
       local: true,
+      valorVaga: true,
+      sede: { select: { capacidade: true } },
       rsvps: {
         orderBy: [{ status: 'asc' }, { id: 'asc' }],
         select: {

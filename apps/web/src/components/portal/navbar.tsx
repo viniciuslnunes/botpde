@@ -18,7 +18,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  Home,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { useNavbarContext } from '@/lib/use-navbar-context'
@@ -29,9 +28,9 @@ import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
- * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`. */
+ * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`.
+ * Landing pós-auth: Comunidade (`/portal/comunidade`). */
 const navLinks = [
-  { href: '/portal', label: 'Início', icon: Home, prefetch: 'hover' as const },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
   { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: 'hover' as const },
@@ -76,16 +75,10 @@ export function PortalNavbar({
     : [...navLinks]
   // Departamentos no meio do fluxo operacional (após Comunidade), não no fim.
   const links = temDepartamentos
-    ? [
-        baseLinks[0]!,
-        baseLinks[1]!,
-        departamentosLink,
-        ...baseLinks.slice(2),
-      ]
+    ? [baseLinks[0]!, departamentosLink, ...baseLinks.slice(1)]
     : [...baseLinks]
 
   function isActive(href: string) {
-    if (href === '/portal') return pathname === '/portal'
     return pathname.startsWith(href)
   }
 
@@ -112,7 +105,7 @@ export function PortalNavbar({
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
         <div className="app-container flex h-14 items-center gap-4">
 
-          <PortalNavLink href="/portal" className="flex shrink-0 items-center gap-2" showSpinner={false}>
+          <PortalNavLink href="/portal/comunidade" className="flex shrink-0 items-center gap-2" showSpinner={false}>
             {tenant.logoUrl ? (
               canOptimizeImageUrl(tenant.logoUrl) ? (
                 <Image

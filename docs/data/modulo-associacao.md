@@ -55,6 +55,13 @@ e registra `EVENTO_CHECKIN_QR`.
 A carteirinha no portal **não** envia o token a APIs externas de QR (LGPD):
 mostra link de validação + cópia. Câmeras do celular abrem o link público.
 
+## Caravana paga (paridade C1)
+
+- Admin define `Evento.valorVaga` em caravanas
+- Associado com RSVP `CONFIRMADO` gera cobrança `AVULSA` ligada a `eventoId`
+  (`solicitarCobrancaVagaCaravana` → `/portal/cobrancas/[id]`)
+- Home Caravanas mostra vagas pagas / confirmados quando há valor
+
 ## Notificações
 
 - `COBRANCA_PENDENTE` → associado

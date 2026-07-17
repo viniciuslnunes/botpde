@@ -39,7 +39,7 @@ export default async function CadastroPage() {
       <div className="space-y-6">
         <div>
           <Link
-            href="/portal"
+            href="/portal/comunidade"
             className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -87,7 +87,7 @@ export default async function CadastroPage() {
       {/* Cabeçalho */}
       <div>
         <Link
-          href="/portal"
+          href="/portal/comunidade"
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
         >
           <ArrowLeft className="h-4 w-4" />

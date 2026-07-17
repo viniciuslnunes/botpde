@@ -19,7 +19,13 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function TipoSelect({ defaultValue = 'GERAL' }: { defaultValue?: string }) {
+function TipoSelect({
+  defaultValue = 'GERAL',
+  onChange,
+}: {
+  defaultValue?: string
+  onChange?: (tipo: string) => void
+}) {
   return (
     <div>
       <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -28,6 +34,7 @@ function TipoSelect({ defaultValue = 'GERAL' }: { defaultValue?: string }) {
       <select
         name="tipo"
         defaultValue={defaultValue}
+        onChange={(e) => onChange?.(e.target.value)}
         className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
       >
         {TIPOS.map((t) => (
@@ -36,6 +43,34 @@ function TipoSelect({ defaultValue = 'GERAL' }: { defaultValue?: string }) {
           </option>
         ))}
       </select>
+    </div>
+  )
+}
+
+function ValorVagaField({
+  defaultValue,
+  errors,
+}: {
+  defaultValue?: number | null
+  errors?: string[]
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Valor da vaga (R$)
+      </label>
+      <Input
+        name="valorVaga"
+        type="number"
+        min="0.01"
+        step="0.01"
+        placeholder="Opcional — caravana paga"
+        defaultValue={defaultValue != null && defaultValue > 0 ? String(defaultValue) : ''}
+      />
+      <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Se preenchido, quem confirmar presença pode gerar cobrança avulsa da vaga.
+      </p>
+      <FieldError errors={errors} />
     </div>
   )
 }
@@ -53,6 +88,7 @@ export function CriarEventoForm({
   lockTipo?: boolean
 }) {
   const [state, setState] = useState<EventoState>({})
+  const [tipo, setTipo] = useState(defaultTipo)
   const { formRef } = useTrackedForm({ title: 'Novo evento' })
 
   // Padrão: amanhã às 12h
@@ -74,7 +110,7 @@ export function CriarEventoForm({
       {lockTipo ? (
         <input type="hidden" name="tipo" value={defaultTipo} />
       ) : (
-        <TipoSelect defaultValue={defaultTipo} />
+        <TipoSelect defaultValue={defaultTipo} onChange={setTipo} />
       )}
 
       <AnimatePresence>
@@ -124,6 +160,10 @@ export function CriarEventoForm({
         </div>
       </div>
 
+      {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
+        <ValorVagaField errors={state.errors?.valorVaga} />
+      )}
+
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Descrição
@@ -150,14 +190,22 @@ type EventoData = {
   data: Date
   local: string | null
   tipo?: string
+  valorVaga?: number | { toNumber(): number } | null
 }
 
 export function EditarEventoForm({ evento }: { evento: EventoData }) {
   const [state, setState] = useState<EventoState>({})
+  const [tipo, setTipo] = useState(evento.tipo ?? 'GERAL')
   const { formRef } = useTrackedForm({
     id: `editar-evento-${evento.id}`,
     title: 'Editar evento',
   })
+  const valorDefault =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
 
   return (
     <form
@@ -185,7 +233,7 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
         )}
       </AnimatePresence>
 
-      <TipoSelect defaultValue={evento.tipo ?? 'GERAL'} />
+      <TipoSelect defaultValue={evento.tipo ?? 'GERAL'} onChange={setTipo} />
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -217,6 +265,10 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
           <FieldError errors={state.errors?.local} />
         </div>
       </div>
+
+      {tipo === 'CARAVANA' && (
+        <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />
+      )}
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">

@@ -5,6 +5,7 @@ import {
   type DeptoHubBase,
 } from '@/lib/departamentos-portal-access'
 import {
+  kindDepartamento,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
 } from '@torcida/types'
@@ -81,8 +82,13 @@ describe('rotulos e moduloPortal canonicos', () => {
   })
 
   it('thin wrappers deixam claro que compõem outro módulo', () => {
-    expect(rotuloAreaDepartamento('carnaval', 'eventos')).toMatch(/Compõe/i)
     expect(rotuloAreaDepartamento('feminino', 'comunidade')).toMatch(/Compõe/i)
     expect(rotuloAreaDepartamento('social-e-eventos', 'eventos')).toMatch(/Compõe/i)
+    expect(rotuloAreaDepartamento('comunicacao', 'comunidade')).toMatch(/Compõe/i)
+  })
+
+  it('carnaval é plugin de barracão (não thin Compõe)', () => {
+    expect(kindDepartamento('carnaval')).toBe('plugin')
+    expect(rotuloAreaDepartamento('carnaval', 'eventos')).toMatch(/barracão/i)
   })
 })

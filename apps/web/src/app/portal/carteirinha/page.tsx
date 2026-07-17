@@ -1,5 +1,4 @@
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -7,7 +6,9 @@ import { CreditCard, ArrowRight, CheckCircle2, Clock, QrCode } from 'lucide-reac
 import { CarteirinhaValidadeAlerts } from '@/components/portal/carteirinha-validade-alerts'
 import { CarteirinhaReveal } from '@/components/portal/carteirinha-motion'
 import { CarteirinhaQrPanel } from '@/components/portal/carteirinha-qr-panel'
+import { CarteirinhaAssociacaoStatus } from '@/components/portal/carteirinha-associacao-status'
 import { garantirQrTokenSocio, montarPayloadQr } from '@/lib/carteirinha-qr'
+import { carregarHomeAssociado } from '@/lib/associacao-home'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Minha Carteirinha' }
@@ -39,31 +40,30 @@ export default async function CarteirinhaPage() {
   const corEscura = `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`
   const textoBranco = luminance(r, g, b) < 180
 
-  const [membro, socio] = await Promise.all([
-    tenant
-      ? db.saasMembro.findUnique({
-          where: { tenantId_userId: { tenantId: tenant.id, userId } },
-        })
-      : null,
-    tenant
-      ? db.saasSocio.findUnique({
-          where: { tenantId_userId: { tenantId: tenant.id, userId } },
-        })
-      : null,
-  ])
+  const home = tenant ? await carregarHomeAssociado(tenant.id, userId) : null
+  const membro = home?.membro ?? null
+  const socio = home?.socio ?? null
 
-  const nome = session.user.name ?? 'Associado'
+  const nome = session.user.name ?? home?.membro?.nome ?? 'Associado'
   const avatarUrl = session.user.image
 
   // Sem vínculo com a torcida
   if (!membro) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="mx-auto flex max-w-lg flex-col items-center justify-center py-20 text-center">
         <CreditCard className="mb-4 h-14 w-14 text-[rgb(var(--foreground-muted))]" />
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Sem carteirinha</h1>
         <p className="mt-2 max-w-sm text-sm text-[rgb(var(--foreground-muted))]">
-          Você ainda não é membro da torcida. Solicite seu cadastro para receber sua carteirinha digital.
+          Você ainda não é membro da torcida. Solicite seu cadastro para receber sua carteirinha digital
+          e acompanhar mensalidades.
         </p>
+        <Link
+          href="/portal/cadastro"
+          className="mt-4 inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white"
+        >
+          Solicitar cadastro
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     )
   }
@@ -71,11 +71,12 @@ export default async function CarteirinhaPage() {
   // Membro pendente
   if (membro.status === 'PENDENTE') {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="mx-auto flex max-w-lg flex-col items-center justify-center py-20 text-center">
         <Clock className="mb-4 h-14 w-14 text-yellow-500" />
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Cadastro em análise</h1>
         <p className="mt-2 max-w-sm text-sm text-[rgb(var(--foreground-muted))]">
-          Sua solicitação está sendo avaliada pela administração. Você receberá sua carteirinha após a aprovação.
+          Sua solicitação está sendo avaliada pela administração. Você receberá sua carteirinha e o
+          status financeiro após a aprovação.
         </p>
       </div>
     )
@@ -84,68 +85,82 @@ export default async function CarteirinhaPage() {
   // Torcedor aprovado mas sem número de sócio
   if (membro.status === 'APROVADO' && !socio) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-lg space-y-6">
         <CarteirinhaReveal index={0}>
-        <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
+          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
         </CarteirinhaReveal>
 
         <CarteirinhaReveal index={1}>
-        <div
-          className="relative overflow-hidden rounded-2xl p-6 shadow-lg"
-          style={{
-            background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
-          }}
-        >
-          {/* Padrão decorativo */}
           <div
-            className="absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-10"
-            style={{ background: 'white' }}
-          />
-          <div
-            className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full opacity-10"
-            style={{ background: 'white' }}
-          />
+            className="relative overflow-hidden rounded-2xl p-6 shadow-lg"
+            style={{
+              background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
+            }}
+          >
+            <div
+              className="absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-10"
+              style={{ background: 'white' }}
+            />
+            <div
+              className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full opacity-10"
+              style={{ background: 'white' }}
+            />
 
-          <div className="relative z-10">
-            <div className="mb-4 flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/70' : 'text-black/60'}`}>
-                {tenant?.nome ?? 'Torcida'}
-              </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}>
-                TORCEDOR
-              </span>
-            </div>
+            <div className="relative z-10">
+              <div className="mb-4 flex items-center justify-between">
+                <span
+                  className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/70' : 'text-black/60'}`}
+                >
+                  {tenant?.nome ?? 'Torcida'}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
+                >
+                  TORCEDOR
+                </span>
+              </div>
 
-            <div className="flex items-center gap-4">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt={nome} className="h-16 w-16 rounded-full border-2 border-white/30 object-cover" />
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-2xl font-bold text-white">
-                  {nome.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-4">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={nome}
+                    className="h-16 w-16 rounded-full border-2 border-white/30 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/20 text-2xl font-bold text-white">
+                    {nome.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className={`text-lg font-bold ${textoBranco ? 'text-white' : 'text-black'}`}>
+                    {nome}
+                  </p>
+                  <p className={`text-sm ${textoBranco ? 'text-white/70' : 'text-black/60'}`}>
+                    Torcedor
+                  </p>
                 </div>
-              )}
-              <div>
-                <p className={`text-lg font-bold ${textoBranco ? 'text-white' : 'text-black'}`}>{nome}</p>
-                <p className={`text-sm ${textoBranco ? 'text-white/70' : 'text-black/60'}`}>Torcedor</p>
               </div>
             </div>
           </div>
-        </div>
         </CarteirinhaReveal>
 
-        <CarteirinhaReveal index={2}>
-        <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Você é um torcedor aprovado. Para obter uma carteirinha numerada de sócio, entre em contato com a administração.
-          </p>
-        </div>
+        {home && <CarteirinhaAssociacaoStatus home={home} revealFrom={2} />}
+
+        <CarteirinhaReveal index={6}>
+          <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              Você é um torcedor aprovado. Para obter uma carteirinha numerada de sócio, entre em
+              contato com a administração.
+            </p>
+          </div>
         </CarteirinhaReveal>
       </div>
     )
   }
 
-  if (!socio) return null
+  if (!socio || !home) return null
 
   const vencida = isVencida(socio.validade)
   const qrToken = await garantirQrTokenSocio(socio.id, tenant!.id)
@@ -153,125 +168,137 @@ export default async function CarteirinhaPage() {
   const validarUrl = `/carteirinha/validar?t=${encodeURIComponent(qrPayload)}`
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-lg space-y-6">
       <CarteirinhaReveal index={0}>
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
-        {!vencida && (
-          <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
-            <CheckCircle2 className="h-4 w-4" /> Ativa
-          </span>
-        )}
-      </div>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Minha Carteirinha</h1>
+          {!vencida && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle2 className="h-4 w-4" /> Ativa
+            </span>
+          )}
+        </div>
       </CarteirinhaReveal>
 
       <CarteirinhaReveal index={1}>
-      <div
-        className={[
-          'relative overflow-hidden rounded-2xl shadow-xl transition-all',
-          vencida ? 'opacity-60 grayscale' : '',
-        ].join(' ')}
-        style={{
-          background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
-          aspectRatio: '1.586', // proporção padrão de cartão
-        }}
-      >
-        {/* Círculos decorativos */}
-        <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
-        <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-white/10" />
-        <div className="absolute right-12 bottom-8 h-20 w-20 rounded-full bg-white/5" />
+        <div
+          className={[
+            'relative overflow-hidden rounded-2xl shadow-xl transition-all',
+            vencida ? 'opacity-60 grayscale' : '',
+          ].join(' ')}
+          style={{
+            background: `linear-gradient(135deg, ${cor} 0%, ${corEscura} 100%)`,
+            aspectRatio: '1.586', // proporção padrão de cartão
+          }}
+        >
+          <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10" />
+          <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-white/10" />
+          <div className="absolute bottom-8 right-12 h-20 w-20 rounded-full bg-white/5" />
 
-        <div className="absolute inset-0 flex flex-col justify-between p-6">
-          {/* Topo: nome da torcida + tipo */}
-          <div className="flex items-start justify-between">
-            <div>
-              <p className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/60' : 'text-black/50'}`}>
-                {tenant?.nome ?? 'Torcida'}
-              </p>
-              <p className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/40' : 'text-black/40'}`}>
-                Carteirinha Digital
-              </p>
-            </div>
-            <div className={`rounded-lg px-2.5 py-1 text-xs font-black uppercase tracking-wider ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}>
-              SÓCIO
-            </div>
-          </div>
-
-          {/* Centro: avatar + nome */}
-          <div className="flex items-center gap-4">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt={socio.nome}
-                className="h-14 w-14 rounded-full border-2 border-white/40 object-cover shadow-md"
-              />
-            ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-xl font-bold shadow-md" style={{ color: textoBranco ? 'white' : 'black' }}>
-                {socio.nome.charAt(0).toUpperCase()}
+          <div className="absolute inset-0 flex flex-col justify-between p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p
+                  className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/60' : 'text-black/50'}`}
+                >
+                  {tenant?.nome ?? 'Torcida'}
+                </p>
+                <p
+                  className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/40' : 'text-black/40'}`}
+                >
+                  Carteirinha Digital
+                </p>
               </div>
-            )}
-            <div>
-              <p className={`text-base font-bold leading-tight ${textoBranco ? 'text-white' : 'text-black'}`}>
-                {socio.nome}
-              </p>
-              <p className={`mt-0.5 font-mono text-xl font-black tracking-wider ${textoBranco ? 'text-white/90' : 'text-black/80'}`}>
-                Nº {String(socio.numeroSocio).padStart(5, '0')}
-              </p>
+              <div
+                className={`rounded-lg px-2.5 py-1 text-xs font-black uppercase tracking-wider ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
+              >
+                SÓCIO
+              </div>
             </div>
-          </div>
 
-          {/* Base: validade */}
-          <div className="flex items-end justify-between">
-            <div>
-              <p className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/50' : 'text-black/40'}`}>
-                Válido até
-              </p>
-              <p className={`font-mono text-sm font-bold ${textoBranco ? 'text-white' : 'text-black'}`}>
-                {socio.validade.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
-              </p>
+            <div className="flex items-center gap-4">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt={socio.nome}
+                  className="h-14 w-14 rounded-full border-2 border-white/40 object-cover shadow-md"
+                />
+              ) : (
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-xl font-bold shadow-md"
+                  style={{ color: textoBranco ? 'white' : 'black' }}
+                >
+                  {socio.nome.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <p
+                  className={`text-base font-bold leading-tight ${textoBranco ? 'text-white' : 'text-black'}`}
+                >
+                  {socio.nome}
+                </p>
+                <p
+                  className={`mt-0.5 font-mono text-xl font-black tracking-wider ${textoBranco ? 'text-white/90' : 'text-black/80'}`}
+                >
+                  Nº {String(socio.numeroSocio).padStart(5, '0')}
+                </p>
+              </div>
             </div>
-            {/* Indicador de QR — painel completo abaixo (sem API externa) */}
-            <div className={`rounded-lg p-2 ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
-              <QrCode className={`h-8 w-8 ${textoBranco ? 'text-white' : 'text-black'}`} />
+
+            <div className="flex items-end justify-between">
+              <div>
+                <p
+                  className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/50' : 'text-black/40'}`}
+                >
+                  Válido até
+                </p>
+                <p
+                  className={`font-mono text-sm font-bold ${textoBranco ? 'text-white' : 'text-black'}`}
+                >
+                  {socio.validade.toLocaleDateString('pt-BR', {
+                    month: '2-digit',
+                    year: 'numeric',
+                  })}
+                </p>
+              </div>
+              <div className={`rounded-lg p-2 ${textoBranco ? 'bg-white/20' : 'bg-black/20'}`}>
+                <QrCode className={`h-8 w-8 ${textoBranco ? 'text-white' : 'text-black'}`} />
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </CarteirinhaReveal>
 
       <CarteirinhaReveal index={2}>
-      <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
+        <CarteirinhaValidadeAlerts validadeIso={socio.validade.toISOString()} />
       </CarteirinhaReveal>
 
-      <CarteirinhaReveal index={3}>
-      <CarteirinhaQrPanel validarUrl={validarUrl} qrPayload={qrPayload} />
+      <CarteirinhaAssociacaoStatus home={home} revealFrom={3} />
+
+      <CarteirinhaReveal index={7}>
+        <CarteirinhaQrPanel validarUrl={validarUrl} qrPayload={qrPayload} />
       </CarteirinhaReveal>
 
-      <CarteirinhaReveal index={4}>
-      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] divide-y divide-[rgb(var(--border))]">
-        {[
-          { label: 'Nome', value: socio.nome },
-          { label: 'Número de sócio', value: String(socio.numeroSocio).padStart(5, '0') },
-          { label: 'Válido até', value: socio.validade.toLocaleDateString('pt-BR') },
-          { label: 'Emitida em', value: socio.criadoEm.toLocaleDateString('pt-BR') },
-        ].map((item) => (
-          <div key={item.label} className="flex items-center justify-between px-4 py-3">
-            <span className="text-sm text-[rgb(var(--foreground-muted))]">{item.label}</span>
-            <span className="font-mono text-sm font-medium text-[rgb(var(--foreground))]">{item.value}</span>
-          </div>
-        ))}
-      </div>
-      </CarteirinhaReveal>
-
-      <CarteirinhaReveal index={5}>
-      <Link
-        href="/portal"
-        className="flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-      >
-        Voltar ao portal
-        <ArrowRight className="h-4 w-4" />
-      </Link>
+      <CarteirinhaReveal index={8}>
+        <div className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+          {[
+            { label: 'Nome', value: socio.nome },
+            {
+              label: 'Número de sócio',
+              value: String(socio.numeroSocio).padStart(5, '0'),
+            },
+            { label: 'Válido até', value: socio.validade.toLocaleDateString('pt-BR') },
+            { label: 'Emitida em', value: socio.criadoEm.toLocaleDateString('pt-BR') },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-[rgb(var(--foreground-muted))]">{item.label}</span>
+              <span className="font-mono text-sm font-medium text-[rgb(var(--foreground))]">
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
       </CarteirinhaReveal>
     </div>
   )

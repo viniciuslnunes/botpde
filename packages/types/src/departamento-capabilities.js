@@ -1,14 +1,23 @@
 /**
  * Registry de capacidades por departamento canônico.
  * Fonte de navegação portal × operação admin — NÃO duplica RBAC.
- * Ver docs/data/proposta-departamentos-portal-admin.md.
+ * Ver docs/data/proposta-departamentos-portal-admin.md (Fase 5).
  */
 
 import { DEPARTAMENTO_MODULO_ADMIN_ROTA, DEPARTAMENTO_MODULO_ROTA, DEPARTAMENTO_MODULOS } from './permissions.js'
 import { thinCopyPorSlug } from './departamento-thin.js'
 
 /**
- * @typedef {'equipe' | 'modulo' | 'avisos' | 'agenda' | 'caixa' | 'inventario' | 'ensaios'} DepartamentoFeature
+ * @typedef {'equipe' | 'modulo' | 'avisos' | 'agenda' | 'caixa' | 'inventario' | 'ensaios' | 'embarque' | 'mensalidades' | 'pedidos' | 'moderacao' | 'barracao' | 'canal'} DepartamentoFeature
+ */
+
+/**
+ * @typedef {{
+ *   id: string,
+ *   label: string,
+ *   feature: DepartamentoFeature,
+ *   href?: string | null,
+ * }} DepartamentoSubarea
  */
 
 /**
@@ -16,7 +25,10 @@ import { thinCopyPorSlug } from './departamento-thin.js'
  *   slug: string,
  *   moduloPortal: string | null,
  *   features: readonly DepartamentoFeature[],
- *   portalPanel: 'generico' | 'financeiro' | 'patrimonio' | 'bateria' | 'caravanas' | 'diretoria',
+ *   portalPanel: 'generico' | 'financeiro' | 'patrimonio' | 'bateria' | 'caravanas' | 'diretoria' | 'carnaval',
+ *   kind: 'plugin' | 'thin',
+ *   mission: string,
+ *   subareas: readonly DepartamentoSubarea[],
  * }} DepartamentoCapability
  */
 
@@ -27,60 +39,132 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     moduloPortal: 'membros',
     features: ['equipe', 'avisos'],
     portalPanel: 'diretoria',
+    kind: 'plugin',
+    mission: 'Governança e admissão: fila de sócios, equipe da prancheta e visão das demais áreas.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'fila', label: 'Fila de membros', feature: 'avisos' },
+      { id: 'dominio', label: 'Painel', feature: 'avisos' },
+    ],
   },
   {
     slug: 'financeiro',
     moduloPortal: 'financeiro',
-    features: ['equipe', 'caixa'],
+    features: ['equipe', 'caixa', 'mensalidades'],
     portalPanel: 'financeiro',
+    kind: 'plugin',
+    mission: 'Caixa da torcida, planos de associação e mensalidades — prestação de contas no portal.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'caixa', label: 'Caixa', feature: 'caixa', href: '/portal/financeiro' },
+      { id: 'mensalidades', label: 'Mensalidades', feature: 'mensalidades', href: '/portal/cobrancas' },
+    ],
   },
   {
     slug: 'social-e-eventos',
     moduloPortal: 'eventos',
     features: ['equipe', 'modulo', 'agenda'],
     portalPanel: 'generico',
+    kind: 'thin',
+    mission: 'Festas, churrascos e ações na sede — agenda no módulo de Eventos.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'agenda', label: 'Agenda', feature: 'agenda', href: '/portal/eventos' },
+      { id: 'dominio', label: 'Sobre', feature: 'modulo' },
+    ],
   },
   {
     slug: 'materiais-loja',
     moduloPortal: 'loja',
-    features: ['equipe', 'modulo'],
+    features: ['equipe', 'modulo', 'pedidos'],
     portalPanel: 'generico',
+    kind: 'thin',
+    mission: 'Camisas, bandeiras e pedidos — catálogo e sacola na Loja do portal.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'pedidos', label: 'Pedidos', feature: 'pedidos', href: '/admin/loja/pedidos' },
+      { id: 'dominio', label: 'Loja', feature: 'modulo', href: '/portal/loja' },
+    ],
   },
   {
     slug: 'comunicacao',
     moduloPortal: 'comunidade',
-    features: ['equipe', 'modulo', 'avisos'],
+    features: ['equipe', 'modulo', 'avisos', 'moderacao'],
     portalPanel: 'generico',
+    kind: 'thin',
+    mission: 'Mural, comunicados e conversa da torcida — Comunidade no dia a dia; moderação no admin.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'avisos', label: 'Comunicados', feature: 'avisos' },
+      { id: 'dominio', label: 'Comunidade', feature: 'modulo', href: '/portal/comunidade' },
+    ],
   },
   {
     slug: 'patrimonio',
     moduloPortal: 'patrimonio',
     features: ['equipe', 'inventario'],
     portalPanel: 'patrimonio',
+    kind: 'plugin',
+    mission: 'Instrumentos, bandeirões e bens da sede — inventário com status e responsáveis.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'inventario', label: 'Inventário', feature: 'inventario', href: '/portal/patrimonio' },
+      { id: 'dominio', label: 'Resumo', feature: 'inventario' },
+    ],
   },
   {
     slug: 'bateria',
     moduloPortal: 'bateria',
     features: ['equipe', 'modulo', 'ensaios', 'agenda'],
     portalPanel: 'bateria',
+    kind: 'plugin',
+    mission: 'Ritmo na arquibancada: ensaios, presença e escala — sem misturar com festa genérica.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'ensaios', label: 'Ensaios', feature: 'ensaios', href: '/portal/bateria' },
+      { id: 'dominio', label: 'Presença', feature: 'ensaios' },
+    ],
   },
   {
     slug: 'caravanas',
     moduloPortal: 'caravanas',
-    features: ['equipe', 'modulo', 'agenda'],
+    features: ['equipe', 'modulo', 'agenda', 'embarque'],
     portalPanel: 'caravanas',
+    kind: 'plugin',
+    mission: 'Viagens para jogos fora: RSVP, lista de embarque e check-in no dia.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'agenda', label: 'Agenda', feature: 'agenda', href: '/portal/caravanas' },
+      { id: 'embarque', label: 'Embarque', feature: 'embarque' },
+    ],
   },
   {
     slug: 'feminino',
     moduloPortal: 'comunidade',
-    features: ['equipe', 'modulo', 'avisos'],
+    features: ['equipe', 'modulo', 'avisos', 'agenda'],
     portalPanel: 'generico',
+    kind: 'thin',
+    mission: 'Organização das mulheres na torcida — equipe da área e presença na Comunidade.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'agenda', label: 'Ações', feature: 'agenda', href: '/portal/eventos' },
+      { id: 'dominio', label: 'Comunidade', feature: 'modulo', href: '/portal/comunidade' },
+    ],
   },
   {
     slug: 'carnaval',
     moduloPortal: 'eventos',
-    features: ['equipe', 'modulo', 'agenda'],
-    portalPanel: 'generico',
+    features: ['equipe', 'modulo', 'agenda', 'barracao'],
+    portalPanel: 'carnaval',
+    kind: 'plugin',
+    mission:
+      'Concentração e ensaios de rua em Eventos; checklist do barracão na área — sem ERP de escola.',
+    subareas: [
+      { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+      { id: 'agenda', label: 'Cronograma', feature: 'agenda', href: '/portal/eventos' },
+      { id: 'barracao', label: 'Barracão', feature: 'barracao' },
+      { id: 'dominio', label: 'Eventos', feature: 'modulo', href: '/portal/eventos' },
+    ],
   },
 ])
 
@@ -100,8 +184,37 @@ export function capabilityPorSlug(slug) {
 }
 
 /**
+ * @param {string} slug
+ * @returns {'plugin' | 'thin'}
+ */
+export function kindDepartamento(slug) {
+  return capabilityPorSlug(slug)?.kind ?? 'thin'
+}
+
+/**
+ * @param {string} slug
+ * @returns {string}
+ */
+export function missionDepartamento(slug) {
+  const cap = capabilityPorSlug(slug)
+  if (cap?.mission) return cap.mission
+  const thin = thinCopyPorSlug(slug)
+  return thin?.descricao ?? 'Área operacional da torcida.'
+}
+
+/**
+ * @param {string} slug
+ * @returns {readonly DepartamentoSubarea[]}
+ */
+export function subareasDepartamento(slug) {
+  return capabilityPorSlug(slug)?.subareas ?? [
+    { id: 'equipe', label: 'Equipe', feature: 'equipe' },
+    { id: 'dominio', label: 'Sobre', feature: 'modulo' },
+  ]
+}
+
+/**
  * `moduloPortal` canônico (registry) com fallback ao valor persistido no banco.
- * Evita rótulos/rotas erradas quando o seed ainda não sincronizou o tenant.
  * @param {string} slug
  * @param {string | null | undefined} moduloPortalDb
  * @returns {string | null}
@@ -128,6 +241,7 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
   if (cap?.portalPanel === 'patrimonio') return 'Área · Inventário'
   if (cap?.portalPanel === 'bateria') return 'Área · Ensaios (Bateria)'
   if (cap?.portalPanel === 'caravanas') return 'Área · Viagens e embarque'
+  if (cap?.portalPanel === 'carnaval') return 'Área · Cronograma e barracão'
 
   if (thin && modulo) {
     const dest = MODULO_LABEL.get(modulo) ?? modulo
@@ -139,7 +253,6 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
 }
 
 /**
- * Home da área no portal — destino padrão para membros.
  * @param {string} slug
  */
 export function hrefHomeDepartamento(slug) {
@@ -147,7 +260,6 @@ export function hrefHomeDepartamento(slug) {
 }
 
 /**
- * Módulo portal associado (nunca /admin). null = experiência só na home da área.
  * @param {string | null | undefined} moduloPortal
  * @returns {string | null}
  */
@@ -160,7 +272,6 @@ export function hrefModuloPortal(moduloPortal) {
 }
 
 /**
- * Operação admin do domínio — só para gestores.
  * @param {string | null | undefined} moduloPortal
  * @returns {string | null}
  */

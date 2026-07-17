@@ -8,6 +8,7 @@ import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import { getEventoEmbarque } from '@/lib/eventos-tipo'
 import { ListaEmbarque, type EmbarqueRow } from '@/components/eventos/lista-embarque'
 import { RsvpButtons } from '@/app/portal/eventos/[id]/rsvp-buttons'
+import { CaravanaVagaPagamento } from '../_components/caravana-vaga-pagamento'
 import { db } from '@torcida/db'
 import type { Metadata } from 'next'
 
@@ -50,6 +51,19 @@ export default async function PortalCaravanaDetailPage({
       where: { eventoId_userId: { eventoId: id, userId: session.user.id } },
       select: { status: true },
     })
+
+  type CobrancaLite = { id: string; status: string }
+  const minhaCobranca: CobrancaLite | null = await db.cobrancaAssociacao.findFirst({
+    where: { tenantId: tenant.id, eventoId: id, userId: session.user.id },
+    select: { id: true, status: true },
+  })
+
+  const valorVagaNum =
+    evento.valorVaga == null
+      ? null
+      : typeof evento.valorVaga === 'number'
+        ? evento.valorVaga
+        : evento.valorVaga.toNumber()
 
   const passado = evento.data < new Date()
   const itens: EmbarqueRow[] = evento.rsvps.map((r) => ({
@@ -105,6 +119,15 @@ export default async function PortalCaravanaDetailPage({
           <h2 className="mb-3 text-sm font-semibold text-[rgb(var(--foreground))]">Sua presença</h2>
           <RsvpButtons eventoId={evento.id} statusAtual={meuRsvp?.status ?? null} />
         </div>
+      )}
+
+      {valorVagaNum != null && valorVagaNum > 0 && (
+        <CaravanaVagaPagamento
+          eventoId={evento.id}
+          valorVaga={valorVagaNum}
+          confirmado={meuRsvp?.status === 'CONFIRMADO'}
+          cobranca={minhaCobranca}
+        />
       )}
 
       <ListaEmbarque

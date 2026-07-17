@@ -1,6 +1,7 @@
 /**
  * Copy e atalhos dos thin wrappers (áreas que só compõem módulos existentes).
- * Ver docs/data/proposta-departamentos-portal-admin.md § Fase 3.4.
+ * Ver docs/data/proposta-departamentos-portal-admin.md § Fase 3.4 / Fase 5 Onda 3.
+ * Carnaval virou plugin (barracão) na Onda 4 — copy permanece como fallback de missão.
  */
 
 /** @type {Record<string, { titulo: string, descricao: string, ctaModulo: string }>} */
@@ -8,31 +9,31 @@ export const DEPARTAMENTO_THIN_COPY = Object.freeze({
   'social-e-eventos': {
     titulo: 'Social e eventos',
     descricao:
-      'Agenda da torcida no portal de Eventos. Gestores criam e acompanham RSVPs; a equipe organiza a festa.',
+      'Festas, churrascos e ações na sede — a agenda vive em Eventos; esta área reúne a equipe que organiza.',
     ctaModulo: 'Abrir eventos',
   },
   'materiais-loja': {
     titulo: 'Materiais e loja',
     descricao:
-      'Catálogo, sacola e pedidos ficam na Loja do portal. Gestores operam pedidos e estoque no admin.',
+      'Camisas, bandeiras e pedidos: catálogo e sacola na Loja. Gestores acompanham pedidos abertos aqui e no admin.',
     ctaModulo: 'Abrir loja',
   },
   comunicacao: {
     titulo: 'Comunicação',
     descricao:
-      'Mural, posts e conversa da torcida na Comunidade. Curadoria e moderação pesada ficam na operação admin.',
+      'Comunicados oficiais e mural na Comunidade. Moderação de denúncias fica na operação — sem app separado.',
     ctaModulo: 'Abrir comunidade',
   },
   feminino: {
     titulo: 'Feminino',
     descricao:
-      'Espaço da organização das mulheres: equipe desta área e presença na Comunidade. Sem app separado — compõe o que já existe.',
+      'Organização das mulheres na torcida: equipe desta área, agenda de ações em Eventos e presença na Comunidade.',
     ctaModulo: 'Abrir comunidade',
   },
   carnaval: {
     titulo: 'Carnaval',
     descricao:
-      'Ensaios de rua, concentração e cronograma usam Eventos. A equipe do departamento organiza; a operação completa fica no admin de eventos.',
+      'Concentração e ensaios de rua em Eventos; checklist do barracão na home da área — sem ERP de escola.',
     ctaModulo: 'Abrir eventos',
   },
 })
@@ -45,5 +46,5 @@ export function thinCopyPorSlug(slug) {
   return DEPARTAMENTO_THIN_COPY[slug] ?? null
 }
 
-/** Slugs cujo thin wrapper mostra próximos eventos (compor agenda). */
-export const THIN_COM_AGENDA = Object.freeze(['social-e-eventos', 'carnaval'])
+/** Slugs thin cujo wrapper mostra próximos eventos. Carnaval = plugin próprio. */
+export const THIN_COM_AGENDA = Object.freeze(['social-e-eventos', 'feminino'])

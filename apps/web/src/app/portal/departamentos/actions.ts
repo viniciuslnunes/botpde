@@ -10,6 +10,8 @@ import {
   calculateEffectivePermissions,
   canManageDepartamento,
   hasPermission,
+  mergeBarracaoItem,
+  BARRACAO_CHECKLIST,
   PERMISSIONS,
 } from '@torcida/types'
 import {
@@ -139,4 +141,132 @@ export async function buscarCandidatosArea(
   })
 
   return membros.map((m) => m.user).filter((u) => !excluir.has(u.id))
+}
+
+const CanalLinkSchema = z.object({
+  departamentoId: z.string().min(1),
+  slug: z.string().min(1),
+  conversaId: z.string().uuid().nullable(),
+})
+
+/** Vincula (ou remove) o canal oficial da área. */
+export async function vincularCanalArea(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const rawConversa = formData.get('conversaId')
+  const parsed = CanalLinkSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    conversaId:
+      rawConversa === null || rawConversa === '' || rawConversa === '__none__'
+        ? null
+        : rawConversa,
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+
+    const depto: { id: string; tenantId: string } | null = await db.departamento.findFirst({
+      where: { id: parsed.data.departamentoId, tenantId: tenant.id },
+      select: { id: true, tenantId: true },
+    })
+    if (!depto) return { error: 'Departamento não encontrado' }
+
+    if (parsed.data.conversaId) {
+      const canal: { id: string } | null = await db.conversa.findFirst({
+        where: {
+          id: parsed.data.conversaId,
+          tenantId: tenant.id,
+          tipo: 'CANAL',
+        },
+        select: { id: true },
+      })
+      if (!canal) return { error: 'Canal inválido' }
+    }
+
+    await db.departamento.update({
+      where: { id: depto.id },
+      data: { canalConversaId: parsed.data.conversaId },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_CANAL_VINCULADO',
+        entidade: 'Departamento',
+        entidadeId: depto.id,
+        detalhes: { conversaId: parsed.data.conversaId },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível vincular o canal' }
+  }
+}
+
+const BarracaoToggleSchema = z.object({
+  departamentoId: z.string().min(1),
+  slug: z.string().min(1),
+  itemId: z.string().min(1).max(64),
+  done: z.enum(['true', 'false']),
+})
+
+/** Marca item do checklist do barracão (Carnaval). */
+export async function toggleBarracaoItem(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = BarracaoToggleSchema.safeParse({
+    departamentoId: formData.get('departamentoId'),
+    slug: formData.get('slug'),
+    itemId: formData.get('itemId'),
+    done: formData.get('done'),
+  })
+  if (!parsed.success) return { error: 'Dados inválidos' }
+
+  try {
+    const { session, tenant } = await assertPodeGerirArea(parsed.data.departamentoId)
+
+    if (!BARRACAO_CHECKLIST.some((i) => i.id === parsed.data.itemId)) {
+      return { error: 'Item inválido' }
+    }
+
+    const depto: { id: string; meta: unknown } | null = await db.departamento.findFirst({
+      where: { id: parsed.data.departamentoId, tenantId: tenant.id },
+      select: { id: true, meta: true },
+    })
+    if (!depto) return { error: 'Departamento não encontrado' }
+
+    const nextMeta = mergeBarracaoItem(
+      depto.meta,
+      parsed.data.itemId,
+      parsed.data.done === 'true',
+    )
+
+    await db.departamento.update({
+      where: { id: depto.id },
+      data: { meta: nextMeta },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'DEPARTAMENTO_BARRACAO_ITEM',
+        entidade: 'Departamento',
+        entidadeId: depto.id,
+        detalhes: { itemId: parsed.data.itemId, done: parsed.data.done === 'true' },
+      },
+    })
+
+    revalidatePath(`/portal/departamentos/${parsed.data.slug}`)
+    return { ok: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Não foi possível atualizar' }
+  }
 }

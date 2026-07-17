@@ -204,7 +204,7 @@ function SidebarBody({
       <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
         <ThemeToggle variant="row" />
         <Link
-          href="/portal"
+          href="/portal/comunidade"
           onClick={onNavigate}
           className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
         >
@@ -214,7 +214,7 @@ function SidebarBody({
 
       <div className="hidden border-t border-[rgb(var(--border))] px-3 py-3 lg:block">
         <Link
-          href="/portal"
+          href="/portal/comunidade"
           className="app-action flex items-center rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
         >
           Voltar ao portal

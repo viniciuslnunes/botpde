@@ -35,6 +35,7 @@ function formToEvento(formData: FormData) {
     data: formData.get('data'),
     local: formData.get('local') || undefined,
     tipo: formData.get('tipo') || 'GERAL',
+    valorVaga: formData.get('valorVaga') || undefined,
   }
 }
 
@@ -52,7 +53,7 @@ export async function criarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo } = parsed.data
+  const { titulo, descricao, data, local, tipo, valorVaga } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -67,6 +68,7 @@ export async function criarEvento(
       descricao: descricao ?? null,
       data: dataComp,
       local: local ?? null,
+      valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
       criadoPorId: session.user.id,
     },
     select: { id: true, tipo: true },
@@ -102,7 +104,7 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo } = parsed.data
+  const { titulo, descricao, data, local, tipo, valorVaga } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -125,6 +127,7 @@ export async function editarEvento(
       data: dataComp,
       local: local ?? null,
       tipo,
+      valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
     },
   })
 
