@@ -6,11 +6,12 @@ import Link from 'next/link'
 import {
   DEPARTAMENTO_MODULOS,
   hrefHomeDepartamento,
+  hrefModuloPortal,
   hrefOperacaoAdmin,
 } from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { ArrowRight, Briefcase, Settings2, Shield } from 'lucide-react'
+import { ArrowRight, Briefcase, LayoutGrid, Settings2, Shield } from 'lucide-react'
 
 /** Tipos explícitos — a inferência do Prisma quebra neste schema (ARCHITECTURE.md §5.2). */
 interface DepartamentoHubLite {
@@ -94,6 +95,7 @@ export async function DepartamentosSection() {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {departamentos.map((depto, index) => {
         const homeHref = hrefHomeDepartamento(depto.slug)
+        const moduloHref = hrefModuloPortal(depto.moduloPortal)
         const operacaoHref = hrefOperacaoAdmin(depto.moduloPortal)
         const moduloLabel = depto.moduloPortal ? MODULO_LABEL.get(depto.moduloPortal) : null
         const isGestor = gestorIds.has(depto.id)
@@ -125,16 +127,27 @@ export async function DepartamentosSection() {
                 </div>
               </div>
 
-              <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                <Link
-                  href={homeHref}
-                  className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                >
-                  Abrir área
-                  <ArrowRight className="h-4 w-4 shrink-0" />
-                </Link>
+              <div className="mt-auto flex flex-col gap-2 pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={homeHref}
+                    className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    Abrir área
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </Link>
+                  {moduloHref && (
+                    <Link
+                      href={moduloHref}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                    >
+                      <LayoutGrid className="h-4 w-4 text-[rgb(var(--primary))]" />
+                      {moduloLabel ?? 'Módulo'}
+                    </Link>
+                  )}
+                </div>
                 {isGestor && (
-                  <>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`${homeHref}#gestao`}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
@@ -152,7 +165,7 @@ export async function DepartamentosSection() {
                         Operação
                       </Link>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

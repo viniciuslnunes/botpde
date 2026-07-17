@@ -13,8 +13,8 @@ export default function DepartamentosPage() {
       <div>
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Departamentos</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Os departamentos da torcida em que você atua — abra a área no portal;
-          gestores também gerenciam a equipe e a operação do domínio.
+          Escolha a área em que você atua. Caravanas, bateria, financeiro e demais
+          módulos abrem a partir daqui — não pela barra superior.
         </p>
       </div>
 

@@ -39,7 +39,8 @@ export default async function PortalLayout({
   // Contexto pode ser torcida ativa ou comunidade nacional (torcedor global).
   const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
 
-  // Link "Departamentos" na navbar só aparece para quem atua em ≥1 departamento
+  // Link agregado "Departamentos" na navbar (não lista cada área).
+  // Áreas → hub /portal/departamentos → /portal/departamentos/[slug]
   const totalDepartamentos: number =
     ctx?.modo === 'torcida'
       ? await db.userDepartamento.count({

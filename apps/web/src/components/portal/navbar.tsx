@@ -29,6 +29,8 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ThemeToggle } from '@/components/theme-toggle'
 
+/** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro…) NÃO entram aqui —
+ * ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`. */
 const navLinks = [
   { href: '/portal', label: 'Início', icon: Home, prefetch: 'hover' as const },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
@@ -39,7 +41,7 @@ const navLinks = [
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
 
-/** Só entra na navegação para quem atua em ≥1 departamento (prop do layout). */
+/** Único atalho de departamentos na navbar (não lista cada área). */
 const departamentosLink = {
   href: '/portal/departamentos',
   label: 'Departamentos',
@@ -76,7 +78,8 @@ export function PortalNavbar({
         (link) =>
           link.href !== '/portal/carteirinha' && link.href !== '/portal/cobrancas',
       )
-    : navLinks
+    : [...navLinks]
+  // Só o link agregado "Departamentos" — nunca um item por área (caravanas, bateria…).
   const links = temDepartamentos ? [...baseLinks, departamentosLink] : [...baseLinks]
 
   function isActive(href: string) {
@@ -134,7 +137,7 @@ export function PortalNavbar({
             </span>
           </PortalNavLink>
 
-          <nav className="hidden min-w-0 flex-1 items-center gap-1 lg:flex">
+          <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto xl:flex">
             {links.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
@@ -145,7 +148,7 @@ export function PortalNavbar({
                   prefetch={link.prefetch}
                   className={linkClass(active)}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   {link.label}
                 </PortalNavLink>
               )
@@ -184,7 +187,7 @@ export function PortalNavbar({
               <ThemeToggle />
             </div>
 
-            <div className="relative hidden lg:block">
+            <div className="relative hidden xl:block">
               <button
                 onClick={() => setUserDropOpen((v) => !v)}
                 className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--surface-raised))]"
@@ -255,7 +258,7 @@ export function PortalNavbar({
 
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="app-action flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] lg:hidden"
+              className="app-action flex h-9 w-9 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] xl:hidden"
               aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
             >
               {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -264,7 +267,7 @@ export function PortalNavbar({
         </div>
 
         {menuOpen && (
-          <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 pb-4 pt-2 lg:hidden">
+          <div className="border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 pb-4 pt-2 xl:hidden">
             <div className="mb-3 flex items-center gap-3 py-2">
               {userAvatar ? (
                 canOptimizeImageUrl(userAvatar) ? (
