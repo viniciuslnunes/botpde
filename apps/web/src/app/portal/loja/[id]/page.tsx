@@ -17,6 +17,7 @@ import { ArrowLeft, Tag } from 'lucide-react'
 import { ProdutoGaleria } from '@/components/portal/produto-galeria'
 import { ProdutoRelacionadosGrid } from '@/components/portal/produto-relacionados-grid'
 import { ProdutoDetailCol } from '@/components/portal/produto-detail-col'
+import { formatNomeTorcida } from '@torcida/types'
 
 import { percentualDesconto } from '@torcida/types'
 
@@ -144,7 +145,7 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
                 <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
 
-                  {produto.tenant.nome}
+                  {formatNomeTorcida(produto.tenant.nome)}
 
                 </span>
 

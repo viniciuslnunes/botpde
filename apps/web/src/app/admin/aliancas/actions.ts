@@ -8,7 +8,7 @@ import { assertPermission } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
 import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
-import { PERMISSIONS } from '@torcida/types'
+import { formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
 const uuidSchema = z.string().uuid('ID inválido')
 
@@ -132,7 +132,7 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
     tenantId: tenantDestinoId,
     tipo: 'ALIANCA_PROPOSTA',
     titulo: `Proposta de aliança de ${tenant.nome}`,
-    corpo: `${tenant.nome} propôs aliança com ${aliado.nome}.`,
+    corpo: `${tenant.nome} propôs aliança com ${formatNomeTorcida(aliado.nome)}.`,
     link: '/admin/aliancas',
   })
 

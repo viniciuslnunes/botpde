@@ -6,6 +6,7 @@ import {
   EventosListAnimated,
   type EventoCardItem,
 } from '@/components/portal/eventos-list-animated'
+import { formatNomeTorcida } from '@torcida/types'
 
 interface EventoListItem {
   id: string
@@ -41,7 +42,7 @@ function serializarEvento(
     titulo: evento.titulo,
     dataLabel: formatarData(new Date(evento.data)),
     local: evento.local,
-    tenantNome: evento.tenantId !== tenantId ? evento.tenant.nome : null,
+    tenantNome: evento.tenantId !== tenantId ? formatNomeTorcida(evento.tenant.nome) : null,
     passado,
     diasLabel: passado ? null : diasParaEvento(new Date(evento.data)),
     rsvpStatus,

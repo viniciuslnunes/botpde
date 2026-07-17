@@ -1,5 +1,6 @@
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from './hierarquia'
 
 export const COMUNICADOS_CACHE_TAG = 'comunicados-feed'
@@ -81,7 +82,10 @@ async function fetchComunicadosBase(tenantId: string): Promise<ComunicadoFeedIte
         },
       })) as ComunicadoFeedItem[]
       sortComunicados(announcements)
-      return announcements
+      return announcements.map((a) => ({
+        ...a,
+        tenant: { nome: formatNomeTorcida(a.tenant.nome) },
+      }))
     },
     ['comunicados-feed', tenantId],
     { revalidate: 120, tags: [COMUNICADOS_CACHE_TAG, comunicadosCacheTag(tenantId)] },

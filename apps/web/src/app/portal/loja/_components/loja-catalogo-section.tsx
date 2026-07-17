@@ -6,7 +6,7 @@ import { LojaCarrossel } from '@/components/portal/loja-ui'
 import { LojaCategoriaChips, LojaPaginacao } from '@/components/portal/loja-catalogo-motion'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
 import { toLojaProdutoCard } from '@/lib/loja-serialize'
-import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/types'
+import { estoqueTotal, formatNomeTorcida, percentualDesconto, ordenarTamanhos } from '@torcida/types'
 
 const PAGE_SIZE = 48
 
@@ -138,7 +138,7 @@ export async function LojaCatalogoSection({
       id: p.id,
       nome: p.nome,
       href: `/portal/loja/${p.id}`,
-      tenantBadge: p.tenantId !== tenantId ? p.tenant.nome : null,
+      tenantBadge: p.tenantId !== tenantId ? formatNomeTorcida(p.tenant.nome) : null,
       precoLabel: formatarPreco(p.preco),
       precoOriginalLabel:
         p.precoOriginal && Number(p.precoOriginal) > Number(p.preco)

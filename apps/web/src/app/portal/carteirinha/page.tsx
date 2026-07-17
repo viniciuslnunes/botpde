@@ -111,7 +111,7 @@ export default async function CarteirinhaPage() {
                 <span
                   className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/70' : 'text-black/60'}`}
                 >
-                  {tenant?.nome ?? 'Torcida'}
+                  {tenant?.nome ?? 'TORCIDA'}
                 </span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${textoBranco ? 'bg-white/20 text-white' : 'bg-black/20 text-black'}`}
@@ -201,7 +201,7 @@ export default async function CarteirinhaPage() {
                 <p
                   className={`text-xs font-bold uppercase tracking-widest ${textoBranco ? 'text-white/60' : 'text-black/50'}`}
                 >
-                  {tenant?.nome ?? 'Torcida'}
+                  {tenant?.nome ?? 'TORCIDA'}
                 </p>
                 <p
                   className={`text-[10px] uppercase tracking-wider ${textoBranco ? 'text-white/40' : 'text-black/40'}`}

@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
-import { canViewRecurso, SYSTEM_ROLES } from '@torcida/types'
+import { canViewRecurso, formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
@@ -97,7 +97,7 @@ export async function getOrCreateCanalOficial(
     data: {
       tipo: 'CANAL',
       tenantId,
-      nome: tenant.nome,
+      nome: formatNomeTorcida(tenant.nome),
       descricao: 'Canal oficial da unidade',
       institucional: true,
       canalOficial: true,
@@ -208,7 +208,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       membros: row._count.membros,
       souMembro: Boolean(membro),
       souAdmin: membro?.papel === 'ADMIN',
-      tenantNome: row.tenant.nome,
+      tenantNome: formatNomeTorcida(row.tenant.nome),
     })
   }
   return result
@@ -277,7 +277,7 @@ export async function getCanalPorId(
     membros: row._count.membros,
     souMembro: Boolean(membro),
     souAdmin: membro?.papel === 'ADMIN',
-    tenantNome: row.tenant.nome,
+    tenantNome: formatNomeTorcida(row.tenant.nome),
   }
 }
 
@@ -389,7 +389,7 @@ export const getPerfilInstitucional = cache(async function getPerfilInstituciona
 
   return {
     tenantId: tenant.id,
-    nome: tenant.nome,
+    nome: formatNomeTorcida(tenant.nome),
     logoUrl: tenant.logoUrl,
     corPrimaria: tenant.corPrimaria,
     tipo: sede?.tipo ?? 'SEDE',
@@ -426,7 +426,7 @@ export async function listUnidadesVisiveis(
     const sede = sedeMap.get(t.id)
     return {
       tenantId: t.id,
-      nome: t.nome,
+      nome: formatNomeTorcida(t.nome),
       logoUrl: t.logoUrl,
       tipo: sede?.tipo ?? 'SEDE',
       cidade: sede?.cidade ?? null,
@@ -523,7 +523,7 @@ export async function buscarCanaisEUnidades(
       membros: row._count.membros,
       souMembro: Boolean(membro),
       souAdmin: membro?.papel === 'ADMIN',
-      tenantNome: row.tenant.nome,
+      tenantNome: formatNomeTorcida(row.tenant.nome),
     })
   }
 
@@ -538,7 +538,7 @@ export async function buscarCanaisEUnidades(
     const sede = sedeMap.get(t.id)
     return {
       tenantId: t.id,
-      nome: t.nome,
+      nome: formatNomeTorcida(t.nome),
       logoUrl: t.logoUrl,
       tipo: sede?.tipo ?? 'SEDE',
       cidade: sede?.cidade ?? null,

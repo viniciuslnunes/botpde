@@ -1,7 +1,12 @@
 import { z } from 'zod'
+import { formatNomeTorcida } from '../nome-torcida.js'
 
 export const CreateTenantSchema = z.object({
-  nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
+  nome: z
+    .string()
+    .min(3, 'Nome deve ter ao menos 3 caracteres')
+    .max(100)
+    .transform(formatNomeTorcida),
   slug: z
     .string()
     .min(3)

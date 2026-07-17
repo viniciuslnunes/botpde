@@ -39,7 +39,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
               {post.autor.nome ?? 'Membro'}
             </ComunidadePrefetchLink>
             {showTenantBadge && (
-              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--primary))]">
+              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--primary))]">
                 {post.tenant.nome}
               </span>
             )}

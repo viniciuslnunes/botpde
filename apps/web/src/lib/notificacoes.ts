@@ -2,6 +2,7 @@ import { db } from '@torcida/db'
 import type { Notificacao, TipoNotificacao } from '@torcida/db'
 import {
   calculateEffectivePermissions,
+  formatNomeTorcida,
   hasPermission,
   PERMISSIONS,
   permissionsOfRole,
@@ -495,7 +496,9 @@ export const reconciliarPropostasAliancaPendentes = cache(async function reconci
     if (targets.length === 0) return 0
 
     // Uma única query para todas as propostas pendentes (evita N+1 no loop).
-    const titulos = pendentes.map((al) => `Proposta de aliança de ${al.tenantOrigem.nome}`)
+    const titulos = pendentes.map(
+      (al) => `Proposta de aliança de ${formatNomeTorcida(al.tenantOrigem.nome)}`,
+    )
     const existentes: Array<{ userId: string; titulo: string }> = await db.notificacao.findMany({
       where: {
         tenantId,
@@ -514,7 +517,9 @@ export const reconciliarPropostasAliancaPendentes = cache(async function reconci
 
     let criadas = 0
     for (const al of pendentes) {
-      const titulo = `Proposta de aliança de ${al.tenantOrigem.nome}`
+      const origemNome = formatNomeTorcida(al.tenantOrigem.nome)
+      const aliadoNome = formatNomeTorcida(al.tenantAliado.nome)
+      const titulo = `Proposta de aliança de ${origemNome}`
       const jaTem = jaTemPorTitulo.get(titulo) ?? new Set<string>()
       const faltando = targets.filter((id) => !jaTem.has(id))
       if (faltando.length === 0) continue
@@ -525,7 +530,7 @@ export const reconciliarPropostasAliancaPendentes = cache(async function reconci
           tenantId,
           tipo: 'ALIANCA_PROPOSTA' as const,
           titulo,
-          corpo: `${al.tenantOrigem.nome} propôs aliança com ${al.tenantAliado.nome}.`,
+          corpo: `${origemNome} propôs aliança com ${aliadoNome}.`,
           link: '/admin/aliancas',
         })),
       )

@@ -77,7 +77,9 @@ export default async function TorcidaComunidadePublicaPage({
             <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
               Publicações públicas
             </p>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">{perfil.tenant.nome}</h1>
+            <h1 className="text-xl font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">
+              {perfil.tenant.nome}
+            </h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">@{perfil.tenant.slug}</p>
             <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
               Sem posts restritos a sócio desta torcida.

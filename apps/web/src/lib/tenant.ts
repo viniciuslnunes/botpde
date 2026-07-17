@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
-import { permissionsOfRole } from '@torcida/types'
+import { formatNomeTorcida, permissionsOfRole } from '@torcida/types'
 import { env } from '@/lib/env'
 import { resolveRequestHost } from '@/lib/request-origin'
 import { TENANT_CTX_COOKIE } from '@/lib/tenant-context'
@@ -31,7 +31,7 @@ export function invalidatePermissionsCache(userId: string, tenantId: string): vo
 }
 
 async function fetchTenantBySlug(slug: string): Promise<Tenant | null> {
-  return unstable_cache(
+  const tenant = await unstable_cache(
     () =>
       db.tenant.findUnique({
         where: { slug, ativo: true },
@@ -39,6 +39,8 @@ async function fetchTenantBySlug(slug: string): Promise<Tenant | null> {
     ['tenant-by-slug', slug],
     { revalidate: 600, tags: [TENANT_CACHE_TAG, tenantCacheTag(slug)] },
   )()
+  if (!tenant) return null
+  return { ...tenant, nome: formatNomeTorcida(tenant.nome) }
 }
 
 /**

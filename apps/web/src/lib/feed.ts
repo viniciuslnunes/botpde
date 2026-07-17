@@ -17,6 +17,7 @@ import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
+import { formatNomeTorcida } from '@torcida/types'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 
@@ -159,9 +160,11 @@ export function projetarEnquete(
 }
 
 export function projetarPost(post: PostRaw): PostSocialItem {
-  const { _count, reacoes, postOrigem, comunicadoOrigem, evento, enquete, autor, ...rest } = post
+  const { _count, reacoes, postOrigem, comunicadoOrigem, evento, enquete, autor, tenant, ...rest } =
+    post
   return {
     ...rest,
+    tenant: { nome: formatNomeTorcida(tenant.nome) },
     autor: {
       ...autor,
       sedeNome: null,
@@ -185,7 +188,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           titulo: comunicadoOrigem.titulo,
           corpo: comunicadoOrigem.corpo,
           prioridade: comunicadoOrigem.prioridade,
-          tenantNome: comunicadoOrigem.tenant.nome,
+          tenantNome: formatNomeTorcida(comunicadoOrigem.tenant.nome),
           autorNome: comunicadoOrigem.autor.nome,
         }
       : null,
@@ -1120,7 +1123,7 @@ export const getPostsPublicosDoTenant = cache(async function getPostsPublicosDoT
   return {
     tenant: {
       id: tenant.id,
-      nome: tenant.nome,
+      nome: formatNomeTorcida(tenant.nome),
       slug: tenant.slug,
       logoUrl: tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl,
       corPrimaria: tenant.corPrimaria,

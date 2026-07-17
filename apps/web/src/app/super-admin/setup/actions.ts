@@ -11,7 +11,7 @@ import { superAdminEmails } from '@/lib/env'
 import { invalidateTorcidasSelecaoCache } from '@/lib/tenant-context'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { SYSTEM_ROLES, podeTerVice } from '@torcida/types'
+import { SYSTEM_ROLES, formatNomeTorcida, podeTerVice } from '@torcida/types'
 
 const schema = z.object({
   slug: z
@@ -19,7 +19,7 @@ const schema = z.object({
     .min(2)
     .max(30)
     .regex(/^[a-z0-9-]+$/, 'Use apenas letras minúsculas, números e hífens'),
-  nome: z.string().min(3).max(100),
+  nome: z.string().min(3).max(100).transform(formatNomeTorcida),
   corPrimaria: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')

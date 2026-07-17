@@ -8,6 +8,7 @@ import {
   ALL_PERMISSIONS,
   applyPermissionCascade,
   DEPARTAMENTO_MODULOS,
+  formatNomeTorcida,
   PERMISSIONS,
   slugifyDepartamento,
 } from '@torcida/types'
@@ -55,10 +56,11 @@ async function assertTenantOwner(userId: string, tenantId: string): Promise<void
 export async function salvarPerfilTenant(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
-  const nome = String(formData.get('nome') ?? '').trim()
+  const nome = formatNomeTorcida(String(formData.get('nome') ?? ''))
   const corPrimaria = String(formData.get('corPrimaria') ?? '').trim()
 
   if (!nome) throw new Error('Nome é obrigatório')
+  if (nome.length < 3) throw new Error('Nome deve ter ao menos 3 caracteres')
   if (!/^#[0-9a-fA-F]{6}$/.test(corPrimaria)) throw new Error('Cor inválida')
 
   await db.tenant.update({

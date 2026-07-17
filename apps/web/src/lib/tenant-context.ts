@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { revalidateTag, unstable_cache } from 'next/cache'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
-import { SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { env, isProd, superAdminEmails } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
@@ -139,7 +139,7 @@ function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
   return {
     id: row.id,
     slug: row.slug,
-    nome: row.nome,
+    nome: formatNomeTorcida(row.nome),
     corPrimaria: row.corPrimaria,
     clubeNome: row.afiliacao
       ? (row.afiliacao.apelido ?? row.afiliacao.nome)

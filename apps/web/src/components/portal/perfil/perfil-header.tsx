@@ -70,7 +70,9 @@ export function PerfilHeader({
         {nickname && (
           <p className="mt-0.5 text-sm font-medium text-[rgb(var(--primary))]">@{nickname}</p>
         )}
-        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
+        <p className="mt-0.5 text-sm uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          {tenantNome}
+        </p>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <span

@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
 import type { ConfiancaRecomendacao, StatusAlianca } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 
 /** @deprecated Prefer findAliancaEntreTenants — pares de aliança não são canônicos por UUID. */
 export function normalizeTenantPair(a: string, b: string): [string, string] {
@@ -42,7 +43,7 @@ function resolveTenantLogoUrl(tenant: TenantLogoRow): string | null {
 function toAliancaTenantLite(tenant: TenantLogoRow): AliancaTenantLite {
   return {
     id: tenant.id,
-    nome: tenant.nome,
+    nome: formatNomeTorcida(tenant.nome),
     slug: tenant.slug,
     logoUrl: resolveTenantLogoUrl(tenant),
   }

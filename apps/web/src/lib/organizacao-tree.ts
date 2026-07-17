@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
+import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema } from '@torcida/types'
 
 /** Pessoa exibida no mural organizacional. */
 export interface OrgPerson {
@@ -213,7 +213,7 @@ export async function getOrganizacaoTree(tenantId: string, tenantNome: string): 
   torcedoresBase.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   return {
-    tenantNome,
+    tenantNome: formatNomeTorcida(tenantNome),
     tipoSede,
     rotuloPresidente: rotuloCargoSistema(SYSTEM_ROLES.OWNER, tipoSede),
     rotuloVice: rotuloCargoSistema(SYSTEM_ROLES.VICE, tipoSede),

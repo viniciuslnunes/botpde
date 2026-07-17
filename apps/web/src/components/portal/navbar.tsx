@@ -127,7 +127,7 @@ export function PortalNavbar({
                 {tenant.nome.charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="hidden text-sm font-semibold text-[rgb(var(--foreground))] sm:block">
+            <span className="hidden text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))] sm:block">
               {tenant.nome}
             </span>
           </PortalNavLink>

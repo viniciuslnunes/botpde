@@ -7,6 +7,7 @@ import { normalizarHashtag } from './comunidade-social'
 import { postInclude, projetarPost, type PostSocialItem, type PostRaw } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
+import { formatNomeTorcida } from '@torcida/types'
 
 export interface MembroBuscaItem {
   id: string
@@ -242,7 +243,7 @@ export async function buscarMembrosComunidade(
       id: r.user.id,
       nome: r.user.nome,
       avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
-      tenantNome: r.tenant.nome,
+      tenantNome: formatNomeTorcida(r.tenant.nome),
       perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
         tipo: r.tipo,
         status: 'APROVADO',

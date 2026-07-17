@@ -11,6 +11,7 @@ import {
   type StatsTorcidaOnboarding,
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
+import { formatNomeTorcida } from '@torcida/types'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
@@ -441,7 +442,7 @@ export const getTorcidasPorAfiliacao = cache(
     return unicos
       .map((t: TenantComContagem) => ({
         id: t.id,
-        nome: t.torcidaConhecida?.titulo ?? t.nome,
+        nome: formatNomeTorcida(t.torcidaConhecida?.titulo ?? t.nome),
         slug: t.slug,
         logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
         corPrimaria: t.corPrimaria,
@@ -519,6 +520,6 @@ export const getSolicitacaoSocioPendente = cache(
         select: { criadoEm: true, tenant: { select: { nome: true } } },
       })
     if (!pendente) return null
-    return { tenantNome: pendente.tenant.nome, criadoEm: pendente.criadoEm }
+    return { tenantNome: formatNomeTorcida(pendente.tenant.nome), criadoEm: pendente.criadoEm }
   },
 )

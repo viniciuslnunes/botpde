@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
-import { canViewRecurso, ordenarPar, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
+import { canViewRecurso, formatNomeTorcida, ordenarPar, relationFromLineage, type RECURSO_SENSIBILIDADE } from '@torcida/types'
 
 export const HIERARCHY_CACHE_TAG = 'tenant-hierarchy'
 
@@ -456,7 +456,7 @@ export async function getTenantHierarquia(tenantId: string): Promise<{
     const sedeInfo = sedeInfoMap.get(tenantRow.id)
     return {
       tenantId: tenantRow.id,
-      nome: tenantRow.nome,
+      nome: formatNomeTorcida(tenantRow.nome),
       tipo: sedeInfo?.tipo ?? 'PONTO_ENCONTRO',
       cidade: sedeInfo?.cidade ?? null,
       ativa: tenantRow.ativo,

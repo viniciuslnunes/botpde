@@ -4,6 +4,7 @@ import { cache } from 'react'
 import { db } from '@torcida/db'
 import { env } from '@/lib/env'
 import { novoQrTokenSocio } from '@/lib/pix-gateway'
+import { formatNomeTorcida } from '@torcida/types'
 
 export type ValidacaoCarteirinha = {
   ok: boolean
@@ -98,7 +99,7 @@ export const validarCarteirinhaPorPayload = cache(async function validarCarteiri
 
   const validadeIso = socio.validade.toISOString()
   const base = {
-    tenantNome: socio.tenant.nome,
+    tenantNome: formatNomeTorcida(socio.tenant.nome),
     nome: socio.nome,
     numeroSocio: socio.numeroSocio,
     validade: validadeIso,
