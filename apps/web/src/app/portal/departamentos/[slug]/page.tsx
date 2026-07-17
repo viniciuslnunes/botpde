@@ -7,11 +7,12 @@ import Link from 'next/link'
 import {
   calculateEffectivePermissions,
   capabilityPorSlug,
-  DEPARTAMENTO_MODULOS,
   hasPermission,
   hrefModuloPortal,
   hrefOperacaoAdmin,
   PERMISSIONS,
+  resolverModuloPortalDepartamento,
+  rotuloAreaDepartamento,
 } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -77,10 +78,6 @@ export async function generateMetadata({
   const { slug } = await params
   return { title: `Departamento · ${slug}` }
 }
-
-const MODULO_LABEL = new Map<string, string>(
-  DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label]),
-)
 
 export default async function DepartamentoHomePage({
   params,
@@ -210,9 +207,10 @@ export default async function DepartamentoHomePage({
   })
 
   const capability = capabilityPorSlug(depto.slug)
-  const moduloHref = hrefModuloPortal(depto.moduloPortal)
-  const operacaoHref = isGestor ? hrefOperacaoAdmin(depto.moduloPortal) : null
-  const moduloLabel = depto.moduloPortal ? MODULO_LABEL.get(depto.moduloPortal) : null
+  const moduloKey = resolverModuloPortalDepartamento(depto.slug, depto.moduloPortal)
+  const moduloHref = hrefModuloPortal(moduloKey)
+  const operacaoHref = isGestor ? hrefOperacaoAdmin(moduloKey) : null
+  const moduloLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
   const panel = capability?.portalPanel ?? 'generico'
 
   let pendentes: PendenteLite[] = []
@@ -306,7 +304,7 @@ export default async function DepartamentoHomePage({
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{depto.nome}</h1>
             <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-              {moduloLabel ? `Módulo · ${moduloLabel}` : 'Área da torcida'}
+              {moduloLabel}
               {isGestor
                 ? ' · você é gestor'
                 : isMembroDaArea

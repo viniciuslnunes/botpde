@@ -4,7 +4,8 @@
  * Ver docs/data/proposta-departamentos-portal-admin.md.
  */
 
-import { DEPARTAMENTO_MODULO_ADMIN_ROTA, DEPARTAMENTO_MODULO_ROTA } from './permissions.js'
+import { DEPARTAMENTO_MODULO_ADMIN_ROTA, DEPARTAMENTO_MODULO_ROTA, DEPARTAMENTO_MODULOS } from './permissions.js'
+import { thinCopyPorSlug } from './departamento-thin.js'
 
 /**
  * @typedef {'equipe' | 'modulo' | 'avisos' | 'agenda' | 'caixa' | 'inventario' | 'ensaios'} DepartamentoFeature
@@ -85,12 +86,56 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
 
 const BY_SLUG = new Map(DEPARTAMENTO_CAPABILITIES.map((c) => [c.slug, c]))
 
+const MODULO_LABEL = new Map(DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label]))
+
+/** Slugs legados (tipo de membro, não área operacional) — não listar no hub. */
+export const DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL = Object.freeze(['socio', 'torcedor'])
+
 /**
  * @param {string} slug
  * @returns {DepartamentoCapability | null}
  */
 export function capabilityPorSlug(slug) {
   return BY_SLUG.get(slug) ?? null
+}
+
+/**
+ * `moduloPortal` canônico (registry) com fallback ao valor persistido no banco.
+ * Evita rótulos/rotas erradas quando o seed ainda não sincronizou o tenant.
+ * @param {string} slug
+ * @param {string | null | undefined} moduloPortalDb
+ * @returns {string | null}
+ */
+export function resolverModuloPortalDepartamento(slug, moduloPortalDb) {
+  const cap = capabilityPorSlug(slug)
+  if (cap) return cap.moduloPortal
+  return moduloPortalDb ?? null
+}
+
+/**
+ * Texto curto do hub: distingue módulo próprio vs thin wrapper que compõe outro.
+ * @param {string} slug
+ * @param {string | null | undefined} moduloPortalDb
+ * @returns {string}
+ */
+export function rotuloAreaDepartamento(slug, moduloPortalDb) {
+  const cap = capabilityPorSlug(slug)
+  const modulo = resolverModuloPortalDepartamento(slug, moduloPortalDb)
+  const thin = thinCopyPorSlug(slug)
+
+  if (cap?.portalPanel === 'diretoria') return 'Área · Membros e governança'
+  if (cap?.portalPanel === 'financeiro') return 'Área · Financeiro e mensalidades'
+  if (cap?.portalPanel === 'patrimonio') return 'Área · Inventário'
+  if (cap?.portalPanel === 'bateria') return 'Área · Ensaios (Bateria)'
+  if (cap?.portalPanel === 'caravanas') return 'Área · Viagens e embarque'
+
+  if (thin && modulo) {
+    const dest = MODULO_LABEL.get(modulo) ?? modulo
+    return `Compõe · ${dest}`
+  }
+
+  if (!modulo) return 'Área da torcida'
+  return `Área · ${MODULO_LABEL.get(modulo) ?? modulo}`
 }
 
 /**

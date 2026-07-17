@@ -4,8 +4,14 @@ import {
   resolverDepartamentosHub,
   type DeptoHubBase,
 } from '@/lib/departamentos-portal-access'
+import {
+  resolverModuloPortalDepartamento,
+  rotuloAreaDepartamento,
+} from '@torcida/types'
 
-const base = (partial: Partial<DeptoHubBase> & Pick<DeptoHubBase, 'id' | 'slug' | 'nome'>): DeptoHubBase => ({
+const base = (
+  partial: Partial<DeptoHubBase> & Pick<DeptoHubBase, 'id' | 'slug' | 'nome'>,
+): DeptoHubBase => ({
   cor: '#000',
   permissions: [],
   permissionsGestor: [],
@@ -63,5 +69,20 @@ describe('departamentos portal access', () => {
         diretoriaId: 'd1',
       }),
     ).toBe(false)
+  })
+})
+
+describe('rotulos e moduloPortal canonicos', () => {
+  it('bateria/caravanas ignoram moduloPortal stale eventos no banco', () => {
+    expect(resolverModuloPortalDepartamento('bateria', 'eventos')).toBe('bateria')
+    expect(resolverModuloPortalDepartamento('caravanas', 'eventos')).toBe('caravanas')
+    expect(rotuloAreaDepartamento('bateria', 'eventos')).toMatch(/Ensaios/i)
+    expect(rotuloAreaDepartamento('caravanas', 'eventos')).toMatch(/Viagens/i)
+  })
+
+  it('thin wrappers deixam claro que compõem outro módulo', () => {
+    expect(rotuloAreaDepartamento('carnaval', 'eventos')).toMatch(/Compõe/i)
+    expect(rotuloAreaDepartamento('feminino', 'comunidade')).toMatch(/Compõe/i)
+    expect(rotuloAreaDepartamento('social-e-eventos', 'eventos')).toMatch(/Compõe/i)
   })
 })

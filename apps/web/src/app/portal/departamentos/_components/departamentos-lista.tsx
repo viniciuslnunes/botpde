@@ -4,10 +4,12 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  DEPARTAMENTO_MODULOS,
+  DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL,
   hrefHomeDepartamento,
   hrefModuloPortal,
   hrefOperacaoAdmin,
+  resolverModuloPortalDepartamento,
+  rotuloAreaDepartamento,
 } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
@@ -26,9 +28,7 @@ interface GestorLite {
   departamentoId: string
 }
 
-const MODULO_LABEL = new Map<string, string>(
-  DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label]),
-)
+const LEGACY = new Set<string>(DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL)
 
 export function DepartamentosFallback() {
   return (
@@ -77,7 +77,10 @@ export async function DepartamentosSection() {
       select: { departamentoId: true },
     }),
     db.departamento.findMany({
-      where: { tenantId: tenant.id },
+      where: {
+        tenantId: tenant.id,
+        slug: { notIn: [...DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL] },
+      },
       select: {
         id: true,
         nome: true,
@@ -94,8 +97,10 @@ export async function DepartamentosSection() {
 
   const diretoriaId = todosTenant.find((d) => d.slug === 'diretoria')?.id ?? null
   const departamentos = resolverDepartamentosHub({
-    todos: todosTenant,
-    membershipIds: meusDepartamentos.map((m) => m.departamentoId),
+    todos: todosTenant.filter((d) => !LEGACY.has(d.slug)),
+    membershipIds: meusDepartamentos
+      .filter((m) => !LEGACY.has(m.departamento.slug))
+      .map((m) => m.departamentoId),
     gestorIds: gestorDe.map((g) => g.departamentoId),
     diretoriaId,
     isSuperAdmin,
@@ -126,14 +131,11 @@ export async function DepartamentosSection() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {departamentos.map((depto, index) => {
+          const moduloKey = resolverModuloPortalDepartamento(depto.slug, depto.moduloPortal)
           const homeHref = hrefHomeDepartamento(depto.slug)
-          const moduloHref = hrefModuloPortal(depto.moduloPortal)
-          const operacaoHref = hrefOperacaoAdmin(depto.moduloPortal)
-          const moduloLabel = depto.moduloPortal
-            ? MODULO_LABEL.get(depto.moduloPortal)
-            : null
-          const organizacional =
-            depto.permissions.length === 0 && depto.permissionsGestor.length === 0
+          const moduloHref = hrefModuloPortal(moduloKey)
+          const operacaoHref = hrefOperacaoAdmin(moduloKey)
+          const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
           const papelLabel = depto.visaoDiretoria
             ? 'visão Diretoria'
             : depto.isGestor
@@ -155,11 +157,7 @@ export async function DepartamentosSection() {
                       {depto.nome}
                     </h2>
                     <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                      {organizacional
-                        ? 'Organizacional — sem ações de acesso'
-                        : moduloLabel
-                          ? `Área · ${moduloLabel}`
-                          : 'Área da torcida'}
+                      {areaLabel}
                       {' · '}
                       {papelLabel}
                     </p>
@@ -181,7 +179,7 @@ export async function DepartamentosSection() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                       >
                         <LayoutGrid className="h-4 w-4 text-[rgb(var(--primary))]" />
-                        {moduloLabel ?? 'Módulo'}
+                        Módulo
                       </Link>
                     )}
                     {depto.visaoDiretoria && (
