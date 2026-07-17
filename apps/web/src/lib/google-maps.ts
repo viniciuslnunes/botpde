@@ -1,7 +1,13 @@
-/** Utilitários Google Maps (Street View / links). Degrada sem API key. */
+/** Utilitários Google Maps (Street View / links / JS API). Degrada sem API key.
+ *  Em produção a key precisa ter Maps JavaScript API + Street View Static + Geocoding.
+ */
 
 export function isGoogleMapsConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim())
+}
+
+export function getGoogleMapsApiKey(): string | null {
+  return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null
 }
 
 export type GoogleMapsRegion = {
@@ -75,6 +81,135 @@ export function buildGoogleMapsUrl(sede: {
   const q = queryLocal(sede) ?? sede.nome
   if (!q) return null
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
+}
+
+/** Abre rotas (“Como chegar”) no Google Maps. */
+export function buildDirectionsUrl(sede: {
+  endereco?: string | null
+  cidade?: string | null
+  estado?: string | null
+  lat?: number | null
+  lng?: number | null
+  nome?: string
+}): string | null {
+  const dest = queryLocal(sede) ?? sede.nome
+  if (!dest) return null
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
+}
+
+/** Subconjunto tipado do Maps JS API usado pelo portal Sedes. */
+export type GoogleMapsNamespace = {
+  maps: {
+    Map: new (
+      el: HTMLElement,
+      opts?: {
+        center?: { lat: number; lng: number }
+        zoom?: number
+        disableDefaultUI?: boolean
+        zoomControl?: boolean
+        mapTypeControl?: boolean
+        streetViewControl?: boolean
+        fullscreenControl?: boolean
+        gestureHandling?: 'cooperative' | 'greedy' | 'none' | 'auto'
+        styles?: Array<Record<string, unknown>>
+      },
+    ) => GoogleMapInstance
+    Marker: new (opts: {
+      map?: GoogleMapInstance | null
+      position: { lat: number; lng: number }
+      title?: string
+      zIndex?: number
+      icon?: {
+        path?: number | string
+        scale?: number
+        fillColor?: string
+        fillOpacity?: number
+        strokeColor?: string
+        strokeWeight?: number
+      }
+    }) => GoogleMarkerInstance
+    LatLngBounds: new () => GoogleLatLngBounds
+    SymbolPath: { CIRCLE: number }
+    event: {
+      addListener: (instance: object, eventName: string, handler: () => void) => { remove: () => void }
+      clearInstanceListeners: (instance: object) => void
+    }
+  }
+}
+
+export type GoogleMapPadding =
+  | number
+  | { top?: number; right?: number; bottom?: number; left?: number }
+
+export type GoogleMapInstance = {
+  fitBounds: (bounds: GoogleLatLngBounds, padding?: GoogleMapPadding) => void
+  panTo: (latLng: { lat: number; lng: number }) => void
+  setZoom: (zoom: number) => void
+  getZoom: () => number | undefined
+}
+
+export type GoogleMarkerInstance = {
+  setMap: (map: GoogleMapInstance | null) => void
+  setIcon: (icon: object) => void
+  setZIndex: (z: number) => void
+  addListener: (eventName: string, handler: () => void) => { remove: () => void }
+}
+
+export type GoogleLatLngBounds = {
+  extend: (latLng: { lat: number; lng: number }) => void
+  isEmpty: () => boolean
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var google: GoogleMapsNamespace | undefined
+}
+
+let mapsScriptPromise: Promise<GoogleMapsNamespace> | null = null
+
+/** Carrega o Maps JavaScript API uma vez (singleton). */
+export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Maps JS só no client'))
+  }
+  if (window.google?.maps?.Map) {
+    return Promise.resolve(window.google)
+  }
+  if (mapsScriptPromise) return mapsScriptPromise
+
+  const key = getGoogleMapsApiKey()
+  if (!key) {
+    return Promise.reject(new Error('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente'))
+  }
+
+  mapsScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="js"]')
+    if (existing) {
+      existing.addEventListener('load', () => {
+        if (window.google?.maps) resolve(window.google)
+        else reject(new Error('Google Maps falhou ao carregar'))
+      })
+      existing.addEventListener('error', () => reject(new Error('Google Maps script error')))
+      return
+    }
+
+    const script = document.createElement('script')
+    script.dataset.googleMaps = 'js'
+    script.async = true
+    script.defer = true
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=pt-BR&region=BR`
+    script.onload = () => {
+      if (window.google?.maps) resolve(window.google)
+      else reject(new Error('Google Maps falhou ao carregar'))
+    }
+    script.onerror = () => {
+      mapsScriptPromise = null
+      reject(new Error('Google Maps script error'))
+    }
+    document.head.appendChild(script)
+  })
+
+  return mapsScriptPromise
 }
 
 type GeocodeAddressComponent = {

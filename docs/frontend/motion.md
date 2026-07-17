@@ -426,8 +426,10 @@ components/motion/
 components/portal/
   eventos-list-animated.tsx
   evento-detail-motion.tsx
-  sedes-list-animated.tsx
-  sede-detail-motion.tsx
+  sedes-explorer.tsx
+  sedes-map.tsx
+  sede-explorer-card.tsx
+  sede-explorer-detail.tsx
   carteirinha-motion.tsx
   salas-list-animated.tsx
   loja-pedidos-list.tsx
