@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { buildGoogleMapsUrl, buildStreetViewImageUrl, isGoogleMapsConfigured } from '@/lib/google-maps'
+import { buildDirectionsUrl, buildGoogleMapsUrl, buildStreetViewImageUrl, isGoogleMapsConfigured } from '@/lib/google-maps'
 
 describe('google-maps', () => {
   const original = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -33,5 +33,15 @@ describe('google-maps', () => {
       estado: 'SP',
     })
     expect(url).toContain('google.com/maps/search')
+  })
+
+  it('monta link de rotas no Google Maps', () => {
+    const url = buildDirectionsUrl({
+      lat: -23.5,
+      lng: -46.6,
+      nome: 'Sede',
+    })
+    expect(url).toContain('google.com/maps/dir')
+    expect(url).toContain(encodeURIComponent('-23.5,-46.6'))
   })
 })
