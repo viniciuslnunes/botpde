@@ -199,7 +199,7 @@ export function missionDepartamento(slug) {
   const cap = capabilityPorSlug(slug)
   if (cap?.mission) return cap.mission
   const thin = thinCopyPorSlug(slug)
-  return thin?.descricao ?? 'Área operacional da torcida.'
+  return thin?.descricao ?? 'Departamento operacional da torcida.'
 }
 
 /**
@@ -236,20 +236,20 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
   const modulo = resolverModuloPortalDepartamento(slug, moduloPortalDb)
   const thin = thinCopyPorSlug(slug)
 
-  if (cap?.portalPanel === 'diretoria') return 'Área · Membros e governança'
-  if (cap?.portalPanel === 'financeiro') return 'Área · Financeiro e mensalidades'
-  if (cap?.portalPanel === 'patrimonio') return 'Área · Inventário'
-  if (cap?.portalPanel === 'bateria') return 'Área · Ensaios (Bateria)'
-  if (cap?.portalPanel === 'caravanas') return 'Área · Viagens e embarque'
-  if (cap?.portalPanel === 'carnaval') return 'Área · Cronograma e barracão'
+  if (cap?.portalPanel === 'diretoria') return 'Departamento · Membros e governança'
+  if (cap?.portalPanel === 'financeiro') return 'Departamento · Financeiro e mensalidades'
+  if (cap?.portalPanel === 'patrimonio') return 'Departamento · Inventário'
+  if (cap?.portalPanel === 'bateria') return 'Departamento · Ensaios (Bateria)'
+  if (cap?.portalPanel === 'caravanas') return 'Departamento · Viagens e embarque'
+  if (cap?.portalPanel === 'carnaval') return 'Departamento · Cronograma e barracão'
 
   if (thin && modulo) {
     const dest = MODULO_LABEL.get(modulo) ?? modulo
     return `Via ${dest}`
   }
 
-  if (!modulo) return 'Área da torcida'
-  return `Área · ${MODULO_LABEL.get(modulo) ?? modulo}`
+  if (!modulo) return 'Departamento da torcida'
+  return `Departamento · ${MODULO_LABEL.get(modulo) ?? modulo}`
 }
 
 /**

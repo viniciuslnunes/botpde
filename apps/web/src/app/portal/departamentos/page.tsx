@@ -18,7 +18,7 @@ export default function DepartamentosPage() {
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Departamentos</h1>
           <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-            Suas áreas de atuação na torcida
+            Seus departamentos de atuação na torcida
           </p>
         </div>
       </div>

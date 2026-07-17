@@ -32,7 +32,7 @@ interface GestorLite {
 
 const LEGACY = new Set<string>(DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL)
 
-/** Rótulo curto do atalho para o módulo portal (não a home da área). */
+/** Rótulo curto do atalho para o módulo portal (não a home do departamento). */
 function rotuloAtalhoModulo(slug: string): string {
   switch (slug) {
     case 'financeiro':
@@ -63,7 +63,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
   const moduloHref = hrefModuloPortal(moduloKey)
   const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
   const Icon = iconeDepartamento(depto.slug)
-  // Demais áreas (visão Diretoria): só leitura — não herdar Gestor/Gestão via SA.
+  // Demais departamentos (visão Diretoria): só leitura — não herdar Gestor/Gestão via SA.
   const mostraModulo = Boolean(moduloHref) && depto.isAtuacao
   const mostraGestao = depto.isGestor && !depto.visaoDiretoria
   const papelBadge = depto.visaoDiretoria ? (
@@ -102,7 +102,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
             href={homeHref}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))]"
           >
-            Abrir área
+            Abrir departamento
             <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
           </Link>
 
@@ -231,22 +231,22 @@ export async function DepartamentosSection() {
       <MotionEmptyState
         icon={<Briefcase className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
         title="Você ainda não faz parte de nenhum departamento."
-        description="Quando a diretoria te incluir em um departamento, as áreas aparecem aqui."
+        description="Quando a diretoria te incluir em um departamento, eles aparecem aqui."
       />
     )
   }
 
-  const minhasAreas = departamentos.filter((d) => d.isAtuacao)
-  const demaisAreas = departamentos.filter((d) => d.visaoDiretoria)
-  const temSecoes = minhasAreas.length > 0 && demaisAreas.length > 0
+  const meusDepartamentos = departamentos.filter((d) => d.isAtuacao)
+  const demaisDepartamentos = departamentos.filter((d) => d.visaoDiretoria)
+  const temSecoes = meusDepartamentos.length > 0 && demaisDepartamentos.length > 0
 
   return (
     <div className="space-y-8">
-      {demaisAreas.length > 0 && (
+      {demaisDepartamentos.length > 0 && (
         <p className="rounded-xl border border-[rgb(var(--primary)_/_0.2)] bg-[rgb(var(--primary)_/_0.06)] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
           {temSecoes
-            ? 'Como Diretoria, você também vê as demais áreas em só leitura. Gestão só onde você é gestor.'
-            : 'Você vê todas as áreas da torcida. Gestão só onde você é gestor.'}
+            ? 'Como Diretoria, você também vê os demais departamentos em só leitura. Gestão só onde você é gestor.'
+            : 'Você vê todos os departamentos da torcida. Gestão só onde você é gestor.'}
         </p>
       )}
 
@@ -254,20 +254,23 @@ export async function DepartamentosSection() {
         <>
           <section className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Minhas áreas
+              Meus departamentos
             </h2>
-            <DeptoHubGrid items={minhasAreas} />
+            <DeptoHubGrid items={meusDepartamentos} />
           </section>
           <section className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Demais áreas
+                Demais departamentos
               </h2>
               <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
                 Visão da Diretoria · só leitura da home
               </p>
             </div>
-            <DeptoHubGrid items={demaisAreas} indexOffset={minhasAreas.length} />
+            <DeptoHubGrid
+              items={demaisDepartamentos}
+              indexOffset={meusDepartamentos.length}
+            />
           </section>
         </>
       ) : (
