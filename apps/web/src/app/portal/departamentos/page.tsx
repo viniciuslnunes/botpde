@@ -13,8 +13,9 @@ export default function DepartamentosPage() {
       <div>
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Departamentos</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Escolha a área em que você atua. Caravanas, bateria, financeiro e demais
-          módulos abrem a partir daqui — não pela barra superior.
+          Selecione sua área de atuação (ou outras que a Diretoria/permissões
+          liberam). Mensalidades, caravanas, bateria e financeiro abrem por aqui —
+          não pela barra superior.
         </p>
       </div>
 

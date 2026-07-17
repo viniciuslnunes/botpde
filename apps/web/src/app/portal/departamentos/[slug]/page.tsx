@@ -48,6 +48,7 @@ import {
   DepartamentoThinSkeleton,
 } from '../_components/departamento-thin-aside'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
+import { podeAbrirDepartamentoPortal } from '@/lib/departamentos-portal-access'
 import {
   ArrowLeft,
   ArrowRight,
@@ -109,15 +110,24 @@ export default async function DepartamentoHomePage({
   })
   if (!depto) notFound()
 
-  const membership: { id: string } | null = await db.userDepartamento.findFirst({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      departamentoId: depto.id,
-    },
+  const memberships: Array<{ departamentoId: string }> = await db.userDepartamento.findMany({
+    where: { userId: session.user.id, tenantId: tenant.id },
+    select: { departamentoId: true },
+  })
+  const membershipIds = memberships.map((m) => m.departamentoId)
+  const diretoriaRow: { id: string } | null = await db.departamento.findFirst({
+    where: { tenantId: tenant.id, slug: 'diretoria' },
     select: { id: true },
   })
-  if (!membership && !isSuperAdmin) redirect('/portal/departamentos')
+  const podeAbrir = podeAbrirDepartamentoPortal({
+    departamentoId: depto.id,
+    membershipIds,
+    diretoriaId: diretoriaRow?.id ?? null,
+    isSuperAdmin,
+  })
+  if (!podeAbrir) redirect('/portal/departamentos')
+
+  const isMembroDaArea = membershipIds.includes(depto.id)
 
   const gestao: { id: string } | null = await db.departamentoGestor.findFirst({
     where: { userId: session.user.id, departamentoId: depto.id },
@@ -297,7 +307,11 @@ export default async function DepartamentoHomePage({
             <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{depto.nome}</h1>
             <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
               {moduloLabel ? `Módulo · ${moduloLabel}` : 'Área da torcida'}
-              {isGestor ? ' · você é gestor' : ' · você é membro'}
+              {isGestor
+                ? ' · você é gestor'
+                : isMembroDaArea
+                  ? ' · você é membro'
+                  : ' · visão Diretoria (sem gestão)'}
               {panel === 'diretoria' && isGestor && totalPendentes > 0
                 ? ` · ${totalPendentes} pendente${totalPendentes === 1 ? '' : 's'}`
                 : ''}

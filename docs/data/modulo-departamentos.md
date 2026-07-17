@@ -124,6 +124,11 @@ agrupada em seções alinhadas a `DEPARTAMENTO_MODULOS` (`ADMIN_MENU_SECOES`).
 Visão-alvo portal × admin (membros no portal, gestores com painel + operação):
 ver `docs/data/proposta-departamentos-portal-admin.md`.
 
+**Hub `/portal/departamentos`:** menu único de áreas. Membro vê só onde atua;
+membro da **Diretoria** vê todas as áreas (somente leitura da home), e **Gestão /
+Operação** só onde é `DepartamentoGestor` (ou permissão equivalente). Mensalidades,
+caravanas, bateria e financeiro **não** ficam na topbar — abrem por este hub.
+
 **Diretoria (gestor):** a home `/portal/departamentos/diretoria` lista solicitações
 `PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).
 Também exibe KPIs leves (pendentes, ativos, reprovados, carteirinhas).

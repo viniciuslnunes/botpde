@@ -25,16 +25,25 @@ export async function FinanceiroCaixaAside({
 }) {
   if (!podeVerFinanceiro) {
     return (
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-          <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caixa</h2>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caixa</h2>
+          </div>
+          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Você faz parte de {nome}, mas não tem permissão para ver o livro-caixa. Peça
+            <span className="font-medium text-[rgb(var(--foreground))]"> finance:view </span>
+            ao gestor ou à Presidência.
+          </p>
         </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas não tem permissão para ver o livro-caixa. Peça
-          <span className="font-medium text-[rgb(var(--foreground))]"> finance:view </span>
-          ao gestor ou à Presidência.
-        </p>
+        <Link
+          href="/portal/cobrancas"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+        >
+          Mensalidades
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     )
   }
@@ -122,6 +131,13 @@ export async function FinanceiroCaixaAside({
           <ArrowRight className="h-4 w-4" />
         </Link>
       )}
+      <Link
+        href="/portal/cobrancas"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+      >
+        Mensalidades
+        <ArrowRight className="h-4 w-4" />
+      </Link>
       {isGestor && operacaoHref && (
         <Link
           href={operacaoHref}

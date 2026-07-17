@@ -19,7 +19,6 @@ import {
   X,
   ChevronDown,
   Home,
-  Wallet,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { useNavbarContext } from '@/lib/use-navbar-context'
@@ -29,13 +28,12 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-/** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro…) NÃO entram aqui —
- * ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`. */
+/** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
+ * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`. */
 const navLinks = [
   { href: '/portal', label: 'Início', icon: Home, prefetch: 'hover' as const },
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
-  { href: '/portal/cobrancas', label: 'Mensalidades', icon: Wallet, prefetch: 'hover' as const },
   { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: 'hover' as const },
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: 'hover' as const },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
@@ -74,13 +72,17 @@ export function PortalNavbar({
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
   const baseLinks = modoNacional
-    ? navLinks.filter(
-        (link) =>
-          link.href !== '/portal/carteirinha' && link.href !== '/portal/cobrancas',
-      )
+    ? navLinks.filter((link) => link.href !== '/portal/carteirinha')
     : [...navLinks]
-  // Só o link agregado "Departamentos" — nunca um item por área (caravanas, bateria…).
-  const links = temDepartamentos ? [...baseLinks, departamentosLink] : [...baseLinks]
+  // Departamentos no meio do fluxo operacional (após Comunidade), não no fim.
+  const links = temDepartamentos
+    ? [
+        baseLinks[0]!,
+        baseLinks[1]!,
+        departamentosLink,
+        ...baseLinks.slice(2),
+      ]
+    : [...baseLinks]
 
   function isActive(href: string) {
     if (href === '/portal') return pathname === '/portal'
@@ -137,7 +139,7 @@ export function PortalNavbar({
             </span>
           </PortalNavLink>
 
-          <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto xl:flex">
+          <nav className="app-scrollbar-none hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] xl:flex [&::-webkit-scrollbar]:hidden">
             {links.map((link) => {
               const Icon = link.icon
               const active = isActive(link.href)
