@@ -58,14 +58,10 @@ import {
   CarnavalBarracaoSkeleton,
 } from '../_components/carnaval-barracao-aside'
 import { DepartamentoCanalBlock } from '../_components/departamento-canal-block'
+import { iconeDepartamento } from '../_components/departamento-icone'
 import { resolveAcessoPluginEvento } from '@/lib/eventos-plugin-access'
 import { podeAbrirDepartamentoPortal } from '@/lib/departamentos-portal-access'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Briefcase,
-  Shield,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, Shield } from 'lucide-react'
 import type { Metadata } from 'next'
 
 type DeptoRow = {
@@ -181,49 +177,65 @@ export default async function DepartamentoHomePage({
     isSuperAdmin,
   )
 
-  const membrosRaw: Array<{
-    userId: string
-    user: {
-      id: string
-      nome: string | null
-      email: string
-      nickname: string | null
-      avatarUrl: string | null
-    }
-  }> = await db.userDepartamento.findMany({
-    where: { departamentoId: depto.id, tenantId: tenant.id },
-    select: {
-      userId: true,
-      user: {
-        select: {
-          id: true,
-          nome: true,
-          email: true,
-          nickname: true,
-          avatarUrl: true,
-        },
-      },
-    },
-    orderBy: { criadoEm: 'asc' },
-  })
+  type EquipeUserLite = {
+    id: string
+    nome: string | null
+    email: string
+    nickname: string | null
+    avatarUrl: string | null
+  }
+  const userSelect = {
+    id: true,
+    nome: true,
+    email: true,
+    nickname: true,
+    avatarUrl: true,
+  } as const
 
-  const gestores: Array<{ userId: string }> = await db.departamentoGestor.findMany({
-    where: { departamentoId: depto.id },
-    select: { userId: true },
-  })
-  const gestorSet = new Set(gestores.map((g) => g.userId))
+  const [membrosRaw, gestoresRaw]: [
+    Array<{ userId: string; user: EquipeUserLite }>,
+    Array<{ userId: string; user: EquipeUserLite }>,
+  ] = await Promise.all([
+    db.userDepartamento.findMany({
+      where: { departamentoId: depto.id, tenantId: tenant.id },
+      select: { userId: true, user: { select: userSelect } },
+      orderBy: { criadoEm: 'asc' },
+    }),
+    db.departamentoGestor.findMany({
+      where: { departamentoId: depto.id },
+      select: { userId: true, user: { select: userSelect } },
+    }),
+  ])
 
-  const membros: MembroEquipe[] = membrosRaw.map((m) => ({
-    userId: m.userId,
-    nome: m.user.nome,
-    email: m.user.email,
-    nickname: m.user.nickname,
-    avatarUrl: m.user.avatarUrl,
-    isGestor: gestorSet.has(m.userId),
-  }))
+  const gestorSet = new Set(gestoresRaw.map((g) => g.userId))
+  const porId = new Map<string, MembroEquipe>()
+
+  for (const g of gestoresRaw) {
+    porId.set(g.userId, {
+      userId: g.userId,
+      nome: g.user.nome,
+      email: g.user.email,
+      nickname: g.user.nickname,
+      avatarUrl: g.user.avatarUrl,
+      isGestor: true,
+    })
+  }
+  for (const m of membrosRaw) {
+    if (porId.has(m.userId)) continue
+    porId.set(m.userId, {
+      userId: m.userId,
+      nome: m.user.nome,
+      email: m.user.email,
+      nickname: m.user.nickname,
+      avatarUrl: m.user.avatarUrl,
+      isGestor: gestorSet.has(m.userId),
+    })
+  }
+
+  const membros: MembroEquipe[] = [...porId.values()]
   membros.sort((a, b) => {
     if (a.isGestor !== b.isGestor) return a.isGestor ? -1 : 1
-    return (a.nome ?? a.email).localeCompare(b.nome ?? b.email)
+    return (a.nome ?? a.email).localeCompare(b.nome ?? b.email, 'pt-BR')
   })
 
   const capability = capabilityPorSlug(depto.slug)
@@ -234,6 +246,7 @@ export default async function DepartamentoHomePage({
   const mission = missionDepartamento(depto.slug)
   const subareas = subareasDepartamento(depto.slug)
   const panel = capability?.portalPanel ?? 'generico'
+  const Icon = iconeDepartamento(depto.slug)
 
   let pendentes: PendenteLite[] = []
   let totalPendentes = 0
@@ -347,10 +360,12 @@ export default async function DepartamentoHomePage({
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white"
             style={{ backgroundColor: depto.cor }}
           >
-            <Briefcase className="h-6 w-6" />
+            <Icon className="h-6 w-6" aria-hidden />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{depto.nome}</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">
+              {depto.nome}
+            </h1>
             <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
               {moduloLabel}
               {isGestor
@@ -365,32 +380,14 @@ export default async function DepartamentoHomePage({
             <p className="mt-2 max-w-2xl text-sm text-[rgb(var(--foreground-muted))]">{mission}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {moduloHref &&
-              (panel === 'financeiro'
-                ? podeVerFinanceiro
-                : panel === 'patrimonio'
-                  ? podeVerPatrimonio
-                  : panel === 'caravanas'
-                    ? acessoCaravanas.podeVer
-                    : panel === 'bateria'
-                      ? acessoBateria.podeVer
-                      : true) && (
+            {/* CTA de módulo fica no aside do domínio; carnaval mantém atalho no header. */}
+            {moduloHref && panel === 'carnaval' && (
               <Link
                 href={moduloHref}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
-                Abrir módulo
+                Abrir eventos
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-            )}
-            {operacaoHref && (
-              <Link
-                href={operacaoHref}
-                prefetch={false}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-              >
-                <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
-                Operação
               </Link>
             )}
           </div>
@@ -400,45 +397,8 @@ export default async function DepartamentoHomePage({
       <DepartamentoSubareasNav subareas={subareas} />
       <DepartamentoProximaAcao acao={proximaAcao} />
 
-      <DepartamentoCanalBlock
-        departamentoId={depto.id}
-        slug={depto.slug}
-        isGestor={isGestor}
-        canal={depto.canalConversa}
-        canaisDisponiveis={canaisDisponiveis}
-      />
-
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-6">
-          {panel === 'diretoria' && isGestor && podeAprovar && (
-            <div id="fila">
-              <DepartamentoFilaMembros
-                pendentes={pendentes}
-                totalPendentes={totalPendentes}
-              />
-            </div>
-          )}
-          <div id="equipe">
-            <DepartamentoEquipe
-              departamentoId={depto.id}
-              slug={depto.slug}
-              membros={membros}
-              isGestor={isGestor}
-              currentUserId={session.user.id}
-            />
-          </div>
-        </div>
-
-        <aside id="dominio" className="space-y-4 scroll-mt-20">
-          <div id="caixa" className="scroll-mt-20" />
-          <div id="mensalidades" className="scroll-mt-20" />
-          <div id="inventario" className="scroll-mt-20" />
-          <div id="ensaios" className="scroll-mt-20" />
-          <div id="agenda" className="scroll-mt-20" />
-          <div id="embarque" className="scroll-mt-20" />
-          <div id="barracao" className="scroll-mt-20" />
-          <div id="avisos" className="scroll-mt-20" />
-          <div id="pedidos" className="scroll-mt-20" />
+        <aside id="dominio" className="order-1 space-y-4 scroll-mt-20 lg:order-2">
           {panel === 'diretoria' && isGestor && kpis && (
             <DepartamentoDiretoriaKpis kpis={kpis} />
           )}
@@ -518,7 +478,37 @@ export default async function DepartamentoHomePage({
             </Suspense>
           )}
         </aside>
+
+        <div className="order-2 space-y-6 lg:order-1">
+          {panel === 'diretoria' && isGestor && podeAprovar && (
+            <div id="fila" className="scroll-mt-20">
+              <DepartamentoFilaMembros
+                pendentes={pendentes}
+                totalPendentes={totalPendentes}
+              />
+            </div>
+          )}
+          <div id="equipe" className="scroll-mt-20">
+            <DepartamentoEquipe
+              departamentoId={depto.id}
+              slug={depto.slug}
+              nome={depto.nome}
+              cor={depto.cor}
+              membros={membros}
+              isGestor={isGestor}
+              currentUserId={session.user.id}
+            />
+          </div>
+        </div>
       </div>
+
+      <DepartamentoCanalBlock
+        departamentoId={depto.id}
+        slug={depto.slug}
+        isGestor={isGestor}
+        canal={depto.canalConversa}
+        canaisDisponiveis={canaisDisponiveis}
+      />
     </div>
   )
 }
@@ -538,8 +528,8 @@ function PainelDominio({
       <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
         {isGestor
           ? totalPendentes > 0
-            ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila à esquerda. Aprove ou reprove sem sair do portal.`
-            : 'Fila de solicitações à esquerda. Quando alguém pedir ingresso, aparece aqui.'
+            ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila. Aprove ou reprove sem sair do portal.`
+            : 'Fila de solicitações nesta área. Quando alguém pedir ingresso, aparece aqui.'
           : 'Você é membro desta área. A gestão da Diretoria é feita pelos gestores.'}
       </p>
       {isGestor && operacaoHref && (

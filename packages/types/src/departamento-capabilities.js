@@ -245,7 +245,7 @@ export function rotuloAreaDepartamento(slug, moduloPortalDb) {
 
   if (thin && modulo) {
     const dest = MODULO_LABEL.get(modulo) ?? modulo
-    return `Compõe · ${dest}`
+    return `Via ${dest}`
   }
 
   if (!modulo) return 'Área da torcida'

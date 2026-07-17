@@ -101,12 +101,9 @@ export async function DepartamentoThinAside({
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</h2>
         </div>
         <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">{descricao}</p>
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
-          Compõe · módulo existente
-        </p>
 
         {slug === 'comunicacao' && (
-          <div className="mt-4 space-y-3 border-t border-[rgb(var(--border))] pt-3">
+          <div id="avisos" className="mt-4 scroll-mt-20 space-y-3 border-t border-[rgb(var(--border))] pt-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
                 Último comunicado
@@ -155,7 +152,7 @@ export async function DepartamentoThinAside({
         )}
 
         {slug === 'materiais-loja' && (
-          <div className="mt-4 space-y-3 border-t border-[rgb(var(--border))] pt-3">
+          <div id="pedidos" className="mt-4 scroll-mt-20 space-y-3 border-t border-[rgb(var(--border))] pt-3">
             {podeVerPedidos && (
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-[rgb(var(--foreground-muted))]">Pedidos abertos</span>
@@ -195,7 +192,7 @@ export async function DepartamentoThinAside({
         )}
 
         {comAgenda && (
-          <div className="mt-4 border-t border-[rgb(var(--border))] pt-3">
+          <div id="agenda" className="mt-4 scroll-mt-20 border-t border-[rgb(var(--border))] pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--foreground-muted))]">
               {slug === 'feminino' ? 'Agenda de ações' : 'Próximos na agenda'}
             </p>
@@ -245,15 +242,6 @@ export async function DepartamentoThinAside({
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           {ctaModulo}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      )}
-      {slug === 'feminino' && (
-        <Link
-          href="/portal/eventos"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-        >
-          Agenda de eventos
           <ArrowRight className="h-4 w-4" />
         </Link>
       )}

@@ -11,7 +11,7 @@ export const resolverProximaAcaoArea = cache(async function resolverProximaAcaoA
   totalPendentes: number
   podeVerFinanceiro: boolean
 }): Promise<ProximaAcaoArea> {
-  const { tenantId, slug, panel, isGestor, totalPendentes, podeVerFinanceiro } = input
+  const { tenantId, panel, isGestor, totalPendentes, podeVerFinanceiro } = input
 
   if (panel === 'diretoria' && isGestor && totalPendentes > 0) {
     return {
@@ -63,32 +63,6 @@ export const resolverProximaAcaoArea = cache(async function resolverProximaAcaoA
     }
   }
 
-  if (slug === 'comunicacao' || slug === 'feminino') {
-    return {
-      titulo: 'Comunidade da torcida',
-      descricao: 'Publique e acompanhe a conversa da área.',
-      href: '/portal/comunidade',
-      cta: 'Abrir comunidade',
-    }
-  }
-
-  if (slug === 'materiais-loja') {
-    return {
-      titulo: 'Loja e materiais',
-      descricao: 'Catálogo e pedidos no portal.',
-      href: '/portal/loja',
-      cta: 'Abrir loja',
-    }
-  }
-
-  if (slug === 'social-e-eventos' || slug === 'carnaval') {
-    return {
-      titulo: 'Agenda de eventos',
-      descricao: 'Próximos compromissos da área.',
-      href: '/portal/eventos',
-      cta: 'Abrir eventos',
-    }
-  }
-
+  // Sem urgência: não duplicar CTAs soft do aside (comunidade/loja/eventos).
   return null
 })

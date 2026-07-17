@@ -51,7 +51,7 @@ export async function BateriaEnsaiosAside({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div id="ensaios" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
           <Music2 className="h-4 w-4 text-rose-600 dark:text-rose-400" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Ensaios</h2>

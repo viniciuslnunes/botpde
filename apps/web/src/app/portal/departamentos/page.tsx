@@ -13,9 +13,8 @@ export default function DepartamentosPage() {
       <div>
         <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Departamentos</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-          Selecione sua área de atuação. Plugins próprios (Financeiro, Patrimônio,
-          Bateria, Caravanas) têm módulo dedicado; outras áreas <strong>compõem</strong>{' '}
-          Eventos, Loja ou Comunidade — sem app duplicado.
+          Abra sua área de atuação. Financeiro, Patrimônio, Bateria e Caravanas têm
+          módulo próprio; outras áreas usam Eventos, Loja ou Comunidade.
         </p>
       </div>
 

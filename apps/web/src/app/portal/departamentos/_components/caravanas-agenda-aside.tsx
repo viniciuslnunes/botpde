@@ -64,7 +64,7 @@ export async function CaravanasAgendaAside({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div id="agenda" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
           <Bus className="h-4 w-4 text-orange-600 dark:text-orange-400" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Agenda</h2>
@@ -110,11 +110,14 @@ export async function CaravanasAgendaAside({
                 </div>
               )}
               {proxima && (
-                <div className="flex justify-between gap-3 border-t border-[rgb(var(--border))] pt-2">
-                  <dt className="text-[rgb(var(--foreground-muted))]">Checklist embarque</dt>
-                  <dd className="font-semibold tabular-nums">
+                <div
+                  id="embarque"
+                  className="flex scroll-mt-20 justify-between gap-3 border-t border-[rgb(var(--border))] pt-2"
+                >
+                  <span className="text-[rgb(var(--foreground-muted))]">Checklist embarque</span>
+                  <span className="font-semibold tabular-nums">
                     {embarcados}/{confirmados.length}
-                  </dd>
+                  </span>
                 </div>
               )}
             </dl>

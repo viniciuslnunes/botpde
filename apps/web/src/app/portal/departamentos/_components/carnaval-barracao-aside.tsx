@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { PartyPopper, Loader2, Check } from 'lucide-react'
 import { BARRACAO_CHECKLIST, barracaoItemsFromMeta, barracaoProgress } from '@torcida/types'
 import { toggleBarracaoItem } from '../actions'
@@ -22,11 +22,15 @@ export function CarnavalBarracaoAside({
 }) {
   const items = barracaoItemsFromMeta(meta)
   const progress = barracaoProgress(meta)
+  const [pendingId, setPendingId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div
+        id="barracao"
+        className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
+      >
         <div className="flex items-center gap-2">
           <PartyPopper className="h-4 w-4 text-pink-600 dark:text-pink-400" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Barracão</h2>
@@ -39,9 +43,10 @@ export function CarnavalBarracaoAside({
           {proximosCount === 1 ? '' : 's'} na agenda
         </p>
 
-        <ul id="barracao" className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
+        <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-3">
           {BARRACAO_CHECKLIST.map((def) => {
             const done = Boolean(items[def.id]?.done)
+            const itemPending = pending && pendingId === def.id
             return (
               <li key={def.id} className="flex items-center justify-between gap-2 text-sm">
                 <span
@@ -63,22 +68,27 @@ export function CarnavalBarracaoAside({
                       fd.set('slug', slug)
                       fd.set('itemId', def.id)
                       fd.set('done', done ? 'false' : 'true')
+                      setPendingId(def.id)
                       startTransition(async () => {
-                        await toggleBarracaoItem({}, fd)
+                        try {
+                          await toggleBarracaoItem({}, fd)
+                        } finally {
+                          setPendingId(null)
+                        }
                       })
                     }}
                     className={[
-                      'inline-flex h-7 w-7 items-center justify-center rounded-md border text-xs',
+                      'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-xs',
                       done
                         ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                         : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                     aria-label={done ? `Desmarcar ${def.label}` : `Marcar ${def.label}`}
                   >
-                    {pending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {itemPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : done ? (
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-4 w-4" />
                     ) : null}
                   </button>
                 ) : done ? (

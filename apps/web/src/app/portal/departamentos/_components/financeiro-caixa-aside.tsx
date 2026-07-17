@@ -35,8 +35,7 @@ export async function FinanceiroCaixaAside({
           </div>
           <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
             Você faz parte de {nome}, mas não tem permissão para ver o livro-caixa. Peça
-            <span className="font-medium text-[rgb(var(--foreground))]"> finance:view </span>
-            ao gestor ou à Presidência.
+            acesso ao caixa ao gestor ou à Presidência.
           </p>
         </div>
         <Link
@@ -78,7 +77,7 @@ export async function FinanceiroCaixaAside({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div id="caixa" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
           <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caixa</h2>
@@ -201,8 +200,9 @@ export async function FinanceiroCaixaAside({
         </Link>
       )}
       <Link
+        id="mensalidades"
         href="/portal/cobrancas"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+        className="inline-flex w-full scroll-mt-20 items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
       >
         Mensalidades
         <ArrowRight className="h-4 w-4" />

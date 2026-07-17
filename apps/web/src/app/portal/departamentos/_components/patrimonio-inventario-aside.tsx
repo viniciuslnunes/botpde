@@ -28,11 +28,10 @@ export async function PatrimonioInventarioAside({
           <Landmark className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Inventário</h2>
         </div>
-        <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas não tem permissão para ver o inventário. Peça
-          <span className="font-medium text-[rgb(var(--foreground))]"> patrimony:view </span>
-          ao gestor ou à Presidência.
-        </p>
+          <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Você faz parte de {nome}, mas não tem permissão para ver o inventário. Peça
+            acesso ao patrimônio ao gestor ou à Presidência.
+          </p>
       </div>
     )
   }
@@ -41,7 +40,7 @@ export async function PatrimonioInventarioAside({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      <div id="inventario" className="scroll-mt-20 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
           <Landmark className="h-4 w-4 text-stone-600 dark:text-stone-300" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Inventário</h2>

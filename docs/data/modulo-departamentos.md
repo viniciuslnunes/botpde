@@ -125,9 +125,10 @@ Visão-alvo portal × admin (membros no portal, gestores com painel + operação
 ver `docs/data/proposta-departamentos-portal-admin.md`.
 
 **Hub `/portal/departamentos`:** menu único de áreas. Membro vê só onde atua;
-membro da **Diretoria** vê todas as áreas (somente leitura da home), e **Gestão /
-Operação** só onde é `DepartamentoGestor` (ou permissão equivalente). Mensalidades,
-caravanas, bateria e financeiro **não** ficam na topbar — abrem por este hub.
+membro da **Diretoria** vê todas as áreas (somente leitura da home), e **Gestão**
+só onde é `DepartamentoGestor` (ou permissão equivalente). Operação admin fica
+no painel do domínio da área. Mensalidades, caravanas, bateria e financeiro
+**não** ficam na topbar — abrem por este hub.
 
 **Diretoria (gestor):** a home `/portal/departamentos/diretoria` lista solicitações
 `PENDENTE` e permite aprovar/reprovar ali (mesmas Server Actions de `/admin/membros`).
@@ -138,8 +139,8 @@ Materiais/Loja e Comunicação não ganham app próprio — copy + CTA para o m�
 portal (`departamento-thin.js`) e widgets compostos (agenda, comunicados, pedidos).
 
 **Fase 5 — Cockpit:** cada home de área tem missão (registry), nav de subáreas por
-âncora, próxima ação contextual e badge Plugin vs Compõe no hub. Detalhe:
-`proposta-departamentos-portal-admin.md` § Fase 5.
+âncora, próxima ação só com urgência real e painel de domínio acima da equipe no
+mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 
 **Onda 4 (MVP):** canal da área (vínculo a `Conversa` CANAL), vaga paga em caravana
 (`valorVaga` + cobrança AVULSA), checklist barracão no Carnaval (`Departamento.meta`).

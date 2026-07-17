@@ -47,6 +47,13 @@ function Kpi({
   )
 
   if (!href) return body
+  if (href.startsWith('#')) {
+    return (
+      <a href={href} className="block transition-opacity hover:opacity-90">
+        {body}
+      </a>
+    )
+  }
   return (
     <Link href={href} prefetch={false} className="block transition-opacity hover:opacity-90">
       {body}
@@ -67,7 +74,7 @@ export function DepartamentoDiretoriaKpis({ kpis }: { kpis: DiretoriaKpis }) {
           value={kpis.pendentes}
           accent={kpis.pendentes > 0}
           icon={Clock}
-          href="/admin/membros?status=PENDENTE"
+          href={kpis.pendentes > 0 ? '#fila' : undefined}
         />
         <Kpi
           label="Ativos"

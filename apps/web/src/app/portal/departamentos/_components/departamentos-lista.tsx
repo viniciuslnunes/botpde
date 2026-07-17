@@ -7,8 +7,6 @@ import {
   DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL,
   hrefHomeDepartamento,
   hrefModuloPortal,
-  hrefOperacaoAdmin,
-  kindDepartamento,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
 } from '@torcida/types'
@@ -19,7 +17,8 @@ import {
 } from '@/lib/departamentos-portal-access'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { ArrowRight, Briefcase, Eye, LayoutGrid, Settings2, Shield } from 'lucide-react'
+import { ArrowRight, Briefcase, ChevronDown, Eye, LayoutGrid, Settings2 } from 'lucide-react'
+import { iconeDepartamento } from './departamento-icone'
 
 interface MembershipLite {
   departamentoId: string
@@ -126,8 +125,8 @@ export async function DepartamentosSection() {
     <div className="space-y-4">
       {isDiretoria && (
         <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Como Diretoria, você vê todas as áreas. Gestão e operação só aparecem onde você
-          é gestor daquele departamento (ou tem a permissão correspondente).
+          Como Diretoria, você vê todas as áreas. Gestão só aparece onde você é gestor
+          daquele departamento (ou tem a permissão correspondente).
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -135,14 +134,15 @@ export async function DepartamentosSection() {
           const moduloKey = resolverModuloPortalDepartamento(depto.slug, depto.moduloPortal)
           const homeHref = hrefHomeDepartamento(depto.slug)
           const moduloHref = hrefModuloPortal(moduloKey)
-          const operacaoHref = hrefOperacaoAdmin(moduloKey)
           const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
-          const kind = kindDepartamento(depto.slug)
           const papelLabel = depto.visaoDiretoria
             ? 'visão Diretoria'
             : depto.isGestor
               ? 'gestor'
               : 'membro'
+          const Icon = iconeDepartamento(depto.slug)
+          const temSecundarios =
+            (Boolean(moduloHref) && depto.isAtuacao) || depto.isGestor
 
           return (
             <MotionReveal key={depto.id} index={index}>
@@ -152,24 +152,12 @@ export async function DepartamentosSection() {
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
                     style={{ backgroundColor: depto.cor }}
                   >
-                    <Briefcase className="h-5 w-5" />
+                    <Icon className="h-5 w-5" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                        {depto.nome}
-                      </h2>
-                      <span
-                        className={[
-                          'rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                          kind === 'plugin'
-                            ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
-                            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                        ].join(' ')}
-                      >
-                        {kind === 'plugin' ? 'Plugin' : 'Compõe'}
-                      </span>
-                    </div>
+                    <h2 className="truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
+                      {depto.nome}
+                    </h2>
                     <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
                       {areaLabel}
                       {' · '}
@@ -179,50 +167,48 @@ export async function DepartamentosSection() {
                 </div>
 
                 <div className="mt-auto flex flex-col gap-2 pt-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={homeHref}
-                      className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      Abrir área
-                      <ArrowRight className="h-4 w-4 shrink-0" />
-                    </Link>
-                    {moduloHref && depto.isAtuacao && (
-                      <Link
-                        href={moduloHref}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                      >
-                        <LayoutGrid className="h-4 w-4 text-[rgb(var(--primary))]" />
-                        Módulo
-                      </Link>
-                    )}
-                    {depto.visaoDiretoria && (
-                      <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
-                        <Eye className="h-3.5 w-3.5" />
-                        Somente leitura da área
-                      </span>
-                    )}
-                  </div>
-                  {depto.isGestor && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`${homeHref}#gestao`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                      >
-                        <Settings2 className="h-4 w-4 text-[rgb(var(--primary))]" />
-                        Gestão
-                      </Link>
-                      {operacaoHref && (
-                        <Link
-                          href={operacaoHref}
-                          prefetch={false}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                        >
-                          <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
-                          Operação
-                        </Link>
-                      )}
-                    </div>
+                  <Link
+                    href={homeHref}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    Abrir área
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                  </Link>
+
+                  {temSecundarios && (
+                    <details className="group relative">
+                      <summary className="flex cursor-pointer list-none items-center justify-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] [&::-webkit-details-marker]:hidden">
+                        Mais
+                        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-1.5">
+                        {moduloHref && depto.isAtuacao && (
+                          <Link
+                            href={moduloHref}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                          >
+                            <LayoutGrid className="h-4 w-4 text-[rgb(var(--primary))]" />
+                            Abrir módulo
+                          </Link>
+                        )}
+                        {depto.isGestor && (
+                          <Link
+                            href={`${homeHref}#gestao`}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                          >
+                            <Settings2 className="h-4 w-4 text-[rgb(var(--primary))]" />
+                            Gestão da equipe
+                          </Link>
+                        )}
+                      </div>
+                    </details>
+                  )}
+
+                  {depto.visaoDiretoria && (
+                    <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+                      <Eye className="h-3.5 w-3.5" />
+                      Somente leitura da área
+                    </span>
                   )}
                 </div>
               </div>
