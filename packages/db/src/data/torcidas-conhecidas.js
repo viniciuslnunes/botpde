@@ -5996,7 +5996,7 @@ export const TORCIDAS_CONHECIDAS = [
     "cidade": "São Paulo",
     "uf": "SP",
     "estado": "São Paulo",
-    "logoUrl": "https://organizadasbrasil.com/imagens/simbolos/obr_gav.gif",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/pt/d/d6/Logogav.png",
     "fonteUrl": "https://organizadasbrasil.com/torcida/GAVIOES-DA-FIEL-TORCIDA-35.html"
   },
   {
