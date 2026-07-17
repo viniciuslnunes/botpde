@@ -63,20 +63,23 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
   const moduloHref = hrefModuloPortal(moduloKey)
   const areaLabel = rotuloAreaDepartamento(depto.slug, depto.moduloPortal)
   const Icon = iconeDepartamento(depto.slug)
+  // Demais áreas (visão Diretoria): só leitura — não herdar Gestor/Gestão via SA.
   const mostraModulo = Boolean(moduloHref) && depto.isAtuacao
-  const mostraGestao = depto.isGestor
-  const temSecundarios = mostraModulo || mostraGestao
+  const mostraGestao = depto.isGestor && !depto.visaoDiretoria
+  const papelBadge = depto.visaoDiretoria ? (
+    <Badge variant="neutral" icon={<Eye className="h-3 w-3" aria-hidden />}>
+      Só leitura
+    </Badge>
+  ) : depto.isGestor ? (
+    <Badge variant="primary">Gestor</Badge>
+  ) : (
+    <Badge variant="neutral">Membro</Badge>
+  )
 
   return (
     <MotionReveal index={index} className="h-full">
-      <div className="group relative flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 transition-[border-color,box-shadow] duration-150 hover:border-[rgb(var(--primary)_/_0.45)] hover:shadow-sm">
-        <Link
-          href={homeHref}
-          className="absolute inset-0 z-0 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--background))]"
-          aria-label={`Abrir área ${depto.nome}`}
-        />
-
-        <div className="relative z-10 flex items-start gap-3 pointer-events-none">
+      <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 transition-[border-color,box-shadow] duration-150 hover:border-[rgb(var(--primary)_/_0.45)] hover:shadow-sm">
+        <div className="flex items-start gap-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
             style={{ backgroundColor: depto.cor }}
@@ -84,52 +87,45 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
             <Icon className="h-5 w-5" aria-hidden />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-2">
-              <h2 className="truncate text-base font-semibold text-[rgb(var(--foreground))]">
+            <div className="flex items-center gap-2">
+              <h2 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
                 {depto.nome}
               </h2>
-              <ArrowRight
-                className="mt-1 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0.5 group-hover:opacity-100"
-                aria-hidden
-              />
+              <div className="shrink-0">{papelBadge}</div>
             </div>
             <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{areaLabel}</p>
-            <div className="mt-2">
-              {depto.isGestor ? (
-                <Badge variant="primary">Gestor</Badge>
-              ) : depto.visaoDiretoria ? (
-                <Badge variant="neutral" icon={<Eye className="h-3 w-3" aria-hidden />}>
-                  Só leitura
-                </Badge>
-              ) : (
-                <Badge variant="neutral">Membro</Badge>
-              )}
-            </div>
           </div>
         </div>
 
-        {temSecundarios && (
-          <div className="relative z-10 mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-[rgb(var(--border))] pt-3 pointer-events-auto">
-            {mostraModulo && moduloHref && (
-              <Link
-                href={moduloHref}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--primary))] transition-opacity hover:opacity-80 focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
-              >
-                <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {rotuloAtalhoModulo(depto.slug)}
-              </Link>
-            )}
-            {mostraGestao && (
-              <Link
-                href={`${homeHref}#gestao`}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
-              >
-                <Settings2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Gestão
-              </Link>
-            )}
-          </div>
-        )}
+        <div className="mt-auto flex flex-col gap-2 pt-4">
+          <Link
+            href={homeHref}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))]"
+          >
+            Abrir área
+            <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+          </Link>
+
+          {mostraModulo && moduloHref && (
+            <Link
+              href={moduloHref}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
+            >
+              <LayoutGrid className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" aria-hidden />
+              {rotuloAtalhoModulo(depto.slug)}
+            </Link>
+          )}
+
+          {mostraGestao && (
+            <Link
+              href={`${homeHref}#gestao`}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
+            >
+              <Settings2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Gestão
+            </Link>
+          )}
+        </div>
       </div>
     </MotionReveal>
   )
