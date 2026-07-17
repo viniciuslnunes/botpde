@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Loader2, Plus, RefreshCw, Trash2, X, Check } from 'lucide-react'
 import { emitirCarteirinha, renovarCarteirinha, revogarCarteirinha } from '@/app/admin/socios/actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 interface MembroElegivel {
@@ -159,6 +160,7 @@ export function SocioActions({ socioId }: SocioActionsProps) {
   const [renovando, setRenovando] = useState(false)
   const [pending, startTransition] = useTransition()
   const [novaValidade, setNovaValidade] = useState(getValidadePadrao)
+  const confirmAction = useConfirmAction()
 
   function handleRenovar() {
     startTransition(async () => {
@@ -169,12 +171,15 @@ export function SocioActions({ socioId }: SocioActionsProps) {
     })
   }
 
-  function handleRevogar() {
-    if (!confirm('Revogar esta carteirinha? Esta ação não pode ser desfeita.')) return
-    startTransition(async () => {
-      await runPersistAction(() => revogarCarteirinha(socioId), {
-        success: 'Carteirinha revogada.',
-      })
+  async function handleRevogar() {
+    await confirmAction({
+      titulo: 'Revogar esta carteirinha?',
+      descricao: 'Esta ação não pode ser desfeita.',
+      labelConfirmar: 'Revogar',
+      variante: 'destructive',
+      cancelled: 'Revogação cancelada.',
+      run: () => revogarCarteirinha(socioId),
+      success: 'Carteirinha revogada.',
     })
   }
 
@@ -223,7 +228,7 @@ export function SocioActions({ socioId }: SocioActionsProps) {
         Renovar
       </button>
       <button
-        onClick={handleRevogar}
+        onClick={() => void handleRevogar()}
         className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
         title="Revogar carteirinha"
       >

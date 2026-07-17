@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import {
   AppWindow,
@@ -17,6 +18,7 @@ import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { fadeScale, springSnappy } from '@/lib/motion-presets'
 
 type SalaAtivaClientProps = {
@@ -41,7 +43,7 @@ type SalaAtivaClientProps = {
   livekitUrl: string | null
   initialParticipantes: ParticipanteSala[]
   initialMensagens: SalaMensagem[]
-  encerrarSalaAction: () => void
+  encerrarSalaAction: () => Promise<void> | void
 }
 
 function callStateKey(
@@ -98,6 +100,8 @@ export function SalaAtivaClient({
   initialMensagens,
   encerrarSalaAction,
 }: SalaAtivaClientProps) {
+  const router = useRouter()
+  const confirmAction = useConfirmAction()
   const [onlineCount, setOnlineCount] = useState(initialParticipantes.length)
   const [inCall, setInCall] = useState(true)
   const [callKey, setCallKey] = useState(0)
@@ -240,16 +244,28 @@ export function SalaAtivaClient({
         </div>
 
         {isHost && !sala.encerradaEm && (
-          <form action={encerrarSalaAction}>
-            <m.button
-              whileTap={{ scale: 0.96 }}
-              transition={springSnappy}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
-            >
-              <Power className="h-4 w-4" />
-              Encerrar sala
-            </m.button>
-          </form>
+          <m.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            transition={springSnappy}
+            onClick={() => {
+              void confirmAction({
+                titulo: 'Encerrar esta sala?',
+                descricao: 'Participantes serão desconectados. A sala não pode ser reaberta.',
+                labelConfirmar: 'Encerrar',
+                variante: 'destructive',
+                cancelled: false,
+                run: () => Promise.resolve(encerrarSalaAction()),
+                success: 'Sala encerrada.',
+              }).then((ok) => {
+                if (ok) router.refresh()
+              })
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+          >
+            <Power className="h-4 w-4" />
+            Encerrar sala
+          </m.button>
         )}
       </div>
 

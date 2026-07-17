@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/app/admin/eventos/actions'
-import { Loader2, Trash2, CalendarPlus } from 'lucide-react'
+import { Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { TIPO_EVENTO_LABEL } from '@torcida/types'
 import { collapsePanel, springSnappy } from '@/lib/motion-presets'
-import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
+import { submitRedirectAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
@@ -290,27 +291,30 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
 
 /* ── Excluir ─────────────────────────────────────────────────────────────────── */
 export function ExcluirEventoButton({ eventoId }: { eventoId: string }) {
-  const [pending, startTransition] = useTransition()
   const router = useRouter()
+  const confirmAction = useConfirmAction()
 
   function handleExcluir() {
-    if (!confirm('Excluir este evento? Todos os RSVPs também serão removidos.')) return
-    startTransition(async () => {
-      await runPersistAction(() => excluirEvento(eventoId), {
-        success: 'Evento excluído.',
-      })
-      router.refresh()
+    void confirmAction({
+      titulo: 'Excluir este evento?',
+      descricao: 'Todos os RSVPs também serão removidos.',
+      labelConfirmar: 'Excluir',
+      variante: 'destructive',
+      cancelled: 'Exclusão cancelada.',
+      run: () => excluirEvento(eventoId),
+      success: 'Evento excluído.',
+    }).then((ok) => {
+      if (ok) router.refresh()
     })
   }
 
   return (
     <button
       onClick={handleExcluir}
-      disabled={pending}
       className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
     >
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-      {pending ? 'Excluindo...' : 'Excluir'}
+      <Trash2 className="h-3.5 w-3.5" />
+      Excluir
     </button>
   )
 }

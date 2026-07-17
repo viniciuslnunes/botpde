@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   CATEGORIA_PATRIMONIO_LABEL,
@@ -11,7 +11,7 @@ import {
   baixarPatrimonioItem,
   excluirPatrimonioItem,
 } from '@/app/admin/patrimonio/actions'
-import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import {
   PatrimonioItemForm,
@@ -185,20 +185,19 @@ export function PatrimonioItensLista({
 }
 
 function BaixarButton({ id, nome }: { id: string; nome: string }) {
-  const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
   return (
     <button
       type="button"
-      disabled={pending}
       title="Baixar do inventário"
       onClick={() => {
-        if (!window.confirm(`Baixar “${nome}” do inventário ativo? O item fica como Baixado.`)) {
-          return
-        }
-        startTransition(async () => {
-          await runPersistAction(() => baixarPatrimonioItem(id), {
-            success: 'Item baixado.',
-          })
+        void confirmAction({
+          titulo: `Baixar “${nome}” do inventário?`,
+          descricao: 'O item fica como Baixado e sai do inventário ativo.',
+          labelConfirmar: 'Baixar',
+          cancelled: 'Baixa cancelada.',
+          run: () => baixarPatrimonioItem(id),
+          success: 'Item baixado.',
         })
       }}
       className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-amber-950"
@@ -209,24 +208,20 @@ function BaixarButton({ id, nome }: { id: string; nome: string }) {
 }
 
 function ExcluirButton({ id, nome }: { id: string; nome: string }) {
-  const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
   return (
     <button
       type="button"
-      disabled={pending}
       title="Excluir permanentemente"
       onClick={() => {
-        if (
-          !window.confirm(
-            `Excluir permanentemente “${nome}”? Prefira Baixar se só quiser tirar do inventário ativo.`,
-          )
-        ) {
-          return
-        }
-        startTransition(async () => {
-          await runPersistAction(() => excluirPatrimonioItem(id), {
-            success: 'Item excluído.',
-          })
+        void confirmAction({
+          titulo: `Excluir permanentemente “${nome}”?`,
+          descricao: 'Prefira Baixar se só quiser tirar do inventário ativo.',
+          labelConfirmar: 'Excluir',
+          variante: 'destructive',
+          cancelled: 'Exclusão cancelada.',
+          run: () => excluirPatrimonioItem(id),
+          success: 'Item excluído.',
         })
       }}
       className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950"

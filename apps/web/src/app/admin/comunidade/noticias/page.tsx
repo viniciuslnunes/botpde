@@ -95,6 +95,13 @@ export default async function AdminNoticiasPage() {
                 <AdminActionForm
                   action={aprovarNoticia.bind(null, noticia.id)}
                   success="Notícia aprovada."
+                  confirm={{
+                    titulo: 'Aprovar esta notícia?',
+                    descricao: `“${noticia.titulo}” passa a aparecer na curadoria publicada.`,
+                    labelConfirmar: 'Aprovar',
+                    variante: 'success',
+                    cancelled: 'Aprovação cancelada.',
+                  }}
                 >
                   <button
                     type="submit"
@@ -106,6 +113,13 @@ export default async function AdminNoticiasPage() {
                 <AdminActionForm
                   action={rejeitarNoticia.bind(null, noticia.id)}
                   success="Notícia rejeitada."
+                  confirm={{
+                    titulo: 'Rejeitar esta notícia?',
+                    descricao: `“${noticia.titulo}” será marcada como rejeitada.`,
+                    labelConfirmar: 'Rejeitar',
+                    variante: 'destructive',
+                    cancelled: 'Rejeição cancelada.',
+                  }}
                 >
                   <button
                     type="submit"

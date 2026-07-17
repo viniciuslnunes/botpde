@@ -6,6 +6,7 @@ import { BarChart3, CheckCircle2, Loader2, Plus, X } from 'lucide-react'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { toast } from '@torcida/ui'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { collapsePanel, springGentle, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 type VotanteEnquete = {
@@ -40,6 +41,7 @@ function InicialAvatar({ nome }: { nome: string | null }) {
 }
 
 export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
+  const confirmAction = useConfirmAction()
   const [enquetes, setEnquetes] = useState<EnqueteSala[]>([])
   const [carregando, setCarregando] = useState(true)
   const [criando, setCriando] = useState(false)
@@ -113,13 +115,21 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
   }
 
   async function encerrar(enqueteId: string) {
-    const res = await fetch(`/api/salas/${salaId}/enquetes/${enqueteId}`, { method: 'PATCH' })
-    if (!res.ok) {
-      toast.error('Não foi possível encerrar a enquete.')
-      return
-    }
-    setEnquetes((prev) => prev.filter((e) => e.id !== enqueteId))
-    toast.success('Enquete encerrada.')
+    await confirmAction({
+      titulo: 'Encerrar esta enquete?',
+      descricao: 'Ninguém mais poderá votar.',
+      labelConfirmar: 'Encerrar',
+      variante: 'destructive',
+      cancelled: false,
+      run: async () => {
+        const res = await fetch(`/api/salas/${salaId}/enquetes/${enqueteId}`, {
+          method: 'PATCH',
+        })
+        if (!res.ok) throw new Error('Não foi possível encerrar a enquete.')
+        setEnquetes((prev) => prev.filter((e) => e.id !== enqueteId))
+      },
+      success: 'Enquete encerrada.',
+    })
   }
 
   return (

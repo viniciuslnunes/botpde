@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { linkPostComunidade } from '@/lib/comunidade-social'
-import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 
 export interface DenunciaPostItem {
   id: string
@@ -51,40 +51,58 @@ export function ModeracaoDenunciasClient({
 }: ModeracaoDenunciasClientProps) {
   const [posts, setPosts] = useState(postsIniciais)
   const [mensagens, setMensagens] = useState(mensagensIniciais)
-  const [, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   function resolverPost(id: string) {
-    startTransition(async () => {
-      const ok = await runPersistAction(() => onResolverPost(id), {
-        success: 'Denúncia resolvida. Post ocultado.',
-      })
+    void confirmAction({
+      titulo: 'Resolver e ocultar o post?',
+      descricao: 'O post deixa de aparecer no feed. A denúncia é marcada como resolvida.',
+      labelConfirmar: 'Ocultar post',
+      variante: 'destructive',
+      cancelled: false,
+      run: () => onResolverPost(id),
+      success: 'Denúncia resolvida. Post ocultado.',
+    }).then((ok) => {
       if (ok) setPosts((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function descartarPost(id: string) {
-    startTransition(async () => {
-      const ok = await runPersistAction(() => onDescartarPost(id), {
-        success: 'Denúncia de post descartada.',
-      })
+    void confirmAction({
+      titulo: 'Descartar esta denúncia?',
+      descricao: 'O post permanece visível. A denúncia sai da fila.',
+      labelConfirmar: 'Descartar',
+      cancelled: false,
+      run: () => onDescartarPost(id),
+      success: 'Denúncia de post descartada.',
+    }).then((ok) => {
       if (ok) setPosts((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function resolverMensagem(id: string) {
-    startTransition(async () => {
-      const ok = await runPersistAction(() => onResolverMensagem(id), {
-        success: 'Denúncia resolvida. Mensagem tratada.',
-      })
+    void confirmAction({
+      titulo: 'Resolver denúncia de mensagem?',
+      descricao: 'A mensagem será tratada conforme a moderação.',
+      labelConfirmar: 'Resolver',
+      variante: 'destructive',
+      cancelled: false,
+      run: () => onResolverMensagem(id),
+      success: 'Denúncia resolvida. Mensagem tratada.',
+    }).then((ok) => {
       if (ok) setMensagens((prev) => prev.filter((d) => d.id !== id))
     })
   }
 
   function descartarMensagem(id: string) {
-    startTransition(async () => {
-      const ok = await runPersistAction(() => onDescartarMensagem(id), {
-        success: 'Denúncia de mensagem descartada.',
-      })
+    void confirmAction({
+      titulo: 'Descartar esta denúncia?',
+      descricao: 'A mensagem permanece. A denúncia sai da fila.',
+      labelConfirmar: 'Descartar',
+      cancelled: false,
+      run: () => onDescartarMensagem(id),
+      success: 'Denúncia de mensagem descartada.',
+    }).then((ok) => {
       if (ok) setMensagens((prev) => prev.filter((d) => d.id !== id))
     })
   }

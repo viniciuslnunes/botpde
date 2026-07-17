@@ -26,6 +26,7 @@ import {
 } from '@/app/admin/configuracoes/actions'
 import { toast } from '@torcida/ui'
 import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction, useConfirmDialog } from '@/lib/confirm-action'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import {
   useTrackedForm,
@@ -294,6 +295,7 @@ export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManag
   const [busca, setBusca] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   // Busca por nome do cargo OU por permissão que ele concede (como na referência:
   // procurar "aprovar" encontra os perfis que têm essa permissão)
@@ -385,8 +387,26 @@ export function RolesManager({ roles, departamentos = [], tipoSede }: RolesManag
                 setEditandoId(role.id)
               }}
               onDelete={() => {
-                if (!confirm(`Excluir o cargo "${role.nome}"?`)) return
-                executar(() => excluirRole(role.id), 'Cargo excluído.')
+                void confirmAction({
+                  titulo: `Excluir o cargo "${role.nome}"?`,
+                  descricao:
+                    'Esta ação remove o cargo. Usuários vinculados precisarão de outro perfil.',
+                  labelConfirmar: 'Excluir',
+                  variante: 'destructive',
+                  cancelled: 'Exclusão cancelada.',
+                  run: async () => {
+                    setErro(null)
+                    try {
+                      await excluirRole(role.id)
+                    } catch (e) {
+                      const message =
+                        e instanceof Error ? e.message : 'Erro ao salvar o cargo'
+                      setErro(message)
+                      throw e
+                    }
+                  },
+                  success: 'Cargo excluído.',
+                })
               }}
               pending={pending}
             />
@@ -571,6 +591,7 @@ function RoleForm({
   const [departamentoId, setDepartamentoId] = useState<string>(initialDepartamentoId ?? '')
   const [papel, setPapel] = useState<string>(initialPapel ?? PAPEL_DEPARTAMENTO.MEMBRO)
   const { confirmDiscard } = useUnsavedChangesContext()
+  const confirmDialog = useConfirmDialog()
 
   const isEdit = initialNome !== ''
   const initial = new Set(initialPermissions)
@@ -636,18 +657,31 @@ function RoleForm({
     }
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!departamentoId && selected.size === 0) return
 
     if (isEdit && (added.length > 0 || removed.length > 0)) {
       const linhas = [
-        ...added.map((p) => `  + ${permissionLabel(p)}`),
-        ...removed.map((p) => `  − ${permissionLabel(p)}`),
+        ...added.map((p) => `+ ${permissionLabel(p)}`),
+        ...removed.map((p) => `− ${permissionLabel(p)}`),
       ]
-      if (!confirm(`Salvar as alterações do cargo "${initialNome}"?\n\n${linhas.join('\n')}`)) return
+      const ok = await confirmDialog({
+        titulo: `Salvar alterações do cargo "${initialNome}"?`,
+        descricao: linhas.join('\n'),
+        labelConfirmar: 'Salvar',
+        cancelled: 'Salvamento cancelado.',
+      })
+      if (!ok) return
     } else if (!isEdit) {
-      if (!confirm('Criar o novo cargo com as permissões selecionadas?')) return
+      const ok = await confirmDialog({
+        titulo: 'Criar o novo cargo?',
+        descricao: 'O cargo será criado com as permissões selecionadas.',
+        labelConfirmar: 'Criar',
+        variante: 'success',
+        cancelled: 'Criação cancelada.',
+      })
+      if (!ok) return
     }
 
     const fd = new FormData(e.currentTarget)
@@ -920,6 +954,7 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
   const [criando, setCriando] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   return (
     <div className="space-y-3">
@@ -951,11 +986,14 @@ export function DepartamentosManager({ departamentos }: DepartamentosManagerProp
               departamento={departamento}
               onEdit={() => setEditandoId(departamento.id)}
               onDelete={() => {
-                if (!confirm(`Excluir o departamento "${departamento.nome}"?`)) return
-                startTransition(async () => {
-                  await runPersistAction(() => excluirDepartamento(departamento.id), {
-                    success: 'Departamento excluído.',
-                  })
+                void confirmAction({
+                  titulo: `Excluir o departamento "${departamento.nome}"?`,
+                  descricao: 'Áreas e vínculos associados podem ser afetados.',
+                  labelConfirmar: 'Excluir',
+                  variante: 'destructive',
+                  cancelled: 'Exclusão cancelada.',
+                  run: () => excluirDepartamento(departamento.id),
+                  success: 'Departamento excluído.',
                 })
               }}
               pending={pending}

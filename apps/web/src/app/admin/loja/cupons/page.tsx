@@ -74,10 +74,22 @@ export default async function AdminCuponsPage() {
             <AdminActionForm
               action={toggleCupomForm}
               success={c.ativo ? 'Cupom desativado.' : 'Cupom ativado.'}
+              confirm={
+                c.ativo
+                  ? {
+                      titulo: `Desativar o cupom “${c.codigo}”?`,
+                      descricao: 'Ele deixa de valer no checkout até ser reativado.',
+                      labelConfirmar: 'Desativar',
+                      cancelled: 'Desativação cancelada.',
+                    }
+                  : undefined
+              }
             >
               <input type="hidden" name="id" value={c.id} />
               <input type="hidden" name="ativo" value={String(!c.ativo)} />
-              <button type="submit" className="text-xs font-medium">{c.ativo ? 'Desativar' : 'Ativar'}</button>
+              <button type="submit" className="text-xs font-medium">
+                {c.ativo ? 'Desativar' : 'Ativar'}
+              </button>
             </AdminActionForm>
           </li>
         ))}

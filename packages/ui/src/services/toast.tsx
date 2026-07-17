@@ -206,8 +206,9 @@ export const toast = {
     }),
 
   /**
-   * Confirmação não bloqueante: fica até o usuário decidir (duration Infinity).
-   * Útil para “Tem certeza?” sem `window.confirm`.
+   * Confirmação não bloqueante via toast (duration Infinity).
+   * Para ações administrativas / departamentos, preferir `useConfirmDialog`
+   * / `useConfirmAction` (modal + toast de resultado).
    */
   confirm: (
     message: string | React.ReactNode,

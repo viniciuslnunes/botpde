@@ -8,7 +8,13 @@ export {
   type ToastPromiseMessages,
   type ToastActionConfig,
 } from './services/toast'
-export { DialogProvider, useDialog } from './services/dialog'
+export {
+  DialogProvider,
+  useDialog,
+  type ConfirmOptions,
+  type ConfirmVariant,
+  type ConfirmDismissReason,
+} from './services/dialog'
 export { PermissionProvider, usePermission, PermissionGate } from './services/permission'
 export { useUpload } from './services/upload'
 export { useRealtime } from './services/realtime'

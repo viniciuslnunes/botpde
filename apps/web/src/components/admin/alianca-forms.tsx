@@ -29,6 +29,7 @@ import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { toast } from '@torcida/ui'
+import { useConfirmAction } from '@/lib/confirm-action'
 
 interface TenantOption {
   id: string
@@ -177,6 +178,7 @@ export function AliancaForms({
   const [sucesso, setSucesso] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null)
+  const confirmAction = useConfirmAction()
 
   const blockedTenantIds = useMemo(() => {
     const ids = new Set<string>()
@@ -274,12 +276,21 @@ export function AliancaForms({
     confirmLabel: string,
     action: () => Promise<void>,
     successMessage: string,
+    variante: 'default' | 'destructive' | 'success' = 'default',
   ): void {
-    toast.confirm(message, {
-      description,
-      confirmLabel,
-      cancelLabel: 'Voltar',
-      onConfirm: () => runAction(action, successMessage),
+    void confirmAction({
+      titulo: message,
+      descricao: description,
+      labelConfirmar: confirmLabel,
+      labelCancelar: 'Voltar',
+      variante,
+      cancelled: 'Ação cancelada.',
+      run: async () => {
+        setErro(null)
+        await action()
+        setSucesso(successMessage)
+      },
+      success: successMessage,
     })
   }
 
@@ -337,7 +348,16 @@ export function AliancaForms({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => runAction(() => aceitarAlianca(item.id), 'Aliança aceita com sucesso')}
+              onClick={() =>
+                confirmAndRun(
+                  `Aceitar aliança com ${counterpart.nome}?`,
+                  'A relação allied passa a valer para visibilidade entre as torcidas.',
+                  'Aceitar',
+                  () => aceitarAlianca(item.id),
+                  'Aliança aceita com sucesso',
+                  'success',
+                )
+              }
               disabled={pending}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
@@ -353,6 +373,7 @@ export function AliancaForms({
                   'Rejeitar',
                   () => rejeitarAlianca(item.id),
                   'Proposta rejeitada',
+                  'destructive',
                 )
               }
               disabled={pending}
@@ -375,6 +396,7 @@ export function AliancaForms({
                   'Cancelar proposta',
                   () => cancelarProposta(item.id),
                   'Proposta cancelada',
+                  'destructive',
                 )
               }
               disabled={pending}
@@ -396,6 +418,7 @@ export function AliancaForms({
                   'Encerrar',
                   () => encerrarAlianca(item.id),
                   'Aliança encerrada',
+                  'destructive',
                 )
               }
               disabled={pending}

@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Loader2, MessageSquare, Pin, Send, Trash2, Pencil } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { formatDateTimeShort } from '@/lib/format-datetime'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Avatar } from '@/components/portal/avatar'
 import { collapsePanel, fadeUp, springSnappy } from '@/lib/motion-presets'
@@ -61,6 +62,7 @@ export function SalaChat({
   listClassName = 'max-h-80 space-y-3 overflow-y-auto pr-1',
   glass = false,
 }: SalaChatProps) {
+  const confirmAction = useConfirmAction()
   const [mensagens, setMensagens] = useState<SalaMensagem[]>(() => ordenarMensagens(initialMensagens))
   const [conteudo, setConteudo] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -229,13 +231,21 @@ export function SalaChat({
     if (isMensagemTemporaria(mensagemId)) return
 
     if (remover) {
-      const res = await fetch(`/api/salas/${salaId}/mensagens/${mensagemId}`, { method: 'DELETE' })
-      if (!res.ok) {
-        toast.error('Não foi possível excluir a mensagem.')
-        return
-      }
-      setMensagens((prev) => prev.filter((msg) => msg.id !== mensagemId))
-      toast.success('Mensagem removida.')
+      await confirmAction({
+        titulo: 'Excluir esta mensagem?',
+        descricao: 'A mensagem some do chat da sala.',
+        labelConfirmar: 'Excluir',
+        variante: 'destructive',
+        cancelled: false,
+        run: async () => {
+          const res = await fetch(`/api/salas/${salaId}/mensagens/${mensagemId}`, {
+            method: 'DELETE',
+          })
+          if (!res.ok) throw new Error('Não foi possível excluir a mensagem.')
+          setMensagens((prev) => prev.filter((msg) => msg.id !== mensagemId))
+        },
+        success: 'Mensagem removida.',
+      })
       return
     }
 

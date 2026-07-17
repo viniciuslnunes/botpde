@@ -23,6 +23,7 @@ import { atualizarRole, excluirRole } from '@/app/admin/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { AccessPermissionWorktree, type PermissaoOrigem } from '@/components/admin/access-permission-worktree'
 import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmDialog } from '@/lib/confirm-action'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 
@@ -919,13 +920,13 @@ function PerfilManagePanel({
     return new Set(role.permissions)
   })
   const [pending, setPending] = useState(false)
-  const [confirmExcluir, setConfirmExcluir] = useState(false)
   const selecionadas = useMemo(() => new Set([...pacote, ...extras]), [pacote, extras])
   const deptoNome = role.departamentoId
     ? departamentos.find((d) => d.id === role.departamentoId)?.nome
     : null
   const somenteLeitura = role.isSystem
   const { confirmDiscard } = useUnsavedChangesContext()
+  const confirmDialog = useConfirmDialog()
 
   const initialExtrasKey = useMemo(() => {
     if (role.departamentoId) {
@@ -976,6 +977,14 @@ function PerfilManagePanel({
 
   async function excluir() {
     if (somenteLeitura) return
+    const ok = await confirmDialog({
+      titulo: `Excluir o perfil “${nome.trim() || role.nome}”?`,
+      descricao: 'Esta ação remove o cargo. Pessoas vinculadas precisarão de outro perfil.',
+      labelConfirmar: 'Excluir',
+      variante: 'destructive',
+      cancelled: 'Exclusão cancelada.',
+    })
+    if (!ok) return
     setPending(true)
     try {
       await onDelete()
@@ -1121,39 +1130,15 @@ function PerfilManagePanel({
 
       {!somenteLeitura && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
-          <div>
-            {confirmExcluir ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-[rgb(var(--foreground-muted))]">Excluir de vez?</span>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => void excluir()}
-                  className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Confirmar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmExcluir(false)}
-                  className="text-xs text-[rgb(var(--foreground-muted))]"
-                >
-                  Cancelar
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setConfirmExcluir(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/5 disabled:opacity-60"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Excluir perfil
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => void excluir()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/5 disabled:opacity-60"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir perfil
+          </button>
           <button
             type="button"
             disabled={pending || nome.trim().length < 2}

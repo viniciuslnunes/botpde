@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Loader2, Square } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { votarEnquetePost, encerrarEnquetePost } from '@/app/portal/comunidade/actions'
+import { useConfirmAction } from '@/lib/confirm-action'
 import type { EnquetePostItem } from '@/lib/feed'
 import { springGentle, springSnappy } from '@/lib/motion-presets'
 
@@ -16,6 +17,7 @@ interface PostPollProps {
 export function PostPoll({ enquete: enqueteInicial, isAuthor = false }: PostPollProps) {
   const [enquete, setEnquete] = useState(enqueteInicial)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   const mostrarResultados = enquete.encerrada || enquete.meuVotoOpcaoId !== null
 
@@ -43,15 +45,17 @@ export function PostPoll({ enquete: enqueteInicial, isAuthor = false }: PostPoll
   }
 
   function encerrar() {
-    if (!confirm('Encerrar esta enquete? Ninguém mais poderá votar.')) return
-    startTransition(async () => {
-      try {
+    void confirmAction({
+      titulo: 'Encerrar esta enquete?',
+      descricao: 'Ninguém mais poderá votar.',
+      labelConfirmar: 'Encerrar',
+      variante: 'destructive',
+      cancelled: false,
+      run: async () => {
         await encerrarEnquetePost(enquete.id)
         setEnquete((prev) => ({ ...prev, encerrada: true }))
-        toast.success('Enquete encerrada.')
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Não foi possível encerrar.')
-      }
+      },
+      success: 'Enquete encerrada.',
     })
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   CATEGORIA_FINANCEIRO_LABEL,
@@ -8,7 +8,7 @@ import {
   TIPO_FINANCEIRO_LABEL,
 } from '@torcida/types'
 import { excluirLancamentoFinanceiro } from '@/app/admin/financeiro/actions'
-import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { FinanceiroLancamentoForm } from '@/components/financeiro/financeiro-lancamento-form'
 import { Pencil, Trash2, Wallet } from 'lucide-react'
@@ -188,24 +188,20 @@ export function FinanceiroLancamentosLista({
 }
 
 function ExcluirButton({ id, descricao }: { id: string; descricao: string }) {
-  const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
   return (
     <button
       type="button"
-      disabled={pending}
       title="Excluir lançamento"
       onClick={() => {
-        if (
-          !window.confirm(
-            `Excluir permanentemente o lançamento “${descricao}”? Esta ação não pode ser desfeita.`,
-          )
-        ) {
-          return
-        }
-        startTransition(async () => {
-          await runPersistAction(() => excluirLancamentoFinanceiro(id), {
-            success: 'Lançamento excluído.',
-          })
+        void confirmAction({
+          titulo: `Excluir o lançamento “${descricao}”?`,
+          descricao: 'Exclusão permanente. Esta ação não pode ser desfeita.',
+          labelConfirmar: 'Excluir',
+          variante: 'destructive',
+          cancelled: 'Exclusão cancelada.',
+          run: () => excluirLancamentoFinanceiro(id),
+          success: 'Lançamento excluído.',
         })
       }}
       className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950"

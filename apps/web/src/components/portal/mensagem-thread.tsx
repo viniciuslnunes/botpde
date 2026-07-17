@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
   tituloConversa,
@@ -106,6 +107,7 @@ export function MensagemThread({
   active = true,
   onMensagemEnviada,
 }: MensagemThreadProps) {
+  const confirmAction = useConfirmAction()
   const [mensagens, setMensagens] = useState<MensagemDto[]>([])
   const [carregando, setCarregando] = useState(true)
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
@@ -533,18 +535,25 @@ export function MensagemThread({
   }
 
   async function removerMensagem(mensagemId: string) {
-    const res = await fetch(`/api/conversas/${conversaId}/mensagens/${mensagemId}`, {
-      method: 'DELETE',
+    await confirmAction({
+      titulo: 'Remover esta mensagem?',
+      descricao: 'A mensagem deixa de aparecer para os participantes.',
+      labelConfirmar: 'Remover',
+      variante: 'destructive',
+      cancelled: false,
+      run: async () => {
+        const res = await fetch(`/api/conversas/${conversaId}/mensagens/${mensagemId}`, {
+          method: 'DELETE',
+        })
+        if (!res.ok) throw new Error('Não foi possível remover a mensagem.')
+        setMensagens((prev) =>
+          prev.map((m) =>
+            m.id === mensagemId ? { ...m, removida: true, conteudo: '', midiaUrls: [] } : m,
+          ),
+        )
+      },
+      success: 'Mensagem removida.',
     })
-    if (!res.ok) {
-      toast.error('Não foi possível remover a mensagem.')
-      return
-    }
-    setMensagens((prev) =>
-      prev.map((m) =>
-        m.id === mensagemId ? { ...m, removida: true, conteudo: '', midiaUrls: [] } : m,
-      ),
-    )
   }
 
   async function denunciar(mensagemId: string) {
@@ -1112,6 +1121,7 @@ function PainelMembros({
   isAdmin: boolean
   onSaiu: () => void
 }) {
+  const confirmAction = useConfirmAction()
   const [membros, setMembros] = useState<MembroConversaDto[]>([])
   const [busca, setBusca] = useState('')
   const [resultados, setResultados] = useState<ContatoDto[]>([])
@@ -1165,37 +1175,51 @@ function PainelMembros({
 
   async function remover(userId: string) {
     const sair = userId === currentUserId
-    const res = await fetch(`/api/conversas/${conversaId}/membros`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sair ? {} : { userId }),
+    const ok = await confirmAction({
+      titulo: sair ? 'Sair deste grupo?' : 'Remover este membro?',
+      descricao: sair
+        ? 'Você deixa de participar desta conversa.'
+        : 'A pessoa sai do grupo e perde o acesso ao chat.',
+      labelConfirmar: sair ? 'Sair' : 'Remover',
+      variante: 'destructive',
+      cancelled: false,
+      run: async () => {
+        const res = await fetch(`/api/conversas/${conversaId}/membros`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sair ? {} : { userId }),
+        })
+        const data = (await res.json()) as { error?: string }
+        if (!res.ok) throw new Error(data.error ?? 'Erro ao remover.')
+        if (sair) {
+          onSaiu()
+          return
+        }
+        setVersaoMembros((v) => v + 1)
+      },
+      success: sair ? 'Você saiu do grupo.' : 'Membro removido.',
     })
-    const data = (await res.json()) as { error?: string }
-    if (!res.ok) {
-      toast.error(data.error ?? 'Erro ao remover.')
-      return
-    }
-    if (sair) {
-      onSaiu()
-      return
-    }
-    setVersaoMembros((v) => v + 1)
+    void ok
   }
 
   async function transferirAdmin(userId: string) {
-    if (!window.confirm('Transferir a administração do grupo para este membro?')) return
-    const res = await fetch(`/api/conversas/${conversaId}/membros`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+    await confirmAction({
+      titulo: 'Transferir a administração?',
+      descricao: 'Este membro passa a ser o admin do grupo.',
+      labelConfirmar: 'Transferir',
+      cancelled: false,
+      run: async () => {
+        const res = await fetch(`/api/conversas/${conversaId}/membros`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        })
+        const data = (await res.json()) as { error?: string }
+        if (!res.ok) throw new Error(data.error ?? 'Erro ao transferir.')
+        setVersaoMembros((v) => v + 1)
+      },
+      success: 'Administração transferida.',
     })
-    const data = (await res.json()) as { error?: string }
-    if (!res.ok) {
-      toast.error(data.error ?? 'Erro ao transferir.')
-      return
-    }
-    toast.success('Administração transferida.')
-    setVersaoMembros((v) => v + 1)
   }
 
   const jaNoGrupo = new Set(membros.map((m) => m.userId))

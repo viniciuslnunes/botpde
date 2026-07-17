@@ -53,9 +53,24 @@ export default async function AdminCategoriasPage() {
               <p className="font-medium">{c.nome}</p>
               <p className="text-xs text-[rgb(var(--foreground-muted))]">{c._count.produtos} produtos · ordem {c.ordem}</p>
             </div>
-            <AdminActionForm action={excluirCategoriaForm} success="Categoria excluída.">
+            <AdminActionForm
+              action={excluirCategoriaForm}
+              success="Categoria excluída."
+              confirm={{
+                titulo: `Excluir a categoria “${c.nome}”?`,
+                descricao:
+                  c._count.produtos > 0
+                    ? `Há ${c._count.produtos} produto(s) nesta categoria.`
+                    : 'A categoria será removida do catálogo.',
+                labelConfirmar: 'Excluir',
+                variante: 'destructive',
+                cancelled: 'Exclusão cancelada.',
+              }}
+            >
               <input type="hidden" name="id" value={c.id} />
-              <button type="submit" className="text-xs text-red-600 hover:underline">Excluir</button>
+              <button type="submit" className="text-xs text-red-600 hover:underline">
+                Excluir
+              </button>
             </AdminActionForm>
           </li>
         ))}

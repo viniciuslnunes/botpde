@@ -11,6 +11,7 @@ import {
 import { Pin, PinOff, Pencil, Trash2, MessageSquarePlus, X } from 'lucide-react'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
@@ -155,6 +156,7 @@ function formatarData(data: Date | string) {
 export function PostsManager({ posts }: { posts: Post[] }) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   const fixados = posts.filter((p) => p.fixado)
   const outros = posts.filter((p) => !p.fixado)
@@ -237,11 +239,14 @@ export function PostsManager({ posts }: { posts: Post[] }) {
                 </button>
                 <button
                   onClick={() => {
-                    if (!confirm('Excluir este post?')) return
-                    startTransition(async () => {
-                      await runPersistAction(() => excluirPost(post.id), {
-                        success: 'Post excluído.',
-                      })
+                    void confirmAction({
+                      titulo: 'Excluir este post?',
+                      descricao: 'O post será removido permanentemente.',
+                      labelConfirmar: 'Excluir',
+                      variante: 'destructive',
+                      cancelled: 'Exclusão cancelada.',
+                      run: () => excluirPost(post.id),
+                      success: 'Post excluído.',
                     })
                   }}
                   disabled={pending}

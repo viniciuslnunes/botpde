@@ -1,9 +1,8 @@
 'use client'
 
-import { useTransition } from 'react'
-import { Check, X, RotateCcw, Loader2 } from 'lucide-react'
+import { Check, X, RotateCcw } from 'lucide-react'
 import { aprovarMembro, reprovarMembro, reverterMembro } from '@/app/admin/membros/actions'
-import { runPersistAction } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 
 interface MemberActionsProps {
   membroId: string
@@ -11,52 +10,55 @@ interface MemberActionsProps {
 }
 
 export function MemberActions({ membroId, status }: MemberActionsProps) {
-  const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
-  function handleAprovar() {
-    startTransition(async () => {
-      await runPersistAction(() => aprovarMembro(membroId), {
-        success: 'Membro aprovado.',
-      })
+  async function handleAprovar() {
+    await confirmAction({
+      titulo: 'Aprovar este membro?',
+      descricao: 'A pessoa passa a ter acesso conforme o status de sócio/torcedor aprovado.',
+      labelConfirmar: 'Aprovar',
+      variante: 'success',
+      cancelled: 'Aprovação cancelada.',
+      run: () => aprovarMembro(membroId),
+      success: 'Membro aprovado.',
     })
   }
 
-  function handleReprovar() {
-    startTransition(async () => {
-      await runPersistAction(() => reprovarMembro(membroId), {
-        success: 'Membro reprovado.',
-      })
+  async function handleReprovar() {
+    await confirmAction({
+      titulo: 'Reprovar este membro?',
+      descricao: 'A solicitação será marcada como reprovada.',
+      labelConfirmar: 'Reprovar',
+      variante: 'destructive',
+      cancelled: 'Reprovação cancelada.',
+      run: () => reprovarMembro(membroId),
+      success: 'Membro reprovado.',
     })
   }
 
-  function handleReverter() {
-    startTransition(async () => {
-      await runPersistAction(() => reverterMembro(membroId), {
-        success: 'Membro movido para pendente.',
-      })
+  async function handleReverter() {
+    await confirmAction({
+      titulo: 'Reverter para pendente?',
+      descricao: 'O membro volta à fila de solicitação.',
+      labelConfirmar: 'Reverter',
+      cancelled: 'Reversão cancelada.',
+      run: () => reverterMembro(membroId),
+      success: 'Membro movido para pendente.',
     })
-  }
-
-  if (pending) {
-    return (
-      <div className="flex items-center justify-end">
-        <Loader2 className="h-4 w-4 animate-spin text-[rgb(var(--foreground-muted))]" />
-      </div>
-    )
   }
 
   if (status === 'PENDENTE') {
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
-          onClick={handleAprovar}
+          onClick={() => void handleAprovar()}
           className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
         >
           <Check className="h-3 w-3" />
           Aprovar
         </button>
         <button
-          onClick={handleReprovar}
+          onClick={() => void handleReprovar()}
           className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
         >
           <X className="h-3 w-3" />
@@ -69,7 +71,7 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <button
-        onClick={handleReverter}
+        onClick={() => void handleReverter()}
         className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
         title="Mover de volta para pendente"
       >
@@ -78,7 +80,7 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
       </button>
       {status === 'REPROVADO' && (
         <button
-          onClick={handleAprovar}
+          onClick={() => void handleAprovar()}
           className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
         >
           <Check className="h-3 w-3" />

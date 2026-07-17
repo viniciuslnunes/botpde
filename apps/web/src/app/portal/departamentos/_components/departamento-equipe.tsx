@@ -9,6 +9,7 @@ import {
   type ActionState,
 } from '@/app/portal/departamentos/actions'
 import { useActionStateToast } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 
 export type MembroEquipe = {
   userId: string
@@ -204,29 +205,34 @@ function RemoverMembroButton({
   targetUserId: string
   label: string
 }) {
-  const [state, action, pending] = useActionState(removerMembroArea, {} as ActionState)
-  useActionStateToast(state, pending, `${label} removido da área`)
+  const confirmAction = useConfirmAction()
 
   return (
-    <form
-      action={(fd) => {
-        if (!window.confirm(`Remover ${label} desta área?`)) return
-        action(fd)
+    <button
+      type="button"
+      onClick={() => {
+        void confirmAction({
+          titulo: `Remover ${label} desta área?`,
+          descricao: 'A pessoa sai da equipe. Pode ser incluída de novo depois.',
+          labelConfirmar: 'Remover',
+          variante: 'destructive',
+          cancelled: 'Remoção cancelada.',
+          run: async () => {
+            const fd = new FormData()
+            fd.set('departamentoId', departamentoId)
+            fd.set('slug', slug)
+            fd.set('targetUserId', targetUserId)
+            return removerMembroArea({}, fd)
+          },
+          success: `${label} removido da área`,
+        })
       }}
+      className="app-action inline-flex min-h-9 min-w-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+      title={`Remover ${label}`}
+      aria-label={`Remover ${label}`}
     >
-      <input type="hidden" name="departamentoId" value={departamentoId} />
-      <input type="hidden" name="slug" value={slug} />
-      <input type="hidden" name="targetUserId" value={targetUserId} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="app-action inline-flex min-h-9 min-w-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
-        title={`Remover ${label}`}
-        aria-label={`Remover ${label}`}
-      >
-        <UserMinus className="h-4 w-4" />
-      </button>
-    </form>
+      <UserMinus className="h-4 w-4" />
+    </button>
   )
 }
 

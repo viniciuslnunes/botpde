@@ -11,6 +11,7 @@ import {
 import { Pin, PinOff, Pencil, Trash2, Megaphone, X } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton, Badge } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
 type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
@@ -165,6 +166,7 @@ function formatarData(data: Date | string) {
 export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] }) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   const fixados = comunicados.filter((c) => c.fixado)
   const outros = comunicados.filter((c) => !c.fixado)
@@ -245,11 +247,14 @@ export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] 
                 </button>
                 <button
                   onClick={() => {
-                    if (!confirm('Excluir este comunicado?')) return
-                    startTransition(async () => {
-                      await runPersistAction(() => excluirComunicado(comunicado.id), {
-                        success: 'Comunicado excluído.',
-                      })
+                    void confirmAction({
+                      titulo: 'Excluir este comunicado?',
+                      descricao: 'O comunicado será removido permanentemente.',
+                      labelConfirmar: 'Excluir',
+                      variante: 'destructive',
+                      cancelled: 'Exclusão cancelada.',
+                      run: () => excluirComunicado(comunicado.id),
+                      success: 'Comunicado excluído.',
                     })
                   }}
                   disabled={pending}

@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { editarPost, excluirPost, fixarPostPerfil } from '@/app/portal/comunidade/actions'
+import { useConfirmAction } from '@/lib/confirm-action'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 
 interface FeedPostMenuProps {
@@ -19,6 +20,7 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
   const [texto, setTexto] = useState(conteudoInicial)
   const [pinned, setPinned] = useState(fixado)
   const [pending, startTransition] = useTransition()
+  const confirmAction = useConfirmAction()
 
   if (editando) {
     return (
@@ -157,14 +159,14 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
                 disabled={pending}
                 onClick={() => {
                   setOpen(false)
-                  if (!confirm('Excluir este post?')) return
-                  startTransition(async () => {
-                    try {
-                      await excluirPost(postId)
-                      toast.success('Post excluído.')
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : 'Não foi possível excluir.')
-                    }
+                  void confirmAction({
+                    titulo: 'Excluir este post?',
+                    descricao: 'O post será removido permanentemente.',
+                    labelConfirmar: 'Excluir',
+                    variante: 'destructive',
+                    cancelled: false,
+                    run: () => excluirPost(postId),
+                    success: 'Post excluído.',
                   })
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-[rgb(var(--background-subtle))]"
