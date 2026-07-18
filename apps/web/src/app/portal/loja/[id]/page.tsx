@@ -61,37 +61,28 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
   if (!produto) notFound()
 
-  if (produto.tenantId !== tenant.id) {
+  // Visibilidade cross-tenant e produtos relacionados só dependem de `produto`
+  // → resolvidos em paralelo em vez de em série.
+  const [visivel, relacionados] = await Promise.all([
+    produto.tenantId !== tenant.id
+      ? resolveVisibility(tenant.id, produto.tenantId, 'loja')
+      : Promise.resolve(true),
+    produto.categoriaId
+      ? db.saasProduto.findMany({
+          where: { categoriaId: produto.categoriaId, ativo: true, id: { not: produto.id } },
+          take: 4,
+          orderBy: { criadoEm: 'desc' },
+        })
+      : Promise.resolve([]),
+  ])
 
-    const visivel = await resolveVisibility(tenant.id, produto.tenantId, 'loja')
-
-    if (!visivel) notFound()
-
-  }
-
-
+  if (!visivel) notFound()
 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
 
   const off = percentualDesconto(produto.precoOriginal, produto.preco)
 
   const emPromo = off > 0
-
-
-
-  const relacionados = produto.categoriaId
-
-    ? await db.saasProduto.findMany({
-
-        where: { categoriaId: produto.categoriaId, ativo: true, id: { not: produto.id } },
-
-        take: 4,
-
-        orderBy: { criadoEm: 'desc' },
-
-      })
-
-    : []
 
 
 

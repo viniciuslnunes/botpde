@@ -50,45 +50,48 @@ export default async function ModeracaoComunidadePage() {
   const podeModerarMensagens = hasPermission(effective, PERMISSIONS.MESSAGES_MODERATE)
   if (!podeModerarPosts && !podeModerarMensagens) redirect('/admin')
 
-  const denuncias: DenunciaPendente[] = podeModerarPosts
-    ? await db.denuncia.findMany({
-        where: { tenantId: tenant.id, status: 'PENDENTE' },
-        orderBy: { criadoEm: 'asc' },
-        select: {
-          id: true,
-          motivo: true,
-          criadoEm: true,
-          post: { select: { id: true, titulo: true, conteudo: true } },
-          denunciante: { select: { nome: true, email: true } },
-        },
-      })
-    : []
-
-  let denunciasMensagem: DenunciaMensagemPendente[] = []
-  if (podeModerarMensagens) {
-    try {
-      denunciasMensagem = await db.denunciaMensagem.findMany({
-        where: { tenantId: tenant.id, status: 'PENDENTE' },
-        orderBy: { criadoEm: 'asc' },
-        select: {
-          id: true,
-          motivo: true,
-          criadoEm: true,
-          mensagem: {
+  // Denúncias de posts e de mensagens são independentes → um round-trip.
+  // A tabela de mensagens pode não existir em bases antigas: catch → [].
+  const [denuncias, denunciasMensagem]: [
+    DenunciaPendente[],
+    DenunciaMensagemPendente[],
+  ] = await Promise.all([
+    podeModerarPosts
+      ? db.denuncia.findMany({
+          where: { tenantId: tenant.id, status: 'PENDENTE' },
+          orderBy: { criadoEm: 'asc' },
+          select: {
+            id: true,
+            motivo: true,
+            criadoEm: true,
+            post: { select: { id: true, titulo: true, conteudo: true } },
+            denunciante: { select: { nome: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    podeModerarMensagens
+      ? db.denunciaMensagem
+          .findMany({
+            where: { tenantId: tenant.id, status: 'PENDENTE' },
+            orderBy: { criadoEm: 'asc' },
             select: {
               id: true,
-              conteudo: true,
-              removidaEm: true,
-              autor: { select: { nome: true } },
+              motivo: true,
+              criadoEm: true,
+              mensagem: {
+                select: {
+                  id: true,
+                  conteudo: true,
+                  removidaEm: true,
+                  autor: { select: { nome: true } },
+                },
+              },
+              denunciante: { select: { nome: true, email: true } },
             },
-          },
-          denunciante: { select: { nome: true, email: true } },
-        },
-      })
-    } catch {
-      denunciasMensagem = []
-    }
-  }
+          })
+          .catch(() => [] as DenunciaMensagemPendente[])
+      : Promise.resolve([]),
+  ])
 
   return (
     <div className="app-container space-y-6 py-6">

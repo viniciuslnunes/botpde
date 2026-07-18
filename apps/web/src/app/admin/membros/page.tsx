@@ -110,18 +110,62 @@ export default async function MembrosPage({
   const userIdsSocios = membros
     .filter((m: (typeof membros)[number]) => m.tipo === 'SOCIO')
     .map((m: (typeof membros)[number]) => m.userId)
+  const membroIds = membros.map((m: (typeof membros)[number]) => m.id)
+  type LogMembro = {
+    entidadeId: string | null
+    acao: string
+    detalhes: unknown
+    criadoEm: Date
+  }
+
+  // As três leituras secundárias são independentes → um round-trip só.
+  // - rival: sócio já aprovado como sócio em torcida rival (booleano p/ o client);
+  // - reprovações: contagem de reprovações em recrutamento de outra torcida;
+  // - logs: tentativas + motivo da última reprovação (AuditLog, sem mudar schema).
+  const [sociosOutrosTenants, reprovacoesOutrosTenants, logsMembros]: [
+    { userId: string; tenantId: string }[],
+    { userId: string }[],
+    LogMembro[],
+  ] = await Promise.all([
+    userIdsSocios.length > 0
+      ? db.saasMembro.findMany({
+          where: {
+            userId: { in: userIdsSocios },
+            status: 'APROVADO',
+            tipo: 'SOCIO',
+            tenantId: { not: tenant.id },
+          },
+          select: { userId: true, tenantId: true },
+        })
+      : Promise.resolve([]),
+    userIdsSocios.length > 0
+      ? db.saasMembro.findMany({
+          where: {
+            userId: { in: userIdsSocios },
+            status: 'REPROVADO',
+            tipo: 'SOCIO',
+            tenantId: { not: tenant.id },
+          },
+          select: { userId: true },
+        })
+      : Promise.resolve([]),
+    membroIds.length > 0
+      ? db.auditLog.findMany({
+          where: {
+            tenantId: tenant.id,
+            entidade: 'SaasMembro',
+            entidadeId: { in: membroIds },
+            acao: { in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'] },
+          },
+          orderBy: { criadoEm: 'desc' },
+          select: { entidadeId: true, acao: true, detalhes: true, criadoEm: true },
+        })
+      : Promise.resolve([]),
+  ])
+
+  // Rival: resolve a rivalidade dos tenants distintos encontrados.
   let userIdsComRivalSocio = new Set<string>()
-  if (userIdsSocios.length > 0) {
-    const sociosOutrosTenants: { userId: string; tenantId: string }[] =
-      await db.saasMembro.findMany({
-        where: {
-          userId: { in: userIdsSocios },
-          status: 'APROVADO',
-          tipo: 'SOCIO',
-          tenantId: { not: tenant.id },
-        },
-        select: { userId: true, tenantId: true },
-      })
+  if (sociosOutrosTenants.length > 0) {
     const outrosTenantIds = [...new Set(sociosOutrosTenants.map((s) => s.tenantId))]
     const checagens = await Promise.all(
       outrosTenantIds.map(
@@ -134,50 +178,13 @@ export default async function MembrosPage({
     )
   }
 
-  // Alerta informativo: sócio (desta página) já foi REPROVADO em recrutamento
-  // de OUTRA torcida/clube. Não identifica qual — só a contagem, mesmo padrão
-  // de privacidade do alerta de rival acima.
   const reprovacoesOutraTorcidaPorUser = new Map<string, number>()
-  if (userIdsSocios.length > 0) {
-    const reprovacoesOutrosTenants: { userId: string }[] = await db.saasMembro.findMany({
-      where: {
-        userId: { in: userIdsSocios },
-        status: 'REPROVADO',
-        tipo: 'SOCIO',
-        tenantId: { not: tenant.id },
-      },
-      select: { userId: true },
-    })
-    for (const r of reprovacoesOutrosTenants) {
-      reprovacoesOutraTorcidaPorUser.set(
-        r.userId,
-        (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
-      )
-    }
+  for (const r of reprovacoesOutrosTenants) {
+    reprovacoesOutraTorcidaPorUser.set(
+      r.userId,
+      (reprovacoesOutraTorcidaPorUser.get(r.userId) ?? 0) + 1,
+    )
   }
-
-  // Histórico de tentativas via AuditLog (sem mudar schema): conta solicitações
-  // e recupera o motivo da última reprovação para informar a decisão do admin.
-  const membroIds = membros.map((m: (typeof membros)[number]) => m.id)
-  type LogMembro = {
-    entidadeId: string | null
-    acao: string
-    detalhes: unknown
-    criadoEm: Date
-  }
-  const logsMembros: LogMembro[] =
-    membroIds.length > 0
-      ? await db.auditLog.findMany({
-          where: {
-            tenantId: tenant.id,
-            entidade: 'SaasMembro',
-            entidadeId: { in: membroIds },
-            acao: { in: ['CADASTRO_SOLICITADO', 'RECADASTRO_SOLICITADO', 'MEMBRO_REPROVADO'] },
-          },
-          orderBy: { criadoEm: 'desc' },
-          select: { entidadeId: true, acao: true, detalhes: true, criadoEm: true },
-        })
-      : []
   const tentativasPorMembro = new Map<string, number>()
   const motivoReprovacaoPorMembro = new Map<string, string>()
   for (const log of logsMembros) {

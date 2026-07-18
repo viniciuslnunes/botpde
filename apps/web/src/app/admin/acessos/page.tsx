@@ -75,47 +75,103 @@ export default async function AcessosPage({
   const secao = parseAccessSecao(secaoRaw)
   const initialUserId = usuarioRaw?.trim() || null
 
-  const usoPorRole: UsoPorRole[] = await db.userRole.groupBy({
-    by: ['roleId'],
-    where: { tenantId: tenant.id },
-    _count: { roleId: true },
-  })
-  const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
+  // As 9 leituras abaixo são independentes entre si (todo o cruzamento é
+  // feito em memória depois) → um único round-trip em vez de waterfall.
+  const [
+    usoPorRole,
+    rolesRaw,
+    departamentosRaw,
+    usuarios,
+    userRoles,
+    userDepartamentos,
+    userPermissions,
+    gestores,
+    sedeDoTenant,
+  ]: [
+    UsoPorRole[],
+    RoleLite[],
+    DepartamentoLite[],
+    UsuarioBasico[],
+    UserRoleLite[],
+    UserDepartamentoLite[],
+    UserPermissionLite[],
+    DepartamentoGestorLite[],
+    { tipo: string } | null,
+  ] = await Promise.all([
+    db.userRole.groupBy({
+      by: ['roleId'],
+      where: { tenantId: tenant.id },
+      _count: { roleId: true },
+    }),
+    db.role.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
+      select: {
+        id: true,
+        nome: true,
+        cor: true,
+        isSystem: true,
+        permissions: true,
+        permissionsExtras: true,
+        departamentoId: true,
+        papelNoDepartamento: true,
+        ordem: true,
+      },
+    }),
+    db.departamento.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+      select: {
+        id: true,
+        nome: true,
+        cor: true,
+        permissions: true,
+        permissionsGestor: true,
+        slug: true,
+        moduloPortal: true,
+        ordem: true,
+      },
+    }),
+    db.user.findMany({
+      where: {
+        OR: [
+          { membros: { some: { tenantId: tenant.id } } },
+          { userRoles: { some: { tenantId: tenant.id } } },
+          { userDepartamentos: { some: { tenantId: tenant.id } } },
+          { userPermissions: { some: { tenantId: tenant.id } } },
+        ],
+      },
+      select: { id: true, nome: true, email: true, avatarUrl: true },
+      orderBy: { nome: 'asc' },
+    }),
+    db.userRole.findMany({
+      where: { tenantId: tenant.id },
+      select: { userId: true, roleId: true },
+    }),
+    db.userDepartamento.findMany({
+      where: { tenantId: tenant.id },
+      select: { userId: true, departamentoId: true },
+    }),
+    db.userPermission.findMany({
+      where: { tenantId: tenant.id },
+      select: { userId: true, permission: true, granted: true },
+    }),
+    db.departamentoGestor.findMany({
+      where: { departamento: { tenantId: tenant.id } },
+      select: { userId: true, departamentoId: true },
+    }),
+    db.sede.findFirst({
+      where: { tenantId: tenant.id, tipo: 'SEDE' },
+      select: { tipo: true },
+    }),
+  ])
 
-  const rolesRaw: RoleLite[] = await db.role.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: [{ isSystem: 'desc' }, { ordem: 'asc' }, { nome: 'asc' }],
-    select: {
-      id: true,
-      nome: true,
-      cor: true,
-      isSystem: true,
-      permissions: true,
-      permissionsExtras: true,
-      departamentoId: true,
-      papelNoDepartamento: true,
-      ordem: true,
-    },
-  })
+  const usoMap = new Map(usoPorRole.map((u) => [u.roleId, u._count.roleId]))
   const roles = rolesRaw.map((role) => ({
     ...role,
     emUso: usoMap.get(role.id) ?? 0,
   }))
 
-  const departamentosRaw: DepartamentoLite[] = await db.departamento.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-    select: {
-      id: true,
-      nome: true,
-      cor: true,
-      permissions: true,
-      permissionsGestor: true,
-      slug: true,
-      moduloPortal: true,
-      ordem: true,
-    },
-  })
   // UI de áreas: esconde slugs legados (tipos de membro). O mapa completo
   // abaixo ainda resolve herança de perfis tipo "Membro · Torcedor".
   const departamentos = departamentosRaw.filter((d) => !isDepartamentoLegado(d))
@@ -136,39 +192,6 @@ export default async function AcessosPage({
     }
   })
 
-  const usuarios: UsuarioBasico[] = await db.user.findMany({
-    where: {
-      OR: [
-        { membros: { some: { tenantId: tenant.id } } },
-        { userRoles: { some: { tenantId: tenant.id } } },
-        { userDepartamentos: { some: { tenantId: tenant.id } } },
-        { userPermissions: { some: { tenantId: tenant.id } } },
-      ],
-    },
-    select: { id: true, nome: true, email: true, avatarUrl: true },
-    orderBy: { nome: 'asc' },
-  })
-  const userRoles: UserRoleLite[] = await db.userRole.findMany({
-    where: { tenantId: tenant.id },
-    select: { userId: true, roleId: true },
-  })
-  const userDepartamentos: UserDepartamentoLite[] = await db.userDepartamento.findMany({
-    where: { tenantId: tenant.id },
-    select: { userId: true, departamentoId: true },
-  })
-  const userPermissions: UserPermissionLite[] = await db.userPermission.findMany({
-    where: { tenantId: tenant.id },
-    select: { userId: true, permission: true, granted: true },
-  })
-  const gestores: DepartamentoGestorLite[] = await db.departamentoGestor.findMany({
-    where: { departamento: { tenantId: tenant.id } },
-    select: { userId: true, departamentoId: true },
-  })
-
-  const sedeDoTenant: { tipo: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id, tipo: 'SEDE' },
-    select: { tipo: true },
-  })
   const tipoSede: string = sedeDoTenant?.tipo ?? 'PONTO_ENCONTRO'
 
   const usuariosFormatados = usuarios.map((u) => ({

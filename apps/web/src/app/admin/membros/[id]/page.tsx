@@ -53,38 +53,38 @@ export default async function MembroDetalhePage({ params }: Props) {
     user: { email: string | null }
   }
 
-  const membro: MembroRow | null = await db.saasMembro.findFirst({
-    where: { id, tenantId: tenant.id },
-    select: {
-      id: true,
-      nome: true,
-      tipo: true,
-      status: true,
-      cidade: true,
-      telefone: true,
-      adimplente: true,
-      desligadoEm: true,
-      desligadoMotivo: true,
-      rg: true,
-      cpf: true,
-      filiacao: true,
-      escolaridade: true,
-      profissao: true,
-      dataNascimento: true,
-      planoAssociacaoId: true,
-      sedeId: true,
-      planoAssociacao: { select: { nome: true } },
-      departamento: { select: { id: true, nome: true } },
-      user: { select: { email: true } },
-    },
-  })
-
-  if (!membro) notFound()
-
-  const [planos, sedes]: [
+  // Membro, planos, sedes e permissões são independentes → um round-trip.
+  const [membro, planos, sedes, perms]: [
+    MembroRow | null,
     { id: string; nome: string }[],
     { id: string; nome: string; tipo: string }[],
+    Awaited<ReturnType<typeof getUserPermissionsInTenant>>,
   ] = await Promise.all([
+    db.saasMembro.findFirst({
+      where: { id, tenantId: tenant.id },
+      select: {
+        id: true,
+        nome: true,
+        tipo: true,
+        status: true,
+        cidade: true,
+        telefone: true,
+        adimplente: true,
+        desligadoEm: true,
+        desligadoMotivo: true,
+        rg: true,
+        cpf: true,
+        filiacao: true,
+        escolaridade: true,
+        profissao: true,
+        dataNascimento: true,
+        planoAssociacaoId: true,
+        sedeId: true,
+        planoAssociacao: { select: { nome: true } },
+        departamento: { select: { id: true, nome: true } },
+        user: { select: { email: true } },
+      },
+    }),
     db.planoAssociacao.findMany({
       where: { tenantId: tenant.id, ativo: true },
       orderBy: { nome: 'asc' },
@@ -95,24 +95,17 @@ export default async function MembroDetalhePage({ params }: Props) {
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
       select: { id: true, nome: true, tipo: true },
     }),
+    getUserPermissionsInTenant(session.user.id, tenant.id),
   ])
 
+  if (!membro) notFound()
+
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
-  let podeDesligar = isSuperAdmin
-  let podeReatribuirSede = isSuperAdmin
-  if (session.user.id) {
-    const { rolePermissions, overrides } = await getUserPermissionsInTenant(
-      session.user.id,
-      tenant.id,
-    )
-    const effective = calculateEffectivePermissions(rolePermissions, overrides)
-    if (!podeDesligar) {
-      podeDesligar = hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
-    }
-    if (!podeReatribuirSede) {
-      podeReatribuirSede = hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
-    }
-  }
+  const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
+  const podeDesligar =
+    isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
+  const podeReatribuirSede =
+    isSuperAdmin || hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
