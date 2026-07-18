@@ -80,7 +80,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
             <DispararLembretesButton />
             <Link
               href="/admin/planos-associacao"
-              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+              className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               Planos
             </Link>

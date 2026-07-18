@@ -39,7 +39,7 @@ export default async function TorcidaPage() {
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
             Presidência
           </p>
           <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Visão da torcida</h1>

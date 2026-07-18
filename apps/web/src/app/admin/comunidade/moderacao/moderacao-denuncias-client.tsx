@@ -136,7 +136,7 @@ export function ModeracaoDenunciasClient({
                       <div className="flex items-center gap-3">
                         <Link
                           href={linkPostComunidade(denuncia.postId)}
-                          className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                          className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                           target="_blank"
                         >
                           Ver post

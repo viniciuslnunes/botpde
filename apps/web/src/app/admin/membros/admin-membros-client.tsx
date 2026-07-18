@@ -134,7 +134,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                     <div>
                       <Link
                         href={`/admin/membros/${membro.id}`}
-                        className="font-medium text-[rgb(var(--foreground))] hover:text-[rgb(var(--primary))] hover:underline"
+                        className="font-medium text-[rgb(var(--foreground))] hover:text-[rgb(var(--color-primary-fg))] hover:underline"
                       >
                         {membro.nome}
                       </Link>

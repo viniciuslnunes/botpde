@@ -12,7 +12,7 @@ const TIPO_LABEL: Record<string, string> = {
 }
 
 const TIPO_BADGE_CLASS: Record<string, string> = {
-  SEDE: 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]',
+  SEDE: 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]',
   SUBSEDE: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
   PONTO_ENCONTRO: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
 }
@@ -258,7 +258,7 @@ export async function TorcidaConsole({
       {unidadesTerritoriais === 0 ? (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
           Só a Sede aparece na árvore. Cadastre subsedes e PDEs em{' '}
-          <Link href="/admin/sedes" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+          <Link href="/admin/sedes" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
             Sedes
           </Link>{' '}
           (mesma estrutura do onboarding) para consolidar toda a torcida aqui.

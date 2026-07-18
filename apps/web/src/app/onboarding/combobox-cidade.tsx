@@ -124,7 +124,7 @@ export function ComboboxCidade({ uf, value, onChange, disabled }: Props) {
               setErro(null)
               setTentativa((t) => t + 1)
             }}
-            className="text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+            className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Tentar novamente
           </button>
@@ -151,7 +151,7 @@ export function ComboboxCidade({ uf, value, onChange, disabled }: Props) {
                   }}
                   className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
                     opcao === value
-                      ? 'font-semibold text-[rgb(var(--color-primary))]'
+                      ? 'font-semibold text-[rgb(var(--color-primary-fg))]'
                       : 'text-[rgb(var(--foreground))]'
                   }`}
                 >

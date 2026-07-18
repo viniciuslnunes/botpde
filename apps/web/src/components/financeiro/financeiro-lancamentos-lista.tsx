@@ -161,7 +161,7 @@ export function FinanceiroLancamentosLista({
           {page > 1 ? (
             <Link
               href={hrefForPage(page - 1)}
-              className="font-medium text-[rgb(var(--primary))] hover:underline"
+              className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               ← Anterior
             </Link>
@@ -174,7 +174,7 @@ export function FinanceiroLancamentosLista({
           {page < totalPages ? (
             <Link
               href={hrefForPage(page + 1)}
-              className="font-medium text-[rgb(var(--primary))] hover:underline"
+              className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               Próxima →
             </Link>

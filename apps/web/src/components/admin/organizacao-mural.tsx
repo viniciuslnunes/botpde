@@ -234,7 +234,7 @@ function DepartamentoBranchCard({
               <p className="text-xs text-[rgb(var(--foreground-muted))]">Sem pessoas nesta área</p>
               <Link
                 href="/admin/acessos?secao=pessoas"
-                className="inline-block text-xs font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline"
+                className="inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
               >
                 Atribuir em Acessos
               </Link>
@@ -325,7 +325,7 @@ function BaseTier({
           <button
             type="button"
             onClick={() => setAberto((v) => !v)}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--primary)_/_0.08)]"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--primary)_/_0.08)]"
           >
             {aberto ? 'Recolher' : `Ver todos (${filtered.length})`}
             <ChevronDown className={['h-3.5 w-3.5 transition-transform', aberto ? 'rotate-180' : ''].join(' ')} />
@@ -674,11 +674,11 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
 
       <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
         Hierarquia territorial (Sede → Subsede → PDE) fica em{' '}
-        <Link href="/admin/sedes" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+        <Link href="/admin/sedes" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
           Sedes
         </Link>
         {' '}e na{' '}
-        <Link href="/admin/torcida" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+        <Link href="/admin/torcida" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
           Visão da torcida
         </Link>
         .

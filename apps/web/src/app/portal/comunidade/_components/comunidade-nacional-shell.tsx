@@ -48,7 +48,7 @@ export async function ComunidadeNacionalShell({
               />
             )
           ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary-fg))]">
               <Users className="h-5 w-5" />
             </div>
           )}
@@ -141,7 +141,7 @@ export async function ComunidadeNacionalShell({
                     href={n.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
+                    className="mt-2 inline-block text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Ler na fonte
                   </a>

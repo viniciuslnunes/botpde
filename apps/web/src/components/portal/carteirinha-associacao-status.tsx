@@ -66,7 +66,7 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
         <CarteirinhaReveal index={i++}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
             <div className="flex items-start gap-3">
-              <Wallet className="mt-0.5 h-5 w-5 text-[rgb(var(--primary))]" />
+              <Wallet className="mt-0.5 h-5 w-5 text-[rgb(var(--color-primary-fg))]" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
                   Cobrança em aberto
@@ -100,7 +100,7 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
             href="/portal/cobrancas"
             className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:bg-[rgb(var(--background-subtle))]"
           >
-            <Wallet className="h-5 w-5 text-[rgb(var(--primary))]" />
+            <Wallet className="h-5 w-5 text-[rgb(var(--color-primary-fg))]" />
             <div>
               <p className="text-sm font-semibold">Mensalidades</p>
               <p className="text-xs text-[rgb(var(--foreground-muted))]">Histórico de cobranças</p>

@@ -86,7 +86,7 @@ export default async function AdminNoticiasPage() {
                 href={noticia.url}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 inline-block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="mt-1 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Abrir link da notícia
               </a>

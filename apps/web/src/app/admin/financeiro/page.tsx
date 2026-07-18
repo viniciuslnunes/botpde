@@ -74,7 +74,7 @@ export default async function FinanceiroAdminPage({ searchParams }: Props) {
             <ExportarFinanceiroButton />
             <Link
               href="/portal/financeiro"
-              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+              className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               Ver no portal
             </Link>

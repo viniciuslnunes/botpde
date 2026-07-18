@@ -425,7 +425,7 @@ export function SalaChat({
                               maxLength={800}
                               className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-sm"
                             />
-                            <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary))]">
+                            <button type="submit" className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
                               Salvar
                             </button>
                           </m.form>

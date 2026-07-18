@@ -215,7 +215,7 @@ export default async function SociosPage({
                               <img src={socio.user.avatarUrl} alt={socio.nome} loading="lazy" decoding="async" className="h-8 w-8 rounded-full object-cover" />
                             )
                           ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--primary))]">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--color-primary-fg))]">
                               {socio.nome.charAt(0).toUpperCase()}
                             </div>
                           )}

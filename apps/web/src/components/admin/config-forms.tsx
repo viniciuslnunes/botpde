@@ -74,7 +74,7 @@ export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
         Cores, fundo e identidade visual ficam em{' '}
         <Link
           href="/admin/design"
-          className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline"
+          className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
         >
           Design
         </Link>
@@ -125,7 +125,7 @@ export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
         Quando ativo, membros logados veem totais e totais por categoria em{' '}
         <Link
           href="/portal/balanco"
-          className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline"
+          className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
         >
           /portal/balanco
         </Link>
@@ -137,7 +137,7 @@ export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
           checked={ativo}
           disabled={pending}
           onChange={(e) => salvar(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--primary))]"
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
         />
         <span className="min-w-0">
           <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
@@ -518,7 +518,7 @@ function RoleRow({
             {emUso > 0 && (
               <Link
                 href="/admin/acessos?secao=pessoas"
-                className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 {emUso} pessoa{emUso === 1 ? '' : 's'}
               </Link>
@@ -568,7 +568,7 @@ function RoleRow({
           {role.isSystem && (
             <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
               Cargo de sistema — permissões fixas. Atribua em{' '}
-              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
                 Pessoas
               </Link>
               .
@@ -1077,7 +1077,7 @@ function DepartamentoRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-[rgb(var(--foreground))]">{departamento.nome}</span>
             {canonico && (
-              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
                 Padrão
               </span>
             )}
@@ -1128,7 +1128,7 @@ function DepartamentoRow({
           {organizacional ? (
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               Este departamento só organiza pessoas — não adiciona permissões. Atribua em{' '}
-              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+              <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
                 Pessoas
               </Link>
               .
@@ -1141,7 +1141,7 @@ function DepartamentoRow({
               />
               <p className="text-xs text-[rgb(var(--foreground-muted))]">
                 Atribua membro/gestor em{' '}
-                <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+                <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
                   Pessoas
                 </Link>
                 .

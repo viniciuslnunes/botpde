@@ -87,7 +87,7 @@ export default async function PortalCobrancaDetalhePage({ params }: Props) {
         {cob.status === 'PAGA' && (
           <Link
             href={`/portal/cobrancas/${cob.id}/recibo`}
-            className="mt-4 inline-block text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            className="mt-4 inline-block text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver recibo
           </Link>

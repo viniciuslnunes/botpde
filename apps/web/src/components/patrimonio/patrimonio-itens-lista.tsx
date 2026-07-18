@@ -162,7 +162,7 @@ export function PatrimonioItensLista({
       {totalPages > 1 && (
         <nav className="flex items-center justify-between gap-3 text-sm">
           {page > 1 ? (
-            <Link href={hrefForPage(page - 1)} className="font-medium text-[rgb(var(--primary))] hover:underline">
+            <Link href={hrefForPage(page - 1)} className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
               ← Anterior
             </Link>
           ) : (
@@ -172,7 +172,7 @@ export function PatrimonioItensLista({
             Página {page} de {totalPages}
           </span>
           {page < totalPages ? (
-            <Link href={hrefForPage(page + 1)} className="font-medium text-[rgb(var(--primary))] hover:underline">
+            <Link href={hrefForPage(page + 1)} className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
               Próxima →
             </Link>
           ) : (

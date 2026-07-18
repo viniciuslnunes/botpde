@@ -269,7 +269,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
     <div className="flex flex-1 flex-col">
       {/* Cabeçalho + progresso */}
       <header className="mb-8">
-        <div className="mb-6 flex items-center gap-2 text-[rgb(var(--color-primary))]">
+        <div className="mb-6 flex items-center gap-2 text-[rgb(var(--color-primary-fg))]">
           <Shield className="h-6 w-6" />
           <span className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Bem-vindo
@@ -421,7 +421,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               transition={springGentle}
               className="flex flex-col items-center justify-center gap-3 py-20 text-center text-[rgb(var(--foreground-muted))]"
             >
-              <Loader2 className="h-8 w-8 animate-spin text-[rgb(var(--color-primary))]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[rgb(var(--color-primary-fg))]" />
               <p>Concluindo seu cadastro...</p>
             </m.div>
           )}
@@ -658,7 +658,7 @@ function PassoRegiao({
       <div className="mt-5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary-fg))]">
               <MapPin className="h-5 w-5" />
             </div>
             <div>
@@ -781,7 +781,7 @@ function PassoTorcida({
           />
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
             Sem organizada
           </p>
           <p className="mt-0.5 text-base font-semibold text-[rgb(var(--foreground))] sm:text-lg">
@@ -792,7 +792,7 @@ function PassoTorcida({
             Sem vínculo com torcida organizada.
           </p>
         </div>
-        <ArrowRight className="hidden h-5 w-5 shrink-0 text-[rgb(var(--color-primary))] sm:block" />
+        <ArrowRight className="hidden h-5 w-5 shrink-0 text-[rgb(var(--color-primary-fg))] sm:block" />
       </button>
 
       {torcidas.length === 0 ? (
@@ -990,7 +990,7 @@ function PassoUnidade({
         </p>
         {regiaoLabel && (
           <span className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground))]">
-            <MapPin className="h-3 w-3 text-[rgb(var(--color-primary))]" aria-hidden />
+            <MapPin className="h-3 w-3 text-[rgb(var(--color-primary-fg))]" aria-hidden />
             {regiaoLabel}
           </span>
         )}
@@ -1035,7 +1035,7 @@ function PassoUnidade({
               setSelecionada(null)
               onErro(null)
             }}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary))] hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             <Mail className="h-3.5 w-3.5" />
             Solicitar cadastro
@@ -1045,7 +1045,7 @@ function PassoUnidade({
         <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary))]">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary-fg))]">
                 <FileText className="h-4 w-4" />
               </div>
               <div className="min-w-0">
@@ -1484,7 +1484,7 @@ function PassoVinculo({
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary))]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
                 Entrada imediata
               </p>
               <p className="mt-1 text-lg font-semibold text-[rgb(var(--foreground))]">
@@ -1496,13 +1496,13 @@ function PassoVinculo({
 
               <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
                 <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   <span>
                     Comunidade do <strong>{nomeClube}</strong> (feed nacional)
                   </span>
                 </li>
                 <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   <span>
                     Espaço aberto da <strong>{torcida.nome}</strong> (eventos e
                     novidades)
@@ -1514,7 +1514,7 @@ function PassoVinculo({
                 </li>
               </ul>
 
-              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
                 Entrar agora
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </span>
@@ -1557,24 +1557,24 @@ function PassoVinculo({
 
               <ul className="mt-4 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm text-[rgb(var(--foreground))]">
                 <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   <span>
                     Comunidade do <strong>{nomeClube}</strong>
                   </span>
                 </li>
                 <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   <span>
                     Mural interno de sócios da <strong>{torcida.nome}</strong>
                   </span>
                 </li>
                 <li className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   <span>Carteirinha, benefícios e posts exclusivos</span>
                 </li>
               </ul>
 
-              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary))]">
+              <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-[rgb(var(--color-primary-fg))]">
                 Solicitar vínculo
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </span>
@@ -1783,7 +1783,7 @@ function UnidadeInfoBox({
               href={mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+              className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               <ExternalLink className="h-3 w-3" />
               Ver no mapa

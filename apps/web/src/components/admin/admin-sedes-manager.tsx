@@ -389,7 +389,7 @@ export function AdminSedesManager({
                   setBusca('')
                   setFiltro('TODAS')
                 }}
-                className="mt-2 text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+                className="mt-2 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Limpar filtros
               </button>

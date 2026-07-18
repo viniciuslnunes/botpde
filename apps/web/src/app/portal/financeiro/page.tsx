@@ -99,7 +99,7 @@ export default async function PortalFinanceiroPage({ searchParams }: Props) {
             )}
             <Link
               href="/portal/departamentos/financeiro"
-              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+              className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               Ver departamento
             </Link>

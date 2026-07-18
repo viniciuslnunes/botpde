@@ -191,7 +191,7 @@ export function PostsManager({ posts }: { posts: Post[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   {post.fixado && (
-                    <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                    <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
                       <Pin className="h-3 w-3" /> Fixado
                     </span>
                   )}

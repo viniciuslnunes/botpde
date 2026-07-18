@@ -125,7 +125,7 @@ export default async function MembroDetalhePage({ params }: Props) {
 
       <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
             <User className="h-5 w-5" />
           </div>
           <div>

@@ -78,7 +78,7 @@ export function AdminPlanosListaClient({ planos }: { planos: PlanoListaItem[] })
               <td className="px-4 py-3 text-right">
                 <Link
                   href={`/admin/planos-associacao?edit=${plano.id}`}
-                  className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                  className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                 >
                   Editar
                 </Link>

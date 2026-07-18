@@ -37,7 +37,7 @@ export default async function PortalCobrancasPage() {
           </div>
           <Link
             href="/portal/carteirinha"
-            className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Carteirinha
           </Link>

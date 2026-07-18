@@ -192,13 +192,13 @@ function UsuarioAcessoRow({
                   <span className="ml-0.5 text-[10px] font-semibold uppercase tracking-wide">
                     {isGestor ? 'gestor' : 'membro'}
                   </span>
-                  {isGestor && <ShieldCheck className="h-3 w-3 text-[rgb(var(--primary))]" />}
+                  {isGestor && <ShieldCheck className="h-3 w-3 text-[rgb(var(--color-primary-fg))]" />}
                 </span>
               )
             })}
 
             {extras > 0 && (
-              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
                 +{extras} extra{extras === 1 ? '' : 's'}
               </span>
             )}

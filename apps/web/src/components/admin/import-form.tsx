@@ -58,7 +58,7 @@ export function ImportForm() {
 
       {/* Seletor de origem — só MOCK habilitada nesta fase */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="rounded-lg border border-[rgb(var(--primary))] bg-[rgb(var(--primary))]/10 px-3 py-1.5 text-xs font-medium text-[rgb(var(--primary))]">
+        <span className="rounded-lg border border-[rgb(var(--primary))] bg-[rgb(var(--primary))]/10 px-3 py-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
           Mock (demonstração)
         </span>
         <span

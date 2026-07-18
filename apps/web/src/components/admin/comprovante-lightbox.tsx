@@ -77,7 +77,7 @@ export function ComprovanteLightbox({
                     href={imagemUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                    className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                   >
                     Abrir em nova aba
                   </a>

@@ -197,7 +197,7 @@ function CabecalhoPainel({
           {uf ? (
             <BandeiraEstado uf={uf} size="md" />
           ) : (
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--color-primary))]/15 text-[rgb(var(--color-primary))]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--color-primary))]/15 text-[rgb(var(--color-primary-fg))]">
               <Search className="h-4 w-4" />
             </span>
           )}
@@ -480,7 +480,7 @@ export function MapaBrasilEstados({
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-1.5 text-[rgb(var(--color-primary))]">
+            <div className="mb-1 flex items-center gap-1.5 text-[rgb(var(--color-primary-fg))]">
               <Sparkles className="h-3.5 w-3.5" aria-hidden />
               <span className="text-[10px] font-semibold uppercase tracking-widest">
                 Explore o Brasil
@@ -667,7 +667,7 @@ export function MapaBrasilEstados({
                     onClick={() => toggleRegiao(regiao.id)}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-all ${
                       ativa
-                        ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/12 text-[rgb(var(--color-primary))] shadow-sm'
+                        ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/12 text-[rgb(var(--color-primary-fg))] shadow-sm'
                         : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--color-primary))]/40 hover:text-[rgb(var(--foreground))]'
                     }`}
                   >

@@ -54,7 +54,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
             className={[
               'relative flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-colors',
               c.id === cat
-                ? 'text-[rgb(var(--primary))]'
+                ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >

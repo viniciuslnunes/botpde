@@ -66,11 +66,11 @@ export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
         {secao === 'pessoas' && (
           <>
             Atribua perfis a cada pessoa — a área vem com o perfil de departamento.{' '}
-            <Link href="/admin/acessos?secao=cargos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+            <Link href="/admin/acessos?secao=cargos" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
               Edite cargos
             </Link>
             {' · '}
-            <Link href="/admin/acessos?secao=departamentos" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+            <Link href="/admin/acessos?secao=departamentos" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
               edite departamentos
             </Link>
             .
@@ -79,7 +79,7 @@ export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
         {secao === 'cargos' && (
           <>
             Papéis transversais (Presidente, Recrutador…). Depois, em{' '}
-            <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+            <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
               Pessoas
             </Link>
             , atribua o cargo a quem deve tê-lo.
@@ -88,7 +88,7 @@ export function AccessControlNav({ secao, counts }: AccessControlNavProps) {
         {secao === 'departamentos' && (
           <>
             Áreas com colaborador e gestor. Depois, em{' '}
-            <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline">
+            <Link href="/admin/acessos?secao=pessoas" className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline">
               Pessoas
             </Link>
             , coloque cada um na área certa.

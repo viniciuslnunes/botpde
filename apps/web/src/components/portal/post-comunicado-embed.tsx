@@ -16,8 +16,8 @@ export function PostComunicadoEmbed({ comunicado }: PostComunicadoEmbedProps) {
   return (
     <div className="mt-3 rounded-xl border border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.05)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Megaphone className="h-3.5 w-3.5 text-[rgb(var(--primary))]" />
-        <span className="text-xs font-semibold text-[rgb(var(--primary))]">Comunicado oficial</span>
+        <Megaphone className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
+        <span className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]">Comunicado oficial</span>
         <Badge variant={PRIORIDADE_VARIANT[comunicado.prioridade]}>
           {comunicado.prioridade === 'URGENTE'
             ? 'Urgente'

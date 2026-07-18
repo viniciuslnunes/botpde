@@ -80,7 +80,7 @@ function TreeCheck({
 
 function origemBadgeClass(origem: PermissaoOrigem): string {
   if (origem === 'extra') {
-    return 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary)_/_0.35)]'
+    return 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--color-primary-fg))] ring-1 ring-[rgb(var(--primary)_/_0.35)]'
   }
   if (origem === 'revogada') {
     return 'bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-300'
@@ -248,7 +248,7 @@ export function AccessPermissionWorktree({
                   className={[
                     'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
                     marks > 0
-                      ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                      ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                   ].join(' ')}
                 >

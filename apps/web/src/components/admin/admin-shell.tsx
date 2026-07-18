@@ -197,7 +197,7 @@ function AdminTopbar({
                   </Link>
                   <div className="my-1 border-t border-[rgb(var(--border))]" />
                   <p className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
-                    <Shield className="h-3.5 w-3.5 text-[rgb(var(--primary))]" />
+                    <Shield className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
                     Área Admin
                   </p>
                   <button

@@ -191,7 +191,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
             <button
               type="button"
               onClick={() => setOpcoes((prev) => [...prev, ''])}
-              className="text-xs font-semibold text-[rgb(var(--color-primary))]"
+              className="text-xs font-semibold text-[rgb(var(--color-primary-fg))]"
             >
               + Adicionar opção
             </button>
@@ -271,7 +271,7 @@ export function SalaEnquete({ salaId, isHost }: SalaEnqueteProps) {
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
                               {selecionada && (
-                                <CheckCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary))]" />
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                               )}
                               <span className="text-sm font-medium text-[rgb(var(--foreground))]">
                                 {opcao.texto}

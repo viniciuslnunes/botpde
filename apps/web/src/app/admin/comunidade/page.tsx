@@ -62,7 +62,7 @@ export default async function AdminComunidadePage() {
             <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 Gerencie canais oficiais e comunidades temáticas em{' '}
-                <Link href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--primary))] hover:underline">
+                <Link href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
                   Portal → Comunidade → Canais
                 </Link>
                 .

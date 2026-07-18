@@ -47,7 +47,7 @@ export default async function DefinirApelidoPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]">
             <AtSign className="h-7 w-7" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[rgb(var(--foreground))]">
