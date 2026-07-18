@@ -25,6 +25,15 @@ import {
   rejeitarAlianca,
 } from '@/app/admin/aliancas/actions'
 import type { AliancaListItem, RecomendacaoAliancaListItem } from '@/lib/aliancas'
+
+/** Props vindas do RSC — datas já em ISO string. */
+type AliancaListItemProp = Omit<AliancaListItem, 'criadoEm' | 'confirmadaEm'> & {
+  criadoEm: string
+  confirmadaEm: string | null
+}
+type RecomendacaoAliancaListItemProp = Omit<RecomendacaoAliancaListItem, 'criadoEm'> & {
+  criadoEm: string
+}
 import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
@@ -48,8 +57,8 @@ interface TenantOption {
 interface AliancaFormsProps {
   tenantId: string
   afiliacaoId: string | null
-  aliancas: AliancaListItem[]
-  recomendacoes: RecomendacaoAliancaListItem[]
+  aliancas: AliancaListItemProp[]
+  recomendacoes: RecomendacaoAliancaListItemProp[]
   tenants: TenantOption[]
 }
 
@@ -207,15 +216,15 @@ export function AliancaForms({
   }, [afiliacaoId, blockedTenantIds, searchNeedle, tenants])
 
   const pendentesRecebidas = aliancas.filter(
-    (item: AliancaListItem) => item.status === 'PENDENTE' && item.tenantAliadoId === tenantId,
+    (item: AliancaListItemProp) => item.status === 'PENDENTE' && item.tenantAliadoId === tenantId,
   )
   const pendentesEnviadas = aliancas.filter(
-    (item: AliancaListItem) => item.status === 'PENDENTE' && item.tenantOrigemId === tenantId,
+    (item: AliancaListItemProp) => item.status === 'PENDENTE' && item.tenantOrigemId === tenantId,
   )
-  const ativas = aliancas.filter((item: AliancaListItem) => item.status === 'ATIVA')
-  const encerradas = aliancas.filter((item: AliancaListItem) => item.status === 'ENCERRADA')
+  const ativas = aliancas.filter((item: AliancaListItemProp) => item.status === 'ATIVA')
+  const encerradas = aliancas.filter((item: AliancaListItemProp) => item.status === 'ENCERRADA')
   const recomendacoesAlta = recomendacoes.filter(
-    (r: RecomendacaoAliancaListItem) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
+    (r: RecomendacaoAliancaListItemProp) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
   )
 
   const defaultTab: TabId = (() => {
@@ -299,7 +308,7 @@ export function AliancaForms({
     setSearch(`${item.slug} — ${item.nome}`)
   }
 
-  function proporManualFromRec(item: RecomendacaoAliancaListItem): void {
+  function proporManualFromRec(item: RecomendacaoAliancaListItemProp): void {
     if (!item.tenantSugeridoId) return
     const aviso =
       item.confianca === 'BAIXA'
@@ -315,7 +324,7 @@ export function AliancaForms({
   }
 
   function renderAliancaRow(
-    item: AliancaListItem,
+    item: AliancaListItemProp,
     options?: { showAcceptReject?: boolean; showCancel?: boolean },
   ) {
     const counterpart = item.tenantOrigemId === tenantId ? item.tenantAliado : item.tenantOrigem
@@ -502,7 +511,7 @@ export function AliancaForms({
               </EmptyState>
             ) : (
               <div className="space-y-3">
-                {recomendacoes.map((item: RecomendacaoAliancaListItem) => (
+                {recomendacoes.map((item: RecomendacaoAliancaListItemProp) => (
                   <div
                     key={item.id}
                     className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-4"
@@ -596,7 +605,7 @@ export function AliancaForms({
               <EmptyState>Nenhuma proposta pendente para aprovação.</EmptyState>
             ) : (
               <div className="space-y-3">
-                {pendentesRecebidas.map((item: AliancaListItem) =>
+                {pendentesRecebidas.map((item: AliancaListItemProp) =>
                   renderAliancaRow(item, { showAcceptReject: true }),
                 )}
               </div>
@@ -613,7 +622,7 @@ export function AliancaForms({
               <EmptyState>Nenhuma proposta enviada aguardando resposta.</EmptyState>
             ) : (
               <div className="space-y-3">
-                {pendentesEnviadas.map((item: AliancaListItem) =>
+                {pendentesEnviadas.map((item: AliancaListItemProp) =>
                   renderAliancaRow(item, { showCancel: true }),
                 )}
               </div>
@@ -635,7 +644,7 @@ export function AliancaForms({
               </EmptyState>
             ) : (
               <div className="space-y-3">
-                {ativas.map((item: AliancaListItem) => renderAliancaRow(item))}
+                {ativas.map((item: AliancaListItemProp) => renderAliancaRow(item))}
               </div>
             )}
           </div>
@@ -650,7 +659,7 @@ export function AliancaForms({
               <EmptyState>Nenhum histórico ainda.</EmptyState>
             ) : (
               <div className="space-y-3">
-                {encerradas.map((item: AliancaListItem) => renderAliancaRow(item))}
+                {encerradas.map((item: AliancaListItemProp) => renderAliancaRow(item))}
               </div>
             )}
           </div>

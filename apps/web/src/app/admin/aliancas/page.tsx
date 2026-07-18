@@ -78,6 +78,18 @@ export default async function AdminAliancasPage() {
     afiliacao: t.afiliacao,
   }))
 
+  // Client Component: Dates → ISO (Flight aceita Date, mas o restante do admin
+  // serializa explicitamente — evita regressão opaca em produção).
+  const aliancasSerializadas = aliancas.map((a) => ({
+    ...a,
+    criadoEm: a.criadoEm.toISOString(),
+    confirmadaEm: a.confirmadaEm?.toISOString() ?? null,
+  }))
+  const recomendacoesSerializadas = recomendacoes.map((r) => ({
+    ...r,
+    criadoEm: r.criadoEm.toISOString(),
+  }))
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
@@ -97,8 +109,8 @@ export default async function AdminAliancasPage() {
           <AliancaForms
             tenantId={authz.tenant.id}
             afiliacaoId={authz.tenant.afiliacaoId ?? null}
-            aliancas={aliancas}
-            recomendacoes={recomendacoes}
+            aliancas={aliancasSerializadas}
+            recomendacoes={recomendacoesSerializadas}
             tenants={tenantOptions}
           />
         </div>
