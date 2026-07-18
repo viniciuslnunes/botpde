@@ -13,10 +13,12 @@ interface MotionRouteTransitionProps {
  *
  * `mode="sync"` (default): enter/exit em paralelo. Evita congelar o conteúdo
  * quando o exit não completa (footgun conhecido com `mode="wait"` no App Router).
+ * Exit/initial usam `pointerEvents: 'none'` (ver `routePage`) para não
+ * interceptar cliques no sidebar enquanto a opacidade anima a 0.
  */
 export function MotionRouteTransition({ children, routeKey }: MotionRouteTransitionProps) {
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       <m.div
         key={routeKey}
         variants={routePage}
@@ -24,6 +26,7 @@ export function MotionRouteTransition({ children, routeKey }: MotionRouteTransit
         animate="animate"
         exit="exit"
         transition={springGentle}
+        className="min-h-0"
       >
         {children}
       </m.div>

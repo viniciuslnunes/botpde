@@ -92,11 +92,14 @@ export const reactionPop: Transition = {
   mass: 0.6,
 }
 
-/** Transição entre rotas da comunidade. */
+/** Transição entre rotas (admin/portal).
+ * `pointerEvents: 'none'` no enter/exit evita camada em opacity:0
+ * capturar cliques (sidebar/menu ficam inacessíveis até reload).
+ */
 export const routePage: Variants = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  initial: { opacity: 0, y: 10, pointerEvents: 'none' },
+  animate: { opacity: 1, y: 0, pointerEvents: 'auto' },
+  exit: { opacity: 0, y: -8, pointerEvents: 'none' },
 }
 
 /** Backdrop de lightbox / viewer fullscreen. */

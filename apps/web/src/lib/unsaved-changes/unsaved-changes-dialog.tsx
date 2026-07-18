@@ -35,8 +35,9 @@ export function UnsavedChangesDialog({ entries, onConfirm, onCancel, onClose }: 
 
   return (
     <div
-      className="torcida-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      className="torcida-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="presentation"
+      data-unsaved-backdrop=""
       onClick={handleCancel}
     >
       <div

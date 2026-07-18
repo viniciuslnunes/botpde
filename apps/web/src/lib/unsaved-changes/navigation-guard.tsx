@@ -60,6 +60,10 @@ export function NavigationGuard() {
 
       const target = event.target
       if (!(target instanceof Element)) return
+      // Clique no próprio modal de descarte / confirm — não interceptar.
+      if (target.closest('[data-unsaved-backdrop], [role="dialog"][aria-modal="true"]')) {
+        return
+      }
       const anchor = target.closest('a')
       if (!(anchor instanceof HTMLAnchorElement)) return
       if (anchor.dataset.unsavedBypass === 'true') return

@@ -50,8 +50,16 @@ export function RegistrarCompraBarForm({ produtos }: { produtos: BarProdutoSeria
   })
 
   async function closeForm() {
+    if (!isDirty) {
+      markPristine()
+      setOpen(false)
+      return
+    }
     const ok = await confirmDiscard()
-    if (ok) setOpen(false)
+    if (ok) {
+      markPristine()
+      setOpen(false)
+    }
   }
 
   if (produtos.length === 0) return null

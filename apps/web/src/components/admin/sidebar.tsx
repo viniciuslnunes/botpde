@@ -268,7 +268,7 @@ export function AdminSidebar({
         </div>
       )}
 
-      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
+      <aside className="relative z-30 hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
         <SidebarBody
           tenantSlug={tenantSlug}
           items={items}
