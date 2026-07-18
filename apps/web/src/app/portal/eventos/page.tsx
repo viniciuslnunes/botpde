@@ -90,17 +90,17 @@ function serializarEvento(
 
 function ListaFallback() {
   return (
-    <div className="animate-pulse space-y-1.5">
+    <div className="grid animate-pulse grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5"
+          className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]"
         >
-          <div className="h-14 w-14 shrink-0 rounded-lg bg-[rgb(var(--border))]" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="h-3 w-24 rounded bg-[rgb(var(--border))]" />
-            <div className="h-3.5 w-3/4 rounded bg-[rgb(var(--border))]" />
-            <div className="h-3 w-1/2 rounded bg-[rgb(var(--border))]" />
+          <div className="aspect-[5/3] bg-[rgb(var(--border))]" />
+          <div className="space-y-2 p-3.5">
+            <div className="h-3 w-20 rounded bg-[rgb(var(--border))]" />
+            <div className="h-4 w-4/5 rounded bg-[rgb(var(--border))]" />
+            <div className="h-3 w-2/3 rounded bg-[rgb(var(--border))]" />
           </div>
         </div>
       ))}
@@ -116,7 +116,8 @@ export default async function EventosPage({ searchParams }: Props) {
   const sp = await searchParams
   const tipoParsed = TipoEventoSchema.safeParse(sp.tipo)
   const tipoFiltro = tipoParsed.success ? tipoParsed.data : undefined
-  const vista = sp.vista === 'semana' || sp.vista === 'mes' ? sp.vista : 'lista'
+  const vista =
+    sp.vista === 'lista' || sp.vista === 'mes' ? sp.vista : 'semana'
   const q = (sp.q ?? '').trim()
 
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
@@ -148,7 +149,12 @@ export default async function EventosPage({ searchParams }: Props) {
   function hrefFiltro(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams()
     const tipo = extra.tipo !== undefined ? extra.tipo : tipoFiltro
-    const v = extra.vista !== undefined ? extra.vista : vista !== 'lista' ? vista : undefined
+    const v =
+      extra.vista !== undefined
+        ? extra.vista
+        : vista !== 'semana'
+          ? vista
+          : undefined
     const data = extra.data !== undefined ? extra.data : sp.data
     const query = extra.q !== undefined ? extra.q : sp.q
     if (tipo) p.set('tipo', tipo)
@@ -222,14 +228,14 @@ export default async function EventosPage({ searchParams }: Props) {
           >
             {(
               [
-                ['lista', 'Lista'],
                 ['semana', 'Semana'],
                 ['mes', 'Mês'],
+                ['lista', 'Grade'],
               ] as const
             ).map(([id, label]) => (
               <Link
                 key={id}
-                href={hrefFiltro({ vista: id === 'lista' ? '' : id })}
+                href={hrefFiltro({ vista: id === 'semana' ? '' : id })}
                 prefetch
                 className={[
                   'rounded-md px-2.5 py-1.5 font-medium transition-colors',
@@ -369,54 +375,52 @@ async function AgendaConteudo({
   const resto = cards.slice(1)
 
   return (
-    <div className="space-y-6">
-      {destaque && (
-        <ProximoEventoSpotlight
-          id={destaque.id}
-          titulo={destaque.titulo}
-          tipo={destaque.tipo ?? 'GERAL'}
-          dataLabel={destaque.dataLabel}
-          local={destaque.local}
-          href={`/portal/eventos/${destaque.id}`}
-          lotacaoLabel={
-            destaque.lotacaoLabel ? `${destaque.lotacaoLabel} conf.` : null
-          }
-          fotoUrl={destaque.fotoUrl}
-          diasLabel={destaque.diasLabel}
-        />
-      )}
-      <div>
-        <div className="mb-2 flex items-baseline justify-between gap-2">
+    <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
+      <div className="space-y-5 lg:col-span-8 xl:col-span-9">
+        <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Próximos
           </h2>
-          {resto.length > 0 && (
+          {cards.length > 0 && (
             <p className="text-[11px] tabular-nums text-[rgb(var(--foreground-muted))]">
-              {resto.length} na fila
+              {cards.length} na fila
             </p>
           )}
         </div>
         <EventosListAnimated
-          eventos={resto}
-          emptyTitle={destaque ? 'Nada mais na fila' : emptyTitle}
-          emptyDescription={
-            destaque
-              ? 'Só o próximo compromisso acima por enquanto.'
-              : 'Quando houver algo marcado, aparece aqui.'
-          }
+          eventos={resto.length > 0 ? resto : cards}
+          emptyTitle={emptyTitle}
+          emptyDescription="Quando houver algo marcado, aparece aqui."
         />
+        {passados.length > 0 && (
+          <details className="group">
+            <summary className="mb-3 cursor-pointer text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Histórico
+            </summary>
+            <EventosListAnimated
+              eventos={passados.map((e) => serializarEvento(e, tenant.id, true))}
+              emptyTitle="Nenhum evento no histórico"
+              emptyDescription=""
+            />
+          </details>
+        )}
       </div>
-      {passados.length > 0 && (
-        <details className="group">
-          <summary className="mb-3 cursor-pointer text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            Histórico
-          </summary>
-          <EventosListAnimated
-            eventos={passados.map((e) => serializarEvento(e, tenant.id, true))}
-            emptyTitle="Nenhum evento no histórico"
-            emptyDescription=""
+      {destaque && (
+        <aside className="lg:sticky lg:top-24 lg:col-span-4 xl:col-span-3">
+          <ProximoEventoSpotlight
+            id={destaque.id}
+            titulo={destaque.titulo}
+            tipo={destaque.tipo ?? 'GERAL'}
+            dataLabel={destaque.dataLabel}
+            local={destaque.local}
+            href={`/portal/eventos/${destaque.id}`}
+            lotacaoLabel={
+              destaque.lotacaoLabel ? `${destaque.lotacaoLabel} conf.` : null
+            }
+            fotoUrl={destaque.fotoUrl}
+            diasLabel={destaque.diasLabel}
           />
-        </details>
+        </aside>
       )}
     </div>
   )
