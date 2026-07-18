@@ -10,7 +10,7 @@ import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertP
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -1536,6 +1536,81 @@ export async function criarGrupo(
 /** @deprecated Use criarGrupo */
 export async function criarGrupoPublico(nome: string, descricao?: string): Promise<{ id: string }> {
   return criarGrupo(nome, descricao, true)
+}
+
+export async function atualizarGrupo(input: {
+  conversaId: string
+  nome: string
+  descricao?: string | null
+  publica: boolean
+  avatarUrl?: string | null
+}): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = atualizarGrupoSchema.safeParse(input)
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  if (parsed.data.avatarUrl != null && !isCloudinaryUrl(parsed.data.avatarUrl)) {
+    throw new Error('Foto do grupo inválida.')
+  }
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores podem editar o grupo.')
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: {
+      id: parsed.data.conversaId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true },
+  })
+  if (!grupo) throw new Error('Grupo não encontrado')
+
+  const descricao =
+    parsed.data.descricao == null || parsed.data.descricao.trim() === ''
+      ? null
+      : parsed.data.descricao.trim()
+
+  await db.conversa.update({
+    where: { id: grupo.id },
+    data: {
+      nome: parsed.data.nome,
+      descricao,
+      publica: parsed.data.publica,
+      ...(parsed.data.avatarUrl !== undefined ? { avatarUrl: parsed.data.avatarUrl } : {}),
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_ATUALIZADO',
+      entidade: 'Conversa',
+      entidadeId: grupo.id,
+      detalhes: {
+        nome: parsed.data.nome,
+        publica: parsed.data.publica,
+        avatar: parsed.data.avatarUrl !== undefined,
+      },
+    },
+  })
+
+  revalidatePath('/portal/comunidade/grupos')
+  revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
+  revalidatePath('/portal/comunidade')
 }
 
 export async function entrarGrupoPublico(conversaId: string): Promise<void> {

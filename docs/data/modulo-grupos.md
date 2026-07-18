@@ -22,12 +22,24 @@ Membro ativo = `status: ATIVO` + `saiuEm: null`.
 | Path | Comportamento |
 |---|---|
 | `/portal/comunidade/grupos` | Lista públicos + privados (metadados); criar; entrar / pedir |
-| `/portal/comunidade/grupos/[id]` | Landing (não-membro) ou mural/chat/membros (membro) |
+| `/portal/comunidade/grupos/[id]` | Landing (não-membro) ou mural / chat / membros / pedidos / config (membro) |
 | `/portal/comunidade?filtro=grupos` | Feed só dos murais dos grupos do viewer |
+
+## Abas do detalhe (membro)
+
+| Aba | Quem vê | Conteúdo |
+|---|---|---|
+| Mural | membros | Composer + posts do grupo |
+| Chat | membros | Link para `/portal/mensagens?c=` |
+| Membros | membros | Lista de ativos (admin em destaque) |
+| Pedidos | admins | Aprovar / recusar entrada |
+| Sobre | todos | Privacidade + descrição |
+| Configurações | admins | Nome, descrição, privacidade, foto (`Conversa.avatarUrl`) |
 
 ## Actions
 
 - `criarGrupo(nome, descricao?, publica)` — `comunidade: true`, criador `ADMIN`+`ATIVO`
+- `atualizarGrupo` — admin; nome / descrição / `publica` / `avatarUrl` (Cloudinary)
 - `entrarGrupoPublico` — só públicos; backfill timeline
 - `pedirEntradaGrupo` / `decidirPedidoGrupo` — privados; notifs `GRUPO_*`
 - `sairGrupo` / `alternarSilencioGrupo`

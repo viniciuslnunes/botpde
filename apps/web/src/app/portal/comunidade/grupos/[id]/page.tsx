@@ -8,11 +8,19 @@ import {
   getPostsDoGrupo,
   getPostIdsSalvos,
   getPedidosPendentesGrupo,
+  getMembrosGrupo,
 } from '@/lib/feed'
 import { GrupoDetalheClient } from './grupo-detalhe-client'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Grupo — Comunidade' }
+
+type GrupoTab = 'mural' | 'membros' | 'pedidos' | 'sobre' | 'config'
+
+function parseTab(tab: string | undefined): GrupoTab {
+  if (tab === 'membros' || tab === 'pedidos' || tab === 'sobre' || tab === 'config') return tab
+  return 'mural'
+}
 
 export default async function GrupoDetalhePage({
   params,
@@ -30,15 +38,15 @@ export default async function GrupoDetalhePage({
   const grupo = await getGrupoPorId(id, tenant.id, session.user.id)
   if (!grupo) notFound()
 
-  const tabInicial =
-    tab === 'membros' ? 'membros' : tab === 'sobre' ? 'sobre' : 'mural'
+  const tabInicial = parseTab(tab)
 
-  const [posts, salvoIds, pedidos] = await Promise.all([
+  const [posts, salvoIds, pedidos, membros] = await Promise.all([
     grupo.souMembro ? getPostsDoGrupo(id, tenant.id, session.user.id) : Promise.resolve([]),
     getPostIdsSalvos(session.user.id, tenant.id),
     grupo.souAdmin
       ? getPedidosPendentesGrupo(id, tenant.id, session.user.id)
       : Promise.resolve([]),
+    grupo.souMembro ? getMembrosGrupo(id, tenant.id, session.user.id) : Promise.resolve([]),
   ])
 
   return (
@@ -56,6 +64,7 @@ export default async function GrupoDetalhePage({
         posts={posts}
         salvoIds={[...salvoIds]}
         pedidos={pedidos}
+        membros={membros}
         tabInicial={tabInicial}
         currentUser={{
           id: session.user.id,

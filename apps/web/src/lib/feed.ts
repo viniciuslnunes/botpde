@@ -1314,6 +1314,7 @@ export interface GrupoItem {
   id: string
   nome: string | null
   descricao: string | null
+  avatarUrl: string | null
   membros: number
   publica: boolean
   souMembro: boolean
@@ -1325,6 +1326,15 @@ export interface GrupoItem {
 /** @deprecated Use GrupoItem */
 export type GrupoPublicoItem = GrupoItem
 export type GrupoDetalheItem = GrupoItem
+
+export interface MembroGrupoItem {
+  userId: string
+  nome: string | null
+  nickname: string | null
+  avatarUrl: string | null
+  papel: 'ADMIN' | 'MEMBRO'
+  entrouEm: Date
+}
 
 export interface MembroGrupoPendenteItem {
   userId: string
@@ -1362,6 +1372,7 @@ export async function getGruposDoTenant(
     id: string
     nome: string | null
     descricao: string | null
+    avatarUrl: string | null
     publica: boolean
     _count: { membros: number }
     membros: Array<{
@@ -1378,6 +1389,7 @@ export async function getGruposDoTenant(
       id: true,
       nome: true,
       descricao: true,
+      avatarUrl: true,
       publica: true,
       _count: { select: { membros: membrosAtivosCount } },
       membros: userId
@@ -1396,6 +1408,7 @@ export async function getGruposDoTenant(
       id: g.id,
       nome: g.nome,
       descricao: g.descricao,
+      avatarUrl: durableImageUrl(g.avatarUrl),
       publica: g.publica,
       membros: g._count.membros,
       souMembro: membro?.status === 'ATIVO',
@@ -1423,6 +1436,7 @@ export async function getGrupoPorId(
     id: string
     nome: string | null
     descricao: string | null
+    avatarUrl: string | null
     publica: boolean
     comunidade: boolean
     _count: { membros: number }
@@ -1437,6 +1451,7 @@ export async function getGrupoPorId(
       id: true,
       nome: true,
       descricao: true,
+      avatarUrl: true,
       publica: true,
       comunidade: true,
       _count: { select: { membros: membrosAtivosCount } },
@@ -1454,6 +1469,7 @@ export async function getGrupoPorId(
     id: row.id,
     nome: row.nome,
     descricao: row.descricao,
+    avatarUrl: durableImageUrl(row.avatarUrl),
     membros: row._count.membros,
     publica: row.publica,
     souMembro: membro?.status === 'ATIVO',
@@ -1461,6 +1477,54 @@ export async function getGrupoPorId(
     souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
     silenciada: membro?.silenciada ?? false,
   }
+}
+
+export async function getMembrosGrupo(
+  conversaId: string,
+  tenantId: string,
+  viewerId: string,
+): Promise<MembroGrupoItem[]> {
+  const viewer: { id: string } | null = await db.membroConversa.findFirst({
+    where: { conversaId, ...filtroMembroGrupoAtivo(viewerId) },
+    select: { id: true },
+  })
+  if (!viewer) return []
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tenantId, tipo: 'GRUPO', comunidade: true },
+    select: { id: true },
+  })
+  if (!grupo) return []
+
+  const rows: Array<{
+    userId: string
+    papel: 'ADMIN' | 'MEMBRO'
+    entrouEm: Date
+    user: {
+      nome: string | null
+      nickname: string | null
+      avatarUrl: string | null
+    }
+  }> = await db.membroConversa.findMany({
+    where: { conversaId, status: 'ATIVO', saiuEm: null },
+    orderBy: [{ papel: 'asc' }, { entrouEm: 'asc' }],
+    take: 200,
+    select: {
+      userId: true,
+      papel: true,
+      entrouEm: true,
+      user: { select: { nome: true, nickname: true, avatarUrl: true } },
+    },
+  })
+
+  return rows.map((r) => ({
+    userId: r.userId,
+    nome: r.user.nome,
+    nickname: r.user.nickname,
+    avatarUrl: durableImageUrl(r.user.avatarUrl),
+    papel: r.papel,
+    entrouEm: r.entrouEm,
+  }))
 }
 
 export async function getPedidosPendentesGrupo(

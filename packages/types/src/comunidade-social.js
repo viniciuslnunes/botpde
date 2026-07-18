@@ -71,6 +71,14 @@ export const criarGrupoSchema = z.object({
 /** @deprecated Use criarGrupoSchema — mantido para compat. */
 export const criarGrupoPublicoSchema = criarGrupoSchema
 
+export const atualizarGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+  nome: z.string().trim().min(3).max(80),
+  descricao: z.string().trim().max(280).optional().nullable(),
+  publica: z.boolean(),
+  avatarUrl: z.string().url().nullable().optional(),
+})
+
 export const pedirEntradaGrupoSchema = z.object({
   conversaId: z.string().min(1),
 })

@@ -65,6 +65,7 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
             id,
             nome: nome.trim(),
             descricao: descricao.trim() || null,
+            avatarUrl: null,
             membros: 1,
             publica,
             souMembro: true,
@@ -194,6 +195,19 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
               layout
               className="card-soft flex items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
             >
+              <div className="flex min-w-0 items-center gap-3">
+                {g.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- lista compacta; URL Cloudinary
+                  <img
+                    src={g.avatarUrl}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary)_/_0.12)] text-sm font-bold text-[rgb(var(--color-primary-fg))]">
+                    {(g.nome ?? 'G').charAt(0).toUpperCase()}
+                  </span>
+                )}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-[rgb(var(--foreground))]">{g.nome ?? 'Grupo'}</p>
@@ -225,6 +239,7 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
                   <Users className="h-3.5 w-3.5" />
                   {g.membros} membro{g.membros === 1 ? '' : 's'}
                 </span>
+              </div>
               </div>
               {g.souMembro ? (
                 <Link
