@@ -1,11 +1,19 @@
 import { PrismaClient } from '@prisma/client'
 import {
   incrementPrismaQueryCount,
+  addPrismaQueryTime,
   resetPrismaQueryCount,
   getAndResetPrismaQueryCount,
+  getAndResetPrismaMetrics,
+  metricsEnabled,
 } from './query-metrics.js'
 
-export { resetPrismaQueryCount, getAndResetPrismaQueryCount }
+export {
+  resetPrismaQueryCount,
+  getAndResetPrismaQueryCount,
+  getAndResetPrismaMetrics,
+  metricsEnabled,
+}
 
 const WEB_CONNECTION_LIMIT = 5
 
@@ -26,7 +34,8 @@ function createPrismaClient() {
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 
-  if (process.env.NODE_ENV !== 'development') {
+  // Sem métricas (produção sem PERF_METRICS): cliente base, zero overhead.
+  if (!metricsEnabled()) {
     return base
   }
 
@@ -34,7 +43,12 @@ function createPrismaClient() {
     query: {
       async $allOperations({ args, query }) {
         incrementPrismaQueryCount()
-        return query(args)
+        const start = performance.now()
+        try {
+          return await query(args)
+        } finally {
+          addPrismaQueryTime(performance.now() - start)
+        }
       },
     },
   })

@@ -69,9 +69,11 @@ export const proxy = auth((req) => {
   }
 
   const requestHeaders = new Headers(req.headers)
-  if (process.env.NODE_ENV === 'development') {
+  // Medição de rota: dev sempre; produção via PERF_METRICS=1 (opt-in).
+  if (process.env.NODE_ENV === 'development' || process.env.PERF_METRICS === '1') {
     requestHeaders.set('x-pathname', pathname)
     requestHeaders.set('x-method', req.method)
+    requestHeaders.set('x-request-start', String(Date.now()))
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } })

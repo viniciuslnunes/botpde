@@ -236,11 +236,34 @@ porém mais lenta em bases grandes).
 
 ## Como medir
 
-- **Dev:** log `[prisma] GET /portal/comunidade — N queries`
+- **Dev:** log `[prisma] GET /portal/comunidade — N queries (Xms db)`
   (`PrismaQueryLogger` + `query-metrics.js`).
 - **Network:** primeira carga = HTML/RSC; scroll = `GET /api/comunidade/feed`;
   chat colapsado = só `/api/conversas/resumo`.
 - **Comparar:** 1ª vs 2ª visita em &lt;2 min (cache `unstable_cache` quente).
+
+### Instrumentação de rota em produção (F3-lite, custo zero) — 2026-07-18
+
+Medição **opt-in** por env, sem backend externo. Serve para achar o p95 real
+por rota e priorizar a próxima rodada de otimização com dado, não palpite.
+
+- **Ligar:** `PERF_METRICS=1` no serviço `torcida-web` (Railway → Variables →
+  redeploy). Sem a env, produção fica **idêntica** (cliente Prisma base, zero
+  overhead; nenhum log extra).
+- **O que registra:** por request de página, uma linha JSON no stdout (logs do
+  Railway): `{"perf":"route","method","route","queries","dbMs","wallMs","ts"}`.
+  `dbMs` = soma do tempo em banco; `wallMs` = tempo de servidor (middleware→após
+  render). Só rotas RSC (não `/api/*`).
+- **Overhead:** um `performance.now()` por query + uma linha de log por rota —
+  desprezível. Extensão Prisma (`$extends`) só é instalada quando ligada.
+- **Como agregar p95:** exportar os logs (Railway) filtrando `perf:route` e
+  calcular p95 de `dbMs`/`queries` agrupando por `route`. As rotas com maior
+  p95 de `dbMs` são o alvo da rodada 4 (aí sim considerar cache/índice/infra
+  **com** evidência — ver gatilhos abaixo e §5.4/§5.6 do ARCHITECTURE).
+- **Arquivos:** `packages/db/src/query-metrics.js` (`metricsEnabled`,
+  `getAndResetPrismaMetrics`), `packages/db/src/index.js` (extensão + timing),
+  `apps/web/src/proxy.ts` (headers `x-pathname`/`x-method`/`x-request-start`),
+  `apps/web/src/components/dev/prisma-query-logger.tsx` (emissão).
 
 ## Ganhos estimados (cenários) — baseline pós A–D / C3
 
@@ -370,7 +393,7 @@ escutam long-poll SSE (`ping`|`idle`); polling 60s como rede de segurança.
 |---|---------|---------|---------|
 | F1 | **PgBouncer / Prisma Accelerate** | Contenção de conexões ou p95 de query &gt; SLA | Médio–Alto |
 | F2 | **Read replica** para feeds e buscas | CPU do primary &gt; 70% sustentado | Alto |
-| F3 | **OpenTelemetry** — span por rota Comunidade + contagem Prisma exportada | Debug em produção sem adivinhar | Médio |
+| F3 | **Instrumentação de rota** — queries + tempo de banco + wall por rota | Debug em produção sem adivinhar | Baixo | ✅ 2026-07-18 (`PERF_METRICS=1`, logs JSON; ver "Como medir"). OpenTelemetry completo só se precisar de tracing distribuído |
 | F4 | **CDN** Cloudflare Free | LCP em 4G no dia de jogo | Baixo | ✅ runbook `docs/ops/cloudflare-cdn.md` + headers origin |
 
 ### Checklist pós-deploy (produção)
