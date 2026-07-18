@@ -7,20 +7,28 @@ import { useConfirmAction } from '@/lib/confirm-action'
 interface MemberActionsProps {
   membroId: string
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
+  /** Departamento pretendido no onboarding (sócio); exibido no diálogo de aprovação. */
+  departamentoNome?: string | null
 }
 
-export function MemberActions({ membroId, status }: MemberActionsProps) {
+export function MemberActions({ membroId, status, departamentoNome }: MemberActionsProps) {
   const confirmAction = useConfirmAction()
+  const depto = departamentoNome?.trim() || null
 
-  async function handleAprovar() {
+  async function handleAprovar(incluirDepartamento: boolean) {
+    const comArea = incluirDepartamento && !!depto
     await confirmAction({
-      titulo: 'Aprovar este membro?',
-      descricao: 'A pessoa passa a ter acesso conforme o status de sócio/torcedor aprovado.',
-      labelConfirmar: 'Aprovar',
+      titulo: comArea ? `Aprovar e incluir em ${depto}?` : 'Aprovar este membro?',
+      descricao: comArea
+        ? `A pessoa entra na torcida e na equipe de ${depto}. A preferência veio do onboarding.`
+        : depto
+          ? `A pessoa entra na torcida sem entrar na equipe de ${depto}. Você pode incluir depois em Departamentos.`
+          : 'A pessoa passa a ter acesso conforme o status de sócio/torcedor aprovado.',
+      labelConfirmar: comArea ? 'Aprovar e incluir' : 'Aprovar',
       variante: 'success',
       cancelled: 'Aprovação cancelada.',
-      run: () => aprovarMembro(membroId),
-      success: 'Membro aprovado.',
+      run: () => aprovarMembro(membroId, { incluirDepartamento }),
+      success: comArea ? `Membro aprovado e incluído em ${depto}.` : 'Membro aprovado.',
     })
   }
 
@@ -39,7 +47,9 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
   async function handleReverter() {
     await confirmAction({
       titulo: 'Reverter para pendente?',
-      descricao: 'O membro volta à fila de solicitação.',
+      descricao: depto
+        ? `O membro volta à fila. Membership de área (ex.: ${depto}) é removida.`
+        : 'O membro volta à fila de solicitação. Membership de área, se houver, é removida.',
       labelConfirmar: 'Reverter',
       cancelled: 'Reversão cancelada.',
       run: () => reverterMembro(membroId),
@@ -51,12 +61,22 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
-          onClick={() => void handleAprovar()}
+          onClick={() => void handleAprovar(true)}
           className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
         >
           <Check className="h-3 w-3" />
           Aprovar
         </button>
+        {depto && (
+          <button
+            type="button"
+            onClick={() => void handleAprovar(false)}
+            className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            title={`Aprovar sem incluir em ${depto}`}
+          >
+            Sem área
+          </button>
+        )}
         <button
           onClick={() => void handleReprovar()}
           className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
@@ -79,13 +99,25 @@ export function MemberActions({ membroId, status }: MemberActionsProps) {
         Reverter
       </button>
       {status === 'REPROVADO' && (
-        <button
-          onClick={() => void handleAprovar()}
-          className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
-        >
-          <Check className="h-3 w-3" />
-          Aprovar
-        </button>
+        <>
+          <button
+            onClick={() => void handleAprovar(true)}
+            className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+          >
+            <Check className="h-3 w-3" />
+            Aprovar
+          </button>
+          {depto && (
+            <button
+              type="button"
+              onClick={() => void handleAprovar(false)}
+              className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+              title={`Aprovar sem incluir em ${depto}`}
+            >
+              Sem área
+            </button>
+          )}
+        </>
       )}
     </div>
   )

@@ -1,14 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db, type Prisma } from '@torcida/db'
+import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { notificarSafe } from '@/lib/notificacoes'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
+import { invalidatePermissionsCache } from '@/lib/tenant'
 import {
   AtualizarMembroLgeSchema,
   DesligarMembroSchema,
   formatDataCompetenciaInput,
+  PAPEL_DEPARTAMENTO,
   PERMISSIONS,
 } from '@torcida/types'
 
@@ -19,7 +21,8 @@ import {
  *
  * Sócio/Torcedor NÃO são departamentos (ver schema Departamento) — o tipo
  * vive em SaasMembro.tipo; departamentos reais (Financeiro, Comunicação…)
- * são atribuídos depois pelo admin.
+ * vêm da preferência do onboarding (SaasMembro.departamentoId) só neste
+ * momento, ou depois via /admin/acessos.
  */
 async function concederAcessoBasico(
   tenantId: string,
@@ -39,8 +42,90 @@ async function concederAcessoBasico(
   })
 }
 
-export async function aprovarMembro(membroId: string) {
+/**
+ * Aplica o departamento pretendido no onboarding (perfil Membro · área +
+ * projeção UserDepartamento). Só chamar com membro já APROVADO.
+ */
+async function aplicarDepartamentoPreferido(
+  tenantId: string,
+  userId: string,
+  departamentoId: string,
+  client: Prisma.TransactionClient,
+) {
+  const depto: { id: string } | null = await client.departamento.findFirst({
+    where: { id: departamentoId, tenantId },
+    select: { id: true },
+  })
+  if (!depto) return
+
+  const roleMembro: { id: string } | null = await client.role.findFirst({
+    where: {
+      tenantId,
+      departamentoId,
+      papelNoDepartamento: PAPEL_DEPARTAMENTO.MEMBRO,
+    },
+    select: { id: true },
+  })
+
+  if (roleMembro) {
+    await client.userRole.upsert({
+      where: {
+        userId_tenantId_roleId: { userId, tenantId, roleId: roleMembro.id },
+      },
+      create: { userId, tenantId, roleId: roleMembro.id },
+      update: {},
+    })
+  } else {
+    await client.userDepartamento.upsert({
+      where: {
+        userId_tenantId_departamentoId: { userId, tenantId, departamentoId },
+      },
+      create: { userId, tenantId, departamentoId },
+      update: {},
+    })
+  }
+
+  await syncMembershipFromRoles(client, { userId, tenantId })
+}
+
+/**
+ * Remove membership de área no tenant (UserDepartamento, gestores e perfis
+ * com departamento). Usado ao reprovar/reverter — pendente/reprovado não
+ * herda departamento.
+ */
+async function limparMembershipDepartamentos(
+  tenantId: string,
+  userId: string,
+  client: Prisma.TransactionClient | typeof db = db,
+) {
+  const rolesDeArea: { id: string }[] = await client.role.findMany({
+    where: { tenantId, departamentoId: { not: null } },
+    select: { id: true },
+  })
+  if (rolesDeArea.length > 0) {
+    await client.userRole.deleteMany({
+      where: {
+        userId,
+        tenantId,
+        roleId: { in: rolesDeArea.map((r) => r.id) },
+      },
+    })
+  }
+
+  await client.userDepartamento.deleteMany({ where: { userId, tenantId } })
+  await client.departamentoGestor.deleteMany({
+    where: { userId, departamento: { tenantId } },
+  })
+}
+
+export type AprovarMembroOpts = {
+  /** Default true: aplica SaasMembro.departamentoId como membership. */
+  incluirDepartamento?: boolean
+}
+
+export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
+  const incluirDepartamento = opts?.incluirDepartamento !== false
 
   const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const atualizado = await tx.saasMembro.update({
@@ -57,10 +142,20 @@ export async function aprovarMembro(membroId: string) {
 
     if (atualizado.tipo === 'SOCIO') {
       await privatizarPerfilAoAprovarSocio(atualizado.userId, tenant.id, tx)
+      if (incluirDepartamento && atualizado.departamentoId) {
+        await aplicarDepartamentoPreferido(
+          tenant.id,
+          atualizado.userId,
+          atualizado.departamentoId,
+          tx,
+        )
+      }
     }
 
     return atualizado
   })
+
+  invalidatePermissionsCache(membro.userId, tenant.id)
 
   await db.auditLog.create({
     data: {
@@ -69,6 +164,13 @@ export async function aprovarMembro(membroId: string) {
       acao: 'MEMBRO_APROVADO',
       entidade: 'SaasMembro',
       entidadeId: membroId,
+      detalhes:
+        membro.departamentoId != null
+          ? {
+              departamentoId: membro.departamentoId,
+              incluirDepartamento,
+            }
+          : undefined,
     },
   })
 
@@ -92,14 +194,22 @@ export async function aprovarMembro(membroId: string) {
 export async function reprovarMembro(membroId: string, motivo?: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
 
-  const membro = await db.saasMembro.update({
-    where: { id: membroId, tenantId: tenant.id },
-    data: {
-      status: 'REPROVADO',
-      aprovadoPorId: session.user.id,
-      aprovadoPorNome: session.user.name ?? 'Admin',
-      aprovadoEm: new Date(),
-    },
+  const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const atualizado = await tx.saasMembro.update({
+      where: { id: membroId, tenantId: tenant.id },
+      data: {
+        status: 'REPROVADO',
+        aprovadoPorId: session.user.id,
+        aprovadoPorNome: session.user.name ?? 'Admin',
+        aprovadoEm: new Date(),
+      },
+    })
+
+    // Preferência do onboarding NÃO vira equipe; limpa qualquer membership
+    // órfã (ex.: bug antigo que upsertava UserDepartamento no cadastro).
+    await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+
+    return atualizado
   })
 
   await db.auditLog.create({
@@ -136,14 +246,19 @@ export async function reverterMembro(membroId: string) {
   // aprovação sendo desfeita).
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  await db.saasMembro.update({
-    where: { id: membroId, tenantId: tenant.id },
-    data: {
-      status: 'PENDENTE',
-      aprovadoPorId: null,
-      aprovadoPorNome: null,
-      aprovadoEm: null,
-    },
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const atualizado = await tx.saasMembro.update({
+      where: { id: membroId, tenantId: tenant.id },
+      data: {
+        status: 'PENDENTE',
+        aprovadoPorId: null,
+        aprovadoPorNome: null,
+        aprovadoEm: null,
+      },
+    })
+
+    // Pendente não herda departamento — remove membership concedida na aprovação.
+    await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
   })
 
   await db.auditLog.create({

@@ -93,6 +93,24 @@ pnpm --filter @torcida/db db:repair-system-roles
 Onboarding e Sedes usam a **árvore de `Sede`** no mesmo tenant. A **Visão da torcida**
 (`/admin/torcida`) consolida a worktree.
 
+### Departamento no onboarding (preferência ≠ membership)
+
+No cadastro de **sócio**, o wizard pode pedir um departamento pretendido. Isso
+grava só `SaasMembro.departamentoId` (informativo para a fila de aprovação em
+`/admin/membros` e na Diretoria). **Não** cria `UserDepartamento` nem perfil
+`Membro · {Área}` enquanto o status for `PENDENTE` ou `REPROVADO`.
+
+Só em `aprovarMembro` a preferência vira membership (perfil membro da área +
+`syncMembershipFromRoles`), salvo se o admin optar por aprovar sem incluir na
+área. Reprovar/reverter limpa membership de área no tenant.
+
+Órfãos legados (membership criada no cadastro antes da correção):
+
+```bash
+pnpm --filter @torcida/db db:repair-departamento-orfaos -- --dry-run
+pnpm --filter @torcida/db db:repair-departamento-orfaos
+```
+
 ## Hierarquia de governança
 
 - **Presidente** — `owner` + Diretoria; console `/admin/torcida`

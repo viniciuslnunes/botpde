@@ -71,7 +71,10 @@ export default async function MembrosPage({
   const [membros, total, contagens] = await Promise.all([
     db.saasMembro.findMany({
       where,
-      include: { user: { select: { nome: true, email: true, avatarUrl: true } } },
+      include: {
+        user: { select: { nome: true, email: true, avatarUrl: true } },
+        departamento: { select: { id: true, nome: true } },
+      },
       orderBy: { criadoEm: 'desc' },
       skip: (pagina - 1) * porPagina,
       take: porPagina,
@@ -266,6 +269,7 @@ export default async function MembrosPage({
               inicial: membro.nome.charAt(0).toUpperCase(),
               telefone: membro.telefone,
               idade: membro.idade,
+              departamentoNome: membro.departamento?.nome ?? null,
               // Prova de vínculo só existe/importa para sócio (dado RESTRITO).
               imagemProva: isSocio ? membro.imagemProva : null,
               numeroAssociado: isSocio ? membro.numeroAssociado : null,

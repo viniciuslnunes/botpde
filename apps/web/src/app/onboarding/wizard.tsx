@@ -1682,7 +1682,7 @@ function PassoVinculo({
         </div>
 
         {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
-          <Campo label="Departamento de atuação" erros={errosCampo.departamentoId}>
+          <Campo label="Departamento pretendido" erros={errosCampo.departamentoId}>
             <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
               <option value="">Selecione (opcional)</option>
               {departamentosSelecionaveis.map((d) => (
@@ -1691,6 +1691,9 @@ function PassoVinculo({
                 </option>
               ))}
             </Select>
+            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+              Informativo para a diretoria — só entra na equipe após aprovação.
+            </p>
           </Campo>
         )}
 

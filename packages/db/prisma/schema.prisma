@@ -334,6 +334,8 @@ model Departamento {
   membros  UserDepartamento[]
   gestores DepartamentoGestor[]
   roles    Role[]
+  /// Preferência de área no cadastro (SaasMembro) — sem membership até APROVADO.
+  solicitacoesMembros SaasMembro[]
 
   @@unique([tenantId, nome])
   @@unique([tenantId, slug])
@@ -434,6 +436,11 @@ model SaasMembro {
   sedeId String? @map("sede_id")
   sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
 
+  /// Departamento pretendido no onboarding (sócio). NÃO cria UserDepartamento
+  /// nem perfil de área enquanto status ≠ APROVADO — só após aprovarMembro.
+  departamentoId String?       @map("departamento_id")
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
   // Rastro de origem: qual importação criou este membro (null = cadastro
   // orgânico). Permite auditar e desfazer importações (ex: dados MOCK de
   // demonstração) sem tocar em membros reais.
@@ -450,6 +457,7 @@ model SaasMembro {
   @@unique([tenantId, userId])
   @@unique([tenantId, cpf])
   @@index([sedeId])
+  @@index([departamentoId])
   @@index([importacaoId])
   @@index([tenantId, status])
   @@index([tenantId, adimplente])

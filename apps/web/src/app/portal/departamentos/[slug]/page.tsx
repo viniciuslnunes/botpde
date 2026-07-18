@@ -207,10 +207,32 @@ export default async function DepartamentoHomePage({
     }),
   ])
 
-  const gestorSet = new Set(gestoresRaw.map((g) => g.userId))
+  // Equipe: só exibe quem não está PENDENTE/REPROVADO. Membership órfã
+  // (bug antigo) some da UI aqui; limpeza no banco via
+  // `pnpm --filter @torcida/db db:repair-departamento-orfaos`.
+  const userIdsEquipe = [
+    ...new Set([...membrosRaw, ...gestoresRaw].map((r) => r.userId)),
+  ]
+  const membrosStatus: { userId: string; status: string }[] =
+    userIdsEquipe.length > 0
+      ? await db.saasMembro.findMany({
+          where: { tenantId: tenant.id, userId: { in: userIdsEquipe } },
+          select: { userId: true, status: true },
+        })
+      : []
+  const statusPorUser = new Map(membrosStatus.map((m) => [m.userId, m.status]))
+  function naEquipeVisivel(userId: string): boolean {
+    const st = statusPorUser.get(userId)
+    return st !== 'PENDENTE' && st !== 'REPROVADO'
+  }
+
+  const gestorSet = new Set(
+    gestoresRaw.filter((g) => naEquipeVisivel(g.userId)).map((g) => g.userId),
+  )
   const porId = new Map<string, MembroEquipe>()
 
   for (const g of gestoresRaw) {
+    if (!naEquipeVisivel(g.userId)) continue
     porId.set(g.userId, {
       userId: g.userId,
       nome: g.user.nome,
@@ -221,6 +243,7 @@ export default async function DepartamentoHomePage({
     })
   }
   for (const m of membrosRaw) {
+    if (!naEquipeVisivel(m.userId)) continue
     if (porId.has(m.userId)) continue
     porId.set(m.userId, {
       userId: m.userId,
@@ -290,6 +313,7 @@ export default async function DepartamentoHomePage({
         tipo: 'SOCIO' | 'TORCEDOR'
         cidade: string | null
         criadoEm: Date
+        departamento: { nome: string } | null
         user: { nome: string | null; email: string; avatarUrl: string | null }
       }
       const rows: PendenteRow[] = await db.saasMembro.findMany({
@@ -302,6 +326,7 @@ export default async function DepartamentoHomePage({
           tipo: true,
           cidade: true,
           criadoEm: true,
+          departamento: { select: { nome: true } },
           user: { select: { nome: true, email: true, avatarUrl: true } },
         },
       })
@@ -311,6 +336,7 @@ export default async function DepartamentoHomePage({
         tipo: r.tipo,
         cidade: r.cidade,
         criadoEm: r.criadoEm.toISOString(),
+        departamentoNome: r.departamento?.nome ?? null,
         user: r.user,
       }))
     }

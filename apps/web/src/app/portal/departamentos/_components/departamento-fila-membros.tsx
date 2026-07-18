@@ -10,6 +10,7 @@ export type PendenteLite = {
   tipo: 'SOCIO' | 'TORCEDOR'
   cidade: string | null
   criadoEm: string
+  departamentoNome: string | null
   user: { nome: string | null; email: string; avatarUrl: string | null }
 }
 
@@ -68,12 +69,17 @@ export function DepartamentoFilaMembros({
                 </p>
                 <p className="mt-0.5 truncate text-xs text-[rgb(var(--foreground-muted))]">
                   {p.tipo === 'SOCIO' ? 'Sócio' : 'Torcedor'}
+                  {p.departamentoNome ? ` · ${p.departamentoNome}` : ''}
                   {p.cidade ? ` · ${p.cidade}` : ''}
                   {' · '}
                   {formatarData(p.criadoEm)}
                 </p>
               </div>
-              <MemberActions membroId={p.id} status="PENDENTE" />
+              <MemberActions
+                membroId={p.id}
+                status="PENDENTE"
+                departamentoNome={p.departamentoNome}
+              />
             </li>
           ))}
         </ul>

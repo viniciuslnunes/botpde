@@ -433,8 +433,9 @@ export async function registrarInteresseUnidade(input: {
  * Cria (ou reenvia, se REPROVADO) um SaasMembro PENDENTE no tenant escolhido,
  * reaproveitando a lógica de dedup / re-tentativa / AuditLog do fluxo de cadastro.
  * Também marca o onboarding do PerfilTorcedor como concluído. Para SOCIO com
- * departamento informado, associa via UserDepartamento. Redireciona para a
- * comunidade (a tela de pendência já existe lá).
+ * departamento informado, grava só a preferência em SaasMembro.departamentoId —
+ * UserDepartamento / perfil de área só após aprovação do admin.
+ * Redireciona para a tela de pendência.
  */
 export async function solicitarVinculo(
   input: SolicitarVinculoInput,
@@ -473,6 +474,7 @@ export async function solicitarVinculo(
     anosSocio: data.anosSocio,
     imagemProva: data.imagemProva,
     sedeId: undefined as string | undefined,
+    departamentoId: null as string | null,
   }
 
   // Vínculo territorial: 1 sede → usa direto; várias → exige seleção válida.
@@ -494,9 +496,10 @@ export async function solicitarVinculo(
   }
   dadosMembro.sedeId = sedeId
 
-  // Valida departamento (se informado) pertence ao tenant.
-  let departamentoId: string | undefined
-  if (data.departamentoId) {
+  // Valida departamento (se informado) pertence ao tenant. Preferência apenas —
+  // não cria membership até o admin aprovar (aprovarMembro).
+  let departamentoId: string | null = null
+  if (data.tipo === 'SOCIO' && data.departamentoId) {
     const dep = await db.departamento.findFirst({
       where: { id: data.departamentoId, tenantId: tenant.id },
       select: { id: true },
@@ -506,6 +509,7 @@ export async function solicitarVinculo(
     }
     departamentoId = dep.id
   }
+  dadosMembro.departamentoId = departamentoId
 
   // TORCEDOR entra sem fila de aprovação (copy do wizard: "entrada imediata,
   // sem aprovação nem comprovante") — só não abre tenant próprio no portal
@@ -569,21 +573,6 @@ export async function solicitarVinculo(
         entidade: 'SaasMembro',
         entidadeId: novo.id,
       },
-    })
-  }
-
-  // Departamento de atuação (só sócios) — idempotente.
-  if (data.tipo === 'SOCIO' && departamentoId) {
-    await db.userDepartamento.upsert({
-      where: {
-        userId_tenantId_departamentoId: {
-          userId,
-          tenantId: tenant.id,
-          departamentoId,
-        },
-      },
-      create: { userId, tenantId: tenant.id, departamentoId },
-      update: {},
     })
   }
 

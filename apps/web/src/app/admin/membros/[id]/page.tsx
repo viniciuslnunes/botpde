@@ -47,6 +47,7 @@ export default async function MembroDetalhePage({ params }: Props) {
     dataNascimento: Date | null
     planoAssociacaoId: string | null
     planoAssociacao: { nome: string } | null
+    departamento: { id: string; nome: string } | null
     user: { email: string | null }
   }
 
@@ -70,6 +71,7 @@ export default async function MembroDetalhePage({ params }: Props) {
       dataNascimento: true,
       planoAssociacaoId: true,
       planoAssociacao: { select: { nome: true } },
+      departamento: { select: { id: true, nome: true } },
       user: { select: { email: true } },
     },
   })
@@ -111,6 +113,7 @@ export default async function MembroDetalhePage({ params }: Props) {
             <h1 className="text-lg font-semibold text-[rgb(var(--foreground))]">{membro.nome}</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
               {membro.tipo} · {membro.status}
+              {membro.departamento ? ` · ${membro.departamento.nome}` : ''}
               {membro.planoAssociacao ? ` · ${membro.planoAssociacao.nome}` : ''}
             </p>
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -130,6 +133,7 @@ export default async function MembroDetalhePage({ params }: Props) {
         <MemberActions
           membroId={membro.id}
           status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
+          departamentoNome={membro.departamento?.nome}
         />
       </div>
 

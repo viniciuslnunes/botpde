@@ -24,6 +24,8 @@ export interface AdminMembroItem {
   inicial: string
   telefone?: string | null
   idade?: number | null
+  /** Departamento pretendido no onboarding (sócio); null se não informou. */
+  departamentoNome?: string | null
   /** Comprovante de vínculo (só sócio; dado RESTRITO — nunca cachear). */
   imagemProva?: string | null
   numeroAssociado?: string | null
@@ -60,7 +62,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
       animate="show"
       className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
     >
-      <table className="w-full min-w-[42rem] text-sm">
+      <table className="w-full min-w-[48rem] text-sm">
         <thead>
           <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -70,12 +72,15 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
               Tipo
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden md:table-cell">
+              Departamento
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden lg:table-cell">
               Cidade
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden lg:table-cell">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden xl:table-cell">
               Cadastro
             </th>
             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -168,6 +173,11 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.tipo}</span>
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {membro.departamentoNome ?? '—'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 hidden lg:table-cell">
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.cidade ?? '—'}</span>
                 </td>
                 <td className="px-4 py-3">
@@ -175,11 +185,15 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                     {membro.statusLabel}
                   </span>
                 </td>
-                <td className="px-4 py-3 hidden lg:table-cell">
+                <td className="px-4 py-3 hidden xl:table-cell">
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.criadoEmLabel}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <MemberActions membroId={membro.id} status={membro.status} />
+                  <MemberActions
+                    membroId={membro.id}
+                    status={membro.status}
+                    departamentoNome={membro.departamentoNome}
+                  />
                 </td>
               </m.tr>
             ))}

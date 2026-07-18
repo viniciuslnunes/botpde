@@ -218,7 +218,7 @@ describe('solicitarVinculo — validação', () => {
     expect(perfilUpsert).toHaveBeenCalled()
   })
 
-  it('sócio com departamento associa via UserDepartamento', async () => {
+  it('sócio com departamento grava preferência sem UserDepartamento', async () => {
     tenantFindFirst.mockResolvedValue({ id: UUID, slug: 'torcida-teste', nome: 'Torcida Teste' })
     sedeFindMany.mockResolvedValue([])
     departamentoFindFirst.mockResolvedValue({ id: UUID2 })
@@ -236,7 +236,15 @@ describe('solicitarVinculo — validação', () => {
         cep: '01310-100',
       }),
     ).rejects.toThrow('REDIRECT')
-    expect(userDepartamentoUpsert).toHaveBeenCalled()
+    expect(membroCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          departamentoId: UUID2,
+          status: 'PENDENTE',
+        }),
+      }),
+    )
+    expect(userDepartamentoUpsert).not.toHaveBeenCalled()
   })
 
   it('bloqueia quando já APROVADO', async () => {
