@@ -710,7 +710,7 @@ function ComposerBody({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={springGentle}
-            className="overflow-hidden"
+            className={alcanceOpen ? 'overflow-visible' : 'overflow-hidden'}
           >
           {/* Prévia dos anexos */}
           {medias.length > 0 && (
@@ -1062,7 +1062,7 @@ function ComposerBody({
                         animate="show"
                         exit="exit"
                         transition={springGentle}
-                        className="card-soft absolute bottom-full right-0 z-30 mb-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                        className="card-soft absolute top-full right-0 z-40 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
                       >
                         {VISIBILIDADE_OPCOES.map((opcao, index) => {
                           const selecionada = opcao.value === visibilidadeEfetiva
