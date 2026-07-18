@@ -319,7 +319,8 @@ async function main() {
         tipo: ev.tipo,
         capacidade: ev.capacidade ?? null,
         valorVaga: ev.tipo === 'CARAVANA' && ev.valorVaga != null ? ev.valorVaga : null,
-        sedeId: sede?.id ?? null,
+        // Global na torcida — escopo por unidade esconde de quem não tem sedeId.
+        sedeId: null,
       },
       create: {
         id: ev.id,
@@ -332,7 +333,7 @@ async function main() {
         tipo: ev.tipo,
         capacidade: ev.capacidade ?? null,
         valorVaga: ev.tipo === 'CARAVANA' && ev.valorVaga != null ? ev.valorVaga : null,
-        sedeId: sede?.id ?? null,
+        sedeId: null,
         criadoPorId: autorId,
       },
     })
