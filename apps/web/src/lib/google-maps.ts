@@ -149,9 +149,8 @@ export type GoogleMarkerInstance = {
   addEventListener: (type: string, listener: () => void) => void
 }
 
-export type GooglePinElement = {
-  element: HTMLElement
-}
+/** PinElement estende HTMLElement; a API antiga expunha `.element` (deprecated). */
+export type GooglePinElement = HTMLElement
 
 export type GoogleMapsMarkerLibrary = {
   AdvancedMarkerElement: new (opts: {

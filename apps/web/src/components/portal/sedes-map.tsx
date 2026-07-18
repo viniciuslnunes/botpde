@@ -30,13 +30,14 @@ function pinContent(
   markerLib: GoogleMapsMarkerLibrary,
   kind: 'sede' | 'sede-selected' | 'user',
 ): HTMLElement {
+  // PinElement é HTMLElement — usar a instância direto (`.element` está deprecated).
   if (kind === 'user') {
     return new markerLib.PinElement({
       background: '#2563eb',
       borderColor: '#ffffff',
       glyphColor: '#ffffff',
       scale: 1.05,
-    }).element
+    })
   }
   if (kind === 'sede-selected') {
     return new markerLib.PinElement({
@@ -44,14 +45,14 @@ function pinContent(
       borderColor: '#ffffff',
       glyphColor: '#ffffff',
       scale: 1.25,
-    }).element
+    })
   }
   return new markerLib.PinElement({
     background: 'rgb(99, 102, 241)',
     borderColor: '#ffffff',
     glyphColor: '#ffffff',
     scale: 1,
-  }).element
+  })
 }
 
 export function SedesMap({
