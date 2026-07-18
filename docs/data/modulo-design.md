@@ -70,24 +70,28 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 1. `TenantDesignBridge` nos layouts portal/admin aplica CSS vars via `applyTenantDesign`.
 2. Grade `.app-shell-bg` usa `--grid-size`, `--grid-line`, `--grid-opacity`, `--grid-base`; `html[data-grid=off]` desliga o padrão.
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
-4. Vars de texto legível: `--color-primary-fg`, `--color-secondary-fg`,
-   `--color-success-fg` / `--color-success-on`, …  
-   Soft/badge/menu/tab → `*-fg`; botão sólido → `*-on`
-   (`resolveActionTextColors`; override em `brandFg` / `actionsFg`). Nav portal,
-   sidebar admin e abas (Membros, Sócios, Cobranças, Acessos) usam `*-fg` no
-   ativo + ring — **proibido** `text-[rgb(var(--primary))]` com marca preta.
+4. Vars de texto legível: `--color-primary-fg` (alias `--primary-fg`),
+   `--color-secondary-fg`, `--color-success-fg` / `--color-success-on`, …  
+   Soft/badge/menu/tab/nome em mensagem → `*-fg`; botão sólido → `*-on`
+   (`resolveActionTextColors`; override em `brandFg` / `actionsFg`).  
+   **Proibido** `text-[rgb(var(--primary))]` em texto sobre fundo escuro com
+   marca preta — some. Preenchimento sólido pode usar `--color-primary` +
+   `*-on` e ring com `*-fg` quando a marca é P&B.
 
 ## Sugestões de cor
 
 1. **Paletas sugeridas** (`gerarPaletasSugeridas` + `resolverMarcaTorcida`) —
-   ordem na UI: **paleta atual** (rascunho) → **paletas salvas** pela torcida
-   (`customPalettes`, até 20) → sistema (marca → escudo → clube → mono → alto
-   contraste).  
+   **exatamente 3 cards**, na ordem da regra de negócio: **marca da torcida** →
+   **escudo/logo** → **paleta do clube**. Sem mono, alto contraste nem
+   harmônicas genéricas.  
    Se `corPrimaria` ainda for o roxo da plataforma (`#7c3aed`), a marca usa
    `TORCIDA_CORES_PRIMARIAS[slug]` (ex. `pde-gavioes-fiel` → `#1a1a1a`) ou a
    paleta do clube — **nunca** tratar o default do produto como identidade da
-   torcida. Cada card: **3 cores** + hex. Lista gerada do baseline + slug;
-   “Salvar paleta atual” grava no rascunho até `salvarDesignTenant`.
+   torcida. Cada card: **3 cores** (primária · secundária · `actions.danger`)
+   — o 3º swatch é o accent da identidade quando existir, e **é o que Aplicar
+   grava** (não há cor “fantasma” só no card). Escudo sem extrato e clube sem
+   afiliação usam fallback estável na marca. Paletas salvas pela torcida
+   (`customPalettes`) ficam numa lista à parte.  
 2. **Rivalidade / identidade** — ver knowledge acima. Sucesso segue a **marca**
    (não azul genérico nem verde forçado); verde só se identidade já for verde;
    neutros sem saturação artificial; sem análoga/complementar.
@@ -96,7 +100,8 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
    filtrados.
 5. **Superfícies derivadas** — `derivarSuperficiesDaMarca` preenche
    `background`, `backgroundSubtle`, `surface` e `surfaceRaised` (light/dark)
-   com tint leve; não deixar fundo/elevada “vazios” no padrão do sistema.
+   com tint leve; `aplicarPaletaAoDesign` sempre reaplica ações + superfícies +
+   texto automático.
 6. **Antes/depois** na prévia.
 
 ## UX do estúdio (`/admin/design`)

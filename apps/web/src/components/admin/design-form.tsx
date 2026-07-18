@@ -39,7 +39,7 @@ import {
   contrasteRatio,
   contrasteTextoSobre,
   customPaletteParaSugerida,
-  designParaPaletaSugerida,
+  derivarAcoesDaMarca,
   gerarPaletasSugeridas,
   isCorPadraoPlataforma,
   mixHex,
@@ -622,17 +622,6 @@ export function DesignForm({
     ],
   )
 
-  const paletaAtual = useMemo(
-    () =>
-      designParaPaletaSugerida(design, {
-        id: 'atual',
-        nome: 'Paleta atual',
-        descricao: 'Rascunho que você está editando agora',
-        fonte: 'atual',
-      }),
-    [design],
-  )
-
   const paletasSalvas = useMemo(
     () => (design.customPalettes ?? []).map(customPaletteParaSugerida),
     [design.customPalettes],
@@ -653,12 +642,26 @@ export function DesignForm({
   function applyPaletaCompleta(
     paleta: ReturnType<typeof gerarPaletasSugeridas>[number],
   ) {
-    // “Paleta atual” é só espelho do rascunho — reaplicar só rederiva e suja o tema.
-    if (paleta.id === 'atual') return
     setDesign(aplicarPaletaAoDesign(design, paleta) as TenantDesign)
     setFocus(null)
     setCompareAtivo(false)
     setSection('identidade')
+  }
+
+  function reequilibrarAcoesDaMarca() {
+    const secondary =
+      design.brand.secondary &&
+      /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
+        ? design.brand.secondary
+        : null
+    const accents = clubePaleta?.accents ?? []
+    patch({
+      actions: derivarAcoesDaMarca(design.brand.primary, {
+        secondary,
+        accents,
+      }),
+      actionsFg: { ...DEFAULT_ACTIONS_FG },
+    })
   }
 
   function salvarPaletaAtual() {
@@ -723,10 +726,10 @@ export function DesignForm({
                   aria-selected={active}
                   onClick={() => setSection(s.id)}
                   className={[
-                    'flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-xs font-medium transition-colors sm:gap-1.5 sm:px-2 sm:text-sm',
+                    'flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-xs transition-colors sm:gap-1.5 sm:px-2 sm:text-sm',
                     active
-                      ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
-                      : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                      ? 'bg-[rgb(var(--surface))] font-semibold text-[rgb(var(--foreground))] shadow-sm'
+                      : 'font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -755,8 +758,8 @@ export function DesignForm({
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Inclui a paleta atual, as que a torcida salvou e sugestões do
-                    catálogo (marca, escudo, clube). Aplicar muda só a prévia até
+                    Três opções na ordem da torcida: marca → escudo → clube.
+                    Aplicar atualiza marca, ações e superfícies na prévia até
                     salvar o design.
                   </p>
                   {extracting ? (
@@ -767,26 +770,6 @@ export function DesignForm({
                   ) : null}
 
                   <div className="space-y-2">
-                    <PaletaCard
-                      paleta={paletaAtual}
-                      badge="Atual"
-                      applyLabel="Em uso"
-                      onApply={() => applyPaletaCompleta(paletaAtual)}
-                    />
-                    {paletasSalvas.map((p) => {
-                      const customId = p.id.startsWith('custom:')
-                        ? p.id.slice('custom:'.length)
-                        : p.id
-                      return (
-                        <PaletaCard
-                          key={p.id}
-                          paleta={p}
-                          badge="Salva"
-                          onApply={() => applyPaletaCompleta(p)}
-                          onRemove={() => removerPaletaSalva(customId)}
-                        />
-                      )
-                    })}
                     {paletasSugeridas.map((p) => (
                       <PaletaCard
                         key={p.id}
@@ -795,6 +778,28 @@ export function DesignForm({
                       />
                     ))}
                   </div>
+
+                  {paletasSalvas.length > 0 ? (
+                    <div className="space-y-2 border-t border-[rgb(var(--border))] pt-3">
+                      <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                        Salvas pela torcida
+                      </p>
+                      {paletasSalvas.map((p) => {
+                        const customId = p.id.startsWith('custom:')
+                          ? p.id.slice('custom:'.length)
+                          : p.id
+                        return (
+                          <PaletaCard
+                            key={p.id}
+                            paleta={p}
+                            badge="Salva"
+                            onApply={() => applyPaletaCompleta(p)}
+                            onRemove={() => removerPaletaSalva(customId)}
+                          />
+                        )
+                      })}
+                    </div>
+                  ) : null}
 
                   {mostrarSalvarPaleta ? (
                     <div className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
@@ -998,10 +1003,7 @@ export function DesignForm({
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      const pack = paletasSugeridas.find((p) => p.id === 'marca-torcida')
-                      if (pack) applyPaletaCompleta(pack)
-                    }}
+                    onClick={reequilibrarAcoesDaMarca}
                     className="text-left text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
                   >
                     Reequilibrar ações a partir da primária atual

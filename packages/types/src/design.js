@@ -754,30 +754,69 @@ export function limitarSwatches(hexes, max = 3) {
 }
 
 /**
- * Terceira cor de destaque: accent do clube, senão fallback (ex.: danger).
+ * Primeiro accent cromático distinto de primária/secundária (destaque da identidade).
+ * Neutros/cinzas do extrator não viram danger — senão o 3º swatch “some” da marca.
  * @param {string} primary
  * @param {string} secondary
- * @param {{ accents?: string[], primary?: string } | null | undefined} clube
- * @param {string} [fallback]
- * @returns {string | undefined}
+ * @param {string[]} [accents]
+ * @returns {string | null}
  */
-function destaqueDaPaleta(primary, secondary, clube, fallback) {
-  const candidates = [
-    ...(clube?.accents ?? []),
-    clube?.primary &&
-    clube.primary.toLowerCase() !== primary.toLowerCase() &&
-    clube.primary.toLowerCase() !== secondary.toLowerCase()
-      ? clube.primary
-      : null,
-    fallback,
-  ].filter(Boolean)
-  for (const c of candidates) {
-    const key = /** @type {string} */ (c).toLowerCase()
-    if (key !== primary.toLowerCase() && key !== secondary.toLowerCase()) {
-      return /** @type {string} */ (c)
-    }
+function accentDestaque(primary, secondary, accents = []) {
+  const p = primary.toLowerCase()
+  const s = secondary.toLowerCase()
+  for (const raw of accents) {
+    if (typeof raw !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(raw)) continue
+    const key = raw.toLowerCase()
+    if (key === p || key === s) continue
+    const { s: sat } = hexToHsl(raw)
+    if (sat < 0.18) continue
+    return raw
   }
-  return fallback
+  return null
+}
+
+/**
+ * Fecha uma paleta sugerida: ações derivadas + swatches = o que Aplicar grava.
+ * O 3º swatch é sempre `actions.danger` (accent da identidade quando existir).
+ * @param {{
+ *   id: string,
+ *   nome: string,
+ *   descricao: string,
+ *   primary: string,
+ *   secondary: string,
+ *   accents?: string[],
+ *   identidade?: string[],
+ *   fonte: PaletaSugerida['fonte'],
+ * }} spec
+ * @returns {PaletaSugerida}
+ */
+function fecharPaletaSugerida(spec) {
+  const identidade = filtrarVerdeForaDeContexto(
+    (spec.identidade ?? [spec.primary, spec.secondary, ...(spec.accents ?? [])]).filter(
+      Boolean,
+    ),
+    [spec.primary, spec.secondary, ...(spec.accents ?? [])],
+  )
+  const accents = filtrarVerdeForaDeContexto(spec.accents ?? [], identidade)
+  const actions = derivarAcoesDaMarca(spec.primary, {
+    secondary: spec.secondary,
+    accents,
+  })
+  const destaque = accentDestaque(spec.primary, spec.secondary, accents)
+  if (destaque) {
+    // Accent da torcida/clube vira o danger aplicado — swatch ≠ fantasma.
+    actions.danger = clampHexLightness(destaque, 0.28, 0.52)
+  }
+  return {
+    id: spec.id,
+    nome: spec.nome,
+    descricao: spec.descricao,
+    primary: spec.primary,
+    secondary: spec.secondary,
+    actions,
+    swatches: limitarSwatches([spec.primary, spec.secondary, actions.danger]),
+    fonte: spec.fonte,
+  }
 }
 
 /**
@@ -795,9 +834,9 @@ function destaqueDaPaleta(primary, secondary, clube, fallback) {
  */
 
 /**
- * Paletas sugeridas no contexto da torcida e do clube afiliado.
- * Ordem: marca da torcida → escudo → clube → variação monocromática → alto contraste.
- * Não sugere harmônicas genéricas (análoga/complementar) que inventam cores de rival.
+ * Exatamente 3 paletas sugeridas — regra de negócio: torcida → escudo → clube.
+ * Sem mono/alto-contraste/harmônicas genéricas. Cada card tem 3 swatches que
+ * batem com o que `aplicarPaletaAoDesign` grava (primária · secundária · danger).
  * @param {string} seedHex cor primária atual (tenant) — se for o roxo da plataforma,
  *   a marca da torcida usa catálogo/clube via `opts.slug`
  * @param {{
@@ -817,8 +856,9 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
   })
   const seed = marca.primary
   const seedSecondary = marca.secondary
-  const { h, s } = hexToHsl(seed)
-  const surfaces = derivarSuperficiesDaMarca(seed)
+  const marcaAccents = marca.accents.length
+    ? marca.accents
+    : (opts.clube?.accents ?? [])
 
   const identidadeBase = [
     seed,
@@ -826,11 +866,8 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     opts.clube?.primary,
     opts.clube?.secondary,
     ...(opts.clube?.accents ?? []),
-    ...marca.accents,
+    ...marcaAccents,
   ].filter(Boolean)
-
-  /** @type {PaletaSugerida[]} */
-  const out = []
 
   const descricaoMarca =
     marca.fonte === 'catalogo'
@@ -841,163 +878,83 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
           ? 'Padrão da plataforma — personalize a primária'
           : 'Primária · secundária · destaque (sem inventar cor de rival)'
 
-  // 1) Marca da torcida (prioridade) — exatamente 3 cores
-  {
-    const primary = seed
-    const secondary = seedSecondary
-    const actions = derivarAcoesDaMarca(primary, {
-      secondary,
-      accents: marca.accents.length ? marca.accents : opts.clube?.accents,
-    })
-    const destaque = destaqueDaPaleta(
-      primary,
-      secondary,
-      opts.clube
-        ? { ...opts.clube, accents: marca.accents.length ? marca.accents : opts.clube.accents }
-        : { primary, secondary, accents: marca.accents },
-      actions.danger,
-    )
-    out.push({
-      id: 'marca-torcida',
-      nome: 'Marca da torcida',
-      descricao: descricaoMarca,
-      primary,
-      secondary,
-      actions,
-      swatches: limitarSwatches([primary, secondary, destaque]),
-      fonte: 'torcida',
-    })
-  }
+  // 1) Marca da torcida
+  const paletaMarca = fecharPaletaSugerida({
+    id: 'marca-torcida',
+    nome: 'Marca da torcida',
+    descricao: descricaoMarca,
+    primary: seed,
+    secondary: seedSecondary,
+    accents: marcaAccents,
+    identidade: identidadeBase,
+    fonte: 'torcida',
+  })
 
-  // 2) Escudo / logo da torcida
+  // 2) Escudo / logo — fallback estável se o extrator ainda não tiver 2+ cores
   const extraRaw = (opts.extraidas ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
-  // Identidade = torcida + clube; não usar o extrator como “permissão” de verde.
   const extra = filtrarVerdeForaDeContexto(extraRaw, identidadeBase)
+  /** @type {PaletaSugerida} */
+  let paletaEscudo
   if (extra.length >= 2) {
-    const primary = extra[0]
-    const secondary = extra[1]
-    const accents = extra.slice(2, 5)
-    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
-    out.push({
+    paletaEscudo = fecharPaletaSugerida({
       id: 'escudo',
       nome: 'Do escudo / logo',
       descricao: 'Extraído da imagem da torcida',
-      primary,
-      secondary,
-      actions,
-      swatches: limitarSwatches(extra),
+      primary: extra[0],
+      secondary: extra[1],
+      accents: extra.slice(2, 5),
+      identidade: [...identidadeBase, ...extra],
+      fonte: 'escudo',
+    })
+  } else {
+    // Sem extrato: mesma família da marca (aplicável), sem inventar hue de rival.
+    paletaEscudo = fecharPaletaSugerida({
+      id: 'escudo',
+      nome: 'Do escudo / logo',
+      descricao:
+        extra.length === 1
+          ? 'Poucas cores no logo — completa com a marca'
+          : 'Sem imagem ainda — usa a marca até extrair o escudo',
+      primary: extra[0] || seed,
+      secondary: seedSecondary,
+      accents: marcaAccents,
+      identidade: identidadeBase,
       fonte: 'escudo',
     })
   }
 
-  // 3) Clube afiliado
+  // 3) Clube afiliado — fallback na marca se não houver afiliação curada
+  /** @type {PaletaSugerida} */
+  let paletaClube
   if (opts.clube?.primary) {
     const primary = opts.clube.primary
     const secondary =
       opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
     const accents = opts.clube.accents ?? []
-    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
-    const destaque = destaqueDaPaleta(primary, secondary, opts.clube, actions.danger)
-    out.push({
+    paletaClube = fecharPaletaSugerida({
       id: 'clube',
       nome: 'Paleta do clube',
       descricao: 'Cores oficiais do time afiliado',
       primary,
       secondary,
-      actions,
-      swatches: limitarSwatches(
-        filtrarVerdeForaDeContexto(
-          [primary, secondary, destaque],
-          [primary, secondary, ...accents],
-        ),
-      ),
+      accents,
+      identidade: [primary, secondary, ...accents],
+      fonte: 'clube',
+    })
+  } else {
+    paletaClube = fecharPaletaSugerida({
+      id: 'clube',
+      nome: 'Paleta do clube',
+      descricao: 'Sem clube afiliado — espelho da marca da torcida',
+      primary: seed,
+      secondary: seedSecondary,
+      accents: marcaAccents,
+      identidade: identidadeBase,
       fonte: 'clube',
     })
   }
 
-  // 4) Torcida + clube (quando há ambos e diferem)
-  if (
-    opts.clube?.primary &&
-    opts.clube.primary.toLowerCase() !== seed.toLowerCase()
-  ) {
-    const primary = seed
-    const secondary = opts.clube.secondary || opts.clube.primary
-    const accents = [
-      ...(opts.clube.accents ?? []),
-      opts.clube.primary,
-    ].filter((c, i, arr) => arr.indexOf(c) === i)
-    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
-    const destaque = destaqueDaPaleta(primary, secondary, opts.clube, accents[0])
-    out.push({
-      id: 'torcida-clube',
-      nome: 'Torcida + clube',
-      descricao: 'Marca da torcida com apoio das cores do time',
-      primary,
-      secondary,
-      actions,
-      swatches: limitarSwatches(
-        filtrarVerdeForaDeContexto(
-          [primary, secondary, destaque],
-          [...identidadeBase, primary, secondary, ...accents],
-        ),
-      ),
-      fonte: 'torcida',
-    })
-  }
-
-  // 5) Monocromática — só a família da marca (sem hue estrangeiro)
-  {
-    const achromatic = s < 0.08
-    const primary = achromatic
-      ? '#1a1a1a'
-      : hslToHex(h, Math.max(0.2, s * 0.7), 0.28)
-    const secondary = achromatic
-      ? '#f4f4f5'
-      : hslToHex(h, Math.max(0.1, s * 0.4), 0.72)
-    const mid = achromatic ? '#737373' : hslToHex(h, s * 0.5, 0.45)
-    const actions = derivarAcoesDaMarca(primary, { secondary: seedSecondary })
-    out.push({
-      id: 'mono',
-      nome: 'Monocromática',
-      descricao: 'Só a família da marca — sem cores de fora',
-      primary: achromatic ? primary : clampHexLightness(primary, 0.15, 0.4),
-      secondary: achromatic ? secondary : clampHexLightness(secondary, 0.55, 0.85),
-      actions,
-      swatches: limitarSwatches(
-        achromatic
-          ? ['#0a0a0a', mid, '#fafafa']
-          : [hslToHex(h, s, 0.15), primary, secondary],
-      ),
-      fonte: 'harmonia',
-    })
-  }
-
-  // 6) Alto contraste — leitura máxima; sucesso azul (não verde)
-  {
-    // Mantém a primária da marca (preto continua preto — sem clamp que inventa matiz).
-    const primary = seed
-    const actions = derivarAcoesDaMarca(primary, {
-      secondary: '#ffffff',
-      accents: opts.clube?.accents,
-    })
-    out.push({
-      id: 'alto-contraste',
-      nome: 'Alto contraste',
-      descricao: 'Prioriza leitura — positivo sem verde forçado',
-      primary,
-      secondary: '#ffffff',
-      actions,
-      swatches: limitarSwatches(
-        filtrarVerdeForaDeContexto(
-          [primary, '#ffffff', actions.danger],
-          identidadeBase,
-        ),
-      ),
-      fonte: 'preset',
-    })
-  }
-
-  return out
+  return [paletaMarca, paletaEscudo, paletaClube]
 }
 
 /**
@@ -1108,16 +1065,12 @@ export function capturarPaletaDoDesign(design, nome) {
 
 /**
  * Aplica uma paleta sugerida sobre um design existente (preserva grade e paletas salvas).
- * Superfícies só são rederivadas quando a primária muda — evita “repintar” o tema
- * ao reaplicar a mesma marca (ex.: Marca da torcida com #1a1a1a de novo).
+ * Sempre herda brand + actions + superfícies derivadas + texto automático —
+ * o que o card mostra (3 swatches) é o que entra no rascunho.
  * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
  * @param {PaletaSugerida} paleta
  */
 export function aplicarPaletaAoDesign(design, paleta) {
-  const primaryAnterior =
-    typeof design.brand?.primary === 'string' ? design.brand.primary.toLowerCase() : ''
-  const primaryNova = String(paleta.primary || '').toLowerCase()
-  const mesmaPrimaria = primaryAnterior !== '' && primaryAnterior === primaryNova
   const derived = derivarSuperficiesDaMarca(paleta.primary)
   return {
     ...design,
@@ -1126,19 +1079,14 @@ export function aplicarPaletaAoDesign(design, paleta) {
       primary: paleta.primary,
       secondary: paleta.secondary,
     },
-    // Nova marca: volta texto da marca ao automático (evita override da paleta anterior).
     brandFg: { ...DEFAULT_BRAND_FG },
     actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
     actionsFg: paleta.actionsFg
-      ? { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}), ...paleta.actionsFg }
-      : (design.actionsFg ?? { ...DEFAULT_ACTIONS_FG }),
+      ? { ...DEFAULT_ACTIONS_FG, ...paleta.actionsFg }
+      : { ...DEFAULT_ACTIONS_FG },
     customPalettes: design.customPalettes ?? [],
-    light: mesmaPrimaria
-      ? { ...(design.light ?? {}) }
-      : { ...(design.light ?? {}), ...derived.light },
-    dark: mesmaPrimaria
-      ? { ...(design.dark ?? {}) }
-      : { ...(design.dark ?? {}), ...derived.dark },
+    light: { ...(design.light ?? {}), ...derived.light },
+    dark: { ...(design.dark ?? {}), ...derived.dark },
     grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,
   }
 }
