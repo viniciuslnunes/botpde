@@ -253,6 +253,140 @@ export const listarEstoqueBaixo = cache(async function listarEstoqueBaixo(
   return rows.filter((p) => p.estoqueMinimo != null && p.estoque <= p.estoqueMinimo)
 })
 
+export type BarCaixaTurnoLite = {
+  id: string
+  abertoEm: Date
+  fechadoEm: Date | null
+  sangria: Prisma.Decimal
+  dinheiroContado: Prisma.Decimal | null
+  observacao: string | null
+  abertoPor: { id: string; nome: string | null }
+  fechadoPor: { id: string; nome: string | null } | null
+}
+
+export type BarTurnoResumo = {
+  totalPago: number
+  quantidadePaga: number
+  dinheiroEsperado: number
+  pendentes: number
+}
+
+/** Turno aberto da unidade (no máx. um). */
+export const getTurnoAbertoBar = cache(async function getTurnoAbertoBar(
+  tenantId: string,
+  sedeId: string,
+): Promise<BarCaixaTurnoLite | null> {
+  const row: BarCaixaTurnoLite | null = await db.barCaixaTurno.findFirst({
+    where: { tenantId, sedeId, fechadoEm: null },
+    orderBy: { abertoEm: 'desc' },
+    select: {
+      id: true,
+      abertoEm: true,
+      fechadoEm: true,
+      sangria: true,
+      dinheiroContado: true,
+      observacao: true,
+      abertoPor: { select: { id: true, nome: true } },
+      fechadoPor: { select: { id: true, nome: true } },
+    },
+  })
+  return row
+})
+
+/** Totais do turno (vendas pagas + dinheiro esperado + pendentes). */
+export const resumirTurnoBar = cache(async function resumirTurnoBar(
+  tenantId: string,
+  turnoId: string,
+): Promise<BarTurnoResumo> {
+  const whereBase: Prisma.BarVendaWhereInput = { tenantId, turnoId }
+
+  const [pagas, pendentes]: [
+    { _sum: { total: Prisma.Decimal | null }; _count: { _all: number } },
+    number,
+  ] = await Promise.all([
+    db.barVenda.aggregate({
+      where: { ...whereBase, status: 'PAGA' },
+      _sum: { total: true },
+      _count: { _all: true },
+    }),
+    db.barVenda.count({ where: { ...whereBase, status: 'PENDENTE' } }),
+  ])
+
+  const dinheiroAgg: { _sum: { total: Prisma.Decimal | null } } = await db.barVenda.aggregate({
+    where: { ...whereBase, status: 'PAGA', metodoPagamento: 'DINHEIRO' },
+    _sum: { total: true },
+  })
+
+  return {
+    totalPago: Number(pagas._sum.total ?? 0),
+    quantidadePaga: pagas._count._all,
+    dinheiroEsperado: Number(dinheiroAgg._sum.total ?? 0),
+    pendentes,
+  }
+})
+
+export type BarMargemResumo = {
+  receita: number
+  custo: number
+  margem: number
+  quantidadeItens: number
+  quantidadeVendas: number
+}
+
+/**
+ * Margem estimada das vendas PAGA da unidade (Σ total − Σ custoUnit×qtd).
+ * Sem schema extra — usa snapshots em BarVendaItem.
+ */
+export const resumirMargemBar = cache(async function resumirMargemBar(
+  tenantId: string,
+  sedeId: string,
+  opts?: { desde?: Date; turnoId?: string },
+): Promise<BarMargemResumo> {
+  const whereVenda: Prisma.BarVendaWhereInput = {
+    tenantId,
+    sedeId,
+    status: 'PAGA',
+  }
+  if (opts?.turnoId) whereVenda.turnoId = opts.turnoId
+  else if (opts?.desde) whereVenda.criadoEm = { gte: opts.desde }
+
+  const vendas: { id: string }[] = await db.barVenda.findMany({
+    where: whereVenda,
+    select: { id: true },
+  })
+  if (vendas.length === 0) {
+    return { receita: 0, custo: 0, margem: 0, quantidadeItens: 0, quantidadeVendas: 0 }
+  }
+
+  const itens: Array<{
+    quantidade: number
+    custoUnit: Prisma.Decimal
+    total: Prisma.Decimal
+  }> = await db.barVendaItem.findMany({
+    where: { vendaId: { in: vendas.map((v) => v.id) } },
+    select: { quantidade: true, custoUnit: true, total: true },
+  })
+
+  let receita = 0
+  let custo = 0
+  let quantidadeItens = 0
+  for (const item of itens) {
+    receita += Number(item.total)
+    custo += Number(item.custoUnit) * item.quantidade
+    quantidadeItens += item.quantidade
+  }
+  receita = Math.round(receita * 100) / 100
+  custo = Math.round(custo * 100) / 100
+
+  return {
+    receita,
+    custo,
+    margem: Math.round((receita - custo) * 100) / 100,
+    quantidadeItens,
+    quantidadeVendas: vendas.length,
+  }
+})
+
 /**
  * Confirma o pagamento de uma venda do bar (baixa via webhook Pix ou manual).
  * Espelha `baixarCobrancaComoPaga`: cria a RECEITA no livro-caixa dentro de
@@ -273,6 +407,7 @@ export async function confirmarVendaBarPaga(input: {
     total: Prisma.Decimal
     financeiroLancamentoId: string | null
     operadorId: string
+    itens: Array<{ produtoNome: string; quantidade: number }>
   }
   const venda: Row | null = await db.barVenda.findFirst({
     where: { id: input.vendaId, tenantId: input.tenantId },
@@ -282,11 +417,21 @@ export async function confirmarVendaBarPaga(input: {
       total: true,
       financeiroLancamentoId: true,
       operadorId: true,
+      itens: { select: { produtoNome: true, quantidade: true } },
     },
   })
   if (!venda) return { ok: false, error: 'Venda não encontrada' }
   if (venda.status === 'PAGA') return { ok: true }
   if (venda.status === 'CANCELADA') return { ok: false, error: 'Venda cancelada' }
+  if (venda.status === 'ESTORNADA') return { ok: false, error: 'Venda estornada' }
+
+  const resumoItens = venda.itens
+    .map((i) => `${i.produtoNome} ×${i.quantidade}`)
+    .join(', ')
+  const descricaoVenda =
+    resumoItens.length > 0
+      ? `Venda do bar — ${resumoItens}`.slice(0, 240)
+      : 'Venda do bar'
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
     let lancamentoId = venda.financeiroLancamentoId
@@ -297,7 +442,7 @@ export async function confirmarVendaBarPaga(input: {
           tipo: 'RECEITA',
           categoria: 'BAR',
           valor: venda.total,
-          descricao: 'Venda do bar',
+          descricao: descricaoVenda,
           data: new Date(),
           observacao: `Pagamento PIX — venda ${venda.id}`,
           criadoPorId: input.atorId ?? venda.operadorId,

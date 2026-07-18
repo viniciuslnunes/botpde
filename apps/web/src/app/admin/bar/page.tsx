@@ -3,8 +3,16 @@ import Link from 'next/link'
 import { AlertTriangle, Beer, Boxes, CupSoda, ReceiptText, Store } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { listarEstoqueBaixo, resolveUnidadeBar, resumirVendasBar } from '@/lib/bar'
-import type { BarProdutoLite, BarUnidadeLite, BarVendasResumo } from '@/lib/bar'
+import {
+  getTurnoAbertoBar,
+  listarEstoqueBaixo,
+  resolveUnidadeBar,
+  resumirMargemBar,
+  resumirTurnoBar,
+  resumirVendasBar,
+} from '@/lib/bar'
+import type { BarMargemResumo, BarProdutoLite, BarUnidadeLite, BarVendasResumo } from '@/lib/bar'
+import { BarTurnoPainel } from '@/components/admin/bar/bar-turno-painel'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -37,14 +45,35 @@ export default async function AdminBarPage() {
     // Operador do PDV sem gestão de catálogo/estoque.
   }
 
+  let podeVerMargem = podeGerir
+  if (!podeVerMargem) {
+    try {
+      await assertPermission(PERMISSIONS.FINANCE_VIEW)
+      podeVerMargem = true
+    } catch {
+      // Sem finance:view nem bar:manage — não mostra CMV/margem.
+    }
+  }
+
   const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
 
   const inicioDoDia = new Date()
   inicioDoDia.setHours(0, 0, 0, 0)
 
-  const [resumoHoje, estoqueBaixo]: [BarVendasResumo, BarProdutoLite[]] = await Promise.all([
+  const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
+
+  const [resumoHoje, estoqueBaixo, resumoTurno, margemHoje]: [
+    BarVendasResumo,
+    BarProdutoLite[],
+    Awaited<ReturnType<typeof resumirTurnoBar>> | null,
+    BarMargemResumo | null,
+  ] = await Promise.all([
     resumirVendasBar(tenant.id, unidade.id, { desde: inicioDoDia }),
     listarEstoqueBaixo(tenant.id, unidade.id),
+    turno ? resumirTurnoBar(tenant.id, turno.id) : Promise.resolve(null),
+    podeVerMargem
+      ? resumirMargemBar(tenant.id, unidade.id, { desde: inicioDoDia })
+      : Promise.resolve(null),
   ])
 
   return (
@@ -64,15 +93,38 @@ export default async function AdminBarPage() {
       </MotionReveal>
 
       <MotionReveal index={1}>
+        <BarTurnoPainel
+          turno={
+            turno
+              ? {
+                  id: turno.id,
+                  abertoEm: turno.abertoEm.toISOString(),
+                  abertoPorNome: turno.abertoPor.nome,
+                }
+              : null
+          }
+          resumo={resumoTurno}
+          podeGerir={podeGerir}
+        />
+      </MotionReveal>
+
+      <MotionReveal index={2}>
         <Link
           href="/admin/bar/pdv"
-          className="flex items-center justify-between gap-4 rounded-2xl bg-[rgb(var(--primary))] px-6 py-5 text-white transition-opacity hover:opacity-90"
+          className={[
+            'flex items-center justify-between gap-4 rounded-2xl px-6 py-5 text-white transition-opacity',
+            turno
+              ? 'bg-[rgb(var(--primary))] hover:opacity-90'
+              : 'bg-[rgb(var(--foreground-muted))] opacity-70',
+          ].join(' ')}
         >
           <div className="flex items-center gap-4">
             <Store className="h-8 w-8" />
             <div>
               <p className="text-lg font-bold">Abrir PDV</p>
-              <p className="text-sm opacity-90">Registrar vendas no balcão</p>
+              <p className="text-sm opacity-90">
+                {turno ? 'Registrar vendas no balcão' : 'Abra o turno de caixa antes'}
+              </p>
             </div>
           </div>
           <span aria-hidden className="text-2xl">
@@ -81,7 +133,7 @@ export default async function AdminBarPage() {
         </Link>
       </MotionReveal>
 
-      <MotionReveal index={2}>
+      <MotionReveal index={3}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">Vendido hoje (pago)</p>
@@ -98,7 +150,43 @@ export default async function AdminBarPage() {
         </div>
       </MotionReveal>
 
-      <MotionReveal index={3}>
+      {margemHoje && (
+        <MotionReveal index={4}>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">Receita (hoje)</p>
+              <p className="mt-1 text-xl font-bold tabular-nums text-[rgb(var(--foreground))]">
+                {formatarPreco(margemHoje.receita)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">CMV estimado</p>
+              <p className="mt-1 text-xl font-bold tabular-nums text-[rgb(var(--foreground))]">
+                {formatarPreco(margemHoje.custo)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">Margem estimada</p>
+              <p
+                className={[
+                  'mt-1 text-xl font-bold tabular-nums',
+                  margemHoje.margem >= 0
+                    ? 'text-[rgb(var(--color-success-fg))]'
+                    : 'text-[rgb(var(--color-danger-fg))]',
+                ].join(' ')}
+              >
+                {formatarPreco(margemHoje.margem)}
+              </p>
+              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                {margemHoje.quantidadeVendas} venda
+                {margemHoje.quantidadeVendas === 1 ? '' : 's'} · custo médio dos itens
+              </p>
+            </div>
+          </div>
+        </MotionReveal>
+      )}
+
+      <MotionReveal index={margemHoje ? 5 : 4}>
         <section className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
@@ -133,7 +221,7 @@ export default async function AdminBarPage() {
         </section>
       </MotionReveal>
 
-      <MotionReveal index={4}>
+      <MotionReveal index={margemHoje ? 6 : 5}>
         <div className="flex flex-wrap gap-2">
           {podeGerir && (
             <>

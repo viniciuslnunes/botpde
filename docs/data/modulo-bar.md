@@ -14,7 +14,9 @@
 | Baixa de estoque na venda | Fornecedores / contas a pagar |
 | Compra de insumo → DESPESA `BAR` | Fidelidade / fiado |
 | Venda paga → RECEITA `BAR` | |
-| Histórico de vendas + toggle Balanço | |
+| Turno de caixa (abrir/fechar) + estorno de venda paga | |
+| Margem estimada (receita − CMV) no hub admin | |
+| Histórico de vendas + Balanço detalhado | |
 | Isolamento por torcida + unidade (SEDE/SUBSEDE/PDE) | |
 
 ## Modelo
@@ -24,19 +26,21 @@
 - `BarProduto` (`saas_bar_produtos`): `tenantId`, `sedeId`, `categoriaId?`, `nome`, `preco`,
   `custoMedio` (média ponderada), `estoque`, `estoqueMinimo?`, `imagemUrl?`, `ativo`,
   `destaque`, `ordem`, `criadoPorId?`.
-- `BarVenda` (`saas_bar_vendas`): `tenantId`, `sedeId`, `operadorId`, `subtotal`/`desconto`/`total`,
+- `BarVenda` (`saas_bar_vendas`): `tenantId`, `sedeId`, `turnoId?`, `operadorId`, `subtotal`/`desconto`/`total`,
   `metodoPagamento`, `status`, campos de gateway (`gatewayProvider`, `gatewayExternalId`,
-  `pixCopiaCola`, `pagoEm`), `financeiroLancamentoId?`, `observacao?`.
+  `pixCopiaCola`, `pagoEm`), `financeiroLancamentoId?`, `financeiroEstornoLancamentoId?`, `observacao?`.
 - `BarVendaItem` (`saas_bar_venda_itens`): snapshots `produtoNome`, `precoUnit`,
   `custoUnit`, `quantidade`, `total`; `produtoId?` (SetNull).
 - `BarMovimentacaoEstoque` (`saas_bar_estoque_mov`): `tenantId`, `sedeId`, `produtoId`, `tipo`,
   `quantidade` (sempre positiva), `custoTotal?`, `motivo?`, `vendaId?`,
   `financeiroLancamentoId?`, `operadorId?`.
+- `BarCaixaTurno` (`saas_bar_caixa_turnos`): `tenantId`, `sedeId`, `abertoEm`/`fechadoEm`,
+  `abertoPorId`/`fechadoPorId`, `sangria`, `dinheiroContado?`, `observacao?`.
 
 Enums:
 
 - `MetodoPagamentoBar`: `PIX` | `DINHEIRO` | `CARTAO_DEBITO` | `CARTAO_CREDITO`
-- `StatusVendaBar`: `PENDENTE` | `PAGA` | `CANCELADA`
+- `StatusVendaBar`: `PENDENTE` | `PAGA` | `CANCELADA` | `ESTORNADA`
 - `TipoMovEstoqueBar`: `ENTRADA` | `SAIDA` | `AJUSTE`
 
 ## Regras de negócio
@@ -49,18 +53,22 @@ Enums:
    (`financeiroLancamentoId` na venda).
 4. **Compra de insumo** cria movimentação `ENTRADA` + DESPESA `BAR` e recalcula
    `custoMedio` por média ponderada.
-5. **Cancelamento** só de venda `PENDENTE` (restaura estoque; sem estorno de receita —
-   venda paga não cancela).
-6. **RBAC**
+5. **Cancelamento** só de venda `PENDENTE` (restaura estoque). Venda `PAGA` usa
+   **estorno** (`ESTORNADA` + DESPESA espelho no livro-caixa + restaura estoque).
+6. **Turno de caixa** — PDV exige `BarCaixaTurno` aberto na unidade (`bar:manage`
+   abre/fecha). Fechamento registra dinheiro contado, sangria e resumo no `AuditLog`.
+7. **RBAC**
    - `bar:operate` — operar PDV / registrar vendas; ver histórico
-   - `bar:manage` — catálogo, estoque, cancelar vendas; inclui operate (cascata)
-7. **Multi-tenant + unidade** — toda query filtra `tenantId` **e** `sedeId`.
+   - `bar:manage` — catálogo, estoque, cancelar/estornar, abrir/fechar turno; inclui operate (cascata)
+8. **Multi-tenant + unidade** — toda query filtra `tenantId` **e** `sedeId`.
    Cada torcida tem seu bar; dentro dela, cada SEDE / SUBSEDE / PDE tem
    catálogo e estoque próprios. Unidade resolvida por `SaasMembro.sedeId`
    (fallback: SEDE principal do tenant). Unidade promovida a tenant próprio
    isola via `tenantId`.
-8. **Balanço** — flag `Tenant.balancoFinanceiroVisivel` expõe agregados financeiros
-   (não lançamentos individuais) a membros logados em `/portal/balanco`.
+9. **Balanço** — flag `Tenant.balancoFinanceiroVisivel` expõe totais, categorias e
+   lançamentos detalhados (itens do bar, unidade, departamento, responsável) a
+   membros logados em `/portal/balanco` (período, print/copiar — ver
+   [`backlog-caixa-operacional.md`](../product/backlog-caixa-operacional.md)).
 
 ## Superfícies
 

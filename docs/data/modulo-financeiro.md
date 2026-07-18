@@ -8,11 +8,12 @@
 | Inclui | Fora (próximas fases) |
 |--------|------------------------|
 | Lançamentos RECEITA / DESPESA | Conciliação bancária |
-| Categorias fixas (mensalidade, loja, evento…) | Mensalidade recorrente / cobrança |
-| Saldo derivado (receitas − despesas) | Inadimplência automática |
-| CRUD com auditoria | Soft-delete / estorno contábil |
-| Filtros + paginação | Integração automática com Loja/Pedidos |
-| Portal (`finance:view`) + Admin (`finance:manage`) | Exportação CSV/PDF |
+| Categorias fixas (mensalidade, loja, evento…) | Mensalidade recorrente automática |
+| Saldo derivado (receitas − despesas) | Soft-delete / estorno contábil genérico |
+| CRUD com auditoria | |
+| Filtros + paginação + export CSV | |
+| Portal (`finance:view`) + Admin (`finance:manage`) + Balanço | |
+| Cobrança / Bar / Loja → lançamento automático | |
 
 ## Modelo
 
@@ -43,6 +44,10 @@ Enums:
 ## Superfícies
 
 - Portal: `/portal/financeiro` (+ filtros/paginação) e home `/portal/departamentos/financeiro`
+- Balanço público: `/portal/balanco` (flags `balancoFinanceiroVisivel` +
+  `balancoDetalheNivel` TOTAIS/CATEGORIAS/COMPLETO) — totais / categorias /
+  lançamentos; filtro de período e unidade (bar); copiar resumo e impressão
+- Backlog operacional: [`docs/product/backlog-caixa-operacional.md`](../product/backlog-caixa-operacional.md)
 - Admin: `/admin/financeiro` (mesma operação, exige manage)
 - Schemas Zod: `packages/types/src/financeiro.js`
 - Lib: `apps/web/src/lib/financeiro.ts` (`React.cache`)

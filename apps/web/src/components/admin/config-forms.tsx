@@ -18,6 +18,7 @@ import {
   salvarDiscordGuildId,
   salvarAfiliacao,
   salvarBalancoFinanceiroVisivel,
+  salvarBalancoDetalheNivel,
   criarRole,
   atualizarRole,
   excluirRole,
@@ -99,13 +100,15 @@ export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
 
 interface BalancoVisivelFormProps {
   visivel: boolean
+  detalheNivel: 'TOTAIS' | 'CATEGORIAS' | 'COMPLETO'
 }
 
-export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
+export function BalancoVisivelForm({ visivel, detalheNivel }: BalancoVisivelFormProps) {
   const [pending, startTransition] = useTransition()
   const [ativo, setAtivo] = useState(visivel)
+  const [nivel, setNivel] = useState(detalheNivel)
 
-  function salvar(next: boolean) {
+  function salvarVisivel(next: boolean) {
     setAtivo(next)
     const fd = new FormData()
     fd.set('balancoFinanceiroVisivel', next ? 'true' : 'false')
@@ -119,24 +122,37 @@ export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
     })
   }
 
+  function salvarNivel(next: 'TOTAIS' | 'CATEGORIAS' | 'COMPLETO') {
+    const prev = nivel
+    setNivel(next)
+    const fd = new FormData()
+    fd.set('balancoDetalheNivel', next)
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarBalancoDetalheNivel(fd), {
+        success: 'Nível de detalhe do balanço atualizado.',
+      })
+      if (!ok) setNivel(prev)
+    })
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-[rgb(var(--foreground-muted))]">
-        Quando ativo, membros logados veem totais e totais por categoria em{' '}
+        Quando ativo, membros logados veem o balanço em{' '}
         <Link
           href="/portal/balanco"
           className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
         >
           /portal/balanco
         </Link>
-        . Lançamentos individuais permanecem só no Financeiro (permissão).
+        . Escolha quanto detalhe expor (totais, categorias ou lançamentos completos).
       </p>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
         <input
           type="checkbox"
           checked={ativo}
           disabled={pending}
-          onChange={(e) => salvar(e.target.checked)}
+          onChange={(e) => salvarVisivel(e.target.checked)}
           className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
         />
         <span className="min-w-0">
@@ -148,6 +164,49 @@ export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
           </span>
         </span>
       </label>
+
+      {ativo && (
+        <fieldset className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+          <legend className="px-1 text-sm font-medium text-[rgb(var(--foreground))]">
+            Nível de detalhe
+          </legend>
+          {(
+            [
+              { value: 'TOTAIS' as const, label: 'Só totais', hint: 'Receitas, despesas e saldo' },
+              {
+                value: 'CATEGORIAS' as const,
+                label: 'Totais e categorias',
+                hint: 'Sem lançamentos individuais',
+              },
+              {
+                value: 'COMPLETO' as const,
+                label: 'Completo',
+                hint: 'Itens, unidade, departamento e responsável',
+              },
+            ] as const
+          ).map((opt) => (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer items-start gap-3 rounded-lg px-1 py-1.5 hover:bg-[rgb(var(--background-subtle))]"
+            >
+              <input
+                type="radio"
+                name="balancoDetalheNivel"
+                checked={nivel === opt.value}
+                disabled={pending}
+                onChange={() => salvarNivel(opt.value)}
+                className="mt-1 h-4 w-4 border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                  {opt.label}
+                </span>
+                <span className="block text-xs text-[rgb(var(--foreground-muted))]">{opt.hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
     </div>
   )
 }

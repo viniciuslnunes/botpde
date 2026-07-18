@@ -25,7 +25,7 @@ Bot Discord legado (`BotProduto`/`BotPedido`) permanece separado — não compar
 | `SaasCupom` | `saas_cupons` | cupons PERCENTUAL/FIXO; `primeiraCompra`, `validoAte` |
 | `SaasProduto` | `saas_produtos` | catálogo; `precoOriginal` (promo), `marca`, `destaque`, estoque JSON por tamanho |
 | `SaasCarrinhoItem` | `saas_carrinho_itens` | sacola por usuário; `@@unique([userId, produtoId, tamanho])`; tamanho `UN` = sem grade |
-| `SaasPedido` | `saas_pedidos` | cabeçalho: `subtotal`, `desconto`, `cupomCodigo`, `modalidadeEntrega`, `grupoCheckoutId` |
+| `SaasPedido` | `saas_pedidos` | cabeçalho: `subtotal`, `desconto`, `cupomCodigo`, `modalidadeEntrega`, `grupoCheckoutId`, `financeiroLancamentoId?` |
 | `SaasPedidoItem` | `saas_pedido_itens` | linhas do pedido; `produtoNome` é snapshot |
 
 Enums: `TipoCupom`, `ModalidadeEntrega` (RETIRADA/ENVIO), `StatusPedido`.
@@ -81,6 +81,9 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 - Chave de tamanho normalizada: `chaveTamanho()` / `TAMANHO_UNICO = 'UN'` (`packages/types/src/loja.js`)
 - Cupom: `validarCupom()` + `calcularDesconto()`; seed `EUSOUGAVIAO` = 10% primeira compra
 - Cancelamento admin: `atualizarStatusPedido(CANCELADO)` **restaura estoque** dos itens
+- **Livro-caixa:** ao passar pedido para `CONFIRMADO` ou `ENTREGUE`, cria
+  `FinanceiroLancamento` RECEITA categoria `LOJA` (idempotente via
+  `SaasPedido.financeiroLancamentoId`) — ver `apps/web/src/lib/loja-financeiro.ts`
 - Auditoria: `PRODUTO_*`, `PEDIDO_*`, `CATEGORIA_*`, `CUPOM_*` em `AuditLog`
 - **Cupom é tenant-scoped e reaplicado por tenant no checkout multi-tenant**:
   `finalizarPedido` busca e valida o mesmo código **em cada tenant dono** do

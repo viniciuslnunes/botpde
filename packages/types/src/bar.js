@@ -21,6 +21,7 @@ export const STATUS_VENDA_BAR_LABEL = {
   PENDENTE: 'Aguardando pagamento',
   PAGA: 'Paga',
   CANCELADA: 'Cancelada',
+  ESTORNADA: 'Estornada',
 }
 
 /** Limite de vendas por página nas listagens do Bar. */
@@ -93,6 +94,35 @@ export const VendaBarSchema = z.object({
     .max(200, 'Observação muito longa')
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+/** Fechamento de turno de caixa do bar. */
+export const FecharTurnoBarSchema = z.object({
+  dinheiroContado: z.coerce
+    .number()
+    .min(0, 'Dinheiro contado não pode ser negativo')
+    .max(9999999.99, 'Valor muito alto'),
+  sangria: z.coerce
+    .number()
+    .min(0, 'Sangria não pode ser negativa')
+    .max(9999999.99, 'Valor muito alto')
+    .default(0),
+  observacao: z
+    .string()
+    .trim()
+    .max(300, 'Observação muito longa')
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+/** Motivo opcional do estorno de venda paga. */
+export const EstornarVendaBarSchema = z.object({
+  vendaId: z.string().uuid('Venda inválida'),
+  motivo: z
+    .string()
+    .trim()
+    .min(3, 'Informe o motivo (mín. 3 caracteres)')
+    .max(200, 'Motivo muito longo'),
 })
 
 /**

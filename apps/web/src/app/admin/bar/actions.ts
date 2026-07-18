@@ -7,6 +7,8 @@ import type { MetodoPagamentoBar, StatusVendaBar } from '@torcida/db'
 import {
   CategoriaBarSchema,
   CompraBarSchema,
+  EstornarVendaBarSchema,
+  FecharTurnoBarSchema,
   PERMISSIONS,
   ProdutoBarSchema,
   VendaBarSchema,
@@ -16,7 +18,12 @@ import {
   slugify,
 } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { confirmarVendaBarPaga, resolveUnidadeBar } from '@/lib/bar'
+import {
+  confirmarVendaBarPaga,
+  getTurnoAbertoBar,
+  resolveUnidadeBar,
+  resumirTurnoBar,
+} from '@/lib/bar'
 import {
   assinarWebhookMockBar,
   criarCobrancaPixBar,
@@ -444,6 +451,14 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
     }
     const { itens, metodoPagamento, desconto, observacao } = parsed.data
 
+    const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
+    if (!turno) {
+      return {
+        success: false,
+        error: 'Abra um turno de caixa antes de registrar vendas no PDV',
+      }
+    }
+
     // Consolida quantidades por produto (evita burlar validação de estoque
     // repetindo o mesmo produtoId em linhas separadas).
     const porProduto = new Map<string, number>()
@@ -507,6 +522,14 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
         throw new Error('Total deve ser maior que zero para pagamento via PIX')
       }
 
+      const resumoItens = linhas
+        .map((l) => `${l.produtoNome} ×${l.quantidade}`)
+        .join(', ')
+      const descricaoVenda =
+        resumoItens.length > 0
+          ? `Venda do bar — ${resumoItens}`.slice(0, 240)
+          : 'Venda do bar'
+
       let financeiroLancamentoId: string | null = null
       if (pago) {
         const lanc: { id: string } = await tx.financeiroLancamento.create({
@@ -515,8 +538,9 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
             tipo: 'RECEITA',
             categoria: 'BAR',
             valor: resumo.total,
-            descricao: 'Venda do bar',
+            descricao: descricaoVenda,
             data: new Date(),
+            observacao: observacao ?? null,
             criadoPorId: session.user.id!,
           },
           select: { id: true },
@@ -528,6 +552,7 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
         data: {
           tenantId: tenant.id,
           sedeId: unidade.id,
+          turnoId: turno.id,
           operadorId: session.user.id!,
           subtotal: resumo.subtotal,
           desconto: resumo.desconto,
@@ -710,6 +735,7 @@ export async function confirmarPixMockBar(vendaId: string): Promise<BarActionSta
     if (!venda) return { error: 'Venda não encontrada' }
     if (venda.status === 'PAGA') return { success: true }
     if (venda.status === 'CANCELADA') return { error: 'Venda cancelada' }
+    if (venda.status === 'ESTORNADA') return { error: 'Venda estornada' }
     if (venda.gatewayProvider && venda.gatewayProvider !== 'mock') {
       return { error: 'Cobrança não é mock' }
     }
@@ -756,8 +782,9 @@ export async function cancelarVendaBar(vendaId: string): Promise<BarActionState>
       })
     if (!venda) return { error: 'Venda não encontrada' }
     if (venda.status === 'CANCELADA') return { success: true }
+    if (venda.status === 'ESTORNADA') return { error: 'Venda já estornada' }
     if (venda.status === 'PAGA') {
-      return { error: 'Venda paga não pode ser cancelada (sem estorno nesta fase)' }
+      return { error: 'Venda paga: use estorno em vez de cancelar' }
     }
 
     await cancelarVendaPendenteTx(tenant.id, venda.id, session.user.id ?? null, 'Cancelamento de venda')
@@ -835,5 +862,220 @@ export async function registrarAjusteEstoqueBar(
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao ajustar estoque' }
+  }
+}
+
+// ── Turno de caixa (BAR_MANAGE) ───────────────────────────────────────────────
+
+export async function abrirTurnoBar(): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+
+    const aberto = await getTurnoAbertoBar(tenant.id, unidade.id)
+    if (aberto) return { error: 'Já existe um turno aberto nesta unidade' }
+
+    const turno: { id: string } = await db.barCaixaTurno.create({
+      data: {
+        tenantId: tenant.id,
+        sedeId: unidade.id,
+        abertoPorId: session.user.id!,
+      },
+      select: { id: true },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_TURNO_ABERTO',
+        entidade: 'BarCaixaTurno',
+        entidadeId: turno.id,
+        detalhes: { sedeId: unidade.id },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao abrir turno' }
+  }
+}
+
+export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+
+    const parsed = FecharTurnoBarSchema.safeParse(input)
+    if (!parsed.success) {
+      return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
+    }
+
+    const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
+    if (!turno) return { error: 'Nenhum turno aberto para fechar' }
+
+    const resumo = await resumirTurnoBar(tenant.id, turno.id)
+    if (resumo.pendentes > 0) {
+      return {
+        error: `Há ${resumo.pendentes} venda(s) PIX pendente(s). Cancele ou confirme antes de fechar.`,
+      }
+    }
+
+    await db.barCaixaTurno.update({
+      where: { id: turno.id },
+      data: {
+        fechadoEm: new Date(),
+        fechadoPorId: session.user.id!,
+        dinheiroContado: parsed.data.dinheiroContado,
+        sangria: parsed.data.sangria,
+        observacao: parsed.data.observacao ?? null,
+      },
+    })
+
+    const diferenca = round2(parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria)
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_TURNO_FECHADO',
+        entidade: 'BarCaixaTurno',
+        entidadeId: turno.id,
+        detalhes: {
+          sedeId: unidade.id,
+          dinheiroContado: parsed.data.dinheiroContado,
+          dinheiroEsperado: resumo.dinheiroEsperado,
+          sangria: parsed.data.sangria,
+          diferenca,
+          totalPago: resumo.totalPago,
+          quantidadePaga: resumo.quantidadePaga,
+        },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao fechar turno' }
+  }
+}
+
+// ── Estorno de venda paga (BAR_MANAGE) ────────────────────────────────────────
+
+export async function estornarVendaBar(input: unknown): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+
+    const parsed = EstornarVendaBarSchema.safeParse(input)
+    if (!parsed.success) {
+      return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
+    }
+
+    type VendaRow = {
+      id: string
+      status: StatusVendaBar
+      total: Prisma.Decimal
+      sedeId: string
+      financeiroLancamentoId: string | null
+      financeiroEstornoLancamentoId: string | null
+      itens: Array<{ produtoId: string | null; produtoNome: string; quantidade: number }>
+    }
+
+    const venda: VendaRow | null = await db.barVenda.findFirst({
+      where: { id: parsed.data.vendaId, tenantId: tenant.id, sedeId: unidade.id },
+      select: {
+        id: true,
+        status: true,
+        total: true,
+        sedeId: true,
+        financeiroLancamentoId: true,
+        financeiroEstornoLancamentoId: true,
+        itens: { select: { produtoId: true, produtoNome: true, quantidade: true } },
+      },
+    })
+    if (!venda) return { error: 'Venda não encontrada' }
+    if (venda.status === 'ESTORNADA') return { success: true }
+    if (venda.status !== 'PAGA') {
+      return { error: 'Só é possível estornar vendas pagas' }
+    }
+
+    const resumoItens = venda.itens
+      .map((i) => `${i.produtoNome} ×${i.quantidade}`)
+      .join(', ')
+    const descricaoEstorno =
+      resumoItens.length > 0
+        ? `Estorno bar — ${resumoItens}`.slice(0, 240)
+        : 'Estorno de venda do bar'
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      let estornoId = venda.financeiroEstornoLancamentoId
+      if (!estornoId) {
+        const lanc: { id: string } = await tx.financeiroLancamento.create({
+          data: {
+            tenantId: tenant.id,
+            tipo: 'DESPESA',
+            categoria: 'BAR',
+            valor: venda.total,
+            descricao: descricaoEstorno,
+            data: new Date(),
+            observacao: `Estorno venda ${venda.id} — ${parsed.data.motivo}`,
+            criadoPorId: session.user.id!,
+          },
+          select: { id: true },
+        })
+        estornoId = lanc.id
+      }
+
+      for (const item of venda.itens) {
+        if (!item.produtoId) continue
+        await tx.barProduto.update({
+          where: { id: item.produtoId },
+          data: { estoque: { increment: item.quantidade } },
+        })
+        await tx.barMovimentacaoEstoque.create({
+          data: {
+            tenantId: tenant.id,
+            sedeId: venda.sedeId,
+            produtoId: item.produtoId,
+            tipo: 'AJUSTE',
+            quantidade: item.quantidade,
+            motivo: `Estorno — ${parsed.data.motivo}`,
+            vendaId: venda.id,
+            operadorId: session.user.id,
+          },
+        })
+      }
+
+      await tx.barVenda.update({
+        where: { id: venda.id },
+        data: {
+          status: 'ESTORNADA',
+          financeiroEstornoLancamentoId: estornoId,
+        },
+      })
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_VENDA_ESTORNADA',
+        entidade: 'BarVenda',
+        entidadeId: venda.id,
+        detalhes: {
+          total: Number(venda.total),
+          motivo: parsed.data.motivo,
+          financeiroLancamentoId: venda.financeiroLancamentoId,
+        },
+      },
+    })
+
+    revalidateBar()
+    revalidateFinanceiro()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao estornar venda' }
   }
 }

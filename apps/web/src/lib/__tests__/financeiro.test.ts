@@ -72,3 +72,38 @@ describe('financeiro — schemas', () => {
     }
   })
 })
+
+describe('balanço — chips de período', () => {
+  const agora = new Date(2026, 6, 18, 15) // 18 jul 2026
+
+  it('resolve hoje, 7d, mês e mês anterior', async () => {
+    const {
+      resolverPeriodoChip,
+      detectarPeriodoChip,
+      hrefBalanco,
+    } = await import('@/lib/financeiro-filtros')
+
+    expect(resolverPeriodoChip('hoje', agora)).toEqual({
+      dataDe: '2026-07-18',
+      dataAte: '2026-07-18',
+    })
+    expect(resolverPeriodoChip('7d', agora)).toEqual({
+      dataDe: '2026-07-12',
+      dataAte: '2026-07-18',
+    })
+    expect(resolverPeriodoChip('mes', agora)).toEqual({
+      dataDe: '2026-07-01',
+      dataAte: '2026-07-18',
+    })
+    expect(resolverPeriodoChip('mes_anterior', agora)).toEqual({
+      dataDe: '2026-06-01',
+      dataAte: '2026-06-30',
+    })
+    expect(resolverPeriodoChip('tudo', agora)).toEqual({})
+    expect(detectarPeriodoChip('2026-07-01', '2026-07-18', agora)).toBe('mes')
+    expect(detectarPeriodoChip(undefined, undefined, agora)).toBe('tudo')
+    expect(hrefBalanco({ dataDe: '2026-07-01', dataAte: '2026-07-18', page: 2 })).toBe(
+      '/portal/balanco?dataDe=2026-07-01&dataAte=2026-07-18&page=2',
+    )
+  })
+})

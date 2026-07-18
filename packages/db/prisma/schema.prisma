@@ -164,13 +164,22 @@ model Tenant {
   barProdutos             BarProduto[]
   barVendas               BarVenda[]
   barMovimentacoesEstoque BarMovimentacaoEstoque[]
+  barCaixaTurnos          BarCaixaTurno[]
 
   /// Config: exibir o balanço financeiro consolidado aos associados no portal.
   balancoFinanceiroVisivel Boolean @default(false) @map("balanco_financeiro_visivel")
+  /// Quanto detalhe o balanço público mostra (totais / categorias / lançamentos).
+  balancoDetalheNivel BalancoDetalheNivel @default(COMPLETO) @map("balanco_detalhe_nivel")
 
   @@map("saas_tenants")
 }
 
+enum BalancoDetalheNivel {
+  TOTAIS
+  CATEGORIAS
+  COMPLETO
+}
+
 enum Plano {
   FREE
   BASIC
@@ -249,6 +258,8 @@ model User {
   barProdutosCriados           BarProduto[]           @relation("BarProdutoCriadoPor")
   barVendasOperadas            BarVenda[]             @relation("BarVendaOperador")
   barMovimentacoesEstoque      BarMovimentacaoEstoque[] @relation("BarMovimentacaoOperador")
+  barCaixaTurnosAbertos        BarCaixaTurno[]        @relation("BarCaixaTurnoAbertoPor")
+  barCaixaTurnosFechados       BarCaixaTurno[]        @relation("BarCaixaTurnoFechadoPor")
 
   @@map("saas_users")
 }
@@ -707,6 +718,7 @@ model Sede {
   barProdutos             BarProduto[]
   barVendas               BarVenda[]
   barMovimentacoesEstoque BarMovimentacaoEstoque[]
+  barCaixaTurnos          BarCaixaTurno[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -909,6 +921,9 @@ model SaasPedido {
   enderecoEntrega   Json?             @map("endereco_entrega")
   grupoCheckoutId   String?           @map("grupo_checkout_id")
 
+  /// Lançamento RECEITA LOJA no livro-caixa (quando pedido é confirmado/entregue).
+  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
+
   discordId     String? @map("discord_id")
   canalTicketId String? @map("canal_ticket_id")
 
@@ -2108,6 +2123,10 @@ model BarVenda {
   sedeId String @map("sede_id")
   sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
 
+  /// Turno de caixa em que a venda foi registrada (null = legado / sem turno).
+  turnoId String?       @map("turno_id")
+  turno   BarCaixaTurno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
+
   operadorId String @map("operador_id")
   operador   User   @relation("BarVendaOperador", fields: [operadorId], references: [id], onDelete: Cascade)
 
@@ -2125,6 +2144,8 @@ model BarVenda {
 
   /// Lançamento gerado no livro-caixa (categoria BAR) quando a venda é paga.
   financeiroLancamentoId String? @map("financeiro_lancamento_id")
+  /// Lançamento DESPESA de estorno (quando status = ESTORNADA).
+  financeiroEstornoLancamentoId String? @map("financeiro_estorno_lancamento_id")
   observacao             String?
 
   criadoEm DateTime @default(now()) @map("criado_em")
@@ -2134,6 +2155,7 @@ model BarVenda {
 
   @@index([tenantId, sedeId, criadoEm])
   @@index([tenantId, sedeId, status])
+  @@index([turnoId])
   @@index([gatewayExternalId])
   @@map("saas_bar_vendas")
 }
@@ -2201,6 +2223,7 @@ enum StatusVendaBar {
   PENDENTE
   PAGA
   CANCELADA
+  ESTORNADA
 }
 
 enum TipoMovEstoqueBar {
@@ -2208,3 +2231,34 @@ enum TipoMovEstoqueBar {
   SAIDA
   AJUSTE
 }
+
+/// Turno de caixa do bar por unidade (SEDE/SUBSEDE/PDE).
+/// No máximo um turno aberto por unidade (fechadoEm = null) — enforced na aplicação.
+model BarCaixaTurno {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  abertoEm     DateTime  @default(now()) @map("aberto_em")
+  fechadoEm    DateTime? @map("fechado_em")
+  abertoPorId  String    @map("aberto_por_id")
+  abertoPor    User      @relation("BarCaixaTurnoAbertoPor", fields: [abertoPorId], references: [id])
+  fechadoPorId String?   @map("fechado_por_id")
+  fechadoPor   User?     @relation("BarCaixaTurnoFechadoPor", fields: [fechadoPorId], references: [id])
+
+  /// Retirada de dinheiro do caixa durante/no fechamento (sempre ≥ 0).
+  sangria         Decimal  @default(0) @db.Decimal(10, 2)
+  /// Dinheiro físico contado no fechamento (null enquanto aberto).
+  dinheiroContado Decimal? @map("dinheiro_contado") @db.Decimal(10, 2)
+  observacao      String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  vendas BarVenda[]
+
+  @@index([tenantId, sedeId, fechadoEm])
+  @@map("saas_bar_caixa_turnos")
+}

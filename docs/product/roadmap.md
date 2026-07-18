@@ -22,6 +22,11 @@ enquetes via LiveKit/WebRTC (permissão `MEETINGS_HOST`). Ver `docs/data/modulo-
 Controle de acesso por **Departamentos** (perfis compostos, herança viva de permissão
 por depto, worktree de acesso) — ver `docs/data/modulo-departamentos.md`.
 
+**Caixa operacional (Bar / Balanço / livro-caixa):** backlog em
+[`backlog-caixa-operacional.md`](backlog-caixa-operacional.md) — Iterações 1–4
+entregues (período/print; turno+estorno; margem+loja→caixa; níveis de detalhe +
+filtro por unidade).
+
 **Resultado:** base estável, acesso consistente e dados reais para métrica.
 
 > **Nota de coerência (2026-07-16):** o foco declarado desta fase é endurecer o

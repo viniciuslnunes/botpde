@@ -5,6 +5,7 @@ import type { Prisma } from '@torcida/db'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertPermission } from '@/lib/authz'
+import { garantirLancamentoFinanceiroPedido } from '@/lib/loja-financeiro'
 import { PERMISSIONS, CategoriaSchema, CupomSchema, parseTamanhosCsv, slugify, chaveTamanho } from '@torcida/types'
 
 // ── Schema produto admin ──────────────────────────────────────────────────────
@@ -278,28 +279,69 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
     const validos = ['PENDENTE', 'CONFIRMADO', 'CANCELADO', 'ENTREGUE']
     if (!validos.includes(status)) return { error: 'Status inválido' }
 
-    const pedido = await db.saasPedido.findFirst({
+    const pedido: {
+      status: string
+      total: Prisma.Decimal
+      financeiroLancamentoId: string | null
+      itens: Array<{ produtoNome: string; quantidade: number }>
+    } | null = await db.saasPedido.findFirst({
       where: { id, tenantId: tenant.id },
-      select: { status: true },
+      select: {
+        status: true,
+        total: true,
+        financeiroLancamentoId: true,
+        itens: { select: { produtoNome: true, quantidade: true } },
+      },
     })
     if (!pedido) return { error: 'Pedido não encontrado' }
 
+    const statusNovo = status as 'PENDENTE' | 'CONFIRMADO' | 'CANCELADO' | 'ENTREGUE'
+
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      if (status === 'CANCELADO' && pedido.status !== 'CANCELADO') {
+      if (statusNovo === 'CANCELADO' && pedido.status !== 'CANCELADO') {
         await restaurarEstoquePedido(id, tx)
       }
+
       await tx.saasPedido.update({
         where: { id, tenantId: tenant.id },
-        data: { status: status as 'PENDENTE' | 'CONFIRMADO' | 'CANCELADO' | 'ENTREGUE' },
+        data: { status: statusNovo },
       })
+
+      // CONFIRMADO / ENTREGUE = pedido “pago” operacional (sem gateway ainda).
+      if (
+        (statusNovo === 'CONFIRMADO' || statusNovo === 'ENTREGUE') &&
+        !pedido.financeiroLancamentoId &&
+        session.user.id
+      ) {
+        const resumoItens = pedido.itens
+          .map((i) => `${i.produtoNome} ×${i.quantidade}`)
+          .join(', ')
+        await garantirLancamentoFinanceiroPedido(tx, {
+          tenantId: tenant.id,
+          pedidoId: id,
+          total: pedido.total,
+          atorId: session.user.id,
+          itensResumo: resumoItens,
+        })
+      }
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PEDIDO_STATUS_ATUALIZADO', entidade: 'SaasPedido', entidadeId: id, detalhes: { status } },
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'PEDIDO_STATUS_ATUALIZADO',
+        entidade: 'SaasPedido',
+        entidadeId: id,
+        detalhes: { status: statusNovo },
+      },
     })
 
     revalidatePath('/admin/loja/pedidos')
     revalidatePath('/portal/loja/pedidos')
+    revalidatePath('/admin/financeiro')
+    revalidatePath('/portal/financeiro')
+    revalidatePath('/portal/balanco')
     return { success: true }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Erro ao atualizar pedido' }

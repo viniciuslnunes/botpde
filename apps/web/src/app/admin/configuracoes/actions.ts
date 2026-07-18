@@ -133,6 +133,36 @@ export async function salvarBalancoFinanceiroVisivel(formData: FormData) {
   invalidateTenantCache(tenant.slug)
 }
 
+/** Define o nível de detalhe do balanço público (TOTAIS / CATEGORIAS / COMPLETO). */
+export async function salvarBalancoDetalheNivel(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+
+  const raw = String(formData.get('balancoDetalheNivel') ?? '')
+  if (raw !== 'TOTAIS' && raw !== 'CATEGORIAS' && raw !== 'COMPLETO') {
+    throw new Error('Nível de detalhe inválido')
+  }
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { balancoDetalheNivel: raw },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'BAR_BALANCO_DETALHE_ALTERADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { nivel: raw },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal/balanco')
+  invalidateTenantCache(tenant.slug)
+}
+
 const afiliacaoSchema = z.object({
   afiliacaoId: z
     .string()

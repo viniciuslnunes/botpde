@@ -1,10 +1,18 @@
 import { redirect } from 'next/navigation'
 import { PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { listarCategoriasBar, listarProdutosBar, listarVendasBar, resolveUnidadeBar } from '@/lib/bar'
+import {
+  getTurnoAbertoBar,
+  listarCategoriasBar,
+  listarProdutosBar,
+  listarVendasBar,
+  resolveUnidadeBar,
+  resumirTurnoBar,
+} from '@/lib/bar'
 import type { BarCategoriaLite, BarProdutoLite, BarVendaLite } from '@/lib/bar'
 import { serializeProdutoBar, serializeVendaBar } from '@/lib/bar-serialize'
 import { BarPdv } from '@/components/admin/bar/bar-pdv'
+import { BarTurnoPainel } from '@/components/admin/bar/bar-turno-painel'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'PDV — Bar Admin' }
@@ -18,24 +26,27 @@ export default async function AdminBarPdvPage() {
     redirect('/admin')
   }
 
-  let podeCancelar = false
+  let podeGerir = false
   try {
     await assertPermission(PERMISSIONS.BAR_MANAGE)
-    podeCancelar = true
+    podeGerir = true
   } catch {
-    // Operador do PDV sem gestão — não cancela vendas pendentes.
+    // Operador do PDV sem gestão — não cancela/estorna/fecha turno.
   }
 
   const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+  const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
 
-  const [produtos, categorias, pendentesLista]: [
+  const [produtos, categorias, pendentesLista, resumoTurno]: [
     BarProdutoLite[],
     BarCategoriaLite[],
     Awaited<ReturnType<typeof listarVendasBar>>,
+    Awaited<ReturnType<typeof resumirTurnoBar>> | null,
   ] = await Promise.all([
     listarProdutosBar(tenant.id, unidade.id, { apenasAtivos: true }),
     listarCategoriasBar(tenant.id, unidade.id),
     listarVendasBar(tenant.id, unidade.id, { status: 'PENDENTE', pageSize: 8 }),
+    turno ? resumirTurnoBar(tenant.id, turno.id) : Promise.resolve(null),
   ])
 
   const categoriasAtivas = categorias
@@ -47,13 +58,32 @@ export default async function AdminBarPdvPage() {
   ).map(serializeVendaBar)
 
   return (
-    <BarPdv
-      produtos={produtos.map(serializeProdutoBar)}
-      categorias={categoriasAtivas}
-      pendentes={pendentes}
-      pendentesTotal={pendentesLista.total}
-      unidadeNome={unidade.nome}
-      podeCancelar={podeCancelar}
-    />
+    <div className="space-y-4">
+      <div className="app-container pt-4">
+        <BarTurnoPainel
+          compact
+          turno={
+            turno
+              ? {
+                  id: turno.id,
+                  abertoEm: turno.abertoEm.toISOString(),
+                  abertoPorNome: turno.abertoPor.nome,
+                }
+              : null
+          }
+          resumo={resumoTurno}
+          podeGerir={podeGerir}
+        />
+      </div>
+      <BarPdv
+        produtos={produtos.map(serializeProdutoBar)}
+        categorias={categoriasAtivas}
+        pendentes={pendentes}
+        pendentesTotal={pendentesLista.total}
+        unidadeNome={unidade.nome}
+        podeCancelar={podeGerir}
+        turnoAberto={Boolean(turno)}
+      />
+    </div>
   )
 }

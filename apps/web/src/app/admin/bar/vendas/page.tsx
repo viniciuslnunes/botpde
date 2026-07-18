@@ -20,7 +20,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Vendas — Bar Admin' }
 
-const STATUS_OPTIONS = ['TODAS', 'PENDENTE', 'PAGA', 'CANCELADA'] as const
+const STATUS_OPTIONS = ['TODAS', 'PENDENTE', 'PAGA', 'CANCELADA', 'ESTORNADA'] as const
 
 function formatarPreco(valor: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -57,7 +57,10 @@ export default async function AdminBarVendasPage({
 
   const sp = await searchParams
   const statusFiltro: StatusVendaBar | undefined =
-    sp.status === 'PENDENTE' || sp.status === 'PAGA' || sp.status === 'CANCELADA'
+    sp.status === 'PENDENTE' ||
+    sp.status === 'PAGA' ||
+    sp.status === 'CANCELADA' ||
+    sp.status === 'ESTORNADA'
       ? sp.status
       : undefined
   const page = Math.max(1, Number(sp.page) || 1)

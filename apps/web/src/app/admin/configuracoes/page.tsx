@@ -65,7 +65,7 @@ export default async function ConfiguracoesPage() {
       id: 'balanco',
       icon: Scale,
       title: 'Balanço financeiro',
-      description: 'Prestação de contas agregada para membros no portal (sem lançamentos individuais)',
+      description: 'Prestação de contas no portal — escolha o nível de detalhe público',
       ownerOnly: false,
     },
   ]
@@ -130,8 +130,9 @@ export default async function ConfiguracoesPage() {
                     <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
                   ) : section.id === 'balanco' ? (
                     <BalancoVisivelForm
-                      key={String(tenant.balancoFinanceiroVisivel)}
+                      key={`${tenant.balancoFinanceiroVisivel}-${tenant.balancoDetalheNivel}`}
                       visivel={tenant.balancoFinanceiroVisivel}
+                      detalheNivel={tenant.balancoDetalheNivel}
                     />
                   ) : null}
                 </div>

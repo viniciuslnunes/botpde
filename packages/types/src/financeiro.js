@@ -111,6 +111,15 @@ export const FiltroFinanceiroSchema = z.object({
 })
 
 /** @type {Record<string, string>} */
+export const BALANCO_DETALHE_NIVEL_LABEL = {
+  TOTAIS: 'Só totais',
+  CATEGORIAS: 'Totais e categorias',
+  COMPLETO: 'Totais, categorias e lançamentos',
+}
+
+export const BalancoDetalheNivelSchema = z.enum(['TOTAIS', 'CATEGORIAS', 'COMPLETO'])
+
+/** @type {Record<string, string>} */
 export const CATEGORIA_FINANCEIRO_LABEL = {
   MENSALIDADE: 'Mensalidade',
   LOJA: 'Loja / materiais',

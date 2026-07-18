@@ -148,6 +148,7 @@ export function BarPdv({
   pendentesTotal: pendentesTotalInicial,
   unidadeNome,
   podeCancelar,
+  turnoAberto = true,
 }: {
   produtos: BarProdutoSerializado[]
   categorias: { id: string; nome: string }[]
@@ -155,6 +156,8 @@ export function BarPdv({
   pendentesTotal: number
   unidadeNome: string
   podeCancelar: boolean
+  /** Sem turno aberto o PDV não registra novas vendas. */
+  turnoAberto?: boolean
 }) {
   const router = useRouter()
   const [produtos, setProdutos] = useState(produtosIniciais)
@@ -832,6 +835,17 @@ export function BarPdv({
         </div>
       </header>
 
+      {!turnoAberto ? (
+        <div className="flex flex-1 items-center justify-center p-6">
+          <MotionEmptyState
+            icon={<Beer className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
+            title="Turno fechado"
+            description="Abra o turno de caixa acima (ou no hub do Bar) para registrar vendas."
+            className="flex max-w-md flex-col items-center text-center"
+          />
+        </div>
+      ) : (
+        <>
       {pendentes.length > 0 && (
         <section className="shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--color-warning)_/_0.06)] px-4 py-3">
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -1112,6 +1126,8 @@ export function BarPdv({
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   )
 }

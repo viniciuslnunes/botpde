@@ -1,9 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { m } from 'motion/react'
 import { ReceiptText } from 'lucide-react'
-import { cancelarVendaBar } from '@/app/admin/bar/actions'
+import { toast } from '@torcida/ui'
+import { cancelarVendaBar, estornarVendaBar } from '@/app/admin/bar/actions'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -25,6 +28,7 @@ const STATUS_VENDA_COR: Record<string, string> = {
   PENDENTE: 'bg-[rgb(var(--color-warning)_/_0.14)] text-[rgb(var(--color-warning-fg))]',
   PAGA: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
   CANCELADA: 'bg-[rgb(var(--color-danger)_/_0.14)] text-[rgb(var(--color-danger-fg))]',
+  ESTORNADA: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
 }
 
 export function StatusVendaBarBadge({ status, label }: { status: string; label: string }) {
@@ -58,6 +62,69 @@ function CancelarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
     >
       Cancelar
     </button>
+  )
+}
+
+function EstornarVendaBarButton({ venda }: { venda: BarVendaListItem }) {
+  const router = useRouter()
+  const [aberto, setAberto] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [pending, startTransition] = useTransition()
+
+  function confirmar() {
+    startTransition(async () => {
+      const result = await estornarVendaBar({ vendaId: venda.id, motivo })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Venda estornada')
+      setAberto(false)
+      router.refresh()
+    })
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+      >
+        Estornar
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-2">
+      <input
+        type="text"
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+        placeholder="Motivo do estorno"
+        maxLength={200}
+        className="rounded-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 py-1 text-xs text-[rgb(var(--foreground))]"
+      />
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          disabled={pending || motivo.trim().length < 3}
+          onClick={confirmar}
+          className="rounded-md bg-[rgb(var(--color-danger)_/_0.9)] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+        >
+          Confirmar
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => setAberto(false)}
+          className="rounded-md px-2.5 py-1 text-xs text-[rgb(var(--foreground-muted))]"
+        >
+          Voltar
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -98,9 +165,10 @@ export function BarVendasList({
                 <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">{venda.observacao}</p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <StatusVendaBarBadge status={venda.status} label={venda.statusLabel} />
               {podeGerir && venda.status === 'PENDENTE' && <CancelarVendaBarButton venda={venda} />}
+              {podeGerir && venda.status === 'PAGA' && <EstornarVendaBarButton venda={venda} />}
             </div>
           </div>
           <ul className="space-y-1.5 text-sm">
