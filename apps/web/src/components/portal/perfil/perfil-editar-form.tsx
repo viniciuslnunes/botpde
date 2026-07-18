@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save } from 'lucide-react'
+import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -74,10 +74,25 @@ export function PerfilEditarForm({
   const bannerRef = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const avatarBox = useRef<HTMLDivElement>(null)
+  const privacidadeRef = useRef<HTMLDivElement>(null)
+  const privacidadeInputRef = useRef<HTMLInputElement>(null)
   const posSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drag = useRef<{ startY: number; startPos: number; h: number } | null>(null)
+  const [destaquePrivacidade, setDestaquePrivacidade] = useState(false)
 
   const displayAvatar = avatarUrl ?? avatarFallback
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('foco') !== 'privacidade' || privacidadeBloqueada) return
+    setDestaquePrivacidade(true)
+    const t = window.setTimeout(() => {
+      privacidadeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      privacidadeInputRef.current?.focus({ preventScroll: true })
+    }, 250)
+    return () => window.clearTimeout(t)
+  }, [privacidadeBloqueada])
 
   const socialUnsaved = useMemo(() => {
     const list: string[] = []
@@ -407,17 +422,48 @@ export function PerfilEditarForm({
         placeholder="Escreva sua bio para a comunidade."
       />
 
-      <label className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
-        <input
-          type="checkbox"
-          checked={perfilPrivado}
-          disabled={privacidadeBloqueada}
-          onChange={(e) => setPerfilPrivado(e.target.checked)}
-        />
-        {privacidadeBloqueada
-          ? 'Perfil público (obrigatório para torcedores)'
-          : 'Perfil privado (só seguidores veem suas publicações e atividade)'}
-      </label>
+      <div
+        ref={privacidadeRef}
+        id="perfil-privacidade"
+        className={[
+          'scroll-mt-28 space-y-2 rounded-xl border p-3 transition-[box-shadow,background-color,border-color] duration-500',
+          destaquePrivacidade
+            ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.1)] shadow-[0_0_0_3px_rgb(var(--color-primary)_/_0.28)]'
+            : 'border-transparent',
+        ].join(' ')}
+      >
+        {destaquePrivacidade && !privacidadeBloqueada && (
+          <div className="flex items-start gap-2 rounded-lg bg-[rgb(var(--surface))] px-3 py-2 text-sm">
+            <Sparkles
+              aria-hidden
+              className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+            />
+            <div>
+              <p className="font-semibold text-[rgb(var(--color-primary-fg))]">
+                Altere a privacidade aqui
+              </p>
+              <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                Desmarque “Perfil privado” e salve para liberar a opção Público nas publicações.
+              </p>
+            </div>
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
+          <input
+            ref={privacidadeInputRef}
+            type="checkbox"
+            checked={perfilPrivado}
+            disabled={privacidadeBloqueada}
+            onChange={(e) => {
+              setPerfilPrivado(e.target.checked)
+              if (!e.target.checked) setDestaquePrivacidade(false)
+            }}
+          />
+          {privacidadeBloqueada
+            ? 'Perfil público (obrigatório para torcedores)'
+            : 'Perfil privado (só seguidores veem suas publicações e atividade)'}
+        </label>
+      </div>
 
       <div className="space-y-2 rounded-lg border border-[rgb(var(--border))] p-3">
         <p className="text-xs font-semibold text-[rgb(var(--foreground-muted))]">Exibir no perfil</p>

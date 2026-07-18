@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import {
   ImagePlus,
@@ -16,9 +17,11 @@ import {
   CalendarDays,
   Plus,
   ChevronDown,
+  Check,
   Globe2,
   Users,
   Lock,
+  type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
@@ -38,13 +41,43 @@ import {
 } from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { useConfirmDialog } from '@/lib/confirm-action'
 
 const INITIAL_STATE: PublicarPostState = {}
 const MAX_ANEXOS = 10
 const MAX_IMG_MB = 10
 const MAX_VIDEO_MB = 100
 
+type VisibilidadePost = 'PUBLICO' | 'TENANT' | 'PRIVADO'
+
+const VISIBILIDADE_OPCOES: Array<{
+  value: VisibilidadePost
+  label: string
+  descricao: string
+  Icon: LucideIcon
+}> = [
+  {
+    value: 'PUBLICO',
+    label: 'Público',
+    descricao: 'Comunidade e torcedores do clube',
+    Icon: Globe2,
+  },
+  {
+    value: 'TENANT',
+    label: 'Só torcida',
+    descricao: 'Membros da organizada',
+    Icon: Users,
+  },
+  {
+    value: 'PRIVADO',
+    label: 'Só seguidores',
+    descricao: 'Quem te segue com aprovação',
+    Icon: Lock,
+  },
+]
+
 interface FeedComposerProps {
+  userId: string
   userName: string | null
   userAvatar: string | null
   perfilPrivado?: boolean
@@ -58,6 +91,7 @@ interface FeedComposerProps {
 }
 
 export function FeedComposer({
+  userId,
   userName,
   userAvatar,
   perfilPrivado = false,
@@ -76,6 +110,7 @@ export function FeedComposer({
 
   return (
     <FeedComposerActive
+      userId={userId}
       userName={userName}
       userAvatar={userAvatar}
       perfilPrivado={perfilPrivado}
@@ -87,6 +122,7 @@ export function FeedComposer({
 }
 
 function FeedComposerActive({
+  userId,
   userName,
   userAvatar,
   perfilPrivado = false,
@@ -136,6 +172,7 @@ function FeedComposerActive({
     <div id="feed-composer" className="scroll-mt-24">
     <ComposerBody
       key={token}
+      userId={userId}
       userName={userName}
       userAvatar={userAvatar}
       perfilPrivado={perfilPrivado}
@@ -166,6 +203,7 @@ interface MediaItem {
 }
 
 function ComposerBody({
+  userId,
   userName,
   userAvatar,
   perfilPrivado,
@@ -180,6 +218,7 @@ function ComposerBody({
   somentePublico = false,
   eventoIdInicial,
 }: {
+  userId: string
   userName: string | null
   userAvatar: string | null
   perfilPrivado: boolean
@@ -209,9 +248,10 @@ function ComposerBody({
   const [mencoes, setMencoes] = useState<MencaoParsed[]>([])
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
-  const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
+  const [visibilidade, setVisibilidade] = useState<VisibilidadePost>(
     somentePublico ? 'PUBLICO' : perfilPrivado ? 'PRIVADO' : 'PUBLICO',
   )
+  const [alcanceOpen, setAlcanceOpen] = useState(false)
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -221,7 +261,10 @@ function ComposerBody({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
+  const alcanceRef = useRef<HTMLDivElement>(null)
   const [, startTransition] = useTransition()
+  const router = useRouter()
+  const confirmDialog = useConfirmDialog()
 
   useEffect(() => {
     if (!eventoPreselecionado) return
@@ -247,15 +290,13 @@ function ComposerBody({
       ? texto.trim().length > 0 && eventoId.length > 0 && !pending
       : texto.trim().length > 0 && !enviando && !pending
 
-  // Perfil privado: sem opção Pública (só torcida / seguidores).
-  const visibilidadeEfetiva: 'PUBLICO' | 'TENANT' | 'PRIVADO' =
+  // Perfil privado: Público fica listado, mas bloqueado (modal para alterar privacidade).
+  const visibilidadeEfetiva: VisibilidadePost =
     !somentePublico && perfilPrivado && visibilidade === 'PUBLICO' ? 'PRIVADO' : visibilidade
-  const AlcanceIcon =
-    visibilidadeEfetiva === 'PRIVADO'
-      ? Lock
-      : visibilidadeEfetiva === 'TENANT'
-        ? Users
-        : Globe2
+  const opcaoVisibilidadeAtual =
+    VISIBILIDADE_OPCOES.find((opcao) => opcao.value === visibilidadeEfetiva) ??
+    VISIBILIDADE_OPCOES[VISIBILIDADE_OPCOES.length - 1]!
+  const AlcanceIcon = opcaoVisibilidadeAtual.Icon
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -353,9 +394,9 @@ function ComposerBody({
 
   useEffect(() => {
     function onPointerDown(e: MouseEvent) {
-      if (!extrasRef.current?.contains(e.target as Node)) {
-        setExtrasOpen(false)
-      }
+      const target = e.target as Node
+      if (!extrasRef.current?.contains(target)) setExtrasOpen(false)
+      if (!alcanceRef.current?.contains(target)) setAlcanceOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -363,6 +404,36 @@ function ComposerBody({
 
   function fecharExtras() {
     setExtrasOpen(false)
+  }
+
+  function escolherVisibilidade(value: VisibilidadePost) {
+    setVisibilidade(value)
+    setAlcanceOpen(false)
+  }
+
+  async function pedirAlterarPrivacidade() {
+    setAlcanceOpen(false)
+    await confirmDialog({
+      titulo: 'Perfil restrito',
+      descricao:
+        'Seu perfil está privado, então não é possível publicar como Público. Quer abrir as configurações de privacidade agora?',
+      labelConfirmar: 'Alterar privacidade',
+      labelCancelar: 'Agora não',
+      cancelled: false,
+      execute: async () => {
+        router.push(
+          '/portal/comunidade/perfil/' + userId + '?aba=sobre&foco=privacidade',
+        )
+      },
+    })
+  }
+
+  function onEscolherVisibilidade(value: VisibilidadePost) {
+    if (value === 'PUBLICO' && perfilPrivado) {
+      void pedirAlterarPrivacidade()
+      return
+    }
+    escolherVisibilidade(value)
   }
 
   function toggleEnquete() {
@@ -801,6 +872,7 @@ function ComposerBody({
                     type="button"
                     onClick={() => {
                       setExtrasOpen((v) => !v)
+                      setAlcanceOpen(false)
                       setEmojiOpen(false)
                       setStickerOpen(false)
                     }}
@@ -948,27 +1020,121 @@ function ComposerBody({
                   Visível para torcedores do clube
                 </span>
               ) : (
-                <div className="relative">
-                  <AlcanceIcon
-                    aria-hidden
-                    className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
-                  />
-                  <select
-                    value={visibilidadeEfetiva}
-                    onChange={(e) =>
-                      setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
-                    }
+                <div ref={alcanceRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlcanceOpen((v) => !v)
+                      setExtrasOpen(false)
+                      setEmojiOpen(false)
+                      setStickerOpen(false)
+                    }}
                     aria-label="Visibilidade do post"
-                    className="h-9 max-w-[11.5rem] cursor-pointer appearance-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-8 pr-8 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color] hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)] sm:max-w-none"
+                    aria-expanded={alcanceOpen}
+                    aria-haspopup="listbox"
+                    className={[
+                      'inline-flex h-9 max-w-[13rem] items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-2.5 pr-2 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color]',
+                      'hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)]',
+                      alcanceOpen ? 'border-[rgb(var(--color-primary))] ring-2 ring-[rgb(var(--color-primary)_/_0.25)]' : '',
+                    ].join(' ')}
                   >
-                    {!perfilPrivado && <option value="PUBLICO">Público</option>}
-                    <option value="TENANT">Só torcida</option>
-                    <option value="PRIVADO">Só seguidores</option>
-                  </select>
-                  <ChevronDown
-                    aria-hidden
-                    className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
-                  />
+                    <AlcanceIcon
+                      aria-hidden
+                      className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                    />
+                    <span className="min-w-0 truncate">{opcaoVisibilidadeAtual.label}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className={[
+                        'h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform',
+                        alcanceOpen ? 'rotate-180' : '',
+                      ].join(' ')}
+                    />
+                  </button>
+                  <AnimatePresence>
+                    {alcanceOpen && (
+                      <m.div
+                        key="alcance-menu"
+                        role="listbox"
+                        aria-label="Visibilidade do post"
+                        variants={popoverPanel}
+                        initial="hidden"
+                        animate="show"
+                        exit="exit"
+                        transition={springGentle}
+                        className="card-soft absolute bottom-full right-0 z-30 mb-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                      >
+                        {VISIBILIDADE_OPCOES.map((opcao, index) => {
+                          const selecionada = opcao.value === visibilidadeEfetiva
+                          const bloqueada = opcao.value === 'PUBLICO' && perfilPrivado
+                          const Icon = opcao.Icon
+                          return (
+                            <m.button
+                              key={opcao.value}
+                              type="button"
+                              role="option"
+                              aria-selected={selecionada}
+                              aria-disabled={bloqueada || undefined}
+                              custom={index}
+                              variants={menuItemStagger}
+                              initial="hidden"
+                              animate="show"
+                              onClick={() => onEscolherVisibilidade(opcao.value)}
+                              className={[
+                                'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
+                                bloqueada
+                                  ? 'cursor-pointer opacity-55 hover:bg-[rgb(var(--background-subtle))]'
+                                  : 'hover:bg-[rgb(var(--background-subtle))]',
+                                selecionada && !bloqueada
+                                  ? 'bg-[rgb(var(--color-primary)_/_0.08)]'
+                                  : '',
+                              ].join(' ')}
+                            >
+                              <Icon
+                                aria-hidden
+                                className={[
+                                  'mt-0.5 h-4 w-4 shrink-0',
+                                  selecionada && !bloqueada
+                                    ? 'text-[rgb(var(--color-primary-fg))]'
+                                    : 'text-[rgb(var(--foreground-muted))]',
+                                ].join(' ')}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span
+                                  className={[
+                                    'block text-sm font-medium',
+                                    selecionada && !bloqueada
+                                      ? 'text-[rgb(var(--color-primary-fg))]'
+                                      : 'text-[rgb(var(--foreground))]',
+                                  ].join(' ')}
+                                >
+                                  {opcao.label}
+                                  {bloqueada ? ' (indisponível)' : ''}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                                  {bloqueada
+                                    ? 'Perfil privado — toque para alterar a privacidade'
+                                    : opcao.descricao}
+                                </span>
+                              </span>
+                              {selecionada && !bloqueada && (
+                                <Check
+                                  aria-hidden
+                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                                />
+                              )}
+                              {bloqueada && (
+                                <Lock
+                                  aria-hidden
+                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]"
+                                />
+                              )}
+                            </m.button>
+                          )
+                        })}
+                      </m.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
               <button

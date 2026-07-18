@@ -47,6 +47,7 @@ export async function ComunidadeComposerSection({
 
   return (
     <FeedComposer
+      userId={userId}
       userName={ctx.nome}
       userAvatar={userAvatar}
       perfilPrivado={ctx.perfilPrivado}
