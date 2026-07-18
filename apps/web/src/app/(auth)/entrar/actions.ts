@@ -28,23 +28,23 @@ function signInRetornouErro(result: unknown): boolean {
  * o redirect() do servidor pode descartar esse cookie — o cliente navega depois.
  */
 async function entrarComCredenciais(
-  email: string,
+  login: string,
   senha: string,
   redirectTo: string,
 ): Promise<LoginSenhaState> {
   try {
     const result = await signIn('credentials', {
-      email,
+      email: login,
       password: senha,
       redirect: false,
       redirectTo,
     })
     if (signInRetornouErro(result)) {
-      return { message: 'E-mail ou senha inválidos.' }
+      return { message: 'E-mail, apelido ou senha inválidos.' }
     }
   } catch (error) {
     if (error instanceof AuthError) {
-      return { message: 'E-mail ou senha inválidos.' }
+      return { message: 'E-mail, apelido ou senha inválidos.' }
     }
     throw error
   }
@@ -56,14 +56,15 @@ export async function entrarComSenha(
   _prev: LoginSenhaState,
   formData: FormData,
 ): Promise<LoginSenhaState> {
-  const email = (formData.get('email') as string)?.trim().toLowerCase()
+  const login = (formData.get('email') as string)?.trim() ?? ''
   const senha = formData.get('senha') as string
+  const rateKey = login.toLowerCase().replace(/^@+/, '')
 
-  if (email && excedeuLimite(email)) {
-    return { message: 'Muitas tentativas com este e-mail. Tente novamente em alguns minutos.' }
+  if (rateKey && excedeuLimite(rateKey)) {
+    return { message: 'Muitas tentativas. Tente novamente em alguns minutos.' }
   }
 
-  return entrarComCredenciais(email, senha, '/auth/contexto')
+  return entrarComCredenciais(login, senha, '/auth/contexto')
 }
 
 const contaSchema = z.object({

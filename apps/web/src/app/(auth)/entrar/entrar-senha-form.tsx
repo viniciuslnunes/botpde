@@ -24,9 +24,16 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
         <div>
           <label htmlFor="email-senha" className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
             <Mail className="h-3.5 w-3.5" />
-            E-mail
+            E-mail ou apelido
           </label>
-          <Input id="email-senha" name="email" type="email" placeholder="seu@email.com" required />
+          <Input
+            id="email-senha"
+            name="email"
+            type="text"
+            autoComplete="username"
+            placeholder="seu@email.com ou @apelido"
+            required
+          />
         </div>
 
         <div>
@@ -56,7 +63,7 @@ export function EntrarSenhaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: str
 
         <div style={{ '--color-primary': hexToRgb(corPrimaria) } as React.CSSProperties}>
           <SubmitButton
-            label="Entrar com e-mail"
+            label="Entrar"
             pendingLabel="Entrando..."
             icon={<ChevronRight className="h-4 w-4" />}
             iconPosition="trailing"

@@ -4,6 +4,7 @@ import Google from 'next-auth/providers/google'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from '@torcida/db'
+import { normalizarNickname } from '@torcida/types'
 import { env, isProd } from '@/lib/env'
 import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
 import { resolveSharedCookieDomain } from '@/lib/session-cookie'
@@ -37,29 +38,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     Credentials({
+      // `email` no form = e-mail OU nickname (@handle).
       credentials: { email: {}, password: {} },
       async authorize(credentials) {
-        const emailRaw = credentials?.email as string | undefined
+        const loginRaw = credentials?.email as string | undefined
         const password = credentials?.password as string | undefined
-        if (!emailRaw || !password) return null
+        if (!loginRaw || !password) return null
 
-        const email = emailRaw.trim().toLowerCase()
+        const login = loginRaw.trim()
+        if (!login) return null
 
-        if (excedeuLimite(email)) return null
+        // Chave de rate-limit estável: e-mail em minúsculas ou nickname sem @.
+        const rateKey = login.toLowerCase().replace(/^@+/, '')
+        if (excedeuLimite(rateKey)) return null
+
+        const emailCandidate = login.toLowerCase()
+        const nicknameCandidate = normalizarNickname(login)
 
         const user = await db.user.findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } },
+          where: {
+            OR: [
+              { email: { equals: emailCandidate, mode: 'insensitive' } },
+              ...(nicknameCandidate
+                ? [{ nickname: { equals: nicknameCandidate, mode: 'insensitive' as const } }]
+                : []),
+            ],
+          },
         })
         // Erro genérico (usuário inexistente ou sem senha cadastrada) —
         // não diferenciar do caso de senha errada, evita enumeração de contas.
         if (!user?.senhaHash) {
-          registrarTentativaFalha(email)
+          registrarTentativaFalha(rateKey)
           return null
         }
 
         const senhaValida = await bcrypt.compare(password, user.senhaHash)
         if (!senhaValida) {
-          registrarTentativaFalha(email)
+          registrarTentativaFalha(rateKey)
           return null
         }
 
