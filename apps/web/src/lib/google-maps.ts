@@ -179,73 +179,170 @@ declare global {
   var google: GoogleMapsNamespace | undefined
 }
 
-let mapsScriptPromise: Promise<GoogleMapsNamespace> | null = null
+let mapsBootstrapInstalled = false
+let mapsReadyPromise: Promise<GoogleMapsNamespace> | null = null
 let markerLibraryPromise: Promise<GoogleMapsMarkerLibrary> | null = null
 
-/** Carrega o Maps JavaScript API uma vez (singleton). Usa `loading=async` (best practice Google). */
+type BootstrapMaps = {
+  importLibrary?: GoogleMapsNamespace['maps']['importLibrary']
+  /** Callback interno do bootstrap oficial (`google.maps.__ib__`). */
+  __ib__?: () => void
+}
+
+/**
+ * Bootstrap oficial da Google (dynamic library import).
+ * Instala `google.maps.importLibrary` na hora; o script real só baixa na 1ª chamada.
+ * Não usar `script.onload` com `loading=async` — a API não fica pronta nesse evento.
+ * @see https://developers.google.com/maps/documentation/javascript/load-maps-js-api
+ */
+function installGoogleMapsBootstrap(key: string): void {
+  if (mapsBootstrapInstalled || typeof window.google?.maps?.importLibrary === 'function') {
+    mapsBootstrapInstalled = true
+    return
+  }
+
+  const gWindow = window as Window & { google?: { maps?: BootstrapMaps } }
+  gWindow.google = gWindow.google ?? {}
+  const mapsNs: BootstrapMaps = gWindow.google.maps ?? {}
+  gWindow.google.maps = mapsNs
+
+  const pendingLibraries = new Set<string>()
+  let scriptPromise: Promise<void> | null = null
+
+  const loadScript = (): Promise<void> => {
+    if (scriptPromise) return scriptPromise
+
+    // Microtask: deixa chamadas concorrentes de importLibrary enfileirarem libs no Set
+    // antes de montar a URL (mesmo truque do bootstrap minificado da Google).
+    scriptPromise = Promise.resolve().then(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const params = new URLSearchParams()
+          params.set('key', key)
+          params.set('v', 'weekly')
+          params.set('language', 'pt-BR')
+          params.set('region', 'BR')
+          params.set('loading', 'async')
+          params.set('libraries', [...pendingLibraries].join(','))
+          params.set('callback', 'google.maps.__ib__')
+
+          mapsNs.__ib__ = () => resolve()
+
+          const script = document.createElement('script')
+          script.dataset.googleMaps = 'js'
+          script.async = true
+          script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`
+          script.onerror = () => {
+            scriptPromise = null
+            mapsBootstrapInstalled = false
+            reject(new Error('Google Maps script error'))
+          }
+          document.head.appendChild(script)
+        }),
+    )
+
+    return scriptPromise
+  }
+
+  const stubImportLibrary: GoogleMapsNamespace['maps']['importLibrary'] = (name) => {
+    pendingLibraries.add(name)
+    return loadScript().then(() => {
+      const real = mapsNs.importLibrary
+      if (!real || real === stubImportLibrary) {
+        throw new Error('Google Maps falhou ao carregar')
+      }
+      return real(name)
+    })
+  }
+
+  mapsNs.importLibrary = stubImportLibrary
+  mapsBootstrapInstalled = true
+}
+
+/** Garante bootstrap + hidrata `google.maps` via `importLibrary('maps')`. */
 export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Maps JS só no client'))
   }
-  if (window.google?.maps?.importLibrary) {
-    return Promise.resolve(window.google)
-  }
-  if (mapsScriptPromise) return mapsScriptPromise
+
+  if (mapsReadyPromise) return mapsReadyPromise
 
   const key = getGoogleMapsApiKey()
   if (!key) {
     return Promise.reject(new Error('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente'))
   }
 
-  mapsScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="js"]')
-    if (existing) {
-      existing.addEventListener('load', () => {
-        if (window.google?.maps?.importLibrary) resolve(window.google)
-        else reject(new Error('Google Maps falhou ao carregar'))
-      })
-      existing.addEventListener('error', () => reject(new Error('Google Maps script error')))
-      return
+  mapsReadyPromise = (async () => {
+    installGoogleMapsBootstrap(key)
+    const g = window.google
+    if (!g?.maps?.importLibrary) {
+      throw new Error('Google Maps falhou ao carregar')
     }
-
-    const script = document.createElement('script')
-    script.dataset.googleMaps = 'js'
-    script.async = true
-    // `loading=async` no URL é o que o Google valida (além de script.async).
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=pt-BR&region=BR&loading=async&v=weekly`
-    script.onload = () => {
-      if (window.google?.maps?.importLibrary) resolve(window.google)
-      else reject(new Error('Google Maps falhou ao carregar'))
-    }
-    script.onerror = () => {
-      mapsScriptPromise = null
-      reject(new Error('Google Maps script error'))
-    }
-    document.head.appendChild(script)
+    await g.maps.importLibrary('maps')
+    return g
+  })().catch((err: unknown) => {
+    mapsReadyPromise = null
+    markerLibraryPromise = null
+    throw err
   })
 
-  return mapsScriptPromise
+  return mapsReadyPromise
 }
 
-/** Biblioteca `marker` (AdvancedMarkerElement + PinElement). */
+/** Biblioteca `marker` (AdvancedMarkerElement + PinElement) + Map hidratado. */
 export async function loadGoogleMapsMarkerLibrary(): Promise<{
   g: GoogleMapsNamespace
   marker: GoogleMapsMarkerLibrary
+  Map: GoogleMapsNamespace['maps']['Map']
 }> {
-  const g = await loadGoogleMapsScript()
-  if (!markerLibraryPromise) {
-    markerLibraryPromise = g.maps.importLibrary('marker').then((lib) => {
-      const marker = lib as unknown as GoogleMapsMarkerLibrary
-      if (!marker.AdvancedMarkerElement || !marker.PinElement) {
-        throw new Error('Biblioteca marker incompleta')
-      }
-      return marker
-    })
+  if (typeof window === 'undefined') {
+    throw new Error('Maps JS só no client')
   }
-  const marker = await markerLibraryPromise
-  // Garante Map no namespace (importLibrary('maps') hidrata google.maps.Map).
-  await g.maps.importLibrary('maps')
-  return { g, marker }
+
+  const key = getGoogleMapsApiKey()
+  if (!key) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente')
+  }
+
+  // Pedir maps+marker juntos para o bootstrap incluir ambos em `libraries=` na URL.
+  installGoogleMapsBootstrap(key)
+  const g = window.google
+  if (!g?.maps?.importLibrary) {
+    throw new Error('Google Maps falhou ao carregar')
+  }
+
+  if (!mapsReadyPromise) {
+    mapsReadyPromise = g.maps
+      .importLibrary('maps')
+      .then(() => g)
+      .catch((err: unknown) => {
+        mapsReadyPromise = null
+        markerLibraryPromise = null
+        throw err
+      })
+  }
+
+  if (!markerLibraryPromise) {
+    markerLibraryPromise = g.maps
+      .importLibrary('marker')
+      .then((lib) => {
+        const marker = lib as unknown as GoogleMapsMarkerLibrary
+        if (!marker.AdvancedMarkerElement || !marker.PinElement) {
+          throw new Error('Biblioteca marker incompleta')
+        }
+        return marker
+      })
+      .catch((err: unknown) => {
+        markerLibraryPromise = null
+        throw err
+      })
+  }
+
+  const [, marker] = await Promise.all([mapsReadyPromise, markerLibraryPromise])
+  if (!g.maps.Map) {
+    throw new Error('google.maps.Map indisponível')
+  }
+  return { g, marker, Map: g.maps.Map }
 }
 
 type GeocodeAddressComponent = {

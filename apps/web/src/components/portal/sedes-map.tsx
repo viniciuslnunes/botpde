@@ -91,12 +91,12 @@ export function SedesMap({
 
     async function init() {
       try {
-        const { g, marker } = await loadGoogleMapsMarkerLibrary()
+        const { g, marker, Map } = await loadGoogleMapsMarkerLibrary()
         if (cancelled || !containerRef.current) return
         gRef.current = g
         markerLibRef.current = marker
 
-        const map = new g.maps.Map(containerRef.current, {
+        const map = new Map(containerRef.current, {
           center: DEFAULT_CENTER,
           zoom: 11,
           mapId: getGoogleMapsMapId(),
