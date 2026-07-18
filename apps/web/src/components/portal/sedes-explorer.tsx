@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useDeferredValue } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Crosshair, Loader2, MapPin, Search, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Crosshair, Loader2, Search, X } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { SedeExplorerCard } from '@/components/portal/sede-explorer-card'
 import { SedeExplorerDetail } from '@/components/portal/sede-explorer-detail'
@@ -20,15 +20,12 @@ import {
   type LocalizacaoOnboarding,
 } from '@/lib/onboarding-unidade'
 
-const SedesMap = dynamic(
-  () => import('@/components/portal/sedes-map').then((m) => m.SedesMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-[14rem] w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:h-[18rem] lg:h-[22rem]" />
-    ),
-  },
-)
+const SedesMap = dynamic(() => import('@/components/portal/sedes-map').then((m) => m.SedesMap), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[14rem] w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:h-[18rem] lg:h-[22rem]" />
+  ),
+})
 
 type FiltroTipo = 'TODAS' | SedeTipo
 
@@ -81,7 +78,7 @@ type Props = {
 export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props) {
   const router = useRouter()
   const listRef = useRef<HTMLDivElement>(null)
-  const mapPanelRef = useRef<HTMLElement>(null)
+  const leftPanelRef = useRef<HTMLElement>(null)
   const enrichedOnce = useRef(false)
 
   const [sedes, setSedes] = useState(sedesIniciais)
@@ -161,14 +158,10 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
       const url = id ? `/portal/sedes?sede=${encodeURIComponent(id)}` : '/portal/sedes'
       router.replace(url, { scroll: false })
     })
-    if (id && listRef.current) {
-      const el = listRef.current.querySelector<HTMLElement>(`[data-sede-id="${CSS.escape(id)}"]`)
-      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    }
-    // Mobile: leva o mapa/detalhe à vista após selecionar
+    // Mobile: leva o detalhe à vista após selecionar (a coluna esquerda troca lista→detalhe)
     if (id && typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
       requestAnimationFrame(() => {
-        mapPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        leftPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
       })
     }
   }
@@ -254,13 +247,10 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   )
 
   const selected = selectedId ? (sedes.find((s) => s.id === selectedId) ?? null) : null
-  const selectedDist =
-    selected && localizacao ? distanciaKm(localizacao, selected) : null
+  const selectedDist = selected && localizacao ? distanciaKm(localizacao, selected) : null
   const buscaPendente = busca !== buscaDeferred
   const maisProximaDist =
-    maisProximaId && localizacao
-      ? distanciaKm(localizacao, filtradas[0]!)
-      : null
+    maisProximaId && localizacao ? distanciaKm(localizacao, filtradas[0]!) : null
 
   if (sedes.length === 0) {
     return (
@@ -273,219 +263,191 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <section className="flex min-h-0 flex-col gap-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]">
-        <div className="space-y-2.5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
-            <input
-              type="search"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome, cidade ou endereço"
-              aria-label="Buscar sedes"
-              className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2.5 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
-            />
-            {busca && (
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
+      <section
+        ref={leftPanelRef}
+        className="order-2 flex min-h-0 flex-col gap-3 scroll-mt-20 lg:order-1 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)]"
+      >
+        {selected ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={() => setBusca('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-                aria-label="Limpar busca"
+                onClick={() => selecionar(null)}
+                className="-ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
-                <X className="h-3.5 w-3.5" />
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Voltar à lista
               </button>
-            )}
-          </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Detalhe
+              </span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 lg:pr-1">
+              <SedeExplorerDetail
+                key={selected.id}
+                sede={selected}
+                distanciaKm={selectedDist}
+                onSelectFilho={selecionar}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2.5">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+                <input
+                  type="search"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar por nome, cidade ou endereço"
+                  aria-label="Buscar sedes"
+                  className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2.5 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
+                />
+                {busca && (
+                  <button
+                    type="button"
+                    onClick={() => setBusca('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
 
-          <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por tipo">
-            {FILTROS.map((f) => {
-              const count = contagens[f.id]
-              if (f.id !== 'TODAS' && count === 0) return null
-              const active = filtro === f.id
-              return (
+              <div
+                className="flex flex-wrap items-center gap-1.5"
+                role="tablist"
+                aria-label="Filtrar por tipo"
+              >
+                {FILTROS.map((f) => {
+                  const count = contagens[f.id]
+                  if (f.id !== 'TODAS' && count === 0) return null
+                  const active = filtro === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setFiltro(f.id)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        active
+                          ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                          : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
+                      }`}
+                    >
+                      {f.label}
+                      <span className={`ml-1 tabular-nums ${active ? 'opacity-80' : 'opacity-70'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  key={f.id}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setFiltro(f.id)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                      : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
+                  onClick={pedirLocalizacao}
+                  disabled={geoStatus === 'loading'}
+                  aria-pressed={localizacao != null}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                    localizacao
+                      ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                      : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.5)]'
                   }`}
                 >
-                  {f.label}
-                  <span className={`ml-1 tabular-nums ${active ? 'opacity-80' : 'opacity-70'}`}>
-                    {count}
-                  </span>
+                  {geoStatus === 'loading' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Crosshair className="h-3.5 w-3.5" />
+                  )}
+                  {localizacao ? 'Perto de mim · ativo' : 'Perto de mim'}
                 </button>
-              )
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={pedirLocalizacao}
-              disabled={geoStatus === 'loading'}
-              aria-pressed={localizacao != null}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
-                localizacao
-                  ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                  : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.5)]'
-              }`}
-            >
-              {geoStatus === 'loading' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Crosshair className="h-3.5 w-3.5" />
-              )}
-              {localizacao ? 'Perto de mim · ativo' : 'Perto de mim'}
-            </button>
-            {localizacao && (
-              <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                Ordenado por proximidade
-                {maisProximaDist != null && (
-                  <>
-                    {' '}
-                    · mais perto a{' '}
-                    <span className="font-medium tabular-nums text-[rgb(var(--foreground))]">
-                      {formatarDistanciaKm(maisProximaDist)}
-                    </span>
-                  </>
+                {localizacao && (
+                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                    Ordenado por proximidade
+                    {maisProximaDist != null && (
+                      <>
+                        {' '}
+                        · mais perto a{' '}
+                        <span className="font-medium tabular-nums text-[rgb(var(--foreground))]">
+                          {formatarDistanciaKm(maisProximaDist)}
+                        </span>
+                      </>
+                    )}
+                  </p>
                 )}
-              </p>
-            )}
-          </div>
+              </div>
 
-          <div className="flex items-center justify-between gap-2 text-[11px] text-[rgb(var(--foreground-muted))]">
-            <p className={buscaPendente ? 'opacity-60' : undefined}>
-              {filtradas.length === sedes.length
-                ? `${sedes.length} ${sedes.length === 1 ? 'local' : 'locais'}`
-                : `${filtradas.length} de ${sedes.length} locais`}
-            </p>
-            {enriching && <p>Atualizando mapa…</p>}
-          </div>
+              <div className="flex items-center justify-between gap-2 text-[11px] text-[rgb(var(--foreground-muted))]">
+                <p className={buscaPendente ? 'opacity-60' : undefined}>
+                  {filtradas.length === sedes.length
+                    ? `${sedes.length} ${sedes.length === 1 ? 'local' : 'locais'}`
+                    : `${filtradas.length} de ${sedes.length} locais`}
+                </p>
+                {enriching && <p>Atualizando mapa…</p>}
+              </div>
 
-          {geoStatus === 'error' && (
-            <p className="text-[11px] text-red-500" role="alert">
-              Não foi possível obter sua localização. Verifique a permissão do navegador.
-            </p>
-          )}
-        </div>
-
-        <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5 lg:pr-1">
-          {filtradas.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center">
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                Nenhuma sede encontrada com esses filtros.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setBusca('')
-                  setFiltro('TODAS')
-                }}
-                className="mt-2 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-              >
-                Limpar filtros
-              </button>
+              {geoStatus === 'error' && (
+                <p className="text-[11px] text-red-500" role="alert">
+                  Não foi possível obter sua localização. Verifique a permissão do navegador.
+                </p>
+              )}
             </div>
-          ) : (
-            <ul className="space-y-2">
-              {filtradas.map((sede, index) => (
-                <li key={sede.id}>
-                  <SedeExplorerCard
-                    sede={sede}
-                    selected={sede.id === selectedId}
-                    distanciaKm={localizacao ? distanciaKm(localizacao, sede) : null}
-                    onSelect={() => selecionar(sede.id)}
-                    priority={index < 4}
-                    maisProxima={sede.id === maisProximaId}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+
+            <div
+              ref={listRef}
+              className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5 lg:pr-1"
+            >
+              {filtradas.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center">
+                  <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                    Nenhuma sede encontrada com esses filtros.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBusca('')
+                      setFiltro('TODAS')
+                    }}
+                    className="mt-2 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {filtradas.map((sede, index) => (
+                    <li key={sede.id}>
+                      <SedeExplorerCard
+                        sede={sede}
+                        selected={sede.id === selectedId}
+                        distanciaKm={localizacao ? distanciaKm(localizacao, sede) : null}
+                        onSelect={() => selecionar(sede.id)}
+                        priority={index < 4}
+                        maisProxima={sede.id === maisProximaId}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
       </section>
 
-      <section ref={mapPanelRef} className="flex min-w-0 flex-col gap-3 scroll-mt-20">
+      <section className="order-1 min-w-0 lg:order-2">
         <SedesMap
           sedes={mapPoints}
           selectedId={selectedId}
           onSelect={selecionar}
           userLocation={localizacao}
-          className="h-[14rem] w-full sm:h-[18rem] lg:sticky lg:top-20 lg:h-[min(28rem,42vh)] lg:z-10"
+          className="h-[16rem] w-full sm:h-[20rem] lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]"
         />
-
-        {selected ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Detalhe
-              </p>
-              <button
-                type="button"
-                onClick={() => selecionar(null)}
-                className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-              >
-                Limpar seleção
-              </button>
-            </div>
-            <SedeExplorerDetail
-              key={selected.id}
-              sede={selected}
-              distanciaKm={selectedDist}
-              onSelectFilho={selecionar}
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-5 py-8 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]">
-              <MapPin className="h-5 w-5" aria-hidden />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[rgb(var(--foreground))]">
-                Selecione uma sede na lista ou no mapa
-              </p>
-              <p className="mt-1 max-w-sm text-xs text-[rgb(var(--foreground-muted))]">
-                Veja fachada, endereço, horários, rotas e próximos eventos
-              </p>
-            </div>
-            {!localizacao && (
-              <button
-                type="button"
-                onClick={pedirLocalizacao}
-                disabled={geoStatus === 'loading'}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
-              >
-                {geoStatus === 'loading' ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Crosshair className="h-3.5 w-3.5" />
-                )}
-                Encontrar sedes perto de mim
-              </button>
-            )}
-            {localizacao && maisProximaId && (
-              <button
-                type="button"
-                onClick={() => selecionar(maisProximaId)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
-              >
-                Ver a mais próxima
-                {maisProximaDist != null && (
-                  <span className="tabular-nums opacity-90">
-                    · {formatarDistanciaKm(maisProximaDist)}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-        )}
       </section>
     </div>
   )
