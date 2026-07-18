@@ -114,13 +114,16 @@ export function EmitirCarteirinhaModal({
   membrosElegiveis: MembroElegivelItem[]
   initialUserId?: string | null
 }) {
-  const initialMembro = membrosElegiveis.find((x) => x.userId === (initialUserId ?? ''))
   const [pending, startTransition] = useTransition()
   const [userId, setUserId] = useState(initialUserId ?? '')
-  const [nome, setNome] = useState(initialMembro?.nome ?? '')
+  const [nome, setNome] = useState(() => {
+    const m = membrosElegiveis.find((x) => x.userId === (initialUserId ?? ''))
+    return m?.nome ?? ''
+  })
   const [validade, setValidade] = useState(getValidadePadrao)
+  const [filtro, setFiltro] = useState('')
   const formIds = useId()
-  const firstFieldRef = useRef<HTMLSelectElement>(null)
+  const firstFieldRef = useRef<HTMLInputElement>(null)
   const { formRef, markPristine } = useTrackedForm({
     title: 'Nova carteirinha',
     enabled: open,
@@ -173,9 +176,20 @@ export function EmitirCarteirinhaModal({
 
   if (!open) return null
 
-  const idMembro = `${formIds}-membro`
+  const idFiltro = `${formIds}-filtro`
   const idNome = `${formIds}-nome`
   const idValidade = `${formIds}-validade`
+  const q = filtro.trim().toLowerCase()
+  const filtrados = q
+    ? membrosElegiveis.filter((m) => {
+        const hay = [m.nome, m.cidade, m.discordTag, m.telefone]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return hay.includes(q)
+      })
+    : membrosElegiveis
+  const selecionado = membrosElegiveis.find((m) => m.userId === userId)
 
   return (
     <div
@@ -208,30 +222,79 @@ export function EmitirCarteirinhaModal({
         </div>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="userId" value={userId} />
+
           <div>
             <label
-              htmlFor={idMembro}
+              htmlFor={idFiltro}
               className="block text-sm font-medium text-[rgb(var(--foreground))]"
             >
               Membro
             </label>
-            <select
+            {selecionado && (
+              <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+                Selecionado:{' '}
+                <span className="font-medium text-[rgb(var(--foreground))]">
+                  {selecionado.nome}
+                </span>
+                {selecionado.cidade ? ` · ${selecionado.cidade}` : ''}
+              </p>
+            )}
+            <input
               ref={firstFieldRef}
-              id={idMembro}
-              name="userId"
-              required
-              value={userId}
-              onChange={(e) => onSelectMembro(e.target.value)}
+              id={idFiltro}
+              type="search"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Buscar por nome, cidade ou telefone…"
+              autoComplete="off"
               className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+            />
+            <ul
+              role="listbox"
+              aria-label="Sócios elegíveis"
+              className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))]"
             >
-              <option value="">Selecione um sócio aprovado…</option>
-              {membrosElegiveis.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.nome}
-                  {m.cidade ? ` · ${m.cidade}` : ''}
-                </option>
-              ))}
-            </select>
+              {filtrados.length === 0 ? (
+                <li className="px-3 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+                  Nenhum sócio encontrado.
+                </li>
+              ) : (
+                filtrados.map((m) => {
+                  const active = m.userId === userId
+                  return (
+                    <li key={m.userId} role="option" aria-selected={active}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectMembro(m.userId)}
+                        className={[
+                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors',
+                          active
+                            ? 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]'
+                            : 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
+                        ].join(' ')}
+                      >
+                        <Avatar url={m.avatarUrl} nome={m.nome} size={28} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{m.nome}</span>
+                          {(m.cidade || m.telefone) && (
+                            <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
+                              {[m.cidade, m.telefone].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                        {active && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+            {membrosElegiveis.length >= 300 && (
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                Mostrando até 300 elegíveis. Use a busca para afinar.
+              </p>
+            )}
           </div>
 
           <div>

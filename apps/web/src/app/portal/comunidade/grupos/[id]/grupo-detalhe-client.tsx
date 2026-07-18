@@ -23,6 +23,7 @@ import {
   Link2,
   Copy,
   RefreshCw,
+  Search,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
@@ -147,6 +148,7 @@ export function GrupoDetalheClient({
   const [publicando, startPublicar] = useTransition()
   const [busyUserId, setBusyUserId] = useState<string | null>(null)
   const [carregandoMais, setCarregandoMais] = useState(false)
+  const [buscaMembros, setBuscaMembros] = useState('')
   const confirmAction = useConfirmAction()
 
   function irParaAba(id: GrupoAba) {
@@ -436,6 +438,16 @@ export function GrupoDetalheClient({
   }
 
   const pedidosCount = pedidos?.length ?? 0
+  const qMembros = buscaMembros.trim().toLowerCase()
+  const membrosFiltrados =
+    membros === null
+      ? null
+      : qMembros
+        ? membros.filter((m) => {
+            const hay = [m.nome, m.nickname].filter(Boolean).join(' ').toLowerCase()
+            return hay.includes(qMembros)
+          })
+        : membros
   const tabs = grupo.souMembro
     ? [
         { kind: 'button' as const, id: 'mural', label: 'Mural' },
@@ -619,45 +631,69 @@ export function GrupoDetalheClient({
             ) : membros.length === 0 ? (
               <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhum membro ativo.</p>
             ) : (
-              <ul className="divide-y divide-[rgb(var(--border))]">
-                {membros.map((membro) => (
-                  <li key={membro.userId} className="flex items-center gap-2 py-2.5">
-                    <Link
-                      href={`/portal/comunidade/perfil/${membro.userId}`}
-                      className="flex min-w-0 flex-1 items-center gap-3 transition-colors hover:opacity-90"
-                    >
-                      <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                          {membro.nome ?? membro.nickname ?? 'Membro'}
-                        </p>
-                        {membro.nickname && membro.nome && (
-                          <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                            @{membro.nickname}
-                          </p>
+              <div className="space-y-3">
+                {membros.length > 8 && (
+                  <div className="relative">
+                    <Search
+                      aria-hidden
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
+                    />
+                    <input
+                      type="search"
+                      value={buscaMembros}
+                      onChange={(e) => setBuscaMembros(e.target.value)}
+                      placeholder="Buscar membro por nome ou @"
+                      aria-label="Buscar membros"
+                      className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))]"
+                    />
+                  </div>
+                )}
+                {membrosFiltrados !== null && membrosFiltrados.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                    Nenhum membro com “{buscaMembros.trim()}”.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-[rgb(var(--border))]">
+                    {(membrosFiltrados ?? []).map((membro) => (
+                      <li key={membro.userId} className="flex items-center gap-2 py-2.5">
+                        <Link
+                          href={`/portal/comunidade/perfil/${membro.userId}`}
+                          className="flex min-w-0 flex-1 items-center gap-3 transition-colors hover:opacity-90"
+                        >
+                          <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                              {membro.nome ?? membro.nickname ?? 'Membro'}
+                            </p>
+                            {membro.nickname && membro.nome && (
+                              <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                                @{membro.nickname}
+                              </p>
+                            )}
+                          </div>
+                          {membro.papel === 'ADMIN' && (
+                            <span className="shrink-0 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
+                              Admin
+                            </span>
+                          )}
+                        </Link>
+                        {grupo.souAdmin && membro.userId !== currentUser.id && (
+                          <button
+                            type="button"
+                            disabled={pendingMembros && busyUserId === membro.userId}
+                            title="Remover do grupo"
+                            onClick={() => removerMembro(membro.userId)}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                          >
+                            <UserMinus className="h-3.5 w-3.5" />
+                            Remover
+                          </button>
                         )}
-                      </div>
-                      {membro.papel === 'ADMIN' && (
-                        <span className="shrink-0 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-                          Admin
-                        </span>
-                      )}
-                    </Link>
-                    {grupo.souAdmin && membro.userId !== currentUser.id && (
-                      <button
-                        type="button"
-                        disabled={pendingMembros && busyUserId === membro.userId}
-                        title="Remover do grupo"
-                        onClick={() => removerMembro(membro.userId)}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                      >
-                        <UserMinus className="h-3.5 w-3.5" />
-                        Remover
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </m.div>
         )}
