@@ -295,16 +295,21 @@ export default async function MembrosPage({
           membros={membros.map((membro: (typeof membros)[number]) => {
             const badge = STATUS_BADGE[membro.status]
             const isSocio = membro.tipo === 'SOCIO'
+            const fmtData = (d: Date | null | undefined) =>
+              d ? new Date(d).toLocaleDateString('pt-BR') : null
             return {
               id: membro.id,
               nome: membro.nome,
               discordTag: membro.discordTag,
+              discordId: membro.discordId,
+              email: membro.user.email,
               tipo: TIPO_BADGE[membro.tipo] ?? membro.tipo,
               cidade: membro.cidade,
               status: membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO',
               statusLabel: badge.label,
               statusClass: badge.className,
               criadoEmLabel: new Date(membro.criadoEm).toLocaleDateString('pt-BR'),
+              atualizadoEmLabel: fmtData(membro.atualizadoEm),
               avatarUrl: membro.user.avatarUrl,
               inicial: membro.nome.charAt(0).toUpperCase(),
               telefone: membro.telefone,
@@ -315,6 +320,15 @@ export default async function MembrosPage({
               imagemProva: isSocio ? membro.imagemProva : null,
               numeroAssociado: isSocio ? membro.numeroAssociado : null,
               anosSocio: isSocio ? membro.anosSocio : null,
+              cep: isSocio ? membro.cep : null,
+              numero: isSocio ? membro.numero : null,
+              bloco: isSocio ? membro.bloco : null,
+              complemento: isSocio ? membro.complemento : null,
+              adimplente: membro.adimplente,
+              aprovadoPorNome: membro.aprovadoPorNome,
+              aprovadoEmLabel: fmtData(membro.aprovadoEm),
+              desligadoEmLabel: fmtData(membro.desligadoEm),
+              desligadoMotivo: membro.desligadoMotivo,
               alertaRivalSocio: isSocio && userIdsComRivalSocio.has(membro.userId),
               reprovacoesOutraTorcida: isSocio
                 ? reprovacoesOutraTorcidaPorUser.get(membro.userId)
