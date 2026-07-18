@@ -20,10 +20,19 @@ interface FeedPostCardProps {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
   isAuthor?: boolean
   salvo?: boolean
+  podeModerarGrupo?: boolean
 }
 
-export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAuthor, salvo = false }: FeedPostCardProps) {
+export function FeedPostCard({
+  post,
+  showTenantBadge = false,
+  currentUser,
+  isAuthor,
+  salvo = false,
+  podeModerarGrupo = false,
+}: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
+  const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
@@ -88,8 +97,13 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
             {formatRelative(post.criadoEm)}
           </ComunidadePrefetchLink>
         </div>
-        {author && (
-          <FeedPostMenu postId={post.id} conteudoInicial={post.conteudo} fixado={post.fixado} />
+        {mostrarMenu && (
+          <FeedPostMenu
+            postId={post.id}
+            conteudoInicial={post.conteudo}
+            fixado={post.fixado}
+            modo={author ? 'autor' : 'moderar-grupo'}
+          />
         )}
       </header>
 

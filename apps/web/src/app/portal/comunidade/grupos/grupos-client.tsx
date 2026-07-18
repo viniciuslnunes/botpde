@@ -66,6 +66,8 @@ export function GruposClient({ gruposIniciais }: GruposClientProps) {
             nome: nome.trim(),
             descricao: descricao.trim() || null,
             avatarUrl: null,
+            codigoConvite: null,
+            somenteAdminPublica: false,
             membros: 1,
             publica,
             souMembro: true,

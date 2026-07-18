@@ -38,6 +38,8 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   GRUPO_PEDIDO: { escopo: 'social' },
   GRUPO_APROVADO: { escopo: 'social' },
   GRUPO_REJEITADO: { escopo: 'social' },
+  GRUPO_ADMIN: { escopo: 'social' },
+  GRUPO_REMOVIDO: { escopo: 'social' },
   COMUNICADO_URGENTE: { escopo: 'hibrido' },
   MEMBRO_APROVADO: { escopo: 'hibrido' },
   MEMBRO_REPROVADO: { escopo: 'hibrido' },

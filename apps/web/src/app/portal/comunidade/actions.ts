@@ -10,7 +10,7 @@ import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertP
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -44,6 +44,7 @@ import {
 } from '@/lib/feed-timeline'
 import { scheduleFanoutPostParaRede } from '@/lib/feed-timeline-queue'
 import { MAX_MEMBROS_GRUPO } from '@/lib/mensageria'
+import { generateInviteSlug } from '@/lib/invite-slug'
 
 const MAX_MIDIAS = 10
 
@@ -303,9 +304,19 @@ const postSchema = z.object({
   conteudo: z.string().trim().min(1, 'Conteúdo é obrigatório').max(3000),
   midias: z.array(midiaUrlSchema).max(MAX_MIDIAS, 'Máximo de 10 anexos').default([]),
   visibilidade: visibilidadePostSchema.default('PUBLICO'),
-  /** Cliente só sugere — servidor revalida com COMMUNITY_POST_NACIONAL antes de gravar. */
-  alcanceNacional: z.coerce.boolean().default(false),
 })
+
+/** PUBLICO + COMMUNITY_POST_NACIONAL → entra no feed nacional sem follow. */
+async function resolverAlcanceNacional(
+  userId: string,
+  tenantId: string,
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO',
+): Promise<boolean> {
+  if (visibilidade !== 'PUBLICO') return false
+  const { rolePermissions, overrides } = await getUserPermissionsInTenant(userId, tenantId)
+  const effective = calculateEffectivePermissions(rolePermissions, overrides)
+  return hasPermission(effective, PERMISSIONS.COMMUNITY_POST_NACIONAL)
+}
 
 function parseMidias(raw: FormDataEntryValue | null): unknown {
   if (typeof raw !== 'string' || raw.trim() === '') return []
@@ -367,14 +378,13 @@ export async function publicarPost(
       conteudo: formData.get('conteudo'),
       midias: parseMidias(formData.get('midias')),
       visibilidade: formData.get('visibilidade') ?? 'PUBLICO',
-      alcanceNacional: formData.get('alcanceNacional'),
     })
 
     if (!parsed.success) {
       return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
     }
 
-    const { conteudo, midias, visibilidade, alcanceNacional: alcanceNacionalPedido } = parsed.data
+    const { conteudo, midias, visibilidade } = parsed.data
 
     let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
     let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
@@ -387,16 +397,11 @@ export async function publicarPost(
     const erroMencoes = erroMencoesExcessivas(conteudo)
     if (erroMencoes) return { message: erroMencoes }
 
-    // Servidor é a única fonte de verdade da permissão — o cliente só sugere.
-    let alcanceNacional = false
-    if (alcanceNacionalPedido && visibilidade === 'PUBLICO') {
-      const { rolePermissions, overrides } = await getUserPermissionsInTenant(
-        session.user.id,
-        tenant.id,
-      )
-      const effective = calculateEffectivePermissions(rolePermissions, overrides)
-      alcanceNacional = hasPermission(effective, PERMISSIONS.COMMUNITY_POST_NACIONAL)
-    }
+    const alcanceNacional = await resolverAlcanceNacional(
+      session.user.id,
+      tenant.id,
+      visibilidade,
+    )
 
     const post = await db.post.create({
       data: {
@@ -1113,6 +1118,12 @@ export async function publicarEnquete(
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
+  const alcanceNacional = await resolverAlcanceNacional(
+    session.user.id,
+    tenant.id,
+    parsed.data.visibilidade,
+  )
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
@@ -1120,6 +1131,7 @@ export async function publicarEnquete(
       conteudo: parsed.data.conteudo,
       tipo: 'MEMBRO',
       visibilidade: parsed.data.visibilidade,
+      alcanceNacional,
       enquete: {
         create: {
           opcoes: {
@@ -1448,6 +1460,12 @@ export async function publicarPostEvento(
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
+  const alcanceNacional = await resolverAlcanceNacional(
+    session.user.id,
+    tenant.id,
+    parsed.data.visibilidade,
+  )
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
@@ -1455,6 +1473,7 @@ export async function publicarPostEvento(
       conteudo: parsed.data.conteudo,
       tipo: 'MEMBRO',
       visibilidade: parsed.data.visibilidade,
+      alcanceNacional,
       eventoId: evento.id,
     },
   })
@@ -1544,6 +1563,7 @@ export async function atualizarGrupo(input: {
   descricao?: string | null
   publica: boolean
   avatarUrl?: string | null
+  somenteAdminPublica?: boolean
 }): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
   await assertMembroAtivo(tenant.id, session.user.id)
@@ -1590,6 +1610,9 @@ export async function atualizarGrupo(input: {
       descricao,
       publica: parsed.data.publica,
       ...(parsed.data.avatarUrl !== undefined ? { avatarUrl: parsed.data.avatarUrl } : {}),
+      ...(parsed.data.somenteAdminPublica !== undefined
+        ? { somenteAdminPublica: parsed.data.somenteAdminPublica }
+        : {}),
     },
   })
 
@@ -1604,6 +1627,7 @@ export async function atualizarGrupo(input: {
         nome: parsed.data.nome,
         publica: parsed.data.publica,
         avatar: parsed.data.avatarUrl !== undefined,
+        somenteAdminPublica: parsed.data.somenteAdminPublica,
       },
     },
   })
@@ -1611,6 +1635,425 @@ export async function atualizarGrupo(input: {
   revalidatePath('/portal/comunidade/grupos')
   revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
   revalidatePath('/portal/comunidade')
+}
+
+export async function alterarPapelGrupo(
+  conversaId: string,
+  userId: string,
+  papel: 'ADMIN' | 'MEMBRO',
+): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = alterarPapelGrupoSchema.safeParse({ conversaId, userId, papel })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores podem alterar papéis.')
+
+  const grupo: { id: string; nome: string | null } | null = await db.conversa.findFirst({
+    where: {
+      id: parsed.data.conversaId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true, nome: true },
+  })
+  if (!grupo) throw new Error('Grupo não encontrado')
+
+  const alvo: { id: string; papel: 'ADMIN' | 'MEMBRO' } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: grupo.id,
+      userId: parsed.data.userId,
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true, papel: true },
+  })
+  if (!alvo) throw new Error('Membro não encontrado neste grupo.')
+  if (alvo.papel === parsed.data.papel) return
+
+  if (parsed.data.papel === 'MEMBRO' && alvo.papel === 'ADMIN') {
+    const outrosAdmins: number = await db.membroConversa.count({
+      where: {
+        conversaId: grupo.id,
+        papel: 'ADMIN',
+        status: 'ATIVO',
+        saiuEm: null,
+        userId: { not: parsed.data.userId },
+      },
+    })
+    if (outrosAdmins === 0) {
+      throw new Error('O grupo precisa de pelo menos um administrador.')
+    }
+  }
+
+  await db.membroConversa.update({
+    where: { id: alvo.id },
+    data: { papel: parsed.data.papel },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: parsed.data.papel === 'ADMIN' ? 'GRUPO_ADMIN_PROMOVIDO' : 'GRUPO_ADMIN_REBAIXADO',
+      entidade: 'MembroConversa',
+      entidadeId: alvo.id,
+      detalhes: {
+        conversaId: grupo.id,
+        userId: parsed.data.userId,
+        papel: parsed.data.papel,
+      },
+    },
+  })
+
+  if (parsed.data.papel === 'ADMIN' && parsed.data.userId !== session.user.id) {
+    await notificarSafe({
+      userId: parsed.data.userId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO_ADMIN',
+      titulo: `Você agora é admin de ${grupo.nome ?? 'um grupo'}`,
+      corpo: 'Pode gerenciar membros, pedidos e configurações.',
+      link: `/portal/comunidade/grupos/${grupo.id}?tab=config`,
+      atorId: session.user.id,
+    })
+  }
+
+  revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
+  revalidatePath('/portal/comunidade/grupos')
+}
+
+export async function removerMembroGrupo(conversaId: string, userId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = removerMembroGrupoSchema.safeParse({ conversaId, userId })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (parsed.data.userId === session.user.id) {
+    throw new Error('Use Sair para deixar o grupo.')
+  }
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores podem remover membros.')
+
+  const grupo: { id: string; nome: string | null } | null = await db.conversa.findFirst({
+    where: {
+      id: parsed.data.conversaId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true, nome: true },
+  })
+  if (!grupo) throw new Error('Grupo não encontrado')
+
+  const alvo: { id: string; papel: 'ADMIN' | 'MEMBRO' } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: grupo.id,
+      userId: parsed.data.userId,
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true, papel: true },
+  })
+  if (!alvo) throw new Error('Membro não encontrado neste grupo.')
+
+  if (alvo.papel === 'ADMIN') {
+    const outrosAdmins: number = await db.membroConversa.count({
+      where: {
+        conversaId: grupo.id,
+        papel: 'ADMIN',
+        status: 'ATIVO',
+        saiuEm: null,
+        userId: { not: parsed.data.userId },
+      },
+    })
+    if (outrosAdmins === 0) {
+      throw new Error('Não é possível remover o único administrador.')
+    }
+  }
+
+  await db.membroConversa.update({
+    where: { id: alvo.id },
+    data: { saiuEm: new Date(), papel: 'MEMBRO' },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_MEMBRO_REMOVIDO',
+      entidade: 'MembroConversa',
+      entidadeId: alvo.id,
+      detalhes: { conversaId: grupo.id, userId: parsed.data.userId },
+    },
+  })
+
+  await notificarSafe({
+    userId: parsed.data.userId,
+    tenantId: tenant.id,
+    tipo: 'GRUPO_REMOVIDO',
+    titulo: `Você foi removido de ${grupo.nome ?? 'um grupo'}`,
+    corpo: 'Um administrador removeu sua participação.',
+    link: '/portal/comunidade/grupos',
+    atorId: session.user.id,
+  })
+
+  revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
+  revalidatePath('/portal/comunidade/grupos')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/mensagens')
+}
+
+export async function gerarCodigoConviteGrupo(conversaId: string): Promise<{ codigo: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = conversaGrupoIdSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores podem gerar convite.')
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: {
+      id: parsed.data.conversaId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true },
+  })
+  if (!grupo) throw new Error('Grupo não encontrado')
+
+  let codigo: string | null = null
+  for (let i = 0; i < 5; i++) {
+    const candidate = generateInviteSlug()
+    const existing: { id: string } | null = await db.conversa.findFirst({
+      where: { codigoConvite: candidate },
+      select: { id: true },
+    })
+    if (!existing) {
+      codigo = candidate
+      break
+    }
+  }
+  if (!codigo) throw new Error('Não foi possível gerar o convite.')
+
+  await db.conversa.update({
+    where: { id: grupo.id },
+    data: { codigoConvite: codigo },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_CONVITE_GERADO',
+      entidade: 'Conversa',
+      entidadeId: grupo.id,
+      detalhes: { codigo },
+    },
+  })
+
+  revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
+  return { codigo }
+}
+
+export async function revogarCodigoConviteGrupo(conversaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = conversaGrupoIdSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores podem revogar o convite.')
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: {
+      id: parsed.data.conversaId,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true },
+  })
+  if (!grupo) throw new Error('Grupo não encontrado')
+
+  await db.conversa.update({
+    where: { id: grupo.id },
+    data: { codigoConvite: null },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_CONVITE_REVOGADO',
+      entidade: 'Conversa',
+      entidadeId: grupo.id,
+    },
+  })
+
+  revalidatePath(`/portal/comunidade/grupos/${grupo.id}`)
+}
+
+export async function entrarPorConviteGrupo(codigo: string): Promise<{ id: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = entrarPorConviteGrupoSchema.safeParse({ codigo })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Convite inválido')
+
+  const conversa: { id: string; nome: string | null } | null = await db.conversa.findFirst({
+    where: {
+      codigoConvite: parsed.data.codigo,
+      tenantId: tenant.id,
+      tipo: 'GRUPO',
+      comunidade: true,
+    },
+    select: { id: true, nome: true },
+  })
+  if (!conversa) throw new Error('Convite inválido ou expirado.')
+
+  const ativoExistente: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: conversa.id,
+      userId: session.user.id,
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (ativoExistente) return { id: conversa.id }
+
+  const ativos: number = await db.membroConversa.count({
+    where: { conversaId: conversa.id, status: 'ATIVO', saiuEm: null },
+  })
+  if (ativos >= MAX_MEMBROS_GRUPO) {
+    throw new Error(`Grupo cheio (máximo ${MAX_MEMBROS_GRUPO} membros).`)
+  }
+
+  await db.membroConversa.upsert({
+    where: { conversaId_userId: { conversaId: conversa.id, userId: session.user.id } },
+    create: {
+      conversaId: conversa.id,
+      userId: session.user.id,
+      papel: 'MEMBRO',
+      status: 'ATIVO',
+    },
+    update: { saiuEm: null, status: 'ATIVO', papel: 'MEMBRO' },
+  })
+
+  await backfillTimelineDoGrupoParaViewer(session.user.id, conversa.id)
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_ENTRADA_CONVITE',
+      entidade: 'Conversa',
+      entidadeId: conversa.id,
+      detalhes: { codigo: parsed.data.codigo },
+    },
+  })
+
+  revalidatePath('/portal/comunidade/grupos')
+  revalidatePath(`/portal/comunidade/grupos/${conversa.id}`)
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/mensagens')
+  return { id: conversa.id }
+}
+
+export async function ocultarPostGrupo(postId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = ocultarPostGrupoSchema.safeParse({ postId })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post inválido')
+
+  const post: {
+    id: string
+    conversaId: string | null
+    oculto: boolean
+  } | null = await db.post.findFirst({
+    where: { id: parsed.data.postId, tenantId: tenant.id },
+    select: { id: true, conversaId: true, oculto: true },
+  })
+  if (!post || post.oculto) throw new Error('Post não encontrado')
+  if (!post.conversaId) throw new Error('Este post não pertence a um grupo.')
+
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: post.conversaId,
+      userId: session.user.id,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+      conversa: { tipo: 'GRUPO', comunidade: true, tenantId: tenant.id },
+    },
+    select: { id: true },
+  })
+  if (!admin) throw new Error('Só administradores do grupo podem moderar o mural.')
+
+  await db.post.update({
+    where: { id: post.id },
+    data: { oculto: true },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'GRUPO_POST_OCULTO',
+      entidade: 'Post',
+      entidadeId: post.id,
+      detalhes: { conversaId: post.conversaId },
+    },
+  })
+
+  revalidatePath(`/portal/comunidade/grupos/${post.conversaId}`)
+  revalidatePath('/portal/comunidade')
+  invalidarLeituraComunidade(tenant.id)
 }
 
 export async function entrarGrupoPublico(conversaId: string): Promise<void> {

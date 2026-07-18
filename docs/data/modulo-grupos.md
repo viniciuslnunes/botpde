@@ -11,6 +11,8 @@ Reusa `Conversa` (`tipo: GRUPO`) + `MembroConversa` + `Post.conversaId`.
 |---|---|
 | `Conversa.comunidade` | `true` = grupo da Comunidade (lista/mural); `false` = só mensageria |
 | `Conversa.publica` | Público (entrada imediata) vs privado (pedido + aprovação) |
+| `Conversa.codigoConvite` | Link de entrada direta |
+| `Conversa.somenteAdminPublica` | Só admins publicam no mural |
 | `MembroConversa.status` | `ATIVO` \| `PENDENTE` \| `REJEITADO` |
 | `MembroConversa.saiuEm` | Soft leave |
 | `MembroConversa.silenciada` | Exclui posts do grupo do feed do membro |

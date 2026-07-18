@@ -1,2206 +1,2210 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TABELAS EXISTENTES DO BOT (leitura/escrita pelo bot via pg)
-// O Prisma pode ler estas tabelas, mas NÃO altera sua estrutura.
-// ═══════════════════════════════════════════════════════════════
-
-/// Tabela legada do bot — lida pelo SaaS para exibir dados no portal
-model BotMembro {
-  id              Int       @id @default(autoincrement())
-  discordId       String    @unique @map("discord_id")
-  nome            String
-  tipo            String // 'socio' ou 'torcedor'
-  numeroAssociado String?   @map("numero_associado")
-  cidade          String?
-  telefone        String?
-  idade           Int?
-  aprovadoPorId   String?   @map("aprovado_por_id")
-  aprovadoPorNome String?   @map("aprovado_por_nome")
-  criadoEm        DateTime? @default(now()) @map("criado_em")
-  imagemProva     String?   @map("imagem_prova")
-
-  @@map("membros")
-}
-
-/// Tabela legada do bot — produtos da loja
-model BotProduto {
-  id        Int         @id @default(autoincrement())
-  nome      String
-  tamanhos  String
-  preco     Decimal     @db.Decimal(10, 2)
-  imagemUrl String?     @map("imagem_url")
-  ativo     Boolean?    @default(true)
-  criadoEm  DateTime?   @default(now()) @map("criado_em")
-  estoque   Json?       @default("{}")
-  pedidos   BotPedido[]
-
-  @@map("produtos")
-}
-
-/// Tabela legada do bot — pedidos da loja
-model BotPedido {
-  id            Int         @id @default(autoincrement())
-  discordId     String      @map("discord_id")
-  discordTag    String?     @map("discord_tag")
-  produtoId     Int?        @map("produto_id")
-  produtoNome   String?     @map("produto_nome")
-  tamanho       String?
-  quantidade    Int
-  precoUnit     Decimal?    @map("preco_unit") @db.Decimal(10, 2)
-  total         Decimal?    @db.Decimal(10, 2)
-  status        String?     @default("pendente")
-  canalTicketId String?     @map("canal_ticket_id")
-  criadoEm      DateTime?   @default(now()) @map("criado_em")
-  produto       BotProduto? @relation(fields: [produtoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@map("pedidos")
-}
-
-/// Tabela legada do bot — ranking de recrutadores
-model BotAprovacao {
-  id            Int       @id @default(autoincrement())
-  aprovadorId   String    @map("aprovador_id")
-  aprovadorNome String?   @map("aprovador_nome")
-  candidatoId   String?   @map("candidato_id")
-  candidatoNome String?   @map("candidato_nome")
-  tipo          String?
-  criadoEm      DateTime? @default(now()) @map("criado_em")
-
-  @@map("aprovacoes_recrutamento")
-}
-
-/// Tabela legada do bot — configurações persistidas (IDs de mensagens)
-model BotConfig {
-  key   String  @id
-  value String?
-
-  @@map("bot_config")
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TABELAS DO SAAS — novas, prefixo saas_ para evitar conflitos
-// ═══════════════════════════════════════════════════════════════
-
-// ─── TENANTS ────────────────────────────────────────────────────────────────
-
-model Tenant {
-  id          String   @id @default(uuid())
-  slug        String   @unique
-  nome        String
-  plano       Plano    @default(FREE)
-  corPrimaria String   @default("#7c3aed") @map("cor_primaria")
-  logoUrl     String?  @map("logo_url")
-  /// Tema visual completo (marca, grade, superfícies claro/escuro). Ver TenantDesignSchema.
-  design      Json?    @map("design")
-  ativo       Boolean  @default(true)
-  criadoEm    DateTime @default(now()) @map("criado_em")
-
-  // Tenant sintético: container de posts de torcedores globais do clube
-  // (Comunidade Nacional). Sem Sede/Role/SaasMembro; nunca listado como torcida real.
-  sintetico Boolean @default(false) @map("sintetico")
-
-  // Banco de dados próprio do tenant (null = usa o banco compartilhado)
-  // Cada torcida pode ter seu banco isolado quando necessário
-  databaseUrl String? @map("database_url")
-
-  discordGuildId String? @unique @map("discord_guild_id")
-
-  afiliacaoId String?     @map("afiliacao_id")
-  afiliacao   Afiliacao?  @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
-
-  // Vínculo opcional ao catálogo nacional (dados ricos: fundação, lema, sede, site).
-  // Tenants pré-criados a partir de TorcidaConhecida referenciam a origem aqui.
-  torcidaConhecidaId String?           @unique @map("torcida_conhecida_id")
-  torcidaConhecida   TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
-
-  membros           SaasMembro[]
-  socios            SaasSocio[]
-  produtos          SaasProduto[]
-  categoriasLoja    SaasCategoria[]
-  cuponsLoja        SaasCupom[]
-  carrinhoItens     SaasCarrinhoItem[]
-  pedidos           SaasPedido[]
-  sedes             Sede[]
-  eventos           Evento[]
-  roles             Role[]
-  userRoles         UserRole[]
-  userPermissions   UserPermission[]
-  departamentos     Departamento[]
-  userDepartamentos UserDepartamento[]
-  auditLogs         AuditLog[]
-  bloqueados        Bloqueado[]
-  posts             Post[]
-  advertencias      Advertencia[]
-  announcements     Announcement[]
-  importacoes       ImportacaoMembros[]
-  aliancasOrigem    Alianca[]             @relation("AliancaOrigem")
-  aliancasAliado    Alianca[]             @relation("AliancaAliado")
-  recomendacoes     RecomendacaoAlianca[]
-  perfisMembro      PerfilMembro[]
-  seguimentosCtx    Seguimento[]          @relation("SeguimentoContexto")
-  salasReuniao      SalaReuniao[]
-  denuncias         Denuncia[]
-  conversas         Conversa[]
-  denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
-  hashtags          Hashtag[]
-  perfilDestaques   PerfilDestaque[]
-  postSalvos        PostSalvo[]
-  momentosStory     MomentoStory[]
-  rivalTorcidaA     RivalidadeTorcida[]   @relation("RivalTorcidaA")
-  rivalTorcidaB     RivalidadeTorcida[]   @relation("RivalTorcidaB")
-  financeiroLancamentos FinanceiroLancamento[]
-  patrimonioItens       PatrimonioItem[]
-  planosAssociacao      PlanoAssociacao[]
-  cobrancasAssociacao   CobrancaAssociacao[]
-  barCategorias           BarCategoria[]
-  barProdutos             BarProduto[]
-  barVendas               BarVenda[]
-  barMovimentacoesEstoque BarMovimentacaoEstoque[]
-
-  /// Config: exibir o balanço financeiro consolidado aos associados no portal.
-  balancoFinanceiroVisivel Boolean @default(false) @map("balanco_financeiro_visivel")
-
-  @@map("saas_tenants")
-}
-
-enum Plano {
-  FREE
-  BASIC
-  PREMIUM
-}
-
-// ─── USUÁRIOS ────────────────────────────────────────────────────────────────
-
-model User {
-  id           String    @id @default(uuid())
-  email        String?   @unique
-  nome         String?
-  /// Handle único global (@usuario) — referência pública no feed/perfil.
-  nickname     String?   @unique
-  avatarUrl    String?   @map("avatar_url")
-  criadoEm     DateTime  @default(now()) @map("criado_em")
-  discordId    String?   @unique @map("discord_id")
-  googleId     String?   @unique @map("google_id")
-  // Hash bcrypt — só usuários que se cadastraram por e-mail/senha têm valor.
-  // Nunca preenchido para contas só-OAuth (Discord/Google).
-  senhaHash    String?   @map("senha_hash")
-  consentidoEm DateTime? @map("consentido_em")
-  /// Última atividade na plataforma (heartbeat throttled) — base de "online" no onboarding.
-  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
-
-  userRoles            UserRole[]
-  userPermissions      UserPermission[]
-  userDepartamentos    UserDepartamento[]
-  departamentosGeridos DepartamentoGestor[]
-  membros              SaasMembro[]
-  socios               SaasSocio[]
-  pedidos              SaasPedido[]
-  carrinhoItens        SaasCarrinhoItem[]
-  eventosRsvp          EventoRsvp[]
-  sedesResponsavel     Sede[]               @relation("SedeResponsavel")
-  posts                Post[]
-  auditLogs            AuditLog[]           @relation("AuditAtor")
-  announcements        Announcement[]
-  announcementReads    AnnouncementRead[]
-  perfisMembro         PerfilMembro[]
-  seguindo             Seguimento[]         @relation("SeguimentoSeguidor")
-  seguidores           Seguimento[]         @relation("SeguimentoSeguido")
-  comentarios          Comentario[]
-  reacoes              Reacao[]
-  denuncias            Denuncia[]
-  denunciasResolvidas  Denuncia[]           @relation("DenunciaResolvidoPor")
-  notificacoes         Notificacao[]
-  notificacoesAtor     Notificacao[]        @relation("NotificacaoAtor")
-  noticiasCuradas      Noticia[]
-  aliancasPropostas    Alianca[]            @relation("AliancaPropostaPor")
-  aliancasConfirmadas  Alianca[]            @relation("AliancaConfirmadaPor")
-  salasHospedadas      SalaReuniao[]
-  participacoesReuniao ParticipanteReuniao[]
-  mensagensReuniao     MensagemReuniao[]
-  enquetesReuniao      EnqueteReuniao[]
-  votosEnqueteReuniao  VotoEnqueteReuniao[]
-
-  conversasCriadas            Conversa[]         @relation("ConversaCriadaPor")
-  membroConversas             MembroConversa[]
-  mensagensDiretas            MensagemDireta[]   @relation("MensagemDiretaAutor")
-  bloqueiosFeitos             BloqueioUsuario[]  @relation("BloqueioBloqueador")
-  bloqueiosRecebidos          BloqueioUsuario[]  @relation("BloqueioBloqueado")
-  denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
-  denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
-  votosEnquetePost            VotoEnquetePost[]
-  perfilDestaques             PerfilDestaque[]
-  postsSalvos                 PostSalvo[]
-  feedTimeline                FeedTimeline[]
-  momentosStory               MomentoStory[]
-  perfilTorcedor              PerfilTorcedor?
-  financeiroLancamentosCriados FinanceiroLancamento[] @relation("FinanceiroLancamentoCriadoPor")
-  patrimonioItensCriados       PatrimonioItem[]       @relation("PatrimonioItemCriadoPor")
-  patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
-  cobrancasAssociacao          CobrancaAssociacao[]
-  cobrancasAssociacaoCriadas   CobrancaAssociacao[]   @relation("CobrancaAssociacaoCriadoPor")
-  barProdutosCriados           BarProduto[]           @relation("BarProdutoCriadoPor")
-  barVendasOperadas            BarVenda[]             @relation("BarVendaOperador")
-  barMovimentacoesEstoque      BarMovimentacaoEstoque[] @relation("BarMovimentacaoOperador")
-
-  @@map("saas_users")
-}
-
-// ─── CARGOS E PERMISSÕES ─────────────────────────────────────────────────────
-
-model Role {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nome        String
-  cor         String   @default("#6b7280")
-  ordem       Int      @default(0)
-  isSystem    Boolean  @default(false) @map("is_system")
-  /// Pacote legado / transversal (sem departamento). Perfis de área preferem
-  /// herança ao vivo do Departamento + permissionsExtras.
-  permissions String[] @default([])
-  /// Deltas além do pacote do departamento (Presidente, perfis compostos…).
-  permissionsExtras String[] @default([]) @map("permissions_extras")
-  /// Área de atuação — null = perfil transversal (ex.: member).
-  departamentoId String? @map("departamento_id")
-  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
-  /// MEMBRO | GESTOR — obrigatório quando departamentoId está setado.
-  papelNoDepartamento String? @map("papel_no_departamento")
-
-  userRoles UserRole[]
-
-  @@unique([tenantId, nome])
-  @@index([departamentoId])
-  @@map("saas_roles")
-}
-
-model UserRole {
-  id       String @id @default(uuid())
-  userId   String @map("user_id")
-  tenantId String @map("tenant_id")
-  roleId   String @map("role_id")
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@unique([userId, tenantId, roleId])
-  @@index([tenantId])
-  @@map("saas_user_roles")
-}
-
-model UserPermission {
-  id         String  @id @default(uuid())
-  userId     String  @map("user_id")
-  tenantId   String  @map("tenant_id")
-  permission String
-  granted    Boolean
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@unique([userId, tenantId, permission])
-  @@index([tenantId])
-  @@map("saas_user_permissions")
-}
-
-// ─── DEPARTAMENTOS ────────────────────────────────────────────────────────────
-// Agrupamento organizacional (Diretoria, Financeiro, Comunicação…).
-// Perfis (Role) de área vinculam-se ao departamento (membro/gestor) e herdam
-// o pacote ao vivo; Role.permissionsExtras guarda deltas. UserDepartamento /
-// DepartamentoGestor são projeção ao atribuir o perfil.
-// Sócio/Torcedor NÃO são departamentos. Lista plana por tenant (MVP).
-
-model Departamento {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  nome         String
-  slug         String   @default("")
-  moduloPortal String?  @map("modulo_portal")
-  /// Permissões do membro da equipe (ver / agir leve).
-  permissions  String[] @default([])
-  /// Permissões adicionais do gestor (gerir a área). Composição:
-  /// membro → permissions; gestor → permissions ∪ permissionsGestor.
-  permissionsGestor String[] @default([]) @map("permissions_gestor")
-  cor          String   @default("#6b7280")
-  ordem        Int      @default(0)
-  /// Canal (Conversa tipo CANAL) oficial da área — deep-link no portal.
-  canalConversaId String? @unique @map("canal_conversa_id")
-  canalConversa   Conversa? @relation("DepartamentoCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
-  /// Meta de área (ex.: checklist barracão do Carnaval). Não é RBAC.
-  meta         Json?
-  criadoEm     DateTime @default(now()) @map("criado_em")
-
-  membros  UserDepartamento[]
-  gestores DepartamentoGestor[]
-  roles    Role[]
-  /// Preferência de área no cadastro (SaasMembro) — sem membership até APROVADO.
-  solicitacoesMembros SaasMembro[]
-
-  @@unique([tenantId, nome])
-  @@unique([tenantId, slug])
-  @@map("saas_departamentos")
-}
-
-/// Associação usuário ↔ departamento (multi-departamento, como cargos do Discord)
-model UserDepartamento {
-  id             String @id @default(uuid())
-  userId         String @map("user_id")
-  tenantId       String @map("tenant_id")
-  departamentoId String @map("departamento_id")
-
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@unique([userId, tenantId, departamentoId])
-  @@index([departamentoId])
-  @@map("saas_user_departamentos")
-}
-
-/// Quem pode gerenciar os membros de um departamento (adicionar/remover membros,
-/// atribuir perfis dentro do escopo do departamento). Owners/admins do tenant
-/// (via Role.isSystem) continuam com acesso total independente desta tabela —
-/// isso serve para delegar gestão de UM departamento específico a alguém que
-/// não é admin geral (ex: liderança de um departamento na subsede/pde).
-model DepartamentoGestor {
-  id             String @id @default(uuid())
-  departamentoId String @map("departamento_id")
-  userId         String @map("user_id")
-
-  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@unique([departamentoId, userId])
-  @@index([userId])
-  @@map("saas_departamento_gestores")
-}
-
-// ─── MEMBROS SaaS ─────────────────────────────────────────────────────────────
-
-model SaasMembro {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  userId   String @map("user_id")
-
-  tipo            TipoMembro
-  nome            String
-  idade           Int?
-  telefone        String?
-  cidade          String?
-  numeroAssociado String?      @map("numero_associado")
-  anosSocio       Int?         @map("anos_socio")
-  cep             String?      @map("cep")
-  numero          String?      @map("numero")
-  bloco           String?      @map("bloco")
-  complemento     String?      @map("complemento")
-  imagemProva     String?      @map("imagem_prova")
-  status          StatusMembro @default(PENDENTE)
-
-  // Campos LGE (Lei 14.597/2023) — sensíveis; nunca em perfil público.
-  rg             String?
-  /// Somente dígitos; único por tenant quando preenchido.
-  cpf            String?
-  filiacao       String?
-  escolaridade   String?
-  profissao      String?
-  dataNascimento DateTime? @map("data_nascimento")
-
-  /// Plano de associação da torcida (não confundir com Tenant.plano SaaS).
-  planoAssociacaoId String?           @map("plano_associacao_id")
-  planoAssociacao   PlanoAssociacao?  @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
-  /// Espelho operacional: false se há cobrança vencida/pendente relevante.
-  adimplente Boolean @default(true)
-
-  aprovadoPorId   String?   @map("aprovado_por_id")
-  aprovadoPorNome String?   @map("aprovado_por_nome")
-  aprovadoEm      DateTime? @map("aprovado_em")
-
-  // Desligamento estatutário (MEMBERS_DISMISS) — distinto de bloqueio.
-  desligadoEm     DateTime? @map("desligado_em")
-  desligadoMotivo String?   @map("desligado_motivo")
-  desligadoPorId  String?   @map("desligado_por_id")
-
-  // Referência ao registro legado do bot (para migração gradual)
-  discordId  String? @map("discord_id")
-  discordTag String? @map("discord_tag")
-
-  // Vínculo territorial principal — a qual Sede/Subsede/PDE específica do
-  // tenant este associado pertence (um tenant pode ter várias linhas de
-  // Sede, ex: vários pontos de encontro). Nullable para não quebrar
-  // cadastros existentes e tenants com uma única Sede.
-  sedeId String? @map("sede_id")
-  sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
-
-  /// Departamento pretendido no onboarding (sócio). NÃO cria UserDepartamento
-  /// nem perfil de área enquanto status ≠ APROVADO — só após aprovarMembro.
-  departamentoId String?       @map("departamento_id")
-  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
-
-  // Rastro de origem: qual importação criou este membro (null = cadastro
-  // orgânico). Permite auditar e desfazer importações (ex: dados MOCK de
-  // demonstração) sem tocar em membros reais.
-  importacaoId String?            @map("importacao_id")
-  importacao   ImportacaoMembros? @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user      User                 @relation(fields: [userId], references: [id])
-  cobrancas CobrancaAssociacao[]
-
-  @@unique([tenantId, userId])
-  @@unique([tenantId, cpf])
-  @@index([sedeId])
-  @@index([departamentoId])
-  @@index([importacaoId])
-  @@index([tenantId, status])
-  @@index([tenantId, adimplente])
-  @@index([planoAssociacaoId])
-  @@map("saas_membros")
-}
-
-enum TipoMembro {
-  SOCIO
-  TORCEDOR
-}
-
-enum StatusMembro {
-  PENDENTE
-  APROVADO
-  REPROVADO
-}
-
-// ─── IMPORTAÇÃO DE MEMBROS ───────────────────────────────────────────────────
-// Staging + auditoria de cada execução de importação da base de associados.
-// Ver docs/data/spec-importacao-membros.md. Origem MOCK = dados de demonstração,
-// rastreáveis via SaasMembro.importacaoId e reversíveis (desfazerImportacao).
-
-model ImportacaoMembros {
-  id          String           @id @default(uuid())
-  tenantId    String           @map("tenant_id")
-  origem      OrigemImportacao
-  status      StatusImportacao @default(PENDENTE)
-  totalLinhas Int              @default(0) @map("total_linhas")
-  importados  Int              @default(0)
-  duplicados  Int              @default(0)
-  erros       Json?
-  criadoPorId String?          @map("criado_por_id")
-  criadoEm    DateTime         @default(now()) @map("criado_em")
-
-  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  membros SaasMembro[]
-
-  @@index([tenantId, criadoEm])
-  @@map("saas_importacoes_membros")
-}
-
-enum OrigemImportacao {
-  CSV
-  BOT
-  DISCORD
-  MOCK
-}
-
-enum StatusImportacao {
-  PENDENTE
-  PROCESSANDO
-  CONCLUIDA
-  ERRO
-}
-
-// ─── SÓCIOS / CARTEIRINHAS ───────────────────────────────────────────────────
-
-model SaasSocio {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  userId      String   @map("user_id")
-  numeroSocio Int      @map("numero_socio")
-  nome        String
-  validade    DateTime
-  criadoEm    DateTime @default(now()) @map("criado_em")
-  discordId   String?  @map("discord_id")
-  /// Segredo opaco para QR verificável (HMAC com AUTH_SECRET).
-  qrToken     String?  @unique @map("qr_token")
-  qrEmitidoEm DateTime? @map("qr_emitido_em")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@unique([tenantId, numeroSocio])
-  @@unique([tenantId, userId])
-  @@map("saas_socios")
-}
-
-// ─── PLANOS DE ASSOCIAÇÃO + COBRANÇAS (não confundir com Tenant.plano SaaS) ───
-// Ver docs/product/plano-paridade-concorrentes.md Fase A.
-
-model PlanoAssociacao {
-  id            String                     @id @default(uuid())
-  tenantId      String                     @map("tenant_id")
-  nome          String
-  descricao     String?
-  /// Valor da contribuição periódica (sempre positivo).
-  valor         Decimal                    @db.Decimal(12, 2)
-  periodicidade PeriodicidadePlanoAssociacao @default(MENSAL)
-  beneficios    String?
-  ativo         Boolean                    @default(true)
-  criadoEm      DateTime                   @default(now()) @map("criado_em")
-  atualizadoEm  DateTime                   @updatedAt @map("atualizado_em")
-
-  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  membros   SaasMembro[]
-  cobrancas CobrancaAssociacao[]
-
-  @@index([tenantId, ativo])
-  @@map("saas_planos_associacao")
-}
-
-enum PeriodicidadePlanoAssociacao {
-  MENSAL
-  TRIMESTRAL
-  ANUAL
-  UNICA
-}
-
-model CobrancaAssociacao {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  userId   String @map("user_id")
-  membroId String? @map("membro_id")
-
-  planoAssociacaoId String? @map("plano_associacao_id")
-  /// Vaga de caravana / cobrança vinculada a evento (paridade C1).
-  eventoId          String? @map("evento_id")
-  tipo              TipoCobrancaAssociacao
-  descricao         String
-  valor             Decimal @db.Decimal(12, 2)
-  vencimento        DateTime
-  status            StatusCobrancaAssociacao @default(PENDENTE)
-  pagoEm            DateTime? @map("pago_em")
-  metodoPagamento   MetodoPagamentoCobranca? @map("metodo_pagamento")
-
-  pixCopiaCola      String? @map("pix_copia_cola")
-  gatewayProvider   String? @map("gateway_provider")
-  gatewayExternalId String? @map("gateway_external_id")
-
-  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
-
-  criadoPorId  String?  @map("criado_por_id")
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  membro          SaasMembro?      @relation(fields: [membroId], references: [id], onDelete: SetNull)
-  planoAssociacao PlanoAssociacao? @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
-  evento          Evento?          @relation(fields: [eventoId], references: [id], onDelete: SetNull)
-  criadoPor       User?            @relation("CobrancaAssociacaoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-
-  @@index([tenantId, status, vencimento])
-  @@index([tenantId, userId])
-  @@index([membroId])
-  @@index([eventoId])
-  @@index([gatewayExternalId])
-  @@unique([eventoId, userId])
-  @@map("saas_cobrancas_associacao")
-}
-
-enum TipoCobrancaAssociacao {
-  MENSALIDADE
-  ADESAO
-  AVULSA
-}
-
-enum StatusCobrancaAssociacao {
-  PENDENTE
-  PAGA
-  CANCELADA
-  VENCIDA
-}
-
-enum MetodoPagamentoCobranca {
-  MANUAL
-  PIX
-}
-
-// ─── BLOQUEADOS ───────────────────────────────────────────────────────────────
-
-model Bloqueado {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  registro         String
-  nome             String?
-  motivo           String?
-  bloqueadoPorId   String?  @map("bloqueado_por_id")
-  bloqueadoPorNome String?  @map("bloqueado_por_nome")
-  criadoEm         DateTime @default(now()) @map("criado_em")
-
-  @@unique([tenantId, registro])
-  @@map("saas_bloqueados")
-}
-
-// ─── SEDES ────────────────────────────────────────────────────────────────────
-
-model Sede {
-  id String @id @default(uuid())
-
-  // tenantId é OPCIONAL — uma subsede ou ponto de encontro pode existir
-  // de forma independente antes da sede principal aderir à plataforma.
-  // Quando a sede principal aderir, basta atribuir o tenantId.
-  tenantId String? @map("tenant_id")
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-
-  nome        String
-  tipo        TipoSede @default(PONTO_ENCONTRO)
-  endereco    String?
-  cidade      String?
-  estado      String?
-  cep         String?
-  lat         Float?
-  lng         Float?
-  capacidade  Int?
-  responsavel String?
-  /// Usuário responsável pela unidade (liderança local). Identidade; poder vem via Caso B (owner).
-  responsavelUserId String? @map("responsavel_user_id")
-  responsavelUser   User?   @relation("SedeResponsavel", fields: [responsavelUserId], references: [id], onDelete: SetNull)
-  telefone    String?
-  horarios    String?
-  descricao   String?
-  fotoUrl     String?  @map("foto_url")
-  ativa       Boolean  @default(true)
-  criadoEm    DateTime @default(now()) @map("criado_em")
-
-  // Hierarquia: subsede aponta para sede pai (também pode ser null)
-  sedeId String? @map("sede_id")
-  sede   Sede?   @relation("SedeFilhos", fields: [sedeId], references: [id])
-  filhos Sede[]  @relation("SedeFilhos")
-
-  // Referência à sede pai que AINDA NÃO É TENANT (pré-adesão)
-  // Ex: PDE aponta para "Gaviões da Fiel" que ainda não aderiu
-  sedeReferenciaNome String? @map("sede_referencia_nome")
-  sedeReferenciaSlug String? @map("sede_referencia_slug")
-
-  eventos Evento[]
-  membros SaasMembro[]
-  barCategorias           BarCategoria[]
-  barProdutos             BarProduto[]
-  barVendas               BarVenda[]
-  barMovimentacoesEstoque BarMovimentacaoEstoque[]
-
-  @@index([tenantId])
-  @@index([sedeId])
-  @@index([responsavelUserId])
-  @@map("saas_sedes")
-}
-
-enum TipoSede {
-  SEDE
-  SUBSEDE
-  PONTO_ENCONTRO
-}
-
-// ─── EVENTOS ──────────────────────────────────────────────────────────────────
-
-model Evento {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  /// Classifica o uso no portal (caravana, ensaio) sem duplicar o módulo.
-  tipo      TipoEvento @default(GERAL)
-  titulo    String
-  descricao String?
-  /// Capa do evento na agenda (URL pública).
-  fotoUrl   String?  @map("foto_url")
-  data      DateTime
-  local     String?
-  sedeId    String?  @map("sede_id")
-  sede      Sede?    @relation(fields: [sedeId], references: [id])
-  lat       Float?
-  lng       Float?
-  /// Valor da vaga (caravana paga). Null = caravana sem cobrança.
-  valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
-  /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
-  capacidade Int?
-  serieId String? @map("serie_id")
-  partidaId String? @map("partida_id")
-  partida   Partida? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
-
-  criadoPorId      String?  @map("criado_por_id")
-  criadoEm         DateTime @default(now()) @map("criado_em")
-  discordMessageId String?  @map("discord_message_id")
-
-  rsvps     EventoRsvp[]
-  salas     SalaReuniao[]
-  posts     Post[]
-  cobrancas CobrancaAssociacao[]
-
-  @@index([tenantId])
-  @@index([sedeId])
-  @@index([serieId])
-  @@index([partidaId])
-  @@index([tenantId, data])
-  @@index([tenantId, tipo, data])
-  @@map("saas_eventos")
-}
-
-model EventoRsvp {
-  id       String     @id @default(uuid())
-  eventoId String     @map("evento_id")
-  userId   String     @map("user_id")
-  status   RsvpStatus @default(CONFIRMADO)
-  criadoEm DateTime   @default(now()) @map("criado_em")
-
-  // Check-in real — independente do status de RSVP. Confirmar presença
-  // (status) não equivale a comparecer de fato (checkedInAt): alguém pode
-  // confirmar e faltar, ou aparecer e ser check-in sem ter confirmado antes.
-  checkedInAt    DateTime? @map("checked_in_at")
-  checkedInPorId String?   @map("checked_in_por_id")
-
-  evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@unique([eventoId, userId])
-  @@index([eventoId, status, criadoEm])
-  @@map("saas_evento_rsvps")
-}
-
-enum RsvpStatus {
-  CONFIRMADO
-  RECUSADO
-  LISTA_ESPERA
-}
-
-enum TipoEvento {
-  GERAL
-  CARAVANA
-  ENSAIO
-}
-
-// ─── LOJA SaaS ────────────────────────────────────────────────────────────────
-
-model SaasCategoria {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nome     String
-  slug     String
-  ordem    Int     @default(0)
-  parentId String? @map("parent_id")
-  parent   SaasCategoria?  @relation("CategoriaFilhas", fields: [parentId], references: [id], onDelete: SetNull)
-  filhas   SaasCategoria[] @relation("CategoriaFilhas")
-
-  produtos SaasProduto[]
-
-  @@unique([tenantId, slug])
-  @@index([tenantId])
-  @@map("saas_categorias")
-}
-
-model SaasCupom {
-  id             String    @id @default(uuid())
-  tenantId       String    @map("tenant_id")
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  codigo         String
-  tipo           TipoCupom
-  valor          Decimal   @db.Decimal(10, 2)
-  primeiraCompra Boolean   @default(false) @map("primeira_compra")
-  ativo          Boolean   @default(true)
-  validoAte      DateTime? @map("valido_ate")
-  criadoEm       DateTime  @default(now()) @map("criado_em")
-
-  @@unique([tenantId, codigo])
-  @@index([tenantId])
-  @@map("saas_cupons")
-}
-
-enum TipoCupom {
-  PERCENTUAL
-  FIXO
-}
-
-model SaasProduto {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  nome          String
-  slug          String?
-  descricao     String?
-  preco         Decimal  @db.Decimal(10, 2)
-  precoOriginal Decimal? @map("preco_original") @db.Decimal(10, 2)
-  marca         String?
-  ativo         Boolean  @default(true)
-  destaque      Boolean  @default(false)
-  ordem         Int      @default(0)
-  estoque       Json     @default("{}")
-  tamanhos      String[]
-  imagensUrl    String[] @map("imagens_url")
-
-  categoriaId String?        @map("categoria_id")
-  categoria   SaasCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  pedidoItens   SaasPedidoItem[]
-  carrinhoItens SaasCarrinhoItem[]
-
-  @@unique([tenantId, slug])
-  @@index([tenantId])
-  @@index([tenantId, ativo])
-  @@index([categoriaId])
-  @@map("saas_produtos")
-}
-
-model SaasCarrinhoItem {
-  id        String      @id @default(uuid())
-  userId    String      @map("user_id")
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenantId  String      @map("tenant_id")
-  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  produtoId String      @map("produto_id")
-  produto   SaasProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  tamanho   String      @default("UN")
-  quantidade Int        @default(1)
-  criadoEm  DateTime    @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  @@unique([userId, produtoId, tamanho])
-  @@index([userId])
-  @@map("saas_carrinho_itens")
-}
-
-model SaasPedido {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId   String @map("user_id")
-  user     User   @relation(fields: [userId], references: [id])
-
-  subtotal  Decimal      @db.Decimal(10, 2)
-  desconto  Decimal      @default(0) @db.Decimal(10, 2)
-  total     Decimal      @db.Decimal(10, 2)
-  status    StatusPedido @default(PENDENTE)
-
-  cupomCodigo       String?           @map("cupom_codigo")
-  modalidadeEntrega ModalidadeEntrega @default(RETIRADA) @map("modalidade_entrega")
-  enderecoEntrega   Json?             @map("endereco_entrega")
-  grupoCheckoutId   String?           @map("grupo_checkout_id")
-
-  discordId     String? @map("discord_id")
-  canalTicketId String? @map("canal_ticket_id")
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  itens SaasPedidoItem[]
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([grupoCheckoutId])
-  @@map("saas_pedidos")
-}
-
-model SaasPedidoItem {
-  id          String      @id @default(uuid())
-  pedidoId    String      @map("pedido_id")
-  pedido      SaasPedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  produtoId   String      @map("produto_id")
-  produto     SaasProduto @relation(fields: [produtoId], references: [id])
-  produtoNome String      @map("produto_nome")
-  tamanho     String?
-  quantidade  Int
-  precoUnit   Decimal     @map("preco_unit") @db.Decimal(10, 2)
-  total       Decimal     @db.Decimal(10, 2)
-
-  @@index([pedidoId])
-  @@index([produtoId])
-  @@map("saas_pedido_itens")
-}
-
-enum ModalidadeEntrega {
-  RETIRADA
-  ENVIO
-}
-
-enum StatusPedido {
-  PENDENTE
-  CONFIRMADO
-  CANCELADO
-  ENTREGUE
-}
-
-// ─── COMUNICADOS OFICIAIS ──────────────────────────────────────────────────
-// Distintos de Post (mural/comunidade): nem todo post comunitário é
-// comunicado oficial. Publicação gated por ANNOUNCEMENTS_PUBLISH (não por
-// COMMUNITY_MANAGE, que segue governando só posts locais).
-
-model Announcement {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autorId  String @map("autor_id")
-  autor    User   @relation(fields: [autorId], references: [id])
-
-  titulo     String
-  corpo      String
-  prioridade PrioridadeComunicado @default(NORMAL)
-  fixado     Boolean              @default(false)
-
-  publicadoEm  DateTime @default(now()) @map("publicado_em")
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  leituras AnnouncementRead[]
-  reposts    Post[]
-
-  @@index([tenantId])
-  @@index([tenantId, publicadoEm])
-  @@map("saas_announcements")
-}
-
-enum PrioridadeComunicado {
-  NORMAL
-  IMPORTANTE
-  URGENTE
-}
-
-/// Rastreio de leitura por associado — usado para saber quem já viu um
-/// comunicado oficial (não se aplica a Post/mural local).
-model AnnouncementRead {
-  id             String @id @default(uuid())
-  announcementId String @map("announcement_id")
-  userId         String @map("user_id")
-
-  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  lidoEm DateTime @default(now()) @map("lido_em")
-
-  @@unique([announcementId, userId])
-  @@index([userId])
-  @@map("saas_announcement_reads")
-}
-
-// ─── AFILIAÇÃO GLOBAL (time apoiado) ─────────────────────────────────────────
-
-model Afiliacao {
-  id             String            @id @default(uuid())
-  nome           String
-  apelido        String?
-  slug           String?           @unique
-  serie          SerieCampeonato?
-  escudoUrl      String?           @map("escudo_url")
-  cidade         String?
-  estado         String?
-  apiExternalId  String?           @map("api_external_id")
-  /// Estimativa pública de torcedores (seed offline — nunca API em runtime).
-  torcedoresEstimados      Int?                     @map("torcedores_estimados")
-  torcedoresEstimadosFonte String?                  @map("torcedores_estimados_fonte")
-  /// IBOPE_DIGITAL = total publicado no Ranking Digital; LIMITE_ATE = fora do Top 50 (teto conservador).
-  torcedoresEstimadosTipo  TorcedoresEstimadosTipo? @map("torcedores_estimados_tipo")
-  criadoEm       DateTime          @default(now()) @map("criado_em")
-
-  tenants            Tenant[]
-  partidas           Partida[]
-  noticias           Noticia[]
-  torcedores         PerfilTorcedor[]
-  rivalClubeA        RivalidadeClube[]  @relation("RivalClubeA")
-  rivalClubeB        RivalidadeClube[]  @relation("RivalClubeB")
-  torcidasConhecidas TorcidaConhecida[]
-
-  @@map("saas_afiliacoes")
-}
-
-/// Catálogo nacional de torcidas organizadas conhecidas (fora da plataforma).
-/// Dataset gerado por scraper (`src/data/torcidas-conhecidas.js`); usado no
-/// onboarding como referência informativa por clube (Afiliacao).
-model TorcidaConhecida {
-  id                String   @id @default(uuid())
-  nome              String   // nome completo (fiel à fonte)
-  titulo            String?  // versão curta/legível p/ exibição (sem prefixo)
-  slug              String   @unique
-  afiliacaoId       String?  @map("afiliacao_id")
-  clubeNomeOriginal String?  @map("clube_nome_original")
-  fundacao          String?
-  sede              String?
-  subsedes          String?
-  lema              String?
-  siteOficial       String?  @map("site_oficial")
-  cidade            String?
-  uf                String?
-  logoUrl           String?  @map("logo_url")
-  fonteUrl          String?  @map("fonte_url")
-  ativa             Boolean  @default(true)
-  criadoEm          DateTime @default(now()) @map("criado_em")
-  atualizadoEm      DateTime @updatedAt @map("atualizado_em")
-
-  afiliacao Afiliacao?       @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
-  perfis    PerfilTorcedor[]
-  tenant    Tenant?
-
-  @@index([afiliacaoId])
-  @@map("saas_torcidas_conhecidas")
-}
-
-enum TorcedoresEstimadosTipo {
-  IBOPE_DIGITAL
-  LIMITE_ATE
-}
-
-enum SerieCampeonato {
-  A
-  B
-  C
-  D
-  ESTADUAL
-  OUTRA
-}
-
-// ─── PERFIL GLOBAL DE TORCEDOR (independe de tenant) ─────────────────────────
-
-model PerfilTorcedor {
-  id                    String    @id @default(uuid())
-  userId                String    @unique @map("user_id")
-  afiliacaoId           String?   @map("afiliacao_id") // clube que torce
-  torcidaConhecidaId    String?   @map("torcida_conhecida_id") // organizada conhecida (fora da plataforma)
-  regiao                String?   // cidade/estado do torcedor
-  bio                   String?
-  onboardingConcluidoEm DateTime? @map("onboarding_concluido_em")
-  criadoEm              DateTime  @default(now()) @map("criado_em")
-  atualizadoEm          DateTime  @updatedAt @map("atualizado_em")
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  afiliacao        Afiliacao?        @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
-  torcidaConhecida TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
-
-  @@index([afiliacaoId])
-  @@index([torcidaConhecidaId])
-  @@map("saas_perfis_torcedor")
-}
-
-// ─── RIVALIDADES (par canônico: sempre gravar com aId < bId) ─────────────────
-
-model RivalidadeClube {
-  id           String   @id @default(uuid())
-  afiliacaoAId String   @map("afiliacao_a_id")
-  afiliacaoBId String   @map("afiliacao_b_id")
-  criadoEm     DateTime @default(now()) @map("criado_em")
-
-  afiliacaoA Afiliacao @relation("RivalClubeA", fields: [afiliacaoAId], references: [id], onDelete: Cascade)
-  afiliacaoB Afiliacao @relation("RivalClubeB", fields: [afiliacaoBId], references: [id], onDelete: Cascade)
-
-  @@unique([afiliacaoAId, afiliacaoBId])
-  @@index([afiliacaoBId])
-  @@map("saas_rivalidades_clube")
-}
-
-model RivalidadeTorcida {
-  id        String   @id @default(uuid())
-  tenantAId String   @map("tenant_a_id")
-  tenantBId String   @map("tenant_b_id")
-  criadoEm  DateTime @default(now()) @map("criado_em")
-
-  tenantA Tenant @relation("RivalTorcidaA", fields: [tenantAId], references: [id], onDelete: Cascade)
-  tenantB Tenant @relation("RivalTorcidaB", fields: [tenantBId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantAId, tenantBId])
-  @@index([tenantBId])
-  @@map("saas_rivalidades_torcida")
-}
-
-// ─── ALIANÇAS ENTRE TORCIDAS ─────────────────────────────────────────────────
-
-model Alianca {
-  id               String        @id @default(uuid())
-  tenantOrigemId   String        @map("tenant_origem_id")
-  tenantAliadoId   String        @map("tenant_aliado_id")
-  status           StatusAlianca @default(PENDENTE)
-  propostaPorId    String        @map("proposta_por_id")
-  confirmadaPorId  String?       @map("confirmada_por_id")
-  confirmadaEm     DateTime?     @map("confirmada_em")
-  criadoEm         DateTime      @default(now()) @map("criado_em")
-
-  tenantOrigem  Tenant @relation("AliancaOrigem", fields: [tenantOrigemId], references: [id], onDelete: Cascade)
-  tenantAliado  Tenant @relation("AliancaAliado", fields: [tenantAliadoId], references: [id], onDelete: Cascade)
-  propostaPor   User   @relation("AliancaPropostaPor", fields: [propostaPorId], references: [id])
-  confirmadaPor User?  @relation("AliancaConfirmadaPor", fields: [confirmadaPorId], references: [id])
-
-  @@unique([tenantOrigemId, tenantAliadoId])
-  @@index([tenantAliadoId])
-  @@index([tenantOrigemId, status])
-  @@index([tenantAliadoId, status])
-  @@map("saas_aliancas")
-}
-
-enum StatusAlianca {
-  SUGERIDA
-  PENDENTE
-  ATIVA
-  ENCERRADA
-}
-
-model RecomendacaoAlianca {
-  id                String                  @id @default(uuid())
-  tenantId          String                  @map("tenant_id")
-  tenantSugeridoId  String?                 @map("tenant_sugerido_id")
-  nomeSugerido      String                  @map("nome_sugerido")
-  confianca         ConfiancaRecomendacao
-  fonte             String
-  observacao        String?
-  criadoEm          DateTime                @default(now()) @map("criado_em")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@map("saas_recomendacoes_alianca")
-}
-
-enum ConfiancaRecomendacao {
-  ALTA
-  MEDIA
-  BAIXA
-}
-
-// ─── COMUNIDADE ───────────────────────────────────────────────────────────────
-
-model Post {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autorId  String @map("autor_id")
-  autor    User   @relation(fields: [autorId], references: [id])
-
-  titulo      String?
-  conteudo    String
-  imagemUrl   String?          @map("imagem_url")
-  midiaUrls   String[]         @default([]) @map("midia_urls")
-  tipo        TipoPost         @default(INSTITUCIONAL)
-  visibilidade VisibilidadePost @default(PUBLICO)
-  fixado      Boolean          @default(false)
-  oculto      Boolean          @default(false)
-  /// Post PUBLICO de sócio que também alcança torcedores globais do clube na
-  /// Comunidade Nacional, bypassando o gate de follow aprovado. Exige
-  /// COMMUNITY_POST_NACIONAL — validado no servidor, nunca só no cliente.
-  alcanceNacional Boolean       @default(false) @map("alcance_nacional")
-
-  postOrigemId String? @map("post_origem_id")
-  postOrigem   Post?   @relation("Repost", fields: [postOrigemId], references: [id], onDelete: SetNull)
-  reposts      Post[]  @relation("Repost")
-
-  comunicadoOrigemId String?       @map("comunicado_origem_id")
-  comunicadoOrigem   Announcement? @relation(fields: [comunicadoOrigemId], references: [id], onDelete: SetNull)
-
-  eventoId String? @map("evento_id")
-  evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
-
-  conversaId String?    @map("conversa_id")
-  conversa   Conversa? @relation(fields: [conversaId], references: [id], onDelete: SetNull)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  comentarios Comentario[]
-  reacoes     Reacao[]
-  denuncias   Denuncia[]
-  enquete     EnquetePost?
-  hashtags    PostHashtag[]
-  destaqueItens PerfilDestaqueItem[]
-  salvos      PostSalvo[]
-  feedTimeline FeedTimeline[]
-
-  @@index([tenantId, criadoEm])
-  @@index([tenantId, oculto])
-  @@index([autorId, criadoEm])
-  @@index([tenantId, tipo, oculto, conversaId, criadoEm])
-  @@index([postOrigemId])
-  @@index([comunicadoOrigemId])
-  @@index([eventoId])
-  @@index([conversaId])
-  @@map("saas_posts")
-}
-
-enum TipoPost {
-  INSTITUCIONAL
-  MEMBRO
-}
-
-enum VisibilidadePost {
-  PUBLICO
-  TENANT
-  PRIVADO
-}
-
-model PerfilMembro {
-  id            String  @id @default(uuid())
-  userId        String  @map("user_id")
-  tenantId      String  @map("tenant_id")
-  bio           String?
-  perfilPrivado Boolean @default(false) @map("perfil_privado")
-  avatarUrl     String? @map("avatar_url")
-  bannerUrl     String? @map("banner_url")
-  bannerPos     Int?    @map("banner_pos") // enquadramento vertical do banner (object-position Y, 0–100)
-
-  exibirCidade Boolean @default(false) @map("exibir_cidade")
-  exibirSede   Boolean @default(false) @map("exibir_sede")
-  exibirDesde  Boolean @default(true)  @map("exibir_desde")
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  @@unique([userId, tenantId])
-  @@map("saas_perfis_membro")
-}
-
-model Seguimento {
-  id               String            @id @default(uuid())
-  seguidorId       String            @map("seguidor_id")
-  seguidoId        String            @map("seguido_id")
-  tenantContextoId String            @map("tenant_contexto_id")
-  status           StatusSeguimento  @default(PENDENTE)
-  criadoEm         DateTime          @default(now()) @map("criado_em")
-  atualizadoEm     DateTime          @updatedAt @map("atualizado_em")
-
-  seguidor       User   @relation("SeguimentoSeguidor", fields: [seguidorId], references: [id], onDelete: Cascade)
-  seguido        User   @relation("SeguimentoSeguido", fields: [seguidoId], references: [id], onDelete: Cascade)
-  tenantContexto Tenant @relation("SeguimentoContexto", fields: [tenantContextoId], references: [id], onDelete: Cascade)
-
-  @@unique([seguidorId, seguidoId])
-  @@index([seguidoId, status])
-  @@index([seguidorId, status])
-  @@map("saas_seguimentos")
-}
-
-enum StatusSeguimento {
-  PENDENTE
-  APROVADO
-  REJEITADO
-  BLOQUEADO
-}
-
-model Comentario {
-  id        String   @id @default(uuid())
-  postId    String   @map("post_id")
-  autorId   String   @map("autor_id")
-  conteudo  String
-  criadoEm  DateTime @default(now()) @map("criado_em")
-
-  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
-
-  @@index([postId, criadoEm])
-  @@map("saas_comentarios")
-}
-
-model Reacao {
-  id       String     @id @default(uuid())
-  postId   String     @map("post_id")
-  userId   String     @map("user_id")
-  tipo     TipoReacao @default(CURTIR)
-  criadoEm DateTime   @default(now()) @map("criado_em")
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, userId])
-  @@map("saas_reacoes")
-}
-
-enum TipoReacao {
-  CURTIR
-  FORCA
-  VAMOS
-  PRESENTE
-}
-
-model Denuncia {
-  id             String         @id @default(uuid())
-  tenantId       String         @map("tenant_id")
-  postId         String         @map("post_id")
-  denuncianteId  String         @map("denunciante_id")
-  motivo         String
-  status         StatusDenuncia @default(PENDENTE)
-  resolvidoPorId String?        @map("resolvido_por_id")
-  resolvidoEm    DateTime?      @map("resolvido_em")
-  criadoEm       DateTime       @default(now()) @map("criado_em")
-
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  post          Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  denunciante   User   @relation(fields: [denuncianteId], references: [id], onDelete: Cascade)
-  resolvidoPor  User?  @relation("DenunciaResolvidoPor", fields: [resolvidoPorId], references: [id])
-
-  @@index([tenantId, status])
-  @@map("saas_denuncias")
-}
-
-enum StatusDenuncia {
-  PENDENTE
-  RESOLVIDA
-  DESCARTADA
-}
-
-model EnquetePost {
-  id          String    @id @default(uuid())
-  postId      String    @unique @map("post_id")
-  encerradaEm DateTime? @map("encerrada_em")
-  criadoEm    DateTime  @default(now()) @map("criado_em")
-
-  post   Post               @relation(fields: [postId], references: [id], onDelete: Cascade)
-  opcoes OpcaoEnquetePost[]
-  votos  VotoEnquetePost[]
-
-  @@map("saas_enquetes_post")
-}
-
-model OpcaoEnquetePost {
-  id        String @id @default(uuid())
-  enqueteId String @map("enquete_id")
-  texto     String
-  ordem     Int    @default(0)
-
-  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
-  votos   VotoEnquetePost[]
-
-  @@index([enqueteId, ordem])
-  @@map("saas_opcoes_enquete_post")
-}
-
-model VotoEnquetePost {
-  id        String   @id @default(uuid())
-  enqueteId String   @map("enquete_id")
-  opcaoId   String   @map("opcao_id")
-  userId    String   @map("user_id")
-  criadoEm  DateTime @default(now()) @map("criado_em")
-
-  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
-  opcao   OpcaoEnquetePost @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([enqueteId, userId])
-  @@map("saas_votos_enquete_post")
-}
-
-model Hashtag {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tag      String
-
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  posts  PostHashtag[]
-
-  @@unique([tenantId, tag])
-  @@index([tag])
-  @@map("saas_hashtags")
-}
-
-model PostHashtag {
-  id        String @id @default(uuid())
-  postId    String @map("post_id")
-  hashtagId String @map("hashtag_id")
-
-  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, hashtagId])
-  @@index([hashtagId])
-  @@map("saas_post_hashtags")
-}
-
-model PostSalvo {
-  id       String   @id @default(uuid())
-  userId   String   @map("user_id")
-  postId   String   @map("post_id")
-  tenantId String   @map("tenant_id")
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, postId])
-  @@index([userId, tenantId])
-  @@map("saas_post_salvos")
-}
-
-/// Timeline materializada da rede ("Minha rede" / filtro seguindo).
-/// Guarda o fan-out do post para o viewer no momento da publicação/aprovação.
-model FeedTimeline {
-  id       String   @id @default(uuid())
-  viewerId String   @map("viewer_id")
-  postId   String   @map("post_id")
-  autorId  String   @map("autor_id")
-  criadoEm DateTime @map("criado_em")
-
-  viewer User @relation(fields: [viewerId], references: [id], onDelete: Cascade)
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  @@unique([viewerId, postId])
-  @@index([viewerId, criadoEm])
-  @@index([viewerId, autorId])
-  @@index([postId])
-  @@map("saas_feed_timeline")
-}
-
-/// Momento efêmero estilo story (expira em 24h).
-model MomentoStory {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  userId   String @map("user_id")
-
-  midiaUrl String  @map("midia_url")
-  conteudo String?
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-  expiraEm DateTime @map("expira_em")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, expiraEm])
-  @@index([userId, tenantId])
-  @@map("saas_momentos_story")
-}
-
-model PerfilDestaque {
-  id       String  @id @default(uuid())
-  userId   String  @map("user_id")
-  tenantId String  @map("tenant_id")
-  titulo   String
-  capaUrl  String? @map("capa_url")
-  ordem    Int     @default(0)
-
-  user   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  itens  PerfilDestaqueItem[]
-
-  @@index([userId, tenantId])
-  @@map("saas_perfil_destaques")
-}
-
-model PerfilDestaqueItem {
-  id         String @id @default(uuid())
-  destaqueId String @map("destaque_id")
-  postId     String @map("post_id")
-  ordem      Int    @default(0)
-
-  destaque PerfilDestaque @relation(fields: [destaqueId], references: [id], onDelete: Cascade)
-  post     Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  @@unique([destaqueId, postId])
-  @@map("saas_perfil_destaque_itens")
-}
-
-model Notificacao {
-  id        String           @id @default(uuid())
-  userId    String           @map("user_id")
-  tenantId  String           @map("tenant_id")
-  tipo      TipoNotificacao
-  titulo    String
-  corpo     String?
-  link      String?
-  lida      Boolean          @default(false)
-  atorId    String?          @map("ator_id")
-  criadoEm  DateTime         @default(now()) @map("criado_em")
-
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ator User? @relation("NotificacaoAtor", fields: [atorId], references: [id], onDelete: SetNull)
-
-  @@index([userId, lida, criadoEm])
-  @@index([tenantId, userId, criadoEm])
-  @@map("saas_notificacoes")
-}
-
-enum TipoNotificacao {
-  SEGUIMENTO_PENDENTE
-  SEGUIMENTO_APROVADO
-  NOVO_COMENTARIO
-  NOVA_REACAO
-  COMUNICADO_URGENTE
-  DENUNCIA_NOVA
-  NOVA_MENSAGEM
-  MENCAO
-  REPOST
-  ALIANCA_PROPOSTA
-  ALIANCA_ACEITA
-  ALIANCA_REJEITADA
-  ALIANCA_ENCERRADA
-  ALIANCA_CANCELADA
-  MEMBRO_APROVADO
-  MEMBRO_REPROVADO
-  MEMBRO_SOLICITADO
-  COBRANCA_PENDENTE
-  COBRANCA_VENCIDA
-  EVENTO_LEMBRETE
-  EVENTO_RSVP
-  EVENTO_DIA_GESTOR
-  GRUPO_PEDIDO
-  GRUPO_APROVADO
-  GRUPO_REJEITADO
-}
-
-// ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
-
-model Conversa {
-  id   String       @id @default(uuid())
-  tipo TipoConversa
-
-  // Tenant onde a conversa foi iniciada — contexto/auditoria. A LEITURA é
-  // chaveada por participação (MembroConversa), não por tenant: é o que
-  // permite DM entre membros de torcidas aliadas.
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Só para GRUPO — DM não tem nome/descrição/avatar próprios
-  nome      String?
-  descricao String?
-  avatarUrl String? @map("avatar_url")
-  // Grupos públicos da comunidade — qualquer membro ativo do tenant pode entrar
-  publica   Boolean @default(false)
-  /// true = grupo da Comunidade (lista/mural); false = só mensageria
-  comunidade Boolean @default(false)
-
-  // CANAL — comunidade temática ou perfil oficial da unidade (M3 mensageria)
-  institucional       Boolean           @default(false) @map("institucional")
-  canalOficial        Boolean           @default(false) @map("canal_oficial")
-  visibilidadeCanal   VisibilidadeCanal @default(HIERARQUIA) @map("visibilidade_canal")
-  /// Mural do canal: quando true, só admins publicam posts
-  somenteAdminPublica Boolean           @default(true) @map("somente_admin_publica")
-
-  criadoPorId String @map("criado_por_id")
-  criadoPor   User   @relation("ConversaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Cascade)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  // Bumpado a cada mensagem — ordena a inbox por atividade recente
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  membros   MembroConversa[]
-  mensagens MensagemDireta[]
-  posts     Post[]
-  departamentoCanal Departamento? @relation("DepartamentoCanal")
-
-  @@index([tenantId, atualizadoEm])
-  @@index([tenantId, tipo, canalOficial])
-  @@index([tenantId, tipo, publica])
-  @@map("saas_conversas")
-}
-
-enum TipoConversa {
-  DIRETA
-  GRUPO
-  CANAL
-}
-
-enum VisibilidadeCanal {
-  TENANT
-  HIERARQUIA
-  ALIADOS
-  PUBLICO
-}
-
-model MembroConversa {
-  id              String               @id @default(uuid())
-  conversaId      String               @map("conversa_id")
-  userId          String               @map("user_id")
-  papel           PapelConversa        @default(MEMBRO)
-  status          StatusMembroConversa @default(ATIVO)
-  entrouEm        DateTime             @default(now()) @map("entrou_em")
-  ultimaLeituraEm DateTime?            @map("ultima_leitura_em")
-  silenciada      Boolean              @default(false)
-  saiuEm          DateTime?            @map("saiu_em")
-
-  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([conversaId, userId])
-  @@index([userId, saiuEm])
-  @@index([conversaId, status, saiuEm])
-  @@map("saas_membros_conversa")
-}
-
-enum StatusMembroConversa {
-  ATIVO
-  PENDENTE
-  REJEITADO
-}
-
-enum PapelConversa {
-  ADMIN
-  MEMBRO
-}
-
-model MensagemDireta {
-  id          String    @id @default(uuid())
-  conversaId  String    @map("conversa_id")
-  autorId     String    @map("autor_id")
-  conteudo    String
-  midiaUrls   String[]  @default([]) @map("midia_urls")
-  respostaAId String?   @map("resposta_a_id")
-  editadaEm   DateTime? @map("editada_em")
-  // Soft delete — mantém a posição na thread ("mensagem removida")
-  removidaEm  DateTime? @map("removida_em")
-  criadoEm    DateTime  @default(now()) @map("criado_em")
-
-  conversa  Conversa           @relation(fields: [conversaId], references: [id], onDelete: Cascade)
-  autor     User               @relation("MensagemDiretaAutor", fields: [autorId], references: [id], onDelete: Cascade)
-  respostaA MensagemDireta?    @relation("MensagemResposta", fields: [respostaAId], references: [id], onDelete: SetNull)
-  respostas MensagemDireta[]   @relation("MensagemResposta")
-  denuncias DenunciaMensagem[]
-
-  @@index([conversaId, criadoEm])
-  @@map("saas_mensagens_diretas")
-}
-
-// Bloqueio usuário→usuário (mensageria). Distinto de `Bloqueado`, que é a
-// blocklist de registros por tenant.
-model BloqueioUsuario {
-  id           String   @id @default(uuid())
-  bloqueadorId String   @map("bloqueador_id")
-  bloqueadoId  String   @map("bloqueado_id")
-  criadoEm     DateTime @default(now()) @map("criado_em")
-
-  bloqueador User @relation("BloqueioBloqueador", fields: [bloqueadorId], references: [id], onDelete: Cascade)
-  bloqueado  User @relation("BloqueioBloqueado", fields: [bloqueadoId], references: [id], onDelete: Cascade)
-
-  @@unique([bloqueadorId, bloqueadoId])
-  @@index([bloqueadoId])
-  @@map("saas_bloqueios_usuario")
-}
-
-// `Denuncia` existente é acoplada a Post — mensagens precisam da própria tabela.
-model DenunciaMensagem {
-  id             String         @id @default(uuid())
-  tenantId       String         @map("tenant_id")
-  mensagemId     String         @map("mensagem_id")
-  denuncianteId  String         @map("denunciante_id")
-  motivo         String
-  status         StatusDenuncia @default(PENDENTE)
-  resolvidoPorId String?        @map("resolvido_por_id")
-  resolvidoEm    DateTime?      @map("resolvido_em")
-  criadoEm       DateTime       @default(now()) @map("criado_em")
-
-  tenant       Tenant         @relation("DenunciaMensagemTenant", fields: [tenantId], references: [id], onDelete: Cascade)
-  mensagem     MensagemDireta @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
-  denunciante  User           @relation("DenunciaMensagemDenunciante", fields: [denuncianteId], references: [id], onDelete: Cascade)
-  resolvidoPor User?          @relation("DenunciaMensagemResolvidoPor", fields: [resolvidoPorId], references: [id])
-
-  @@index([tenantId, status])
-  @@map("saas_denuncias_mensagem")
-}
-
-// ─── NOTÍCIAS CURADAS (global por afiliação) ─────────────────────────────────
-
-model Partida {
-  id              String        @id @default(uuid())
-  afiliacaoId     String        @map("afiliacao_id")
-  adversario      String
-  competicao      String?
-  dataHora        DateTime      @map("data_hora")
-  local           String?
-  mando           MandoJogo     @default(CASA)
-  placarCasa      Int?          @map("placar_casa")
-  placarFora      Int?          @map("placar_fora")
-  status          StatusPartida @default(AGENDADA)
-  fonteExternalId String?       @map("fonte_external_id")
-  criadoEm        DateTime      @default(now()) @map("criado_em")
-  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
-  eventos   Evento[]
-  @@index([afiliacaoId, dataHora])
-  @@index([afiliacaoId, status, dataHora])
-  @@map("saas_partidas")
-}
-enum MandoJogo {
-  CASA
-  FORA
-}
-
-enum StatusPartida {
-  AGENDADA
-  AO_VIVO
-  ENCERRADA
-  CANCELADA
-}
-
-model Noticia {
-  id              String        @id @default(uuid())
-  afiliacaoId     String        @map("afiliacao_id")
-  titulo          String
-  resumo          String?
-  url             String
-  fonte           String
-  embedHtml       String?       @map("embed_html")
-  embedThumbnail  String?       @map("embed_thumbnail")
-  status          StatusNoticia @default(RASCUNHO)
-  publicadoEm     DateTime?     @map("publicado_em")
-  curadoPorId     String?       @map("curado_por_id")
-  criadoEm        DateTime      @default(now()) @map("criado_em")
-
-  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
-  curadoPor User?     @relation(fields: [curadoPorId], references: [id])
-
-  @@unique([afiliacaoId, url])
-  @@index([afiliacaoId, status, publicadoEm])
-  @@map("saas_noticias")
-}
-
-enum StatusNoticia {
-  RASCUNHO
-  APROVADA
-  REJEITADA
-}
-
-// ─── SALAS MEET (WebRTC) ─────────────────────────────────────────────────────
-
-model SalaReuniao {
-  id              String        @id @default(uuid())
-  tenantId        String        @map("tenant_id")
-  hostId          String        @map("host_id")
-  titulo          String
-  tipo            TipoSalaReuniao @default(ABERTA)
-  livekitRoomName String        @unique @map("livekit_room_name")
-  linkConvite     String        @unique @map("link_convite")
-  agendadaPara    DateTime?     @map("agendada_para")
-  encerradaEm     DateTime?     @map("encerrada_em")
-  eventoId        String?       @map("evento_id")
-  criadoEm        DateTime      @default(now()) @map("criado_em")
-
-  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  host          User                  @relation(fields: [hostId], references: [id])
-  evento        Evento?               @relation(fields: [eventoId], references: [id], onDelete: SetNull)
-  participantes ParticipanteReuniao[]
-  mensagens     MensagemReuniao[]
-  enquetes      EnqueteReuniao[]
-
-  @@index([tenantId, encerradaEm])
-  @@map("saas_salas_reuniao")
-}
-
-enum TipoSalaReuniao {
-  EVENTO
-  ABERTA
-  DM_GRUPO
-}
-
-model ParticipanteReuniao {
-  id       String              @id @default(uuid())
-  salaId   String              @map("sala_id")
-  userId   String              @map("user_id")
-  papel    PapelParticipanteReuniao @default(PARTICIPANTE)
-  entrouEm DateTime            @default(now()) @map("entrou_em")
-  saiuEm   DateTime?           @map("saiu_em")
-
-  sala SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([salaId, userId])
-  @@map("saas_participantes_reuniao")
-}
-
-enum PapelParticipanteReuniao {
-  HOST
-  MODERADOR
-  PARTICIPANTE
-}
-
-model MensagemReuniao {
-  id         String    @id @default(uuid())
-  salaId     String    @map("sala_id")
-  autorId    String    @map("autor_id")
-  conteudo   String
-  destacada  Boolean   @default(false)
-  editadaEm  DateTime? @map("editada_em")
-  excluidaEm DateTime? @map("excluida_em")
-  criadoEm   DateTime  @default(now()) @map("criado_em")
-
-  sala  SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
-  autor User        @relation(fields: [autorId], references: [id], onDelete: Cascade)
-
-  @@index([salaId, criadoEm])
-  @@index([salaId, destacada])
-  @@map("saas_mensagens_reuniao")
-}
-
-model EnqueteReuniao {
-  id          String    @id @default(uuid())
-  salaId      String    @map("sala_id")
-  criadorId   String    @map("criador_id")
-  pergunta    String
-  encerradaEm DateTime? @map("encerrada_em")
-  criadoEm    DateTime  @default(now()) @map("criado_em")
-
-  sala    SalaReuniao           @relation(fields: [salaId], references: [id], onDelete: Cascade)
-  criador User                  @relation(fields: [criadorId], references: [id], onDelete: Cascade)
-  opcoes  OpcaoEnqueteReuniao[]
-  votos   VotoEnqueteReuniao[]
-
-  @@index([salaId, encerradaEm])
-  @@map("saas_enquetes_reuniao")
-}
-
-model OpcaoEnqueteReuniao {
-  id        String @id @default(uuid())
-  enqueteId String @map("enquete_id")
-  texto     String
-  ordem     Int    @default(0)
-
-  enquete EnqueteReuniao       @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
-  votos   VotoEnqueteReuniao[]
-
-  @@index([enqueteId, ordem])
-  @@map("saas_opcoes_enquete_reuniao")
-}
-
-model VotoEnqueteReuniao {
-  id        String   @id @default(uuid())
-  enqueteId String   @map("enquete_id")
-  opcaoId   String   @map("opcao_id")
-  userId    String   @map("user_id")
-  criadoEm  DateTime @default(now()) @map("criado_em")
-
-  enquete EnqueteReuniao      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
-  opcao   OpcaoEnqueteReuniao @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
-  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([enqueteId, userId])
-  @@map("saas_votos_enquete_reuniao")
-}
-
-// ─── ADVERTÊNCIAS ─────────────────────────────────────────────────────────────
-
-model Advertencia {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  membroDiscordId String   @map("membro_discord_id")
-  membroNome      String   @map("membro_nome")
-  motivo          String?
-  tier            Int      @default(1)
-  prazo           DateTime
-
-  emitidoPorId   String? @map("emitido_por_id")
-  emitidoPorNome String? @map("emitido_por_nome")
-
-  resolvida Boolean  @default(false)
-  criadoEm  DateTime @default(now()) @map("criado_em")
-
-  @@index([tenantId])
-  @@map("saas_advertencias")
-}
-
-// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
-
-model AuditLog {
-  id       String  @id @default(uuid())
-  tenantId String  @map("tenant_id")
-  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  atorId   String? @map("ator_id")
-  ator     User?   @relation("AuditAtor", fields: [atorId], references: [id])
-
-  acao       String
-  entidade   String?
-  entidadeId String? @map("entidade_id")
-  detalhes   Json?
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@index([tenantId, criadoEm])
-  @@map("saas_audit_logs")
-}
-
-// ─── FINANCEIRO (livro-caixa operacional) ─────────────────────────────────────
-// MVP: lançamentos manuais de receita/despesa por tenant. Sem conciliação bancária,
-// mensalidade recorrente automática ou inadimplência (fases seguintes).
-// Sensibilidade: RESTRITO — só quem tem finance:view / finance:manage.
-
-model FinanceiroLancamento {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  tipo      TipoFinanceiroLancamento
-  categoria CategoriaFinanceiroLancamento
-  /// Sempre positivo; o sinal vem de `tipo` (RECEITA / DESPESA).
-  valor     Decimal                     @db.Decimal(12, 2)
-  descricao String
-  /// Data de competência (quando entrou/saiu o dinheiro).
-  data      DateTime
-  observacao String?
-
-  criadoPorId String   @map("criado_por_id")
-  criadoPor   User     @relation("FinanceiroLancamentoCriadoPor", fields: [criadoPorId], references: [id])
-  criadoEm    DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  @@index([tenantId, data])
-  @@index([tenantId, tipo, data])
-  @@index([tenantId, categoria])
-  @@map("saas_financeiro_lancamentos")
-}
-
-enum TipoFinanceiroLancamento {
-  RECEITA
-  DESPESA
-}
-
-enum CategoriaFinanceiroLancamento {
-  MENSALIDADE
-  LOJA
-  EVENTO
-  CARAVANA
-  PATRIMONIO
-  BAR
-  DOACAO
-  OUTROS
-}
-
-// ─── PATRIMÔNIO (inventário) ─────────────────────────────────────────────────
-// MVP: itens físicos da torcida (instrumentos, bandeirões, etc.).
-// Baixa = status BAIXADO (não apaga o histórico operacional).
-// Sensibilidade: RESTRITO — patrimony:view / patrimony:manage.
-
-model PatrimonioItem {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  nome         String
-  categoria    CategoriaPatrimonioItem
-  status       StatusPatrimonioItem @default(DISPONIVEL)
-  quantidade   Int                  @default(1)
-  localizacao  String?
-  /// Valor estimado unitário (opcional) — prestação de contas informal.
-  valorEstimado Decimal? @map("valor_estimado") @db.Decimal(12, 2)
-  observacao   String?
-
-  responsavelId String? @map("responsavel_id")
-  responsavel   User?   @relation("PatrimonioItemResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
-
-  criadoPorId  String   @map("criado_por_id")
-  criadoPor    User     @relation("PatrimonioItemCriadoPor", fields: [criadoPorId], references: [id])
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  @@index([tenantId, status])
-  @@index([tenantId, categoria])
-  @@index([tenantId, nome])
-  @@map("saas_patrimonio_itens")
-}
-
-enum CategoriaPatrimonioItem {
-  INSTRUMENTO
-  BANDEIRA
-  UNIFORME
-  MOBILIARIO
-  ELETRONICO
-  ESPACO
-  OUTROS
-}
-
-enum StatusPatrimonioItem {
-  DISPONIVEL
-  EM_USO
-  MANUTENCAO
-  BAIXADO
-}
-
-// ─── BAR (PDV da sede/subsede/PDE) ───────────────────────────────────────────
-// Catálogo, vendas e estoque isolados por `tenantId` + `sedeId`.
-// Cada torcida (tenant) tem seu bar; dentro dela, cada unidade (SEDE /
-// SUBSEDE / PONTO_ENCONTRO) tem catálogo e estoque próprios.
-// Integra com o livro-caixa via `financeiroLancamentoId` (categoria BAR).
-
-model BarCategoria {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  /// Unidade dona deste catálogo (SEDE / SUBSEDE / PDE). Isola estoque entre unidades.
-  sedeId String @map("sede_id")
-  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
-
-  nome  String
-  slug  String
-  ordem Int     @default(0)
-  ativo Boolean @default(true)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  produtos BarProduto[]
-
-  @@unique([tenantId, sedeId, slug])
-  @@index([tenantId, sedeId])
-  @@map("saas_bar_categorias")
-}
-
-model BarProduto {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  sedeId String @map("sede_id")
-  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
-
-  categoriaId String?       @map("categoria_id")
-  categoria   BarCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-
-  nome      String
-  descricao String?
-  preco     Decimal @db.Decimal(10, 2)
-  /// Custo médio ponderado por entradas de estoque — base do lucro estimado.
-  custoMedio Decimal @default(0) @map("custo_medio") @db.Decimal(10, 2)
-
-  estoque       Int     @default(0)
-  estoqueMinimo Int?    @map("estoque_minimo")
-  imagemUrl     String? @map("imagem_url")
-  ativo         Boolean @default(true)
-  destaque      Boolean @default(false)
-  ordem         Int     @default(0)
-
-  criadoPorId String? @map("criado_por_id")
-  criadoPor   User?   @relation("BarProdutoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  vendaItens    BarVendaItem[]
-  movimentacoes BarMovimentacaoEstoque[]
-
-  @@index([tenantId, sedeId, ativo])
-  @@index([categoriaId])
-  @@map("saas_bar_produtos")
-}
-
-model BarVenda {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  sedeId String @map("sede_id")
-  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
-
-  operadorId String @map("operador_id")
-  operador   User   @relation("BarVendaOperador", fields: [operadorId], references: [id], onDelete: Cascade)
-
-  subtotal Decimal @db.Decimal(10, 2)
-  desconto Decimal @default(0) @db.Decimal(10, 2)
-  total    Decimal @db.Decimal(10, 2)
-
-  metodoPagamento MetodoPagamentoBar @map("metodo_pagamento")
-  status          StatusVendaBar     @default(PENDENTE)
-
-  gatewayProvider   String?   @map("gateway_provider")
-  gatewayExternalId String?   @map("gateway_external_id")
-  pixCopiaCola      String?   @map("pix_copia_cola")
-  pagoEm            DateTime? @map("pago_em")
-
-  /// Lançamento gerado no livro-caixa (categoria BAR) quando a venda é paga.
-  financeiroLancamentoId String? @map("financeiro_lancamento_id")
-  observacao             String?
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  itens         BarVendaItem[]
-  movimentacoes BarMovimentacaoEstoque[]
-
-  @@index([tenantId, sedeId, criadoEm])
-  @@index([tenantId, sedeId, status])
-  @@index([gatewayExternalId])
-  @@map("saas_bar_vendas")
-}
-
-model BarVendaItem {
-  id      String   @id @default(uuid())
-  vendaId String   @map("venda_id")
-  venda   BarVenda @relation(fields: [vendaId], references: [id], onDelete: Cascade)
-
-  produtoId String?     @map("produto_id")
-  produto   BarProduto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
-
-  /// Snapshot do nome no momento da venda (produto pode ser removido depois).
-  produtoNome String  @map("produto_nome")
-  quantidade  Int
-  precoUnit   Decimal @map("preco_unit") @db.Decimal(10, 2)
-  custoUnit   Decimal @default(0) @map("custo_unit") @db.Decimal(10, 2)
-  total       Decimal @db.Decimal(10, 2)
-
-  @@index([vendaId])
-  @@index([produtoId])
-  @@map("saas_bar_venda_itens")
-}
-
-model BarMovimentacaoEstoque {
-  id       String @id @default(uuid())
-  tenantId String @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  sedeId String @map("sede_id")
-  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
-
-  produtoId String     @map("produto_id")
-  produto   BarProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-
-  tipo       TipoMovEstoqueBar
-  /// Sempre positiva; a direção vem de `tipo` (ENTRADA / SAIDA / AJUSTE).
-  quantidade Int
-  custoTotal Decimal? @map("custo_total") @db.Decimal(10, 2)
-  motivo     String?
-
-  vendaId String?   @map("venda_id")
-  venda   BarVenda? @relation(fields: [vendaId], references: [id], onDelete: SetNull)
-
-  /// Lançamento de despesa no livro-caixa quando a entrada tem custo.
-  financeiroLancamentoId String? @map("financeiro_lancamento_id")
-
-  operadorId String? @map("operador_id")
-  operador   User?   @relation("BarMovimentacaoOperador", fields: [operadorId], references: [id], onDelete: SetNull)
-
-  criadoEm DateTime @default(now()) @map("criado_em")
-
-  @@index([tenantId, sedeId, produtoId, criadoEm])
-  @@map("saas_bar_estoque_mov")
-}
-
-enum MetodoPagamentoBar {
-  PIX
-  DINHEIRO
-  CARTAO_DEBITO
-  CARTAO_CREDITO
-}
-
-enum StatusVendaBar {
-  PENDENTE
-  PAGA
-  CANCELADA
-}
-
-enum TipoMovEstoqueBar {
-  ENTRADA
-  SAIDA
-  AJUSTE
-}
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELAS EXISTENTES DO BOT (leitura/escrita pelo bot via pg)
+// O Prisma pode ler estas tabelas, mas NÃO altera sua estrutura.
+// ═══════════════════════════════════════════════════════════════
+
+/// Tabela legada do bot — lida pelo SaaS para exibir dados no portal
+model BotMembro {
+  id              Int       @id @default(autoincrement())
+  discordId       String    @unique @map("discord_id")
+  nome            String
+  tipo            String // 'socio' ou 'torcedor'
+  numeroAssociado String?   @map("numero_associado")
+  cidade          String?
+  telefone        String?
+  idade           Int?
+  aprovadoPorId   String?   @map("aprovado_por_id")
+  aprovadoPorNome String?   @map("aprovado_por_nome")
+  criadoEm        DateTime? @default(now()) @map("criado_em")
+  imagemProva     String?   @map("imagem_prova")
+
+  @@map("membros")
+}
+
+/// Tabela legada do bot — produtos da loja
+model BotProduto {
+  id        Int         @id @default(autoincrement())
+  nome      String
+  tamanhos  String
+  preco     Decimal     @db.Decimal(10, 2)
+  imagemUrl String?     @map("imagem_url")
+  ativo     Boolean?    @default(true)
+  criadoEm  DateTime?   @default(now()) @map("criado_em")
+  estoque   Json?       @default("{}")
+  pedidos   BotPedido[]
+
+  @@map("produtos")
+}
+
+/// Tabela legada do bot — pedidos da loja
+model BotPedido {
+  id            Int         @id @default(autoincrement())
+  discordId     String      @map("discord_id")
+  discordTag    String?     @map("discord_tag")
+  produtoId     Int?        @map("produto_id")
+  produtoNome   String?     @map("produto_nome")
+  tamanho       String?
+  quantidade    Int
+  precoUnit     Decimal?    @map("preco_unit") @db.Decimal(10, 2)
+  total         Decimal?    @db.Decimal(10, 2)
+  status        String?     @default("pendente")
+  canalTicketId String?     @map("canal_ticket_id")
+  criadoEm      DateTime?   @default(now()) @map("criado_em")
+  produto       BotProduto? @relation(fields: [produtoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("pedidos")
+}
+
+/// Tabela legada do bot — ranking de recrutadores
+model BotAprovacao {
+  id            Int       @id @default(autoincrement())
+  aprovadorId   String    @map("aprovador_id")
+  aprovadorNome String?   @map("aprovador_nome")
+  candidatoId   String?   @map("candidato_id")
+  candidatoNome String?   @map("candidato_nome")
+  tipo          String?
+  criadoEm      DateTime? @default(now()) @map("criado_em")
+
+  @@map("aprovacoes_recrutamento")
+}
+
+/// Tabela legada do bot — configurações persistidas (IDs de mensagens)
+model BotConfig {
+  key   String  @id
+  value String?
+
+  @@map("bot_config")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABELAS DO SAAS — novas, prefixo saas_ para evitar conflitos
+// ═══════════════════════════════════════════════════════════════
+
+// ─── TENANTS ────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  nome        String
+  plano       Plano    @default(FREE)
+  corPrimaria String   @default("#7c3aed") @map("cor_primaria")
+  logoUrl     String?  @map("logo_url")
+  /// Tema visual completo (marca, grade, superfícies claro/escuro). Ver TenantDesignSchema.
+  design      Json?    @map("design")
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  // Tenant sintético: container de posts de torcedores globais do clube
+  // (Comunidade Nacional). Sem Sede/Role/SaasMembro; nunca listado como torcida real.
+  sintetico Boolean @default(false) @map("sintetico")
+
+  // Banco de dados próprio do tenant (null = usa o banco compartilhado)
+  // Cada torcida pode ter seu banco isolado quando necessário
+  databaseUrl String? @map("database_url")
+
+  discordGuildId String? @unique @map("discord_guild_id")
+
+  afiliacaoId String?     @map("afiliacao_id")
+  afiliacao   Afiliacao?  @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+
+  // Vínculo opcional ao catálogo nacional (dados ricos: fundação, lema, sede, site).
+  // Tenants pré-criados a partir de TorcidaConhecida referenciam a origem aqui.
+  torcidaConhecidaId String?           @unique @map("torcida_conhecida_id")
+  torcidaConhecida   TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
+
+  membros           SaasMembro[]
+  socios            SaasSocio[]
+  produtos          SaasProduto[]
+  categoriasLoja    SaasCategoria[]
+  cuponsLoja        SaasCupom[]
+  carrinhoItens     SaasCarrinhoItem[]
+  pedidos           SaasPedido[]
+  sedes             Sede[]
+  eventos           Evento[]
+  roles             Role[]
+  userRoles         UserRole[]
+  userPermissions   UserPermission[]
+  departamentos     Departamento[]
+  userDepartamentos UserDepartamento[]
+  auditLogs         AuditLog[]
+  bloqueados        Bloqueado[]
+  posts             Post[]
+  advertencias      Advertencia[]
+  announcements     Announcement[]
+  importacoes       ImportacaoMembros[]
+  aliancasOrigem    Alianca[]             @relation("AliancaOrigem")
+  aliancasAliado    Alianca[]             @relation("AliancaAliado")
+  recomendacoes     RecomendacaoAlianca[]
+  perfisMembro      PerfilMembro[]
+  seguimentosCtx    Seguimento[]          @relation("SeguimentoContexto")
+  salasReuniao      SalaReuniao[]
+  denuncias         Denuncia[]
+  conversas         Conversa[]
+  denunciasMensagem DenunciaMensagem[]    @relation("DenunciaMensagemTenant")
+  hashtags          Hashtag[]
+  perfilDestaques   PerfilDestaque[]
+  postSalvos        PostSalvo[]
+  momentosStory     MomentoStory[]
+  rivalTorcidaA     RivalidadeTorcida[]   @relation("RivalTorcidaA")
+  rivalTorcidaB     RivalidadeTorcida[]   @relation("RivalTorcidaB")
+  financeiroLancamentos FinanceiroLancamento[]
+  patrimonioItens       PatrimonioItem[]
+  planosAssociacao      PlanoAssociacao[]
+  cobrancasAssociacao   CobrancaAssociacao[]
+  barCategorias           BarCategoria[]
+  barProdutos             BarProduto[]
+  barVendas               BarVenda[]
+  barMovimentacoesEstoque BarMovimentacaoEstoque[]
+
+  /// Config: exibir o balanço financeiro consolidado aos associados no portal.
+  balancoFinanceiroVisivel Boolean @default(false) @map("balanco_financeiro_visivel")
+
+  @@map("saas_tenants")
+}
+
+enum Plano {
+  FREE
+  BASIC
+  PREMIUM
+}
+
+// ─── USUÁRIOS ────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String?   @unique
+  nome         String?
+  /// Handle único global (@usuario) — referência pública no feed/perfil.
+  nickname     String?   @unique
+  avatarUrl    String?   @map("avatar_url")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  discordId    String?   @unique @map("discord_id")
+  googleId     String?   @unique @map("google_id")
+  // Hash bcrypt — só usuários que se cadastraram por e-mail/senha têm valor.
+  // Nunca preenchido para contas só-OAuth (Discord/Google).
+  senhaHash    String?   @map("senha_hash")
+  consentidoEm DateTime? @map("consentido_em")
+  /// Última atividade na plataforma (heartbeat throttled) — base de "online" no onboarding.
+  ultimoAcessoEm DateTime? @map("ultimo_acesso_em")
+
+  userRoles            UserRole[]
+  userPermissions      UserPermission[]
+  userDepartamentos    UserDepartamento[]
+  departamentosGeridos DepartamentoGestor[]
+  membros              SaasMembro[]
+  socios               SaasSocio[]
+  pedidos              SaasPedido[]
+  carrinhoItens        SaasCarrinhoItem[]
+  eventosRsvp          EventoRsvp[]
+  sedesResponsavel     Sede[]               @relation("SedeResponsavel")
+  posts                Post[]
+  auditLogs            AuditLog[]           @relation("AuditAtor")
+  announcements        Announcement[]
+  announcementReads    AnnouncementRead[]
+  perfisMembro         PerfilMembro[]
+  seguindo             Seguimento[]         @relation("SeguimentoSeguidor")
+  seguidores           Seguimento[]         @relation("SeguimentoSeguido")
+  comentarios          Comentario[]
+  reacoes              Reacao[]
+  denuncias            Denuncia[]
+  denunciasResolvidas  Denuncia[]           @relation("DenunciaResolvidoPor")
+  notificacoes         Notificacao[]
+  notificacoesAtor     Notificacao[]        @relation("NotificacaoAtor")
+  noticiasCuradas      Noticia[]
+  aliancasPropostas    Alianca[]            @relation("AliancaPropostaPor")
+  aliancasConfirmadas  Alianca[]            @relation("AliancaConfirmadaPor")
+  salasHospedadas      SalaReuniao[]
+  participacoesReuniao ParticipanteReuniao[]
+  mensagensReuniao     MensagemReuniao[]
+  enquetesReuniao      EnqueteReuniao[]
+  votosEnqueteReuniao  VotoEnqueteReuniao[]
+
+  conversasCriadas            Conversa[]         @relation("ConversaCriadaPor")
+  membroConversas             MembroConversa[]
+  mensagensDiretas            MensagemDireta[]   @relation("MensagemDiretaAutor")
+  bloqueiosFeitos             BloqueioUsuario[]  @relation("BloqueioBloqueador")
+  bloqueiosRecebidos          BloqueioUsuario[]  @relation("BloqueioBloqueado")
+  denunciasMensagem           DenunciaMensagem[] @relation("DenunciaMensagemDenunciante")
+  denunciasMensagemResolvidas DenunciaMensagem[] @relation("DenunciaMensagemResolvidoPor")
+  votosEnquetePost            VotoEnquetePost[]
+  perfilDestaques             PerfilDestaque[]
+  postsSalvos                 PostSalvo[]
+  feedTimeline                FeedTimeline[]
+  momentosStory               MomentoStory[]
+  perfilTorcedor              PerfilTorcedor?
+  financeiroLancamentosCriados FinanceiroLancamento[] @relation("FinanceiroLancamentoCriadoPor")
+  patrimonioItensCriados       PatrimonioItem[]       @relation("PatrimonioItemCriadoPor")
+  patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
+  cobrancasAssociacao          CobrancaAssociacao[]
+  cobrancasAssociacaoCriadas   CobrancaAssociacao[]   @relation("CobrancaAssociacaoCriadoPor")
+  barProdutosCriados           BarProduto[]           @relation("BarProdutoCriadoPor")
+  barVendasOperadas            BarVenda[]             @relation("BarVendaOperador")
+  barMovimentacoesEstoque      BarMovimentacaoEstoque[] @relation("BarMovimentacaoOperador")
+
+  @@map("saas_users")
+}
+
+// ─── CARGOS E PERMISSÕES ─────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nome        String
+  cor         String   @default("#6b7280")
+  ordem       Int      @default(0)
+  isSystem    Boolean  @default(false) @map("is_system")
+  /// Pacote legado / transversal (sem departamento). Perfis de área preferem
+  /// herança ao vivo do Departamento + permissionsExtras.
+  permissions String[] @default([])
+  /// Deltas além do pacote do departamento (Presidente, perfis compostos…).
+  permissionsExtras String[] @default([]) @map("permissions_extras")
+  /// Área de atuação — null = perfil transversal (ex.: member).
+  departamentoId String? @map("departamento_id")
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+  /// MEMBRO | GESTOR — obrigatório quando departamentoId está setado.
+  papelNoDepartamento String? @map("papel_no_departamento")
+
+  userRoles UserRole[]
+
+  @@unique([tenantId, nome])
+  @@index([departamentoId])
+  @@map("saas_roles")
+}
+
+model UserRole {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  tenantId String @map("tenant_id")
+  roleId   String @map("role_id")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, roleId])
+  @@index([tenantId])
+  @@map("saas_user_roles")
+}
+
+model UserPermission {
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  tenantId   String  @map("tenant_id")
+  permission String
+  granted    Boolean
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, permission])
+  @@index([tenantId])
+  @@map("saas_user_permissions")
+}
+
+// ─── DEPARTAMENTOS ────────────────────────────────────────────────────────────
+// Agrupamento organizacional (Diretoria, Financeiro, Comunicação…).
+// Perfis (Role) de área vinculam-se ao departamento (membro/gestor) e herdam
+// o pacote ao vivo; Role.permissionsExtras guarda deltas. UserDepartamento /
+// DepartamentoGestor são projeção ao atribuir o perfil.
+// Sócio/Torcedor NÃO são departamentos. Lista plana por tenant (MVP).
+
+model Departamento {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome         String
+  slug         String   @default("")
+  moduloPortal String?  @map("modulo_portal")
+  /// Permissões do membro da equipe (ver / agir leve).
+  permissions  String[] @default([])
+  /// Permissões adicionais do gestor (gerir a área). Composição:
+  /// membro → permissions; gestor → permissions ∪ permissionsGestor.
+  permissionsGestor String[] @default([]) @map("permissions_gestor")
+  cor          String   @default("#6b7280")
+  ordem        Int      @default(0)
+  /// Canal (Conversa tipo CANAL) oficial da área — deep-link no portal.
+  canalConversaId String? @unique @map("canal_conversa_id")
+  canalConversa   Conversa? @relation("DepartamentoCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
+  /// Meta de área (ex.: checklist barracão do Carnaval). Não é RBAC.
+  meta         Json?
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  membros  UserDepartamento[]
+  gestores DepartamentoGestor[]
+  roles    Role[]
+  /// Preferência de área no cadastro (SaasMembro) — sem membership até APROVADO.
+  solicitacoesMembros SaasMembro[]
+
+  @@unique([tenantId, nome])
+  @@unique([tenantId, slug])
+  @@map("saas_departamentos")
+}
+
+/// Associação usuário ↔ departamento (multi-departamento, como cargos do Discord)
+model UserDepartamento {
+  id             String @id @default(uuid())
+  userId         String @map("user_id")
+  tenantId       String @map("tenant_id")
+  departamentoId String @map("departamento_id")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([userId, tenantId, departamentoId])
+  @@index([departamentoId])
+  @@map("saas_user_departamentos")
+}
+
+/// Quem pode gerenciar os membros de um departamento (adicionar/remover membros,
+/// atribuir perfis dentro do escopo do departamento). Owners/admins do tenant
+/// (via Role.isSystem) continuam com acesso total independente desta tabela —
+/// isso serve para delegar gestão de UM departamento específico a alguém que
+/// não é admin geral (ex: liderança de um departamento na subsede/pde).
+model DepartamentoGestor {
+  id             String @id @default(uuid())
+  departamentoId String @map("departamento_id")
+  userId         String @map("user_id")
+
+  departamento Departamento @relation(fields: [departamentoId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([departamentoId, userId])
+  @@index([userId])
+  @@map("saas_departamento_gestores")
+}
+
+// ─── MEMBROS SaaS ─────────────────────────────────────────────────────────────
+
+model SaasMembro {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  tipo            TipoMembro
+  nome            String
+  idade           Int?
+  telefone        String?
+  cidade          String?
+  numeroAssociado String?      @map("numero_associado")
+  anosSocio       Int?         @map("anos_socio")
+  cep             String?      @map("cep")
+  numero          String?      @map("numero")
+  bloco           String?      @map("bloco")
+  complemento     String?      @map("complemento")
+  imagemProva     String?      @map("imagem_prova")
+  status          StatusMembro @default(PENDENTE)
+
+  // Campos LGE (Lei 14.597/2023) — sensíveis; nunca em perfil público.
+  rg             String?
+  /// Somente dígitos; único por tenant quando preenchido.
+  cpf            String?
+  filiacao       String?
+  escolaridade   String?
+  profissao      String?
+  dataNascimento DateTime? @map("data_nascimento")
+
+  /// Plano de associação da torcida (não confundir com Tenant.plano SaaS).
+  planoAssociacaoId String?           @map("plano_associacao_id")
+  planoAssociacao   PlanoAssociacao?  @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
+  /// Espelho operacional: false se há cobrança vencida/pendente relevante.
+  adimplente Boolean @default(true)
+
+  aprovadoPorId   String?   @map("aprovado_por_id")
+  aprovadoPorNome String?   @map("aprovado_por_nome")
+  aprovadoEm      DateTime? @map("aprovado_em")
+
+  // Desligamento estatutário (MEMBERS_DISMISS) — distinto de bloqueio.
+  desligadoEm     DateTime? @map("desligado_em")
+  desligadoMotivo String?   @map("desligado_motivo")
+  desligadoPorId  String?   @map("desligado_por_id")
+
+  // Referência ao registro legado do bot (para migração gradual)
+  discordId  String? @map("discord_id")
+  discordTag String? @map("discord_tag")
+
+  // Vínculo territorial principal — a qual Sede/Subsede/PDE específica do
+  // tenant este associado pertence (um tenant pode ter várias linhas de
+  // Sede, ex: vários pontos de encontro). Nullable para não quebrar
+  // cadastros existentes e tenants com uma única Sede.
+  sedeId String? @map("sede_id")
+  sede   Sede?   @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+
+  /// Departamento pretendido no onboarding (sócio). NÃO cria UserDepartamento
+  /// nem perfil de área enquanto status ≠ APROVADO — só após aprovarMembro.
+  departamentoId String?       @map("departamento_id")
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
+
+  // Rastro de origem: qual importação criou este membro (null = cadastro
+  // orgânico). Permite auditar e desfazer importações (ex: dados MOCK de
+  // demonstração) sem tocar em membros reais.
+  importacaoId String?            @map("importacao_id")
+  importacao   ImportacaoMembros? @relation(fields: [importacaoId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id])
+  cobrancas CobrancaAssociacao[]
+
+  @@unique([tenantId, userId])
+  @@unique([tenantId, cpf])
+  @@index([sedeId])
+  @@index([departamentoId])
+  @@index([importacaoId])
+  @@index([tenantId, status])
+  @@index([tenantId, adimplente])
+  @@index([planoAssociacaoId])
+  @@map("saas_membros")
+}
+
+enum TipoMembro {
+  SOCIO
+  TORCEDOR
+}
+
+enum StatusMembro {
+  PENDENTE
+  APROVADO
+  REPROVADO
+}
+
+// ─── IMPORTAÇÃO DE MEMBROS ───────────────────────────────────────────────────
+// Staging + auditoria de cada execução de importação da base de associados.
+// Ver docs/data/spec-importacao-membros.md. Origem MOCK = dados de demonstração,
+// rastreáveis via SaasMembro.importacaoId e reversíveis (desfazerImportacao).
+
+model ImportacaoMembros {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  origem      OrigemImportacao
+  status      StatusImportacao @default(PENDENTE)
+  totalLinhas Int              @default(0) @map("total_linhas")
+  importados  Int              @default(0)
+  duplicados  Int              @default(0)
+  erros       Json?
+  criadoPorId String?          @map("criado_por_id")
+  criadoEm    DateTime         @default(now()) @map("criado_em")
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membros SaasMembro[]
+
+  @@index([tenantId, criadoEm])
+  @@map("saas_importacoes_membros")
+}
+
+enum OrigemImportacao {
+  CSV
+  BOT
+  DISCORD
+  MOCK
+}
+
+enum StatusImportacao {
+  PENDENTE
+  PROCESSANDO
+  CONCLUIDA
+  ERRO
+}
+
+// ─── SÓCIOS / CARTEIRINHAS ───────────────────────────────────────────────────
+
+model SaasSocio {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  numeroSocio Int      @map("numero_socio")
+  nome        String
+  validade    DateTime
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  discordId   String?  @map("discord_id")
+  /// Segredo opaco para QR verificável (HMAC com AUTH_SECRET).
+  qrToken     String?  @unique @map("qr_token")
+  qrEmitidoEm DateTime? @map("qr_emitido_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, numeroSocio])
+  @@unique([tenantId, userId])
+  @@map("saas_socios")
+}
+
+// ─── PLANOS DE ASSOCIAÇÃO + COBRANÇAS (não confundir com Tenant.plano SaaS) ───
+// Ver docs/product/plano-paridade-concorrentes.md Fase A.
+
+model PlanoAssociacao {
+  id            String                     @id @default(uuid())
+  tenantId      String                     @map("tenant_id")
+  nome          String
+  descricao     String?
+  /// Valor da contribuição periódica (sempre positivo).
+  valor         Decimal                    @db.Decimal(12, 2)
+  periodicidade PeriodicidadePlanoAssociacao @default(MENSAL)
+  beneficios    String?
+  ativo         Boolean                    @default(true)
+  criadoEm      DateTime                   @default(now()) @map("criado_em")
+  atualizadoEm  DateTime                   @updatedAt @map("atualizado_em")
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membros   SaasMembro[]
+  cobrancas CobrancaAssociacao[]
+
+  @@index([tenantId, ativo])
+  @@map("saas_planos_associacao")
+}
+
+enum PeriodicidadePlanoAssociacao {
+  MENSAL
+  TRIMESTRAL
+  ANUAL
+  UNICA
+}
+
+model CobrancaAssociacao {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+  membroId String? @map("membro_id")
+
+  planoAssociacaoId String? @map("plano_associacao_id")
+  /// Vaga de caravana / cobrança vinculada a evento (paridade C1).
+  eventoId          String? @map("evento_id")
+  tipo              TipoCobrancaAssociacao
+  descricao         String
+  valor             Decimal @db.Decimal(12, 2)
+  vencimento        DateTime
+  status            StatusCobrancaAssociacao @default(PENDENTE)
+  pagoEm            DateTime? @map("pago_em")
+  metodoPagamento   MetodoPagamentoCobranca? @map("metodo_pagamento")
+
+  pixCopiaCola      String? @map("pix_copia_cola")
+  gatewayProvider   String? @map("gateway_provider")
+  gatewayExternalId String? @map("gateway_external_id")
+
+  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
+
+  criadoPorId  String?  @map("criado_por_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membro          SaasMembro?      @relation(fields: [membroId], references: [id], onDelete: SetNull)
+  planoAssociacao PlanoAssociacao? @relation(fields: [planoAssociacaoId], references: [id], onDelete: SetNull)
+  evento          Evento?          @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  criadoPor       User?            @relation("CobrancaAssociacaoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, vencimento])
+  @@index([tenantId, userId])
+  @@index([membroId])
+  @@index([eventoId])
+  @@index([gatewayExternalId])
+  @@unique([eventoId, userId])
+  @@map("saas_cobrancas_associacao")
+}
+
+enum TipoCobrancaAssociacao {
+  MENSALIDADE
+  ADESAO
+  AVULSA
+}
+
+enum StatusCobrancaAssociacao {
+  PENDENTE
+  PAGA
+  CANCELADA
+  VENCIDA
+}
+
+enum MetodoPagamentoCobranca {
+  MANUAL
+  PIX
+}
+
+// ─── BLOQUEADOS ───────────────────────────────────────────────────────────────
+
+model Bloqueado {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  registro         String
+  nome             String?
+  motivo           String?
+  bloqueadoPorId   String?  @map("bloqueado_por_id")
+  bloqueadoPorNome String?  @map("bloqueado_por_nome")
+  criadoEm         DateTime @default(now()) @map("criado_em")
+
+  @@unique([tenantId, registro])
+  @@map("saas_bloqueados")
+}
+
+// ─── SEDES ────────────────────────────────────────────────────────────────────
+
+model Sede {
+  id String @id @default(uuid())
+
+  // tenantId é OPCIONAL — uma subsede ou ponto de encontro pode existir
+  // de forma independente antes da sede principal aderir à plataforma.
+  // Quando a sede principal aderir, basta atribuir o tenantId.
+  tenantId String? @map("tenant_id")
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  nome        String
+  tipo        TipoSede @default(PONTO_ENCONTRO)
+  endereco    String?
+  cidade      String?
+  estado      String?
+  cep         String?
+  lat         Float?
+  lng         Float?
+  capacidade  Int?
+  responsavel String?
+  /// Usuário responsável pela unidade (liderança local). Identidade; poder vem via Caso B (owner).
+  responsavelUserId String? @map("responsavel_user_id")
+  responsavelUser   User?   @relation("SedeResponsavel", fields: [responsavelUserId], references: [id], onDelete: SetNull)
+  telefone    String?
+  horarios    String?
+  descricao   String?
+  fotoUrl     String?  @map("foto_url")
+  ativa       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  // Hierarquia: subsede aponta para sede pai (também pode ser null)
+  sedeId String? @map("sede_id")
+  sede   Sede?   @relation("SedeFilhos", fields: [sedeId], references: [id])
+  filhos Sede[]  @relation("SedeFilhos")
+
+  // Referência à sede pai que AINDA NÃO É TENANT (pré-adesão)
+  // Ex: PDE aponta para "Gaviões da Fiel" que ainda não aderiu
+  sedeReferenciaNome String? @map("sede_referencia_nome")
+  sedeReferenciaSlug String? @map("sede_referencia_slug")
+
+  eventos Evento[]
+  membros SaasMembro[]
+  barCategorias           BarCategoria[]
+  barProdutos             BarProduto[]
+  barVendas               BarVenda[]
+  barMovimentacoesEstoque BarMovimentacaoEstoque[]
+
+  @@index([tenantId])
+  @@index([sedeId])
+  @@index([responsavelUserId])
+  @@map("saas_sedes")
+}
+
+enum TipoSede {
+  SEDE
+  SUBSEDE
+  PONTO_ENCONTRO
+}
+
+// ─── EVENTOS ──────────────────────────────────────────────────────────────────
+
+model Evento {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Classifica o uso no portal (caravana, ensaio) sem duplicar o módulo.
+  tipo      TipoEvento @default(GERAL)
+  titulo    String
+  descricao String?
+  /// Capa do evento na agenda (URL pública).
+  fotoUrl   String?  @map("foto_url")
+  data      DateTime
+  local     String?
+  sedeId    String?  @map("sede_id")
+  sede      Sede?    @relation(fields: [sedeId], references: [id])
+  lat       Float?
+  lng       Float?
+  /// Valor da vaga (caravana paga). Null = caravana sem cobrança.
+  valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
+  /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
+  capacidade Int?
+  serieId String? @map("serie_id")
+  partidaId String? @map("partida_id")
+  partida   Partida? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
+
+  criadoPorId      String?  @map("criado_por_id")
+  criadoEm         DateTime @default(now()) @map("criado_em")
+  discordMessageId String?  @map("discord_message_id")
+
+  rsvps     EventoRsvp[]
+  salas     SalaReuniao[]
+  posts     Post[]
+  cobrancas CobrancaAssociacao[]
+
+  @@index([tenantId])
+  @@index([sedeId])
+  @@index([serieId])
+  @@index([partidaId])
+  @@index([tenantId, data])
+  @@index([tenantId, tipo, data])
+  @@map("saas_eventos")
+}
+
+model EventoRsvp {
+  id       String     @id @default(uuid())
+  eventoId String     @map("evento_id")
+  userId   String     @map("user_id")
+  status   RsvpStatus @default(CONFIRMADO)
+  criadoEm DateTime   @default(now()) @map("criado_em")
+
+  // Check-in real — independente do status de RSVP. Confirmar presença
+  // (status) não equivale a comparecer de fato (checkedInAt): alguém pode
+  // confirmar e faltar, ou aparecer e ser check-in sem ter confirmado antes.
+  checkedInAt    DateTime? @map("checked_in_at")
+  checkedInPorId String?   @map("checked_in_por_id")
+
+  evento Evento @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([eventoId, userId])
+  @@index([eventoId, status, criadoEm])
+  @@map("saas_evento_rsvps")
+}
+
+enum RsvpStatus {
+  CONFIRMADO
+  RECUSADO
+  LISTA_ESPERA
+}
+
+enum TipoEvento {
+  GERAL
+  CARAVANA
+  ENSAIO
+}
+
+// ─── LOJA SaaS ────────────────────────────────────────────────────────────────
+
+model SaasCategoria {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nome     String
+  slug     String
+  ordem    Int     @default(0)
+  parentId String? @map("parent_id")
+  parent   SaasCategoria?  @relation("CategoriaFilhas", fields: [parentId], references: [id], onDelete: SetNull)
+  filhas   SaasCategoria[] @relation("CategoriaFilhas")
+
+  produtos SaasProduto[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("saas_categorias")
+}
+
+model SaasCupom {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  codigo         String
+  tipo           TipoCupom
+  valor          Decimal   @db.Decimal(10, 2)
+  primeiraCompra Boolean   @default(false) @map("primeira_compra")
+  ativo          Boolean   @default(true)
+  validoAte      DateTime? @map("valido_ate")
+  criadoEm       DateTime  @default(now()) @map("criado_em")
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId])
+  @@map("saas_cupons")
+}
+
+enum TipoCupom {
+  PERCENTUAL
+  FIXO
+}
+
+model SaasProduto {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome          String
+  slug          String?
+  descricao     String?
+  preco         Decimal  @db.Decimal(10, 2)
+  precoOriginal Decimal? @map("preco_original") @db.Decimal(10, 2)
+  marca         String?
+  ativo         Boolean  @default(true)
+  destaque      Boolean  @default(false)
+  ordem         Int      @default(0)
+  estoque       Json     @default("{}")
+  tamanhos      String[]
+  imagensUrl    String[] @map("imagens_url")
+
+  categoriaId String?        @map("categoria_id")
+  categoria   SaasCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  pedidoItens   SaasPedidoItem[]
+  carrinhoItens SaasCarrinhoItem[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, ativo])
+  @@index([categoriaId])
+  @@map("saas_produtos")
+}
+
+model SaasCarrinhoItem {
+  id        String      @id @default(uuid())
+  userId    String      @map("user_id")
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId  String      @map("tenant_id")
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  produtoId String      @map("produto_id")
+  produto   SaasProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  tamanho   String      @default("UN")
+  quantidade Int        @default(1)
+  criadoEm  DateTime    @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@unique([userId, produtoId, tamanho])
+  @@index([userId])
+  @@map("saas_carrinho_itens")
+}
+
+model SaasPedido {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String @map("user_id")
+  user     User   @relation(fields: [userId], references: [id])
+
+  subtotal  Decimal      @db.Decimal(10, 2)
+  desconto  Decimal      @default(0) @db.Decimal(10, 2)
+  total     Decimal      @db.Decimal(10, 2)
+  status    StatusPedido @default(PENDENTE)
+
+  cupomCodigo       String?           @map("cupom_codigo")
+  modalidadeEntrega ModalidadeEntrega @default(RETIRADA) @map("modalidade_entrega")
+  enderecoEntrega   Json?             @map("endereco_entrega")
+  grupoCheckoutId   String?           @map("grupo_checkout_id")
+
+  discordId     String? @map("discord_id")
+  canalTicketId String? @map("canal_ticket_id")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  itens SaasPedidoItem[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([grupoCheckoutId])
+  @@map("saas_pedidos")
+}
+
+model SaasPedidoItem {
+  id          String      @id @default(uuid())
+  pedidoId    String      @map("pedido_id")
+  pedido      SaasPedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produtoId   String      @map("produto_id")
+  produto     SaasProduto @relation(fields: [produtoId], references: [id])
+  produtoNome String      @map("produto_nome")
+  tamanho     String?
+  quantidade  Int
+  precoUnit   Decimal     @map("preco_unit") @db.Decimal(10, 2)
+  total       Decimal     @db.Decimal(10, 2)
+
+  @@index([pedidoId])
+  @@index([produtoId])
+  @@map("saas_pedido_itens")
+}
+
+enum ModalidadeEntrega {
+  RETIRADA
+  ENVIO
+}
+
+enum StatusPedido {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+  ENTREGUE
+}
+
+// ─── COMUNICADOS OFICIAIS ──────────────────────────────────────────────────
+// Distintos de Post (mural/comunidade): nem todo post comunitário é
+// comunicado oficial. Publicação gated por ANNOUNCEMENTS_PUBLISH (não por
+// COMMUNITY_MANAGE, que segue governando só posts locais).
+
+model Announcement {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId  String @map("autor_id")
+  autor    User   @relation(fields: [autorId], references: [id])
+
+  titulo     String
+  corpo      String
+  prioridade PrioridadeComunicado @default(NORMAL)
+  fixado     Boolean              @default(false)
+
+  publicadoEm  DateTime @default(now()) @map("publicado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  leituras AnnouncementRead[]
+  reposts    Post[]
+
+  @@index([tenantId])
+  @@index([tenantId, publicadoEm])
+  @@map("saas_announcements")
+}
+
+enum PrioridadeComunicado {
+  NORMAL
+  IMPORTANTE
+  URGENTE
+}
+
+/// Rastreio de leitura por associado — usado para saber quem já viu um
+/// comunicado oficial (não se aplica a Post/mural local).
+model AnnouncementRead {
+  id             String @id @default(uuid())
+  announcementId String @map("announcement_id")
+  userId         String @map("user_id")
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lidoEm DateTime @default(now()) @map("lido_em")
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+  @@map("saas_announcement_reads")
+}
+
+// ─── AFILIAÇÃO GLOBAL (time apoiado) ─────────────────────────────────────────
+
+model Afiliacao {
+  id             String            @id @default(uuid())
+  nome           String
+  apelido        String?
+  slug           String?           @unique
+  serie          SerieCampeonato?
+  escudoUrl      String?           @map("escudo_url")
+  cidade         String?
+  estado         String?
+  apiExternalId  String?           @map("api_external_id")
+  /// Estimativa pública de torcedores (seed offline — nunca API em runtime).
+  torcedoresEstimados      Int?                     @map("torcedores_estimados")
+  torcedoresEstimadosFonte String?                  @map("torcedores_estimados_fonte")
+  /// IBOPE_DIGITAL = total publicado no Ranking Digital; LIMITE_ATE = fora do Top 50 (teto conservador).
+  torcedoresEstimadosTipo  TorcedoresEstimadosTipo? @map("torcedores_estimados_tipo")
+  criadoEm       DateTime          @default(now()) @map("criado_em")
+
+  tenants            Tenant[]
+  partidas           Partida[]
+  noticias           Noticia[]
+  torcedores         PerfilTorcedor[]
+  rivalClubeA        RivalidadeClube[]  @relation("RivalClubeA")
+  rivalClubeB        RivalidadeClube[]  @relation("RivalClubeB")
+  torcidasConhecidas TorcidaConhecida[]
+
+  @@map("saas_afiliacoes")
+}
+
+/// Catálogo nacional de torcidas organizadas conhecidas (fora da plataforma).
+/// Dataset gerado por scraper (`src/data/torcidas-conhecidas.js`); usado no
+/// onboarding como referência informativa por clube (Afiliacao).
+model TorcidaConhecida {
+  id                String   @id @default(uuid())
+  nome              String   // nome completo (fiel à fonte)
+  titulo            String?  // versão curta/legível p/ exibição (sem prefixo)
+  slug              String   @unique
+  afiliacaoId       String?  @map("afiliacao_id")
+  clubeNomeOriginal String?  @map("clube_nome_original")
+  fundacao          String?
+  sede              String?
+  subsedes          String?
+  lema              String?
+  siteOficial       String?  @map("site_oficial")
+  cidade            String?
+  uf                String?
+  logoUrl           String?  @map("logo_url")
+  fonteUrl          String?  @map("fonte_url")
+  ativa             Boolean  @default(true)
+  criadoEm          DateTime @default(now()) @map("criado_em")
+  atualizadoEm      DateTime @updatedAt @map("atualizado_em")
+
+  afiliacao Afiliacao?       @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+  perfis    PerfilTorcedor[]
+  tenant    Tenant?
+
+  @@index([afiliacaoId])
+  @@map("saas_torcidas_conhecidas")
+}
+
+enum TorcedoresEstimadosTipo {
+  IBOPE_DIGITAL
+  LIMITE_ATE
+}
+
+enum SerieCampeonato {
+  A
+  B
+  C
+  D
+  ESTADUAL
+  OUTRA
+}
+
+// ─── PERFIL GLOBAL DE TORCEDOR (independe de tenant) ─────────────────────────
+
+model PerfilTorcedor {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  afiliacaoId           String?   @map("afiliacao_id") // clube que torce
+  torcidaConhecidaId    String?   @map("torcida_conhecida_id") // organizada conhecida (fora da plataforma)
+  regiao                String?   // cidade/estado do torcedor
+  bio                   String?
+  onboardingConcluidoEm DateTime? @map("onboarding_concluido_em")
+  criadoEm              DateTime  @default(now()) @map("criado_em")
+  atualizadoEm          DateTime  @updatedAt @map("atualizado_em")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  afiliacao        Afiliacao?        @relation(fields: [afiliacaoId], references: [id], onDelete: SetNull)
+  torcidaConhecida TorcidaConhecida? @relation(fields: [torcidaConhecidaId], references: [id], onDelete: SetNull)
+
+  @@index([afiliacaoId])
+  @@index([torcidaConhecidaId])
+  @@map("saas_perfis_torcedor")
+}
+
+// ─── RIVALIDADES (par canônico: sempre gravar com aId < bId) ─────────────────
+
+model RivalidadeClube {
+  id           String   @id @default(uuid())
+  afiliacaoAId String   @map("afiliacao_a_id")
+  afiliacaoBId String   @map("afiliacao_b_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  afiliacaoA Afiliacao @relation("RivalClubeA", fields: [afiliacaoAId], references: [id], onDelete: Cascade)
+  afiliacaoB Afiliacao @relation("RivalClubeB", fields: [afiliacaoBId], references: [id], onDelete: Cascade)
+
+  @@unique([afiliacaoAId, afiliacaoBId])
+  @@index([afiliacaoBId])
+  @@map("saas_rivalidades_clube")
+}
+
+model RivalidadeTorcida {
+  id        String   @id @default(uuid())
+  tenantAId String   @map("tenant_a_id")
+  tenantBId String   @map("tenant_b_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  tenantA Tenant @relation("RivalTorcidaA", fields: [tenantAId], references: [id], onDelete: Cascade)
+  tenantB Tenant @relation("RivalTorcidaB", fields: [tenantBId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantAId, tenantBId])
+  @@index([tenantBId])
+  @@map("saas_rivalidades_torcida")
+}
+
+// ─── ALIANÇAS ENTRE TORCIDAS ─────────────────────────────────────────────────
+
+model Alianca {
+  id               String        @id @default(uuid())
+  tenantOrigemId   String        @map("tenant_origem_id")
+  tenantAliadoId   String        @map("tenant_aliado_id")
+  status           StatusAlianca @default(PENDENTE)
+  propostaPorId    String        @map("proposta_por_id")
+  confirmadaPorId  String?       @map("confirmada_por_id")
+  confirmadaEm     DateTime?     @map("confirmada_em")
+  criadoEm         DateTime      @default(now()) @map("criado_em")
+
+  tenantOrigem  Tenant @relation("AliancaOrigem", fields: [tenantOrigemId], references: [id], onDelete: Cascade)
+  tenantAliado  Tenant @relation("AliancaAliado", fields: [tenantAliadoId], references: [id], onDelete: Cascade)
+  propostaPor   User   @relation("AliancaPropostaPor", fields: [propostaPorId], references: [id])
+  confirmadaPor User?  @relation("AliancaConfirmadaPor", fields: [confirmadaPorId], references: [id])
+
+  @@unique([tenantOrigemId, tenantAliadoId])
+  @@index([tenantAliadoId])
+  @@index([tenantOrigemId, status])
+  @@index([tenantAliadoId, status])
+  @@map("saas_aliancas")
+}
+
+enum StatusAlianca {
+  SUGERIDA
+  PENDENTE
+  ATIVA
+  ENCERRADA
+}
+
+model RecomendacaoAlianca {
+  id                String                  @id @default(uuid())
+  tenantId          String                  @map("tenant_id")
+  tenantSugeridoId  String?                 @map("tenant_sugerido_id")
+  nomeSugerido      String                  @map("nome_sugerido")
+  confianca         ConfiancaRecomendacao
+  fonte             String
+  observacao        String?
+  criadoEm          DateTime                @default(now()) @map("criado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("saas_recomendacoes_alianca")
+}
+
+enum ConfiancaRecomendacao {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+// ─── COMUNIDADE ───────────────────────────────────────────────────────────────
+
+model Post {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autorId  String @map("autor_id")
+  autor    User   @relation(fields: [autorId], references: [id])
+
+  titulo      String?
+  conteudo    String
+  imagemUrl   String?          @map("imagem_url")
+  midiaUrls   String[]         @default([]) @map("midia_urls")
+  tipo        TipoPost         @default(INSTITUCIONAL)
+  visibilidade VisibilidadePost @default(PUBLICO)
+  fixado      Boolean          @default(false)
+  oculto      Boolean          @default(false)
+  /// Post PUBLICO de sócio que também alcança torcedores globais do clube na
+  /// Comunidade Nacional, bypassando o gate de follow aprovado. Exige
+  /// COMMUNITY_POST_NACIONAL — validado no servidor, nunca só no cliente.
+  alcanceNacional Boolean       @default(false) @map("alcance_nacional")
+
+  postOrigemId String? @map("post_origem_id")
+  postOrigem   Post?   @relation("Repost", fields: [postOrigemId], references: [id], onDelete: SetNull)
+  reposts      Post[]  @relation("Repost")
+
+  comunicadoOrigemId String?       @map("comunicado_origem_id")
+  comunicadoOrigem   Announcement? @relation(fields: [comunicadoOrigemId], references: [id], onDelete: SetNull)
+
+  eventoId String? @map("evento_id")
+  evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+
+  conversaId String?    @map("conversa_id")
+  conversa   Conversa? @relation(fields: [conversaId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  comentarios Comentario[]
+  reacoes     Reacao[]
+  denuncias   Denuncia[]
+  enquete     EnquetePost?
+  hashtags    PostHashtag[]
+  destaqueItens PerfilDestaqueItem[]
+  salvos      PostSalvo[]
+  feedTimeline FeedTimeline[]
+
+  @@index([tenantId, criadoEm])
+  @@index([tenantId, oculto])
+  @@index([autorId, criadoEm])
+  @@index([tenantId, tipo, oculto, conversaId, criadoEm])
+  @@index([postOrigemId])
+  @@index([comunicadoOrigemId])
+  @@index([eventoId])
+  @@index([conversaId])
+  @@map("saas_posts")
+}
+
+enum TipoPost {
+  INSTITUCIONAL
+  MEMBRO
+}
+
+enum VisibilidadePost {
+  PUBLICO
+  TENANT
+  PRIVADO
+}
+
+model PerfilMembro {
+  id            String  @id @default(uuid())
+  userId        String  @map("user_id")
+  tenantId      String  @map("tenant_id")
+  bio           String?
+  perfilPrivado Boolean @default(false) @map("perfil_privado")
+  avatarUrl     String? @map("avatar_url")
+  bannerUrl     String? @map("banner_url")
+  bannerPos     Int?    @map("banner_pos") // enquadramento vertical do banner (object-position Y, 0–100)
+
+  exibirCidade Boolean @default(false) @map("exibir_cidade")
+  exibirSede   Boolean @default(false) @map("exibir_sede")
+  exibirDesde  Boolean @default(true)  @map("exibir_desde")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@unique([userId, tenantId])
+  @@map("saas_perfis_membro")
+}
+
+model Seguimento {
+  id               String            @id @default(uuid())
+  seguidorId       String            @map("seguidor_id")
+  seguidoId        String            @map("seguido_id")
+  tenantContextoId String            @map("tenant_contexto_id")
+  status           StatusSeguimento  @default(PENDENTE)
+  criadoEm         DateTime          @default(now()) @map("criado_em")
+  atualizadoEm     DateTime          @updatedAt @map("atualizado_em")
+
+  seguidor       User   @relation("SeguimentoSeguidor", fields: [seguidorId], references: [id], onDelete: Cascade)
+  seguido        User   @relation("SeguimentoSeguido", fields: [seguidoId], references: [id], onDelete: Cascade)
+  tenantContexto Tenant @relation("SeguimentoContexto", fields: [tenantContextoId], references: [id], onDelete: Cascade)
+
+  @@unique([seguidorId, seguidoId])
+  @@index([seguidoId, status])
+  @@index([seguidorId, status])
+  @@map("saas_seguimentos")
+}
+
+enum StatusSeguimento {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  BLOQUEADO
+}
+
+model Comentario {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  autorId   String   @map("autor_id")
+  conteudo  String
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  autor User @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, criadoEm])
+  @@map("saas_comentarios")
+}
+
+model Reacao {
+  id       String     @id @default(uuid())
+  postId   String     @map("post_id")
+  userId   String     @map("user_id")
+  tipo     TipoReacao @default(CURTIR)
+  criadoEm DateTime   @default(now()) @map("criado_em")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("saas_reacoes")
+}
+
+enum TipoReacao {
+  CURTIR
+  FORCA
+  VAMOS
+  PRESENTE
+}
+
+model Denuncia {
+  id             String         @id @default(uuid())
+  tenantId       String         @map("tenant_id")
+  postId         String         @map("post_id")
+  denuncianteId  String         @map("denunciante_id")
+  motivo         String
+  status         StatusDenuncia @default(PENDENTE)
+  resolvidoPorId String?        @map("resolvido_por_id")
+  resolvidoEm    DateTime?      @map("resolvido_em")
+  criadoEm       DateTime       @default(now()) @map("criado_em")
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post          Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  denunciante   User   @relation(fields: [denuncianteId], references: [id], onDelete: Cascade)
+  resolvidoPor  User?  @relation("DenunciaResolvidoPor", fields: [resolvidoPorId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("saas_denuncias")
+}
+
+enum StatusDenuncia {
+  PENDENTE
+  RESOLVIDA
+  DESCARTADA
+}
+
+model EnquetePost {
+  id          String    @id @default(uuid())
+  postId      String    @unique @map("post_id")
+  encerradaEm DateTime? @map("encerrada_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  post   Post               @relation(fields: [postId], references: [id], onDelete: Cascade)
+  opcoes OpcaoEnquetePost[]
+  votos  VotoEnquetePost[]
+
+  @@map("saas_enquetes_post")
+}
+
+model OpcaoEnquetePost {
+  id        String @id @default(uuid())
+  enqueteId String @map("enquete_id")
+  texto     String
+  ordem     Int    @default(0)
+
+  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  votos   VotoEnquetePost[]
+
+  @@index([enqueteId, ordem])
+  @@map("saas_opcoes_enquete_post")
+}
+
+model VotoEnquetePost {
+  id        String   @id @default(uuid())
+  enqueteId String   @map("enquete_id")
+  opcaoId   String   @map("opcao_id")
+  userId    String   @map("user_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  enquete EnquetePost      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  opcao   OpcaoEnquetePost @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enqueteId, userId])
+  @@map("saas_votos_enquete_post")
+}
+
+model Hashtag {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tag      String
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts  PostHashtag[]
+
+  @@unique([tenantId, tag])
+  @@index([tag])
+  @@map("saas_hashtags")
+}
+
+model PostHashtag {
+  id        String @id @default(uuid())
+  postId    String @map("post_id")
+  hashtagId String @map("hashtag_id")
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, hashtagId])
+  @@index([hashtagId])
+  @@map("saas_post_hashtags")
+}
+
+model PostSalvo {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  postId   String   @map("post_id")
+  tenantId String   @map("tenant_id")
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, tenantId])
+  @@map("saas_post_salvos")
+}
+
+/// Timeline materializada da rede ("Minha rede" / filtro seguindo).
+/// Guarda o fan-out do post para o viewer no momento da publicação/aprovação.
+model FeedTimeline {
+  id       String   @id @default(uuid())
+  viewerId String   @map("viewer_id")
+  postId   String   @map("post_id")
+  autorId  String   @map("autor_id")
+  criadoEm DateTime @map("criado_em")
+
+  viewer User @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([viewerId, postId])
+  @@index([viewerId, criadoEm])
+  @@index([viewerId, autorId])
+  @@index([postId])
+  @@map("saas_feed_timeline")
+}
+
+/// Momento efêmero estilo story (expira em 24h).
+model MomentoStory {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  midiaUrl String  @map("midia_url")
+  conteudo String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+  expiraEm DateTime @map("expira_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, expiraEm])
+  @@index([userId, tenantId])
+  @@map("saas_momentos_story")
+}
+
+model PerfilDestaque {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  tenantId String  @map("tenant_id")
+  titulo   String
+  capaUrl  String? @map("capa_url")
+  ordem    Int     @default(0)
+
+  user   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  itens  PerfilDestaqueItem[]
+
+  @@index([userId, tenantId])
+  @@map("saas_perfil_destaques")
+}
+
+model PerfilDestaqueItem {
+  id         String @id @default(uuid())
+  destaqueId String @map("destaque_id")
+  postId     String @map("post_id")
+  ordem      Int    @default(0)
+
+  destaque PerfilDestaque @relation(fields: [destaqueId], references: [id], onDelete: Cascade)
+  post     Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([destaqueId, postId])
+  @@map("saas_perfil_destaque_itens")
+}
+
+model Notificacao {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  tenantId  String           @map("tenant_id")
+  tipo      TipoNotificacao
+  titulo    String
+  corpo     String?
+  link      String?
+  lida      Boolean          @default(false)
+  atorId    String?          @map("ator_id")
+  criadoEm  DateTime         @default(now()) @map("criado_em")
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ator User? @relation("NotificacaoAtor", fields: [atorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, lida, criadoEm])
+  @@index([tenantId, userId, criadoEm])
+  @@map("saas_notificacoes")
+}
+
+enum TipoNotificacao {
+  SEGUIMENTO_PENDENTE
+  SEGUIMENTO_APROVADO
+  NOVO_COMENTARIO
+  NOVA_REACAO
+  COMUNICADO_URGENTE
+  DENUNCIA_NOVA
+  NOVA_MENSAGEM
+  MENCAO
+  REPOST
+  ALIANCA_PROPOSTA
+  ALIANCA_ACEITA
+  ALIANCA_REJEITADA
+  ALIANCA_ENCERRADA
+  ALIANCA_CANCELADA
+  MEMBRO_APROVADO
+  MEMBRO_REPROVADO
+  MEMBRO_SOLICITADO
+  COBRANCA_PENDENTE
+  COBRANCA_VENCIDA
+  EVENTO_LEMBRETE
+  EVENTO_RSVP
+  EVENTO_DIA_GESTOR
+  GRUPO_PEDIDO
+  GRUPO_APROVADO
+  GRUPO_REJEITADO
+  GRUPO_ADMIN
+  GRUPO_REMOVIDO
+}
+
+// ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
+
+model Conversa {
+  id   String       @id @default(uuid())
+  tipo TipoConversa
+
+  // Tenant onde a conversa foi iniciada — contexto/auditoria. A LEITURA é
+  // chaveada por participação (MembroConversa), não por tenant: é o que
+  // permite DM entre membros de torcidas aliadas.
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Só para GRUPO — DM não tem nome/descrição/avatar próprios
+  nome      String?
+  descricao String?
+  avatarUrl String? @map("avatar_url")
+  // Grupos públicos da comunidade — qualquer membro ativo do tenant pode entrar
+  publica   Boolean @default(false)
+  /// true = grupo da Comunidade (lista/mural); false = só mensageria
+  comunidade Boolean @default(false)
+  /// Código curto para link de convite
+  codigoConvite String? @unique @map("codigo_convite")
+
+  // CANAL — comunidade temática ou perfil oficial da unidade (M3 mensageria)
+  institucional       Boolean           @default(false) @map("institucional")
+  canalOficial        Boolean           @default(false) @map("canal_oficial")
+  visibilidadeCanal   VisibilidadeCanal @default(HIERARQUIA) @map("visibilidade_canal")
+  /// Mural do canal: quando true, só admins publicam posts
+  somenteAdminPublica Boolean           @default(true) @map("somente_admin_publica")
+
+  criadoPorId String @map("criado_por_id")
+  criadoPor   User   @relation("ConversaCriadaPor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  // Bumpado a cada mensagem — ordena a inbox por atividade recente
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  membros   MembroConversa[]
+  mensagens MensagemDireta[]
+  posts     Post[]
+  departamentoCanal Departamento? @relation("DepartamentoCanal")
+
+  @@index([tenantId, atualizadoEm])
+  @@index([tenantId, tipo, canalOficial])
+  @@index([tenantId, tipo, publica])
+  @@map("saas_conversas")
+}
+
+enum TipoConversa {
+  DIRETA
+  GRUPO
+  CANAL
+}
+
+enum VisibilidadeCanal {
+  TENANT
+  HIERARQUIA
+  ALIADOS
+  PUBLICO
+}
+
+model MembroConversa {
+  id              String               @id @default(uuid())
+  conversaId      String               @map("conversa_id")
+  userId          String               @map("user_id")
+  papel           PapelConversa        @default(MEMBRO)
+  status          StatusMembroConversa @default(ATIVO)
+  entrouEm        DateTime             @default(now()) @map("entrou_em")
+  ultimaLeituraEm DateTime?            @map("ultima_leitura_em")
+  silenciada      Boolean              @default(false)
+  saiuEm          DateTime?            @map("saiu_em")
+
+  conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversaId, userId])
+  @@index([userId, saiuEm])
+  @@index([conversaId, status, saiuEm])
+  @@map("saas_membros_conversa")
+}
+
+enum StatusMembroConversa {
+  ATIVO
+  PENDENTE
+  REJEITADO
+}
+
+enum PapelConversa {
+  ADMIN
+  MEMBRO
+}
+
+model MensagemDireta {
+  id          String    @id @default(uuid())
+  conversaId  String    @map("conversa_id")
+  autorId     String    @map("autor_id")
+  conteudo    String
+  midiaUrls   String[]  @default([]) @map("midia_urls")
+  respostaAId String?   @map("resposta_a_id")
+  editadaEm   DateTime? @map("editada_em")
+  // Soft delete — mantém a posição na thread ("mensagem removida")
+  removidaEm  DateTime? @map("removida_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  conversa  Conversa           @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  autor     User               @relation("MensagemDiretaAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  respostaA MensagemDireta?    @relation("MensagemResposta", fields: [respostaAId], references: [id], onDelete: SetNull)
+  respostas MensagemDireta[]   @relation("MensagemResposta")
+  denuncias DenunciaMensagem[]
+
+  @@index([conversaId, criadoEm])
+  @@map("saas_mensagens_diretas")
+}
+
+// Bloqueio usuário→usuário (mensageria). Distinto de `Bloqueado`, que é a
+// blocklist de registros por tenant.
+model BloqueioUsuario {
+  id           String   @id @default(uuid())
+  bloqueadorId String   @map("bloqueador_id")
+  bloqueadoId  String   @map("bloqueado_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  bloqueador User @relation("BloqueioBloqueador", fields: [bloqueadorId], references: [id], onDelete: Cascade)
+  bloqueado  User @relation("BloqueioBloqueado", fields: [bloqueadoId], references: [id], onDelete: Cascade)
+
+  @@unique([bloqueadorId, bloqueadoId])
+  @@index([bloqueadoId])
+  @@map("saas_bloqueios_usuario")
+}
+
+// `Denuncia` existente é acoplada a Post — mensagens precisam da própria tabela.
+model DenunciaMensagem {
+  id             String         @id @default(uuid())
+  tenantId       String         @map("tenant_id")
+  mensagemId     String         @map("mensagem_id")
+  denuncianteId  String         @map("denunciante_id")
+  motivo         String
+  status         StatusDenuncia @default(PENDENTE)
+  resolvidoPorId String?        @map("resolvido_por_id")
+  resolvidoEm    DateTime?      @map("resolvido_em")
+  criadoEm       DateTime       @default(now()) @map("criado_em")
+
+  tenant       Tenant         @relation("DenunciaMensagemTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  mensagem     MensagemDireta @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
+  denunciante  User           @relation("DenunciaMensagemDenunciante", fields: [denuncianteId], references: [id], onDelete: Cascade)
+  resolvidoPor User?          @relation("DenunciaMensagemResolvidoPor", fields: [resolvidoPorId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("saas_denuncias_mensagem")
+}
+
+// ─── NOTÍCIAS CURADAS (global por afiliação) ─────────────────────────────────
+
+model Partida {
+  id              String        @id @default(uuid())
+  afiliacaoId     String        @map("afiliacao_id")
+  adversario      String
+  competicao      String?
+  dataHora        DateTime      @map("data_hora")
+  local           String?
+  mando           MandoJogo     @default(CASA)
+  placarCasa      Int?          @map("placar_casa")
+  placarFora      Int?          @map("placar_fora")
+  status          StatusPartida @default(AGENDADA)
+  fonteExternalId String?       @map("fonte_external_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+  eventos   Evento[]
+  @@index([afiliacaoId, dataHora])
+  @@index([afiliacaoId, status, dataHora])
+  @@map("saas_partidas")
+}
+enum MandoJogo {
+  CASA
+  FORA
+}
+
+enum StatusPartida {
+  AGENDADA
+  AO_VIVO
+  ENCERRADA
+  CANCELADA
+}
+
+model Noticia {
+  id              String        @id @default(uuid())
+  afiliacaoId     String        @map("afiliacao_id")
+  titulo          String
+  resumo          String?
+  url             String
+  fonte           String
+  embedHtml       String?       @map("embed_html")
+  embedThumbnail  String?       @map("embed_thumbnail")
+  status          StatusNoticia @default(RASCUNHO)
+  publicadoEm     DateTime?     @map("publicado_em")
+  curadoPorId     String?       @map("curado_por_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+
+  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+  curadoPor User?     @relation(fields: [curadoPorId], references: [id])
+
+  @@unique([afiliacaoId, url])
+  @@index([afiliacaoId, status, publicadoEm])
+  @@map("saas_noticias")
+}
+
+enum StatusNoticia {
+  RASCUNHO
+  APROVADA
+  REJEITADA
+}
+
+// ─── SALAS MEET (WebRTC) ─────────────────────────────────────────────────────
+
+model SalaReuniao {
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  hostId          String        @map("host_id")
+  titulo          String
+  tipo            TipoSalaReuniao @default(ABERTA)
+  livekitRoomName String        @unique @map("livekit_room_name")
+  linkConvite     String        @unique @map("link_convite")
+  agendadaPara    DateTime?     @map("agendada_para")
+  encerradaEm     DateTime?     @map("encerrada_em")
+  eventoId        String?       @map("evento_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  host          User                  @relation(fields: [hostId], references: [id])
+  evento        Evento?               @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  participantes ParticipanteReuniao[]
+  mensagens     MensagemReuniao[]
+  enquetes      EnqueteReuniao[]
+
+  @@index([tenantId, encerradaEm])
+  @@map("saas_salas_reuniao")
+}
+
+enum TipoSalaReuniao {
+  EVENTO
+  ABERTA
+  DM_GRUPO
+}
+
+model ParticipanteReuniao {
+  id       String              @id @default(uuid())
+  salaId   String              @map("sala_id")
+  userId   String              @map("user_id")
+  papel    PapelParticipanteReuniao @default(PARTICIPANTE)
+  entrouEm DateTime            @default(now()) @map("entrou_em")
+  saiuEm   DateTime?           @map("saiu_em")
+
+  sala SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([salaId, userId])
+  @@map("saas_participantes_reuniao")
+}
+
+enum PapelParticipanteReuniao {
+  HOST
+  MODERADOR
+  PARTICIPANTE
+}
+
+model MensagemReuniao {
+  id         String    @id @default(uuid())
+  salaId     String    @map("sala_id")
+  autorId    String    @map("autor_id")
+  conteudo   String
+  destacada  Boolean   @default(false)
+  editadaEm  DateTime? @map("editada_em")
+  excluidaEm DateTime? @map("excluida_em")
+  criadoEm   DateTime  @default(now()) @map("criado_em")
+
+  sala  SalaReuniao @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  autor User        @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([salaId, criadoEm])
+  @@index([salaId, destacada])
+  @@map("saas_mensagens_reuniao")
+}
+
+model EnqueteReuniao {
+  id          String    @id @default(uuid())
+  salaId      String    @map("sala_id")
+  criadorId   String    @map("criador_id")
+  pergunta    String
+  encerradaEm DateTime? @map("encerrada_em")
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+
+  sala    SalaReuniao           @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  criador User                  @relation(fields: [criadorId], references: [id], onDelete: Cascade)
+  opcoes  OpcaoEnqueteReuniao[]
+  votos   VotoEnqueteReuniao[]
+
+  @@index([salaId, encerradaEm])
+  @@map("saas_enquetes_reuniao")
+}
+
+model OpcaoEnqueteReuniao {
+  id        String @id @default(uuid())
+  enqueteId String @map("enquete_id")
+  texto     String
+  ordem     Int    @default(0)
+
+  enquete EnqueteReuniao       @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  votos   VotoEnqueteReuniao[]
+
+  @@index([enqueteId, ordem])
+  @@map("saas_opcoes_enquete_reuniao")
+}
+
+model VotoEnqueteReuniao {
+  id        String   @id @default(uuid())
+  enqueteId String   @map("enquete_id")
+  opcaoId   String   @map("opcao_id")
+  userId    String   @map("user_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  enquete EnqueteReuniao      @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  opcao   OpcaoEnqueteReuniao @relation(fields: [opcaoId], references: [id], onDelete: Cascade)
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enqueteId, userId])
+  @@map("saas_votos_enquete_reuniao")
+}
+
+// ─── ADVERTÊNCIAS ─────────────────────────────────────────────────────────────
+
+model Advertencia {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  membroDiscordId String   @map("membro_discord_id")
+  membroNome      String   @map("membro_nome")
+  motivo          String?
+  tier            Int      @default(1)
+  prazo           DateTime
+
+  emitidoPorId   String? @map("emitido_por_id")
+  emitidoPorNome String? @map("emitido_por_nome")
+
+  resolvida Boolean  @default(false)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId])
+  @@map("saas_advertencias")
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  atorId   String? @map("ator_id")
+  ator     User?   @relation("AuditAtor", fields: [atorId], references: [id])
+
+  acao       String
+  entidade   String?
+  entidadeId String? @map("entidade_id")
+  detalhes   Json?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, criadoEm])
+  @@map("saas_audit_logs")
+}
+
+// ─── FINANCEIRO (livro-caixa operacional) ─────────────────────────────────────
+// MVP: lançamentos manuais de receita/despesa por tenant. Sem conciliação bancária,
+// mensalidade recorrente automática ou inadimplência (fases seguintes).
+// Sensibilidade: RESTRITO — só quem tem finance:view / finance:manage.
+
+model FinanceiroLancamento {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  tipo      TipoFinanceiroLancamento
+  categoria CategoriaFinanceiroLancamento
+  /// Sempre positivo; o sinal vem de `tipo` (RECEITA / DESPESA).
+  valor     Decimal                     @db.Decimal(12, 2)
+  descricao String
+  /// Data de competência (quando entrou/saiu o dinheiro).
+  data      DateTime
+  observacao String?
+
+  criadoPorId String   @map("criado_por_id")
+  criadoPor   User     @relation("FinanceiroLancamentoCriadoPor", fields: [criadoPorId], references: [id])
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([tenantId, data])
+  @@index([tenantId, tipo, data])
+  @@index([tenantId, categoria])
+  @@map("saas_financeiro_lancamentos")
+}
+
+enum TipoFinanceiroLancamento {
+  RECEITA
+  DESPESA
+}
+
+enum CategoriaFinanceiroLancamento {
+  MENSALIDADE
+  LOJA
+  EVENTO
+  CARAVANA
+  PATRIMONIO
+  BAR
+  DOACAO
+  OUTROS
+}
+
+// ─── PATRIMÔNIO (inventário) ─────────────────────────────────────────────────
+// MVP: itens físicos da torcida (instrumentos, bandeirões, etc.).
+// Baixa = status BAIXADO (não apaga o histórico operacional).
+// Sensibilidade: RESTRITO — patrimony:view / patrimony:manage.
+
+model PatrimonioItem {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  nome         String
+  categoria    CategoriaPatrimonioItem
+  status       StatusPatrimonioItem @default(DISPONIVEL)
+  quantidade   Int                  @default(1)
+  localizacao  String?
+  /// Valor estimado unitário (opcional) — prestação de contas informal.
+  valorEstimado Decimal? @map("valor_estimado") @db.Decimal(12, 2)
+  observacao   String?
+
+  responsavelId String? @map("responsavel_id")
+  responsavel   User?   @relation("PatrimonioItemResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  criadoPorId  String   @map("criado_por_id")
+  criadoPor    User     @relation("PatrimonioItemCriadoPor", fields: [criadoPorId], references: [id])
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([tenantId, status])
+  @@index([tenantId, categoria])
+  @@index([tenantId, nome])
+  @@map("saas_patrimonio_itens")
+}
+
+enum CategoriaPatrimonioItem {
+  INSTRUMENTO
+  BANDEIRA
+  UNIFORME
+  MOBILIARIO
+  ELETRONICO
+  ESPACO
+  OUTROS
+}
+
+enum StatusPatrimonioItem {
+  DISPONIVEL
+  EM_USO
+  MANUTENCAO
+  BAIXADO
+}
+
+// ─── BAR (PDV da sede/subsede/PDE) ───────────────────────────────────────────
+// Catálogo, vendas e estoque isolados por `tenantId` + `sedeId`.
+// Cada torcida (tenant) tem seu bar; dentro dela, cada unidade (SEDE /
+// SUBSEDE / PONTO_ENCONTRO) tem catálogo e estoque próprios.
+// Integra com o livro-caixa via `financeiroLancamentoId` (categoria BAR).
+
+model BarCategoria {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Unidade dona deste catálogo (SEDE / SUBSEDE / PDE). Isola estoque entre unidades.
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  nome  String
+  slug  String
+  ordem Int     @default(0)
+  ativo Boolean @default(true)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  produtos BarProduto[]
+
+  @@unique([tenantId, sedeId, slug])
+  @@index([tenantId, sedeId])
+  @@map("saas_bar_categorias")
+}
+
+model BarProduto {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  categoriaId String?       @map("categoria_id")
+  categoria   BarCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  nome      String
+  descricao String?
+  preco     Decimal @db.Decimal(10, 2)
+  /// Custo médio ponderado por entradas de estoque — base do lucro estimado.
+  custoMedio Decimal @default(0) @map("custo_medio") @db.Decimal(10, 2)
+
+  estoque       Int     @default(0)
+  estoqueMinimo Int?    @map("estoque_minimo")
+  imagemUrl     String? @map("imagem_url")
+  ativo         Boolean @default(true)
+  destaque      Boolean @default(false)
+  ordem         Int     @default(0)
+
+  criadoPorId String? @map("criado_por_id")
+  criadoPor   User?   @relation("BarProdutoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  vendaItens    BarVendaItem[]
+  movimentacoes BarMovimentacaoEstoque[]
+
+  @@index([tenantId, sedeId, ativo])
+  @@index([categoriaId])
+  @@map("saas_bar_produtos")
+}
+
+model BarVenda {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  operadorId String @map("operador_id")
+  operador   User   @relation("BarVendaOperador", fields: [operadorId], references: [id], onDelete: Cascade)
+
+  subtotal Decimal @db.Decimal(10, 2)
+  desconto Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
+  metodoPagamento MetodoPagamentoBar @map("metodo_pagamento")
+  status          StatusVendaBar     @default(PENDENTE)
+
+  gatewayProvider   String?   @map("gateway_provider")
+  gatewayExternalId String?   @map("gateway_external_id")
+  pixCopiaCola      String?   @map("pix_copia_cola")
+  pagoEm            DateTime? @map("pago_em")
+
+  /// Lançamento gerado no livro-caixa (categoria BAR) quando a venda é paga.
+  financeiroLancamentoId String? @map("financeiro_lancamento_id")
+  observacao             String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  itens         BarVendaItem[]
+  movimentacoes BarMovimentacaoEstoque[]
+
+  @@index([tenantId, sedeId, criadoEm])
+  @@index([tenantId, sedeId, status])
+  @@index([gatewayExternalId])
+  @@map("saas_bar_vendas")
+}
+
+model BarVendaItem {
+  id      String   @id @default(uuid())
+  vendaId String   @map("venda_id")
+  venda   BarVenda @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+  produtoId String?     @map("produto_id")
+  produto   BarProduto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+
+  /// Snapshot do nome no momento da venda (produto pode ser removido depois).
+  produtoNome String  @map("produto_nome")
+  quantidade  Int
+  precoUnit   Decimal @map("preco_unit") @db.Decimal(10, 2)
+  custoUnit   Decimal @default(0) @map("custo_unit") @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  @@index([vendaId])
+  @@index([produtoId])
+  @@map("saas_bar_venda_itens")
+}
+
+model BarMovimentacaoEstoque {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  produtoId String     @map("produto_id")
+  produto   BarProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  tipo       TipoMovEstoqueBar
+  /// Sempre positiva; a direção vem de `tipo` (ENTRADA / SAIDA / AJUSTE).
+  quantidade Int
+  custoTotal Decimal? @map("custo_total") @db.Decimal(10, 2)
+  motivo     String?
+
+  vendaId String?   @map("venda_id")
+  venda   BarVenda? @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+
+  /// Lançamento de despesa no livro-caixa quando a entrada tem custo.
+  financeiroLancamentoId String? @map("financeiro_lancamento_id")
+
+  operadorId String? @map("operador_id")
+  operador   User?   @relation("BarMovimentacaoOperador", fields: [operadorId], references: [id], onDelete: SetNull)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, sedeId, produtoId, criadoEm])
+  @@map("saas_bar_estoque_mov")
+}
+
+enum MetodoPagamentoBar {
+  PIX
+  DINHEIRO
+  CARTAO_DEBITO
+  CARTAO_CREDITO
+}
+
+enum StatusVendaBar {
+  PENDENTE
+  PAGA
+  CANCELADA
+}
+
+enum TipoMovEstoqueBar {
+  ENTRADA
+  SAIDA
+  AJUSTE
+}

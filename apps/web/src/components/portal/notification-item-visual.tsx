@@ -12,6 +12,7 @@ import {
   UserCog,
   UserPlus,
   UserX,
+  UserMinus,
   Users,
   Wallet,
   Calendar,
@@ -46,6 +47,8 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   GRUPO_PEDIDO: Users,
   GRUPO_APROVADO: UserCheck,
   GRUPO_REJEITADO: UserX,
+  GRUPO_ADMIN: ShieldAlert,
+  GRUPO_REMOVIDO: UserMinus,
 }
 
 export interface NotificacaoAtorInfo {
@@ -64,6 +67,8 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   GRUPO_PEDIDO: (nome) => `${nome} pediu para entrar no grupo`,
   GRUPO_APROVADO: (nome) => `${nome} aprovou sua entrada no grupo`,
   GRUPO_REJEITADO: (nome) => `${nome} recusou sua entrada no grupo`,
+  GRUPO_ADMIN: (nome) => `${nome} tornou você admin do grupo`,
+  GRUPO_REMOVIDO: (nome) => `${nome} removeu você do grupo`,
 }
 
 /**

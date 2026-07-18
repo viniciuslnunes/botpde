@@ -22,6 +22,7 @@ interface ComunidadePostsAnimatedProps {
   emptyIcon?: React.ReactNode
   emptyClassName?: string
   isAuthor?: boolean
+  podeModerarGrupo?: boolean
   className?: string
 }
 
@@ -37,6 +38,7 @@ export function ComunidadePostsAnimated({
   emptyIcon,
   emptyClassName,
   isAuthor,
+  podeModerarGrupo = false,
   className,
 }: ComunidadePostsAnimatedProps) {
   const salvoSet = salvoIds
@@ -73,6 +75,7 @@ export function ComunidadePostsAnimated({
                 : !!showTenantBadge
             }
             isAuthor={isAuthor ?? post.autorId === currentUser.id}
+            podeModerarGrupo={podeModerarGrupo}
           />
         </MotionReveal>
       ))}

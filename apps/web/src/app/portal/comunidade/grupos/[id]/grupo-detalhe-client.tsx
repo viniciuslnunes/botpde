@@ -19,6 +19,10 @@ import {
   Camera,
   Settings,
   Inbox,
+  UserMinus,
+  Link2,
+  Copy,
+  RefreshCw,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
@@ -29,6 +33,10 @@ import {
   alternarSilencioGrupo,
   decidirPedidoGrupo,
   atualizarGrupo,
+  alterarPapelGrupo,
+  removerMembroGrupo,
+  gerarCodigoConviteGrupo,
+  revogarCodigoConviteGrupo,
 } from '@/app/portal/comunidade/actions'
 import { ComunidadeTabBar } from '../../_components/comunidade-tab-bar'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
@@ -80,6 +88,8 @@ export function GrupoDetalheClient({
   const [descEdit, setDescEdit] = useState(grupoInicial.descricao ?? '')
   const [publicaEdit, setPublicaEdit] = useState(grupoInicial.publica)
   const [uploadingFoto, setUploadingFoto] = useState(false)
+  const [codigoConvite, setCodigoConvite] = useState(grupoInicial.codigoConvite)
+  const [somenteAdminEdit, setSomenteAdminEdit] = useState(grupoInicial.somenteAdminPublica)
   const [pending, startTransition] = useTransition()
 
   function publicar(e: React.FormEvent) {
@@ -174,6 +184,78 @@ export function GrupoDetalheClient({
     })
   }
 
+  function removerMembro(userId: string) {
+    if (!confirm('Remover este membro do grupo?')) return
+    startTransition(async () => {
+      try {
+        await removerMembroGrupo(grupo.id, userId)
+        setMembros((prev) => prev.filter((m) => m.userId !== userId))
+        setGrupo((g) => ({ ...g, membros: Math.max(0, g.membros - 1) }))
+        toast.success('Membro removido.')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
+      }
+    })
+  }
+
+  function alterarPapel(userId: string, papel: 'ADMIN' | 'MEMBRO') {
+    startTransition(async () => {
+      try {
+        await alterarPapelGrupo(grupo.id, userId, papel)
+        setMembros((prev) => prev.map((m) => (m.userId === userId ? { ...m, papel } : m)))
+        if (userId === currentUser.id) {
+          setGrupo((g) => ({ ...g, souAdmin: papel === 'ADMIN' }))
+          if (papel === 'MEMBRO') setAba('membros')
+        }
+        toast.success(papel === 'ADMIN' ? 'Administrador adicionado.' : 'Admin removido.')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível alterar.')
+      }
+    })
+  }
+
+  function gerarConvite() {
+    startTransition(async () => {
+      try {
+        const { codigo } = await gerarCodigoConviteGrupo(grupo.id)
+        setCodigoConvite(codigo)
+        setGrupo((g) => ({ ...g, codigoConvite: codigo }))
+        toast.success('Link de convite gerado.')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível gerar.')
+      }
+    })
+  }
+
+  function revogarConvite() {
+    if (!confirm('Revogar o link atual? Quem tiver o link antigo não poderá mais entrar.')) return
+    startTransition(async () => {
+      try {
+        await revogarCodigoConviteGrupo(grupo.id)
+        setCodigoConvite(null)
+        setGrupo((g) => ({ ...g, codigoConvite: null }))
+        toast.success('Convite revogado.')
+        router.refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível revogar.')
+      }
+    })
+  }
+
+  async function copiarConvite() {
+    if (!codigoConvite) return
+    const url = window.location.origin + '/portal/comunidade/grupos/convite/' + codigoConvite
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copiado.')
+    } catch {
+      toast.error('Não foi possível copiar.')
+    }
+  }
+
   function salvarConfig(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
@@ -183,12 +265,14 @@ export function GrupoDetalheClient({
           nome: nomeEdit.trim(),
           descricao: descEdit.trim() || null,
           publica: publicaEdit,
+          somenteAdminPublica: somenteAdminEdit,
         })
         setGrupo((g) => ({
           ...g,
           nome: nomeEdit.trim(),
           descricao: descEdit.trim() || null,
           publica: publicaEdit,
+          somenteAdminPublica: somenteAdminEdit,
         }))
         toast.success('Configurações salvas.')
         router.refresh()
@@ -425,10 +509,10 @@ export function GrupoDetalheClient({
             ) : (
               <ul className="divide-y divide-[rgb(var(--border))]">
                 {membros.map((membro) => (
-                  <li key={membro.userId}>
+                  <li key={membro.userId} className="flex items-center gap-2 py-2.5">
                     <Link
                       href={`/portal/comunidade/perfil/${membro.userId}`}
-                      className="flex items-center gap-3 py-2.5 transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                      className="flex min-w-0 flex-1 items-center gap-3 transition-colors hover:opacity-90"
                     >
                       <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="sm" />
                       <div className="min-w-0 flex-1">
@@ -447,6 +531,18 @@ export function GrupoDetalheClient({
                         </span>
                       )}
                     </Link>
+                    {grupo.souAdmin && membro.userId !== currentUser.id && (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        title="Remover do grupo"
+                        onClick={() => removerMembro(membro.userId)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                        Remover
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -632,6 +728,24 @@ export function GrupoDetalheClient({
                   </span>
                 </label>
               </fieldset>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] p-3">
+              <input
+                type="checkbox"
+                checked={somenteAdminEdit}
+                onChange={(e) => setSomenteAdminEdit(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="text-sm font-medium text-[rgb(var(--foreground))]">
+                  Só administradores publicam no mural
+                </span>
+                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                  Membros comuns só leem e comentam.
+                </span>
+              </span>
+            </label>
+
               <button
                 type="submit"
                 disabled={pending || nomeEdit.trim().length < 3}
@@ -641,6 +755,83 @@ export function GrupoDetalheClient({
                 Salvar alterações
               </button>
             </form>
+
+            <div className="space-y-3 border-t border-[rgb(var(--border))] pt-5">
+              <div className="flex items-start gap-2">
+                <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+                <div>
+                  <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">Link de convite</h3>
+                  <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                    Quem tiver o link entra direto — inclusive em grupos privados.
+                  </p>
+                </div>
+              </div>
+              {codigoConvite ? (
+                <div className="space-y-2">
+                  <p className="break-all rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 font-mono text-xs">
+                    /portal/comunidade/grupos/convite/{codigoConvite}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={pending} onClick={() => void copiarConvite()} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                      <Copy className="h-4 w-4" /> Copiar
+                    </button>
+                    <button type="button" disabled={pending} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                      <RefreshCw className="h-4 w-4" /> Regenerar
+                    </button>
+                    <button type="button" disabled={pending} onClick={revogarConvite} className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                      Revogar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" disabled={pending} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                  <Link2 className="h-4 w-4" /> Gerar link de convite
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3 border-t border-[rgb(var(--border))] pt-5">
+              <div>
+                <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">Administradores</h3>
+                <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                  Admins aprovam pedidos, editam o grupo e podem promover outros membros.
+                </p>
+              </div>
+              <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))]">
+                {membros.map((membro) => {
+                  const admins = membros.filter((m) => m.papel === 'ADMIN').length
+                  const podeRebaixar = membro.papel === 'ADMIN' && admins > 1
+                  return (
+                    <li key={membro.userId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {membro.nome ?? membro.nickname ?? 'Membro'}
+                            {membro.userId === currentUser.id ? ' (você)' : ''}
+                          </p>
+                          {membro.papel === 'ADMIN' && (
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">Admin</p>
+                          )}
+                        </div>
+                      </div>
+                      {membro.papel === 'MEMBRO' ? (
+                        <button type="button" disabled={pending} onClick={() => alterarPapel(membro.userId, 'ADMIN')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                          Tornar admin
+                        </button>
+                      ) : podeRebaixar ? (
+                        <button type="button" disabled={pending} onClick={() => alterarPapel(membro.userId, 'MEMBRO')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                          Remover admin
+                        </button>
+                      ) : (
+                        <span className="shrink-0 text-[10px] text-[rgb(var(--foreground-muted))]">Único admin</span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+
           </m.div>
         )}
 
@@ -653,34 +844,41 @@ export function GrupoDetalheClient({
             transition={springSnappy}
             className="space-y-4"
           >
-            <form
-              onSubmit={publicar}
-              className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-            >
-              <textarea
-                value={conteudo}
-                onChange={(e) => setConteudo(e.target.value)}
-                maxLength={3000}
-                rows={3}
-                placeholder="Publique no mural do grupo…"
-                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
-              />
-              <m.button
-                type="submit"
-                disabled={pending || !conteudo.trim()}
-                whileTap={{ scale: 0.96 }}
-                transition={springSnappy}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            {(!grupo.somenteAdminPublica || grupo.souAdmin) ? (
+              <form
+                onSubmit={publicar}
+                className="card-soft space-y-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
               >
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Publicar
-              </m.button>
-            </form>
+                <textarea
+                  value={conteudo}
+                  onChange={(e) => setConteudo(e.target.value)}
+                  maxLength={3000}
+                  rows={3}
+                  placeholder="Publique no mural do grupo…"
+                  className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm outline-none transition-colors focus:border-[rgb(var(--primary))]"
+                />
+                <m.button
+                  type="submit"
+                  disabled={pending || !conteudo.trim()}
+                  whileTap={{ scale: 0.96 }}
+                  transition={springSnappy}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Publicar
+                </m.button>
+              </form>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+                Só administradores podem publicar neste mural.
+              </p>
+            )}
 
             <ComunidadePostsAnimated
               posts={postsIniciais}
               currentUser={currentUser}
               salvoIds={salvoIds}
+              podeModerarGrupo={grupo.souAdmin}
               emptyTitle="Nenhuma publicação no mural ainda."
               emptyDescription="Seja o primeiro!"
             />

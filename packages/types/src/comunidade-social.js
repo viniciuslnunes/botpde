@@ -77,6 +77,30 @@ export const atualizarGrupoSchema = z.object({
   descricao: z.string().trim().max(280).optional().nullable(),
   publica: z.boolean(),
   avatarUrl: z.string().url().nullable().optional(),
+  somenteAdminPublica: z.boolean().optional(),
+})
+
+export const alterarPapelGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+  papel: z.enum(['ADMIN', 'MEMBRO']),
+})
+
+export const removerMembroGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+})
+
+export const conversaGrupoIdSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
+export const entrarPorConviteGrupoSchema = z.object({
+  codigo: z.string().trim().min(4).max(32),
+})
+
+export const ocultarPostGrupoSchema = z.object({
+  postId: z.string().min(1),
 })
 
 export const pedirEntradaGrupoSchema = z.object({

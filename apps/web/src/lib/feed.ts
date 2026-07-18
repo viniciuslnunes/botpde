@@ -1321,6 +1321,8 @@ export interface GrupoItem {
   pedidoPendente: boolean
   souAdmin: boolean
   silenciada: boolean
+  codigoConvite: string | null
+  somenteAdminPublica: boolean
 }
 
 /** @deprecated Use GrupoItem */
@@ -1374,6 +1376,7 @@ export async function getGruposDoTenant(
     descricao: string | null
     avatarUrl: string | null
     publica: boolean
+    somenteAdminPublica: boolean
     _count: { membros: number }
     membros: Array<{
       id: string
@@ -1391,6 +1394,7 @@ export async function getGruposDoTenant(
       descricao: true,
       avatarUrl: true,
       publica: true,
+      somenteAdminPublica: true,
       _count: { select: { membros: membrosAtivosCount } },
       membros: userId
         ? {
@@ -1415,6 +1419,8 @@ export async function getGruposDoTenant(
       pedidoPendente: membro?.status === 'PENDENTE',
       souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
       silenciada: membro?.silenciada ?? false,
+      codigoConvite: null,
+      somenteAdminPublica: g.somenteAdminPublica,
     }
   })
 }
@@ -1437,7 +1443,9 @@ export async function getGrupoPorId(
     nome: string | null
     descricao: string | null
     avatarUrl: string | null
+    codigoConvite: string | null
     publica: boolean
+    somenteAdminPublica: boolean
     comunidade: boolean
     _count: { membros: number }
     membros: Array<{
@@ -1452,7 +1460,9 @@ export async function getGrupoPorId(
       nome: true,
       descricao: true,
       avatarUrl: true,
+      codigoConvite: true,
       publica: true,
+      somenteAdminPublica: true,
       comunidade: true,
       _count: { select: { membros: membrosAtivosCount } },
       membros: {
@@ -1465,6 +1475,7 @@ export async function getGrupoPorId(
   if (!row) return null
 
   const membro = row.membros[0]
+  const souAdmin = membro?.status === 'ATIVO' && membro.papel === 'ADMIN'
   return {
     id: row.id,
     nome: row.nome,
@@ -1474,8 +1485,10 @@ export async function getGrupoPorId(
     publica: row.publica,
     souMembro: membro?.status === 'ATIVO',
     pedidoPendente: membro?.status === 'PENDENTE',
-    souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+    souAdmin,
     silenciada: membro?.silenciada ?? false,
+    codigoConvite: souAdmin ? row.codigoConvite : null,
+    somenteAdminPublica: row.somenteAdminPublica,
   }
 }
 
