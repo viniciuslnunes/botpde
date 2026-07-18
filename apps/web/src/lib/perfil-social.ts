@@ -374,7 +374,7 @@ export interface FotoPerfilItem {
 
 export interface AtividadePerfilItem {
   id: string
-  tipo: 'COMENTARIO' | 'CURTIR' | 'FORCA'
+  tipo: 'COMENTARIO' | 'CURTIR'
   conteudo: string
   criadoEm: Date
   postId: string
@@ -429,7 +429,7 @@ export async function getAtividadeDoAutor(
     }>,
     Array<{
       id: string
-      tipo: 'CURTIR' | 'FORCA'
+      tipo: string
       criadoEm: Date
       post: { id: string; conteudo: string; tenantId: string; oculto: boolean }
     }>,
@@ -470,8 +470,8 @@ export async function getAtividadeDoAutor(
     if (r.post.oculto || !visibleSet.has(r.post.tenantId)) continue
     itens.push({
       id: r.id,
-      tipo: r.tipo,
-      conteudo: r.tipo === 'FORCA' ? 'Deu Força' : 'Curtiu',
+      tipo: 'CURTIR',
+      conteudo: 'Curtiu',
       criadoEm: r.criadoEm,
       postId: r.post.id,
       postSnippet: r.post.conteudo.slice(0, 120),

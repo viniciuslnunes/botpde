@@ -1836,8 +1836,8 @@ export async function criarDestaquePerfil(titulo: string, postIds: string[]): Pr
 
 export async function reagirPost(
   postId: string,
-  tipo: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE',
-): Promise<{ minhaReacao: 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE' | null }> {
+  tipo: 'CURTIR',
+): Promise<{ minhaReacao: 'CURTIR' | null }> {
   const parsed = reacaoSchema.safeParse({ postId, tipo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Reação inválida')
 
@@ -1868,39 +1868,31 @@ export async function reagirPost(
   }
   registrarAcaoEngajamento(limiterKey)
 
-  // 1 RTT no descurtir (deleteMany); add/troca = deleteMany(0) + upsert.
-  // Evita o findUnique prévio que sempre somava um round-trip.
+  // Toggle: qualquer reação existente (incl. legado FORCA/VAMOS/PRESENTE) remove;
+  // senão cria/atualiza como CURTIR. 1 RTT no descurtir; add = deleteMany(0) + upsert.
   const removidos: { count: number } = await db.reacao.deleteMany({
-    where: { postId: post.id, userId: viewerId, tipo: parsed.data.tipo },
+    where: { postId: post.id, userId: viewerId },
   })
   const removendo = removidos.count > 0
 
   if (!removendo) {
     await db.reacao.upsert({
       where: { postId_userId: { postId: post.id, userId: viewerId } },
-      create: { postId: post.id, userId: viewerId, tipo: parsed.data.tipo },
-      update: { tipo: parsed.data.tipo },
+      create: { postId: post.id, userId: viewerId, tipo: 'CURTIR' },
+      update: { tipo: 'CURTIR' },
     })
   }
 
   // Notificação fora do caminho crítico — UI já é otimista.
   if (!removendo && post.autorId !== viewerId) {
     const notifTenantId = tenantId ?? post.tenantId
-    const corpo =
-      parsed.data.tipo === 'FORCA'
-        ? 'Recebeu uma reação de Força.'
-        : parsed.data.tipo === 'VAMOS'
-          ? 'Recebeu um Vamos!'
-          : parsed.data.tipo === 'PRESENTE'
-            ? 'Marcou presença no seu post.'
-            : 'Recebeu uma curtida.'
     after(() => {
       void notificarSafe({
         userId: post.autorId,
         tenantId: notifTenantId,
         tipo: 'NOVA_REACAO',
-        titulo: 'Nova reação no seu post',
-        corpo,
+        titulo: 'Nova curtida no seu post',
+        corpo: 'Recebeu uma curtida.',
         link: linkPostComunidade(post.id),
         atorId: viewerId,
       })
@@ -1908,7 +1900,7 @@ export async function reagirPost(
   }
 
   // Sem revalidatePath: overlay de reação é estado do cliente (otimista).
-  return { minhaReacao: removendo ? null : parsed.data.tipo }
+  return { minhaReacao: removendo ? null : 'CURTIR' }
 }
 
 export async function denunciarPost(postId: string, motivo: string): Promise<void> {

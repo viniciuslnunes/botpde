@@ -98,16 +98,13 @@ export function formatarMencao(nome: string, userId: string): string {
   return `${formatarMencaoToken(nome, userId)} `
 }
 
-export type TipoReacaoSocial = 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE'
+export type TipoReacaoSocial = 'CURTIR'
 
 export const REACOES_CONFIG: Record<
   TipoReacaoSocial,
   { label: string; emoji: string; cor: string }
 > = {
   CURTIR: { label: 'Curtir', emoji: '♥', cor: 'primary' },
-  FORCA: { label: 'Força', emoji: '⚡', cor: 'amber' },
-  VAMOS: { label: 'Vamos!', emoji: '🔥', cor: 'orange' },
-  PRESENTE: { label: 'Presente', emoji: '✓', cor: 'emerald' },
 }
 
 export function isVideoUrl(url: string): boolean {

@@ -4,7 +4,7 @@ import { z } from 'zod'
 export const MENCAO_REGEX = /@\[([^\]]+)\]\(user:([0-9a-f-]{36})\)/gi
 export const HASHTAG_REGEX = /#([\p{L}\p{N}_]{2,40})/gu
 
-export const reacaoTipoSchema = z.enum(['CURTIR', 'FORCA', 'VAMOS', 'PRESENTE'])
+export const reacaoTipoSchema = z.enum(['CURTIR'])
 
 export const enqueteOpcoesSchema = z
   .array(z.string().trim().min(1).max(120))

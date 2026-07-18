@@ -1,7 +1,7 @@
 'use client'
 
 import { m } from 'motion/react'
-import { Heart, MessageCircle, Zap } from 'lucide-react'
+import { Heart, MessageCircle } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { AtividadePerfilItem } from '@/lib/perfil-social'
@@ -13,7 +13,6 @@ interface PerfilAtividadeListProps {
 
 function IconeAtividade({ tipo }: { tipo: AtividadePerfilItem['tipo'] }) {
   if (tipo === 'COMENTARIO') return <MessageCircle className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
-  if (tipo === 'FORCA') return <Zap className="h-4 w-4 text-amber-500" />
   return <Heart className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
 }
 

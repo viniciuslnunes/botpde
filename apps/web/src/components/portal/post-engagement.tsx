@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Heart, Flag, MessageCircle, Zap, Send, Loader2, Flame, CheckCircle, Repeat2, Bookmark } from 'lucide-react'
+import { Heart, Flag, MessageCircle, Send, Loader2, Repeat2, Bookmark } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import {
   comentarPost,
@@ -337,51 +337,6 @@ export function PostEngagement({
         >
           <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
           Curtir
-        </EngajamentoBtn>
-        <EngajamentoBtn
-          disabled={pending}
-          active={reacao === 'FORCA'}
-          onClick={() => handleReacao('FORCA')}
-          aria-pressed={reacao === 'FORCA'}
-          className={[
-            btnBase,
-            reacao === 'FORCA'
-              ? 'text-amber-500'
-              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-          ].join(' ')}
-        >
-          <Zap className={['h-4 w-4', reacao === 'FORCA' ? 'fill-current' : ''].join(' ')} />
-          Força
-        </EngajamentoBtn>
-        <EngajamentoBtn
-          disabled={pending}
-          active={reacao === 'VAMOS'}
-          onClick={() => handleReacao('VAMOS')}
-          aria-pressed={reacao === 'VAMOS'}
-          className={[
-            btnBase,
-            reacao === 'VAMOS'
-              ? 'text-orange-500'
-              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-          ].join(' ')}
-        >
-          <Flame className={['h-4 w-4', reacao === 'VAMOS' ? 'fill-current' : ''].join(' ')} />
-          Vamos!
-        </EngajamentoBtn>
-        <EngajamentoBtn
-          disabled={pending}
-          active={reacao === 'PRESENTE'}
-          onClick={() => handleReacao('PRESENTE')}
-          aria-pressed={reacao === 'PRESENTE'}
-          className={[
-            btnBase,
-            reacao === 'PRESENTE'
-              ? 'text-emerald-500'
-              : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
-          ].join(' ')}
-        >
-          <CheckCircle className={['h-4 w-4', reacao === 'PRESENTE' ? 'fill-current' : ''].join(' ')} />
-          Presente
         </EngajamentoBtn>
         <EngajamentoBtn
           active={comentariosAbertos}

@@ -112,7 +112,7 @@ export type PostRaw = Omit<
   | 'enquete'
 > & {
   _count: { reacoes: number; comentarios: number }
-  reacoes: { tipo: TipoReacaoSocial }[]
+  reacoes: { tipo: string }[]
   postOrigem?: {
     id: string
     conteudo: string
@@ -178,7 +178,8 @@ export function projetarPost(post: PostRaw): PostSocialItem {
     },
     totalReacoes: _count.reacoes,
     totalComentarios: _count.comentarios,
-    minhaReacao: reacoes[0]?.tipo ?? null,
+    // Legado: FORCA/VAMOS/PRESENTE no banco contam como curtida na UI.
+    minhaReacao: reacoes[0] ? 'CURTIR' : null,
     postOrigem: postOrigem
       ? {
           id: postOrigem.id,

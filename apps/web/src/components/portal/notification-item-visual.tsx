@@ -54,7 +54,7 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   SEGUIMENTO_PENDENTE: (nome) => `${nome} quer seguir você`,
   SEGUIMENTO_APROVADO: (nome) => `${nome} aceitou você`,
   NOVO_COMENTARIO: (nome) => `${nome} comentou no seu post`,
-  NOVA_REACAO: (nome) => `${nome} reagiu ao seu post`,
+  NOVA_REACAO: (nome) => `${nome} curtiu seu post`,
   MENCAO: (nome) => `${nome} mencionou você`,
   REPOST: (nome) => `${nome} compartilhou seu post`,
 }

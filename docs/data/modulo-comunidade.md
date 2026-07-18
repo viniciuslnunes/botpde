@@ -12,7 +12,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `PerfilMembro` | `saas_perfis_membro` | Bio, banner, avatar social, privacidade, toggles de exibição (por tenant) |
 | `PerfilDestaque` / `PerfilDestaqueItem` | — | Destaques estilo stories no perfil |
 | `Seguimento` | `saas_seguimentos` | Grafo social; status `PENDENTE` / `APROVADO` / `REJEITADO` |
-| `Comentario` / `Reacao` | — | Engajamento (`CURTIR`, `FORCA`, `VAMOS`, `PRESENTE`) |
+| `Comentario` / `Reacao` | — | Engajamento (`CURTIR`; valores legados `FORCA`/`VAMOS`/`PRESENTE` no banco contam como curtida) |
 | `EnquetePost` / `OpcaoEnquetePost` / `VotoEnquetePost` | — | Enquetes embutidas em posts |
 | `Hashtag` / `PostHashtag` | — | Hashtags por tenant |
 | `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
