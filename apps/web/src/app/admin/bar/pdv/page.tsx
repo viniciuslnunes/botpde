@@ -58,8 +58,15 @@ export default async function AdminBarPdvPage() {
   ).map(serializeVendaBar)
 
   return (
-    <div className="space-y-4">
-      <div className="app-container pt-4">
+    <BarPdv
+      produtos={produtos.map(serializeProdutoBar)}
+      categorias={categoriasAtivas}
+      pendentes={pendentes}
+      pendentesTotal={pendentesLista.total}
+      unidadeNome={unidade.nome}
+      podeCancelar={podeGerir}
+      turnoAberto={Boolean(turno)}
+      turnoPainel={
         <BarTurnoPainel
           compact
           turno={
@@ -74,16 +81,7 @@ export default async function AdminBarPdvPage() {
           resumo={resumoTurno}
           podeGerir={podeGerir}
         />
-      </div>
-      <BarPdv
-        produtos={produtos.map(serializeProdutoBar)}
-        categorias={categoriasAtivas}
-        pendentes={pendentes}
-        pendentesTotal={pendentesLista.total}
-        unidadeNome={unidade.nome}
-        podeCancelar={podeGerir}
-        turnoAberto={Boolean(turno)}
-      />
-    </div>
+      }
+    />
   )
 }

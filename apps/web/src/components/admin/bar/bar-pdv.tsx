@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore, useTransition } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
@@ -9,10 +10,13 @@ import {
   Banknote,
   Beer,
   CheckCircle2,
+  Clock,
   Copy,
   CreditCard,
   Loader2,
   Minus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   QrCode,
   ReceiptText,
@@ -141,6 +145,38 @@ function Stepper({
   )
 }
 
+// Preferência (expandido/recolhido) do menu de turno, persistida em localStorage.
+// useSyncExternalStore mantém SSR/hidratação consistentes sem setState em effect.
+const TURNO_SIDEBAR_KEY = 'bar-pdv-turno-sidebar'
+const turnoSidebarListeners = new Set<() => void>()
+
+function turnoSidebarSubscribe(listener: () => void) {
+  turnoSidebarListeners.add(listener)
+  return () => turnoSidebarListeners.delete(listener)
+}
+
+function turnoSidebarSnapshot() {
+  if (typeof window === 'undefined') return true
+  try {
+    return window.localStorage.getItem(TURNO_SIDEBAR_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function turnoSidebarServerSnapshot() {
+  return true
+}
+
+function setTurnoSidebarStored(value: boolean) {
+  try {
+    window.localStorage.setItem(TURNO_SIDEBAR_KEY, value ? '1' : '0')
+  } catch {
+    // ignore
+  }
+  turnoSidebarListeners.forEach((l) => l())
+}
+
 export function BarPdv({
   produtos: produtosIniciais,
   categorias,
@@ -149,6 +185,7 @@ export function BarPdv({
   unidadeNome,
   podeCancelar,
   turnoAberto = true,
+  turnoPainel,
 }: {
   produtos: BarProdutoSerializado[]
   categorias: { id: string; nome: string }[]
@@ -158,6 +195,8 @@ export function BarPdv({
   podeCancelar: boolean
   /** Sem turno aberto o PDV não registra novas vendas. */
   turnoAberto?: boolean
+  /** Painel de turno (abrir/fechar caixa) exibido no menu lateral colapsável. */
+  turnoPainel: ReactNode
 }) {
   const router = useRouter()
   const [produtos, setProdutos] = useState(produtosIniciais)
@@ -178,6 +217,12 @@ export function BarPdv({
   const [erro, setErro] = useState<string | null>(null)
   const [comandaMobileAberta, setComandaMobileAberta] = useState(false)
   const [opcoesAbertas, setOpcoesAbertas] = useState(false)
+  const turnoSidebarAberto = useSyncExternalStore(
+    turnoSidebarSubscribe,
+    turnoSidebarSnapshot,
+    turnoSidebarServerSnapshot,
+  )
+  const [turnoDrawerAberto, setTurnoDrawerAberto] = useState(false)
 
   const desconto = Math.max(0, Number(descontoStr.replace(',', '.')) || 0)
 
@@ -684,6 +729,90 @@ export function BarPdv({
     </div>
   )
 
+  const turnoStatusDot = (
+    <span
+      className={[
+        'h-2 w-2 shrink-0 rounded-full',
+        turnoAberto
+          ? 'bg-[rgb(var(--color-success-fg))]'
+          : 'bg-[rgb(var(--foreground-muted))]',
+      ].join(' ')}
+    />
+  )
+
+  const turnoSidebar = (
+    <aside
+      className={[
+        'relative hidden shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-[width] duration-300 ease-out lg:flex',
+        turnoSidebarAberto ? 'w-[19rem] xl:w-[21rem]' : 'w-14',
+      ].join(' ')}
+    >
+      {turnoSidebarAberto ? (
+        <>
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
+            <div className="flex items-center gap-2">
+              {turnoStatusDot}
+              <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Turno</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTurnoSidebarStored(false)}
+              aria-label="Recolher menu de turno"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">{turnoPainel}</div>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setTurnoSidebarStored(true)}
+          aria-label="Expandir menu de turno"
+          className="flex h-full w-full flex-col items-center gap-3 py-3 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgb(var(--border))]">
+            <PanelLeftOpen className="h-4 w-4" />
+          </span>
+          {turnoStatusDot}
+          <span className="mt-1 flex rotate-180 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider [writing-mode:vertical-rl]">
+            <Clock className="h-3.5 w-3.5" />
+            Turno
+          </span>
+        </button>
+      )}
+    </aside>
+  )
+
+  const turnoDrawer = turnoDrawerAberto ? (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <button
+        type="button"
+        aria-label="Fechar menu de turno"
+        className="absolute inset-0 bg-black/40"
+        onClick={() => setTurnoDrawerAberto(false)}
+      />
+      <div className="absolute inset-y-0 left-0 flex w-[85vw] max-w-sm flex-col bg-[rgb(var(--surface))] shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-4 py-3">
+          <div className="flex items-center gap-2">
+            {turnoStatusDot}
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Turno</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTurnoDrawerAberto(false)}
+            aria-label="Fechar menu de turno"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{turnoPainel}</div>
+      </div>
+    </div>
+  ) : null
+
   if (fase === 'sucesso') {
     return (
       <div className="flex h-full min-h-0 items-center justify-center p-6">
@@ -813,6 +942,15 @@ export function BarPdv({
           </h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTurnoDrawerAberto(true)}
+            aria-label="Abrir menu de turno"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] lg:hidden"
+          >
+            <Clock className="h-4 w-4" />
+            {turnoStatusDot}
+          </button>
           {pendentesTotal > 0 ? (
             <span className="hidden items-center rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2.5 py-1 text-xs font-semibold text-[rgb(var(--color-warning-fg))] sm:inline-flex">
               {pendentesTotal} PIX
@@ -835,12 +973,15 @@ export function BarPdv({
         </div>
       </header>
 
+      <div className="flex min-h-0 flex-1">
+        {turnoSidebar}
+        <div className="flex min-h-0 flex-1 flex-col">
       {!turnoAberto ? (
         <div className="flex flex-1 items-center justify-center p-6">
           <MotionEmptyState
             icon={<Beer className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />}
             title="Turno fechado"
-            description="Abra o turno de caixa acima (ou no hub do Bar) para registrar vendas."
+            description="Abra o turno de caixa no menu de turno (ou no hub do Bar) para registrar vendas."
             className="flex max-w-md flex-col items-center text-center"
           />
         </div>
@@ -1128,6 +1269,10 @@ export function BarPdv({
       </div>
         </>
       )}
+        </div>
+      </div>
+
+      {turnoDrawer}
     </div>
   )
 }
