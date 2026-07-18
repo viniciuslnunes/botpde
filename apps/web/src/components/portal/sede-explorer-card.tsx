@@ -105,11 +105,14 @@ export function SedeExplorerCard({
             className={`flex shrink-0 flex-col items-end gap-0.5 rounded-lg px-2 py-1.5 tabular-nums ${
               selected
                 ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]'
+                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]'
             }`}
             title={`Aproximadamente ${distanciaLabel}`}
           >
-            <Navigation className="h-3 w-3 opacity-70" aria-hidden />
+            <Navigation
+              className={`h-3 w-3 ${selected ? 'opacity-80' : 'opacity-55'}`}
+              aria-hidden
+            />
             <span className="text-xs font-semibold leading-none">{distanciaLabel}</span>
           </span>
         )}
