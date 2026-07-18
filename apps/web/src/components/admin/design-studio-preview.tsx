@@ -120,11 +120,13 @@ function PortalScene({
   const secondaryHex =
     design.brand.secondary ??
     (contrasteTextoSobre(design.brand.primary) === 'light' ? '#f4f4f5' : '#27272a')
-  const secondaryFg = resolveActionTextColors(
+  const secondaryText = resolveActionTextColors(
     secondaryHex,
     design.brandFg?.secondary,
     surfaces.surface,
-  ).fg
+  )
+  const secondaryFg = secondaryText.fg
+  const secondaryOn = secondaryText.on
   const raisedOn =
     contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
   const raisedMuted =
@@ -285,9 +287,8 @@ function PortalScene({
                         type="button"
                         className="rounded-lg px-3 py-1.5 text-xs font-semibold"
                         style={{
-                          backgroundColor: `${secondaryHex}22`,
-                          color: secondaryFg,
-                          border: `1px solid ${secondaryHex}55`,
+                          backgroundColor: secondaryHex,
+                          color: secondaryOn,
                         }}
                       >
                         Curtir
@@ -653,7 +654,7 @@ function EntrarScene({
             <Hotspot token="brand.secondary" focus={focus} label="Link secundário" className="mt-3">
               <p className="text-center text-xs">
                 <span className="text-[rgb(var(--foreground-muted))]">Não tem conta? </span>
-                <span className="font-semibold text-[rgb(var(--color-secondary))] underline-offset-2">
+                <span className="font-semibold text-[rgb(var(--color-secondary-fg))] underline-offset-2">
                   Criar conta
                 </span>
               </p>

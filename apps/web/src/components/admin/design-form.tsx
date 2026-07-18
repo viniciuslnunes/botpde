@@ -962,7 +962,7 @@ export function DesignForm({
                     return (
                       <>
                         <ColorField
-                          label="Texto da secundária"
+                          label="Texto da secundária (badges / botão)"
                           value={secondaryFg}
                           resolved={autoSecondary.fg}
                           token="brand.secondary"
@@ -993,13 +993,33 @@ export function DesignForm({
                           >
                             Badge soft {secondaryText.fg.toUpperCase()}
                           </span>
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold"
+                            style={{
+                              backgroundColor: secondaryHex,
+                              color: secondaryText.on,
+                            }}
+                          >
+                            Botão {secondaryText.on.toUpperCase()}
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5 px-1 py-1.5 font-semibold underline-offset-2"
+                            style={{ color: secondaryText.fg }}
+                          >
+                            Link {secondaryText.fg.toUpperCase()}
+                          </span>
                         </div>
+                        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                          Controla o texto sobre a secundária (badge soft, botão
+                          sólido e links). Automático garante leitura se a fill for
+                          branca/preta. Manual só vale onde o contraste fecha.
+                        </p>
                       </>
                     )
                   })()}
                   <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                    Secundária: botão Curtir, badge Destaque, faixa do evento e link
-                    “Criar conta” (cena Login).
+                    Cor secundária: fill do botão Curtir, badge Destaque e faixa do
+                    evento. O texto desses elementos é o campo acima.
                   </p>
                   <button
                     type="button"

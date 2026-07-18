@@ -114,14 +114,15 @@ body {
   background-color: rgb(var(--color-secondary));
 }
 .text-secondary {
-  color: rgb(var(--color-secondary));
+  /* Legível (brandFg / automático) — não a fill crua (branco some no claro). */
+  color: rgb(var(--color-secondary-fg));
 }
 .border-secondary {
   border-color: rgb(var(--color-secondary));
 }
 .btn-secondary {
   background-color: rgb(var(--color-secondary));
-  color: #fff;
+  color: rgb(var(--color-secondary-on));
 }
 .btn-secondary:hover {
   filter: brightness(0.92);

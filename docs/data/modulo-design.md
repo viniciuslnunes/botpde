@@ -10,7 +10,7 @@ Inteligência de domínio (rivalidade cromática, P&B, prioridade torcida→club
 | Área | Tokens / campos |
 |------|-----------------|
 | Marca | `brand.primary` (sincroniza `Tenant.corPrimaria`), `brand.secondary` opcional |
-| Texto da marca | `brandFg.primary` / `brandFg.secondary` — menus, tabs, badges soft (`*-fg`) e botão sólido (`*-on`); null = automático |
+| Texto da marca | `brandFg.primary` / `brandFg.secondary` — menus, tabs, badges soft (`*-fg`) e botão sólido (`*-on`); null = automático. Secundária também pinta links (`.text-secondary` / “Criar conta”). |
 | Ações / status | `actions.success`, `danger`, `warning`, `info` — botões e badges de fluxo |
 | Grade | `grid.enabled`, `sizePx` (24–96), `lineOpacity`, `lineColor`, `baseColor` |
 | Superfícies (claro/escuro) | `background`, `backgroundSubtle`, `foreground`, `foregroundMuted`, `border`, `borderStrong`, `surface`, `surfaceRaised` |
