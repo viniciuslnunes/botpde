@@ -92,17 +92,14 @@ export const reactionPop: Transition = {
   mass: 0.6,
 }
 
-/** Transição entre rotas (admin/portal).
- *
- * NÃO animar `pointerEvents` no enter: spring + valor discreto pode deixar a
- * página nova em `pointer-events: none` (formulários visíveis mas sem digitação).
- * Só a camada de *exit* (opacity→0) desliga pointer-events, para não roubar
- * cliques do sidebar / página entrante — mesma classe de bug do dialog backdrop.
+/** Transição entre rotas (admin/portal) — DESLIGADA em `MotionRouteTransition`
+ * (ghost layer bloqueava digitação). Preset mantido para reativação futura com
+ * teste E2E de input; não animar `pointerEvents`.
  */
 export const routePage: Variants = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8, pointerEvents: 'none' },
+  exit: { opacity: 0, y: -8 },
 }
 
 /** Backdrop de lightbox / viewer fullscreen. */

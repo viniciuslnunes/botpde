@@ -72,6 +72,7 @@ export function PerfilForm({
         id="nickname"
         defaultValue={nickname ?? ''}
         nicknameAtual={nickname}
+        suggestFromNome={nickname ? undefined : nome}
         label={
           <>
             Apelido (@usuário) <span className="text-red-500">*</span>
@@ -153,6 +154,12 @@ export function PerfilForm({
         <p className="rounded-xl bg-[rgb(var(--background-subtle))] p-3 text-xs text-[rgb(var(--foreground-muted))]">
           Os campos acima serão salvos no seu perfil. Quando solicitar filiação, serão
           pré-preenchidos automaticamente.
+        </p>
+      )}
+
+      {!nickDisponivel && (
+        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+          Digite um @ disponível (3–20 caracteres: letras, números ou _) para liberar o salvamento.
         </p>
       )}
 

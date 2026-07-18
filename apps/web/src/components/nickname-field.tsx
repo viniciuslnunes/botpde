@@ -204,13 +204,24 @@ export function NicknameField({
           id={id}
           name={name}
           type="text"
+          inputMode="text"
+          enterKeyHint="done"
           value={value}
           onChange={(e) => {
             dirtyRef.current = true
-            setValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))
+            // Aceita maiúsculas na digitação; o schema normaliza para minúsculas no submit.
+            setValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))
+          }}
+          onPaste={(e) => {
+            e.preventDefault()
+            dirtyRef.current = true
+            const pasted = e.clipboardData.getData('text')
+            setValue(normalizarNickname(pasted).replace(/[^a-z0-9_]/g, '').slice(0, 20))
           }}
           placeholder="seu_apelido"
-          autoComplete="off"
+          autoComplete="username"
+          autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
           maxLength={20}
           pattern="[a-zA-Z0-9_]*"
