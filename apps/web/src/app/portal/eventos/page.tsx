@@ -32,6 +32,7 @@ interface EventoListItem {
   titulo: string
   data: Date
   local: string | null
+  fotoUrl: string | null
   tipo: TipoEvento
   tenantId: string
   capacidade: number | null
@@ -67,6 +68,7 @@ function serializarEvento(
     titulo: evento.titulo,
     dataLabel: formatarData(new Date(evento.data)),
     local: evento.local,
+    fotoUrl: evento.fotoUrl,
     tenantNome: evento.tenantId !== tenantId ? formatNomeTorcida(evento.tenant.nome) : null,
     passado,
     diasLabel: passado ? null : diasParaEvento(new Date(evento.data)),
@@ -281,6 +283,7 @@ async function AgendaConteudo({
         titulo: true,
         data: true,
         local: true,
+        fotoUrl: true,
         tipo: true,
         tenantId: true,
         capacidade: true,
@@ -298,6 +301,7 @@ async function AgendaConteudo({
         titulo: true,
         data: true,
         local: true,
+        fotoUrl: true,
         tipo: true,
         tenantId: true,
         capacidade: true,

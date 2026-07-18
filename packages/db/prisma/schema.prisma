@@ -715,6 +715,8 @@ model Evento {
   tipo      TipoEvento @default(GERAL)
   titulo    String
   descricao String?
+  /// Capa do evento na agenda (URL pública).
+  fotoUrl   String?  @map("foto_url")
   data      DateTime
   local     String?
   sedeId    String?  @map("sede_id")

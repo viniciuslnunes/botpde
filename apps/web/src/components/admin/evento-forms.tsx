@@ -244,6 +244,13 @@ export function CriarEventoForm({
 
       <SedeSelect sedes={sedes} errors={state.errors?.sedeId} />
       <CapacidadeField errors={state.errors?.capacidade} />
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Foto de capa (URL)
+        </label>
+        <Input name="fotoUrl" type="url" placeholder="https://…" />
+        <FieldError errors={state.errors?.fotoUrl} />
+      </div>
 
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
         <ValorVagaField errors={state.errors?.valorVaga} />
@@ -283,6 +290,7 @@ type EventoData = {
   id: string
   titulo: string
   descricao: string | null
+  fotoUrl?: string | null
   data: Date
   local: string | null
   tipo?: string
@@ -375,6 +383,13 @@ export function EditarEventoForm({
 
       <SedeSelect sedes={sedes} defaultValue={evento.sedeId} errors={state.errors?.sedeId} />
       <CapacidadeField defaultValue={evento.capacidade} errors={state.errors?.capacidade} />
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Foto de capa (URL)
+        </label>
+        <Input name="fotoUrl" type="url" defaultValue={evento.fotoUrl ?? ''} placeholder="https://…" />
+        <FieldError errors={state.errors?.fotoUrl} />
+      </div>
 
       {tipo === 'CARAVANA' && (
         <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />

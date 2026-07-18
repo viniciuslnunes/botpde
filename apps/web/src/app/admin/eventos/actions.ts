@@ -34,6 +34,7 @@ function formToEvento(formData: FormData) {
     descricao: formData.get('descricao') || undefined,
     data: formData.get('data'),
     local: formData.get('local') || undefined,
+    fotoUrl: formData.get('fotoUrl') || undefined,
     tipo: formData.get('tipo') || 'GERAL',
     sedeId: formData.get('sedeId') || null,
     valorVaga: formData.get('valorVaga') || undefined,
@@ -55,7 +56,8 @@ export async function criarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo, valorVaga, sedeId, capacidade } = parsed.data
+  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade } =
+    parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -76,6 +78,7 @@ export async function criarEvento(
       tipo,
       titulo,
       descricao: descricao ?? null,
+      fotoUrl: fotoUrl ?? null,
       data: dataComp,
       local: local ?? null,
       sedeId: sedeId ?? null,
@@ -117,7 +120,8 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo, valorVaga, sedeId, capacidade } = parsed.data
+  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade } =
+    parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -145,6 +149,7 @@ export async function editarEvento(
     data: {
       titulo,
       descricao: descricao ?? null,
+      fotoUrl: fotoUrl ?? null,
       data: dataComp,
       local: local ?? null,
       tipo,

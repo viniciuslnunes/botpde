@@ -43,6 +43,7 @@ export default async function AdminEventoDetailPage({
     tenantId: string
     titulo: string
     descricao: string | null
+    fotoUrl: string | null
     data: Date
     local: string | null
     tipo: import('@torcida/db').TipoEvento

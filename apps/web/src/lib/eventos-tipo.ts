@@ -21,6 +21,7 @@ export type EventoEmbarqueLite = {
   tipo: TipoEvento
   titulo: string
   descricao: string | null
+  fotoUrl: string | null
   data: Date
   local: string | null
   valorVaga: { toNumber(): number } | number | null
@@ -150,6 +151,7 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
       tipo: true,
       titulo: true,
       descricao: true,
+      fotoUrl: true,
       data: true,
       local: true,
       valorVaga: true,
@@ -174,6 +176,7 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
     tipo: row.tipo,
     titulo: row.titulo,
     descricao: row.descricao,
+    fotoUrl: row.fotoUrl,
     data: row.data,
     local: row.local,
     valorVaga: row.valorVaga,
