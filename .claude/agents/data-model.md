@@ -21,6 +21,10 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
   (feed social, `FeedTimeline`, índices e busca),
   `docs/data/escudos-afiliacoes.md` (pipeline de escudos de `Afiliacao`) e
   `docs/data/torcedores-estimados.md` (base digital IBOPE + enum `TorcedoresEstimadosTipo`).
+- Departamentos / admissão: `docs/data/modulo-departamentos.md` —
+  `SaasMembro.departamentoId` = **preferência** de onboarding (não membership);
+  `UserDepartamento` só após `APROVADO`. Não modele “departamento pretendido”
+  como `UserDepartamento` prematuro.
 - Cobrança / planos de sócio / LGE (próximo núcleo): `docs/product/plano-paridade-concorrentes.md`
   Fase A — entidades candidatas `PlanoAssociacao`, `Cobranca`/`Contribuicao`;
   **não** reusar `Tenant.plano` (tier SaaS FREE/BASIC/PREMIUM). Campos LGE em
@@ -68,6 +72,11 @@ nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/
   (`IBOPE_DIGITAL` | `LIMITE_ATE`) — dados de seed offline, não runtime.
   Ver `docs/data/torcedores-estimados.md`. `User.ultimoAcessoEm` para presença
   “online” (separado da estimativa IBOPE).
+- **Admissão × lotação (2026-07-17):** candidato sócio informa área pretendida;
+  `SaasMembro.departamentoId` é intenção. Membership (`UserDepartamento` /
+  `UserRole` com `departamentoId`) e pacote de área só após aprovação —
+  `aprovarMembro` / Sem área / Acessos. Pendente e reprovado não herdam área.
+  Ver `docs/data/modulo-departamentos.md`.
 - `aliancas.md` — aliança é relação curada torcida↔torcida (tenant raiz ↔
   tenant raiz), opt-in, simétrica na leitura; rivalidade NÃO vira entidade de
   produto — no máximo lista de supressão para recomendações.

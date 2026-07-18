@@ -5,9 +5,12 @@ produto e roadmap em `docs/`; time de agentes em `.claude/agents/` (ver `docs/ag
 conhecimento do nicho (torcidas, alianças, governança, lei) em `docs/knowledge/`.
 Performance web: `ARCHITECTURE.md` §5.6 e §5.6.1; Comunidade (feed/timeline/busca):
 `docs/data/modulo-comunidade-performance.md` (inclui **ganhos estimados por
-cenário %**, live UX: ping pós-fan-out / auto-refetch no topo, e **engajamento
-overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário); agente
-`performance` para auditorias novas.
+cenário %**, live UX: ping pós-fan-out / auto-refetch no topo, **engajamento
+overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
+**publish + nav-back** 2026-07-17: prepend otimista / chrome no layout /
+`React.cache` salas·tenant, e **busca** 2026-07-17: `modo=rapida` + SQL
+`GROUP BY` — sem `DISTINCT`+`similarity`); agente `performance` para auditorias
+novas.
 
 ## O que é
 
@@ -97,6 +100,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   ver `docs/data/modulo-loja.md`.
 - **Departamentos / governo** — RBAC por depto + worktree da Visão da torcida:
   `docs/data/modulo-departamentos.md`; seed `packages/db/scripts/seed-departamentos.js`.
+  **Preferência ≠ membership (2026-07-17):** onboarding grava
+  `SaasMembro.departamentoId`; equipe só após `aprovarMembro` (ou Sem área).
+  Repair: `db:repair-departamento-orfaos`.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
@@ -108,7 +114,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`; engajamento (reação/comentário CN):
   `comunidade/actions.ts` (`resolverContextoEngajamento`, `podeEngajarPostVisivel`);
-  ver `docs/data/modulo-comunidade.md` e
+  busca: `modo=rapida` no typeahead, `postIncludeBusca`, SQL membros com
+  `GROUP BY` (nunca `DISTINCT`+`ORDER BY similarity`); ver
+  `docs/data/modulo-comunidade.md` (§ engajamento / § busca) e
   `docs/data/modulo-comunidade-performance.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,

@@ -205,9 +205,14 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   - Plataforma: sócios e torcedores (total + online, ponto verde).
   - Busca por prefixo (`startsWith`) em nome/apelido; dedup `saoMesmoClube`.
 - Passo sócio coleta: nome, nº associado, idade, telefone, unidade/sede, imagem-prova,
-  **departamento de atuação** (lista `Departamento` do tenant).
+  **departamento pretendido** (lista `Departamento` do tenant) — grava
+  `SaasMembro.departamentoId` **sem** membership até aprovação da diretoria.
+  Ver `docs/data/modulo-departamentos.md` § preferência ≠ membership.
+  Copy do wizard: “Informativo para a diretoria — só entra na equipe após aprovação.”
 - Tela de pendência reaproveita `apps/web/src/app/portal/cadastro/page.tsx`.
 - Server Actions com `assertPermission` nas mutações administrativas + `AuditLog`.
+- **Admin `/admin/membros`:** coluna Departamento + diálogo “Aprovar e incluir em X?”
+  (ou **Sem área**). Reprovar/reverter limpa membership de área.
 
 ## 5. Base de clubes (seed) + escudos + estimativa de torcedores
 

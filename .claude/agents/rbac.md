@@ -79,6 +79,17 @@ associado é figura estatutária formal: precisa de permissão própria e
 `AuditLog` com data — tem valor jurídico para a torcida (responsabilidade
 objetiva).
 
+## Admissão de sócio × departamento (2026-07-17)
+Preferência no onboarding (`SaasMembro.departamentoId`) **não** concede pacote
+de área nem entra em `UserDepartamento`. Só `aprovarMembro` (com
+`incluirDepartamento: true`, default) aplica `Membro · {Área}` +
+`syncMembershipFromRoles` + `invalidatePermissionsCache`.
+`reprovarMembro` / `reverterMembro` chamam `limparMembershipDepartamentos`.
+Equipe do portal filtra PENDENTE/REPROVADO; não faça heal com write no GET.
+Doc: `docs/data/modulo-departamentos.md`. Ao mudar gates de membros/área,
+teste: sócio pendente **não** aparece na equipe; reprovado some da área;
+aprovar com Sem área não cria membership.
+
 ## Como trabalhar
 1. Nova permissão → adicionar em `PERMISSIONS` + `PERMISSION_GROUPS`, definir a base do
    grupo (cascata) e o cargo que a recebe por padrão.

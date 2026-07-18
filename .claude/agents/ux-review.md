@@ -53,7 +53,12 @@ comunicar validação real (não placeholder decorativo).
   visível o vínculo territorial e (quando houver) o contexto de aliados.
 - Feed live: no **topo**, posts novos entram sozinhos (refetch ~250ms); **rolando**,
   banner “N novos posts” com clique — não saltar a lista no meio da leitura
-  (`feed-live-banner.tsx`, `feed-live-refresh.ts`).
+  (`feed-live-banner.tsx`, `feed-live-refresh.ts`). Banner **não** deve forçar
+  `router.refresh` (lista é TanStack).
+- Publicar: o card do autor deve aparecer **na hora** (prepend otimista via
+  `comunidade:post-publicado`) — F5 para ver o próprio post é regressão de UX.
+- Voltar de Buscar/Classificação: feed não deve “piscar” skeleton vazio se o
+  cache TanStack ainda está quente (`ComunidadeFeedBootstrap` + chrome no layout).
 - Consistência com `@torcida/ui` e tokens; não introduzir estilos soltos.
 - Salas (Meet): lista/lobby, grid de chamada, chat, enquetes, presença e o gesto de
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho
@@ -68,6 +73,12 @@ comunicar validação real (não placeholder decorativo).
   - Tooltip com fonte (`torcedoresEstimadosFonte`); ícone globo + sublinhado pontilhado.
   - Online: ponto verde + “N online”; ocultar linhas zeradas de plataforma.
   - Ver `docs/data/torcedores-estimados.md` e `docs/knowledge/futebol-dados-publicos.md`.
+- **Onboarding → aprovação de sócio (departamento):** o passo “departamento
+  pretendido” deve deixar claro que é informativo (copy + hint). Na fila
+  admin/Diretoria, **sempre** mostrar o departamento antes de Aprovar —
+  não aprovar “no escuro”. Diálogo: “Aprovar e incluir em {Área}?” com
+  alternativa **Sem área**. Equipe do portal: só aprovados. Ver
+  `docs/data/modulo-departamentos.md`.
 
 ## Captura visual de fluxo (Playwright)
 Antes de avaliar uma tela real (não só o código), prefira evidência de tela a

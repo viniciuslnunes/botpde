@@ -34,7 +34,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
 - [ ] Em mudanças de navegação/feed/polling: sem regressão dos padrões de `ARCHITECTURE.md`
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` (cache, Suspense,
   `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat,
-  overlay de engajamento sem `revalidatePath` do feed).
+  overlay de engajamento sem `revalidatePath` do feed, publish com prepend
+  client / sem refresh RSC, chrome salas/chat persistente ao sair do feed).
 
 ## Compliance de domínio (`docs/knowledge/contexto-legal.md`)
 Em mudanças que tocam membros/cadastro, verifique também:
@@ -67,9 +68,21 @@ Em mudanças que tocam membros/cadastro, verifique também:
   `tenantId: tenant.id` isolado); sem `revalidatePath` do feed no hot path;
   UI otimista em `PostEngagement`. Smoke: curtir post badge “Comunidade Nacional”
   (sócio e torcedor global) sem digest RSC genérico.
+- Publicar: após “Publicar”, o card aparece **sem F5**; Network não deve
+  tempestuar RSC do feed (`revalidatePath` / `router.refresh`). Smoke:
+  publicar texto → card no topo em Descobrir e Seguindo. Opcional:
+  `publish-latency.measure.ts` / `feed-nav-back.measure.ts` (`--project=measure`).
+- Descobrir: post próprio não some quando há sugestões externas (ranking
+  unificado / `feed.posts`).
 - Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
   (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
   inscritos digitais com torcedores presenciais.
+- Recrutamento × departamentos: `solicitarVinculo` **não** cria
+  `UserDepartamento`; sócio PENDENTE/REPROVADO ausente da equipe; coluna
+  Departamento visível em `/admin/membros`; `aprovarMembro` aplica área
+  (default) ou Sem área; reprovar/reverter limpa membership. Vitest:
+  `onboarding.test.ts` (“grava preferência sem UserDepartamento”).
+  Repair: `db:repair-departamento-orfaos -- --dry-run`.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

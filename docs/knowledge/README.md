@@ -11,7 +11,7 @@
 | [`aliancas.md`](aliancas.md) | Blocos nacionais, alianças bilaterais, rivalidades (só moderação) | `aliancas-torcidas`, `rbac`, `news-curator` |
 | [`diretorio-nacional.md`](diretorio-nacional.md) | Mapa amplo clube → torcidas por região/estado (21 estados) | `aliancas-torcidas`, `news-curator`, `research-dominio` |
 | [`torcidas-brasil.md`](torcidas-brasil.md) | Perfis aprofundados das principais organizadas por afiliação/região | `aliancas-torcidas`, `product-strategy`, `research-dominio` |
-| [`estrutura-governanca.md`](estrutura-governanca.md) | Hierarquia, cargos, departamentos, escalões, modelo associativo | `rbac`, `data-model`, `product-strategy` |
+| [`estrutura-governanca.md`](estrutura-governanca.md) | Hierarquia, cargos, departamentos, escalões, modelo associativo; admissão ≠ lotação de área (2026-07-17) | `rbac`, `data-model`, `product-strategy` |
 | [`cultura-ideologia.md`](cultura-ideologia.md) | Origem, gerações, escolas de samba, política e valores | `ux-review`, `news-curator`, `product-strategy` |
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |

@@ -106,6 +106,13 @@ exclusão. É fluxo com aprovação da diretoria e auditoria (`MEMBERS_APPROVE`)
 `imagemProva` é dado pessoal — tratar com a mesma cautela de retenção/minimização
 que os demais dados sensíveis de cadastro (ver `contexto-legal.md`).
 
+**Departamento pretendido no recrutamento ≠ lotação na área.** Na vida real o
+candidato informa em qual diretoria/departamento quer atuar; a diretoria só
+lotaciona **depois** de admitir. No produto: `SaasMembro.departamentoId` é a
+intenção; `UserDepartamento` / perfil `Membro · {Área}` só após `APROVADO`
+(`docs/data/modulo-departamentos.md` § preferência ≠ membership, 2026-07-17).
+Reprovado ou pendente **nunca** aparece na equipe do departamento.
+
 ## Mapeamento para o produto (RBAC e dados)
 
 1. Cargos reais → papéis do sistema: Presidente = owner; diretoria executiva

@@ -95,14 +95,28 @@ Onboarding e Sedes usam a **árvore de `Sede`** no mesmo tenant. A **Visão da t
 
 ### Departamento no onboarding (preferência ≠ membership)
 
-No cadastro de **sócio**, o wizard pode pedir um departamento pretendido. Isso
-grava só `SaasMembro.departamentoId` (informativo para a fila de aprovação em
-`/admin/membros` e na Diretoria). **Não** cria `UserDepartamento` nem perfil
-`Membro · {Área}` enquanto o status for `PENDENTE` ou `REPROVADO`.
+> Decisão fechada **2026-07-17** (`b0a5e3a`). Bug corrigido: onboarding antigo
+> fazia `UserDepartamento.upsert` no cadastro — sócio **reprovado** aparecia na
+> equipe (ex.: Comunicação).
 
-Só em `aprovarMembro` a preferência vira membership (perfil membro da área +
-`syncMembershipFromRoles`), salvo se o admin optar por aprovar sem incluir na
-área. Reprovar/reverter limpa membership de área no tenant.
+No cadastro de **sócio**, o wizard pergunta o **departamento pretendido**. Isso
+grava só `SaasMembro.departamentoId` (FK opcional, `onDelete: SetNull`). É
+informativo para a fila em `/admin/membros` (coluna Departamento) e na home da
+Diretoria. **Não** cria `UserDepartamento` nem perfil `Membro · {Área}` enquanto
+o status for `PENDENTE` ou `REPROVADO`.
+
+| Momento | O que acontece |
+|--------|----------------|
+| `solicitarVinculo` (SOCIO) | Valida depto do tenant → grava `SaasMembro.departamentoId`; status `PENDENTE` |
+| Equipe `/portal/departamentos/[slug]` | Lista só quem **não** é PENDENTE/REPROVADO (filtro de leitura; sem write-on-GET) |
+| `aprovarMembro(id)` | Role `member` + (default) perfil `Membro · área` + `syncMembershipFromRoles` + `invalidatePermissionsCache` |
+| `aprovarMembro(id, { incluirDepartamento: false })` | Aprova vínculo **sem** entrar na equipe — botão **Sem área** no admin |
+| `reprovarMembro` / `reverterMembro` | `limparMembershipDepartamentos` (roles de área + UD + gestores) |
+
+**Anti-padrões (não reintroduzir):**
+- Upsert de `UserDepartamento` / `UserRole` de área em `solicitarVinculo`.
+- `deleteMany` de órfãos no GET da página de equipe (cura só via script ou nas actions).
+- Aprovar na fila sem mostrar o departamento pretendido.
 
 Órfãos legados (membership criada no cadastro antes da correção):
 
@@ -110,6 +124,9 @@ Só em `aprovarMembro` a preferência vira membership (perfil membro da área +
 pnpm --filter @torcida/db db:repair-departamento-orfaos -- --dry-run
 pnpm --filter @torcida/db db:repair-departamento-orfaos
 ```
+
+Código: `onboarding/actions.ts`, `admin/membros/actions.ts`,
+`components/admin/member-actions.tsx`.
 
 ## Hierarquia de governança
 
@@ -170,3 +187,6 @@ mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 3. Torcedor/Sócio **não** são departamento.
 4. Overrides pontuais na pessoa são exceção; caminho feliz = novo perfil composto.
 5. `member` permanece transversal (sem departamento).
+6. **Preferência de onboarding ≠ membership** (2026-07-17): `SaasMembro.departamentoId`
+   é intenção até `APROVADO`; equipe e RBAC de área só depois de `aprovarMembro`
+   (ou inclusão manual em Acessos / portal). Ver seção acima.

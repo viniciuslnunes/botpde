@@ -51,6 +51,16 @@ e F4 (Cloudflare) em `docs/data/modulo-comunidade-performance.md`.
 **Engajamento overlay (2026-07-17):** reação/comentário sem `revalidatePath` do
 feed; gate CN em `modulo-comunidade.md` § engajamento — agente `performance` /
 `implementation` / `rbac` / `qa-verification` devem preservar o padrão.
+**Publish + nav-back (2026-07-17):** prepend otimista (`comunidade:post-publicado`);
+sem refresh RSC ao publicar; Descobrir unificado; chrome salas/chat no layout;
+`React.cache` salas/tenant; measure `publish-latency` / `feed-nav-back` — ver
+`modulo-comunidade-performance.md` § publish / nav-back. Agentes:
+`performance`, `implementation`, `qa-verification`, `ux-review`.
+**Busca (2026-07-17):** typeahead `modo=rapida`; SQL membros com `GROUP BY`
+(nunca `DISTINCT`+`ORDER BY similarity` — Postgres `42P10`); erro HTTP ≠ empty
+state; `postIncludeBusca` — ver `modulo-comunidade.md` § busca e
+`modulo-comunidade-performance.md` § B6.1. Agentes: `performance`,
+`implementation`, `qa-verification`, `ux-review`.
 CDN: `docs/ops/cloudflare-cdn.md`. Use o agente `performance` para:
 - validar que uma feature nova não reintroduz N+1 ou prefetch agressivo;
 - propor recortes quando navegação ou demo voltarem a degradar;
@@ -89,6 +99,24 @@ Coleta mensual offline — **nunca** IBOPE em runtime.
 Agentes: `research-dominio` (atualizar knowledge), `data-model` (enum/campos),
 `ux-review` (card/tooltip), `implementation` (seed + UI), `qa-verification`
 (`test:torcedores-estimados`, Vitest format-contagem).
+
+## Departamento no onboarding — preferência ≠ membership (2026-07-17)
+
+Inteligência do fluxo recrutamento → departamentos. Commit `b0a5e3a`.
+
+| Regra | Detalhe |
+|-------|---------|
+| Preferência | `SaasMembro.departamentoId` no cadastro de sócio |
+| Membership | Só em `aprovarMembro` (perfil `Membro · área` + sync); opção **Sem área** |
+| Pendente/Reprovado | Sem `UserDepartamento`; equipe filtra; reprovar/reverter limpa |
+| Admin | Coluna Departamento na fila; diálogo “Aprovar e incluir em X?” |
+| Repair | `pnpm --filter @torcida/db db:repair-departamento-orfaos` |
+| Doc | `docs/data/modulo-departamentos.md`, `spec-onboarding.md`, `estrutura-governanca.md` |
+
+**Anti-padrão:** upsert de área em `solicitarVinculo`; write-on-GET na equipe;
+aprovar “no escuro” sem mostrar o departamento.
+
+Agentes: `data-model`, `rbac`, `implementation`, `ux-review`, `qa-verification`.
 
 
 ## Benchmark competitivo (gestão de torcidas) — 2026-07-16

@@ -60,7 +60,8 @@ não reintroduza fetch-on-mount onde já há SSR, infinite scroll via API ou res
 Comunidade — feed/timeline/busca: `feed.ts`, `feed-timeline.ts`, `feed-timeline-queue.ts`,
 `comunidade-busca.ts`, `feed-live-refresh.ts`;
 padrões: batch privacidade, SSE ping **pós-fan-out** (não na action de publicar),
-auto-refetch só no topo, banner se rolado, salas únicas na page.
+auto-refetch só no topo (**sem** `router.refresh` no banner), banner se rolado,
+salas no `ComunidadeLayoutChrome` + `React.cache` em `listSalasAtivas`/`getActiveTenant`.
 **Engajamento (reação/comentário):** escopo = o que o feed lista (incl. tenant
 sintético da CN). Use `resolverContextoEngajamento` + `podeEngajarPostVisivel`
 em `comunidade/actions.ts` — **não** `findFirst({ tenantId: tenant.id })` nem
@@ -68,6 +69,12 @@ só `assertPermission` (quebra torcedor global e posts da CN). Sem
 `revalidatePath` do feed no hot path; notifs em `after()`; UI otimista em
 `PostEngagement`. Ver `docs/data/modulo-comunidade.md` § engajamento e
 `modulo-comunidade-performance.md` § engajamento.
+**Publicar post:** sem `revalidatePath` do feed; composer emite
+`comunidade:post-publicado` para prepend no infinite (TanStack). Crítico =
+create + timeline autor; hashtags/menções/audit em `after()`. Descobrir =
+`feed.posts` unificado (não preferir só `postsSugeridos`). Nav-back: bootstrap
+TanStack + chrome no layout. Ver `modulo-comunidade-performance.md` § publish /
+nav-back.
 Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
 Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
 `seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Coleta mensual:
@@ -75,3 +82,9 @@ Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnbo
 passo clube; `ComunidadeNacionalShell` para torcedor global sem torcida. Copy distinta:
 “inscritos digitais” (IBOPE) vs “até X torcedores ou menos” (LIMITE_ATE). Nunca
 chamar API IBOPE em runtime.
+Onboarding — departamento do sócio: grava **só** `SaasMembro.departamentoId` em
+`solicitarVinculo`. **Proibido** upsert de `UserDepartamento` / role de área no
+cadastro. Membership em `aprovarMembro` (`admin/membros/actions.ts`); UI em
+`member-actions.tsx` (Aprovar e incluir / Sem área). Equipe:
+filtrar PENDENTE/REPROVADO sem `deleteMany` no GET. Repair:
+`db:repair-departamento-orfaos`. Ver `docs/data/modulo-departamentos.md`.

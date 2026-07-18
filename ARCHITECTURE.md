@@ -321,7 +321,7 @@ terceiros que o MVP não precisa.
 | 9 | ~~UI de atribuição de acesso~~ | ✅ Feito (2026-07-02): `/admin/acessos` — edição por usuário (perfis, departamentos com gestor opcional, permissões efetivas/adicionais). `DepartamentosManager` (CRUD) adicionado em `/admin/configuracoes`. Ver nota de escopo abaixo | — |
 | 10 | ~~Migração de banco~~ | ✅ Aplicada (2026-07-02) via `prisma db push` em produção: `saas_departamentos`, `saas_user_departamentos`, `saas_departamento_gestores` e todos os índices novos criados | — |
 | 11 | ~~Coerência do schema~~ | ✅ Feito (2026-07-02): `Advertencia` sem relação de `Tenant` corrigido; índices adicionados em toda coluna `tenantId`/FK usada em query multi-tenant (`Sede`, `Evento`, `SaasProduto`, `SaasPedido`, `Post`, `AuditLog`, `UserRole`, `UserPermission`, `UserDepartamento`, `DepartamentoGestor`) | — |
-| 12 | ~~Permissão desde o primeiro acesso~~ | ✅ Feito (2026-07-02): aprovar `SaasMembro` agora auto-concede Role `member` + Departamento (Sócio/Torcedor) via `concederAcessoBasico()` em `admin/membros/actions.ts` | — |
+| 12 | ~~Permissão desde o primeiro acesso~~ | ✅ Feito (2026-07-02): aprovar `SaasMembro` auto-concede Role `member` via `concederAcessoBasico()`. **Atualizado 2026-07-17:** departamento do onboarding é preferência (`SaasMembro.departamentoId`), não membership — só aplica em `aprovarMembro` | — |
 | 13 | ~~Menu do admin gated por permissão~~ | ✅ Feito (2026-07-02): `ADMIN_MENU` + `filterMenuByPermissions`/`hasAdminAreaAccess` em `packages/types/src/menu.js`; `admin/layout.tsx` e `AdminSidebar` agora filtram por permissão efetiva em vez de nome de cargo hard-coded | — |
 | 14 | ~~Cargos de sistema desalinhados~~ | ✅ Corrigido (2026-07-02): seed de `owner`/`admin`/`member` em `super-admin/setup/actions.ts` usava strings em português (`membros:ler`, `sedes:editar`...) divergentes do vocabulário canônico (`members:view`, `sedes:manage`...) usado pela UI de cargos e por `packages/types`. Agora usa `SYSTEM_ROLES`/`SYSTEM_ROLE_PERMISSIONS` compartilhados | ⚠️ ver nota de migração abaixo |
 | 17 | ~~Gestão de perfis aprimorada~~ | ✅ Feito (2026-07-02), inspirado na tela de Perfis/Permissões de referência: cascata de dependência (`applyPermissionCascade` em `packages/types` — marcar permissão não-base puxa a base do grupo, ex. `members:view`; desmarcar a base derruba as irmãs), aplicada na UI E no servidor (cargos e acessos); diff visual verde/vermelho com contadores por grupo na edição; busca por nome/permissão; confirmação com resumo das mudanças; exclusão bloqueada para cargo em uso (contagem exibida); validação de ≥1 permissão | — |
@@ -343,8 +343,12 @@ terceiros que o MVP não precisa.
   fase futura, não meta do MVP.
 - `dbo-bot-pde` confirmado como o mesmo Postgres do `torcida-web` — sem
   banco duplicado, sem ação de custo pendente.
-- Aprovação de `SaasMembro` concede automaticamente Role `member` +
-  Departamento padrão (Sócio/Torcedor); atribuições extras continuam manuais.
+- Aprovação de `SaasMembro` concede Role `member` via `concederAcessoBasico()`.
+  Departamento pretendido no onboarding (`SaasMembro.departamentoId`) **não** é
+  membership: só vira perfil `Membro · {Área}` + `UserDepartamento` em
+  `aprovarMembro` (default), ou fica de fora com `{ incluirDepartamento: false }`.
+  Sócio/Torcedor **nunca** foram departamentos — ver `modulo-departamentos.md`
+  (2026-07-17). Atribuições extras continuam manuais em `/admin/acessos`.
 - Árvore de menu do admin fica **estática no código** (`packages/types`),
   não configurável via banco no MVP.
 - Permissões efetivas são resolvidas **no servidor a cada request**
@@ -569,6 +573,7 @@ checklist: **`docs/data/modulo-comunidade-performance.md`**.
 | D1–D3 | Redis SSE, fan-out async (+ ping SSE **após** fan-out), SSE mensageria |
 | Live UX | Auto-refetch no topo (~250ms); banner “novos posts” só se rolado |
 | Engajamento (2026-07-17) | Overlay reação/comentário sem `revalidatePath` do feed; gate CN via `resolverContextoEngajamento` + `podeEngajarPostVisivel`; notifs em `after()` |
+| Publish + nav-back (2026-07-17) | Prepend otimista (`comunidade:post-publicado`); sem `revalidatePath`/`router.refresh` no publish; Descobrir unificado; chrome no layout + `ComunidadeFeedBootstrap` + `React.cache` salas/tenant; measure e2e |
 
 **Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
 
