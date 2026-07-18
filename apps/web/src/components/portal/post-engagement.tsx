@@ -45,6 +45,8 @@ interface PostEngagementProps {
   totalComentarios: number
   minhaReacao: TipoReacaoSocial | null
   currentUser: CurrentUser
+  /** Autor do post — esconde denúncia (servidor também rejeita). */
+  isAuthor?: boolean
   isRepost?: boolean
   salvoInicial?: boolean
 }
@@ -88,6 +90,7 @@ export function PostEngagement({
   totalComentarios,
   minhaReacao,
   currentUser,
+  isAuthor = false,
   isRepost = false,
   salvoInicial = false,
 }: PostEngagementProps) {
@@ -102,6 +105,7 @@ export function PostEngagement({
   const [comentario, setComentario] = useState('')
   const [mencoesComentario, setMencoesComentario] = useState<MencaoParsed[]>([])
   const [denunciando, setDenunciando] = useState(false)
+  const [denunciado, setDenunciado] = useState(false)
   const [repostando, setRepostando] = useState(false)
   const [comentarioRepost, setComentarioRepost] = useState('')
   const [motivo, setMotivo] = useState('')
@@ -193,6 +197,7 @@ export function PostEngagement({
 
   function enviarDenuncia(e: React.FormEvent) {
     e.preventDefault()
+    if (denunciado || isAuthor) return
     const texto = motivo.trim()
     if (texto.length < 5) {
       toast.error('Descreva o motivo com pelo menos 5 caracteres.')
@@ -200,12 +205,17 @@ export function PostEngagement({
     }
     startTransition(async () => {
       try {
-        await denunciarPost(postId, texto)
+        const result = await denunciarPost(postId, texto)
+        if (!result.ok) {
+          toast.error(result.message)
+          return
+        }
         setDenunciando(false)
+        setDenunciado(true)
         setMotivo('')
         toast.success('Denúncia enviada. A moderação vai analisar.')
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Não foi possível denunciar.')
+      } catch {
+        toast.error('Não foi possível denunciar.')
       }
     })
   }
@@ -381,13 +391,25 @@ export function PostEngagement({
           <Bookmark className={['h-4 w-4', salvo ? 'fill-current' : ''].join(' ')} />
           Salvar
         </EngajamentoBtn>
-        <EngajamentoBtn
-          onClick={() => setDenunciando((v) => !v)}
-          aria-label="Denunciar publicação"
-          className={[btnBase, 'ml-auto text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-red-600'].join(' ')}
-        >
-          <Flag className="h-4 w-4" />
-        </EngajamentoBtn>
+        {!isAuthor && (
+          <EngajamentoBtn
+            onClick={() => {
+              if (denunciado) return
+              setDenunciando((v) => !v)
+            }}
+            aria-label={denunciado ? 'Denúncia enviada' : 'Denunciar publicação'}
+            aria-pressed={denunciado}
+            className={[
+              btnBase,
+              'ml-auto',
+              denunciado
+                ? 'text-red-600'
+                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-red-600',
+            ].join(' ')}
+          >
+            <Flag className={['h-4 w-4', denunciado ? 'fill-current' : ''].join(' ')} />
+          </EngajamentoBtn>
+        )}
       </div>
 
       <AnimatePresence initial={false}>
@@ -423,7 +445,7 @@ export function PostEngagement({
       </AnimatePresence>
 
       <AnimatePresence initial={false}>
-        {denunciando && (
+        {denunciando && !denunciado && (
           <m.form
             key="denuncia-form"
             onSubmit={enviarDenuncia}

@@ -1903,71 +1903,92 @@ export async function reagirPost(
   return { minhaReacao: removendo ? null : 'CURTIR' }
 }
 
-export async function denunciarPost(postId: string, motivo: string): Promise<void> {
+/**
+ * Denúncia de post. Retorna `{ ok }` em vez de `throw` nos erros de negócio —
+ * em produção, throw de Server Action vira HTTP 500 sem corpo (digest RSC).
+ */
+export async function denunciarPost(
+  postId: string,
+  motivo: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const parsed = denunciaSchema.safeParse({ postId, motivo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Denúncia inválida')
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Denúncia inválida' }
+  }
 
   // Mesmo gate de reação/comentário: post visível no feed (CN / hierarquia /
   // alianças) pode ser denunciado; a fila fica no tenant dono do post.
-  const [ctx, post] = await Promise.all([
-    resolverContextoEngajamento(),
-    db.post.findUnique({
-      where: { id: parsed.data.postId },
-      select: {
-        id: true,
-        autorId: true,
-        tenantId: true,
-        oculto: true,
-        visibilidade: true,
-        tenant: { select: { afiliacaoId: true, sintetico: true } },
-      },
-    }) as Promise<PostEngajavelLite | null>,
-  ])
+  let ctx: Awaited<ReturnType<typeof resolverContextoEngajamento>>
+  try {
+    ctx = await resolverContextoEngajamento()
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Não autorizado',
+    }
+  }
+
+  const post: PostEngajavelLite | null = await db.post.findUnique({
+    where: { id: parsed.data.postId },
+    select: {
+      id: true,
+      autorId: true,
+      tenantId: true,
+      oculto: true,
+      visibilidade: true,
+      tenant: { select: { afiliacaoId: true, sintetico: true } },
+    },
+  })
 
   if (!post || !(await podeEngajarPostVisivel(ctx, post))) {
-    throw new Error('Post não encontrado')
+    return { ok: false, message: 'Post não encontrado' }
   }
   if (post.autorId === ctx.viewerId) {
-    throw new Error('Não é possível denunciar o próprio post.')
+    return { ok: false, message: 'Não é possível denunciar o próprio post.' }
   }
 
   const { viewerId, tenantId, afiliacaoId } = ctx
   const limiterKey = `report:${tenantId ?? `nacional:${afiliacaoId}`}:${viewerId}`
   if (excedeuLimiteEngajamento(limiterKey)) {
-    throw new Error('Você atingiu o limite de denúncias por minuto.')
+    return { ok: false, message: 'Você atingiu o limite de denúncias por minuto.' }
   }
   registrarAcaoEngajamento(limiterKey)
 
   const denunciaTenantId = post.tenantId
 
-  const denuncia = await db.denuncia.create({
-    data: {
+  try {
+    const denuncia: { id: string } = await db.denuncia.create({
+      data: {
+        tenantId: denunciaTenantId,
+        postId: post.id,
+        denuncianteId: viewerId,
+        motivo: parsed.data.motivo,
+      },
+      select: { id: true },
+    })
+
+    await notificarDenunciaPost({
       tenantId: denunciaTenantId,
-      postId: post.id,
-      denuncianteId: viewerId,
       motivo: parsed.data.motivo,
-    },
-  })
+      denuncianteUserId: viewerId,
+    })
 
-  await notificarDenunciaPost({
-    tenantId: denunciaTenantId,
-    motivo: parsed.data.motivo,
-    denuncianteUserId: viewerId,
-  })
+    await db.auditLog.create({
+      data: {
+        tenantId: denunciaTenantId,
+        atorId: viewerId,
+        acao: 'POST_DENUNCIADO',
+        entidade: 'Denuncia',
+        entidadeId: denuncia.id,
+        detalhes: { postId: post.id },
+      },
+    })
+  } catch {
+    return { ok: false, message: 'Não foi possível enviar a denúncia. Tente de novo.' }
+  }
 
-  await db.auditLog.create({
-    data: {
-      tenantId: denunciaTenantId,
-      atorId: viewerId,
-      acao: 'POST_DENUNCIADO',
-      entidade: 'Denuncia',
-      entidadeId: denuncia.id,
-      detalhes: { postId: post.id },
-    },
-  })
-
-  revalidatePath('/portal/comunidade')
   revalidatePath('/admin/comunidade/moderacao')
+  return { ok: true }
 }
 
 /** Marca como lidas apenas notificações sociais (central da Comunidade). */

@@ -125,6 +125,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
         totalComentarios={post.totalComentarios}
         minhaReacao={post.minhaReacao}
         currentUser={currentUser}
+        isAuthor={author}
         isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
         salvoInicial={salvo}
       />
