@@ -7,7 +7,11 @@ import {
   serializeMensagem,
   MAX_CONTEUDO_MENSAGEM,
 } from '@/lib/mensageria'
-import { assertConversaAccess } from '@/lib/mensageria-api'
+import {
+  assertConversaAccess,
+  assertConversaLeitura,
+  statusErroMensageria,
+} from '@/lib/mensageria-api'
 import { emitMensagemNova } from '@/lib/mensageria-bus'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
@@ -31,13 +35,15 @@ const enviarSchema = z
     path: ['conteudo'],
   })
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: conversaId } = await context.params
-    await assertConversaAccess(conversaId)
+    await assertConversaLeitura(conversaId)
 
     const full = request.nextUrl.searchParams.get('full') === '1'
     const after = request.nextUrl.searchParams.get('after')
@@ -57,8 +63,9 @@ export async function GET(
       hasMore,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao carregar mensagens.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[api/conversas/[id]/mensagens GET]', error)
+    const { message, status } = statusErroMensageria(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 
@@ -118,7 +125,8 @@ export async function POST(
 
     return NextResponse.json({ mensagem: serializeMensagem(mensagem) })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao enviar mensagem.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[api/conversas/[id]/mensagens POST]', error)
+    const { message, status } = statusErroMensageria(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

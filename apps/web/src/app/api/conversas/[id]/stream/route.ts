@@ -1,5 +1,5 @@
 import { subscribeConversaMensagem } from '@/lib/mensageria-bus'
-import { assertConversaAccess } from '@/lib/mensageria-api'
+import { assertConversaLeitura, statusErroMensageria } from '@/lib/mensageria-api'
 import { createSsePingResponse } from '@/lib/sse-stream'
 
 export const dynamic = 'force-dynamic'
@@ -14,15 +14,15 @@ export async function GET(
 ) {
   try {
     const { id: conversaId } = await context.params
-    await assertConversaAccess(conversaId)
+    await assertConversaLeitura(conversaId)
 
     return createSsePingResponse(
       (onPing) => subscribeConversaMensagem(conversaId, onPing),
       request.signal,
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Não autorizado'
-    const status = message.includes('autentic') ? 401 : 403
+    console.error('[api/conversas/[id]/stream GET]', error)
+    const { message, status } = statusErroMensageria(error)
     return new Response(message, { status })
   }
 }

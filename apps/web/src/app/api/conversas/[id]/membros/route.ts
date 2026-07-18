@@ -3,7 +3,11 @@ import { z } from 'zod'
 import { db } from '@torcida/db'
 import { canMessageUser, listMembrosConversa, MAX_MEMBROS_GRUPO } from '@/lib/mensageria'
 import { isConversaGrupoLike } from '@/lib/canais'
-import { assertConversaAccess } from '@/lib/mensageria-api'
+import {
+  assertConversaAccess,
+  assertConversaLeitura,
+  statusErroMensageria,
+} from '@/lib/mensageria-api'
 
 const adicionarSchema = z.object({
   userId: z.string().uuid(),
@@ -24,12 +28,13 @@ export async function GET(
 ) {
   try {
     const { id: conversaId } = await context.params
-    await assertConversaAccess(conversaId)
+    await assertConversaLeitura(conversaId)
     const membros = await listMembrosConversa(conversaId)
     return NextResponse.json({ membros })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao listar membros.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[api/conversas/[id]/membros GET]', error)
+    const { message, status } = statusErroMensageria(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { marcarConversaLida } from '@/lib/mensageria'
-import { assertConversaAccess } from '@/lib/mensageria-api'
+import { assertConversaLeitura, statusErroMensageria } from '@/lib/mensageria-api'
 
 export async function POST(
   _request: Request,
@@ -8,11 +8,12 @@ export async function POST(
 ) {
   try {
     const { id: conversaId } = await context.params
-    const { userId } = await assertConversaAccess(conversaId)
+    const { userId } = await assertConversaLeitura(conversaId)
     await marcarConversaLida(conversaId, userId)
     return NextResponse.json({ ok: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao marcar como lida.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error('[api/conversas/[id]/ler POST]', error)
+    const { message, status } = statusErroMensageria(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

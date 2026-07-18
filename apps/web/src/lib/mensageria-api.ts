@@ -75,9 +75,38 @@ export async function assertPodeEnviarMensagens() {
   return { ...ctx, efetivas }
 }
 
-/** Usuário autenticado + participante ativo da conversa. */
+/**
+ * Leitura da thread: só sessão + participação (`MembroConversa`).
+ * Não depende do tenant do host — alinhado à regra da mensageria (DM entre
+ * torcidas aliadas) e evita 400 quando a inbox SSR já listou a conversa.
+ */
+export async function assertConversaLeitura(conversaId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado.')
+  const membro = await assertMembroConversa(conversaId, session.user.id)
+  return { session, userId: session.user.id, membro, conversa: membro.conversa }
+}
+
+/** Mutação na conversa: elegível no tenant do host + participante ativo. */
 export async function assertConversaAccess(conversaId: string) {
   const ctx = await assertUsuarioMensageria()
   const membro = await assertMembroConversa(conversaId, ctx.userId)
   return { ...ctx, membro, conversa: membro.conversa }
+}
+
+/** Mapeia erros conhecidos da mensageria para status HTTP (evita 400 genérico). */
+export function statusErroMensageria(error: unknown): { message: string; status: number } {
+  const message = error instanceof Error ? error.message : 'Erro inesperado.'
+  if (message.includes('autentic')) return { message, status: 401 }
+  if (message === 'Conversa não encontrada') return { message, status: 404 }
+  if (
+    message.includes('aprovado') ||
+    message.includes('associado') ||
+    message.includes('carteirinha') ||
+    message.includes('permissão') ||
+    message.includes('não está ativo')
+  ) {
+    return { message, status: 403 }
+  }
+  return { message, status: 500 }
 }

@@ -271,11 +271,15 @@ export function MensagemThread({
       try {
         const res = await fetch(url, { cache: 'no-store' })
         if (!res.ok) {
-          if (full) setErro('Não foi possível carregar a conversa.')
+          if (full) {
+            const body = (await res.json().catch(() => null)) as { error?: string } | null
+            setErro(body?.error ?? 'Não foi possível carregar a conversa.')
+          }
           return false
         }
         const data = (await res.json()) as { mensagens?: MensagemDto[]; hasMore?: boolean }
         if (!data.mensagens) return false
+        if (full) setErro(null)
         const novas = data.mensagens
         const deOutros = !full
           ? novas.filter((m) => m.autor.id !== currentUserId).length
