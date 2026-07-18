@@ -58,7 +58,9 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
    torcida** → **escudo/logo** → **paleta do clube** → **torcida + clube** →
    monocromática → alto contraste. Cada card: **3 cores** + hex
    (`limitarSwatches`). Clique → `aplicarPaletaAoDesign` (marca + ações +
-   tint de superfícies).
+   tint de superfícies). A UI do estúdio gera a lista a partir do **design
+   salvo (baseline)**, não do rascunho — senão aplicar “Do escudo” regenerava
+   todas as cards com a nova primária.
 2. **Rivalidade / identidade** — ver knowledge acima. Sucesso default azul;
    verde só se identidade já for verde; neutros sem saturação artificial;
    sem análoga/complementar.

@@ -420,10 +420,12 @@ export function DesignForm({
     [clubeNome, clubeApelido],
   )
 
+  // Semente = marca salva (baseline), não o rascunho. Se usar design.brand,
+  // aplicar "Do escudo" regenerava todas as cards com a nova primária.
   const paletasSugeridas = useMemo(
     () =>
-      gerarPaletasSugeridas(design.brand.primary, {
-        secondary: design.brand.secondary,
+      gerarPaletasSugeridas(normalizedBaseline.brand.primary, {
+        secondary: normalizedBaseline.brand.secondary,
         clube: clubePaleta
           ? {
               primary: clubePaleta.primary,
@@ -433,7 +435,12 @@ export function DesignForm({
           : null,
         extraidas: extracted,
       }),
-    [design.brand.primary, design.brand.secondary, clubePaleta, extracted],
+    [
+      normalizedBaseline.brand.primary,
+      normalizedBaseline.brand.secondary,
+      clubePaleta,
+      extracted,
+    ],
   )
 
   const contrastChecks = useMemo(
@@ -529,8 +536,9 @@ export function DesignForm({
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Prioridade: marca da torcida, escudo e clube. Cada sugestão
-                    mostra 3 cores (primária · secundária · destaque).
+                    Baseadas na marca salva, no escudo e no clube (3 cores cada).
+                    Aplicar uma opção muda só a prévia — a lista de sugestões
+                    permanece estável até salvar.
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
