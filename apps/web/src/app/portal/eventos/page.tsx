@@ -24,6 +24,7 @@ import type { Metadata } from 'next'
 import type { TipoEvento } from '@torcida/db'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
+import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 
 export const metadata: Metadata = { title: 'Agenda' }
 
@@ -41,10 +42,18 @@ interface EventoListItem {
   _count: { rsvps: number }
 }
 
-function formatarData(data: Date) {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeStyle: 'short' }).format(
-    new Date(data),
-  )
+function formatarDataLista(data: Date) {
+  const d = new Date(data)
+  const dia = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(d)
+  const hora = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  return `${dia.replace('.', '')} · ${hora}`
 }
 
 function diasParaEvento(data: Date) {
@@ -66,7 +75,7 @@ function serializarEvento(
   return {
     id: evento.id,
     titulo: evento.titulo,
-    dataLabel: formatarData(new Date(evento.data)),
+    dataLabel: formatarDataLista(new Date(evento.data)),
     local: evento.local,
     fotoUrl: evento.fotoUrl,
     tenantNome: evento.tenantId !== tenantId ? formatNomeTorcida(evento.tenant.nome) : null,
@@ -104,6 +113,8 @@ export default async function EventosPage({ searchParams }: Props) {
 
   let podeCriar = false
   let sedes: Awaited<ReturnType<typeof listSedesAtivasParaEvento>> = []
+  let partidas: Awaited<ReturnType<typeof listPartidasParaEvento>> = []
+  let temAfiliacao = false
   if (session?.user?.id && tenant) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
       session.user.id,
@@ -114,7 +125,11 @@ export default async function EventosPage({ searchParams }: Props) {
       hasPermission(effective, PERMISSIONS.EVENTS_CREATE) ||
       hasPermission(effective, PERMISSIONS.EVENTS_MANAGE)
     if (podeCriar) {
-      sedes = await listSedesAtivasParaEvento(tenant.id)
+      ;[sedes, partidas, temAfiliacao] = await Promise.all([
+        listSedesAtivasParaEvento(tenant.id),
+        listPartidasParaEvento(tenant.id),
+        getAfiliacaoIdDoTenant(tenant.id).then((id) => Boolean(id)),
+      ])
     }
   }
 
@@ -149,6 +164,8 @@ export default async function EventosPage({ searchParams }: Props) {
           <NovoEventoButton
             defaultTipo={tipoFiltro ?? 'GERAL'}
             sedes={sedes}
+            partidas={partidas}
+            temAfiliacao={temAfiliacao}
             redirectTo="/portal/eventos"
           />
         )}

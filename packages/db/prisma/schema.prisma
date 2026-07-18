@@ -98,6 +98,8 @@ model Tenant {
   plano       Plano    @default(FREE)
   corPrimaria String   @default("#7c3aed") @map("cor_primaria")
   logoUrl     String?  @map("logo_url")
+  /// Tema visual completo (marca, grade, superfícies claro/escuro). Ver TenantDesignSchema.
+  design      Json?    @map("design")
   ativo       Boolean  @default(true)
   criadoEm    DateTime @default(now()) @map("criado_em")
 
@@ -727,6 +729,9 @@ model Evento {
   valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
   /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
   capacidade Int?
+  serieId String? @map("serie_id")
+  partidaId String? @map("partida_id")
+  partida   Partida? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
 
   criadoPorId      String?  @map("criado_por_id")
   criadoEm         DateTime @default(now()) @map("criado_em")
@@ -739,6 +744,8 @@ model Evento {
 
   @@index([tenantId])
   @@index([sedeId])
+  @@index([serieId])
+  @@index([partidaId])
   @@index([tenantId, data])
   @@index([tenantId, tipo, data])
   @@map("saas_eventos")
@@ -749,6 +756,7 @@ model EventoRsvp {
   eventoId String     @map("evento_id")
   userId   String     @map("user_id")
   status   RsvpStatus @default(CONFIRMADO)
+  criadoEm DateTime   @default(now()) @map("criado_em")
 
   // Check-in real — independente do status de RSVP. Confirmar presença
   // (status) não equivale a comparecer de fato (checkedInAt): alguém pode
@@ -760,6 +768,7 @@ model EventoRsvp {
   user   User   @relation(fields: [userId], references: [id])
 
   @@unique([eventoId, userId])
+  @@index([eventoId, status, criadoEm])
   @@map("saas_evento_rsvps")
 }
 
@@ -1001,6 +1010,7 @@ model Afiliacao {
   criadoEm       DateTime          @default(now()) @map("criado_em")
 
   tenants            Tenant[]
+  partidas           Partida[]
   noticias           Noticia[]
   torcedores         PerfilTorcedor[]
   rivalClubeA        RivalidadeClube[]  @relation("RivalClubeA")
@@ -1675,6 +1685,37 @@ model DenunciaMensagem {
 }
 
 // ─── NOTÍCIAS CURADAS (global por afiliação) ─────────────────────────────────
+
+model Partida {
+  id              String        @id @default(uuid())
+  afiliacaoId     String        @map("afiliacao_id")
+  adversario      String
+  competicao      String?
+  dataHora        DateTime      @map("data_hora")
+  local           String?
+  mando           MandoJogo     @default(CASA)
+  placarCasa      Int?          @map("placar_casa")
+  placarFora      Int?          @map("placar_fora")
+  status          StatusPartida @default(AGENDADA)
+  fonteExternalId String?       @map("fonte_external_id")
+  criadoEm        DateTime      @default(now()) @map("criado_em")
+  afiliacao Afiliacao @relation(fields: [afiliacaoId], references: [id], onDelete: Cascade)
+  eventos   Evento[]
+  @@index([afiliacaoId, dataHora])
+  @@index([afiliacaoId, status, dataHora])
+  @@map("saas_partidas")
+}
+enum MandoJogo {
+  CASA
+  FORA
+}
+
+enum StatusPartida {
+  AGENDADA
+  AO_VIVO
+  ENCERRADA
+  CANCELADA
+}
 
 model Noticia {
   id              String        @id @default(uuid())

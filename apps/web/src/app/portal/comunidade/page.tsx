@@ -16,10 +16,17 @@ export const metadata: Metadata = { title: 'Comunidade' }
 export default async function ComunidadePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string; filtro?: string }>
+  searchParams: Promise<{ cursor?: string; filtro?: string; eventoId?: string }>
 }) {
   const params = await searchParams
   const filtro = params.filtro === 'seguindo' ? 'seguindo' : 'descobrir'
+  const eventoIdComposer =
+    typeof params.eventoId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      params.eventoId,
+    )
+      ? params.eventoId
+      : undefined
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
@@ -58,6 +65,7 @@ export default async function ComunidadePage({
         filtro={filtro}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
+        eventoIdInicial={eventoIdComposer}
       />
     </div>
   )

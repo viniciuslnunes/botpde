@@ -1,5 +1,7 @@
 import dynamic from 'next/dynamic'
+import { db } from '@torcida/db'
 import { getComposerContext } from './composer-context'
+import type { EventoComposerItem } from '@/lib/eventos'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
@@ -15,23 +17,44 @@ export async function ComunidadeComposerSection({
   userId,
   userName,
   userAvatar,
+  eventoIdInicial,
 }: {
   tenantId: string
   userId: string
   userName: string | null
   userAvatar: string | null
+  eventoIdInicial?: string
 }) {
   const ctx = await getComposerContext(tenantId, userId, userName)
+
+  let eventos = ctx.eventosComposer
+  if (eventoIdInicial && !eventos.some((e) => e.id === eventoIdInicial)) {
+    type EvLite = { id: string; titulo: string; data: Date; local: string | null }
+    const extra: EvLite | null = await db.evento.findFirst({
+      where: { id: eventoIdInicial, tenantId, data: { gte: new Date() } },
+      select: { id: true, titulo: true, data: true, local: true },
+    })
+    if (extra) {
+      const item: EventoComposerItem = {
+        id: extra.id,
+        titulo: extra.titulo,
+        data: extra.data.toISOString(),
+        local: extra.local,
+      }
+      eventos = [item, ...eventos]
+    }
+  }
 
   return (
     <FeedComposer
       userName={ctx.nome}
       userAvatar={userAvatar}
       perfilPrivado={ctx.perfilPrivado}
-      eventos={ctx.eventosComposer}
+      eventos={eventos}
       bloqueioPublicacao={ctx.bloqueioPublicacao}
       somentePublico={ctx.somentePublico}
       podePublicarNacional={ctx.podePublicarNacional}
+      eventoIdInicial={eventoIdInicial}
     />
   )
 }

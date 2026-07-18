@@ -11,7 +11,10 @@ import type { Metadata } from 'next'
 import { EventoTipoBadge } from '@/components/eventos/evento-tipo-badge'
 import { ListaEmbarque, type EmbarqueRow } from '@/components/eventos/lista-embarque'
 import { EventoAcoesRapidas } from '@/components/eventos/evento-acoes-rapidas'
+import { EventoMapaLinks } from '@/components/eventos/evento-mapa-links'
+import { EventoPartidaCard } from '@/components/eventos/evento-partida-card'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
+import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 
 export const metadata: Metadata = { title: 'Agenda — Evento' }
 
@@ -49,22 +52,53 @@ export default async function AdminEventoDetailPage({
     tipo: import('@torcida/db').TipoEvento
     sedeId: string | null
     capacidade: number | null
+    lat: number | null
+    lng: number | null
+    serieId: string | null
+    partidaId: string | null
     valorVaga: { toNumber(): number } | number | null
     sede: { capacidade: number | null; nome: string } | null
+    partida: {
+      adversario: string
+      competicao: string | null
+      dataHora: Date
+      local: string | null
+      mando: 'CASA' | 'FORA'
+      status: string
+      placarCasa: number | null
+      placarFora: number | null
+    } | null
     rsvps: RsvpRow[]
     _count: { rsvps: number; cobrancas: number }
   }
 
-  const [evento, sedes]: [EventoDetail | null, SedeLite[]] = await Promise.all([
+  const [evento, sedes, partidas, afiliacaoId]: [
+    EventoDetail | null,
+    SedeLite[],
+    Awaited<ReturnType<typeof listPartidasParaEvento>>,
+    string | null,
+  ] = await Promise.all([
     db.evento.findUnique({
       where: { id },
       include: {
         sede: { select: { capacidade: true, nome: true } },
+        partida: {
+          select: {
+            adversario: true,
+            competicao: true,
+            dataHora: true,
+            local: true,
+            mando: true,
+            status: true,
+            placarCasa: true,
+            placarFora: true,
+          },
+        },
         rsvps: {
           include: {
             user: { select: { id: true, nome: true, avatarUrl: true, email: true } },
           },
-          orderBy: { status: 'asc' },
+          orderBy: [{ status: 'asc' }, { criadoEm: 'asc' }],
         },
         _count: {
           select: {
@@ -79,6 +113,8 @@ export default async function AdminEventoDetailPage({
       select: { id: true, nome: true, capacidade: true },
       orderBy: { nome: 'asc' },
     }) as Promise<SedeLite[]>,
+    listPartidasParaEvento(tenant.id),
+    getAfiliacaoIdDoTenant(tenant.id),
   ])
 
   if (!evento || evento.tenantId !== tenant.id) notFound()
@@ -126,7 +162,14 @@ export default async function AdminEventoDetailPage({
             dataIso={evento.data.toISOString()}
           />
         </div>
+        {(evento.lat != null && evento.lng != null) && (
+          <div className="mt-3">
+            <EventoMapaLinks lat={evento.lat} lng={evento.lng} local={evento.local} />
+          </div>
+        )}
       </div>
+
+      {evento.partida && <EventoPartidaCard partida={evento.partida} />}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
@@ -164,6 +207,8 @@ export default async function AdminEventoDetailPage({
         <EditarEventoForm
           evento={evento}
           sedes={sedes}
+          partidas={partidas}
+          temAfiliacao={Boolean(afiliacaoId)}
           redirectTo={`/admin/eventos/${evento.id}`}
         />
       </div>

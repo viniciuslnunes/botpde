@@ -29,6 +29,8 @@ import { EventoTipoBadge } from '@/components/eventos/evento-tipo-badge'
 import { ListaEmbarque, type EmbarqueRow } from '@/components/eventos/lista-embarque'
 import { CaravanaVagaPagamento } from '@/app/portal/caravanas/_components/caravana-vaga-pagamento'
 import { EventoAcoesRapidas } from '@/components/eventos/evento-acoes-rapidas'
+import { EventoMapaLinks } from '@/components/eventos/evento-mapa-links'
+import { EventoPartidaCard } from '@/components/eventos/evento-partida-card'
 import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
 import { getEventoEmbarque } from '@/lib/eventos-tipo'
 
@@ -165,11 +167,13 @@ export default async function EventoDetailPage({
       </EventoDetailReveal>
 
       <EventoDetailReveal index={1}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-            <p className="text-[11px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
-              Confirmados
-            </p>
+        <div className="space-y-3">
+          {evento.partida && <EventoPartidaCard partida={evento.partida} />}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+              <p className="text-[11px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
+                Confirmados
+              </p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-[rgb(var(--foreground))]">
               {cap != null ? `${confirmadosCount}/${cap}` : confirmadosCount}
             </p>
@@ -203,6 +207,7 @@ export default async function EventoDetailPage({
             </div>
           )}
         </div>
+        </div>
       </EventoDetailReveal>
 
       <EventoDetailReveal index={2}>
@@ -223,6 +228,8 @@ export default async function EventoDetailPage({
                 <span>{evento.local}</span>
               </div>
             )}
+
+            <EventoMapaLinks lat={evento.lat} lng={evento.lng} local={evento.local} />
 
             {evento.sedeNome && (
               <div className="flex items-center gap-3 text-[rgb(var(--foreground))]">

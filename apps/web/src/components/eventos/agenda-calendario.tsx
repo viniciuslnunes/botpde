@@ -42,6 +42,12 @@ function addDays(d: Date, n: number) {
 
 const DIA_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
+const TIPO_DOT: Record<string, string> = {
+  GERAL: 'bg-[rgb(var(--primary))]',
+  CARAVANA: 'bg-amber-500',
+  ENSAIO: 'bg-sky-500',
+}
+
 export function AgendaCalendario({
   vista,
   itens,
@@ -125,6 +131,18 @@ export function AgendaCalendario({
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-3 text-[10px] text-[rgb(var(--foreground-muted))]">
+        <span className="inline-flex items-center gap-1">
+          <span className={`h-2 w-2 rounded-full ${TIPO_DOT.GERAL}`} /> Evento
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className={`h-2 w-2 rounded-full ${TIPO_DOT.CARAVANA}`} /> Caravana
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className={`h-2 w-2 rounded-full ${TIPO_DOT.ENSAIO}`} /> Ensaio
+        </span>
+      </div>
+
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-[rgb(var(--foreground-muted))]">
         {DIA_LABEL.map((d) => (
           <div key={d}>{d}</div>
@@ -159,10 +177,13 @@ export function AgendaCalendario({
                   <li key={e.id}>
                     <Link
                       href={e.href}
-                      className="block truncate rounded px-0.5 text-[10px] font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+                      className="flex items-center gap-1 truncate rounded px-0.5 text-[10px] font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
                       title={`${e.tipo}: ${e.titulo}`}
                     >
-                      {e.titulo}
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${TIPO_DOT[e.tipo] ?? TIPO_DOT.GERAL}`}
+                      />
+                      <span className="truncate">{e.titulo}</span>
                     </Link>
                   </li>
                 ))}
@@ -179,3 +200,4 @@ export function AgendaCalendario({
     </div>
   )
 }
+

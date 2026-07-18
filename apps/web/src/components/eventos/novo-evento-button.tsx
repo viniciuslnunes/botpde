@@ -4,14 +4,19 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { CriarEventoForm, type SedeOption } from '@/components/admin/evento-forms'
 import { EventoFormDrawer } from '@/components/eventos/evento-form-drawer'
+import type { PartidaOption } from '@/lib/partidas'
 
 export function NovoEventoButton({
   defaultTipo,
   sedes,
+  partidas = [],
+  temAfiliacao = true,
   redirectTo = '/admin/eventos',
 }: {
   defaultTipo?: string
   sedes: SedeOption[]
+  partidas?: PartidaOption[]
+  temAfiliacao?: boolean
   redirectTo?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -30,6 +35,8 @@ export function NovoEventoButton({
         <CriarEventoForm
           defaultTipo={defaultTipo ?? 'GERAL'}
           sedes={sedes}
+          partidas={partidas}
+          temAfiliacao={temAfiliacao}
           redirectTo={redirectTo}
           onCancel={() => setOpen(false)}
         />

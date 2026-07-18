@@ -18,6 +18,7 @@ export interface AdminEventoItem {
   confirmados: number
   passado: boolean
   tipo: TipoEvento | string
+  serieId?: string | null
   lotacaoLabel?: string | null
   embarcados?: number | null
 }
@@ -38,6 +39,11 @@ function AdminEventoCard({ evento }: { evento: AdminEventoItem }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <EventoTipoBadge tipo={evento.tipo} />
+            {evento.serieId && (
+              <span className="rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[rgb(var(--foreground-muted))]">
+                Série
+              </span>
+            )}
             <h3 className="truncate font-semibold text-[rgb(var(--foreground))]">{evento.titulo}</h3>
           </div>
           {evento.descricao && (
@@ -77,7 +83,7 @@ function AdminEventoCard({ evento }: { evento: AdminEventoItem }) {
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </m.div>
-          <ExcluirEventoButton eventoId={evento.id} />
+          <ExcluirEventoButton eventoId={evento.id} serieId={evento.serieId} />
         </div>
       </div>
     </m.div>

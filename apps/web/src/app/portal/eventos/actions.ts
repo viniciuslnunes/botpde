@@ -7,6 +7,7 @@ import { assertMembroAtivo } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
 import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
 import { notificarSafe } from '@/lib/notificacoes'
+import { promoverProximoDaEspera } from '@/lib/eventos-waitlist'
 import type { RsvpStatus } from '@torcida/db'
 
 export type RsvpResult =
@@ -43,18 +44,17 @@ export async function responderRsvp(
     return { ok: false, error: 'Evento já encerrado' }
   }
 
+  const atual = await db.eventoRsvp.findUnique({
+    where: { eventoId_userId: { eventoId, userId: session.user.id } },
+    select: { status: true },
+  })
+
   let statusFinal: RsvpStatus = status
 
   if (status === 'CONFIRMADO') {
     const cap = capacidadeEfetiva(evento)
-    const atual = await db.eventoRsvp.findUnique({
-      where: { eventoId_userId: { eventoId, userId: session.user.id } },
-      select: { status: true },
-    })
     const jaConfirmado = atual?.status === 'CONFIRMADO'
-    const confirmados =
-      jaConfirmado ? evento._count.rsvps : evento._count.rsvps
-    if (!jaConfirmado && lotacaoCheia(confirmados, cap)) {
+    if (!jaConfirmado && lotacaoCheia(evento._count.rsvps, cap)) {
       statusFinal = 'LISTA_ESPERA'
     }
   }
@@ -65,7 +65,16 @@ export async function responderRsvp(
     create: { eventoId, userId: session.user.id, status: statusFinal },
   })
 
-  if (evento.criadoPorId && evento.criadoPorId !== session.user.id && statusFinal === 'CONFIRMADO') {
+  // Liberou vaga → promove o próximo da fila
+  if (atual?.status === 'CONFIRMADO' && statusFinal !== 'CONFIRMADO') {
+    await promoverProximoDaEspera(eventoId)
+  }
+
+  if (
+    evento.criadoPorId &&
+    evento.criadoPorId !== session.user.id &&
+    statusFinal === 'CONFIRMADO'
+  ) {
     await notificarSafe({
       userId: evento.criadoPorId,
       tenantId: tenant.id,

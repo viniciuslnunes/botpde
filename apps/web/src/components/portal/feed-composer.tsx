@@ -32,9 +32,20 @@ interface FeedComposerProps {
   bloqueioPublicacao?: string | null
   /** COMMUNITY_POST_NACIONAL — libera a opção "Torcida e torcedores" no seletor. */
   podePublicarNacional?: boolean
+  /** Deep-link da Agenda — abre modo evento com este id pré-selecionado. */
+  eventoIdInicial?: string
 }
 
-export function FeedComposer({ userName, userAvatar, perfilPrivado = false, eventos = [], bloqueioPublicacao = null, somentePublico = false, podePublicarNacional = false }: FeedComposerProps) {
+export function FeedComposer({
+  userName,
+  userAvatar,
+  perfilPrivado = false,
+  eventos = [],
+  bloqueioPublicacao = null,
+  somentePublico = false,
+  podePublicarNacional = false,
+  eventoIdInicial,
+}: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -51,11 +62,20 @@ export function FeedComposer({ userName, userAvatar, perfilPrivado = false, even
       eventos={eventos}
       somentePublico={somentePublico}
       podePublicarNacional={podePublicarNacional}
+      eventoIdInicial={eventoIdInicial}
     />
   )
 }
 
-function FeedComposerActive({ userName, userAvatar, perfilPrivado = false, eventos = [], somentePublico = false, podePublicarNacional = false }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
+function FeedComposerActive({
+  userName,
+  userAvatar,
+  perfilPrivado = false,
+  eventos = [],
+  somentePublico = false,
+  podePublicarNacional = false,
+  eventoIdInicial,
+}: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -95,6 +115,7 @@ function FeedComposerActive({ userName, userAvatar, perfilPrivado = false, event
   ])
 
   return (
+    <div id="feed-composer" className="scroll-mt-24">
     <ComposerBody
       key={token}
       userName={userName}
@@ -109,8 +130,10 @@ function FeedComposerActive({ userName, userAvatar, perfilPrivado = false, event
       eventos={eventos}
       somentePublico={somentePublico}
       podePublicarNacional={podePublicarNacional}
+      eventoIdInicial={eventoIdInicial}
       serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
+    </div>
   )
 }
 
@@ -139,6 +162,7 @@ function ComposerBody({
   eventos,
   somentePublico = false,
   podePublicarNacional = false,
+  eventoIdInicial,
 }: {
   userName: string | null
   userAvatar: string | null
@@ -153,11 +177,19 @@ function ComposerBody({
   eventos: EventoComposerItem[]
   somentePublico?: boolean
   podePublicarNacional?: boolean
+  eventoIdInicial?: string
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const eventoPreselecionado =
+    eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
+      ? eventoIdInicial
+      : undefined
+
+  const [expanded, setExpanded] = useState(Boolean(eventoPreselecionado))
   const [modoEnquete, setModoEnquete] = useState(false)
-  const [modoEvento, setModoEvento] = useState(false)
-  const [eventoId, setEventoId] = useState(eventos[0]?.id ?? '')
+  const [modoEvento, setModoEvento] = useState(Boolean(eventoPreselecionado))
+  const [eventoId, setEventoId] = useState(
+    eventoPreselecionado ?? eventos[0]?.id ?? '',
+  )
   const [texto, setTexto] = useState('')
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
@@ -175,6 +207,14 @@ function ComposerBody({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
   const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (!eventoPreselecionado) return
+    const el = document.getElementById('feed-composer')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const t = window.setTimeout(() => textareaRef.current?.focus(), 350)
+    return () => window.clearTimeout(t)
+  }, [eventoPreselecionado])
 
   const firstName = userName?.split(' ')[0] ?? 'torcedor'
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)

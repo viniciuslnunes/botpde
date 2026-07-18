@@ -1,10 +1,13 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { db } from '@torcida/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { CriarEventoSchema, PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
+import { listarOcorrenciasFuturasSerie, parseEscopoSerie } from '@/lib/eventos-serie'
+import { resolvePartidaIdFromForm } from '@/app/admin/partidas/actions'
 
 export type EventoState = {
   ok?: boolean
@@ -39,6 +42,10 @@ function formToEvento(formData: FormData) {
     sedeId: formData.get('sedeId') || null,
     valorVaga: formData.get('valorVaga') || undefined,
     capacidade: formData.get('capacidade') || undefined,
+    lat: formData.get('lat') || undefined,
+    lng: formData.get('lng') || undefined,
+    recorrenciasSemanas: formData.get('recorrenciasSemanas') || 0,
+    partidaId: formData.get('partidaId') || null,
   }
 }
 
@@ -56,8 +63,20 @@ export async function criarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade } =
-    parsed.data
+  const {
+    titulo,
+    descricao,
+    data,
+    local,
+    fotoUrl,
+    tipo,
+    valorVaga,
+    sedeId,
+    capacidade,
+    lat,
+    lng,
+    recorrenciasSemanas,
+  } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -71,41 +90,68 @@ export async function criarEvento(
     if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
   }
 
-  const redirectTo = formData.get('redirectTo')
-  const evento = await db.evento.create({
-    data: {
-      tenantId: tenant.id,
-      tipo,
-      titulo,
-      descricao: descricao ?? null,
-      fotoUrl: fotoUrl ?? null,
-      data: dataComp,
-      local: local ?? null,
-      sedeId: sedeId ?? null,
-      capacidade: capacidade ?? null,
-      valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
-      criadoPorId: session.user.id,
-    },
-    select: { id: true, tipo: true },
-  })
+  const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
+  if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
+  const partidaId = partidaRes.partidaId
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'EVENTO_CRIADO',
-      entidade: 'Evento',
-      entidadeId: evento.id,
-      detalhes: { tipo: evento.tipo, sedeId: sedeId ?? null },
-    },
-  })
-
-  revalidateEventoPaths(evento.id, evento.tipo)
-  // Sempre abre o cockpit do evento recém-criado
-  if (typeof redirectTo === 'string' && redirectTo.startsWith('/admin')) {
-    redirect(`/admin/eventos/${evento.id}`)
+  const semanasExtras = recorrenciasSemanas ?? 0
+  const datas: Date[] = [dataComp]
+  for (let i = 1; i <= semanasExtras; i++) {
+    const d = new Date(dataComp)
+    d.setDate(d.getDate() + i * 7)
+    datas.push(d)
   }
-  redirect(`/portal/eventos/${evento.id}`)
+  const serieId = semanasExtras > 0 ? randomUUID() : null
+
+  const baseData = {
+    tenantId: tenant.id,
+    tipo,
+    titulo,
+    descricao: descricao ?? null,
+    fotoUrl: fotoUrl ?? null,
+    local: local ?? null,
+    sedeId: sedeId ?? null,
+    capacidade: capacidade ?? null,
+    lat: lat ?? null,
+    lng: lng ?? null,
+    serieId,
+    partidaId,
+    valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
+    criadoPorId: session.user.id,
+  }
+
+  const criados: Array<{ id: string; tipo: string }> = []
+  for (const dataOcorrencia of datas) {
+    const evento = await db.evento.create({
+      data: { ...baseData, data: dataOcorrencia },
+      select: { id: true, tipo: true },
+    })
+    criados.push(evento)
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'EVENTO_CRIADO',
+        entidade: 'Evento',
+        entidadeId: evento.id,
+        detalhes: {
+          tipo: evento.tipo,
+          sedeId: sedeId ?? null,
+          serieId,
+          partidaId,
+          serie: serieId ? { indice: criados.length, total: datas.length } : null,
+        },
+      },
+    })
+  }
+
+  const primeiro = criados[0]!
+  revalidateEventoPaths(primeiro.id, primeiro.tipo)
+  const redirectTo = formData.get('redirectTo')
+  if (typeof redirectTo === 'string' && redirectTo.startsWith('/admin')) {
+    redirect(`/admin/eventos/${primeiro.id}`)
+  }
+  redirect(`/portal/eventos/${primeiro.id}`)
 }
 
 export async function editarEvento(
@@ -120,16 +166,21 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade } =
+  const { titulo, descricao, data, local, fotoUrl, tipo, valorVaga, sedeId, capacidade, lat, lng } =
     parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
   }
 
-  const existing: { id: string; tenantId: string } | null = await db.evento.findUnique({
+  const existing: {
+    id: string
+    tenantId: string
+    data: Date
+    serieId: string | null
+  } | null = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { id: true, tenantId: true },
+    select: { id: true, tenantId: true, data: true, serieId: true },
   })
 
   if (!existing || existing.tenantId !== tenant.id) {
@@ -144,20 +195,49 @@ export async function editarEvento(
     if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
   }
 
-  await db.evento.update({
-    where: { id: existing.id },
-    data: {
-      titulo,
-      descricao: descricao ?? null,
-      fotoUrl: fotoUrl ?? null,
-      data: dataComp,
-      local: local ?? null,
-      tipo,
-      sedeId: sedeId ?? null,
-      capacidade: capacidade ?? null,
-      valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
-    },
-  })
+  const partidaRes = await resolvePartidaIdFromForm(tenant.id, formData)
+  if (partidaRes.error?.errors) return { errors: partidaRes.error.errors }
+  const partidaId = partidaRes.partidaId
+
+  const escopo = parseEscopoSerie(formData.get('escopoSerie'))
+  const patchBase = {
+    titulo,
+    descricao: descricao ?? null,
+    fotoUrl: fotoUrl ?? null,
+    local: local ?? null,
+    tipo,
+    sedeId: sedeId ?? null,
+    capacidade: capacidade ?? null,
+    lat: lat ?? null,
+    lng: lng ?? null,
+    partidaId,
+    valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
+  }
+
+  let afetados = 1
+  if (escopo === 'futuras' && existing.serieId) {
+    const ocorrencias = await listarOcorrenciasFuturasSerie({
+      tenantId: tenant.id,
+      serieId: existing.serieId,
+      aPartirDe: existing.data,
+    })
+    const deltaMs = dataComp.getTime() - existing.data.getTime()
+    for (const oc of ocorrencias) {
+      await db.evento.update({
+        where: { id: oc.id },
+        data: {
+          ...patchBase,
+          data: oc.id === existing.id ? dataComp : new Date(oc.data.getTime() + deltaMs),
+        },
+      })
+    }
+    afetados = ocorrencias.length
+  } else {
+    await db.evento.update({
+      where: { id: existing.id },
+      data: { ...patchBase, data: dataComp },
+    })
+  }
 
   await db.auditLog.create({
     data: {
@@ -166,7 +246,14 @@ export async function editarEvento(
       acao: 'EVENTO_EDITADO',
       entidade: 'Evento',
       entidadeId: eventoId,
-      detalhes: { tipo, sedeId: sedeId ?? null },
+      detalhes: {
+        tipo,
+        sedeId: sedeId ?? null,
+        escopoSerie: escopo,
+        serieId: existing.serieId,
+        partidaId,
+        afetados,
+      },
     },
   })
 
@@ -350,20 +437,41 @@ export async function promoverDaListaEspera(
   return { ok: true }
 }
 
-export async function excluirEvento(eventoId: string) {
+export async function excluirEvento(
+  eventoId: string,
+  escopo: 'esta' | 'futuras' = 'esta',
+) {
   const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
 
-  const existing: { id: string; tenantId: string; tipo: string } | null =
-    await db.evento.findUnique({
-      where: { id: eventoId },
-      select: { id: true, tenantId: true, tipo: true },
-    })
+  const existing: {
+    id: string
+    tenantId: string
+    tipo: string
+    data: Date
+    serieId: string | null
+  } | null = await db.evento.findUnique({
+    where: { id: eventoId },
+    select: { id: true, tenantId: true, tipo: true, data: true, serieId: true },
+  })
 
   if (!existing || existing.tenantId !== tenant.id) {
     throw new Error('Evento não encontrado.')
   }
 
-  await db.evento.delete({ where: { id: existing.id } })
+  let idsExcluidos: string[] = [existing.id]
+  if (escopo === 'futuras' && existing.serieId) {
+    const ocorrencias = await listarOcorrenciasFuturasSerie({
+      tenantId: tenant.id,
+      serieId: existing.serieId,
+      aPartirDe: existing.data,
+    })
+    idsExcluidos = ocorrencias.map((o) => o.id)
+    await db.evento.deleteMany({
+      where: { id: { in: idsExcluidos }, tenantId: tenant.id },
+    })
+  } else {
+    await db.evento.delete({ where: { id: existing.id } })
+  }
 
   await db.auditLog.create({
     data: {
@@ -372,7 +480,13 @@ export async function excluirEvento(eventoId: string) {
       acao: 'EVENTO_EXCLUIDO',
       entidade: 'Evento',
       entidadeId: eventoId,
-      detalhes: { tipo: existing.tipo },
+      detalhes: {
+        tipo: existing.tipo,
+        escopoSerie: escopo,
+        serieId: existing.serieId,
+        afetados: idsExcluidos.length,
+        ids: idsExcluidos,
+      },
     },
   })
 

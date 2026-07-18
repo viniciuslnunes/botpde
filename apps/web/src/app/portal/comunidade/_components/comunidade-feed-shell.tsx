@@ -33,6 +33,8 @@ interface ComunidadeFeedShellProps {
   /** Banner CN — true enquanto o composer carrega o estado real. */
   somentePublicoHint?: boolean
   salasAtivas?: SalaAtivaListItem[]
+  /** Deep-link `?eventoId=` — abre o composer no modo evento. */
+  eventoIdInicial?: string
 }
 
 function ComunicadosFallback() {
@@ -62,6 +64,7 @@ export function ComunidadeFeedShell({
   clubeNacional = null,
   somentePublicoHint = false,
   salasAtivas = [],
+  eventoIdInicial,
 }: ComunidadeFeedShellProps) {
   return (
     <>
@@ -162,6 +165,7 @@ export function ComunidadeFeedShell({
               userId={currentUser.id}
               userName={currentUser.nome}
               userAvatar={currentUser.avatarUrl}
+              eventoIdInicial={eventoIdInicial}
             />
           </Suspense>
         )}

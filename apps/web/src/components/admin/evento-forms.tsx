@@ -16,6 +16,8 @@ import { collapsePanel, springSnappy } from '@/lib/motion-presets'
 import { submitRedirectAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
+import { PartidaFields } from '@/components/eventos/partida-fields'
+import type { PartidaOption } from '@/lib/partidas'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
 
@@ -126,6 +128,73 @@ function CapacidadeField({
   )
 }
 
+function RecorrenciaField({ errors }: { errors?: string[] }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Repetir semanalmente
+      </label>
+      <select
+        name="recorrenciasSemanas"
+        defaultValue="0"
+        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+      >
+        <option value="0">Só esta data</option>
+        <option value="3">+ 3 semanas (4 no total)</option>
+        <option value="7">+ 7 semanas (8 no total)</option>
+        <option value="11">+ 11 semanas (12 no total)</option>
+      </select>
+      <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Útil para ensaios — cria ocorrências no mesmo horário.
+      </p>
+      <FieldError errors={errors} />
+    </div>
+  )
+}
+
+function GeoFields({
+  defaultLat,
+  defaultLng,
+  errorsLat,
+  errorsLng,
+}: {
+  defaultLat?: number | null
+  defaultLng?: number | null
+  errorsLat?: string[]
+  errorsLng?: string[]
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Latitude (opcional)
+        </label>
+        <Input
+          name="lat"
+          type="number"
+          step="any"
+          placeholder="-23.545"
+          defaultValue={defaultLat != null ? String(defaultLat) : ''}
+        />
+        <FieldError errors={errorsLat} />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Longitude (opcional)
+        </label>
+        <Input
+          name="lng"
+          type="number"
+          step="any"
+          placeholder="-46.474"
+          defaultValue={defaultLng != null ? String(defaultLng) : ''}
+        />
+        <FieldError errors={errorsLng} />
+      </div>
+    </div>
+  )
+}
+
 function ValorVagaField({
   defaultValue,
   errors,
@@ -161,6 +230,8 @@ export function CriarEventoForm({
   submitLabel = 'Criar evento',
   lockTipo = false,
   sedes = [],
+  partidas = [],
+  temAfiliacao = true,
   onCancel,
 }: {
   defaultTipo?: string
@@ -168,6 +239,8 @@ export function CriarEventoForm({
   submitLabel?: string
   lockTipo?: boolean
   sedes?: SedeOption[]
+  partidas?: PartidaOption[]
+  temAfiliacao?: boolean
   onCancel?: () => void
 }) {
   const [state, setState] = useState<EventoState>({})
@@ -244,6 +317,11 @@ export function CriarEventoForm({
 
       <SedeSelect sedes={sedes} errors={state.errors?.sedeId} />
       <CapacidadeField errors={state.errors?.capacidade} />
+      <PartidaFields
+        partidas={partidas}
+        temAfiliacao={temAfiliacao}
+        errors={state.errors?.partidaId}
+      />
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Foto de capa (URL)
@@ -251,6 +329,8 @@ export function CriarEventoForm({
         <Input name="fotoUrl" type="url" placeholder="https://…" />
         <FieldError errors={state.errors?.fotoUrl} />
       </div>
+      <RecorrenciaField errors={state.errors?.recorrenciasSemanas} />
+      <GeoFields errorsLat={state.errors?.lat} errorsLng={state.errors?.lng} />
 
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
         <ValorVagaField errors={state.errors?.valorVaga} />
@@ -296,16 +376,24 @@ type EventoData = {
   tipo?: string
   sedeId?: string | null
   capacidade?: number | null
+  lat?: number | null
+  lng?: number | null
+  serieId?: string | null
+  partidaId?: string | null
   valorVaga?: number | { toNumber(): number } | null
 }
 
 export function EditarEventoForm({
   evento,
   sedes = [],
+  partidas = [],
+  temAfiliacao = true,
   redirectTo,
 }: {
   evento: EventoData
   sedes?: SedeOption[]
+  partidas?: PartidaOption[]
+  temAfiliacao?: boolean
   redirectTo?: string
 }) {
   const [state, setState] = useState<EventoState>({})
@@ -383,6 +471,12 @@ export function EditarEventoForm({
 
       <SedeSelect sedes={sedes} defaultValue={evento.sedeId} errors={state.errors?.sedeId} />
       <CapacidadeField defaultValue={evento.capacidade} errors={state.errors?.capacidade} />
+      <PartidaFields
+        partidas={partidas}
+        defaultPartidaId={evento.partidaId}
+        temAfiliacao={temAfiliacao}
+        errors={state.errors?.partidaId}
+      />
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Foto de capa (URL)
@@ -390,6 +484,28 @@ export function EditarEventoForm({
         <Input name="fotoUrl" type="url" defaultValue={evento.fotoUrl ?? ''} placeholder="https://…" />
         <FieldError errors={state.errors?.fotoUrl} />
       </div>
+      <GeoFields
+        defaultLat={evento.lat}
+        defaultLng={evento.lng}
+        errorsLat={state.errors?.lat}
+        errorsLng={state.errors?.lng}
+      />
+
+      {evento.serieId && (
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Escopo da série
+          </label>
+          <select
+            name="escopoSerie"
+            defaultValue="esta"
+            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
+          >
+            <option value="esta">Só esta ocorrência</option>
+            <option value="futuras">Esta e as próximas da série</option>
+          </select>
+        </div>
+      )}
 
       {tipo === 'CARAVANA' && (
         <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />
@@ -408,37 +524,74 @@ export function EditarEventoForm({
         <FieldError errors={state.errors?.descricao} />
       </div>
 
-      <SubmitButton label="Salvar alterações" icon={<CalendarPlus className="h-4 w-4" />} />
+      <div className="flex flex-wrap items-center gap-2">
+        <SubmitButton label="Salvar alterações" icon={<CalendarPlus className="h-4 w-4" />} />
+        <ExcluirEventoButton eventoId={evento.id} serieId={evento.serieId} />
+      </div>
     </form>
   )
 }
 
 /* ── Excluir ─────────────────────────────────────────────────────────────────── */
-export function ExcluirEventoButton({ eventoId }: { eventoId: string }) {
+export function ExcluirEventoButton({
+  eventoId,
+  serieId,
+}: {
+  eventoId: string
+  serieId?: string | null
+}) {
   const router = useRouter()
   const confirmAction = useConfirmAction()
 
-  function handleExcluir() {
+  function handleExcluir(escopo: 'esta' | 'futuras') {
+    const ehSerie = escopo === 'futuras'
     void confirmAction({
-      titulo: 'Excluir este evento?',
-      descricao: 'Todos os RSVPs também serão removidos.',
+      titulo: ehSerie ? 'Excluir esta e as próximas?' : 'Excluir este evento?',
+      descricao: ehSerie
+        ? 'Remove esta ocorrência e todas as futuras da mesma série.'
+        : 'Todos os RSVPs desta ocorrência também serão removidos.',
       labelConfirmar: 'Excluir',
       variante: 'destructive',
       cancelled: 'Exclusão cancelada.',
-      run: () => excluirEvento(eventoId),
-      success: 'Evento excluído.',
+      run: () => excluirEvento(eventoId, escopo),
+      success: ehSerie ? 'Ocorrências excluídas.' : 'Evento excluído.',
     }).then((ok) => {
-      if (ok) router.refresh()
+      if (ok) router.push('/admin/eventos')
     })
   }
 
+  if (!serieId) {
+    return (
+      <button
+        type="button"
+        onClick={() => handleExcluir('esta')}
+        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Excluir
+      </button>
+    )
+  }
+
   return (
-    <button
-      onClick={handleExcluir}
-      className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-    >
-      <Trash2 className="h-3.5 w-3.5" />
-      Excluir
-    </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => handleExcluir('esta')}
+        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Excluir esta
+      </button>
+      <button
+        type="button"
+        onClick={() => handleExcluir('futuras')}
+        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Excluir série futura
+      </button>
+    </div>
   )
 }
+

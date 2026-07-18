@@ -16,6 +16,7 @@ import type { Metadata } from 'next'
 import type { TipoEvento } from '@torcida/db'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
+import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 
 export const metadata: Metadata = { title: 'Agenda — Admin' }
 
@@ -62,6 +63,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     local: string | null
     tipo: TipoEvento
     capacidade: number | null
+    serieId: string | null
     sede: { capacidade: number | null } | null
     _count: { rsvps: number }
   }
@@ -69,11 +71,13 @@ export default async function AdminEventosPage({ searchParams }: Props) {
 
   const calJanela = isCal ? janelaCalendario(vista, sp.data) : null
 
-  const [proximos, passados, sedes, calEventos]: [
+  const [proximos, passados, sedes, calEventos, partidas, afiliacaoId]: [
     EventoAdminRow[],
     EventoAdminRow[],
     Awaited<ReturnType<typeof listSedesAtivasParaEvento>>,
     CalRow[],
+    Awaited<ReturnType<typeof listPartidasParaEvento>>,
+    string | null,
   ] = await Promise.all([
     isCal
       ? Promise.resolve([] as EventoAdminRow[])
@@ -87,6 +91,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             local: true,
             tipo: true,
             capacidade: true,
+            serieId: true,
             sede: { select: { capacidade: true } },
             _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
           },
@@ -105,6 +110,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             local: true,
             tipo: true,
             capacidade: true,
+            serieId: true,
             sede: { select: { capacidade: true } },
             _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
           },
@@ -120,6 +126,8 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           take: 120,
         }) as Promise<CalRow[]>)
       : Promise.resolve([] as CalRow[]),
+    listPartidasParaEvento(tenant.id),
+    getAfiliacaoIdDoTenant(tenant.id),
   ])
 
   function serializar(evento: EventoAdminRow, passado: boolean): AdminEventoItem {
@@ -137,6 +145,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
       confirmados,
       passado,
       tipo: evento.tipo,
+      serieId: evento.serieId,
       lotacaoLabel:
         cap != null
           ? `${confirmados}/${cap} confirmados`
@@ -189,6 +198,8 @@ export default async function AdminEventosPage({ searchParams }: Props) {
         <NovoEventoButton
           defaultTipo={tipoFiltro ?? 'GERAL'}
           sedes={sedes}
+          partidas={partidas}
+          temAfiliacao={Boolean(afiliacaoId)}
           redirectTo="/admin/eventos"
         />
       </div>

@@ -16,65 +16,41 @@
 
 Filtros: `?tipo=CARAVANA\|ENSAIO\|GERAL`, `?vista=lista\|semana\|mes`, `?q=`, `?data=YYYY-MM-DD`.
 
-Menu admin: label **Agenda**. Caps de depto apontam para `?tipo=`.
-
 ## Modelo
 
-- `Evento` — `tipo` GERAL \| CARAVANA \| ENSAIO; `sedeId` (escopo territorial);
-  `capacidade` (override); `valorVaga` (caravana); `lat`/`lng` (horizonte).
-- `EventoRsvp` — `CONFIRMADO` \| `RECUSADO` \| `LISTA_ESPERA`; `checkedInAt` =
-  presença real (independente do RSVP).
+- `Evento` — `tipo` GERAL \| CARAVANA \| ENSAIO; `sedeId`; `capacidade`; `valorVaga`;
+  `lat`/`lng`; `serieId`; `partidaId` (jogo do clube); `fotoUrl`.
+- `Partida` — **global por `Afiliacao`** (sem `tenantId`): adversário, mando,
+  competição, data/hora, placar opcional, status.
+- `EventoRsvp` — `CONFIRMADO` \| `RECUSADO` \| `LISTA_ESPERA`; `criadoEm` (fila);
+  `checkedInAt` = presença real.
 
-**Capacidade efetiva** = `Evento.capacidade` se setado, senão `Sede.capacidade`.
-Sem nenhum dos dois → lotação livre. Ao tentar `CONFIRMADO` com lotação cheia →
-grava `LISTA_ESPERA`. Gestor promove via `promoverDaListaEspera`.
+**Capacidade efetiva** = `Evento.capacidade` senão `Sede.capacidade`. Lotação cheia
+→ `LISTA_ESPERA`. Saída de `CONFIRMADO` → `promoverProximoDaEspera` (ordem
+`criadoEm`).
 
-Visibilidade: `getEscopoEventosVisiveis` (global vs sede + ancestrais).
+**Recorrência:** `recorrenciasSemanas` cria N+1 com o mesmo `serieId`. Edit/delete:
+escopo **esta** ou **futuras**.
 
-## Plugins (modos)
+**Partida:** select no form (ou “cadastrar nova”). Requer `Tenant.afiliacaoId`.
+Queries de `Partida` **não** filtram por tenant.
 
-Ver [modulo-caravanas.md](./modulo-caravanas.md) e [modulo-bateria.md](./modulo-bateria.md)
-para copy/KPIs de departamento. Comportamento tipado no detalhe:
+## Plugins / lembretes / RBAC / performance
 
-- **CARAVANA** — valor da vaga + cobrança AVULSA; lista “Embarque”
-- **ENSAIO** — lista “Presença”
-- **GERAL** — RSVP + confirmados; embarque se gestor
+Ver histórico do hub: modos CARAVANA/ENSAIO, cron `eventos-lembretes`,
+`events:create|manage`, cache de escopo/sedes, calendário por janela + cores por tipo.
 
-## Lembretes
+## Ações de valor
 
-`GET /api/cron/eventos-lembretes` (Bearer `CRON_SECRET`):
+- ICS, copiar link, publicar no mural (`?eventoId=` + foco composer)
+- RSVP inline, QR câmera, **fila offline** (localStorage → sync ao voltar online)
+- Mapa embutido (OSM) + Ver no mapa / Como chegar
+- Card da partida vinculada no detalhe
+- Badge **Série** + escopo esta/futuras
 
-- T−24h / T−2h → confirmados (`EVENTO_LEMBRETE`)
-- ~08h no dia → gestores (`EVENTO_DIA_GESTOR`)
-- Novo CONFIRMADO → criador (`EVENTO_RSVP`)
+## Horizonte
 
-## RBAC
-
-- `events:create` — criar (portal/admin drawer)
-- `events:manage` — editar, excluir, check-in/QR, promover espera, CSV
-
-## Performance
-
-- `React.cache` em `getEscopoEventosVisiveis` e `listSedesAtivasParaEvento`
-- Lista e calendário **não** carregam juntos — só a vista ativa
-- Calendário filtra pela **janela** da semana/mês (não 200 eventos soltos)
-- Próximos limitados (`take: 40`); RSVPs do membro só dos eventos futuros
-- Toolbar sticky + busca com debounce (`AgendaBusca`)
-- Prefetch nos cards/filtros; skeleton alinhado ao layout
-
-## Ações de valor no detalhe
-
-- **Adicionar ao calendário** (`.ics`)
-- **Copiar link**
-- **Publicar no mural** (deep-link Comunidade)
-- Spotlight **Próximo** no hub
-
-
-
-- **Partida:** entidade/`Partida` ou vínculo a calendário do clube — domínio ainda
-  inexistente; UI não promete “partidas”.
-- **Recorrência / data fim:** série de ensaios (RRULE simples ou “repetir N semanas”).
-- **Mapa / lat-lng** no formulário (já no Zod/schema).
-- **Câmera QR** nativa; modo offline de check-in.
-- **Ônibus/assentos** e bilheteria completa — fora do escopo atual.
-
+- Sync de calendário externo (Sofascore / API) para popular `Partida`
+- Placar ao vivo / status AO_VIVO automático
+- PWA completa de check-in (hoje: fila local no browser)
+- Ônibus/assentos e bilheteria

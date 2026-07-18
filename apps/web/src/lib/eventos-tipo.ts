@@ -24,10 +24,22 @@ export type EventoEmbarqueLite = {
   fotoUrl: string | null
   data: Date
   local: string | null
+  lat: number | null
+  lng: number | null
   valorVaga: { toNumber(): number } | number | null
   capacidade: number | null
   sedeNome: string | null
   sede: { capacidade: number | null } | null
+  partida: {
+    adversario: string
+    competicao: string | null
+    dataHora: Date
+    local: string | null
+    mando: 'CASA' | 'FORA'
+    status: string
+    placarCasa: number | null
+    placarFora: number | null
+  } | null
   rsvps: Array<{
     id: string
     status: RsvpStatus
@@ -154,11 +166,25 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
       fotoUrl: true,
       data: true,
       local: true,
+      lat: true,
+      lng: true,
       valorVaga: true,
       capacidade: true,
       sede: { select: { capacidade: true, nome: true } },
+      partida: {
+        select: {
+          adversario: true,
+          competicao: true,
+          dataHora: true,
+          local: true,
+          mando: true,
+          status: true,
+          placarCasa: true,
+          placarFora: true,
+        },
+      },
       rsvps: {
-        orderBy: [{ status: 'asc' }, { id: 'asc' }],
+        orderBy: [{ status: 'asc' }, { criadoEm: 'asc' }],
         select: {
           id: true,
           status: true,
@@ -179,10 +205,13 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
     fotoUrl: row.fotoUrl,
     data: row.data,
     local: row.local,
+    lat: row.lat,
+    lng: row.lng,
     valorVaga: row.valorVaga,
     capacidade: row.capacidade,
     sedeNome: row.sede?.nome ?? null,
     sede: row.sede ? { capacidade: row.sede.capacidade } : null,
+    partida: row.partida,
     rsvps: row.rsvps,
   }
 })

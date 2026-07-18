@@ -64,7 +64,7 @@ export function EventoAcoesRapidas({
       </button>
       {podePublicarMural && (
         <Link
-          href="/portal/comunidade"
+          href={`/portal/comunidade?eventoId=${eventoId}`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
         >
           <Share2 className="h-3.5 w-3.5" />
