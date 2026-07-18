@@ -99,7 +99,7 @@ function Stepper({
   const icon = size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5'
   const qty = size === 'lg' ? 'min-w-9 text-base' : 'min-w-8 text-sm'
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-0.5 shadow-sm">
+    <div className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-0.5 shadow-sm">
       <button
         type="button"
         aria-label={`Diminuir ${label}`}
@@ -964,23 +964,23 @@ export function BarPdv({
                   const estoqueBaixo =
                     !esgotado && p.estoqueMinimo != null && p.estoque <= p.estoqueMinimo
                   return (
-                    <m.button
+                    // Card is a div (not a button): Stepper/Remover nest real <button>s;
+                    // nested buttons make the browser close the outer early and shatter the grid.
+                    <m.div
                       key={p.id}
-                      type="button"
                       variants={staggerItem}
-                      whileTap={esgotado || pending ? undefined : { scale: 0.985 }}
+                      whileTap={esgotado || pending || semMais ? undefined : { scale: 0.985 }}
                       transition={springSnappy}
-                      disabled={esgotado || pending}
                       onClick={() => {
-                        if (!semMais) setQtdProduto(p, 1)
+                        if (!semMais && !pending) setQtdProduto(p, 1)
                       }}
                       className={[
-                        'flex gap-3 overflow-hidden rounded-3xl border p-3 text-left transition-colors',
+                        'flex min-w-0 gap-3 overflow-hidden rounded-3xl border p-3 text-left transition-colors',
                         esgotado
                           ? 'cursor-not-allowed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-50'
                           : noCarrinho > 0
-                            ? 'border-[rgb(var(--color-primary)_/_0.55)] bg-[rgb(var(--color-primary)_/_0.08)] ring-1 ring-[rgb(var(--color-primary)_/_0.25)]'
-                            : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.35)]',
+                            ? 'cursor-pointer border-[rgb(var(--color-primary)_/_0.55)] bg-[rgb(var(--color-primary)_/_0.08)] ring-1 ring-[rgb(var(--color-primary)_/_0.25)]'
+                            : 'cursor-pointer border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.35)]',
                       ].join(' ')}
                     >
                       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[rgb(var(--background-subtle))] sm:h-24 sm:w-24">
@@ -1050,14 +1050,14 @@ export function BarPdv({
                               type="button"
                               aria-label={`Remover ${p.nome}`}
                               onClick={() => removerLinha(p.id)}
-                              className="flex h-10 w-10 items-center justify-center rounded-full text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.1)]"
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.1)]"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           )}
                         </div>
                       </div>
-                    </m.button>
+                    </m.div>
                   )
                 })}
               </m.div>
