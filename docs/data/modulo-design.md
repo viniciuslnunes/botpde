@@ -46,9 +46,13 @@ Consumidores: `Badge` (`success`/`danger`/`warning`/`info`), diálogos de confir
 
 ## Sugestões de cor
 
-1. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube(nome, apelido)` a partir da afiliação.
-2. **Escudo/logo** — `extrairPaletaDeImagem` (canvas no client) em `logoUrl` → logo da torcida conhecida → `escudoUrl`.
-3. **Aplicar sugestão** — preenche marca + deriva tint leve em `backgroundSubtle` / `surface` (`derivarSuperficiesDaMarca`).
+1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — harmônicas a partir da
+   primária atual (marca harmonizada, análoga, complementar, mono), mais clube,
+   escudo/logo e preset alto contraste. Um clique via `aplicarPaletaAoDesign`
+   preenche marca + ações + tint de superfícies.
+2. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube`.
+3. **Escudo/logo** — `extrairPaletaDeImagem` (canvas) alimenta a sugestão “Do escudo”.
+4. **Antes/depois** na prévia — compara rascunho com o design já salvo.
 
 ## Actions
 

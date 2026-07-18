@@ -32,10 +32,10 @@ import {
   DEFAULT_TENANT_DESIGN,
   SURFACE_TOKEN_KEYS,
   SURFACE_TOKEN_LABELS,
+  aplicarPaletaAoDesign,
   contrasteRatio,
   contrasteTextoSobre,
-  derivarSuperficiesDaMarca,
-  designFromPrimary,
+  gerarPaletasSugeridas,
   paletaDoClube,
   resolveTenantDesign,
 } from '@torcida/types'
@@ -385,6 +385,7 @@ export function DesignForm({
   const [previewMode, setPreviewMode] = useState<PreviewMode>('dark')
   const [scene, setScene] = useState<PreviewScene>('portal')
   const [focus, setFocus] = useState<TokenFocus>(null)
+  const [compareAtivo, setCompareAtivo] = useState(false)
   const [pending, startTransition] = useTransition()
   const [extracted, setExtracted] = useState<string[]>([])
   const [extracting, setExtracting] = useState(false)
@@ -442,6 +443,21 @@ export function DesignForm({
     [clubeNome, clubeApelido],
   )
 
+  const paletasSugeridas = useMemo(
+    () =>
+      gerarPaletasSugeridas(design.brand.primary, {
+        clube: clubePaleta
+          ? {
+              primary: clubePaleta.primary,
+              secondary: clubePaleta.secondary,
+              accents: clubePaleta.accents,
+            }
+          : null,
+        extraidas: extracted,
+      }),
+    [design.brand.primary, clubePaleta, extracted],
+  )
+
   const contrastChecks = useMemo(
     () => buildContrastChecks(design, previewMode),
     [design, previewMode],
@@ -454,15 +470,13 @@ export function DesignForm({
     setDesign((d) => ({ ...d, ...partial }))
   }
 
-  function applySuggestion(primary: string, secondary?: string | null) {
-    const derived = derivarSuperficiesDaMarca(primary)
-    const next = designFromPrimary(primary, secondary ?? derived.secondary) as TenantDesign
-    next.light = { ...next.light, ...derived.light }
-    next.dark = { ...next.dark, ...derived.dark }
-    next.grid = { ...design.grid }
-    next.actions = { ...DEFAULT_ACTIONS, ...design.actions }
-    setDesign(next)
+  function applyPaletaCompleta(
+    paleta: ReturnType<typeof gerarPaletasSugeridas>[number],
+  ) {
+    setDesign(aplicarPaletaAoDesign(design, paleta) as TenantDesign)
     setFocus('brand.primary')
+    setCompareAtivo(false)
+    setSection('identidade')
   }
 
   function handleCancel() {
@@ -529,9 +543,63 @@ export function DesignForm({
             {section === 'identidade' ? (
               <SectionFrame
                 title="Identidade"
-                description="Passe o mouse nos campos — a prévia destaca onde a cor aparece."
+                description="Escolha uma paleta pronta ou ajuste a marca. A prévia mostra o resultado na hora."
               >
-                <div className="grid gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
+                    <Sparkles className="h-3.5 w-3.5 text-sky-500" />
+                    Paletas sugeridas
+                  </div>
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    Geradas da sua cor, do clube e do escudo. Um clique aplica marca + ações +
+                    fundos tintados.
+                  </p>
+                  {extracting ? (
+                    <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Extraindo cores do escudo…
+                    </p>
+                  ) : null}
+                  <div className="space-y-2">
+                    {paletasSugeridas.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPaletaCompleta(p)}
+                        className="group w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 text-left transition-colors hover:border-sky-400 hover:bg-[rgb(var(--background-subtle))]"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                              {p.nome}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+                              {p.descricao}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 opacity-0 transition-opacity group-hover:opacity-100 dark:text-sky-300">
+                            Aplicar
+                          </span>
+                        </div>
+                        <div className="mt-2.5 flex overflow-hidden rounded-lg">
+                          {p.swatches.map((hex, i) => (
+                            <span
+                              key={`${p.id}-${hex}-${i}`}
+                              className="h-8 flex-1 first:rounded-l-lg last:rounded-r-lg"
+                              style={{ backgroundColor: hex }}
+                              title={hex}
+                            />
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 border-t border-[rgb(var(--border))] pt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    Ajuste fino
+                  </p>
                   <ColorField
                     label="Cor primária"
                     value={design.brand.primary}
@@ -552,60 +620,16 @@ export function DesignForm({
                     emptyLabel="Remover"
                     {...fieldProps}
                   />
-                </div>
-
-                <div className="space-y-2 border-t border-[rgb(var(--border))] pt-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
-                    <Sparkles className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
-                    Sugestões do clube / escudo
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {clubePaleta ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          applySuggestion(clubePaleta.primary, clubePaleta.secondary)
-                        }
-                        className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-left transition-colors hover:border-sky-400"
-                      >
-                        <span className="flex -space-x-1">
-                          <span
-                            className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
-                            style={{ backgroundColor: clubePaleta.primary }}
-                          />
-                          <span
-                            className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
-                            style={{ backgroundColor: clubePaleta.secondary }}
-                          />
-                        </span>
-                        <span className="text-xs font-medium text-[rgb(var(--foreground))]">
-                          Paleta · {clubeApelido ?? clubeNome}
-                        </span>
-                      </button>
-                    ) : null}
-                    {extracting ? (
-                      <span className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Lendo escudo…
-                      </span>
-                    ) : null}
-                    {extracted.map((hex) => (
-                      <button
-                        key={hex}
-                        type="button"
-                        onClick={() => applySuggestion(hex)}
-                        className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 transition-colors hover:border-sky-400"
-                      >
-                        <span
-                          className="h-6 w-6 rounded-full border border-[rgb(var(--border))]"
-                          style={{ backgroundColor: hex }}
-                        />
-                        <span className="font-mono text-xs text-[rgb(var(--foreground-muted))]">
-                          {hex}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pack = paletasSugeridas.find((p) => p.id === 'marca-harmonizada')
+                      if (pack) applyPaletaCompleta(pack)
+                    }}
+                    className="text-left text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                  >
+                    Reequilibrar ações a partir da primária atual
+                  </button>
                 </div>
               </SectionFrame>
             ) : null}
@@ -782,12 +806,15 @@ export function DesignForm({
         <div className="flex min-h-[520px] flex-col gap-3 xl:min-h-0">
           <DesignStudioPreview
             design={design}
+            baselineDesign={normalizedBaseline}
+            compareAtivo={compareAtivo && dirty}
             mode={previewMode}
             scene={scene}
             tenantNome={tenantNome}
             focus={focus}
             onSceneChange={setScene}
             onModeChange={setPreviewMode}
+            onCompareChange={setCompareAtivo}
           />
           <ContrastPanel checks={contrastChecks} />
         </div>

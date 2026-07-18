@@ -38,14 +38,18 @@ export type TokenFocus =
   | 'surfaceRaised'
   | null
 
-type Props = {
+export type DesignStudioPreviewProps = {
   design: TenantDesign
+  /** Se definido com compareAtivo, mostra o design salvo (antes). */
+  baselineDesign?: TenantDesign
+  compareAtivo?: boolean
   mode: PreviewMode
   scene: PreviewScene
   tenantNome: string
   focus: TokenFocus
   onSceneChange: (s: PreviewScene) => void
   onModeChange: (m: PreviewMode) => void
+  onCompareChange?: (ativo: boolean) => void
 }
 
 function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
@@ -484,37 +488,69 @@ const SCENES: { id: PreviewScene; label: string; hint: string }[] = [
  */
 export function DesignStudioPreview({
   design,
+  baselineDesign,
+  compareAtivo = false,
   mode,
   scene,
   tenantNome,
   focus,
   onSceneChange,
   onModeChange,
-}: Props) {
+  onCompareChange,
+}: DesignStudioPreviewProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const activeDesign =
+    compareAtivo && baselineDesign ? baselineDesign : design
+  const showingBefore = Boolean(compareAtivo && baselineDesign)
 
   useEffect(() => {
     if (!rootRef.current) return
-    applyTenantDesign(design, mode, rootRef.current)
-  }, [design, mode])
+    applyTenantDesign(activeDesign, mode, rootRef.current)
+  }, [activeDesign, mode])
 
   useEffect(() => {
-    if (!focus || !rootRef.current) return
+    if (!focus || !rootRef.current || showingBefore) return
     const el = rootRef.current.querySelector(`[data-token="${focus}"]`)
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [focus, scene])
+  }, [focus, scene, showingBefore])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Prévia da aplicação</p>
+          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            Prévia da aplicação
+            {showingBefore ? (
+              <span className="ml-2 rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">
+                Antes (salvo)
+              </span>
+            ) : (
+              <span className="ml-2 rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                Depois (rascunho)
+              </span>
+            )}
+          </p>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Passe o mouse nos controles à esquerda — a área afetada acende aqui. Nada muda de
-            verdade até salvar.
+            {showingBefore
+              ? 'Visualização do que está publicado hoje. Desative “Antes/depois” para editar.'
+              : 'Passe o mouse nos controles — a área afetada acende. Só aplica na torcida ao salvar.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {baselineDesign && onCompareChange ? (
+            <button
+              type="button"
+              onClick={() => onCompareChange(!compareAtivo)}
+              className={[
+                'rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                compareAtivo
+                  ? 'border-amber-500/50 bg-amber-500/15 text-amber-800 dark:text-amber-100'
+                  : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+              ].join(' ')}
+            >
+              Antes / depois
+            </button>
+          ) : null}
           <div className="flex gap-0.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5">
             {SCENES.map((s) => (
               <button
@@ -558,13 +594,28 @@ export function DesignStudioPreview({
         className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/5 dark:ring-white/5"
       >
         {scene === 'portal' ? (
-          <PortalScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+          <PortalScene
+            design={activeDesign}
+            mode={mode}
+            tenantNome={tenantNome}
+            focus={showingBefore ? null : focus}
+          />
         ) : null}
         {scene === 'admin' ? (
-          <AdminScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+          <AdminScene
+            design={activeDesign}
+            mode={mode}
+            tenantNome={tenantNome}
+            focus={showingBefore ? null : focus}
+          />
         ) : null}
         {scene === 'entrar' ? (
-          <EntrarScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+          <EntrarScene
+            design={activeDesign}
+            mode={mode}
+            tenantNome={tenantNome}
+            focus={showingBefore ? null : focus}
+          />
         ) : null}
       </div>
     </div>

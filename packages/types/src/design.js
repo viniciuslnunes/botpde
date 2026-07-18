@@ -307,7 +307,6 @@ export function paletaDoClube(nome, apelido) {
  * @returns {{ light: Record<string, string>, dark: Record<string, string>, secondary: string }}
  */
 export function derivarSuperficiesDaMarca(primaryHex) {
-  const rgb = hexToRgbChannels(primaryHex)
   const secondary = contrasteTextoSobre(primaryHex) === 'light' ? '#ffffff' : '#0a0a0a'
 
   // Mix bem suave com o default (≈8% da marca no subtle light; ≈12% no dark).
@@ -319,6 +318,260 @@ export function derivarSuperficiesDaMarca(primaryHex) {
     secondary,
     light: { backgroundSubtle: lightSubtle },
     dark: { backgroundSubtle: darkSubtle, surface: darkSurface },
+  }
+}
+
+/**
+ * @param {string} hex
+ * @returns {{ h: number, s: number, l: number }}
+ */
+export function hexToHsl(hex) {
+  const [r0, g0, b0] = hexToRgbChannels(hex).map((c) => c / 255)
+  const max = Math.max(r0, g0, b0)
+  const min = Math.min(r0, g0, b0)
+  const l = (max + min) / 2
+  if (max === min) return { h: 0, s: 0, l }
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let h = 0
+  if (max === r0) h = ((g0 - b0) / d + (g0 < b0 ? 6 : 0)) / 6
+  else if (max === g0) h = ((b0 - r0) / d + 2) / 6
+  else h = ((r0 - g0) / d + 4) / 6
+  return { h: h * 360, s, l }
+}
+
+/**
+ * @param {number} h 0–360
+ * @param {number} s 0–1
+ * @param {number} l 0–1
+ * @returns {string}
+ */
+export function hslToHex(h, s, l) {
+  const hh = ((h % 360) + 360) % 360
+  const a = s * Math.min(l, 1 - l)
+  /** @param {number} n */
+  const f = (n) => {
+    const k = (n + hh / 30) % 12
+    const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * c)
+  }
+  return rgbToHex(f(0), f(8), f(4))
+}
+
+/**
+ * Garante luminância útil para botões (nem branco, nem preto puro).
+ * @param {string} hex
+ * @param {number} [minL]
+ * @param {number} [maxL]
+ */
+function clampHexLightness(hex, minL = 0.22, maxL = 0.62) {
+  const { h, s, l } = hexToHsl(hex)
+  if (s < 0.08) {
+    // Quase monocromático — empurra para um tom utilizável.
+    return hslToHex(h, 0.12, Math.min(maxL, Math.max(minL, l)))
+  }
+  return hslToHex(h, s, Math.min(maxL, Math.max(minL, l)))
+}
+
+/**
+ * Deriva cores de ação legíveis a partir da marca (semânticas reconhecíveis).
+ * @param {string} primaryHex
+ */
+export function derivarAcoesDaMarca(primaryHex) {
+  const { h } = hexToHsl(primaryHex)
+  // Sucesso fica em verde; perigo em vermelho; warning âmbar; info perto da marca ou azul.
+  const success = mixHex('#059669', hslToHex((h + 140) % 360, 0.55, 0.38), 0.25)
+  const danger = mixHex('#dc2626', hslToHex((h + 20) % 360, 0.7, 0.42), 0.2)
+  const warning = mixHex('#d97706', hslToHex((h + 40) % 360, 0.75, 0.45), 0.2)
+  const info = clampHexLightness(
+    mixHex('#2563eb', primaryHex, 0.35),
+    0.28,
+    0.55,
+  )
+  return {
+    success: clampHexLightness(success, 0.28, 0.48),
+    danger: clampHexLightness(danger, 0.32, 0.5),
+    warning: clampHexLightness(warning, 0.35, 0.52),
+    info,
+  }
+}
+
+/**
+ * @typedef {{
+ *   id: string,
+ *   nome: string,
+ *   descricao: string,
+ *   primary: string,
+ *   secondary: string,
+ *   actions: { success: string, danger: string, warning: string, info: string },
+ *   swatches: string[],
+ *   fonte: 'harmonia' | 'clube' | 'escudo' | 'preset'
+ * }} PaletaSugerida
+ */
+
+/**
+ * Gera paletas harmônicas a partir de uma cor semente (marca atual, clube ou escudo).
+ * @param {string} seedHex
+ * @param {{ clube?: { primary: string, secondary: string, accents?: string[] } | null, extraidas?: string[] }} [opts]
+ * @returns {PaletaSugerida[]}
+ */
+export function gerarPaletasSugeridas(seedHex, opts = {}) {
+  const seed =
+    typeof seedHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(seedHex)
+      ? seedHex
+      : DEFAULT_ACTIONS.info
+  const { h, s, l } = hexToHsl(seed)
+  const surfaces = derivarSuperficiesDaMarca(seed)
+
+  /** @type {PaletaSugerida[]} */
+  const out = []
+
+  // 1) Marca atual + ações derivadas
+  {
+    const primary = clampHexLightness(seed, 0.12, 0.55)
+    const actions = derivarAcoesDaMarca(primary)
+    out.push({
+      id: 'marca-harmonizada',
+      nome: 'Marca harmonizada',
+      descricao: 'Mantém sua cor e equilibra aprovar/reprovar/alerta',
+      primary,
+      secondary: surfaces.secondary,
+      actions,
+      swatches: [primary, surfaces.secondary, actions.success, actions.danger, actions.warning],
+      fonte: 'harmonia',
+    })
+  }
+
+  // 2) Análoga
+  {
+    const primary = hslToHex(h, Math.max(0.35, s), Math.min(0.45, Math.max(0.25, l)))
+    const secondary = hslToHex((h + 28) % 360, Math.max(0.25, s * 0.8), 0.42)
+    const actions = derivarAcoesDaMarca(primary)
+    out.push({
+      id: 'analoga',
+      nome: 'Análoga',
+      descricao: 'Tons vizinhos no círculo cromático — visual coeso',
+      primary: clampHexLightness(primary),
+      secondary: clampHexLightness(secondary, 0.2, 0.7),
+      actions,
+      swatches: [primary, secondary, actions.info, actions.success],
+      fonte: 'harmonia',
+    })
+  }
+
+  // 3) Complementar (energia de torcida)
+  {
+    const primary = clampHexLightness(seed)
+    const accent = hslToHex((h + 180) % 360, Math.max(0.45, s), 0.42)
+    const actions = {
+      ...derivarAcoesDaMarca(primary),
+      danger: clampHexLightness(accent, 0.3, 0.5),
+    }
+    out.push({
+      id: 'complementar',
+      nome: 'Complementar',
+      descricao: 'Contraste forte — destaque em ações destrutivas',
+      primary,
+      secondary: contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a',
+      actions,
+      swatches: [primary, accent, actions.success, actions.warning],
+      fonte: 'harmonia',
+    })
+  }
+
+  // 4) Monocromática
+  {
+    const primary = hslToHex(h, Math.max(0.2, s * 0.7), 0.28)
+    const secondary = hslToHex(h, Math.max(0.1, s * 0.4), 0.72)
+    const actions = derivarAcoesDaMarca(primary)
+    out.push({
+      id: 'mono',
+      nome: 'Monocromática',
+      descricao: 'Só a família da marca — sóbria e profissional',
+      primary: clampHexLightness(primary, 0.15, 0.4),
+      secondary: clampHexLightness(secondary, 0.55, 0.85),
+      actions,
+      swatches: [
+        hslToHex(h, s, 0.15),
+        primary,
+        hslToHex(h, s * 0.5, 0.45),
+        secondary,
+      ],
+      fonte: 'harmonia',
+    })
+  }
+
+  // 5) Clube (se houver)
+  if (opts.clube?.primary) {
+    const primary = opts.clube.primary
+    const secondary = opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
+    const actions = derivarAcoesDaMarca(primary)
+    out.unshift({
+      id: 'clube',
+      nome: 'Paleta do clube',
+      descricao: 'Cores oficiais do time afiliado',
+      primary,
+      secondary,
+      actions,
+      swatches: [primary, secondary, ...(opts.clube.accents ?? []).slice(0, 2), actions.success],
+      fonte: 'clube',
+    })
+  }
+
+  // 6) Escudo — usa 1ª cor extraída como semente
+  const extra = (opts.extraidas ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
+  if (extra.length >= 2) {
+    const primary = clampHexLightness(extra[0])
+    const secondary = extra[1]
+    const actions = derivarAcoesDaMarca(primary)
+    out.splice(opts.clube ? 1 : 0, 0, {
+      id: 'escudo',
+      nome: 'Do escudo / logo',
+      descricao: 'Extraído da imagem da torcida',
+      primary,
+      secondary,
+      actions,
+      swatches: extra.slice(0, 5),
+      fonte: 'escudo',
+    })
+  }
+
+  // 7) Preset alto contraste
+  {
+    const primary = clampHexLightness(seed, 0.1, 0.35)
+    out.push({
+      id: 'alto-contraste',
+      nome: 'Alto contraste',
+      descricao: 'Prioriza leitura — ações semânticas clássicas',
+      primary,
+      secondary: '#ffffff',
+      actions: { ...DEFAULT_ACTIONS },
+      swatches: [primary, '#ffffff', DEFAULT_ACTIONS.success, DEFAULT_ACTIONS.danger],
+      fonte: 'preset',
+    })
+  }
+
+  return out
+}
+
+/**
+ * Aplica uma paleta sugerida sobre um design existente (preserva grade).
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ * @param {PaletaSugerida} paleta
+ */
+export function aplicarPaletaAoDesign(design, paleta) {
+  const derived = derivarSuperficiesDaMarca(paleta.primary)
+  return {
+    ...design,
+    version: 1,
+    brand: {
+      primary: paleta.primary,
+      secondary: paleta.secondary,
+    },
+    actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
+    light: { ...(design.light ?? {}), ...derived.light },
+    dark: { ...(design.dark ?? {}), ...derived.dark },
+    grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,
   }
 }
 
