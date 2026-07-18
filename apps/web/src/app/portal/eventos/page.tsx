@@ -90,9 +90,19 @@ function serializarEvento(
 
 function ListaFallback() {
   return (
-    <div className="animate-pulse space-y-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-24 rounded-xl bg-[rgb(var(--border))]" />
+    <div className="animate-pulse space-y-1.5">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] px-3 py-2.5"
+        >
+          <div className="h-14 w-14 shrink-0 rounded-lg bg-[rgb(var(--border))]" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-24 rounded bg-[rgb(var(--border))]" />
+            <div className="h-3.5 w-3/4 rounded bg-[rgb(var(--border))]" />
+            <div className="h-3 w-1/2 rounded bg-[rgb(var(--border))]" />
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -205,7 +215,11 @@ export default async function EventosPage({ searchParams }: Props) {
           <Suspense fallback={<div className="h-8 w-48 animate-pulse rounded-lg bg-[rgb(var(--border))]" />}>
             <AgendaBusca key={q} defaultValue={q} />
           </Suspense>
-          <div className="flex gap-1 text-xs">
+          <div
+            className="inline-flex rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5 text-xs"
+            role="group"
+            aria-label="Vista da agenda"
+          >
             {(
               [
                 ['lista', 'Lista'],
@@ -218,10 +232,10 @@ export default async function EventosPage({ searchParams }: Props) {
                 href={hrefFiltro({ vista: id === 'lista' ? '' : id })}
                 prefetch
                 className={[
-                  'rounded-lg px-2.5 py-1.5 font-medium',
+                  'rounded-md px-2.5 py-1.5 font-medium transition-colors',
                   vista === id
-                    ? 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]'
-                    : 'text-[rgb(var(--foreground-muted))]',
+                    ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                    : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
                 {label}
@@ -365,14 +379,23 @@ async function AgendaConteudo({
           local={destaque.local}
           href={`/portal/eventos/${destaque.id}`}
           lotacaoLabel={
-            destaque.lotacaoLabel ? `${destaque.lotacaoLabel} confirmados` : null
+            destaque.lotacaoLabel ? `${destaque.lotacaoLabel} conf.` : null
           }
+          fotoUrl={destaque.fotoUrl}
+          diasLabel={destaque.diasLabel}
         />
       )}
       <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Próximos
-        </h2>
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Próximos
+          </h2>
+          {resto.length > 0 && (
+            <p className="text-[11px] tabular-nums text-[rgb(var(--foreground-muted))]">
+              {resto.length} na fila
+            </p>
+          )}
+        </div>
         <EventosListAnimated
           eventos={resto}
           emptyTitle={destaque ? 'Nada mais na fila' : emptyTitle}
