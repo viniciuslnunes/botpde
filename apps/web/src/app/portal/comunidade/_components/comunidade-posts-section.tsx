@@ -1,4 +1,4 @@
-import { getPostsDaRede, getPostsParaFeed, getPostIdsSalvos } from '@/lib/feed'
+import { getPostsDaRede, getPostsParaFeed, getPostsDosMeusGrupos, getPostIdsSalvos } from '@/lib/feed'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
 
 interface CurrentUser {
@@ -11,8 +11,8 @@ interface ComunidadePostsSectionProps {
   tenantId: string
   currentUser: CurrentUser
   cursor?: string
-  /** 'descobrir' = ranking misto (rede + externos); 'seguindo' = timeline da rede. */
-  filtro?: 'descobrir' | 'seguindo'
+  /** 'descobrir' | 'seguindo' | 'grupos' */
+  filtro?: 'descobrir' | 'seguindo' | 'grupos'
 }
 
 export async function ComunidadePostsSection({
@@ -27,6 +27,21 @@ export async function ComunidadePostsSection({
 
   if (filtro === 'seguindo') {
     const feed = await getPostsDaRede(tenantId, currentUser.id, { cursor, take: 20 })
+    return (
+      <ComunidadeFeedInfinite
+        tenantId={tenantId}
+        currentUser={currentUser}
+        filtro={filtro}
+        initialPosts={feed.posts}
+        initialPageInfo={feed.pageInfo}
+        initialCursor={cursor ?? null}
+        salvoIds={[...salvoIds]}
+      />
+    )
+  }
+
+  if (filtro === 'grupos') {
+    const feed = await getPostsDosMeusGrupos(tenantId, currentUser.id, { cursor, take: 20 })
     return (
       <ComunidadeFeedInfinite
         tenantId={tenantId}

@@ -1558,6 +1558,9 @@ enum TipoNotificacao {
   EVENTO_LEMBRETE
   EVENTO_RSVP
   EVENTO_DIA_GESTOR
+  GRUPO_PEDIDO
+  GRUPO_APROVADO
+  GRUPO_REJEITADO
 }
 
 // ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
@@ -1578,6 +1581,8 @@ model Conversa {
   avatarUrl String? @map("avatar_url")
   // Grupos públicos da comunidade — qualquer membro ativo do tenant pode entrar
   publica   Boolean @default(false)
+  /// true = grupo da Comunidade (lista/mural); false = só mensageria
+  comunidade Boolean @default(false)
 
   // CANAL — comunidade temática ou perfil oficial da unidade (M3 mensageria)
   institucional       Boolean           @default(false) @map("institucional")
@@ -1600,6 +1605,7 @@ model Conversa {
 
   @@index([tenantId, atualizadoEm])
   @@index([tenantId, tipo, canalOficial])
+  @@index([tenantId, tipo, publica])
   @@map("saas_conversas")
 }
 
@@ -1617,21 +1623,29 @@ enum VisibilidadeCanal {
 }
 
 model MembroConversa {
-  id              String        @id @default(uuid())
-  conversaId      String        @map("conversa_id")
-  userId          String        @map("user_id")
-  papel           PapelConversa @default(MEMBRO)
-  entrouEm        DateTime      @default(now()) @map("entrou_em")
-  ultimaLeituraEm DateTime?     @map("ultima_leitura_em")
-  silenciada      Boolean       @default(false)
-  saiuEm          DateTime?     @map("saiu_em")
+  id              String               @id @default(uuid())
+  conversaId      String               @map("conversa_id")
+  userId          String               @map("user_id")
+  papel           PapelConversa        @default(MEMBRO)
+  status          StatusMembroConversa @default(ATIVO)
+  entrouEm        DateTime             @default(now()) @map("entrou_em")
+  ultimaLeituraEm DateTime?            @map("ultima_leitura_em")
+  silenciada      Boolean              @default(false)
+  saiuEm          DateTime?            @map("saiu_em")
 
   conversa Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversaId, userId])
   @@index([userId, saiuEm])
+  @@index([conversaId, status, saiuEm])
   @@map("saas_membros_conversa")
+}
+
+enum StatusMembroConversa {
+  ATIVO
+  PENDENTE
+  REJEITADO
 }
 
 enum PapelConversa {

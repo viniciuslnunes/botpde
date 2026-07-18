@@ -12,6 +12,7 @@ import {
   UserCog,
   UserPlus,
   UserX,
+  Users,
   Wallet,
   Calendar,
   type LucideIcon,
@@ -42,6 +43,9 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   EVENTO_LEMBRETE: Calendar,
   EVENTO_RSVP: Calendar,
   EVENTO_DIA_GESTOR: Calendar,
+  GRUPO_PEDIDO: Users,
+  GRUPO_APROVADO: UserCheck,
+  GRUPO_REJEITADO: UserX,
 }
 
 export interface NotificacaoAtorInfo {
@@ -57,6 +61,9 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   NOVA_REACAO: (nome) => `${nome} curtiu seu post`,
   MENCAO: (nome) => `${nome} mencionou você`,
   REPOST: (nome) => `${nome} compartilhou seu post`,
+  GRUPO_PEDIDO: (nome) => `${nome} pediu para entrar no grupo`,
+  GRUPO_APROVADO: (nome) => `${nome} aprovou sua entrada no grupo`,
+  GRUPO_REJEITADO: (nome) => `${nome} recusou sua entrada no grupo`,
 }
 
 /**

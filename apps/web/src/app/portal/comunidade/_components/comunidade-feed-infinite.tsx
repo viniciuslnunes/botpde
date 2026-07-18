@@ -27,7 +27,7 @@ interface PageInfo {
   nextCursor: string | null
 }
 
-type Filtro = 'descobrir' | 'seguindo'
+type Filtro = 'descobrir' | 'seguindo' | 'grupos'
 
 function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
   return {
@@ -62,6 +62,7 @@ function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
     comunicadoOrigem: null,
     evento: null,
     enquete: null,
+    grupo: null,
   }
 }
 

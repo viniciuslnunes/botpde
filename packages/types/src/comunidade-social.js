@@ -62,9 +62,31 @@ export const publicarPostCanalSchema = z.object({
   conteudo: z.string().trim().min(1).max(3000),
 })
 
-export const criarGrupoPublicoSchema = z.object({
+export const criarGrupoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),
+  publica: z.boolean().default(true),
+})
+
+/** @deprecated Use criarGrupoSchema — mantido para compat. */
+export const criarGrupoPublicoSchema = criarGrupoSchema
+
+export const pedirEntradaGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
+export const decidirPedidoGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+  aprovar: z.boolean(),
+})
+
+export const sairGrupoSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
+export const alternarSilencioGrupoSchema = z.object({
+  conversaId: z.string().min(1),
 })
 
 export const criarDestaqueSchema = z.object({

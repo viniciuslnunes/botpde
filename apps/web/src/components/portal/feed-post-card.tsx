@@ -64,6 +64,14 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
                 Fixado
               </span>
             )}
+            {post.grupo && (
+              <ComunidadePrefetchLink
+                href={`/portal/comunidade/grupos/${post.grupo.id}`}
+                className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:underline"
+              >
+                em {post.grupo.nome ?? 'grupo'}
+              </ComunidadePrefetchLink>
+            )}
           </div>
           {post.autor.nickname && (
             <ComunidadePrefetchLink

@@ -18,7 +18,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `PostSalvo` | `saas_post_salvos` | Bookmarks privados por usuário |
 | `MomentoStory` | `saas_momentos_story` | Momentos efêmeros (24h) no feed |
 | `FeedTimeline` | `saas_feed_timeline` | Timeline materializada por viewer (fan-out on write) para feed de rede/seguindo |
-| `Conversa` (`publica: true`) | `saas_conversas` | Grupos temáticos abertos; posts do mural via `Post.conversaId` |
+| `Conversa` (`comunidade: true`) | `saas_conversas` | Grupos temáticos (público/privado); posts do mural via `Post.conversaId` |
 | `Conversa` (`tipo: CANAL`) | `saas_conversas` | Canais institucionais e comunidades temáticas (M3); mural só-admin opcional |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
 
@@ -77,7 +77,7 @@ visibilidade do post).
 - `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
 - `fixarPostPerfil`, `salvarPost`, `removerPostSalvo`
 - `marcarNotificacaoLida`, `marcarTodasNotificacoesLidas`
-- `criarGrupoPublico`, `entrarGrupoPublico`, `publicarPostGrupo`, `publicarMomentoStory`
+- `criarGrupo`, `entrarGrupoPublico`, `pedirEntradaGrupo`, `decidirPedidoGrupo`, `sairGrupo`, `alternarSilencioGrupo`, `publicarPostGrupo`, `publicarMomentoStory`
 - `criarCanalTematico`, `entrarCanal`, `publicarPostCanal`
 
 Notificações de menção, comentário, reação e repost apontam para

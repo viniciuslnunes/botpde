@@ -21,15 +21,25 @@ import { formatNomeTorcida } from '@torcida/types'
 import { durableImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
+import {
+  escopoFeedComGrupos,
+  escopoFeedSemConversa,
+  escopoFeedSomenteGrupos,
+  filtroMembroGrupoAtivo,
+} from './grupos-scope'
+
+export {
+  escopoFeedComGrupos,
+  escopoFeedSomenteGrupos,
+  filtroMembroGrupoAtivo,
+  filtroMembroGrupoNoFeed,
+} from './grupos-scope'
 
 interface FeedOpts {
   cursor?: string
   take?: number
   afiliacaoId?: string | null
 }
-
-/** Posts do mural de grupo ficam fora do feed principal. */
-const escopoFeedPrincipal = { conversaId: null } as const
 
 type SeguimentoLite = { seguidoId: string }
 
@@ -98,6 +108,8 @@ export interface PostSocialItem {
   comunicadoOrigem: ComunicadoOrigemEmbed | null
   evento: EventoPostEmbed | null
   enquete: EnquetePostItem | null
+  /** Origem do mural de grupo da comunidade, se houver. */
+  grupo: { id: string; nome: string | null } | null
 }
 
 /** Shape cru do Prisma antes de projetar em PostSocialItem. */
@@ -110,9 +122,11 @@ export type PostRaw = Omit<
   | 'comunicadoOrigem'
   | 'evento'
   | 'enquete'
+  | 'grupo'
 > & {
   _count: { reacoes: number; comentarios: number }
   reacoes: { tipo: string }[]
+  conversa?: { id: string; nome: string | null; tipo: string } | null
   postOrigem?: {
     id: string
     conteudo: string
@@ -162,8 +176,18 @@ export function projetarEnquete(
 }
 
 export function projetarPost(post: PostRaw): PostSocialItem {
-  const { _count, reacoes, postOrigem, comunicadoOrigem, evento, enquete, autor, tenant, ...rest } =
-    post
+  const {
+    _count,
+    reacoes,
+    postOrigem,
+    comunicadoOrigem,
+    evento,
+    enquete,
+    autor,
+    tenant,
+    conversa,
+    ...rest
+  } = post
   return {
     ...rest,
     imagemUrl: durableImageUrl(rest.imagemUrl),
@@ -178,7 +202,6 @@ export function projetarPost(post: PostRaw): PostSocialItem {
     },
     totalReacoes: _count.reacoes,
     totalComentarios: _count.comentarios,
-    // Legado: FORCA/VAMOS/PRESENTE no banco contam como curtida na UI.
     minhaReacao: reacoes[0] ? 'CURTIR' : null,
     postOrigem: postOrigem
       ? {
@@ -212,6 +235,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
         }
       : null,
     enquete: enquete ? projetarEnquete(enquete) : null,
+    grupo: conversa?.tipo === 'GRUPO' ? { id: conversa.id, nome: conversa.nome } : null,
   }
 }
 
@@ -274,6 +298,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
     comunicadoOrigem: null,
     evento: null,
     enquete: null,
+    grupo: null,
   }
 }
 
@@ -442,7 +467,7 @@ async function getDescobrirPostsBaseCached(
           tipo: 'MEMBRO',
           visibilidade: 'PUBLICO',
           oculto: false,
-          ...escopoFeedPrincipal,
+          ...escopoFeedSemConversa,
           ...cursorWhere,
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
@@ -581,7 +606,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
         oculto: false,
-        ...escopoFeedPrincipal,
+        ...escopoFeedSemConversa,
         ...cursorWhere,
         autorId: { in: redeIds },
       },
@@ -654,7 +679,7 @@ async function getSugestoesAutoresBaseCached(
             tipo: 'MEMBRO',
             visibilidade: 'PUBLICO',
             oculto: false,
-            ...escopoFeedPrincipal,
+            ...escopoFeedSemConversa,
           },
           orderBy: { criadoEm: 'desc' },
           take: 24,
@@ -810,19 +835,6 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
     }
   })
 })
-
-export interface GrupoPublicoItem {
-  id: string
-  nome: string | null
-  descricao: string | null
-  membros: number
-  souMembro: boolean
-}
-
-export interface GrupoDetalheItem extends GrupoPublicoItem {
-  souAdmin: boolean
-  publica: boolean
-}
 
 export interface DestaquePerfilItem {
   id: string
@@ -1010,7 +1022,7 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
         tenantId: { in: visibleTenantIds },
         tipo: 'MEMBRO',
         oculto: false,
-        ...escopoFeedPrincipal,
+        ...escopoFeedSemConversa,
       },
       include: postInclude(userId),
     })) as PostRaw[]
@@ -1077,7 +1089,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
       tipo: 'MEMBRO',
       visibilidade: 'PUBLICO',
       oculto: false,
-      ...escopoFeedPrincipal,
+      ...escopoFeedSemConversa,
       ...cursorWhere,
       OR: [
         { tenant: { sintetico: true } },
@@ -1192,7 +1204,7 @@ export const getPostsPublicosDoTenant = cache(async function getPostsPublicosDoT
       tenantId: targetTenantId,
       oculto: false,
       visibilidade: 'PUBLICO',
-      ...escopoFeedPrincipal,
+      ...escopoFeedSemConversa,
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: 30,
@@ -1237,7 +1249,7 @@ export async function getPostsPorHashtag(
       tipo: 'MEMBRO',
       oculto: false,
       visibilidade: 'PUBLICO',
-      ...escopoFeedPrincipal,
+      ...escopoFeedSemConversa,
       hashtags: { some: { hashtagId: { in: hashtags.map((h) => h.id) } } },
     },
     orderBy: { criadoEm: 'desc' },
@@ -1268,7 +1280,7 @@ export async function getPostsComVideo(
       tipo: 'MEMBRO',
       oculto: false,
       visibilidade: 'PUBLICO',
-      ...escopoFeedPrincipal,
+      ...escopoFeedComGrupos(userId),
     },
     orderBy: { criadoEm: 'desc' },
     take: 80,
@@ -1293,38 +1305,113 @@ export async function getPostsComVideo(
   return finalizarPosts(posts)
 }
 
-export async function getGruposPublicos(
+/** Contagem só de membros ativos. */
+const membrosAtivosCount = {
+  where: { status: 'ATIVO' as const, saiuEm: null },
+} as const
+
+export interface GrupoItem {
+  id: string
+  nome: string | null
+  descricao: string | null
+  membros: number
+  publica: boolean
+  souMembro: boolean
+  pedidoPendente: boolean
+  souAdmin: boolean
+  silenciada: boolean
+}
+
+/** @deprecated Use GrupoItem */
+export type GrupoPublicoItem = GrupoItem
+export type GrupoDetalheItem = GrupoItem
+
+export interface MembroGrupoPendenteItem {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+  pediuEm: Date
+}
+
+/** Posts recentes dos murais dos grupos do viewer (merge no Descobrir). */
+async function getPostsRecentesDosMeusGrupos(
+  tenantId: string,
+  userId: string,
+  take: number,
+): Promise<PostSocialItem[]> {
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+      ...escopoFeedSomenteGrupos(userId),
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take,
+    include: postInclude(userId),
+  })) as PostRaw[]
+  return postsRaw.map(projetarPost)
+}
+
+export async function getGruposDoTenant(
   tenantId: string,
   userId?: string,
-): Promise<GrupoPublicoItem[]> {
+): Promise<GrupoItem[]> {
   const rows: Array<{
     id: string
     nome: string | null
     descricao: string | null
+    publica: boolean
     _count: { membros: number }
-    membros: Array<{ id: string }>
+    membros: Array<{
+      id: string
+      papel: 'ADMIN' | 'MEMBRO'
+      status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+      silenciada: boolean
+    }>
   }> = await db.conversa.findMany({
-    where: { tenantId, tipo: 'GRUPO', publica: true },
+    where: { tenantId, tipo: 'GRUPO', comunidade: true },
     orderBy: { atualizadoEm: 'desc' },
     take: 50,
     select: {
       id: true,
       nome: true,
       descricao: true,
-      _count: { select: { membros: true } },
+      publica: true,
+      _count: { select: { membros: membrosAtivosCount } },
       membros: userId
-        ? { where: { userId, saiuEm: null }, select: { id: true }, take: 1 }
-        : { where: { id: '' }, select: { id: true }, take: 0 },
+        ? {
+            where: { userId, saiuEm: null },
+            select: { id: true, papel: true, status: true, silenciada: true },
+            take: 1,
+          }
+        : { where: { id: '' }, select: { id: true, papel: true, status: true, silenciada: true }, take: 0 },
     },
   })
 
-  return rows.map((g) => ({
-    id: g.id,
-    nome: g.nome,
-    descricao: g.descricao,
-    membros: g._count.membros,
-    souMembro: g.membros.length > 0,
-  }))
+  return rows.map((g) => {
+    const membro = g.membros[0]
+    return {
+      id: g.id,
+      nome: g.nome,
+      descricao: g.descricao,
+      publica: g.publica,
+      membros: g._count.membros,
+      souMembro: membro?.status === 'ATIVO',
+      pedidoPendente: membro?.status === 'PENDENTE',
+      souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+      silenciada: membro?.silenciada ?? false,
+    }
+  })
+}
+
+/** @deprecated Use getGruposDoTenant */
+export async function getGruposPublicos(
+  tenantId: string,
+  userId?: string,
+): Promise<GrupoItem[]> {
+  return getGruposDoTenant(tenantId, userId)
 }
 
 export async function getGrupoPorId(
@@ -1337,19 +1424,25 @@ export async function getGrupoPorId(
     nome: string | null
     descricao: string | null
     publica: boolean
+    comunidade: boolean
     _count: { membros: number }
-    membros: Array<{ papel: 'ADMIN' | 'MEMBRO' }>
+    membros: Array<{
+      papel: 'ADMIN' | 'MEMBRO'
+      status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+      silenciada: boolean
+    }>
   } | null = await db.conversa.findFirst({
-    where: { id: conversaId, tenantId, tipo: 'GRUPO' },
+    where: { id: conversaId, tenantId, tipo: 'GRUPO', comunidade: true },
     select: {
       id: true,
       nome: true,
       descricao: true,
       publica: true,
-      _count: { select: { membros: { where: { saiuEm: null } } } },
+      comunidade: true,
+      _count: { select: { membros: membrosAtivosCount } },
       membros: {
         where: { userId, saiuEm: null },
-        select: { papel: true },
+        select: { papel: true, status: true, silenciada: true },
         take: 1,
       },
     },
@@ -1357,17 +1450,63 @@ export async function getGrupoPorId(
   if (!row) return null
 
   const membro = row.membros[0]
-  if (!membro && !row.publica) return null
-
   return {
     id: row.id,
     nome: row.nome,
     descricao: row.descricao,
     membros: row._count.membros,
-    souMembro: Boolean(membro),
-    souAdmin: membro?.papel === 'ADMIN',
     publica: row.publica,
+    souMembro: membro?.status === 'ATIVO',
+    pedidoPendente: membro?.status === 'PENDENTE',
+    souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+    silenciada: membro?.silenciada ?? false,
   }
+}
+
+export async function getPedidosPendentesGrupo(
+  conversaId: string,
+  tenantId: string,
+  adminUserId: string,
+): Promise<MembroGrupoPendenteItem[]> {
+  const admin: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId,
+      userId: adminUserId,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!admin) return []
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tenantId, tipo: 'GRUPO', comunidade: true },
+    select: { id: true },
+  })
+  if (!grupo) return []
+
+  const rows: Array<{
+    userId: string
+    entrouEm: Date
+    user: { nome: string | null; avatarUrl: string | null }
+  }> = await db.membroConversa.findMany({
+    where: { conversaId, status: 'PENDENTE', saiuEm: null },
+    orderBy: { entrouEm: 'asc' },
+    take: 50,
+    select: {
+      userId: true,
+      entrouEm: true,
+      user: { select: { nome: true, avatarUrl: true } },
+    },
+  })
+
+  return rows.map((r) => ({
+    userId: r.userId,
+    nome: r.user.nome,
+    avatarUrl: durableImageUrl(r.user.avatarUrl),
+    pediuEm: r.entrouEm,
+  }))
 }
 
 export async function getPostsDoGrupo(
@@ -1376,7 +1515,7 @@ export async function getPostsDoGrupo(
   userId: string,
 ): Promise<PostSocialItem[]> {
   const membro: { id: string } | null = await db.membroConversa.findFirst({
-    where: { conversaId, userId, saiuEm: null },
+    where: { conversaId, ...filtroMembroGrupoAtivo(userId) },
     select: { id: true },
   })
   if (!membro) return []
@@ -1391,6 +1530,45 @@ export async function getPostsDoGrupo(
   const posts = postsRaw.map(projetarPost)
   return finalizarPosts(posts)
 }
+
+/**
+ * Feed só dos murais dos grupos do viewer (aba "Meus grupos").
+ */
+export const getPostsDosMeusGrupos = cache(async function getPostsDosMeusGrupos(
+  tenantId: string,
+  userId: string,
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: visibleTenantIds },
+      tipo: 'MEMBRO',
+      oculto: false,
+      ...escopoFeedSomenteGrupos(userId),
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+})
 
 export async function getPostIdsSalvos(userId: string, tenantId: string): Promise<Set<string>> {
   const rows: Array<{ postId: string }> = await db.postSalvo.findMany({

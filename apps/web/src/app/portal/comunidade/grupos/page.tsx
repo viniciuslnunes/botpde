@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getGruposPublicos } from '@/lib/feed'
+import { getGruposDoTenant } from '@/lib/feed'
 import { GruposClient } from './grupos-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
@@ -14,14 +14,14 @@ export default async function GruposPage() {
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
-  const grupos = await getGruposPublicos(tenant.id, session.user.id)
+  const grupos = await getGruposDoTenant(tenant.id, session.user.id)
 
   return (
     <div className="space-y-5">
       <ComunidadePageHeader
         icon={Users}
         titulo="Grupos"
-        subtitulo={`Grupos temáticos abertos da ${tenant.nome}`}
+        subtitulo={`Comunidades temáticas da ${tenant.nome}`}
       />
 
       <GruposClient gruposIniciais={grupos} />

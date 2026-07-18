@@ -5,7 +5,7 @@ import { MessagesSquare } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 
 interface ComunidadeFeedEmptyProps {
-  filtro: 'descobrir' | 'seguindo'
+  filtro: 'descobrir' | 'seguindo' | 'grupos'
 }
 
 export function ComunidadeFeedEmpty({ filtro }: ComunidadeFeedEmptyProps) {

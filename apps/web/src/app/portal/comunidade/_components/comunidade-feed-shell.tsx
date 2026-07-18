@@ -32,7 +32,7 @@ interface ComunidadeFeedShellProps {
   }
   currentUser: CurrentUser
   cursor?: string
-  filtro?: 'descobrir' | 'seguindo'
+  filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'grupos' | 'grupos' | 'grupos'
   /** Clube do torcedor global (banner quando feed usa tenant proxy). */
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
   /** Banner CN — true enquanto o composer carrega o estado real. */

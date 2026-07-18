@@ -10,11 +10,14 @@ import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-
  */
 export function ComunidadeFeedTabs() {
   const params = useSearchParams()
-  const filtro = params.get('filtro') === 'seguindo' ? 'seguindo' : 'descobrir'
+  const filtroRaw = params.get('filtro')
+  const filtro =
+    filtroRaw === 'seguindo' ? 'seguindo' : filtroRaw === 'grupos' ? 'grupos' : 'descobrir'
 
   const tabs = [
     { id: 'descobrir', label: 'Descobrir', href: '/portal/comunidade' },
     { id: 'seguindo', label: 'Seguindo', href: '/portal/comunidade?filtro=seguindo' },
+    { id: 'grupos', label: 'Meus grupos', href: '/portal/comunidade?filtro=grupos' },
   ] as const
 
   return (

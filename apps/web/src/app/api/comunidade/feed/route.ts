@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getPostsDaRede, getPostsParaFeed } from '@/lib/feed'
+import { getPostsDaRede, getPostsParaFeed, getPostsDosMeusGrupos } from '@/lib/feed'
 
 const querySchema = z.object({
   cursor: z.string().optional(),
   take: z.coerce.number().int().min(5).max(50).optional(),
-  filtro: z.enum(['descobrir', 'seguindo']).optional(),
+  filtro: z.enum(['descobrir', 'seguindo', 'grupos']).optional(),
 })
 
 export const dynamic = 'force-dynamic'

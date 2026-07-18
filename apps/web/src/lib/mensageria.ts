@@ -178,7 +178,7 @@ export async function assertMembroConversa(
   userId: string,
 ): Promise<MembroAtivoRow> {
   const membro: MembroAtivoRow | null = await db.membroConversa.findFirst({
-    where: { conversaId, userId, saiuEm: null },
+    where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
     select: {
       id: true,
       papel: true,

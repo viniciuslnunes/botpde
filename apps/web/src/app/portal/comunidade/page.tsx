@@ -19,7 +19,12 @@ export default async function ComunidadePage({
   searchParams: Promise<{ cursor?: string; filtro?: string; eventoId?: string }>
 }) {
   const params = await searchParams
-  const filtro = params.filtro === 'seguindo' ? 'seguindo' : 'descobrir'
+  const filtro =
+    params.filtro === 'seguindo'
+      ? 'seguindo'
+      : params.filtro === 'grupos'
+        ? 'grupos'
+        : 'descobrir'
   const eventoIdComposer =
     typeof params.eventoId === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

@@ -6,10 +6,17 @@ type TimelineSeed = {
   criadoEm: Date
 }
 
-const FEED_SCOPE_WHERE = {
+/** Posts do feed principal (sem mural de grupo) — usados no backfill de seguimento. */
+const FEED_SCOPE_REDE = {
   tipo: 'MEMBRO' as const,
   oculto: false,
   conversaId: null,
+}
+
+const MEMBRO_ATIVO_GRUPO = {
+  status: 'ATIVO' as const,
+  saiuEm: null,
+  silenciada: false,
 }
 
 async function createTimelineEntries(viewerIds: string[], seed: TimelineSeed): Promise<void> {
@@ -53,6 +60,54 @@ export async function fanoutSeguidoresPostParaRede(seed: TimelineSeed): Promise<
   )
 }
 
+/** Fan-out do post do mural para membros ativos do grupo (exceto silenciados). */
+export async function fanoutPostParaMembrosGrupo(
+  conversaId: string,
+  seed: TimelineSeed,
+): Promise<void> {
+  const membros: Array<{ userId: string }> = await db.membroConversa.findMany({
+    where: {
+      conversaId,
+      ...MEMBRO_ATIVO_GRUPO,
+    },
+    select: { userId: true },
+  })
+  if (membros.length === 0) return
+  await createTimelineEntries(
+    membros.map((m) => m.userId),
+    seed,
+  )
+}
+
+/** Backfill dos posts recentes do grupo ao entrar / ser aprovado. */
+export async function backfillTimelineDoGrupoParaViewer(
+  viewerId: string,
+  conversaId: string,
+  limite = 50,
+): Promise<void> {
+  const posts: Array<{ id: string; autorId: string; criadoEm: Date }> = await db.post.findMany({
+    where: {
+      conversaId,
+      tipo: 'MEMBRO',
+      oculto: false,
+    },
+    select: { id: true, autorId: true, criadoEm: true },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: limite,
+  })
+  if (posts.length === 0) return
+
+  await db.feedTimeline.createMany({
+    data: posts.map((post) => ({
+      viewerId,
+      postId: post.id,
+      autorId: post.autorId,
+      criadoEm: post.criadoEm,
+    })),
+    skipDuplicates: true,
+  })
+}
+
 /** Backfill histórico dos posts do autor para um viewer recém-aprovado. */
 export async function backfillTimelineDoAutorParaViewer(
   viewerId: string,
@@ -61,7 +116,7 @@ export async function backfillTimelineDoAutorParaViewer(
   const posts: Array<{ id: string; autorId: string; criadoEm: Date }> = await db.post.findMany({
     where: {
       autorId,
-      ...FEED_SCOPE_WHERE,
+      ...FEED_SCOPE_REDE,
     },
     select: { id: true, autorId: true, criadoEm: true },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
@@ -101,7 +156,7 @@ export async function reconstruirTimelineDaRedeDoViewer(viewerId: string): Promi
       select: { seguidoId: true },
     }),
     db.post.findMany({
-      where: { autorId: viewerId, ...FEED_SCOPE_WHERE },
+      where: { autorId: viewerId, ...FEED_SCOPE_REDE },
       select: { id: true, autorId: true, criadoEm: true },
       orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     }),
@@ -113,7 +168,7 @@ export async function reconstruirTimelineDaRedeDoViewer(viewerId: string): Promi
   const posts: Array<{ id: string; autorId: string; criadoEm: Date }> = await db.post.findMany({
     where: {
       autorId: { in: autorIds },
-      ...FEED_SCOPE_WHERE,
+      ...FEED_SCOPE_REDE,
     },
     select: { id: true, autorId: true, criadoEm: true },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
@@ -150,5 +205,3 @@ export async function garantirTimelineDaRedeDoViewer(viewerId: string): Promise<
 export async function materializarTimelineAutor(seed: TimelineSeed): Promise<void> {
   await createTimelineEntries([seed.autorId], seed)
 }
-
-

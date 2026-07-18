@@ -21,7 +21,7 @@ export function ComunidadeFeedBootstrap({
 }: {
   tenantId: string
   currentUser: CurrentUser
-  filtro?: 'descobrir' | 'seguindo'
+  filtro?: 'descobrir' | 'seguindo' | 'grupos'
   cursor?: string | null
 }) {
   return (

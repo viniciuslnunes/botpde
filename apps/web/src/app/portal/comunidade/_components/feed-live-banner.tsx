@@ -11,7 +11,7 @@ import { isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
  * No topo, o infinite feed já refetcha via API — não chamar `router.refresh()`
  * aqui (dispara RSC de navbar/salas/conversas junto com o feed).
  */
-export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' }) {
+export function FeedLiveBanner({ filtro }: { filtro?: 'descobrir' | 'seguindo' | 'grupos' }) {
   const router = useRouter()
   const [novos, setNovos] = useState(0)
 
