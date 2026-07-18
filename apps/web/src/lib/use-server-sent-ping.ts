@@ -9,13 +9,13 @@ import {
 import { subscribeSharedSse } from '@/lib/sse-shared-source'
 
 /**
- * Railway/Fastly: corte sujo de HTTP/2 vira ERR_HTTP2_PROTOCOL_ERROR no console
- * e pode envenenar a conexão multiplexada — soft nav do App Router trava.
+ * Railway/Fastly + HTTP/2: EventSource + RST do proxy vira ERR_HTTP2_PROTOCOL_ERROR
+ * e pode envenenar soft-nav do App Router.
  *
- * Mitigações (em `sse-shared-source` + `sse-nav-gate` + `sse-stream`):
- * - um EventSource por endpoint (navbar/chat/banner não duplicam)
- * - servidor manda `data: reconnect` cedo; cliente troca limpo
- * - backoff + circuit breaker; aba oculta e soft-nav fecham o stream
+ * Mitigações (`sse-shared-source` + `sse-nav-gate` + `sse-stream`):
+ * - fetch+stream (abort = canceled, não PROTOCOL_ERROR do EventSource)
+ * - um stream por endpoint; vida ~12 min (cap Railway 15 min), não ~20s
+ * - soft-nav fecha o stream antes do fetch RSC; backoff + circuit breaker
  */
 export function useServerSentPing(
   endpoint: string,

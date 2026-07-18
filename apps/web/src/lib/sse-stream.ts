@@ -5,25 +5,27 @@
  * - sem `Connection`/`Keep-Alive` (hop-by-hop → ERR_HTTP2_PROTOCOL_ERROR)
  * - sem `Content-Encoding` (valor inventado tipo `none` também quebra H2 no Chrome)
  * - `no-transform` pede ao proxy para não comprimir o stream
- * - heartbeat evita idle cut; close limpo antes do teto do proxy
+ * - heartbeat evita idle cut (Railway: 5 min sem bytes)
  * - enqueue após close também gera PROTOCOL_ERROR
- * - `data: reconnect` (~25s) antes do close: o cliente troca a conexão limpo;
- *   comentário `: bye` o EventSource não vê → proxy RST vira PROTOCOL_ERROR
+ * - `data: reconnect` antes do teto de 15 min: o cliente troca a conexão limpo;
+ *   comentário `: bye` o parser não entrega → proxy RST vira PROTOCOL_ERROR
+ *
+ * Não reconectar a cada ~20s: isso martelava H2 e enchía o console de
+ * ERR_HTTP2_PROTOCOL_ERROR mesmo com close “limpo”.
  */
 
-import { SSE_RECONNECT_DATA } from '@/lib/sse-protocol'
+import {
+  SSE_HEARTBEAT_MS,
+  SSE_MAX_STREAM_MS,
+  SSE_RECONNECT_DATA,
+  SSE_RECONNECT_SIGNAL_MS,
+} from '@/lib/sse-protocol'
 
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, no-transform',
   'X-Accel-Buffering': 'no',
 } as const
-
-const HEARTBEAT_MS = 10_000
-/** Avisa o client para reconectar antes do proxy HTTP/2 cortar sujo. */
-const RECONNECT_SIGNAL_MS = 18_000
-/** Fecha o stream se o client não tiver saído após o sinal. */
-const MAX_STREAM_MS = 22_000
 
 type SubscribeFn = (onPing: () => void) => () => void
 
@@ -86,7 +88,7 @@ export function createSsePingResponse(
       signal?.addEventListener('abort', onAbort)
 
       // Flush imediato — proxies HTTP/2 precisam de bytes cedo.
-      // `retry:` reduz martelada do EventSource nativo se a gente fechar.
+      // `retry:` é informativo; o client usa fetch (não EventSource nativo).
       safeEnqueue('retry: 5000\n: connected\n\n')
 
       unsubscribe = subscribe(() => {
@@ -95,17 +97,17 @@ export function createSsePingResponse(
 
       heartbeat = setInterval(() => {
         if (!safeEnqueue(': keep-alive\n\n')) return
-      }, HEARTBEAT_MS)
+      }, SSE_HEARTBEAT_MS)
 
       reconnectSignal = setTimeout(() => {
-        // EventSource só entrega `data:` — o client fecha e reabre limpo.
+        // Client fecha e reabre limpo (fetch abort → canceled, não PROTOCOL_ERROR).
         safeEnqueue(`data: ${SSE_RECONNECT_DATA}\n\n`)
-      }, RECONNECT_SIGNAL_MS)
+      }, SSE_RECONNECT_SIGNAL_MS)
 
       maxLife = setTimeout(() => {
         safeEnqueue(': bye\n\n')
         closeClean()
-      }, MAX_STREAM_MS)
+      }, SSE_MAX_STREAM_MS)
     },
     cancel() {
       closed = true

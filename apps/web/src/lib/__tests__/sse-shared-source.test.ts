@@ -1,35 +1,38 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pauseSseForSoftNav, resetSseNavGateForTests } from '@/lib/sse-nav-gate'
 import {
+  consumeSseDataFrames,
   resetSharedSseForTests,
   subscribeSharedSse,
 } from '@/lib/sse-shared-source'
 
-class FakeEventSource {
-  static instances: FakeEventSource[] = []
-  onmessage: ((ev: MessageEvent<string>) => void) | null = null
-  onerror: (() => void) | null = null
-  closed = false
-  url: string
-
-  constructor(url: string) {
-    this.url = url
-    FakeEventSource.instances.push(this)
-  }
-
-  close() {
-    this.closed = true
-  }
-
-  emit(data: string) {
-    this.onmessage?.({ data } as MessageEvent<string>)
-  }
+function sseBody(chunks: string[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder()
+  let i = 0
+  return new ReadableStream({
+    pull(controller) {
+      if (i >= chunks.length) {
+        controller.close()
+        return
+      }
+      controller.enqueue(encoder.encode(chunks[i]))
+      i += 1
+    },
+  })
 }
+
+describe('consumeSseDataFrames', () => {
+  it('parseia data: e ignora comentários', () => {
+    const { rest, payloads } = consumeSseDataFrames(
+      ': keep-alive\n\ndata: ping\n\ndata: reconnect\n\npartial',
+    )
+    expect(payloads).toEqual(['ping', 'reconnect'])
+    expect(rest).toBe('partial')
+  })
+})
 
 describe('subscribeSharedSse', () => {
   beforeEach(() => {
-    vi.stubGlobal('EventSource', FakeEventSource)
-    FakeEventSource.instances = []
     resetSseNavGateForTests()
     resetSharedSseForTests()
   })
@@ -40,29 +43,68 @@ describe('subscribeSharedSse', () => {
     vi.unstubAllGlobals()
   })
 
-  it('reusa um EventSource para o mesmo endpoint', () => {
+  it('reusa um fetch para o mesmo endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: sseBody(['retry: 5000\n: connected\n\ndata: ping\n\n']),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
     const a = vi.fn()
     const b = vi.fn()
     const unsubA = subscribeSharedSse('/api/conversas/stream', a)
     const unsubB = subscribeSharedSse('/api/conversas/stream', b)
-    expect(FakeEventSource.instances).toHaveLength(1)
 
-    FakeEventSource.instances[0]!.emit('ping')
-    expect(a).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(a).toHaveBeenCalledTimes(1))
     expect(b).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
 
     unsubA()
-    expect(FakeEventSource.instances[0]!.closed).toBe(false)
     unsubB()
-    expect(FakeEventSource.instances[0]!.closed).toBe(true)
   })
 
-  it('fecha no soft-nav gate e não deixa stream órfão', () => {
+  it('fecha no soft-nav gate (abort) e não deixa stream órfão', async () => {
+    let signal: AbortSignal | undefined
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      signal = init?.signal ?? undefined
+      return Promise.resolve({
+        ok: true,
+        body: sseBody([': connected\n\n']),
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
     const onPing = vi.fn()
     const unsub = subscribeSharedSse('/api/notificacoes/stream', onPing)
-    expect(FakeEventSource.instances).toHaveLength(1)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(signal?.aborted).toBe(false)
+
     pauseSseForSoftNav(1_000)
-    expect(FakeEventSource.instances[0]!.closed).toBe(true)
+    expect(signal?.aborted).toBe(true)
+    unsub()
+  })
+
+  it('reconecta limpo ao receber data: reconnect', async () => {
+    let calls = 0
+    const fetchMock = vi.fn().mockImplementation(() => {
+      calls += 1
+      if (calls === 1) {
+        return Promise.resolve({
+          ok: true,
+          body: sseBody(['data: reconnect\n\n']),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        body: sseBody(['data: ping\n\n']),
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onPing = vi.fn()
+    const unsub = subscribeSharedSse('/api/notificacoes/stream', onPing)
+    await vi.waitFor(() => expect(onPing).toHaveBeenCalledTimes(1))
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2)
     unsub()
   })
 })

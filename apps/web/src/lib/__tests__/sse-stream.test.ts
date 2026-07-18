@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SSE_MAX_STREAM_MS, SSE_RECONNECT_SIGNAL_MS } from '@/lib/sse-protocol'
 import { createSsePingResponse, SSE_HEADERS } from '@/lib/sse-stream'
 
 describe('createSsePingResponse', () => {
@@ -52,7 +53,7 @@ describe('createSsePingResponse', () => {
 
     expect(() => emit?.()).not.toThrow()
     expect(() => {
-      vi.advanceTimersByTime(20_000)
+      vi.advanceTimersByTime(SSE_RECONNECT_SIGNAL_MS)
     }).not.toThrow()
   })
 
@@ -77,10 +78,11 @@ describe('createSsePingResponse', () => {
 
     await reader.read() // connected
 
-    vi.advanceTimersByTime(18_000)
+    vi.advanceTimersByTime(SSE_RECONNECT_SIGNAL_MS)
 
     let sawReconnect = false
-    for (let i = 0; i < 8; i++) {
+    // Heartbeats a cada 15s acumulam muitos chunks antes do reconnect.
+    for (let i = 0; i < 200; i++) {
       const chunk = await reader.read()
       if (chunk.done) break
       const text = decoder.decode(chunk.value)
@@ -91,7 +93,7 @@ describe('createSsePingResponse', () => {
     }
     expect(sawReconnect).toBe(true)
 
-    vi.advanceTimersByTime(5_000)
+    vi.advanceTimersByTime(SSE_MAX_STREAM_MS - SSE_RECONNECT_SIGNAL_MS)
 
     let text = ''
     for (;;) {

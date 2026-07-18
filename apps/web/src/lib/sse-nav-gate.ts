@@ -1,11 +1,11 @@
 /**
  * Pausa streams SSE antes de soft-nav do App Router.
  *
- * No Railway/HTTP/2, EventSource aberto disputa a conexão multiplexada com o
+ * No Railway/HTTP/2, stream SSE aberto disputa a conexão multiplexada com o
  * fetch do RSC. Um RST no stream vira ERR_HTTP2_PROTOCOL_ERROR e o payload da
  * página falha com TypeError: network error (error.tsx da comunidade).
  *
- * Fechamos os EventSources no pointerdown de links internos — antes do click
+ * Abortamos o fetch SSE no pointerdown de links internos — antes do click
  * disparar a navegação — e reassumimos após um quiet period curto.
  */
 
@@ -14,7 +14,7 @@ const DEFAULT_PAUSE_MS = 2_000
 let pausedUntil = 0
 let endTimer: ReturnType<typeof setTimeout> | undefined
 const listeners = new Set<() => void>()
-/** Closers síncronos dos EventSources ativos — React setState seria tarde demais. */
+/** Closers síncronos dos streams SSE ativos — React setState seria tarde demais. */
 const activeClosers = new Set<() => void>()
 
 let installCount = 0
