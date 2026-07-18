@@ -19,7 +19,7 @@ describe('resolverAvatarSocial', () => {
 })
 
 describe('resolverPerfilPrivadoEfetivo', () => {
-  it('sócio aprovado respeita preferência gravada', () => {
+  it('sócio aprovado respeita preferência gravada (default privado)', () => {
     expect(
       resolverPerfilPrivadoEfetivo(true, { tipo: 'SOCIO', status: 'APROVADO' }),
     ).toBe(true)
@@ -28,16 +28,16 @@ describe('resolverPerfilPrivadoEfetivo', () => {
     ).toBe(false)
     expect(
       resolverPerfilPrivadoEfetivo(undefined, { tipo: 'SOCIO', status: 'APROVADO' }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  it('sócio pendente respeita preferência (default público)', () => {
+  it('sócio pendente também defaulta privado quando sem preferência', () => {
     expect(
       resolverPerfilPrivadoEfetivo(undefined, { tipo: 'SOCIO', status: 'PENDENTE' }),
-    ).toBe(false)
-    expect(
-      resolverPerfilPrivadoEfetivo(true, { tipo: 'SOCIO', status: 'PENDENTE' }),
     ).toBe(true)
+    expect(
+      resolverPerfilPrivadoEfetivo(false, { tipo: 'SOCIO', status: 'PENDENTE' }),
+    ).toBe(false)
   })
 
   it('torcedor é sempre público', () => {

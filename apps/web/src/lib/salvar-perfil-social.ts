@@ -35,7 +35,6 @@ export async function salvarPerfilSocial(
       where: { tenantId_userId: { tenantId: tenant.id, userId } },
       select: { tipo: true, status: true },
     })
-  const perfilPrivado = resolverPerfilPrivadoEfetivo(parsed.data.perfilPrivado, membro)
 
   const bannerUrl = parsed.data.bannerUrl ?? null
   const bannerPos = parsed.data.bannerPos ?? null
@@ -48,30 +47,45 @@ export async function salvarPerfilSocial(
     throw new Error('Avatar inválido')
   }
 
+  const apenasMidia = parsed.data.apenasMidia === true
+  const perfilPrivadoDefault = membro?.tipo === 'SOCIO'
+  const perfilPrivado = apenasMidia
+    ? undefined
+    : resolverPerfilPrivadoEfetivo(
+        parsed.data.perfilPrivado ?? perfilPrivadoDefault,
+        membro,
+      )
+
   const saved: PerfilSocialSalvo = await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId, tenantId: tenant.id } },
     create: {
       userId,
       tenantId: tenant.id,
-      bio: parsed.data.bio?.trim() || null,
-      perfilPrivado,
-      exibirCidade: parsed.data.exibirCidade,
-      exibirSede: parsed.data.exibirSede,
-      exibirDesde: parsed.data.exibirDesde,
+      bio: apenasMidia ? null : parsed.data.bio?.trim() || null,
+      perfilPrivado: perfilPrivado ?? perfilPrivadoDefault,
+      exibirCidade: apenasMidia ? false : (parsed.data.exibirCidade ?? false),
+      exibirSede: apenasMidia ? false : (parsed.data.exibirSede ?? false),
+      exibirDesde: apenasMidia ? true : (parsed.data.exibirDesde ?? true),
       bannerUrl,
       bannerPos,
       avatarUrl,
     },
-    update: {
-      bio: parsed.data.bio?.trim() || null,
-      perfilPrivado,
-      exibirCidade: parsed.data.exibirCidade,
-      exibirSede: parsed.data.exibirSede,
-      exibirDesde: parsed.data.exibirDesde,
-      bannerUrl,
-      bannerPos,
-      avatarUrl,
-    },
+    update: apenasMidia
+      ? {
+          bannerUrl,
+          bannerPos,
+          avatarUrl,
+        }
+      : {
+          bio: parsed.data.bio?.trim() || null,
+          perfilPrivado: perfilPrivado!,
+          exibirCidade: parsed.data.exibirCidade ?? false,
+          exibirSede: parsed.data.exibirSede ?? false,
+          exibirDesde: parsed.data.exibirDesde ?? true,
+          bannerUrl,
+          bannerPos,
+          avatarUrl,
+        },
     select: {
       bannerUrl: true,
       bannerPos: true,
@@ -92,7 +106,7 @@ export async function salvarPerfilSocial(
       acao: 'PERFIL_SOCIAL_ATUALIZADO',
       entidade: 'PerfilMembro',
       entidadeId: userId,
-      detalhes: bannerUrl ? { bannerUrl: true } : undefined,
+      detalhes: bannerUrl ? { bannerUrl: true, apenasMidia } : { apenasMidia },
     },
   })
 

@@ -60,7 +60,7 @@ export type VinculoPrivacidadePerfil = {
 
 /**
  * Privacidade efetiva por vínculo:
- * - Sócio: respeita preferência gravada (default privado na aprovação; toggle na aba Sobre).
+ * - Sócio: respeita preferência gravada; sem valor → privado (default da aprovação / aba Sobre).
  * - Torcedor: sempre público.
  * - Sem vínculo / situação diversa: usa preferência gravada (fallback público).
  */
@@ -70,6 +70,7 @@ export function resolverPerfilPrivadoEfetivo(
 ): boolean {
   // Torcedor sempre pública: não importa se está APROVADO ou PENDENTE.
   if (vinculo?.tipo === 'TORCEDOR') return false
+  if (vinculo?.tipo === 'SOCIO') return perfilPrivado ?? true
   return perfilPrivado ?? false
 }
 

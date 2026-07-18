@@ -99,9 +99,10 @@ export default async function PerfilComunidadePage({
     select: perfilSelect,
   })
 
+  const vinculo = membro ? { tipo: membro.tipo, status: membro.status } : null
   const perfilBase = perfilAtual ?? {
     bio: null,
-    perfilPrivado: false,
+    perfilPrivado: vinculo?.tipo === 'SOCIO',
     avatarUrl: null,
     bannerUrl: null,
     bannerPos: null,
@@ -109,13 +110,8 @@ export default async function PerfilComunidadePage({
     exibirSede: false,
     exibirDesde: true,
   }
-  const perfilPrivadoEfetivo = resolverPerfilPrivadoEfetivo(
-    perfilBase.perfilPrivado,
-    membro ? { tipo: membro.tipo, status: membro.status } : null,
-  )
-  const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(
-    membro ? { tipo: membro.tipo, status: membro.status } : null,
-  )
+  const perfilPrivadoEfetivo = resolverPerfilPrivadoEfetivo(perfilBase.perfilPrivado, vinculo)
+  const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(vinculo)
   const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
   const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge] = isSelf

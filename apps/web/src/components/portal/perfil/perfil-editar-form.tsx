@@ -11,7 +11,7 @@ interface PerfilEditarFormProps {
   tenantId: string
   bio: string
   perfilPrivado: boolean
-  /** Sócio aprovado não pode tornar o perfil público. */
+  /** Sócio pode alterar; torcedor permanece público obrigatório. */
   privacidadeBloqueada?: boolean
   exibirCidade: boolean
   exibirSede: boolean
@@ -33,6 +33,7 @@ type PerfilPersistPayload = {
   bannerUrl: string | null
   bannerPos: number | null
   avatarUrl: string | null
+  apenasMidia?: boolean
 }
 
 type PerfilPersistResponse = {
@@ -130,9 +131,13 @@ export function PerfilEditarForm({
   ])
 
   const buildPayload = useCallback(
-    (overrides?: Partial<Pick<PerfilPersistPayload, 'bannerUrl' | 'bannerPos' | 'avatarUrl'>>): PerfilPersistPayload => {
+    (
+      overrides?: Partial<Pick<PerfilPersistPayload, 'bannerUrl' | 'bannerPos' | 'avatarUrl'>>,
+      options?: { apenasMidia?: boolean },
+    ): PerfilPersistPayload => {
       const nextBanner = overrides?.bannerUrl !== undefined ? overrides.bannerUrl : bannerUrl
       const nextPos = overrides?.bannerPos !== undefined ? overrides.bannerPos : bannerPos
+      const apenasMidia = options?.apenasMidia === true
       return {
         tenantId,
         bio,
@@ -143,6 +148,7 @@ export function PerfilEditarForm({
         bannerUrl: nextBanner,
         bannerPos: nextBanner ? nextPos : null,
         avatarUrl: overrides?.avatarUrl !== undefined ? overrides.avatarUrl : avatarUrl,
+        ...(apenasMidia ? { apenasMidia: true } : {}),
       }
     },
     [
@@ -161,9 +167,9 @@ export function PerfilEditarForm({
   const persistPerfil = useCallback(
     async (
       overrides?: Partial<Pick<PerfilPersistPayload, 'bannerUrl' | 'bannerPos' | 'avatarUrl'>>,
-      options?: { silent?: boolean; refresh?: boolean },
+      options?: { silent?: boolean; refresh?: boolean; apenasMidia?: boolean },
     ) => {
-      const payload = buildPayload(overrides)
+      const payload = buildPayload(overrides, { apenasMidia: options?.apenasMidia })
       const res = await fetch('/api/perfil/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,7 +207,7 @@ export function PerfilEditarForm({
     if (!moved || !bannerUrl) return
     if (posSaveTimer.current) clearTimeout(posSaveTimer.current)
     posSaveTimer.current = setTimeout(() => {
-      void persistPerfil(undefined, { silent: true, refresh: true }).catch((err: unknown) => {
+      void persistPerfil(undefined, { silent: true, refresh: true, apenasMidia: true }).catch((err: unknown) => {
         toast.error(err instanceof Error ? err.message : 'Não foi possível salvar o enquadramento.')
       })
     }, 400)
@@ -232,11 +238,11 @@ export function PerfilEditarForm({
       if (tipo === 'banner') {
         setBannerUrl(url)
         setBannerPos(50)
-        await persistPerfil({ bannerUrl: url, bannerPos: 50 }, { silent: true, refresh: true })
+        await persistPerfil({ bannerUrl: url, bannerPos: 50 }, { silent: true, refresh: true, apenasMidia: true })
         toast.success('Capa salva no perfil.', { id: toastId })
       } else {
         setAvatarUrl(url)
-        await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true })
+        await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true, apenasMidia: true })
         toast.success('Foto de perfil salva.', { id: toastId })
       }
     } catch {

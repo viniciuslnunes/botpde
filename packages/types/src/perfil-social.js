@@ -10,13 +10,18 @@ export const atualizarPerfilSocialSchema = z.object({
   /** Tenant da tela aberta — evita gravar no tenant errado quando o host/proxy diverge. */
   tenantId: z.string().min(1),
   bio: z.string().max(280, 'Bio deve ter no máximo 280 caracteres').optional(),
-  perfilPrivado: z.boolean(),
-  exibirCidade: z.boolean(),
-  exibirSede: z.boolean(),
-  exibirDesde: z.boolean(),
+  perfilPrivado: z.boolean().optional(),
+  exibirCidade: z.boolean().optional(),
+  exibirSede: z.boolean().optional(),
+  exibirDesde: z.boolean().optional(),
   bannerUrl: cloudinaryUrlSchema.nullable().optional(),
   bannerPos: z.number().int().min(0).max(100).nullable().optional(),
   avatarUrl: cloudinaryUrlSchema.nullable().optional(),
+  /**
+   * Upload de capa/foto: atualiza só mídia, sem alterar bio/privacidade
+   * (evita gravar checkbox ainda não confirmado pelo botão Salvar).
+   */
+  apenasMidia: z.boolean().optional(),
 })
 
 export const buscaMembrosSchema = z.object({

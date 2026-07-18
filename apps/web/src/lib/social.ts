@@ -56,9 +56,15 @@ export async function getOrCreatePerfilMembro(
   userId: string,
   tenantId: string,
 ): Promise<PerfilMembroLite> {
+  const membro: { tipo: 'SOCIO' | 'TORCEDOR' } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { tipo: true },
+  })
+  const perfilPrivadoDefault = membro?.tipo === 'SOCIO'
+
   const perfil: PerfilMembroLite = await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId, tenantId } },
-    create: { userId, tenantId },
+    create: { userId, tenantId, perfilPrivado: perfilPrivadoDefault },
     update: {},
     select: {
       id: true,

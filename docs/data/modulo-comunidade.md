@@ -30,7 +30,8 @@ visibilidade do post).
 
 - **Perfil público** (`perfilPrivado: false`): posts visíveis no feed conforme a visibilidade do post (`PUBLICO` / `TENANT` / `PRIVADO`).
 - **Perfil privado**: só o próprio usuário e seguidores com status `APROVADO` veem publicações, fotos e atividade — a visibilidade do post não abre o conteúdo para quem não segue.
-- **Sócio aprovado**: entra com perfil privado (`privatizarPerfilAoAprovarSocio`); pode tornar público depois na aba Sobre. Torcedor permanece sempre público.
+- **Sócio**: default privado (aprovação + create sem preferência). Pode tornar público na aba Sobre e salvar; upload de capa/foto não altera a privacidade.
+- **Torcedor**: permanece sempre público.
 - O feed principal (`/portal/comunidade`) prioriza **descoberta** (posts públicos de fora da rede).
 - **Minha rede** (`/portal/comunidade/rede`) mostra só posts de quem você segue + os seus.
 
