@@ -1,5 +1,13 @@
 // Serviços
-export { ThemeProvider, useTenantTheme, hexToRgb } from './services/theme'
+export {
+  ThemeProvider,
+  useTenantTheme,
+  hexToRgb,
+  applyTenantDesign,
+  tenantDesignCriticalCss,
+  type TenantDesign,
+  type TenantTheme,
+} from './services/theme'
 export {
   ToastProvider,
   toast,

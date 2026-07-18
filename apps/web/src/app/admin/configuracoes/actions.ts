@@ -57,15 +57,13 @@ export async function salvarPerfilTenant(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
   const nome = formatNomeTorcida(String(formData.get('nome') ?? ''))
-  const corPrimaria = String(formData.get('corPrimaria') ?? '').trim()
 
   if (!nome) throw new Error('Nome é obrigatório')
   if (nome.length < 3) throw new Error('Nome deve ter ao menos 3 caracteres')
-  if (!/^#[0-9a-fA-F]{6}$/.test(corPrimaria)) throw new Error('Cor inválida')
 
   await db.tenant.update({
     where: { id: tenant.id },
-    data: { nome, corPrimaria },
+    data: { nome },
   })
 
   await db.auditLog.create({
@@ -73,7 +71,7 @@ export async function salvarPerfilTenant(formData: FormData) {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'TENANT_PERFIL_ATUALIZADO',
-      detalhes: { nome, corPrimaria },
+      detalhes: { nome },
     },
   })
 

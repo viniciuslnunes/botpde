@@ -6,6 +6,8 @@ import { getEstadoOnboarding } from '@/lib/onboarding'
 import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
+import { TenantDesignBridge } from '@/components/tenant-design-bridge'
+import { getTenantFromHost } from '@/lib/tenant'
 
 export default async function PortalLayout({
   children,
@@ -59,8 +61,14 @@ export default async function PortalLayout({
           }
         : { nome: 'Torcida', corPrimaria: '#7c3aed', logoUrl: null }
 
+  // Design completo só no modo torcida (tenant real).
+  const hostTenant = ctx?.modo === 'torcida' ? await getTenantFromHost() : null
+
   return (
     <div className="app-shell-bg min-h-screen">
+      {hostTenant ? (
+        <TenantDesignBridge corPrimaria={hostTenant.corPrimaria} design={hostTenant.design} />
+      ) : null}
       <PortalNavbar
         userName={session.user.name ?? null}
         userAvatar={session.user.image ?? null}

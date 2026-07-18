@@ -1,5 +1,6 @@
 import { signIn } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
+import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { EntrarSenhaForm } from './entrar-senha-form'
 import type { Metadata } from 'next'
 
@@ -11,7 +12,9 @@ export default async function EntrarPage() {
 
   return (
     <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
-
+      {tenant ? (
+        <TenantDesignBridge corPrimaria={tenant.corPrimaria} design={tenant.design} />
+      ) : null}
       {/* Gradiente decorativo de fundo */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"

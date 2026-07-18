@@ -2,7 +2,7 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, Palette, MessageSquare, Flag } from 'lucide-react'
+import { Settings, MessageSquare, Flag } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
@@ -41,9 +41,9 @@ export default async function ConfiguracoesPage() {
   const sections = [
     {
       id: 'perfil',
-      icon: Palette,
+      icon: Settings,
       title: 'Perfil da torcida',
-      description: 'Nome e identidade visual da plataforma',
+      description: 'Nome da plataforma. Cores e visual ficam em Design.',
       ownerOnly: true,
     },
     {
@@ -115,7 +115,7 @@ export default async function ConfiguracoesPage() {
                       Apenas o owner da torcida pode alterar esta configuração.
                     </p>
                   ) : section.id === 'perfil' ? (
-                    <PerfilTenantForm nome={tenant.nome} corPrimaria={tenant.corPrimaria} />
+                    <PerfilTenantForm nome={tenant.nome} />
                   ) : section.id === 'discord' ? (
                     <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
                   ) : section.id === 'afiliacao' ? (

@@ -1,5 +1,6 @@
 export * from './schemas/auth.js'
 export * from './schemas/tenant.js'
+export * from './design.js'
 export * from './schemas/membro.js'
 export * from './schemas/sede.js'
 export * from './schemas/evento.js'

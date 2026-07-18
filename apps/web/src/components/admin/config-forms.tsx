@@ -38,12 +38,10 @@ import {
 
 interface PerfilTenantFormProps {
   nome: string
-  corPrimaria: string
 }
 
-export function PerfilTenantForm({ nome, corPrimaria }: PerfilTenantFormProps) {
+export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
   const [pending, startTransition] = useTransition()
-  const [cor, setCor] = useState(corPrimaria)
   const { formRef, markPristine } = useTrackedForm({ title: 'Perfil da torcida' })
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -71,59 +69,22 @@ export function PerfilTenantForm({ nome, corPrimaria }: PerfilTenantFormProps) {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
-          Cor primária
-        </label>
-        <div className="mt-1.5 flex items-center gap-3">
-          <div
-            className="h-10 w-10 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm transition-colors"
-            style={{ backgroundColor: cor }}
-          />
-          <input
-            type="color"
-            name="corPrimaria"
-            value={cor}
-            onChange={(e) => setCor(e.target.value)}
-            className="h-10 w-16 cursor-pointer rounded-lg border border-[rgb(var(--border))] bg-transparent p-0.5"
-          />
-          <input
-            type="text"
-            value={cor}
-            onChange={(e) => {
-              if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) setCor(e.target.value)
-            }}
-            className="w-28 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 font-mono text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-            maxLength={7}
-          />
-          <span className="text-xs text-[rgb(var(--foreground-muted))]">
-            Hex: #RRGGBB
-          </span>
-        </div>
-        {/* Preview */}
-        <div className="mt-3 flex items-center gap-2 text-sm text-[rgb(var(--foreground-muted))]">
-          <span>Preview:</span>
-          <span
-            className="rounded-full px-3 py-0.5 text-xs font-semibold text-white"
-            style={{ backgroundColor: cor }}
-          >
-            Membro ativo
-          </span>
-          <span
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-            style={{ backgroundColor: cor }}
-          >
-            Botão
-          </span>
-        </div>
-      </div>
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Cores, fundo e identidade visual ficam em{' '}
+        <Link
+          href="/admin/design"
+          className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline"
+        >
+          Design
+        </Link>
+        .
+      </p>
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={pending}
           className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          style={{ backgroundColor: cor }}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar alterações

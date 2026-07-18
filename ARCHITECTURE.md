@@ -637,11 +637,12 @@ cliente rodava (não só o botão do login: badges, inputs, `sala-enquete`,
 (usa o `hexToRgb` já existente, agora exportado por `@torcida/ui`) + nos 3
 pontos que reinjetavam `--color-primary` localmente com hex puro
 (`entrar-senha-form.tsx`, `criar-conta-form.tsx`, `cadastro-form.tsx`).
-Achado, não resolvido aqui: `ThemeProvider` nunca recebe a prop `tenant` em
-`app/layout.tsx` — a cor por tenant hoje só existe via cálculo manual
-duplicado em páginas individuais (`/entrar` computa `cor` direto do
-tenant fetchado), não via este mecanismo central. Não corrigido nesta
-rodada (fora do escopo dos 2 bugs reportados).
+Achado original: `ThemeProvider` no `app/layout.tsx` raiz não recebia `tenant`.
+**Atualizado 2026-07-17 — módulo Design:** a aplicação do tema do tenant passa
+por `TenantDesignBridge` nos layouts portal/admin (`Tenant.design` JSON +
+`corPrimaria`), via `applyTenantDesign` / CSS crítico. O root `ThemeProvider`
+continua sem tenant (só dark/light); o bridge sobrescreve as CSS vars do host
+ativo. Ver `docs/data/modulo-design.md`.
 
 **Bug 2 — sessão de e-mail/senha "não persistia" (não era bug de app).**
 Investigação longa (Turbopack vs. webpack, matcher do middleware, `redirect:

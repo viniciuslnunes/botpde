@@ -144,6 +144,13 @@ export const ADMIN_MENU = /** @type {const} */ ([
     secao: 'governanca',
   },
   {
+    id: 'design',
+    label: 'Design',
+    href: '/admin/design',
+    permissao: PERMISSIONS.SETTINGS_MANAGE,
+    secao: 'governanca',
+  },
+  {
     id: 'configuracoes',
     label: 'Configurações',
     href: '/admin/configuracoes',

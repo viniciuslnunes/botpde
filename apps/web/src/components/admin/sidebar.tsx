@@ -21,6 +21,7 @@ import {
   ScrollText,
   Wallet,
   Landmark,
+  Palette,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -48,6 +49,7 @@ const ICON_BY_ID: Record<string, LucideIcon> = {
   aliancas: Handshake,
   acessos: KeyRound,
   auditoria: ScrollText,
+  design: Palette,
   configuracoes: Settings,
 }
 

@@ -1,39 +1,202 @@
 'use client'
 
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import { createContext, useContext, useEffect } from 'react'
+import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from 'react'
+import {
+  DEFAULT_SURFACE_DARK,
+  DEFAULT_SURFACE_LIGHT,
+  DEFAULT_TENANT_DESIGN,
+  hexToCssRgb,
+  resolveTenantDesign,
+  SURFACE_CSS_VARS,
+  SURFACE_TOKEN_KEYS,
+} from '@torcida/types'
+
+/** Espelha TenantDesign de @torcida/types (JS) para tipagem no pacote UI. */
+export type TenantDesign = {
+  version: 1
+  brand: { primary: string; secondary: string | null }
+  grid: {
+    enabled: boolean
+    sizePx: number
+    lineOpacity: number
+    lineColor: string | null
+    baseColor: string | null
+  }
+  light: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
+  dark: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
+}
 
 interface TenantTheme {
   corPrimaria: string
   nome: string
   logoUrl?: string | null
+  design?: TenantDesign | null
 }
 
 const TenantThemeContext = createContext<TenantTheme>({
   corPrimaria: '#7c3aed',
   nome: '',
   logoUrl: null,
+  design: null,
 })
 
 interface ThemeProviderProps {
-  children: React.ReactNode
+  children: ReactNode
   tenant?: TenantTheme
+}
+
+/**
+ * Aplica tokens de design no documentElement.
+ * Superfícies usam overrides do modo ativo; grade e marca são globais.
+ */
+export function applyTenantDesign(
+  design: TenantDesign,
+  mode: 'light' | 'dark' = 'dark',
+  root: HTMLElement = document.documentElement,
+): void {
+  const primary = design.brand.primary
+  const rgb = hexToCssRgb(primary)
+  root.style.setProperty('--color-primary', rgb)
+  root.style.setProperty('--primary', rgb)
+  root.style.setProperty('--color-primary-raw', primary)
+
+  if (design.brand.secondary) {
+    root.style.setProperty('--color-secondary', hexToCssRgb(design.brand.secondary))
+    root.style.setProperty('--secondary', hexToCssRgb(design.brand.secondary))
+  } else {
+    root.style.removeProperty('--color-secondary')
+    root.style.removeProperty('--secondary')
+  }
+
+  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const overrides = mode === 'dark' ? design.dark : design.light
+
+  for (const key of SURFACE_TOKEN_KEYS) {
+    const cssVar = SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]
+    const hex =
+      (overrides as Record<string, string | undefined>)[key] ??
+      (defaults as Record<string, string>)[key]
+    root.style.setProperty(cssVar, hexToCssRgb(hex))
+  }
+
+  root.style.setProperty('--grid-enabled', design.grid.enabled ? '1' : '0')
+  root.style.setProperty('--grid-size', `${design.grid.sizePx}px`)
+  root.style.setProperty('--grid-opacity', String(design.grid.lineOpacity))
+  root.dataset.grid = design.grid.enabled ? 'on' : 'off'
+
+  if (design.grid.baseColor) {
+    root.style.setProperty('--grid-base', hexToCssRgb(design.grid.baseColor))
+  } else {
+    const subtle =
+      (overrides as Record<string, string | undefined>).backgroundSubtle ??
+      (defaults as Record<string, string>).backgroundSubtle
+    root.style.setProperty('--grid-base', hexToCssRgb(subtle))
+  }
+
+  if (design.grid.lineColor) {
+    root.style.setProperty('--grid-line', hexToCssRgb(design.grid.lineColor))
+  } else {
+    const fg =
+      (overrides as Record<string, string | undefined>).foreground ??
+      (defaults as Record<string, string>).foreground
+    root.style.setProperty('--grid-line', hexToCssRgb(fg))
+  }
+}
+
+/** Gera bloco CSS crítico (SSR) para evitar flash sem JS. */
+export function tenantDesignCriticalCss(
+  design: TenantDesign,
+  mode: 'light' | 'dark' = 'dark',
+): string {
+  const primary = design.brand.primary
+  const rgb = hexToCssRgb(primary)
+  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const overrides = mode === 'dark' ? design.dark : design.light
+
+  const lines: string[] = [
+    `--color-primary:${rgb}`,
+    `--primary:${rgb}`,
+    `--color-primary-raw:${primary}`,
+    `--grid-enabled:${design.grid.enabled ? '1' : '0'}`,
+    `--grid-size:${design.grid.sizePx}px`,
+    `--grid-opacity:${design.grid.lineOpacity}`,
+  ]
+
+  if (design.brand.secondary) {
+    lines.push(`--color-secondary:${hexToCssRgb(design.brand.secondary)}`)
+    lines.push(`--secondary:${hexToCssRgb(design.brand.secondary)}`)
+  }
+
+  for (const key of SURFACE_TOKEN_KEYS) {
+    const hex =
+      (overrides as Record<string, string | undefined>)[key] ??
+      (defaults as Record<string, string>)[key]
+    lines.push(
+      `${SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]}:${hexToCssRgb(hex)}`,
+    )
+  }
+
+  const base =
+    design.grid.baseColor ??
+    (overrides as Record<string, string | undefined>).backgroundSubtle ??
+    (defaults as Record<string, string>).backgroundSubtle
+  const line =
+    design.grid.lineColor ??
+    (overrides as Record<string, string | undefined>).foreground ??
+    (defaults as Record<string, string>).foreground
+  lines.push(`--grid-base:${hexToCssRgb(base)}`)
+  lines.push(`--grid-line:${hexToCssRgb(line)}`)
+
+  return `:root{${lines.join(';')}}`
+}
+
+function DesignApplier({ design }: { design: TenantDesign }) {
+  const { resolvedTheme } = useTheme()
+
+  useEffect(() => {
+    const mode = resolvedTheme === 'light' ? 'light' : 'dark'
+    applyTenantDesign(design, mode)
+  }, [design, resolvedTheme])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const observer = new MutationObserver(() => {
+      const mode = root.classList.contains('dark') ? 'dark' : 'light'
+      applyTenantDesign(design, mode)
+    })
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [design])
+
+  return null
 }
 
 export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
   const cor = tenant?.corPrimaria ?? '#7c3aed'
+  const design = useMemo((): TenantDesign => {
+    const resolved = resolveTenantDesign(tenant?.design ?? null, cor) as TenantDesign
+    return resolved
+  }, [tenant?.design, cor])
 
-  useEffect(() => {
-    // --color-primary é consumida como `rgb(var(--color-primary))` em todo o
-    // app (ver globals.css) — precisa ser canais RGB, não o hex puro.
-    const rgb = hexToRgb(cor)
-    document.documentElement.style.setProperty('--color-primary', rgb)
-    document.documentElement.style.setProperty('--primary', rgb)
-    document.documentElement.style.setProperty('--color-primary-raw', cor)
-  }, [cor])
+  const ctxValue = useMemo(
+    () => ({
+      corPrimaria: cor,
+      nome: tenant?.nome ?? '',
+      logoUrl: tenant?.logoUrl ?? null,
+      design,
+    }),
+    [cor, tenant?.nome, tenant?.logoUrl, design],
+  )
 
   return (
-    <TenantThemeContext.Provider value={tenant ?? { corPrimaria: cor, nome: '' }}>
+    <TenantThemeContext.Provider value={ctxValue}>
       <NextThemesProvider
         attribute="class"
         defaultTheme="dark"
@@ -41,6 +204,7 @@ export function ThemeProvider({ children, tenant }: ThemeProviderProps) {
         storageKey="torcida-theme"
         disableTransitionOnChange
       >
+        {tenant ? <DesignApplier design={design} /> : null}
         {children}
       </NextThemesProvider>
     </TenantThemeContext.Provider>
@@ -57,3 +221,6 @@ export function hexToRgb(hex: string): string {
   const b = parseInt(hex.slice(5, 7), 16)
   return `${r} ${g} ${b}`
 }
+
+export { DEFAULT_TENANT_DESIGN, resolveTenantDesign }
+export type { TenantTheme }

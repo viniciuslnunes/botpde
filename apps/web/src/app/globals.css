@@ -29,6 +29,17 @@
   /* Superfícies */
   --surface: 255 255 255;
   --surface-raised: 249 250 251;
+
+  /* Secundária (opcional — módulo Design) */
+  --color-secondary: 124 58 237;
+  --secondary: var(--color-secondary);
+
+  /* Grade .app-shell-bg — sobrescrita pelo TenantDesignBridge */
+  --grid-enabled: 1;
+  --grid-size: 48px;
+  --grid-opacity: 0.03;
+  --grid-base: var(--background-subtle);
+  --grid-line: var(--foreground);
 }
 
 .dark {
@@ -231,14 +242,24 @@ body {
 
 .app-shell-bg {
   position: relative;
-  background-color: rgb(var(--background-subtle));
-  /* Grid no próprio elemento com attachment local: acompanha o scroll
-     e cobre toda a área rolável (absolute ::before só pintava o viewport). */
+  background-color: rgb(var(--grid-base, var(--background-subtle)));
+  /* Grade configurável via --grid-* (módulo Design). Desliga com --grid-enabled: 0. */
   background-image:
-    linear-gradient(rgb(var(--foreground) / 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--foreground) / 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(
+      rgb(var(--grid-line, var(--foreground)) / var(--grid-opacity, 0.03)) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgb(var(--grid-line, var(--foreground)) / var(--grid-opacity, 0.03)) 1px,
+      transparent 1px
+    );
+  background-size: var(--grid-size, 48px) var(--grid-size, 48px);
   background-attachment: local;
+}
+/* Quando a grade está desligada, só a cor de fundo permanece. */
+html[data-grid='off'] .app-shell-bg {
+  background-image: none;
 }
 .app-shell-bg::before {
   content: none;

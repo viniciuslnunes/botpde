@@ -86,6 +86,7 @@ export default async function AdminLayout({
       tenantCor={tenant.corPrimaria}
       tenantSlug={tenant.slug}
       tenantLogoUrl={tenant.logoUrl}
+      tenantDesign={tenant.design}
       userName={session.user.name ?? null}
       userAvatar={session.user.image ?? null}
       items={menuItems}

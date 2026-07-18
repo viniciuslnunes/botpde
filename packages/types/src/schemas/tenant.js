@@ -22,3 +22,5 @@ export const CreateTenantSchema = z.object({
 export const UpdateTenantSchema = CreateTenantSchema.partial().extend({
   logoUrl: z.string().url().optional().nullable(),
 })
+
+// TenantDesignSchema vive em ../design.js (módulo Design admin).

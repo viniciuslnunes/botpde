@@ -21,6 +21,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { useAdminNavbarContext } from '@/lib/use-admin-navbar-context'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
 interface AdminMenuItem {
@@ -36,6 +37,8 @@ interface AdminShellProps {
   tenantCor: string
   tenantSlug: string
   tenantLogoUrl: string | null
+  /** JSON de tema visual (Tenant.design). */
+  tenantDesign?: unknown
   userName: string | null
   userAvatar: string | null
   items: AdminMenuItem[]
@@ -220,6 +223,7 @@ export function AdminShell({
   tenantCor,
   tenantSlug,
   tenantLogoUrl,
+  tenantDesign,
   userName,
   userAvatar,
   items,
@@ -238,6 +242,7 @@ export function AdminShell({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
+      <TenantDesignBridge corPrimaria={tenantCor} design={tenantDesign} />
       <AdminTopbar
         tenantNome={tenantNome}
         tenantCor={tenantCor}

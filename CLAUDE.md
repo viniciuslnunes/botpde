@@ -122,6 +122,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `docs/data/modulo-comunidade-performance.md`.
 - **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos`; plugins
   Caravanas/Bateria por `Evento.tipo`; ver `docs/data/modulo-eventos.md`.
+- **Design** — personalização visual do tenant (`/admin/design`): marca, grade
+  `.app-shell-bg`, superfícies claro/escuro; `Tenant.design` + sugestões por
+  clube/escudo; ver `docs/data/modulo-design.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.

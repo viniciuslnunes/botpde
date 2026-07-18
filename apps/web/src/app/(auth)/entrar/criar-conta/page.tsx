@@ -1,4 +1,5 @@
 import { getTenantFromHost } from '@/lib/tenant'
+import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { CriarContaForm } from './criar-conta-form'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -12,6 +13,9 @@ export default async function CriarContaPage() {
 
   return (
     <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
+      {tenant ? (
+        <TenantDesignBridge corPrimaria={tenant.corPrimaria} design={tenant.design} />
+      ) : null}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
