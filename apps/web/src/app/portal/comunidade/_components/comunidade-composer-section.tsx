@@ -53,7 +53,6 @@ export async function ComunidadeComposerSection({
       eventos={eventos}
       bloqueioPublicacao={ctx.bloqueioPublicacao}
       somentePublico={ctx.somentePublico}
-      podePublicarNacional={ctx.podePublicarNacional}
       eventoIdInicial={eventoIdInicial}
     />
   )

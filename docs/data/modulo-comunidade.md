@@ -183,9 +183,10 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   Enum de status inclui `BLOQUEADO` além de `PENDENTE`/`APROVADO`/`REJEITADO`.
 - **Comunidade Nacional / alcance por afiliação**: `Tenant.sintetico` marca o
   tenant-container onde vivem os posts de torcedores globais (sem organizada
-  própria); `Post.alcanceNacional` faz o post **bypassar o gate de seguir** —
-  qualquer torcedor da mesma afiliação vê, mesmo sem seguir o autor. Publicar
-  com `alcanceNacional` exige `COMMUNITY_POST_NACIONAL`.
+  própria); posts `PUBLICO` de quem tem `COMMUNITY_POST_NACIONAL` gravam
+  `Post.alcanceNacional` e **bypassam o gate de seguir** — qualquer torcedor da
+  mesma afiliação vê no feed nacional, mesmo sem seguir o autor. No composer,
+  “Público” e o antigo “Torcida e torcedores” são a mesma opção.
 - **Torcedor global pode publicar mesmo PENDENTE**: `assertAutorPublicacaoPost`
   (`apps/web/src/lib/authz.ts`) diferencia sócio de torcedor — um torcedor com
   onboarding concluído na mesma afiliação publica posts com visibilidade

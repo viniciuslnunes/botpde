@@ -1,8 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { checarPodePublicarNoFeed } from '@/lib/authz'
-import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 
@@ -12,7 +10,6 @@ export type ComposerContext = {
   eventosComposer: EventoComposerItem[]
   bloqueioPublicacao: string | null
   somentePublico: boolean
-  podePublicarNacional: boolean
   userCard: {
     numeroSocio: number | null
     numeroAssociado: string | null
@@ -27,26 +24,24 @@ export const getComposerContext = cache(async function getComposerContext(
   userId: string,
   sessionNome: string | null,
 ): Promise<ComposerContext> {
-  const [perfil, eventos, bloqueio, membro, socio, deptos, { rolePermissions, overrides }] =
-    await Promise.all([
-      getPerfilMembroForPortal(userId, tenantId),
-      getEventosParaComposer(tenantId, userId),
-      checarPodePublicarNoFeed(userId, tenantId),
-      db.saasMembro.findUnique({
-        where: { tenantId_userId: { tenantId, userId } },
-        select: { status: true, tipo: true, numeroAssociado: true, nome: true },
-      }),
-      db.saasSocio.findUnique({
-        where: { tenantId_userId: { tenantId, userId } },
-        select: { numeroSocio: true },
-      }),
-      db.userDepartamento.findMany({
-        where: { tenantId, userId },
-        select: { departamento: { select: { nome: true, ordem: true } } },
-        orderBy: { departamento: { ordem: 'asc' } },
-      }) as Promise<Array<{ departamento: { nome: string; ordem: number } }>>,
-      getUserPermissionsInTenant(userId, tenantId),
-    ])
+  const [perfil, eventos, bloqueio, membro, socio, deptos] = await Promise.all([
+    getPerfilMembroForPortal(userId, tenantId),
+    getEventosParaComposer(tenantId, userId),
+    checarPodePublicarNoFeed(userId, tenantId),
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { status: true, tipo: true, numeroAssociado: true, nome: true },
+    }),
+    db.saasSocio.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { numeroSocio: true },
+    }),
+    db.userDepartamento.findMany({
+      where: { tenantId, userId },
+      select: { departamento: { select: { nome: true, ordem: true } } },
+      orderBy: { departamento: { ordem: 'asc' } },
+    }) as Promise<Array<{ departamento: { nome: string; ordem: number } }>>,
+  ])
 
   return {
     nome: membro?.nome?.trim() || sessionNome,
@@ -54,10 +49,6 @@ export const getComposerContext = cache(async function getComposerContext(
     eventosComposer: eventos,
     bloqueioPublicacao: bloqueio,
     somentePublico: bloqueio === null && membro?.status !== 'APROVADO',
-    podePublicarNacional: hasPermission(
-      calculateEffectivePermissions(rolePermissions, overrides),
-      PERMISSIONS.COMMUNITY_POST_NACIONAL,
-    ),
     userCard: {
       numeroSocio: socio?.numeroSocio ?? null,
       numeroAssociado: membro?.numeroAssociado ?? null,

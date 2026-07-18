@@ -53,8 +53,6 @@ interface FeedComposerProps {
   somentePublico?: boolean
   /** Quando definido, substitui o composer por aviso (ex.: cadastro pendente). */
   bloqueioPublicacao?: string | null
-  /** COMMUNITY_POST_NACIONAL — libera a opção "Torcida e torcedores" no seletor. */
-  podePublicarNacional?: boolean
   /** Deep-link da Agenda — abre modo evento com este id pré-selecionado. */
   eventoIdInicial?: string
 }
@@ -66,7 +64,6 @@ export function FeedComposer({
   eventos = [],
   bloqueioPublicacao = null,
   somentePublico = false,
-  podePublicarNacional = false,
   eventoIdInicial,
 }: FeedComposerProps) {
   if (bloqueioPublicacao) {
@@ -84,7 +81,6 @@ export function FeedComposer({
       perfilPrivado={perfilPrivado}
       eventos={eventos}
       somentePublico={somentePublico}
-      podePublicarNacional={podePublicarNacional}
       eventoIdInicial={eventoIdInicial}
     />
   )
@@ -96,7 +92,6 @@ function FeedComposerActive({
   perfilPrivado = false,
   eventos = [],
   somentePublico = false,
-  podePublicarNacional = false,
   eventoIdInicial,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
@@ -152,7 +147,6 @@ function FeedComposerActive({
       eventPending={eventPending}
       eventos={eventos}
       somentePublico={somentePublico}
-      podePublicarNacional={podePublicarNacional}
       eventoIdInicial={eventoIdInicial}
       serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
@@ -184,7 +178,6 @@ function ComposerBody({
   serverError,
   eventos,
   somentePublico = false,
-  podePublicarNacional = false,
   eventoIdInicial,
 }: {
   userName: string | null
@@ -199,7 +192,6 @@ function ComposerBody({
   serverError?: string
   eventos: EventoComposerItem[]
   somentePublico?: boolean
-  podePublicarNacional?: boolean
   eventoIdInicial?: string
 }) {
   const eventoPreselecionado =
@@ -220,7 +212,6 @@ function ComposerBody({
   const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
     somentePublico ? 'PUBLICO' : perfilPrivado ? 'PRIVADO' : 'PUBLICO',
   )
-  const [alcanceNacional, setAlcanceNacional] = useState(false)
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -256,13 +247,8 @@ function ComposerBody({
       ? texto.trim().length > 0 && eventoId.length > 0 && !pending
       : texto.trim().length > 0 && !enviando && !pending
 
-  const alcanceSelectValue = alcanceNacional ? 'PUBLICO_NACIONAL' : visibilidade
   const AlcanceIcon =
-    alcanceSelectValue === 'PRIVADO'
-      ? Lock
-      : alcanceSelectValue === 'TENANT'
-        ? Users
-        : Globe2
+    visibilidade === 'PRIVADO' ? Lock : visibilidade === 'TENANT' ? Users : Globe2
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -510,7 +496,6 @@ function ComposerBody({
     >
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
       <input type="hidden" name="visibilidade" value={visibilidade} />
-      <input type="hidden" name="alcanceNacional" value={alcanceNacional ? '1' : ''} />
       {modoEnquete && (
         <input type="hidden" name="opcoes" value={JSON.stringify(opcoesValidas)} />
       )}
@@ -962,26 +947,16 @@ function ComposerBody({
                     className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
                   />
                   <select
-                    value={alcanceSelectValue}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      if (v === 'PUBLICO_NACIONAL') {
-                        setVisibilidade('PUBLICO')
-                        setAlcanceNacional(true)
-                        return
-                      }
-                      setVisibilidade(v as 'PUBLICO' | 'TENANT' | 'PRIVADO')
-                      setAlcanceNacional(false)
-                    }}
+                    value={visibilidade}
+                    onChange={(e) =>
+                      setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
+                    }
                     aria-label="Visibilidade do post"
                     className="h-9 max-w-[11.5rem] cursor-pointer appearance-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-8 pr-8 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color] hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)] sm:max-w-none"
                   >
                     <option value="PUBLICO">Público</option>
                     <option value="TENANT">Só torcida</option>
                     <option value="PRIVADO">Só seguidores</option>
-                    {podePublicarNacional && (
-                      <option value="PUBLICO_NACIONAL">Torcida e torcedores</option>
-                    )}
                   </select>
                   <ChevronDown
                     aria-hidden

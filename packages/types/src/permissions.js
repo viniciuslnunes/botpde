@@ -64,8 +64,8 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Comunidade social
   COMMUNITY_POST: 'community:post',
   COMMUNITY_MODERATE: 'community:moderate',
-  // Publicar post PUBLICO que também alcança torcedores globais do clube na
-  // Comunidade Nacional (bypassa o gate de follow aprovado sócio→torcedor).
+  // Posts PUBLICO de quem tem esta perm ganham alcanceNacional (feed nacional
+  // do clube, bypassa follow). No composer vira a opção única "Público".
   COMMUNITY_POST_NACIONAL: 'community:post_nacional',
 
   // Notícias curadas
