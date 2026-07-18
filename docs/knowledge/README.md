@@ -13,6 +13,7 @@
 | [`torcidas-brasil.md`](torcidas-brasil.md) | Perfis aprofundados das principais organizadas por afiliação/região | `aliancas-torcidas`, `product-strategy`, `research-dominio` |
 | [`estrutura-governanca.md`](estrutura-governanca.md) | Hierarquia, cargos, departamentos, escalões, modelo associativo; admissão ≠ lotação de área (2026-07-17) | `rbac`, `data-model`, `product-strategy` |
 | [`cultura-ideologia.md`](cultura-ideologia.md) | Origem, gerações, escolas de samba, política e valores | `ux-review`, `news-curator`, `product-strategy` |
+| [`identidade-visual-cores.md`](identidade-visual-cores.md) | Cores da torcida/clube, rivalidade cromática, regras do módulo Design (sem verde forçado, P&B) | `ux-review`, `implementation`, `product-strategy`, `qa-verification` |
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
 | [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital; **APIs de jogos** (Google Sports ≠ API gratuita; alternativas para `Partida`) | `research-dominio`, `product-strategy`, `data-model`, `ux-review` |
@@ -25,6 +26,7 @@
 | [`docs/data/escudos-afiliacoes.md`](../data/escudos-afiliacoes.md) | Escudos de `Afiliacao` (Soccer Wiki, Ogol, Cloudinary) |
 | [`docs/data/torcedores-estimados.md`](../data/torcedores-estimados.md) | Base digital IBOPE + teto conservador no onboarding |
 | [`docs/data/modulo-eventos.md`](../data/modulo-eventos.md) | Agenda unificada (eventos/caravanas/bateria), `Partida`, capacidade, série |
+| [`docs/data/modulo-design.md`](../data/modulo-design.md) | Estúdio Design do tenant (paletas, tokens, contraste `*-fg`) |
 | [`docs/data/modulo-comunidade-performance.md`](../data/modulo-comunidade-performance.md) | Feed, timeline, busca, caches e plano futuro Comunidade |
 | [`docs/product/plano-paridade-concorrentes.md`](../product/plano-paridade-concorrentes.md) | O que integrar do mercado (fases A–D: caixa, LGE, QR, sede) |
 
@@ -42,6 +44,8 @@
    **exclusivamente** para (a) nunca sugerir rivais como aliados e (b) moderação
    de conteúdo. Nunca derivar ranking de inimizade, mapa de confronto ou
    qualquer conteúdo que possa escalar conflito ou expor pessoas.
+   **Paralelo de UI:** não pintar a marca da torcida com cor típica de rival
+   (ver [`identidade-visual-cores.md`](identidade-visual-cores.md)).
 
 ## Guia rápido do nicho (TL;DR para agentes)
 
@@ -56,5 +60,8 @@
   blocos nacionais** (Punho Cruzado, Dedo pro Alto, Punho Colado, Lado A,
   Lado B) além de laços bilaterais. No produto, aliança = visibilidade
   cross-tenant de conteúdo PÚBLICO, sempre opt-in do Presidente.
+- **Cores da torcida/clube** são identidade e rivalidade: priorizar marca da
+  torcida; não forçar verde (ou hue de rival) fora do contexto; preto é preto.
+  Ver [`identidade-visual-cores.md`](identidade-visual-cores.md).
 - O movimento tem ~2 milhões de envolvidos; a ANATORG (2014) representa 247+
   torcidas em 21 estados. Perfis, jornadas e dores variam por região.

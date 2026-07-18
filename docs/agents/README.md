@@ -16,6 +16,11 @@ só para moderação; quem escreve lá são `aliancas-torcidas` e
 arquitetura, registre nos docs que os agentes leem (este é o protocolo de
 "alimentar o time").
 
+**Design / cores (2026-07-17):** rivalidade também é regra de UI — ver
+`docs/knowledge/identidade-visual-cores.md` e `docs/data/modulo-design.md`.
+Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
+(+ `aliancas-torcidas` se surgir fato novo de cor ofensiva por praça).
+
 ## Papéis
 
 | Agente | Quando usar | Model |

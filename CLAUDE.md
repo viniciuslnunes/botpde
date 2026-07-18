@@ -130,9 +130,11 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `GROUP BY` (nunca `DISTINCT`+`ORDER BY similarity`); ver
   `docs/data/modulo-comunidade.md` (§ engajamento / § busca) e
   `docs/data/modulo-comunidade-performance.md`.
-- **Design** — personalização visual do tenant (`/admin/design`): marca, grade
-  `.app-shell-bg`, superfícies claro/escuro; `Tenant.design` + sugestões por
-  clube/escudo; ver `docs/data/modulo-design.md`.
+- **Design** — personalização visual do tenant (`/admin/design`): marca, ações,
+  grade `.app-shell-bg`, superfícies; paletas priorizam torcida→escudo→clube
+  (3 cores; sem verde/rival forçado; P&B sem virar marrom); nav/badges usam
+  `--color-*-fg`. Domínio: `docs/knowledge/identidade-visual-cores.md`;
+  spec: `docs/data/modulo-design.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.

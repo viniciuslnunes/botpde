@@ -38,7 +38,9 @@ operacional** antes de expandir para comunidade/informação.
   Grêmio). Segmente propostas por porte.
 - `cultura-ideologia.md` — presença é status (check-in/caravana como moeda de
   reputação), símbolos têm alto valor emocional, calendário inclui carnaval e
-  ensaios, base popular mobile-first.
+  ensaios, base popular mobile-first. **Identidade cromática** é diferencial
+  de produto: errar cor de rival na UI destrói confiança — ver
+  `docs/knowledge/identidade-visual-cores.md` (módulo Design).
 - `glossario.md` — nomeie features com o vocabulário do movimento (caravana,
   sede, materiais), nunca jargão de "rede social" ou "fã-clube".
 - `futebol-dados-publicos.md` — card de clube no onboarding usa IBOPE Repucom

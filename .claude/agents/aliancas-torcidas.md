@@ -44,6 +44,9 @@ agente `performance` se listagens ficarem pesadas.
   estado (21 UFs). Use para desambiguar homônimos (Camisa 12, Mancha Azul,
   Trovão Azul existem em vários clubes) antes de recomendar aliança.
 - `docs/knowledge/README.md` — protocolo de fontes e confiança (obrigatório).
+- `docs/knowledge/identidade-visual-cores.md` — rivalidade também vale para
+  **cores na UI** (não sugerir hue típico de rival no Design). Se descobrir
+  fato novo de “cor ofensiva” por praça, atualize esse arquivo (fonte + data).
 
 Mantenha estrutura por clube/torcida com: aliados conhecidos, rivais conhecidos,
 grau de confiança e fonte/data. Atualize incrementalmente; marque o que é
@@ -75,3 +78,7 @@ torcida > redes sociais (só como pista, nunca confirmação).
 Este é um domínio com risco real de segurança de pessoas. Nunca produza rankings de
 inimizade, chamadas de confronto ou qualquer conteúdo que possa escalar conflito.
 Foque em ajudar a torcida a se conectar com quem já é aliado.
+**Paralelo visual:** ao comentar identidade/marca, lembre que pintar a UI com
+cor de rival (ex. verde forçado em torcida alvinegra) é ofensa cultural —
+aponta para `identidade-visual-cores.md` / agente `ux-review`, não invente
+paleta.

@@ -100,6 +100,11 @@ Em mudanças que tocam membros/cadastro, verifique também:
   **desaparece** (não fica cinza/disabled). Regressão = `visible` preso após
   sair de `locked`. Doc: `docs/frontend/motion.md`, `docs/agents/README.md`
   § StickyPersistBar.
+- Design / marca escura (Gaviões etc.): com primária `#000000` no dark, item
+  ativo da topbar e do sidebar admin permanece **legível**
+  (`--color-primary-fg` + ring). “Marca da torcida” não mostra marrom no
+  lugar do preto; sucesso sugerido ≠ verde se a identidade não for verde.
+  Doc: `docs/knowledge/identidade-visual-cores.md`, `docs/data/modulo-design.md`.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

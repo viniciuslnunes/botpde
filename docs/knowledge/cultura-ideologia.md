@@ -88,7 +88,10 @@ desfile são eventos de mobilização máxima.
 2. **Presença é status**: histórico de check-ins/caravanas do associado é
    feature de orgulho (gamificação natural, sem inventar pontos artificiais).
 3. **Símbolos importam**: personalização visual do tenant (cores, escudo da
-   torcida) tem valor emocional alto.
+   torcida) tem valor emocional alto. **Cores também carregam rivalidade** —
+   não sugerir/forçar verde (ou outra cor típica de rival) fora da identidade;
+   ver [`identidade-visual-cores.md`](identidade-visual-cores.md) e
+   `docs/data/modulo-design.md`.
 4. **Conteúdo sensível**: provocação a rivais é cultura, mas incitação é
    risco legal (ver [`contexto-legal.md`](contexto-legal.md)) — moderação
    calibrada, não censura de zoeira.

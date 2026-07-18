@@ -30,7 +30,9 @@ responsivo agora; mobile (React Native/Expo) é fase futura sobre tRPC.
   a **Afiliação**.
 - `cultura-ideologia.md` — presença é status: histórico de check-ins/caravanas
   merece destaque visual de orgulho. Símbolos (cores, escudo da torcida) têm
-  valor emocional alto — personalização do tenant importa. Base popular,
+  valor emocional alto — personalização do tenant importa. **Cores ≠ cosmético
+  de SaaS:** rivalidade cromática (ex.: não forçar verde em identidade
+  alvinegra) — `docs/knowledge/identidade-visual-cores.md`. Base popular,
   aparelhos modestos, uso em dia de jogo (rua, 4G): mobile-first de verdade e
   peso de página contido.
 - Conteúdo sensível: zoeira com rival é cultura; incitação é risco legal
@@ -93,6 +95,16 @@ comunicar validação real (não placeholder decorativo).
   não aprovar “no escuro”. Diálogo: “Aprovar e incluir em {Área}?” com
   alternativa **Sem área**. Equipe do portal: só aprovados. Ver
   `docs/data/modulo-departamentos.md`.
+- **Design / identidade visual** (`/admin/design`, tokens no portal/admin):
+  - Paletas sugeridas: prioridade **torcida → escudo → clube**; **3 cores**
+    por card; sem harmônica genérica que inventa cor de rival.
+  - Sucesso default **azul**, não emerald; verde só se for identidade.
+  - Neutros (preto/branco): sem saturação artificial (não virar marrom).
+  - Nav/sidebar ativos e badges: `--color-*-fg` + seleção visível — nunca
+    texto = primária preta no dark.
+  - Estúdio: full-bleed + `px-4`; color picker nativo direto.
+  - Ver `docs/knowledge/identidade-visual-cores.md` e
+    `docs/data/modulo-design.md`.
 
 ## Captura visual de fluxo (Playwright)
 Antes de avaliar uma tela real (não só o código), prefira evidência de tela a

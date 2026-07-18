@@ -33,6 +33,8 @@ web para o que ela não cobre:
   ANATORG.
 - `cultura-ideologia.md` — gerações do torcer, escolas de samba, torcidas
   antifascistas, valores e códigos do movimento.
+- `identidade-visual-cores.md` — cores da torcida/clube e rivalidade
+  cromática no produto (módulo Design).
 - `contexto-legal.md` — Lei Geral do Esporte 14.597/2023 (cadastro obrigatório
   de integrantes, responsabilidade objetiva, banimento), torcida única em SP,
   LGPD.

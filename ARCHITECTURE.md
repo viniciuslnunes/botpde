@@ -645,7 +645,12 @@ Achado original: `ThemeProvider` no `app/layout.tsx` raiz não recebia `tenant`.
 por `TenantDesignBridge` nos layouts portal/admin (`Tenant.design` JSON +
 `corPrimaria`), via `applyTenantDesign` / CSS crítico. O root `ThemeProvider`
 continua sem tenant (só dark/light); o bridge sobrescreve as CSS vars do host
-ativo. Ver `docs/data/modulo-design.md`.
+ativo. **Identidade cromática (2026-07-17):** sucesso default azul (não
+emerald); verde só se for identidade; paletas sugeridas no contexto
+torcida→clube (3 swatches); neutros sem saturação artificial; nav/sidebar
+ativos e badges usam `--color-*-fg` (`corMarcaLegivel`). Domínio:
+`docs/knowledge/identidade-visual-cores.md`. Spec:
+`docs/data/modulo-design.md`.
 
 **Bug 2 — sessão de e-mail/senha "não persistia" (não era bug de app).**
 Investigação longa (Turbopack vs. webpack, matcher do middleware, `redirect:

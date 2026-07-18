@@ -104,3 +104,11 @@ filtrar PENDENTE/REPROVADO sem `deleteMany` no GET. Repair:
 Waitlist: `promoverProximoDaEspera` na saída de CONFIRMADO. Série: escopo
 esta|futuras. **Não** scrapar Google Sports; widgets Sofascore ≠ ingestão de
 `Partida`. Cron: `api/cron/eventos-lembretes`.
+**Design / tema do tenant:** `packages/types/src/design.js` +
+`packages/ui` (`theme.tsx`, `badge.tsx`) + `apps/web/.../admin/design*`.
+Regras: `docs/knowledge/identidade-visual-cores.md`,
+`docs/data/modulo-design.md`. Não reintroduzir `emerald` como sucesso
+universal; não usar `text-[rgb(var(--primary))]` em nav ativa (usar
+`--color-primary-fg`); paletas sugeridas = contexto torcida/clube, 3
+swatches; `clamp` de neutros sem saturação (preto ≠ marrom);
+`derivarSuperficiesDaMarca` cobre fundo + elevated.
