@@ -63,7 +63,9 @@ export type BarVendaSerializada = {
   status: string
   pagoEm: Date | null
   observacao: string | null
-  criadoEm: Date
+  criadoEm: string
+  pixCopiaCola: string | null
+  gatewayProvider: string | null
   operador: { id: string; nome: string | null }
   itens: BarVendaItemSerializado[]
 }
@@ -78,6 +80,8 @@ export function serializeVendaBar(v: {
   pagoEm: Date | null
   observacao: string | null
   criadoEm: Date
+  pixCopiaCola?: string | null
+  gatewayProvider?: string | null
   operador: { id: string; nome: string | null }
   itens: Array<{
     id: string
@@ -97,7 +101,9 @@ export function serializeVendaBar(v: {
     status: v.status,
     pagoEm: v.pagoEm,
     observacao: v.observacao,
-    criadoEm: v.criadoEm,
+    criadoEm: v.criadoEm.toISOString(),
+    pixCopiaCola: v.pixCopiaCola ?? null,
+    gatewayProvider: v.gatewayProvider ?? null,
     operador: v.operador,
     itens: v.itens.map((item) => ({
       id: item.id,

@@ -15,5 +15,13 @@ function adminRouteKey(pathname: string): string {
 /** Transição suave entre seções do admin (loja, membros, comunidade…). */
 export function AdminRouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  return <MotionRouteTransition routeKey={adminRouteKey(pathname)}>{children}</MotionRouteTransition>
+  const immersivePdv = pathname === '/admin/bar/pdv'
+  return (
+    <MotionRouteTransition
+      routeKey={adminRouteKey(pathname)}
+      className={immersivePdv ? 'flex h-full min-h-0 flex-col' : undefined}
+    >
+      {children}
+    </MotionRouteTransition>
+  )
 }

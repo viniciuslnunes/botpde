@@ -54,6 +54,8 @@ export type BarVendaLite = {
   pagoEm: Date | null
   observacao: string | null
   criadoEm: Date
+  pixCopiaCola: string | null
+  gatewayProvider: string | null
   operador: { id: string; nome: string | null }
   itens: BarVendaItemLite[]
 }
@@ -191,6 +193,8 @@ export const listarVendasBar = cache(async function listarVendasBar(
         pagoEm: true,
         observacao: true,
         criadoEm: true,
+        pixCopiaCola: true,
+        gatewayProvider: true,
         operador: { select: { id: true, nome: true } },
         itens: {
           select: {

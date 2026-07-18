@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   ChevronDown,
@@ -233,6 +234,8 @@ export function AdminShell({
   operatorBanner,
   children,
 }: AdminShellProps) {
+  const pathname = usePathname()
+  const immersivePdv = pathname === '/admin/bar/pdv'
   const [mobileOpen, setMobileOpen] = useState(false)
   const {
     notifications: liveNotifications,
@@ -243,32 +246,41 @@ export function AdminShell({
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <TenantDesignBridge corPrimaria={tenantCor} design={tenantDesign} />
-      <AdminTopbar
-        tenantNome={tenantNome}
-        tenantCor={tenantCor}
-        tenantSlug={tenantSlug}
-        tenantLogoUrl={tenantLogoUrl}
-        userName={userName}
-        userAvatar={userAvatar}
-        notifications={liveNotifications}
-        unreadNotifications={unreadNotifications}
-        mobileOpen={mobileOpen}
-        onToggleMobile={() => setMobileOpen((v) => !v)}
-      />
+      {!immersivePdv && (
+        <AdminTopbar
+          tenantNome={tenantNome}
+          tenantCor={tenantCor}
+          tenantSlug={tenantSlug}
+          tenantLogoUrl={tenantLogoUrl}
+          userName={userName}
+          userAvatar={userAvatar}
+          notifications={liveNotifications}
+          unreadNotifications={unreadNotifications}
+          mobileOpen={mobileOpen}
+          onToggleMobile={() => setMobileOpen((v) => !v)}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <AdminSidebar
-          tenantSlug={tenantSlug}
-          items={items}
-          badges={menuBadges}
-          isSuperAdmin={isSuperAdmin}
-          torcidas={torcidas}
-          mobileOpen={mobileOpen}
-          onMobileClose={() => setMobileOpen(false)}
-        />
+        {!immersivePdv && (
+          <AdminSidebar
+            tenantSlug={tenantSlug}
+            items={items}
+            badges={menuBadges}
+            isSuperAdmin={isSuperAdmin}
+            torcidas={torcidas}
+            mobileOpen={mobileOpen}
+            onMobileClose={() => setMobileOpen(false)}
+          />
+        )}
 
-        <main className="app-shell-bg min-h-0 min-w-0 flex-1 overflow-auto">
-          {operatorBanner}
+        <main
+          className={[
+            'app-shell-bg min-h-0 min-w-0 flex-1',
+            immersivePdv ? 'h-full overflow-hidden' : 'overflow-auto',
+          ].join(' ')}
+        >
+          {!immersivePdv && operatorBanner}
           {children}
         </main>
       </div>
