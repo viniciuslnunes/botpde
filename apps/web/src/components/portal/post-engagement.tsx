@@ -107,6 +107,7 @@ export function PostEngagement({
   const [denunciando, setDenunciando] = useState(false)
   const [denunciado, setDenunciado] = useState(false)
   const [repostando, setRepostando] = useState(false)
+  const [compartilhado, setCompartilhado] = useState(false)
   const [comentarioRepost, setComentarioRepost] = useState('')
   const [motivo, setMotivo] = useState('')
   const [pending, startTransition] = useTransition()
@@ -291,6 +292,7 @@ export function PostEngagement({
       try {
         await repostarPost(postId, comentarioRepost.trim() || undefined)
         setRepostando(false)
+        setCompartilhado(true)
         setComentarioRepost('')
         toast.success('Publicação compartilhada!')
       } catch (err) {
@@ -338,6 +340,7 @@ export function PostEngagement({
           active={reacao === 'CURTIR'}
           onClick={() => handleReacao('CURTIR')}
           aria-pressed={reacao === 'CURTIR'}
+          aria-label={reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}
           className={[
             btnBase,
             reacao === 'CURTIR'
@@ -346,13 +349,13 @@ export function PostEngagement({
           ].join(' ')}
         >
           <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
-          Curtir
+          {reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}
         </EngajamentoBtn>
         <EngajamentoBtn
           active={comentariosAbertos}
           onClick={abrirComentarios}
           aria-expanded={comentariosAbertos}
-          aria-label={comentariosAbertos ? 'Comentar' : 'Ver comentários'}
+          aria-label={comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
           className={[
             btnBase,
             comentariosAbertos
@@ -361,27 +364,30 @@ export function PostEngagement({
           ].join(' ')}
         >
           <MessageCircle className="h-4 w-4" />
-          {comentariosAbertos ? 'Comentar' : 'Ver comentários'}
+          {comentariosAbertos ? 'Ocultar comentários' : 'Ver comentários'}
         </EngajamentoBtn>
         {!isRepost && (
           <EngajamentoBtn
-            active={repostando}
+            active={repostando || compartilhado}
             onClick={() => setRepostando((v) => !v)}
+            aria-pressed={compartilhado}
+            aria-label={compartilhado ? 'Compartilhado' : 'Compartilhar'}
             className={[
               btnBase,
-              repostando
+              repostando || compartilhado
                 ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
             <Repeat2 className="h-4 w-4" />
-            Compartilhar
+            {compartilhado ? 'Compartilhado' : 'Compartilhar'}
           </EngajamentoBtn>
         )}
         <EngajamentoBtn
           active={salvo}
           onClick={toggleSalvar}
           aria-pressed={salvo}
+          aria-label={salvo ? 'Salvo' : 'Salvar'}
           className={[
             btnBase,
             salvo
@@ -390,7 +396,7 @@ export function PostEngagement({
           ].join(' ')}
         >
           <Bookmark className={['h-4 w-4', salvo ? 'fill-current' : ''].join(' ')} />
-          Salvar
+          {salvo ? 'Salvo' : 'Salvar'}
         </EngajamentoBtn>
         {!isAuthor && (
           <EngajamentoBtn
