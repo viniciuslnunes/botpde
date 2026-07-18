@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
+import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
 
 interface PostLegacyImageProps {
   src: string
@@ -11,7 +12,8 @@ interface PostLegacyImageProps {
 export function PostLegacyImage({ src, caption }: PostLegacyImageProps) {
   const [broken, setBroken] = useState(false)
   const [open, setOpen] = useState(false)
-  if (broken) return null
+  // Anexo Discord efêmero/expirado — não dispara GET 404.
+  if (!isDurableRemoteImageUrl(src) || broken) return null
 
   return (
     <>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
   classifyMedia,
@@ -49,7 +49,7 @@ interface PostMediaProps {
 }
 
 export function PostMedia({ urls, caption }: PostMediaProps) {
-  const { media, embeds } = classifyMedia(urls)
+  const { media, embeds } = classifyMedia(filterDurableImageUrls(urls))
   const slides = media.filter((m) => m.type !== 'sticker')
   const stickers = media.filter((m) => m.type === 'sticker')
   if (media.length === 0 && embeds.length === 0) return null

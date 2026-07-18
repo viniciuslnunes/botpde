@@ -7,6 +7,7 @@ import { invalidateComunicadosCache } from '@/lib/comunidade'
 import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
+import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
 
 const postSchema = z.object({
   titulo: z
@@ -20,7 +21,11 @@ const postSchema = z.object({
     .url('URL de imagem inválida')
     .optional()
     .or(z.literal(''))
-    .transform((v) => v || undefined),
+    .transform((v) => v || undefined)
+    .refine(
+      (v) => v === undefined || isDurableRemoteImageUrl(v),
+      'URL de imagem temporária (ex.: Discord) não é aceita — use upload permanente',
+    ),
 })
 
 export type PostState = {

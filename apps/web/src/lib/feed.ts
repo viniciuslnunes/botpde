@@ -18,6 +18,7 @@ import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
 import { formatNomeTorcida } from '@torcida/types'
+import { durableImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 
@@ -165,9 +166,12 @@ export function projetarPost(post: PostRaw): PostSocialItem {
     post
   return {
     ...rest,
+    imagemUrl: durableImageUrl(rest.imagemUrl),
+    midiaUrls: filterDurableImageUrls(rest.midiaUrls),
     tenant: { nome: formatNomeTorcida(tenant.nome) },
     autor: {
       ...autor,
+      avatarUrl: durableImageUrl(autor.avatarUrl),
       sedeNome: null,
       cargoNome: null,
       departamentoNome: null,
@@ -180,8 +184,11 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           id: postOrigem.id,
           conteudo: postOrigem.conteudo,
           oculto: postOrigem.oculto,
-          midiaUrls: postOrigem.midiaUrls,
-          autor: postOrigem.autor,
+          midiaUrls: filterDurableImageUrls(postOrigem.midiaUrls),
+          autor: {
+            ...postOrigem.autor,
+            avatarUrl: durableImageUrl(postOrigem.autor.avatarUrl),
+          },
         }
       : null,
     comunicadoOrigem: comunicadoOrigem
@@ -241,8 +248,8 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
     tenantId: post.tenantId,
     titulo: post.titulo,
     conteudo: post.conteudo,
-    imagemUrl: post.imagemUrl,
-    midiaUrls: post.midiaUrls,
+    imagemUrl: durableImageUrl(post.imagemUrl),
+    midiaUrls: filterDurableImageUrls(post.midiaUrls),
     tipo: post.tipo,
     visibilidade: post.visibilidade,
     fixado: post.fixado,
@@ -254,6 +261,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
     tenant: { nome: formatNomeTorcida(post.tenant.nome) },
     autor: {
       ...post.autor,
+      avatarUrl: durableImageUrl(post.autor.avatarUrl),
       sedeNome: null,
       cargoNome: null,
       departamentoNome: null,

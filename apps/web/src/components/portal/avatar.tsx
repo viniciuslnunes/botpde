@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { canOptimizeImageUrl, durableImageUrl } from '@/lib/optimizable-image'
 
 const SIZES = {
   xs: 'h-7 w-7 text-[10px]',
@@ -37,11 +37,13 @@ function inicial(nome: string | null): string {
 export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps) {
   const base = `inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${SIZES[size]}`
   const px = PIXELS[size]
+  // Não pedir anexo Discord expirado — cai na inicial sem 404 no console.
+  const src = durableImageUrl(avatarUrl)
 
-  if (avatarUrl && canOptimizeImageUrl(avatarUrl)) {
+  if (src && canOptimizeImageUrl(src)) {
     return (
       <Image
-        src={avatarUrl}
+        src={src}
         alt={nome ?? 'Membro'}
         width={px}
         height={px}
@@ -50,11 +52,11 @@ export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps)
     )
   }
 
-  if (avatarUrl) {
+  if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={avatarUrl}
+        src={src}
         alt={nome ?? 'Membro'}
         width={px}
         height={px}
