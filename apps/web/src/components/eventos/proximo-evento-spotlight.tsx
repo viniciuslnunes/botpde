@@ -54,7 +54,7 @@ export function ProximoEventoSpotlight({
         </p>
         <Link
           href={href}
-          prefetch
+          prefetch={false}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           Abrir evento

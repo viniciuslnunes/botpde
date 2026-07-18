@@ -1,5 +1,6 @@
 import { subscribeConversaMensagem } from '@/lib/mensageria-bus'
 import { assertConversaAccess } from '@/lib/mensageria-api'
+import { createSsePingResponse } from '@/lib/sse-stream'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,32 +16,9 @@ export async function GET(
     const { id: conversaId } = await context.params
     await assertConversaAccess(conversaId)
 
-    const encoder = new TextEncoder()
-    let unsubscribe: () => void = () => {}
-    let heartbeat: ReturnType<typeof setInterval> | undefined
-
-    const stream = new ReadableStream({
-      start(controller) {
-        unsubscribe = subscribeConversaMensagem(conversaId, () => {
-          controller.enqueue(encoder.encode('data: ping\n\n'))
-        })
-        heartbeat = setInterval(() => {
-          controller.enqueue(encoder.encode(': keep-alive\n\n'))
-        }, 25_000)
-      },
-      cancel() {
-        unsubscribe()
-        if (heartbeat) clearInterval(heartbeat)
-      },
-    })
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-      },
-    })
+    return createSsePingResponse((onPing) =>
+      subscribeConversaMensagem(conversaId, onPing),
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Não autorizado'
     const status = message.includes('autentic') ? 401 : 403

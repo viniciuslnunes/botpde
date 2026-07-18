@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { subscribeInboxMensagem } from '@/lib/mensageria-bus'
+import { createSsePingResponse } from '@/lib/sse-stream'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,30 +15,5 @@ export async function GET() {
   }
   const userId = session.user.id
 
-  const encoder = new TextEncoder()
-  let unsubscribe: () => void = () => {}
-  let heartbeat: ReturnType<typeof setInterval> | undefined
-
-  const stream = new ReadableStream({
-    start(controller) {
-      unsubscribe = subscribeInboxMensagem(userId, () => {
-        controller.enqueue(encoder.encode('data: ping\n\n'))
-      })
-      heartbeat = setInterval(() => {
-        controller.enqueue(encoder.encode(': keep-alive\n\n'))
-      }, 25_000)
-    },
-    cancel() {
-      unsubscribe()
-      if (heartbeat) clearInterval(heartbeat)
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-    },
-  })
+  return createSsePingResponse((onPing) => subscribeInboxMensagem(userId, onPing))
 }

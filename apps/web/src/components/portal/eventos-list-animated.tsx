@@ -59,12 +59,19 @@ function TipoThumbFallback({ tipo }: { tipo?: string }) {
   )
 }
 
-function EventoGridCard({ evento }: { evento: EventoCardItem }) {
+function EventoGridCard({
+  evento,
+  eager,
+}: {
+  evento: EventoCardItem
+  /** Primeiras capas above-the-fold — evita preload órfão (Early Hints / LCP). */
+  eager?: boolean
+}) {
   return (
     <m.div variants={staggerItem} whileTap={{ scale: 0.99 }} transition={springSnappy} className="h-full">
       <Link
         href={`/portal/eventos/${evento.id}`}
-        prefetch
+        prefetch={false}
         className={[
           'group flex h-full flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--surface)_/_0.85)] shadow-sm backdrop-blur-sm transition-all',
           evento.passado
@@ -79,7 +86,9 @@ function EventoGridCard({ evento }: { evento: EventoCardItem }) {
               src={evento.fotoUrl}
               alt=""
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              loading="lazy"
+              loading={eager ? 'eager' : 'lazy'}
+              fetchPriority={eager ? 'high' : 'auto'}
+              decoding="async"
             />
           ) : (
             <TipoThumbFallback tipo={evento.tipo} />
@@ -152,8 +161,8 @@ export function EventosListAnimated({
       animate="show"
       className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-3"
     >
-      {eventos.map((e) => (
-        <EventoGridCard key={e.id} evento={e} />
+      {eventos.map((e, i) => (
+        <EventoGridCard key={e.id} evento={e} eager={i < 3} />
       ))}
     </m.div>
   )
@@ -178,7 +187,13 @@ export function EventoListaThumb({
     >
       {fotoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={fotoUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={fotoUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+        />
       ) : (
         <TipoThumbFallback tipo={tipo} />
       )}
