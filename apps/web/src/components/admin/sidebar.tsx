@@ -104,7 +104,7 @@ function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
               className={[
                 'app-action group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 active
-                  ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                   : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
@@ -112,7 +112,7 @@ function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
                 className={[
                   'h-4 w-4 shrink-0 transition-colors',
                   active
-                    ? 'text-[rgb(var(--primary))]'
+                    ? 'text-[rgb(var(--color-primary-fg))]'
                     : 'text-[rgb(var(--foreground-muted))] group-hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               />
@@ -125,7 +125,7 @@ function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
                   {formatBadgeCount(badgeCount)}
                 </span>
               ) : (
-                active && <ChevronRight className="h-3 w-3 shrink-0 text-[rgb(var(--primary))]" />
+                active && <ChevronRight className="h-3 w-3 shrink-0 text-[rgb(var(--color-primary-fg))]" />
               )}
             </Link>
           </li>

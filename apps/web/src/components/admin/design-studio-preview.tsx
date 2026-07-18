@@ -153,7 +153,7 @@ function PortalScene({
                 className={[
                   'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium',
                   item.active
-                    ? 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]'
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                     : 'text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >
@@ -353,7 +353,7 @@ function AdminScene({
               className={[
                 'rounded-lg px-2.5 py-1.5 text-xs font-medium',
                 i === 1
-                  ? 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]'
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                   : 'text-[rgb(var(--foreground-muted))]',
               ].join(' ')}
             >

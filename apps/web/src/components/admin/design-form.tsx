@@ -529,8 +529,8 @@ export function DesignForm({
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Prioridade: marca da torcida, escudo e clube afiliado. Sem
-                    cores de rivalidade inventadas por harmonia genérica.
+                    Prioridade: marca da torcida, escudo e clube. Cada sugestão
+                    mostra 3 cores (primária · secundária · destaque).
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -559,15 +559,28 @@ export function DesignForm({
                             Aplicar
                           </span>
                         </div>
-                        <div className="mt-2.5 flex overflow-hidden rounded-lg">
-                          {p.swatches.map((hex, i) => (
-                            <span
-                              key={`${p.id}-${hex}-${i}`}
-                              className="h-8 flex-1 first:rounded-l-lg last:rounded-r-lg"
-                              style={{ backgroundColor: hex }}
-                              title={hex}
-                            />
-                          ))}
+                        <div className="mt-2.5 space-y-1.5">
+                          <div className="flex overflow-hidden rounded-lg ring-1 ring-[rgb(var(--border))]">
+                            {p.swatches.map((hex, i) => (
+                              <span
+                                key={`${p.id}-${hex}-${i}`}
+                                className="h-9 flex-1 first:rounded-l-lg last:rounded-r-lg"
+                                style={{ backgroundColor: hex }}
+                                title={hex}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-1">
+                            {p.swatches.map((hex, i) => (
+                              <span
+                                key={`${p.id}-label-${hex}-${i}`}
+                                className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-[rgb(var(--foreground-muted))]"
+                                title={hex}
+                              >
+                                {hex.toUpperCase()}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </button>
                     ))}

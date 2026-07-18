@@ -86,7 +86,7 @@ export function PortalNavbar({
     return [
       'app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
       active
-        ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+        ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
     ].join(' ')
   }
@@ -95,7 +95,7 @@ export function PortalNavbar({
     return [
       'app-action flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
       active
-        ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+        ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
         : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
     ].join(' ')
   }
@@ -162,7 +162,7 @@ export function PortalNavbar({
               className={[
                 'relative flex h-9 w-9 items-center justify-center rounded-lg border transition-colors',
                 pathname.startsWith('/portal/mensagens')
-                  ? 'border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  ? 'border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                   : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
               showSpinner={false}

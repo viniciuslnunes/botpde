@@ -48,7 +48,7 @@ export function ComunidadeTabBar({
             className={[
               'relative -mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
               ativo
-                ? 'border-transparent text-[rgb(var(--primary))]'
+                ? 'border-transparent text-[rgb(var(--color-primary-fg))]'
                 : 'border-transparent text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -56,7 +56,7 @@ export function ComunidadeTabBar({
             {ativo && (
               <m.span
                 layoutId={layoutId}
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--primary))]"
+                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[rgb(var(--color-primary))]"
                 transition={springSnappy}
               />
             )}

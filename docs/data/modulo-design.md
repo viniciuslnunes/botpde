@@ -49,12 +49,13 @@ Consumidores: `Badge` (`success`/`danger`/`warning`/`info`), diálogos de confir
 1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — no contexto da torcida e do
    clube afiliado, nesta ordem: **marca da torcida** → **escudo/logo** →
    **paleta do clube** → **torcida + clube** → monocromática → alto contraste.
-   Um clique via `aplicarPaletaAoDesign` preenche marca + ações + tint de
-   superfícies.
+   Cada card mostra **3 cores** (primária · secundária · destaque) via
+   `limitarSwatches`. Um clique via `aplicarPaletaAoDesign` preenche marca +
+   ações + tint de superfícies.
 2. **Rivalidade / identidade** — sucesso **não** é verde por padrão. Verde só
    entra em ações/swatches se já fizer parte da identidade (clube/torcida).
-   Harmônicas genéricas (análoga/complementar) foram removidas para não
-   inventar cor de rival.
+   Preto/branco/cinza não recebem saturação artificial (evita “marrom” a partir
+   do preto). Harmônicas genéricas (análoga/complementar) foram removidas.
 3. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube`.
 4. **Escudo/logo** — `extrairPaletaDeImagem` (canvas) alimenta a sugestão “Do
    escudo”; verdes fora de contexto são filtrados.

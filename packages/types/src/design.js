@@ -387,8 +387,10 @@ export function hslToHex(h, s, l) {
 function clampHexLightness(hex, minL = 0.22, maxL = 0.62) {
   const { h, s, l } = hexToHsl(hex)
   if (s < 0.08) {
-    // Quase monocromático — empurra para um tom utilizável.
-    return hslToHex(h, 0.12, Math.min(maxL, Math.max(minL, l)))
+    // Neutro (preto/branco/cinza): só ajusta luminância — saturação > 0
+    // com hue 0 vira marrom e quebra identidade de torcidas P&B.
+    const targetL = l < minL ? minL : l > maxL ? maxL : l
+    return hslToHex(0, 0, targetL)
   }
   return hslToHex(h, s, Math.min(maxL, Math.max(minL, l)))
 }
@@ -473,6 +475,54 @@ export function derivarAcoesDaMarca(primaryHex, opts = {}) {
 }
 
 /**
+ * Até 3 swatches únicos para a UI de paletas sugeridas.
+ * @param {string[]} hexes
+ * @param {number} [max]
+ * @returns {string[]}
+ */
+export function limitarSwatches(hexes, max = 3) {
+  /** @type {string[]} */
+  const out = []
+  const seen = new Set()
+  for (const raw of hexes) {
+    if (typeof raw !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(raw)) continue
+    const key = raw.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(raw)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/**
+ * Terceira cor de destaque: accent do clube, senão fallback (ex.: danger).
+ * @param {string} primary
+ * @param {string} secondary
+ * @param {{ accents?: string[], primary?: string } | null | undefined} clube
+ * @param {string} [fallback]
+ * @returns {string | undefined}
+ */
+function destaqueDaPaleta(primary, secondary, clube, fallback) {
+  const candidates = [
+    ...(clube?.accents ?? []),
+    clube?.primary &&
+    clube.primary.toLowerCase() !== primary.toLowerCase() &&
+    clube.primary.toLowerCase() !== secondary.toLowerCase()
+      ? clube.primary
+      : null,
+    fallback,
+  ].filter(Boolean)
+  for (const c of candidates) {
+    const key = /** @type {string} */ (c).toLowerCase()
+    if (key !== primary.toLowerCase() && key !== secondary.toLowerCase()) {
+      return /** @type {string} */ (c)
+    }
+  }
+  return fallback
+}
+
+/**
  * @typedef {{
  *   id: string,
  *   nome: string,
@@ -520,7 +570,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
   /** @type {PaletaSugerida[]} */
   const out = []
 
-  // 1) Marca da torcida (prioridade)
+  // 1) Marca da torcida (prioridade) — exatamente 3 cores: primária, secundária, destaque
   {
     const primary = seed
     const secondary = seedSecondary ?? surfaces.secondary
@@ -528,17 +578,20 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       secondary,
       accents: opts.clube?.accents,
     })
+    const destaque = destaqueDaPaleta(
+      primary,
+      secondary,
+      opts.clube,
+      actions.danger,
+    )
     out.push({
       id: 'marca-torcida',
       nome: 'Marca da torcida',
-      descricao: 'Sua cor atual + ações sem introduzir cor de rival',
+      descricao: 'Primária · secundária · destaque (sem inventar cor de rival)',
       primary,
       secondary,
       actions,
-      swatches: filtrarVerdeForaDeContexto(
-        [primary, secondary, actions.danger, actions.warning, actions.success],
-        identidadeBase,
-      ),
+      swatches: limitarSwatches([primary, secondary, destaque]),
       fonte: 'torcida',
     })
   }
@@ -559,7 +612,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       primary,
       secondary,
       actions,
-      swatches: extra.slice(0, 5),
+      swatches: limitarSwatches(extra),
       fonte: 'escudo',
     })
   }
@@ -571,6 +624,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
     const accents = opts.clube.accents ?? []
     const actions = derivarAcoesDaMarca(primary, { secondary, accents })
+    const destaque = destaqueDaPaleta(primary, secondary, opts.clube, actions.danger)
     out.push({
       id: 'clube',
       nome: 'Paleta do clube',
@@ -578,9 +632,11 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       primary,
       secondary,
       actions,
-      swatches: filtrarVerdeForaDeContexto(
-        [primary, secondary, ...accents.slice(0, 2)],
-        [primary, secondary, ...accents],
+      swatches: limitarSwatches(
+        filtrarVerdeForaDeContexto(
+          [primary, secondary, destaque],
+          [primary, secondary, ...accents],
+        ),
       ),
       fonte: 'clube',
     })
@@ -598,6 +654,7 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       opts.clube.primary,
     ].filter((c, i, arr) => arr.indexOf(c) === i)
     const actions = derivarAcoesDaMarca(primary, { secondary, accents })
+    const destaque = destaqueDaPaleta(primary, secondary, opts.clube, accents[0])
     out.push({
       id: 'torcida-clube',
       nome: 'Torcida + clube',
@@ -605,9 +662,11 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       primary,
       secondary,
       actions,
-      swatches: filtrarVerdeForaDeContexto(
-        [primary, secondary, ...accents.slice(0, 2)],
-        [...identidadeBase, primary, secondary, ...accents],
+      swatches: limitarSwatches(
+        filtrarVerdeForaDeContexto(
+          [primary, secondary, destaque],
+          [...identidadeBase, primary, secondary, ...accents],
+        ),
       ),
       fonte: 'torcida',
     })
@@ -615,29 +674,35 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
 
   // 5) Monocromática — só a família da marca (sem hue estrangeiro)
   {
-    const primary = hslToHex(h, Math.max(0.2, s * 0.7), 0.28)
-    const secondary = hslToHex(h, Math.max(0.1, s * 0.4), 0.72)
+    const achromatic = s < 0.08
+    const primary = achromatic
+      ? '#1a1a1a'
+      : hslToHex(h, Math.max(0.2, s * 0.7), 0.28)
+    const secondary = achromatic
+      ? '#f4f4f5'
+      : hslToHex(h, Math.max(0.1, s * 0.4), 0.72)
+    const mid = achromatic ? '#737373' : hslToHex(h, s * 0.5, 0.45)
     const actions = derivarAcoesDaMarca(primary, { secondary: seedSecondary })
     out.push({
       id: 'mono',
       nome: 'Monocromática',
       descricao: 'Só a família da marca — sem cores de fora',
-      primary: clampHexLightness(primary, 0.15, 0.4),
-      secondary: clampHexLightness(secondary, 0.55, 0.85),
+      primary: achromatic ? primary : clampHexLightness(primary, 0.15, 0.4),
+      secondary: achromatic ? secondary : clampHexLightness(secondary, 0.55, 0.85),
       actions,
-      swatches: [
-        hslToHex(h, s, 0.15),
-        primary,
-        hslToHex(h, s * 0.5, 0.45),
-        secondary,
-      ],
+      swatches: limitarSwatches(
+        achromatic
+          ? ['#0a0a0a', mid, '#fafafa']
+          : [hslToHex(h, s, 0.15), primary, secondary],
+      ),
       fonte: 'harmonia',
     })
   }
 
   // 6) Alto contraste — leitura máxima; sucesso azul (não verde)
   {
-    const primary = clampHexLightness(seed, 0.1, 0.35)
+    // Mantém a primária da marca (preto continua preto — sem clamp que inventa matiz).
+    const primary = seed
     const actions = derivarAcoesDaMarca(primary, {
       secondary: '#ffffff',
       accents: opts.clube?.accents,
@@ -649,9 +714,11 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
       primary,
       secondary: '#ffffff',
       actions,
-      swatches: filtrarVerdeForaDeContexto(
-        [primary, '#ffffff', actions.success, actions.danger],
-        identidadeBase,
+      swatches: limitarSwatches(
+        filtrarVerdeForaDeContexto(
+          [primary, '#ffffff', actions.danger],
+          identidadeBase,
+        ),
       ),
       fonte: 'preset',
     })
