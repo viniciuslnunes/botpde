@@ -89,7 +89,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number
               departamentoId={depto.id}
               cor={depto.cor}
               nome={depto.nome}
-              Icon={Icon}
+              slug={depto.slug}
             />
           ) : (
             <div

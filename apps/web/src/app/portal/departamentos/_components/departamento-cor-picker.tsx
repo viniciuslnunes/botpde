@@ -1,10 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import type { LucideIcon } from 'lucide-react'
 import { Loader2 } from 'lucide-react'
 import { atualizarCorDepartamento } from '../actions'
 import { runPersistAction } from '@/lib/toast-action'
+import { iconeDepartamento } from './departamento-icone'
 
 const HEX_COR = /^#[0-9a-fA-F]{6}$/
 
@@ -12,13 +12,15 @@ export function DepartamentoCorPicker({
   departamentoId,
   cor,
   nome,
-  Icon,
+  slug,
 }: {
   departamentoId: string
   cor: string
   nome: string
-  Icon: LucideIcon
+  /** Resolve o ícone no client — não passar componente Lucide do Server Component. */
+  slug: string
 }) {
+  const Icon = iconeDepartamento(slug)
   const inputRef = useRef<HTMLInputElement>(null)
   const [corAtual, setCorAtual] = useState(cor)
   const [pending, startTransition] = useTransition()
