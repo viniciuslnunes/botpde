@@ -364,7 +364,49 @@ export function EmitirCarteirinhaModal({
   )
 }
 
-function SocioActions({ socio }: { socio: SocioEmitidoItem }) {
+function ValidadeStatus({ socio }: { socio: SocioEmitidoItem }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {socio.vencida ? (
+        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-red-500" />
+      ) : socio.vencendo ? (
+        <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+      ) : (
+        <CheckCircle2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-green-500" />
+      )}
+      <span
+        className={[
+          'text-sm',
+          socio.vencida
+            ? 'text-red-600 dark:text-red-400'
+            : socio.vencendo
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-[rgb(var(--foreground))]',
+        ].join(' ')}
+      >
+        {socio.validadeLabel}
+      </span>
+      {socio.vencida && (
+        <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
+          Vencida
+        </span>
+      )}
+      {socio.vencendo && (
+        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+          Vence em breve
+        </span>
+      )}
+    </div>
+  )
+}
+
+function SocioActions({
+  socio,
+  stacked = false,
+}: {
+  socio: SocioEmitidoItem
+  stacked?: boolean
+}) {
   const [renovando, setRenovando] = useState(false)
   const [pending, startTransition] = useTransition()
   const [novaValidade, setNovaValidade] = useState(getValidadePadrao)
@@ -394,7 +436,7 @@ function SocioActions({ socio }: { socio: SocioEmitidoItem }) {
 
   if (pending) {
     return (
-      <div className="flex justify-end">
+      <div className={stacked ? 'flex justify-center' : 'flex justify-end'}>
         <Loader2 className="h-4 w-4 animate-spin text-[rgb(var(--foreground-muted))]" />
       </div>
     )
@@ -402,38 +444,64 @@ function SocioActions({ socio }: { socio: SocioEmitidoItem }) {
 
   if (renovando) {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div
+        className={
+          stacked
+            ? 'flex flex-col gap-2'
+            : 'flex flex-wrap items-center justify-end gap-2'
+        }
+      >
         <input
           type="date"
           value={novaValidade}
           onChange={(e) => setNovaValidade(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
-          className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          className={[
+            'app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2 py-1 text-xs text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]',
+            stacked ? 'w-full' : '',
+          ].join(' ')}
         />
-        <button
-          type="button"
-          onClick={handleRenovar}
-          className="app-action flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
-        >
-          <Check className="h-3 w-3" /> OK
-        </button>
-        <button
-          type="button"
-          onClick={() => setRenovando(false)}
-          className="app-action rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-        >
-          <X className="h-3 w-3" />
-        </button>
+        <div className={stacked ? 'flex gap-2' : 'contents'}>
+          <button
+            type="button"
+            onClick={handleRenovar}
+            className={[
+              'app-action flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700',
+              stacked ? 'flex-1 justify-center' : '',
+            ].join(' ')}
+          >
+            <Check className="h-3 w-3" /> OK
+          </button>
+          <button
+            type="button"
+            onClick={() => setRenovando(false)}
+            className={[
+              'app-action rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+              stacked ? 'px-3' : '',
+            ].join(' ')}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
+    <div
+      className={
+        stacked
+          ? 'flex gap-2'
+          : 'flex flex-wrap items-center justify-end gap-1'
+      }
+    >
       <button
         type="button"
         onClick={() => setRenovando(true)}
-        className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        className={[
+          'app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]',
+          stacked ? 'flex-1 justify-center' : '',
+        ].join(' ')}
         title="Renovar validade"
       >
         <RefreshCw className="h-3 w-3" />
@@ -442,7 +510,10 @@ function SocioActions({ socio }: { socio: SocioEmitidoItem }) {
       <button
         type="button"
         onClick={() => void handleRevogar()}
-        className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+        className={[
+          'app-action flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950',
+          stacked ? 'flex-1 justify-center' : '',
+        ].join(' ')}
         title="Revogar carteirinha"
       >
         <Trash2 className="h-3 w-3" />
@@ -670,8 +741,53 @@ export function AdminSociosClient({
                     o acesso no portal.
                   </p>
                 </div>
-                <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-                  <table className="w-full min-w-[40rem] text-sm">
+
+                <ul className="space-y-2 md:hidden">
+                  {elegiveis.map((membro) => (
+                    <li
+                      key={membro.userId}
+                      className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar url={membro.avatarUrl} nome={membro.nome} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-[rgb(var(--foreground))]">
+                            {membro.nome}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                            {[membro.sedeNome, membro.cidade, membro.telefone]
+                              .filter(Boolean)
+                              .join(' · ') || '—'}
+                          </p>
+                          {membro.aprovadoEmLabel && (
+                            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                              Aprovado em {membro.aprovadoEmLabel}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        {podeEmitir ? (
+                          <button
+                            type="button"
+                            onClick={() => abrirEmit(membro.userId)}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Emitir carteirinha
+                          </button>
+                        ) : (
+                          <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
+                            Sem permissão
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] md:block">
+                  <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -781,8 +897,44 @@ export function AdminSociosClient({
             />
           ) : (
             <MotionReveal index={0}>
-              <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-                <table className="w-full min-w-[40rem] text-sm">
+              <ul className="space-y-2 md:hidden">
+                {socios.map((socio) => (
+                  <li
+                    key={socio.id}
+                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar url={socio.avatarUrl} nome={socio.nome} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
+                            {String(socio.numeroSocio).padStart(5, '0')}
+                          </span>
+                          <span className="font-medium text-[rgb(var(--foreground))]">
+                            {socio.nome}
+                          </span>
+                        </div>
+                        {socio.email && (
+                          <p className="mt-0.5 truncate text-xs text-[rgb(var(--foreground-muted))]">
+                            {socio.email}
+                          </p>
+                        )}
+                        <div className="mt-2">
+                          <ValidadeStatus socio={socio} />
+                        </div>
+                      </div>
+                    </div>
+                    {podeEmitir && (
+                      <div className="mt-3 border-t border-[rgb(var(--border))] pt-3">
+                        <SocioActions socio={socio} stacked />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] md:block">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -791,7 +943,7 @@ export function AdminSociosClient({
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                         Nome
                       </th>
-                      <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] md:table-cell">
+                      <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] lg:table-cell">
                         Contato
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -821,52 +973,13 @@ export function AdminSociosClient({
                             </span>
                           </div>
                         </td>
-                        <td className="hidden px-4 py-3 md:table-cell">
+                        <td className="hidden px-4 py-3 lg:table-cell">
                           <span className="text-xs text-[rgb(var(--foreground-muted))]">
                             {socio.email ?? '—'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {socio.vencida ? (
-                              <AlertTriangle
-                                aria-hidden
-                                className="h-3.5 w-3.5 shrink-0 text-red-500"
-                              />
-                            ) : socio.vencendo ? (
-                              <AlertTriangle
-                                aria-hidden
-                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                              />
-                            ) : (
-                              <CheckCircle2
-                                aria-hidden
-                                className="h-3.5 w-3.5 shrink-0 text-green-500"
-                              />
-                            )}
-                            <span
-                              className={[
-                                'text-sm',
-                                socio.vencida
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : socio.vencendo
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-[rgb(var(--foreground))]',
-                              ].join(' ')}
-                            >
-                              {socio.validadeLabel}
-                            </span>
-                            {socio.vencida && (
-                              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
-                                Vencida
-                              </span>
-                            )}
-                            {socio.vencendo && (
-                              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                                Vence em breve
-                              </span>
-                            )}
-                          </div>
+                          <ValidadeStatus socio={socio} />
                         </td>
                         <td className="px-4 py-3">
                           {podeEmitir ? (
