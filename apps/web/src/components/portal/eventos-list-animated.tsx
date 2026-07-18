@@ -12,6 +12,7 @@ export interface EventoCardItem {
   titulo: string
   dataLabel: string
   local: string | null
+  fotoUrl?: string | null
   tenantNome: string | null
   passado: boolean
   diasLabel: string | null
@@ -53,13 +54,22 @@ function EventoCardLink({ evento }: { evento: EventoCardItem }) {
         href={`/portal/eventos/${evento.id}`}
         prefetch
         className={[
-          'group flex flex-col gap-3 rounded-xl border p-5 transition-all hover:shadow-md',
+          'group flex flex-col overflow-hidden rounded-xl border transition-all hover:shadow-md',
           evento.passado
             ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-70'
             : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
         ].join(' ')}
       >
-        <div className="flex items-start justify-between gap-3">
+        {evento.fotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- capas externas (Unsplash/seed)
+          <img
+            src={evento.fotoUrl}
+            alt=""
+            className="h-36 w-full object-cover sm:h-40"
+            loading="lazy"
+          />
+        ) : null}
+        <div className="flex items-start justify-between gap-3 p-5">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {evento.tipo && <EventoTipoBadge tipo={evento.tipo} />}

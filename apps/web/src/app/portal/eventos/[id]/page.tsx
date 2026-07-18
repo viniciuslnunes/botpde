@@ -146,6 +146,12 @@ export default async function EventoDetailPage({
               </span>
             )}
           </div>
+          {evento.fotoUrl ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={evento.fotoUrl} alt="" className="max-h-80 w-full object-cover" />
+            </div>
+          ) : null}
           <div className="mt-3">
             <EventoAcoesRapidas
               eventoId={evento.id}

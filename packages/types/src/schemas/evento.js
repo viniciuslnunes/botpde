@@ -31,6 +31,10 @@ export const CriarEventoSchema = z.object({
     .max(200)
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  fotoUrl: z.preprocess((v) => {
+    if (v === '' || v === null || v === undefined) return undefined
+    return v
+  }, z.string().url('URL da foto inválida').max(500).optional()),
   tipo: TipoEventoSchema.default('GERAL'),
   sedeId: z.preprocess((v) => {
     if (v === '' || v === null || v === undefined || v === 'global') return null
