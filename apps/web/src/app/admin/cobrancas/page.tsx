@@ -124,7 +124,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
             Nenhuma cobrança encontrada.
           </p>
         ) : (
-          <table className="w-full min-w-[48rem] text-sm">
+          <table className="w-full min-w-0 text-sm md:min-w-[36rem] xl:min-w-[48rem]">
             <thead>
               <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

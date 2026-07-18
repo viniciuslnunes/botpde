@@ -190,13 +190,13 @@ async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
     <div className="space-y-7">
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Próximos eventos */}
-        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-              <Calendar className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+        <div className="min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex min-w-0 items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
+              <Calendar className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
               Próximos eventos
             </h2>
-            <Link href="/admin/eventos" className="text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
+            <Link href="/admin/eventos" className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
               Ver todos →
             </Link>
           </div>
@@ -241,13 +241,13 @@ async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
         </div>
 
         {/* Membros recentes */}
-        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        <div className="min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex min-w-0 items-center gap-2 text-balance font-semibold text-[rgb(var(--foreground))]">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
               Membros aprovados recentemente
             </h2>
-            <Link href="/admin/membros" className="text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
+            <Link href="/admin/membros" className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
               Ver todos →
             </Link>
           </div>
@@ -285,13 +285,13 @@ async function DashboardListas({ tenant }: { tenant: TenantInfo }) {
       </div>
 
       {/* Log de atividade */}
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-            <Activity className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+      <div className="min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex min-w-0 items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
+            <Activity className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
             Atividade recente
           </h2>
-          <Link href="/admin/auditoria" className="text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
+          <Link href="/admin/auditoria" className="shrink-0 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]">
             Ver registro →
           </Link>
         </div>
@@ -329,14 +329,14 @@ export default async function AdminPage() {
   const tenantInfo: TenantInfo = { id: tenant.id, nome: tenant.nome, corPrimaria: tenant.corPrimaria }
 
   return (
-    <div className="app-container space-y-7 py-8">
+    <div className="app-container min-w-0 space-y-7 py-5 sm:py-8">
       {/* Cabeçalho */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
+          <p className="mt-0.5 truncate text-sm text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="h-2 w-2 rounded-full bg-emerald-500" />
           <span className="text-xs text-[rgb(var(--foreground-muted))]">Operacional</span>
         </div>

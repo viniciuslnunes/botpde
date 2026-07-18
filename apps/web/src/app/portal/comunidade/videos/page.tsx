@@ -21,10 +21,18 @@ export default async function VideosPage() {
       <ComunidadePageHeader
         icon={Video}
         titulo="Vídeos"
-        subtitulo="Reels e publicações com vídeo da comunidade"
+        subtitulo="Clipes da torcida — deslize, curta e publique o seu"
       />
 
-      <VideosPageClient posts={posts} />
+      <VideosPageClient
+        posts={posts}
+        tenantId={tenant.id}
+        currentUser={{
+          id: session.user.id,
+          nome: session.user.name ?? null,
+          avatarUrl: session.user.image ?? null,
+        }}
+      />
     </div>
   )
 }

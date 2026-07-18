@@ -24,6 +24,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   retries: 0,
+  timeout: 60_000,
   reporter: [['list']],
   outputDir: './e2e/.test-results',
   use: {
@@ -36,6 +37,7 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
+      timeout: 90_000,
     },
     {
       name: 'sem-auth',

@@ -142,7 +142,7 @@ export function MensagensShell({
         'flex overflow-hidden bg-[rgb(var(--surface))]',
         embedded
           ? 'h-[min(28rem,calc(100vh-12rem))] min-h-[16rem] rounded-xl border border-[rgb(var(--border))]'
-          : 'h-[calc(100vh-8.5rem)] min-h-[24rem] rounded-2xl border border-[rgb(var(--border))]',
+          : 'h-[calc(100dvh-8.5rem)] min-h-[22rem] rounded-2xl border border-[rgb(var(--border))] sm:min-h-[24rem]',
       ].join(' ')}
     >
       {/* Coluna: inbox */}
@@ -232,7 +232,12 @@ export function MensagensShell({
                         : 'hover:bg-[rgb(var(--background-subtle))]',
                     ].join(' ')}
                   >
-                  <Avatar nome={titulo} avatarUrl={avatarUrl} size="md" />
+                  <Avatar
+                    nome={titulo}
+                    avatarUrl={avatarUrl}
+                    size="md"
+                    fit={c.tipo === 'DIRETA' ? 'cover' : 'contain'}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">

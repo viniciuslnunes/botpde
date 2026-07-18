@@ -55,9 +55,12 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
   const perfilAtivo = pathname.startsWith('/portal/comunidade/perfil')
 
   function abrirComposer() {
+    const onVideos = pathname.startsWith('/portal/comunidade/videos')
     if (isFeed) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
       window.dispatchEvent(new CustomEvent('comunidade:compose'))
+    } else if (onVideos) {
+      router.push('/portal/comunidade?compose=1&media=video')
     } else {
       router.push('/portal/comunidade?compose=1')
     }

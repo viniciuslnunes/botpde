@@ -89,7 +89,7 @@ function AdminTopbar({
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        <Link href="/admin" className="flex min-w-0 shrink-0 items-center gap-2">
+        <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
           {tenantLogoUrl ? (
             canOptimizeImageUrl(tenantLogoUrl) ? (
               <Image
@@ -97,19 +97,19 @@ function AdminTopbar({
                 alt={tenantNome}
                 width={28}
                 height={28}
-                className="h-7 w-7 rounded-lg object-contain"
+                className="h-7 w-7 shrink-0 rounded-lg object-contain"
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={tenantLogoUrl}
                 alt={tenantNome}
-                className="h-7 w-7 rounded-lg object-contain"
+                className="h-7 w-7 shrink-0 rounded-lg object-contain"
               />
             )
           ) : (
             <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
               style={{ backgroundColor: tenantCor }}
             >
               {tenantNome.charAt(0).toUpperCase()}

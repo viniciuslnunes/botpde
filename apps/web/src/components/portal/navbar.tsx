@@ -106,7 +106,7 @@ export function PortalNavbar({
       <header className="relative sticky top-0 z-40 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
         <div className="app-container flex h-14 items-center gap-4">
 
-          <PortalNavLink href="/portal/comunidade" className="flex shrink-0 items-center gap-2" showSpinner={false}>
+          <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {tenant.logoUrl ? (
               canOptimizeImageUrl(tenant.logoUrl) ? (
                 <Image
@@ -114,21 +114,21 @@ export function PortalNavbar({
                   alt={tenant.nome}
                   width={28}
                   height={28}
-                  className="h-7 w-7 rounded-lg object-contain"
+                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={tenant.logoUrl} alt={tenant.nome} className="h-7 w-7 rounded-lg object-contain" />
+                <img src={tenant.logoUrl} alt={tenant.nome} className="h-7 w-7 shrink-0 rounded-lg object-contain" />
               )
             ) : (
               <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
                 style={{ backgroundColor: tenant.corPrimaria }}
               >
                 {tenant.nome.charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="hidden text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))] sm:block">
+            <span className="hidden truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))] sm:block sm:max-w-[10rem] lg:max-w-[14rem]">
               {tenant.nome}
             </span>
           </PortalNavLink>

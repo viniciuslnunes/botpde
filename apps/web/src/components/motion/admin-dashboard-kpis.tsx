@@ -91,13 +91,13 @@ export function AdminDashboardKpis({
               transition={springSnappy}
               className="h-full"
             >
-              <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-                <div className="flex flex-1 items-start justify-between gap-3">
+              <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+                <div className="flex flex-1 items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                       {k.label}
                     </p>
-                    <p className="mt-2 text-4xl font-bold text-[rgb(var(--foreground))]">{k.value}</p>
+                    <p className="mt-1.5 text-3xl font-bold tabular-nums text-[rgb(var(--foreground))] sm:mt-2 sm:text-4xl">{k.value}</p>
                     <div className="mt-1 min-h-5">
                       {k.badge ? (
                         <p className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">

@@ -85,7 +85,7 @@ export function StoryRings({
                 )}
               </span>
             </div>
-            <span className="max-w-14 truncate text-[10px] text-[rgb(var(--foreground-muted))]">
+            <span className="w-16 text-center text-[10px] leading-tight text-[rgb(var(--foreground-muted))]">
               Seu momento
             </span>
             <input
@@ -115,7 +115,7 @@ export function StoryRings({
                 <Avatar nome={meuRing.nome} avatarUrl={meuRing.avatarUrl} size="md" />
               </div>
             </div>
-            <span className="max-w-14 truncate text-[10px] font-medium text-[rgb(var(--foreground))]">
+            <span className="w-16 text-center text-[10px] font-medium leading-tight text-[rgb(var(--foreground))]">
               Você
             </span>
           </m.button>
@@ -145,7 +145,7 @@ export function StoryRings({
                   <Avatar nome={ring.nome} avatarUrl={ring.avatarUrl} size="md" />
                 </div>
               </div>
-              <span className="max-w-14 truncate text-[10px] text-[rgb(var(--foreground-muted))]">
+              <span className="w-16 truncate text-center text-[10px] leading-tight text-[rgb(var(--foreground-muted))]">
                 {ring.nome ?? 'Membro'}
               </span>
             </m.button>

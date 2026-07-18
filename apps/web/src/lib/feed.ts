@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, Prisma } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
 import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes } from './comunidade-cache'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
@@ -1304,34 +1304,81 @@ export async function getPostsPorHashtag(
   return { tag: normalized, posts: await finalizarPosts(posts) }
 }
 
+/**
+ * Posts MEMBRO públicos com vídeo nativo (Cloudinary `/video/upload/` ou
+ * extensão .mp4/.webm/.mov/.m4v). Embeds (YouTube/TikTok) ficam no feed,
+ * não nesta galeria — o player de Reels só toca `<video>`.
+ */
 export async function getPostsComVideo(
   tenantId: string,
   userId?: string,
 ): Promise<PostSocialItem[]> {
   const { isVideoUrl } = await import('./comunidade-social')
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  if (visibleTenantIds.length === 0) return []
+
+  const videoExt = '\\.(mp4|webm|mov|m4v)(\\?|$)'
+  const videoMatch = Prisma.sql`(
+    (p.imagem_url IS NOT NULL AND (
+      p.imagem_url LIKE ${'%/video/upload/%'}
+      OR p.imagem_url ~* ${videoExt}
+    ))
+    OR EXISTS (
+      SELECT 1 FROM unnest(p.midia_urls) AS u
+      WHERE u LIKE ${'%/video/upload/%'}
+         OR u ~* ${videoExt}
+    )
+  )`
+
+  const grupoScope = userId
+    ? Prisma.sql`(
+        p.conversa_id IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM saas_conversas c
+          INNER JOIN saas_membros_conversa m ON m.conversa_id = c.id
+          WHERE c.id = p.conversa_id
+            AND c.tipo = 'GRUPO'
+            AND c.comunidade = true
+            AND m.user_id = ${userId}
+            AND m.status = 'ATIVO'
+            AND m.saiu_em IS NULL
+            AND m.silenciada = false
+        )
+      )`
+    : Prisma.sql`p.conversa_id IS NULL`
+
+  const idRows: Array<{ id: string }> = await db.$queryRaw`
+    SELECT p.id
+    FROM saas_posts p
+    WHERE p.tenant_id IN (${Prisma.join(visibleTenantIds)})
+      AND p.tipo = 'MEMBRO'
+      AND p.oculto = false
+      AND p.visibilidade = 'PUBLICO'
+      AND ${videoMatch}
+      AND ${grupoScope}
+    ORDER BY p.criado_em DESC
+    LIMIT 30
+  `
+
+  const ids = idRows.map((row) => row.id)
+  if (ids.length === 0) return []
 
   const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: visibleTenantIds },
-      tipo: 'MEMBRO',
-      oculto: false,
-      visibilidade: 'PUBLICO',
-      ...escopoFeedComGrupos(userId),
-    },
-    orderBy: { criadoEm: 'desc' },
-    take: 80,
+    where: { id: { in: ids } },
     include: postInclude(userId),
   })) as PostRaw[]
 
-  let posts = postsRaw
+  const byId = new Map(postsRaw.map((p) => [p.id, p]))
+  let posts = ids
+    .map((id) => byId.get(id))
+    .filter((p): p is PostRaw => p != null)
     .map(projetarPost)
     .filter(
       (p) =>
         p.midiaUrls.some(isVideoUrl) ||
         (p.imagemUrl != null && isVideoUrl(p.imagemUrl)),
     )
-    .slice(0, 30)
 
   if (userId) {
     const autorIds = posts.map((p) => p.autorId)

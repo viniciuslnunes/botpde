@@ -56,29 +56,32 @@ export default async function PortalLojaPage({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-gradient-to-br from-[rgb(var(--primary)_/_0.15)] to-transparent p-6">
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Loja oficial da torcida</h1>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-gradient-to-br from-[rgb(var(--primary)_/_0.15)] to-transparent p-4 sm:p-6">
+        <h1 className="text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">Loja oficial da torcida</h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
           Produtos exclusivos dos Gaviões da Fiel
         </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
-          <Tag className="h-3.5 w-3.5" />
-          Primeira compra: cupom <strong>EUSOUGAVIAO</strong> (10% off)
+        <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
+          <Tag className="h-3.5 w-3.5 shrink-0" />
+          <span className="sm:hidden">Cupom <strong className="tracking-wide">EUSOUGAVIAO</strong> · 10%</span>
+          <span className="hidden sm:inline">
+            Primeira compra: cupom <strong className="tracking-wide">EUSOUGAVIAO</strong> (10% off)
+          </span>
         </div>
       </div>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
           {totalProdutos} produto{totalProdutos !== 1 ? 's' : ''}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <SacolaBadge count={sacolaCount._sum.quantidade ?? 0} />
           <Link
             href="/portal/loja/pedidos"
-            className="relative flex items-center gap-2 rounded-xl border border-[rgb(var(--foreground-muted)_/_0.4)] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))]"
+            className="relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[rgb(var(--foreground-muted)_/_0.4)] px-3 text-sm font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))] sm:px-4"
           >
-            <Package className="h-4 w-4" />
-            Meus pedidos
+            <Package className="h-4 w-4 shrink-0" />
+            <span className="truncate">Pedidos</span>
             {meusPedidos > 0 && (
               <span className="rounded-full bg-[rgb(var(--primary))] px-1.5 py-0.5 text-xs font-bold text-white">
                 {meusPedidos}

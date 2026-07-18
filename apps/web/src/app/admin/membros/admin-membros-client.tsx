@@ -41,10 +41,10 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
         animate="show"
         className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
       >
-        <table className="w-full min-w-[48rem] text-sm">
+        <table className="w-full min-w-0 text-sm md:min-w-[36rem] xl:min-w-[48rem]">
           <thead>
             <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:px-4">
                 Membro
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden sm:table-cell">
@@ -59,13 +59,13 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden xl:table-cell">
                 Cidade
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:table-cell">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden 2xl:table-cell">
                 Cadastro
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:px-4">
                 Ações
               </th>
             </tr>
@@ -92,7 +92,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                   role="button"
                   aria-label={`Ver detalhes de ${membro.nome}`}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 sm:px-4">
                     <div className="flex items-center gap-3">
                       {membro.avatarUrl ? (
                         canOptimizeImageUrl(membro.avatarUrl) ? (
@@ -118,10 +118,13 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                           {membro.inicial}
                         </div>
                       )}
-                      <div>
-                        <p className="font-medium text-[rgb(var(--foreground))] group-hover:underline">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-[rgb(var(--foreground))] group-hover:underline">
                           {membro.nome}
                         </p>
+                        <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium sm:hidden ${membro.statusClass}`}>
+                          {membro.statusLabel}
+                        </span>
                         {membro.alertaRivalSocio && (
                           <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                             <TriangleAlert className="h-3 w-3 shrink-0" />
@@ -153,7 +156,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                   <td className="px-4 py-3 hidden xl:table-cell">
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.cidade ?? '—'}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden px-4 py-3 sm:table-cell">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${membro.statusClass}`}>
                       {membro.statusLabel}
                     </span>
@@ -162,7 +165,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.criadoEmLabel}</span>
                   </td>
                   <td
-                    className="px-4 py-3"
+                    className="px-2 py-3 sm:px-4"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
@@ -197,11 +200,11 @@ export function AdminMembrosTabs({ tabs }: { tabs: AdminMembrosTab[] }) {
   return (
     <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
       {tabs.map((tab) => (
-        <m.div key={tab.status} whileTap={{ scale: 0.97 }} transition={springSnappy}>
+        <m.div key={tab.status} className="shrink-0" whileTap={{ scale: 0.97 }} transition={springSnappy}>
           <Link
             href={tab.href}
             className={[
-              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
+              'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors',
               tab.active
                 ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                 : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',

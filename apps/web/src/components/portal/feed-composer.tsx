@@ -380,16 +380,26 @@ function ComposerBody({
   }
 
   // Abre o composer a partir do FAB do dock (evento) ou de `?compose=1` na URL.
+  // `media=video` (vindo de /videos) abre o seletor de arquivo após expandir.
   useEffect(() => {
-    function onCompose() {
+    function onCompose(preferVideo = false) {
       setExpanded(true)
-      requestAnimationFrame(() => textareaRef.current?.focus())
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus()
+        if (preferVideo) {
+          window.setTimeout(() => fileInputRef.current?.click(), 120)
+        }
+      })
     }
-    window.addEventListener('comunidade:compose', onCompose)
-    if (new URLSearchParams(window.location.search).get('compose') === '1') {
-      onCompose()
+    function onComposeEvent() {
+      onCompose(false)
     }
-    return () => window.removeEventListener('comunidade:compose', onCompose)
+    window.addEventListener('comunidade:compose', onComposeEvent)
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('compose') === '1') {
+      onCompose(params.get('media') === 'video')
+    }
+    return () => window.removeEventListener('comunidade:compose', onComposeEvent)
   }, [])
 
   useEffect(() => {

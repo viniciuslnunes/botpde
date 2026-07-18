@@ -59,19 +59,20 @@ export function MemberActions({ membroId, status, departamentoNome }: MemberActi
 
   if (status === 'PENDENTE') {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
         <button
           onClick={() => void handleAprovar(true)}
-          className="btn-success app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
+          aria-label="Aprovar"
+          className="btn-success app-action flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-[filter] sm:px-3"
         >
-          <Check className="h-3 w-3" />
-          Aprovar
+          <Check className="h-3.5 w-3.5" />
+          <span className="max-sm:sr-only">Aprovar</span>
         </button>
         {depto && (
           <button
             type="button"
             onClick={() => void handleAprovar(false)}
-            className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+            className="app-action hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] sm:inline-flex"
             title={`Aprovar sem incluir em ${depto}`}
           >
             Sem área
@@ -79,39 +80,42 @@ export function MemberActions({ membroId, status, departamentoNome }: MemberActi
         )}
         <button
           onClick={() => void handleReprovar()}
-          className="btn-danger-soft app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+          aria-label="Reprovar"
+          className="btn-danger-soft app-action flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3"
         >
-          <X className="h-3 w-3" />
-          Reprovar
+          <X className="h-3.5 w-3.5" />
+          <span className="max-sm:sr-only">Reprovar</span>
         </button>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
       <button
         onClick={() => void handleReverter()}
-        className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        aria-label="Reverter para pendente"
+        className="app-action flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] sm:px-3"
         title="Mover de volta para pendente"
       >
-        <RotateCcw className="h-3 w-3" />
-        Reverter
+        <RotateCcw className="h-3.5 w-3.5" />
+        <span className="max-sm:sr-only">Reverter</span>
       </button>
       {status === 'REPROVADO' && (
         <>
           <button
             onClick={() => void handleAprovar(true)}
-            className="btn-success app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
+            aria-label="Aprovar"
+            className="btn-success app-action flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-[filter] sm:px-3"
           >
-            <Check className="h-3 w-3" />
-            Aprovar
+            <Check className="h-3.5 w-3.5" />
+            <span className="max-sm:sr-only">Aprovar</span>
           </button>
           {depto && (
             <button
               type="button"
               onClick={() => void handleAprovar(false)}
-              className="app-action rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+              className="app-action hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] sm:inline-flex"
               title={`Aprovar sem incluir em ${depto}`}
             >
               Sem área

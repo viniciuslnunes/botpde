@@ -24,6 +24,8 @@ interface AvatarProps {
   avatarUrl?: string | null
   size?: AvatarSize
   className?: string
+  /** cover (padrão) para fotos; contain para logos de grupo/torcida. */
+  fit?: 'cover' | 'contain'
 }
 
 function inicial(nome: string | null): string {
@@ -34,9 +36,10 @@ function inicial(nome: string | null): string {
  * Avatar circular consistente da comunidade: foto quando existe, senão a inicial
  * sobre a cor primária do tenant. Sem hooks — usável em Server e Client Components.
  */
-export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps) {
-  const base = `inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${SIZES[size]}`
+export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' }: AvatarProps) {
+  const base = `inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold ${SIZES[size]}`
   const px = PIXELS[size]
+  const objectFit = fit === 'contain' ? 'object-contain bg-[rgb(var(--background-subtle))]' : 'object-cover'
   // Não pedir anexo Discord expirado — cai na inicial sem 404 no console.
   const src = durableImageUrl(avatarUrl)
 
@@ -47,7 +50,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps)
         alt={nome ?? 'Membro'}
         width={px}
         height={px}
-        className={[base, 'object-cover', className ?? ''].join(' ')}
+        className={[base, objectFit, className ?? ''].join(' ')}
       />
     )
   }
@@ -62,7 +65,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps)
         height={px}
         loading="lazy"
         decoding="async"
-        className={[base, 'object-cover', className ?? ''].join(' ')}
+        className={[base, objectFit, className ?? ''].join(' ')}
       />
     )
   }

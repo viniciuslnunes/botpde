@@ -25,7 +25,7 @@ export default async function MensagensPage({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Mensagens</h1>
+        <h1 className="text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">Mensagens</h1>
         <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
           Conversas diretas e grupos com membros da torcida e aliadas
         </p>

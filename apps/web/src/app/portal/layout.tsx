@@ -76,7 +76,7 @@ export default async function PortalLayout({
         temDepartamentos={totalDepartamentos > 0}
         modoNacional={ctx?.modo === 'nacional'}
       />
-      <main className="app-container relative py-8">
+      <main className="app-container relative py-4 sm:py-8">
         <PortalMotionShell>{children}</PortalMotionShell>
       </main>
     </div>

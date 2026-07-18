@@ -299,7 +299,7 @@ Troca visual entre estados de UI (ex.: Seguir → Pendente → Seguindo):
 | Perfil | tabs, destaques, fotos, atividade, publicações |
 | Rede / salvos / hashtag / post | `ComunidadePostsAnimated`, `MotionReveal` |
 | Seguir / solicitações | botões, review, listas de membros |
-| Vídeos | reels (snap + scale), grid stagger |
+| Vídeos | reels imersivo (snap, progresso, double-tap, rail), grid→fullscreen, Em alta |
 | Aside | `MotionReveal` nos widgets; salas ao vivo stagger |
 | Comunicados | collapse + stagger nos itens |
 

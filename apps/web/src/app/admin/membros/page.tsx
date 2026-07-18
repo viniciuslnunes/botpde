@@ -229,14 +229,16 @@ export default async function MembrosPage({
       {/* Cabeçalho */}
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
         <div className="app-container">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Membros</h1>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 {total} {total === 1 ? 'resultado' : 'resultados'}
               </p>
             </div>
-            <ExportarLgeButton />
+            <div className="shrink-0">
+              <ExportarLgeButton />
+            </div>
           </div>
 
         <AdminMembrosTabs

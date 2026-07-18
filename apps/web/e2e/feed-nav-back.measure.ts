@@ -20,7 +20,7 @@ async function login(page: Page) {
   await page.goto('/entrar')
   await page.locator('#email-senha').fill(email)
   await page.locator('#senha').fill(senha)
-  await page.getByRole('button', { name: /entrar com e-mail/i }).click()
+  await page.getByRole('button', { name: /^entrar$/i }).click()
   await page.waitForURL(/\/(portal|super-admin)/, { timeout: 60_000 })
   if (page.url().includes('/super-admin')) {
     await page.goto('/portal/comunidade')

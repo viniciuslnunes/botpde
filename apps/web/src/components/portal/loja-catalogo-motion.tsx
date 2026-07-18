@@ -13,12 +13,12 @@ interface LojaCategoriaChip {
 
 export function LojaCategoriaChips({ chips }: { chips: LojaCategoriaChip[] }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="app-scrollbar-none -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
       {chips.map((chip) => (
-        <m.div key={chip.slug} whileTap={{ scale: 0.96 }} transition={springSnappy}>
+        <m.div key={chip.slug} whileTap={{ scale: 0.96 }} transition={springSnappy} className="shrink-0">
           <Link
             href={chip.href}
-            className={`rounded-full px-3 py-1 text-sm font-medium border ${
+            className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium ${
               chip.active
                 ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                 : 'border-[rgb(var(--foreground-muted)_/_0.35)] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.5)]'

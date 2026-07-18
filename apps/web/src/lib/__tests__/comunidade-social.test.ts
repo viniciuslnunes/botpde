@@ -58,7 +58,9 @@ describe('comunidade-social', () => {
 
   it('detecta URLs de vídeo', () => {
     expect(isVideoUrl('https://res.cloudinary.com/x/video/upload/v1/a.mp4')).toBe(true)
+    expect(isVideoUrl('https://cdn.example.com/clip.m4v?token=1')).toBe(true)
     expect(isVideoUrl('https://res.cloudinary.com/x/image/upload/v1/a.jpg')).toBe(false)
+    expect(isVideoUrl('https://www.youtube.com/watch?v=abc')).toBe(false)
   })
 
   it('limita menções distintas extraídas', () => {

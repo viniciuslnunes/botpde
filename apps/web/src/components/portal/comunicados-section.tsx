@@ -102,7 +102,7 @@ export function ComunicadosSection({
           </span>
         )}
         {!expanded && preview && (
-          <span className="min-w-0 flex-1 truncate text-xs text-[rgb(var(--foreground-muted))]">
+          <span className="hidden min-w-0 flex-1 truncate text-xs text-[rgb(var(--foreground-muted))] sm:inline">
             {preview}
           </span>
         )}

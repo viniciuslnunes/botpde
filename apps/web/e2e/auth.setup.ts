@@ -25,11 +25,11 @@ setup('autenticar usuário de teste', async ({ page }) => {
   await page.goto('/entrar')
   await page.locator('#email-senha').fill(email)
   await page.locator('#senha').fill(senha)
-  await page.getByRole('button', { name: /entrar com e-mail/i }).click()
+  await page.getByRole('button', { name: /^entrar$/i }).click()
   // Super-admin pode ir para /super-admin/torcidas; sócio comum para /portal.
-  await page.waitForURL(/\/(portal|super-admin)/)
+  await page.waitForURL(/\/(portal|super-admin)/, { timeout: 60_000 })
   if (page.url().includes('/super-admin')) {
-    await page.goto('/portal/comunidade')
+    await page.goto('/portal/comunidade', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForURL('**/portal/**')
   }
 

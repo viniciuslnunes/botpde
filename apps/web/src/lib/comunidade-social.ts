@@ -107,13 +107,11 @@ export const REACOES_CONFIG: Record<
   CURTIR: { label: 'Curtir', emoji: '♥', cor: 'primary' },
 }
 
+/** Vídeo nativo (Cloudinary ou arquivo). Não inclui embeds sociais. */
+const VIDEO_URL_EXT = /\.(mp4|webm|mov|m4v)(\?.*)?$/i
+
 export function isVideoUrl(url: string): boolean {
-  return (
-    url.includes('/video/upload/') ||
-    url.endsWith('.mp4') ||
-    url.endsWith('.webm') ||
-    url.endsWith('.mov')
-  )
+  return url.includes('/video/upload/') || VIDEO_URL_EXT.test(url)
 }
 
 /** Permalink estável de um post no portal. */

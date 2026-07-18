@@ -156,7 +156,17 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
 - **Transferência de admin** — `PATCH /api/conversas/[id]/membros` promove outro membro e rebaixa o admin atual; botão "Tornar admin" no painel de membros.
 - **Mural do grupo** — posts com `conversaId` ficam só no mural (`/portal/comunidade/grupos/[id]`); não entram no feed principal.
 - **Momentos 24h** — `MomentoStory` com `expiraEm`; anéis no topo do feed; viewer fullscreen.
-- **Reels** — `/portal/comunidade/videos` com modo vertical (snap scroll + autoplay) e grade.
+- **Reels / Vídeos** — `/portal/comunidade/videos` lista posts MEMBRO **PÚBLICO** com
+  vídeo nativo (Cloudinary `/video/upload/` ou `.mp4`/`.webm`/`.mov`/`.m4v`) no feed
+  e nos murais de grupos do viewer.
+  - **UI** — modo Reels (snap vertical, autoplay mudo, barra de progresso, tap pausa,
+    double-tap curte) e Grade (poster Cloudinary + contagens; toque abre fullscreen
+    no índice). Ordenação **Recentes** / **Em alta** (mesma heurística do Descobrir).
+  - **Engajamento in-player** — rail Curtir / Comentários (sheet) / Salvar / Compartilhar
+    reusa actions do feed (`reagirPost`, `comentarPost`, `salvarPost`); sem entidade Reel.
+  - **Criação** — empty state e dock (`+` em `/videos`) → `?compose=1&media=video`.
+  - Embeds (YouTube/TikTok/Instagram/X) e stories (`MomentoStory`) **não** entram.
+  - Loader: SQL com `unnest(midia_urls)` (`getPostsComVideo`); helpers em `lib/videos.ts`.
 
 ## Canais institucionais (M3 mensageria)
 

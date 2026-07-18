@@ -35,7 +35,7 @@ export default async function ComunidadeLayout({
 
   return (
     <ComunidadeQueryProvider>
-      <div className="pb-24 lg:pb-0">
+      <div className="pb-28 lg:pb-0">
         <ComunidadeLayoutChrome
           currentUserId={currentUser.id}
           salas={salas}

@@ -44,16 +44,30 @@ export function CarteirinhaAssociacaoStatus({ home, revealFrom = 0 }: Props) {
             ].join(' ')}
           >
             {home.membro.adimplente ? (
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-700 dark:text-green-400" />
             ) : (
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-700 dark:text-red-400" />
             )}
-            <div>
-              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+            <div className="min-w-0">
+              <p
+                className={[
+                  'text-sm font-semibold',
+                  home.membro.adimplente
+                    ? 'text-green-900 dark:text-green-100'
+                    : 'text-red-900 dark:text-red-100',
+                ].join(' ')}
+              >
                 {home.membro.adimplente ? 'Situação regular' : 'Inadimplente'}
               </p>
               {home.membro.planoNome && (
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                <p
+                  className={[
+                    'text-xs',
+                    home.membro.adimplente
+                      ? 'text-green-800/80 dark:text-green-200/80'
+                      : 'text-red-800/80 dark:text-red-200/80',
+                  ].join(' ')}
+                >
                   Plano: {home.membro.planoNome}
                 </p>
               )}

@@ -209,7 +209,7 @@ function MediaCarousel({ slides, caption }: { slides: MediaAttachment[]; caption
           <Slide
             key={i}
             item={item}
-            className="h-[22rem] w-full shrink-0 snap-center bg-black object-contain sm:h-[28rem]"
+            className="h-[22rem] w-full min-w-full shrink-0 basis-full snap-center bg-black object-contain sm:h-[28rem]"
             onOpen={item.type === 'image' ? () => openLightbox(item.url) : undefined}
           />
         ))}
