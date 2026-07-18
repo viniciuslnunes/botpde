@@ -1,18 +1,23 @@
 /**
  * Helper para rotas SSE de ping (notificações, feed, mensagens).
  *
- * Railway/Fastly + HTTP/2: sem `Connection`/`Keep-Alive` (hop-by-hop,
- * proibidos em H2 — Chrome loga ERR_HTTP2_PROTOCOL_ERROR 200). Heartbeat
- * evita idle cut; enqueue após close também gera o mesmo erro.
+ * Railway/Fastly + HTTP/2:
+ * - sem `Connection`/`Keep-Alive` (hop-by-hop → ERR_HTTP2_PROTOCOL_ERROR)
+ * - sem compressão no stream (`Content-Encoding: none`)
+ * - heartbeat evita idle cut; close limpo antes do teto do proxy
+ * - enqueue após close também gera PROTOCOL_ERROR
  */
 
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, no-transform',
+  'Content-Encoding': 'none',
   'X-Accel-Buffering': 'no',
 } as const
 
 const HEARTBEAT_MS = 15_000
+/** Fecha limpo antes do proxy HTTP/2 cortar sujo (~5–15 min). */
+const MAX_STREAM_MS = 55_000
 
 type SubscribeFn = (onPing: () => void) => () => void
 
@@ -27,6 +32,7 @@ export function createSsePingResponse(
   const encoder = new TextEncoder()
   let unsubscribe: () => void = () => {}
   let heartbeat: ReturnType<typeof setInterval> | undefined
+  let maxLife: ReturnType<typeof setTimeout> | undefined
   let closed = false
   let onAbort: (() => void) | undefined
 
@@ -37,10 +43,11 @@ export function createSsePingResponse(
         closed = true
         unsubscribe()
         if (heartbeat) clearInterval(heartbeat)
+        if (maxLife) clearTimeout(maxLife)
         if (onAbort) signal?.removeEventListener('abort', onAbort)
       }
 
-      onAbort = () => {
+      const closeClean = () => {
         cleanup()
         try {
           controller.close()
@@ -49,18 +56,17 @@ export function createSsePingResponse(
         }
       }
 
+      onAbort = () => {
+        closeClean()
+      }
+
       const safeEnqueue = (chunk: string): boolean => {
         if (closed) return false
         try {
           controller.enqueue(encoder.encode(chunk))
           return true
         } catch {
-          cleanup()
-          try {
-            controller.close()
-          } catch {
-            /* já fechado */
-          }
+          closeClean()
           return false
         }
       }
@@ -82,11 +88,18 @@ export function createSsePingResponse(
       heartbeat = setInterval(() => {
         if (!safeEnqueue(': keep-alive\n\n')) return
       }, HEARTBEAT_MS)
+
+      maxLife = setTimeout(() => {
+        // Bye limpo → cliente reconecta sem RST PROTOCOL_ERROR.
+        safeEnqueue(': bye\n\n')
+        closeClean()
+      }, MAX_STREAM_MS)
     },
     cancel() {
       closed = true
       unsubscribe()
       if (heartbeat) clearInterval(heartbeat)
+      if (maxLife) clearTimeout(maxLife)
       if (onAbort) signal?.removeEventListener('abort', onAbort)
     },
   })

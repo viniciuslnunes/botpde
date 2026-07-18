@@ -4,10 +4,10 @@ import { useEffect, useRef } from 'react'
 
 /**
  * Railway/Fastly: corte sujo de HTTP/2 vira ERR_HTTP2_PROTOCOL_ERROR no console.
- * Reconectamos limpo antes do teto de request (~15 min) e, em erro, fechamos o
- * EventSource (senão ele martela reconnect sozinho e multiplica o ruído).
+ * O servidor fecha limpo ~55s (`sse-stream`); aqui reconectamos um pouco depois
+ * e, em erro, fechamos o EventSource (senão ele martela reconnect sozinho).
  */
-const PROACTIVE_RECONNECT_MS = 12 * 60 * 1000
+const PROACTIVE_RECONNECT_MS = 60_000
 const ERROR_RECONNECT_MS = 5_000
 
 /**

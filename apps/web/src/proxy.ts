@@ -16,6 +16,20 @@ const PUBLIC_PATHS = [
 /** Auth real fica no Route Handler / página — evita falso negativo do proxy. */
 const AUTH_DEFER_PATHS = ['/auth/contexto', '/onboarding', '/definir-apelido']
 
+/**
+ * SSE: o proxy `auth()` às vezes dá falso negativo. Redirect HTML para
+ * `/entrar` (com `Connection: keep-alive`) vira ERR_HTTP2_PROTOCOL_ERROR no
+ * EventSource — a rota valida a sessão e devolve 401/stream.
+ */
+function isSseStreamPath(pathname: string): boolean {
+  return (
+    pathname === '/api/notificacoes/stream' ||
+    pathname === '/api/comunidade/feed/stream' ||
+    pathname === '/api/conversas/stream' ||
+    /^\/api\/conversas\/[^/]+\/stream$/.test(pathname)
+  )
+}
+
 export const proxy = auth((req) => {
   if (process.env.NODE_ENV === 'development') {
     resetPrismaQueryCount()
@@ -32,7 +46,15 @@ export const proxy = auth((req) => {
     return NextResponse.next()
   }
 
+  // Nunca redirecionar EventSource/XHR para HTML de login.
+  if (isSseStreamPath(pathname)) {
+    return NextResponse.next()
+  }
+
   if (!session) {
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse('Não autenticado', { status: 401 })
+    }
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/entrar'
     loginUrl.searchParams.set('callbackUrl', pathname)

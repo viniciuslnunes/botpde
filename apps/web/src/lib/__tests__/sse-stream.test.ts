@@ -17,6 +17,7 @@ describe('createSsePingResponse', () => {
 
     expect(res.headers.get('Content-Type')).toBe(SSE_HEADERS['Content-Type'])
     expect(res.headers.get('X-Accel-Buffering')).toBe('no')
+    expect(res.headers.get('Content-Encoding')).toBe('none')
     // Hop-by-hop proibido em HTTP/2 — causa ERR_HTTP2_PROTOCOL_ERROR no Chrome.
     expect(res.headers.get('Connection')).toBeNull()
     expect(res.body).toBeTruthy()
@@ -63,6 +64,26 @@ describe('createSsePingResponse', () => {
     ac.abort()
     // dá um tick para o listener rodar
     await Promise.resolve()
+    expect(unsub).toHaveBeenCalled()
+  })
+
+  it('fecha limpo após MAX_STREAM_MS com bye', async () => {
+    vi.useFakeTimers()
+    const unsub = vi.fn()
+    const res = createSsePingResponse(() => unsub)
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+
+    await reader.read() // connected
+    vi.advanceTimersByTime(55_000)
+
+    let text = ''
+    for (;;) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      text += decoder.decode(chunk.value)
+    }
+    expect(text).toContain(': bye')
     expect(unsub).toHaveBeenCalled()
   })
 })
