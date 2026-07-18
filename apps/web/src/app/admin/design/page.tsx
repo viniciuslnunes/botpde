@@ -59,17 +59,19 @@ export default async function DesignPage() {
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Design</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Personalize cores, superfícies e o fundo da plataforma · {tenant.nome}
+              Ajuste cores com prévia ao vivo · salve para aplicar a toda a torcida ·{' '}
+              {tenant.nome}
             </p>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto py-6">
-        <div className="app-container max-w-3xl">
+        <div className="app-container max-w-6xl">
           <DesignForm
             initialDesign={design}
             corPrimaria={tenant.corPrimaria}
+            tenantNome={tenant.nome}
             clubeNome={afiliacao?.nome ?? null}
             clubeApelido={afiliacao?.apelido ?? null}
             imagemUrls={imagemUrls}
