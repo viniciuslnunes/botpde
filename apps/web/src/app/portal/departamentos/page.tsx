@@ -12,7 +12,7 @@ export default function DepartamentosPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
           <Briefcase className="h-5 w-5" aria-hidden />
         </div>
         <div>

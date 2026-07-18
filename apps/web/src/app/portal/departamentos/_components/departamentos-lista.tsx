@@ -111,7 +111,7 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
               href={moduloHref}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary))]"
             >
-              <LayoutGrid className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" aria-hidden />
+              <LayoutGrid className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" aria-hidden />
               {rotuloAtalhoModulo(depto.slug)}
             </Link>
           )}

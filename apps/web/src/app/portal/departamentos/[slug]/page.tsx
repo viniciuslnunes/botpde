@@ -564,7 +564,7 @@ function PainelDominio({
           prefetch={false}
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
         >
-          <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
+          <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
           Operação completa (admin)
         </Link>
       )}

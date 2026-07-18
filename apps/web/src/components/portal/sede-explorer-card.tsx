@@ -57,8 +57,8 @@ export function SedeExplorerCard({
       data-sede-id={sede.id}
       className={`group flex w-full items-stretch gap-0 overflow-hidden rounded-xl border text-left transition-[border-color,background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
         selected
-          ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/5 shadow-sm'
-          : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary))]/45'
+          ? 'border-[rgb(var(--color-primary)_/_0.55)] bg-[rgb(var(--color-primary)_/_0.1)] shadow-sm ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.35)]'
+          : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.45)]'
       }`}
     >
       <div className="relative h-[4.75rem] w-[5.25rem] shrink-0 bg-[rgb(var(--background-subtle))] sm:h-[5.25rem] sm:w-[6rem]">
@@ -103,8 +103,8 @@ export function SedeExplorerCard({
         {distanciaLabel && (
           <span
             className={`flex shrink-0 flex-col items-end gap-0.5 rounded-lg px-2 py-1.5 tabular-nums ${
-              selected || maisProxima
-                ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))]'
+              selected
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                 : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]'
             }`}
             title={`Aproximadamente ${distanciaLabel}`}

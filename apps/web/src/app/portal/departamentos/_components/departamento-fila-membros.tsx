@@ -33,7 +33,7 @@ export function DepartamentoFilaMembros({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-            <Users className="h-4 w-4 text-[rgb(var(--primary))]" />
+            <Users className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
             Solicitações pendentes
           </h2>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
@@ -45,7 +45,7 @@ export function DepartamentoFilaMembros({
         <Link
           href="/admin/membros?status=PENDENTE"
           prefetch={false}
-          className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+          className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Ver todas no admin
         </Link>

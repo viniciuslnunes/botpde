@@ -28,7 +28,7 @@ export function ComprovanteLightbox({
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--primary)_/_0.1)]"
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.1)]"
       >
         <FileSearch className="h-3.5 w-3.5" />
         Ver comprovante

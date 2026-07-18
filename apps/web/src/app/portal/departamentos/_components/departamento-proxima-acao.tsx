@@ -14,7 +14,7 @@ export function DepartamentoProximaAcao({ acao }: { acao: ProximaAcaoArea }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgb(var(--primary)_/_0.25)] bg-[rgb(var(--primary)_/_0.06)] px-4 py-3">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
           Próxima ação
         </p>
         <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{acao.titulo}</p>

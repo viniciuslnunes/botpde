@@ -34,7 +34,7 @@ export function DepartamentoCanalBlock({
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+          <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
               {canal.nome?.trim() || 'Canal do departamento'}
@@ -85,7 +85,7 @@ export function DepartamentoCanalBlock({
       className="group rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-[rgb(var(--foreground-muted))] [&::-webkit-details-marker]:hidden">
-        <MessageCircle className="h-4 w-4 text-[rgb(var(--primary))]" />
+        <MessageCircle className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
         Vincular canal do departamento
         <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
       </summary>

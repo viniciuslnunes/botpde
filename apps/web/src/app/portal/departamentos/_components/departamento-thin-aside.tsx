@@ -97,7 +97,7 @@ export async function DepartamentoThinAside({
     <div className="space-y-4">
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-[rgb(var(--primary))]" />
+          <Icon className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</h2>
         </div>
         <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">{descricao}</p>
@@ -143,7 +143,7 @@ export async function DepartamentoThinAside({
               <Link
                 href="/admin/comunidade/moderacao"
                 prefetch={false}
-                className="block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Abrir moderação →
               </Link>
@@ -183,7 +183,7 @@ export async function DepartamentoThinAside({
               <Link
                 href="/admin/loja/pedidos"
                 prefetch={false}
-                className="block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver pedidos no admin →
               </Link>
@@ -227,7 +227,7 @@ export async function DepartamentoThinAside({
             {(slug === 'feminino' || slug === 'social-e-eventos') && (
               <Link
                 href="/portal/eventos"
-                className="mt-2 inline-block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="mt-2 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver todos os eventos →
               </Link>
@@ -251,7 +251,7 @@ export async function DepartamentoThinAside({
           prefetch={false}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
         >
-          <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
+          <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
           Operação (admin)
         </Link>
       )}

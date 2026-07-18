@@ -312,12 +312,12 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                   onClick={() => setFiltro(f.id)}
                   className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-[rgb(var(--color-primary))] text-white'
+                      ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
                   }`}
                 >
                   {f.label}
-                  <span className={`ml-1 tabular-nums ${active ? 'text-white/80' : 'opacity-70'}`}>
+                  <span className={`ml-1 tabular-nums ${active ? 'opacity-80' : 'opacity-70'}`}>
                     {count}
                   </span>
                 </button>
@@ -333,8 +333,8 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
               aria-pressed={localizacao != null}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
                 localizacao
-                  ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))] text-white'
-                  : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50'
+                  ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                  : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.5)]'
               }`}
             >
               {geoStatus === 'loading' ? (
@@ -388,7 +388,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
                   setBusca('')
                   setFiltro('TODAS')
                 }}
-                className="mt-2 text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+                className="mt-2 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Limpar filtros
               </button>
@@ -430,7 +430,7 @@ export function SedesExplorer({ sedes: sedesIniciais, initialSelectedId }: Props
               <button
                 type="button"
                 onClick={() => selecionar(null)}
-                className="text-xs font-medium text-[rgb(var(--color-primary))] hover:underline"
+                className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Limpar seleção
               </button>
