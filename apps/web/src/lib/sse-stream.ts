@@ -3,7 +3,8 @@
  *
  * Railway/Fastly + HTTP/2:
  * - sem `Connection`/`Keep-Alive` (hop-by-hop → ERR_HTTP2_PROTOCOL_ERROR)
- * - sem compressão no stream (`Content-Encoding: none`)
+ * - sem `Content-Encoding` (valor inventado tipo `none` também quebra H2 no Chrome)
+ * - `no-transform` pede ao proxy para não comprimir o stream
  * - heartbeat evita idle cut; close limpo antes do teto do proxy
  * - enqueue após close também gera PROTOCOL_ERROR
  */
@@ -11,7 +12,6 @@
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, no-transform',
-  'Content-Encoding': 'none',
   'X-Accel-Buffering': 'no',
 } as const
 

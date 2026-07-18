@@ -17,7 +17,8 @@ describe('createSsePingResponse', () => {
 
     expect(res.headers.get('Content-Type')).toBe(SSE_HEADERS['Content-Type'])
     expect(res.headers.get('X-Accel-Buffering')).toBe('no')
-    expect(res.headers.get('Content-Encoding')).toBe('none')
+    // Sem Content-Encoding — `none` não é coding válido e quebra HTTP/2 no Chrome.
+    expect(res.headers.get('Content-Encoding')).toBeNull()
     // Hop-by-hop proibido em HTTP/2 — causa ERR_HTTP2_PROTOCOL_ERROR no Chrome.
     expect(res.headers.get('Connection')).toBeNull()
     expect(res.body).toBeTruthy()
