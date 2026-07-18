@@ -35,7 +35,7 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | **B1** Paginação API | `GET /api/comunidade/feed`, `/rede` | Infinite scroll sem reload |
 | **B1** Client infinite | `comunidade-feed-infinite.tsx`, `comunidade-rede-infinite.tsx` | `IntersectionObserver` + cache módulo |
 | **B2** Deep-link cursor | `replaceState` nos clients | URL preserva posição parcial |
-| **B3** SSE invalidação | `feed-bus.ts`, `/api/comunidade/feed/stream` | Ping → refetch do trecho atual |
+| **B3** SSE invalidação | `feed-bus.ts`, `/api/comunidade/feed/stream` | Long-poll ping → refetch do trecho atual |
 | **B4** Timeline materializada | `FeedTimeline`, `feed-timeline.ts`, `actions.ts` | Fan-out on write para rede/seguindo |
 | **B5** Ranking Descobrir | `scoreDescobrirPost`, `rankDescobrirPosts` | Recência + engajamento + boost local |
 | **B6** Busca `pg_trgm` | `comunidade-busca.ts`, `enable-pg-trgm.js` | Similaridade + índices GIN; fallback ILIKE |
@@ -112,7 +112,7 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
 |--------|------|-----|
 | GET | `/api/comunidade/feed?cursor=&take=&filtro=` | Paginação feed Descobrir/Seguindo |
 | GET | `/api/comunidade/rede?cursor=&take=` | Paginação Minha rede |
-| GET | `/api/comunidade/feed/stream` | SSE ping (sem payload) |
+| GET | `/api/comunidade/feed/stream` | Long-poll ping (sem payload; ≤~25s) |
 | GET | `/api/conversas/resumo` | `naoLidas` + flags de bloqueio |
 
 ## Padrões obrigatórios (features novas na Comunidade)
@@ -127,7 +127,9 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    estiver perto do scroll top (`FEED_NEAR_TOP_PX`); longe do topo, banner
    pede clique. Debounce `FEED_SSE_DEBOUNCE_MS` (250ms). Ping do servidor só
    após fan-out da timeline (`feed-timeline-queue`), para o filtro Seguindo
-   já ter a linha materializada.
+   já ter a linha materializada. **Transporte = long-poll ~25s** (`ping`|`idle`,
+   body finito) — não hold de `ReadableStream` aberto; no Railway/HTTP/2 o
+   edge RST mid-stream vira `ERR_HTTP2_PROTOCOL_ERROR`.
 5. **Chat colapsado = resumo** — inbox completa só quando o usuário expande.
 6. **Uma leitura, vários consumidores** — dados compartilhados (ex.: salas)
    no layout chrome ou page, com `React.cache` se layout + page chamam a
@@ -352,7 +354,7 @@ dispara `emitFeedPing` (SSE). Sem custo extra.
 
 **D3:** `mensageria-bus` + `GET /api/conversas/stream` e `/api/conversas/[id]/stream`.
 Ao enviar mensagem, ping na thread e na inbox de cada membro. Clients
-escutam SSE; polling 60s como rede de segurança.
+escutam long-poll SSE (`ping`|`idle`); polling 60s como rede de segurança.
 
 ### Fase E — busca e descoberta avançada
 

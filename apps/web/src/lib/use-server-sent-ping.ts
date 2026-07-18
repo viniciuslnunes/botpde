@@ -9,13 +9,13 @@ import {
 import { subscribeSharedSse } from '@/lib/sse-shared-source'
 
 /**
- * Railway/Fastly + HTTP/2: EventSource + RST do proxy vira ERR_HTTP2_PROTOCOL_ERROR
- * e pode envenenar soft-nav do App Router.
+ * Railway/Fastly + HTTP/2: stream SSE longo + RST do proxy vira
+ * ERR_HTTP2_PROTOCOL_ERROR e pode envenenar soft-nav do App Router.
  *
  * Mitigações (`sse-shared-source` + `sse-nav-gate` + `sse-stream`):
- * - fetch+stream (abort = canceled, não PROTOCOL_ERROR do EventSource)
- * - um stream por endpoint; vida ~12 min (cap Railway 15 min), não ~20s
- * - soft-nav fecha o stream antes do fetch RSC; backoff + circuit breaker
+ * - long-poll com body finito (ping|idle ≤ ~25s) — sem ReadableStream aberto
+ * - fetch + abort = canceled limpo (não PROTOCOL_ERROR do EventSource)
+ * - um ciclo por endpoint; soft-nav fecha antes do fetch RSC; backoff + circuit
  */
 export function useServerSentPing(
   endpoint: string,

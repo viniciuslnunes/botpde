@@ -1,15 +1,13 @@
 /**
- * Uma assinatura SSE por endpoint — navbar + chat + feed banner não abrem N streams.
+ * Uma assinatura long-poll por endpoint — navbar + chat + feed banner não
+ * abrem N conexões.
  *
- * Usa `fetch` + ReadableStream em vez de `EventSource`:
- * - abort no soft-nav / reconnect aparece como canceled (não ERR_HTTP2_PROTOCOL_ERROR)
- * - EventSource no Railway/HTTP/2 disputava a conexão multiplexada; RST envenenava soft-nav
+ * Usa `fetch` + body finito (não EventSource / ReadableStream longo):
+ * - Railway/HTTP/2 RST em streams abertos → ERR_HTTP2_PROTOCOL_ERROR
+ * - long-poll devolve ping|idle e fecha; abort no soft-nav = canceled limpo
  */
 
-import {
-  SSE_CLIENT_PROACTIVE_MS,
-  SSE_RECONNECT_DATA,
-} from '@/lib/sse-protocol'
+import { SSE_IDLE_DATA, SSE_PING_DATA } from '@/lib/sse-protocol'
 import {
   isSsePausedForNav,
   registerSseCloser,
@@ -28,7 +26,6 @@ type SharedEntry = {
   abort: AbortController | null
   generation: number
   consecutiveFailures: number
-  proactiveTimer: ReturnType<typeof setTimeout> | undefined
   errorTimer: ReturnType<typeof setTimeout> | undefined
   unregisterCloser: (() => void) | undefined
 }
@@ -42,9 +39,7 @@ function backoffMs(failures: number): number {
 }
 
 function clearTimers(entry: SharedEntry) {
-  if (entry.proactiveTimer) clearTimeout(entry.proactiveTimer)
   if (entry.errorTimer) clearTimeout(entry.errorTimer)
-  entry.proactiveTimer = undefined
   entry.errorTimer = undefined
 }
 
@@ -97,7 +92,11 @@ function scheduleReconnect(entry: SharedEntry, delay: number) {
   entry.errorTimer = setTimeout(() => openSource(entry), delay)
 }
 
-async function readSseStream(entry: SharedEntry, id: number, signal: AbortSignal) {
+async function readSseLongPoll(
+  entry: SharedEntry,
+  id: number,
+  signal: AbortSignal,
+): Promise<'ping' | 'idle' | 'empty'> {
   const res = await fetch(entry.endpoint, {
     method: 'GET',
     headers: { Accept: 'text/event-stream' },
@@ -113,6 +112,8 @@ async function readSseStream(entry: SharedEntry, id: number, signal: AbortSignal
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let sawPing = false
+  let sawIdle = false
 
   for (;;) {
     const { done, value } = await reader.read()
@@ -122,7 +123,7 @@ async function readSseStream(entry: SharedEntry, id: number, signal: AbortSignal
       } catch {
         /* ignore */
       }
-      return
+      return 'empty'
     }
     if (done) break
 
@@ -131,15 +132,15 @@ async function readSseStream(entry: SharedEntry, id: number, signal: AbortSignal
     buffer = rest
 
     for (const data of payloads) {
-      if (id !== entry.generation) return
-      entry.consecutiveFailures = 0
-      if (data === SSE_RECONNECT_DATA) {
-        openSource(entry)
-        return
-      }
-      if (data === 'ping') notifyPing(entry)
+      if (id !== entry.generation) return 'empty'
+      if (data === SSE_PING_DATA) sawPing = true
+      if (data === SSE_IDLE_DATA) sawIdle = true
     }
   }
+
+  if (sawPing) return 'ping'
+  if (sawIdle) return 'idle'
+  return 'empty'
 }
 
 function openSource(entry: SharedEntry) {
@@ -150,18 +151,15 @@ function openSource(entry: SharedEntry) {
   const ac = new AbortController()
   entry.abort = ac
 
-  entry.proactiveTimer = setTimeout(() => {
-    if (id !== entry.generation) return
-    openSource(entry)
-  }, SSE_CLIENT_PROACTIVE_MS)
-
   void (async () => {
     try {
-      await readSseStream(entry, id, ac.signal)
+      const result = await readSseLongPoll(entry, id, ac.signal)
       if (id !== entry.generation) return
-      // Stream acabou sem abort (bye do servidor) — reabre.
       entry.consecutiveFailures = 0
-      scheduleReconnect(entry, 1_000)
+      entry.abort = null
+      if (result === 'ping') notifyPing(entry)
+      // ping | idle | empty → reconecta na hora (long-poll ciclo).
+      scheduleReconnect(entry, 0)
     } catch {
       if (id !== entry.generation) return
       if (ac.signal.aborted) return
@@ -181,7 +179,6 @@ function ensureEntry(endpoint: string): SharedEntry {
     abort: null,
     generation: 0,
     consecutiveFailures: 0,
-    proactiveTimer: undefined,
     errorTimer: undefined,
     unregisterCloser: undefined,
   }
@@ -191,14 +188,14 @@ function ensureEntry(endpoint: string): SharedEntry {
 }
 
 /**
- * Assina pings SSE de `endpoint`. Vários assinantes compartilham um stream.
+ * Assina pings long-poll de `endpoint`. Vários assinantes compartilham um ciclo.
  * Unsubscribe fecha a conexão só quando não restar ninguém.
  */
 export function subscribeSharedSse(endpoint: string, onPing: PingListener): () => void {
   if (!endpoint) return () => {}
   const entry = ensureEntry(endpoint)
   entry.listeners.add(onPing)
-  if (!entry.abort && !isSsePausedForNav()) {
+  if (!entry.abort && !entry.errorTimer && !isSsePausedForNav()) {
     openSource(entry)
   }
   return () => {

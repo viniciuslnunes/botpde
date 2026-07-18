@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SSE_MAX_STREAM_MS, SSE_RECONNECT_SIGNAL_MS } from '@/lib/sse-protocol'
+import { SSE_IDLE_DATA, SSE_LONG_POLL_MS, SSE_PING_DATA } from '@/lib/sse-protocol'
 import { createSsePingResponse, SSE_HEADERS } from '@/lib/sse-stream'
 
 describe('createSsePingResponse', () => {
@@ -7,101 +7,73 @@ describe('createSsePingResponse', () => {
     vi.useRealTimers()
   })
 
-  it('envia connected + ping e headers anti-buffer', async () => {
+  it('responde com ping e headers anti-buffer', async () => {
     const unsub = vi.fn()
     let emit: (() => void) | undefined
 
-    const res = createSsePingResponse((onPing) => {
+    const pending = createSsePingResponse((onPing) => {
       emit = onPing
       return unsub
     })
 
+    emit?.()
+    const res = await pending
+
     expect(res.headers.get('Content-Type')).toBe(SSE_HEADERS['Content-Type'])
     expect(res.headers.get('X-Accel-Buffering')).toBe('no')
-    // Sem Content-Encoding — `none` não é coding válido e quebra HTTP/2 no Chrome.
     expect(res.headers.get('Content-Encoding')).toBeNull()
-    // Hop-by-hop proibido em HTTP/2 — causa ERR_HTTP2_PROTOCOL_ERROR no Chrome.
     expect(res.headers.get('Connection')).toBeNull()
-    expect(res.body).toBeTruthy()
 
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-
-    const first = await reader.read()
-    const firstText = decoder.decode(first.value)
-    expect(firstText).toContain(': connected')
-    expect(firstText).toContain('retry: 5000')
-
-    emit?.()
-    const second = await reader.read()
-    expect(decoder.decode(second.value)).toContain('data: ping')
-
-    await reader.cancel()
+    const text = await res.text()
+    expect(text).toContain(': connected')
+    expect(text).toContain('retry: 5000')
+    expect(text).toContain(`data: ${SSE_PING_DATA}`)
     expect(unsub).toHaveBeenCalled()
   })
 
-  it('não explode enqueue após cancel', async () => {
+  it('responde idle após o timeout do long-poll', async () => {
+    vi.useFakeTimers()
+    const unsub = vi.fn()
+    const pending = createSsePingResponse(() => unsub)
+
+    vi.advanceTimersByTime(SSE_LONG_POLL_MS)
+    const res = await pending
+    const text = await res.text()
+
+    expect(text).toContain(`data: ${SSE_IDLE_DATA}`)
+    expect(unsub).toHaveBeenCalled()
+  })
+
+  it('não resolve ping depois do idle', async () => {
     vi.useFakeTimers()
     let emit: (() => void) | undefined
-    const res = createSsePingResponse((onPing) => {
+    const pending = createSsePingResponse((onPing) => {
       emit = onPing
       return () => {}
     })
-    const reader = res.body!.getReader()
-    await reader.read() // connected
-    await reader.cancel()
+
+    vi.advanceTimersByTime(SSE_LONG_POLL_MS)
+    const res = await pending
+    expect(await res.text()).toContain(`data: ${SSE_IDLE_DATA}`)
 
     expect(() => emit?.()).not.toThrow()
-    expect(() => {
-      vi.advanceTimersByTime(SSE_RECONNECT_SIGNAL_MS)
-    }).not.toThrow()
   })
 
-  it('fecha no abort do request.signal', async () => {
+  it('limpa no abort do request.signal', async () => {
     const unsub = vi.fn()
     const ac = new AbortController()
-    const res = createSsePingResponse(() => unsub, ac.signal)
-    const reader = res.body!.getReader()
-    await reader.read()
+    const pending = createSsePingResponse(() => unsub, ac.signal)
     ac.abort()
-    // dá um tick para o listener rodar
-    await Promise.resolve()
+    const res = await pending
     expect(unsub).toHaveBeenCalled()
+    expect(await res.text()).toContain(': aborted')
   })
 
-  it('sinaliza reconnect antes do bye e fecha limpo', async () => {
-    vi.useFakeTimers()
+  it('abort antes do start resolve na hora', async () => {
     const unsub = vi.fn()
-    const res = createSsePingResponse(() => unsub)
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-
-    await reader.read() // connected
-
-    vi.advanceTimersByTime(SSE_RECONNECT_SIGNAL_MS)
-
-    let sawReconnect = false
-    // Heartbeats a cada 15s acumulam muitos chunks antes do reconnect.
-    for (let i = 0; i < 200; i++) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      const text = decoder.decode(chunk.value)
-      if (text.includes('data: reconnect')) {
-        sawReconnect = true
-        break
-      }
-    }
-    expect(sawReconnect).toBe(true)
-
-    vi.advanceTimersByTime(SSE_MAX_STREAM_MS - SSE_RECONNECT_SIGNAL_MS)
-
-    let text = ''
-    for (;;) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      text += decoder.decode(chunk.value)
-    }
-    expect(text).toContain(': bye')
-    expect(unsub).toHaveBeenCalled()
+    const ac = new AbortController()
+    ac.abort()
+    const res = await createSsePingResponse(() => unsub, ac.signal)
+    expect(await res.text()).toContain(': aborted')
   })
 })

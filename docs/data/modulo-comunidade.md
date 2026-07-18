@@ -66,7 +66,7 @@ visibilidade do post).
 | `GET /api/comunidade/busca?q=&modo=` | Busca unificada (membros + hashtags + posts); `modo=rapida` (dropdown do feed) pula canais/unidades, badges e enrich de follow; `modo=completa` (default) na página `/busca` |
 | `GET /api/comunidade/feed?cursor=&take=&filtro=` | Paginação do feed (Descobrir / Seguindo) |
 | `GET /api/comunidade/rede?cursor=&take=` | Paginação de Minha rede |
-| `GET /api/comunidade/feed/stream` | SSE — ping de novos posts (sem payload) |
+| `GET /api/comunidade/feed/stream` | Long-poll — ping de novos posts (sem payload) |
 | `GET /api/comunidade/notificacoes?filtro=` | Lista notificações sociais com filtro |
 | `GET /api/conversas/resumo` | Badge de mensagens + bloqueio de inbox (sem lista de conversas) |
 | `POST /api/upload/sign` | Assinatura Cloudinary (`purpose`: comunidade, perfil-banner, perfil-avatar) |

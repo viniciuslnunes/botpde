@@ -24,9 +24,9 @@ function sseBody(chunks: string[]): ReadableStream<Uint8Array> {
 describe('consumeSseDataFrames', () => {
   it('parseia data: e ignora comentários', () => {
     const { rest, payloads } = consumeSseDataFrames(
-      ': keep-alive\n\ndata: ping\n\ndata: reconnect\n\npartial',
+      ': keep-alive\n\ndata: ping\n\ndata: idle\n\npartial',
     )
-    expect(payloads).toEqual(['ping', 'reconnect'])
+    expect(payloads).toEqual(['ping', 'idle'])
     expect(rest).toBe('partial')
   })
 })
@@ -44,9 +44,13 @@ describe('subscribeSharedSse', () => {
   })
 
   it('reusa um fetch para o mesmo endpoint', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      body: sseBody(['retry: 5000\n: connected\n\ndata: ping\n\n']),
+    let release!: (chunks: string[]) => void
+    const fetchMock = vi.fn().mockImplementation(() => {
+      return new Promise<{ ok: boolean; body: ReadableStream<Uint8Array> }>((resolve) => {
+        release = (chunks) => {
+          resolve({ ok: true, body: sseBody(chunks) })
+        }
+      })
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -55,9 +59,13 @@ describe('subscribeSharedSse', () => {
     const unsubA = subscribeSharedSse('/api/conversas/stream', a)
     const unsubB = subscribeSharedSse('/api/conversas/stream', b)
 
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    // Hold aberto: A e B compartilham o mesmo fetch antes do body chegar.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    release(['retry: 5000\n: connected\n\ndata: ping\n\n'])
     await vi.waitFor(() => expect(a).toHaveBeenCalledTimes(1))
     expect(b).toHaveBeenCalledTimes(1)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
 
     unsubA()
     unsubB()
@@ -84,14 +92,14 @@ describe('subscribeSharedSse', () => {
     unsub()
   })
 
-  it('reconecta limpo ao receber data: reconnect', async () => {
+  it('reconecta limpo ao receber data: idle', async () => {
     let calls = 0
     const fetchMock = vi.fn().mockImplementation(() => {
       calls += 1
       if (calls === 1) {
         return Promise.resolve({
           ok: true,
-          body: sseBody(['data: reconnect\n\n']),
+          body: sseBody(['data: idle\n\n']),
         })
       }
       return Promise.resolve({
@@ -103,8 +111,22 @@ describe('subscribeSharedSse', () => {
 
     const onPing = vi.fn()
     const unsub = subscribeSharedSse('/api/notificacoes/stream', onPing)
-    await vi.waitFor(() => expect(onPing).toHaveBeenCalledTimes(1))
-    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await vi.waitFor(() => expect(onPing).toHaveBeenCalled())
+    unsub()
+  })
+
+  it('notifica ping e reconecta sem contar falha', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: sseBody(['data: ping\n\n']),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onPing = vi.fn()
+    const unsub = subscribeSharedSse('/api/comunidade/feed/stream', onPing)
+    await vi.waitFor(() => expect(onPing).toHaveBeenCalled())
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2))
     unsub()
   })
 })
