@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPin } from 'lucide-react'
 import {
+  getGoogleMapsMapId,
   isGoogleMapsConfigured,
-  loadGoogleMapsScript,
+  loadGoogleMapsMarkerLibrary,
   type GoogleMapInstance,
   type GoogleMarkerInstance,
+  type GoogleMapsMarkerLibrary,
   type GoogleMapsNamespace,
 } from '@/lib/google-maps'
 import type { SedeExplorerItem } from '@/components/portal/sede-explorer-types'
@@ -24,43 +26,32 @@ type Props = {
 
 const DEFAULT_CENTER = { lat: -23.55, lng: -46.63 }
 
-function markerIcon(
-  g: GoogleMapsNamespace,
-  selected: boolean,
-): {
-  path: number
-  scale: number
-  fillColor: string
-  fillOpacity: number
-  strokeColor: string
-  strokeWeight: number
-} {
-  return {
-    path: g.maps.SymbolPath.CIRCLE,
-    scale: selected ? 11 : 8,
-    fillColor: selected ? 'rgb(124, 58, 237)' : 'rgb(99, 102, 241)',
-    fillOpacity: 1,
-    strokeColor: '#ffffff',
-    strokeWeight: selected ? 2.5 : 1.5,
+function pinContent(
+  markerLib: GoogleMapsMarkerLibrary,
+  kind: 'sede' | 'sede-selected' | 'user',
+): HTMLElement {
+  if (kind === 'user') {
+    return new markerLib.PinElement({
+      background: '#2563eb',
+      borderColor: '#ffffff',
+      glyphColor: '#ffffff',
+      scale: 1.05,
+    }).element
   }
-}
-
-function userLocationIcon(g: GoogleMapsNamespace): {
-  path: number
-  scale: number
-  fillColor: string
-  fillOpacity: number
-  strokeColor: string
-  strokeWeight: number
-} {
-  return {
-    path: g.maps.SymbolPath.CIRCLE,
-    scale: 9,
-    fillColor: '#2563eb',
-    fillOpacity: 1,
-    strokeColor: '#ffffff',
-    strokeWeight: 2.5,
+  if (kind === 'sede-selected') {
+    return new markerLib.PinElement({
+      background: 'rgb(124, 58, 237)',
+      borderColor: '#ffffff',
+      glyphColor: '#ffffff',
+      scale: 1.25,
+    }).element
   }
+  return new markerLib.PinElement({
+    background: 'rgb(99, 102, 241)',
+    borderColor: '#ffffff',
+    glyphColor: '#ffffff',
+    scale: 1,
+  }).element
 }
 
 export function SedesMap({
@@ -75,6 +66,7 @@ export function SedesMap({
   const markersRef = useRef<Map<string, GoogleMarkerInstance>>(new Map())
   const userMarkerRef = useRef<GoogleMarkerInstance | null>(null)
   const gRef = useRef<GoogleMapsNamespace | null>(null)
+  const markerLibRef = useRef<GoogleMapsMarkerLibrary | null>(null)
   const onSelectRef = useRef(onSelect)
   const fittedKeyRef = useRef<string>('')
   const selectedIdRef = useRef(selectedId)
@@ -99,13 +91,15 @@ export function SedesMap({
 
     async function init() {
       try {
-        const g = await loadGoogleMapsScript()
+        const { g, marker } = await loadGoogleMapsMarkerLibrary()
         if (cancelled || !containerRef.current) return
         gRef.current = g
+        markerLibRef.current = marker
 
         const map = new g.maps.Map(containerRef.current, {
           center: DEFAULT_CENTER,
           zoom: 11,
+          mapId: getGoogleMapsMapId(),
           disableDefaultUI: true,
           zoomControl: true,
           mapTypeControl: false,
@@ -128,14 +122,15 @@ export function SedesMap({
     void init()
     return () => {
       cancelled = true
-      for (const marker of markersRef.current.values()) {
-        marker.setMap(null)
+      for (const m of markersRef.current.values()) {
+        m.map = null
       }
       markersRef.current.clear()
-      userMarkerRef.current?.setMap(null)
+      if (userMarkerRef.current) userMarkerRef.current.map = null
       userMarkerRef.current = null
       mapRef.current = null
       gRef.current = null
+      markerLibRef.current = null
       setMapReady(false)
     }
   }, [configured])
@@ -144,32 +139,34 @@ export function SedesMap({
   useEffect(() => {
     const map = mapRef.current
     const g = gRef.current
-    if (!mapReady || !map || !g) return
+    const markerLib = markerLibRef.current
+    if (!mapReady || !map || !g || !markerLib) return
 
     const points = sedes.filter((s) => s.lat != null && s.lng != null)
     const alive = new Set(points.map((s) => s.id))
     const selected = selectedIdRef.current
 
-    for (const [id, marker] of markersRef.current) {
+    for (const [id, m] of markersRef.current) {
       if (!alive.has(id)) {
-        marker.setMap(null)
+        m.map = null
         markersRef.current.delete(id)
       }
     }
 
     for (const sede of points) {
       const pos = { lat: sede.lat!, lng: sede.lng! }
-      let marker = markersRef.current.get(sede.id)
-      if (!marker) {
-        marker = new g.maps.Marker({
+      let m = markersRef.current.get(sede.id)
+      if (!m) {
+        const selectedNow = sede.id === selected
+        m = new markerLib.AdvancedMarkerElement({
           map,
           position: pos,
           title: sede.nome,
-          icon: markerIcon(g, sede.id === selected),
-          zIndex: sede.id === selected ? 10 : 1,
+          content: pinContent(markerLib, selectedNow ? 'sede-selected' : 'sede'),
+          zIndex: selectedNow ? 10 : 1,
         })
-        marker.addListener('click', () => onSelectRef.current(sede.id))
-        markersRef.current.set(sede.id, marker)
+        m.addEventListener('gmp-click', () => onSelectRef.current(sede.id))
+        markersRef.current.set(sede.id, m)
       }
     }
 
@@ -192,25 +189,25 @@ export function SedesMap({
     }
   }, [mapReady, sedes, coordsKey])
 
-  // Só atualiza ícone do pin anterior + selecionado
+  // Só atualiza pin do anterior + selecionado
   useEffect(() => {
-    const g = gRef.current
     const map = mapRef.current
-    if (!mapReady || !g || !map) return
+    const markerLib = markerLibRef.current
+    if (!mapReady || !map || !markerLib) return
 
     const prev = prevSelectedRef.current
     if (prev && prev !== selectedId) {
       const prevMarker = markersRef.current.get(prev)
       if (prevMarker) {
-        prevMarker.setIcon(markerIcon(g, false))
-        prevMarker.setZIndex(1)
+        prevMarker.content = pinContent(markerLib, 'sede')
+        prevMarker.zIndex = 1
       }
     }
     if (selectedId) {
-      const marker = markersRef.current.get(selectedId)
-      if (marker) {
-        marker.setIcon(markerIcon(g, true))
-        marker.setZIndex(10)
+      const m = markersRef.current.get(selectedId)
+      if (m) {
+        m.content = pinContent(markerLib, 'sede-selected')
+        m.zIndex = 10
       }
       const selected = sedesRef.current.find((s) => s.id === selectedId)
       if (selected?.lat != null && selected.lng != null) {
@@ -225,26 +222,26 @@ export function SedesMap({
   // Pin da localização do usuário
   useEffect(() => {
     const map = mapRef.current
-    const g = gRef.current
-    if (!mapReady || !map || !g) return
+    const markerLib = markerLibRef.current
+    if (!mapReady || !map || !markerLib) return
 
     if (!userLocation) {
-      userMarkerRef.current?.setMap(null)
+      if (userMarkerRef.current) userMarkerRef.current.map = null
       userMarkerRef.current = null
       return
     }
 
     if (!userMarkerRef.current) {
-      userMarkerRef.current = new g.maps.Marker({
+      userMarkerRef.current = new markerLib.AdvancedMarkerElement({
         map,
         position: userLocation,
         title: 'Você está aqui',
-        icon: userLocationIcon(g),
+        content: pinContent(markerLib, 'user'),
         zIndex: 20,
       })
     } else {
-      userMarkerRef.current.setPosition(userLocation)
-      userMarkerRef.current.setMap(map)
+      userMarkerRef.current.position = userLocation
+      userMarkerRef.current.map = map
     }
   }, [mapReady, userLocation])
 

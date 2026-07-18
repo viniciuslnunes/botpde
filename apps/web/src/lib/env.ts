@@ -73,6 +73,8 @@ const clientSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
   /** Street View Static + Maps JS + Geocoding — opcional; Sedes/onboarding degradam sem key */
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
+  /** Map ID cloud p/ Advanced Markers (opcional; default DEMO_MAP_ID da Google) */
+  NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: z.string().min(1).optional(),
 })
 
 // ── Validação ─────────────────────────────────────────────────────────────────
@@ -102,6 +104,7 @@ function validateEnv() {
       NEXT_PUBLIC_API_URL: undefined,
       NEXT_PUBLIC_SENTRY_DSN: undefined,
       NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: undefined,
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: undefined,
     }
   }
 

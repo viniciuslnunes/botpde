@@ -1,19 +1,37 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { buildDirectionsUrl, buildGoogleMapsUrl, buildStreetViewImageUrl, isGoogleMapsConfigured } from '@/lib/google-maps'
+import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import {
+  buildDirectionsUrl,
+  buildGoogleMapsUrl,
+  buildStreetViewImageUrl,
+  getGoogleMapsMapId,
+  isGoogleMapsConfigured,
+} from '@/lib/google-maps'
 
 describe('google-maps', () => {
-  const original = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  const originalKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  const originalMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key'
+    delete process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
   })
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = original
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = originalKey
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID = originalMapId
   })
 
   it('detecta API key', () => {
     expect(isGoogleMapsConfigured()).toBe(true)
+  })
+
+  it('usa DEMO_MAP_ID quando Map ID não está configurado', () => {
+    expect(getGoogleMapsMapId()).toBe('DEMO_MAP_ID')
+  })
+
+  it('respeita NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID', () => {
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID = 'abc123'
+    expect(getGoogleMapsMapId()).toBe('abc123')
   })
 
   it('monta URL Street View com endereço', () => {

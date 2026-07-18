@@ -97,39 +97,30 @@ export function buildDirectionsUrl(sede: {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
 }
 
+/** Map ID cloud (Advanced Markers). `DEMO_MAP_ID` é oficial da Google p/ dev/prod sem estilo custom. */
+export function getGoogleMapsMapId(): string {
+  return process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID?.trim() || 'DEMO_MAP_ID'
+}
+
 /** Subconjunto tipado do Maps JS API usado pelo portal Sedes. */
 export type GoogleMapsNamespace = {
   maps: {
+    importLibrary: (name: 'maps' | 'marker') => Promise<Record<string, unknown>>
     Map: new (
       el: HTMLElement,
       opts?: {
         center?: { lat: number; lng: number }
         zoom?: number
+        mapId?: string
         disableDefaultUI?: boolean
         zoomControl?: boolean
         mapTypeControl?: boolean
         streetViewControl?: boolean
         fullscreenControl?: boolean
         gestureHandling?: 'cooperative' | 'greedy' | 'none' | 'auto'
-        styles?: Array<Record<string, unknown>>
       },
     ) => GoogleMapInstance
-    Marker: new (opts: {
-      map?: GoogleMapInstance | null
-      position: { lat: number; lng: number }
-      title?: string
-      zIndex?: number
-      icon?: {
-        path?: number | string
-        scale?: number
-        fillColor?: string
-        fillOpacity?: number
-        strokeColor?: string
-        strokeWeight?: number
-      }
-    }) => GoogleMarkerInstance
     LatLngBounds: new () => GoogleLatLngBounds
-    SymbolPath: { CIRCLE: number }
     event: {
       addListener: (instance: object, eventName: string, handler: () => void) => { remove: () => void }
       clearInstanceListeners: (instance: object) => void
@@ -148,12 +139,34 @@ export type GoogleMapInstance = {
   getZoom: () => number | undefined
 }
 
+/** AdvancedMarkerElement (substitui Marker depreciado). */
 export type GoogleMarkerInstance = {
-  setMap: (map: GoogleMapInstance | null) => void
-  setIcon: (icon: object) => void
-  setZIndex: (z: number) => void
-  setPosition: (latLng: { lat: number; lng: number }) => void
-  addListener: (eventName: string, handler: () => void) => { remove: () => void }
+  map: GoogleMapInstance | null
+  position: { lat: number; lng: number } | null
+  content: HTMLElement | null
+  zIndex: number | null
+  title: string
+  addEventListener: (type: string, listener: () => void) => void
+}
+
+export type GooglePinElement = {
+  element: HTMLElement
+}
+
+export type GoogleMapsMarkerLibrary = {
+  AdvancedMarkerElement: new (opts: {
+    map?: GoogleMapInstance | null
+    position: { lat: number; lng: number }
+    title?: string
+    zIndex?: number
+    content?: HTMLElement
+  }) => GoogleMarkerInstance
+  PinElement: new (opts: {
+    background?: string
+    borderColor?: string
+    glyphColor?: string
+    scale?: number
+  }) => GooglePinElement
 }
 
 export type GoogleLatLngBounds = {
@@ -167,13 +180,14 @@ declare global {
 }
 
 let mapsScriptPromise: Promise<GoogleMapsNamespace> | null = null
+let markerLibraryPromise: Promise<GoogleMapsMarkerLibrary> | null = null
 
-/** Carrega o Maps JavaScript API uma vez (singleton). */
+/** Carrega o Maps JavaScript API uma vez (singleton). Usa `loading=async` (best practice Google). */
 export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Maps JS só no client'))
   }
-  if (window.google?.maps?.Map) {
+  if (window.google?.maps?.importLibrary) {
     return Promise.resolve(window.google)
   }
   if (mapsScriptPromise) return mapsScriptPromise
@@ -187,7 +201,7 @@ export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
     const existing = document.querySelector<HTMLScriptElement>('script[data-google-maps="js"]')
     if (existing) {
       existing.addEventListener('load', () => {
-        if (window.google?.maps) resolve(window.google)
+        if (window.google?.maps?.importLibrary) resolve(window.google)
         else reject(new Error('Google Maps falhou ao carregar'))
       })
       existing.addEventListener('error', () => reject(new Error('Google Maps script error')))
@@ -197,10 +211,10 @@ export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
     const script = document.createElement('script')
     script.dataset.googleMaps = 'js'
     script.async = true
-    script.defer = true
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=pt-BR&region=BR`
+    // `loading=async` no URL é o que o Google valida (além de script.async).
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=pt-BR&region=BR&loading=async&v=weekly`
     script.onload = () => {
-      if (window.google?.maps) resolve(window.google)
+      if (window.google?.maps?.importLibrary) resolve(window.google)
       else reject(new Error('Google Maps falhou ao carregar'))
     }
     script.onerror = () => {
@@ -211,6 +225,27 @@ export function loadGoogleMapsScript(): Promise<GoogleMapsNamespace> {
   })
 
   return mapsScriptPromise
+}
+
+/** Biblioteca `marker` (AdvancedMarkerElement + PinElement). */
+export async function loadGoogleMapsMarkerLibrary(): Promise<{
+  g: GoogleMapsNamespace
+  marker: GoogleMapsMarkerLibrary
+}> {
+  const g = await loadGoogleMapsScript()
+  if (!markerLibraryPromise) {
+    markerLibraryPromise = g.maps.importLibrary('marker').then((lib) => {
+      const marker = lib as unknown as GoogleMapsMarkerLibrary
+      if (!marker.AdvancedMarkerElement || !marker.PinElement) {
+        throw new Error('Biblioteca marker incompleta')
+      }
+      return marker
+    })
+  }
+  const marker = await markerLibraryPromise
+  // Garante Map no namespace (importLibrary('maps') hidrata google.maps.Map).
+  await g.maps.importLibrary('maps')
+  return { g, marker }
 }
 
 type GeocodeAddressComponent = {
