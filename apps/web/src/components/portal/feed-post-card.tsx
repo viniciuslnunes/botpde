@@ -13,7 +13,7 @@ import { PostRepostEmbed } from './post-repost-embed'
 import { PostComunicadoEmbed } from './post-comunicado-embed'
 import { PostEventoEmbed } from './post-evento-embed'
 import type { PostSocialItem } from '@/lib/feed'
-import { formatAutorCargoBadge } from '@/lib/autor-badges'
+import { formatAutorCargoBadge } from '@/lib/autor-badges-format'
 
 interface FeedPostCardProps {
   post: PostSocialItem

@@ -2,6 +2,8 @@ import { db } from '@torcida/db'
 import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
 import type { PostSocialItem } from './feed'
 
+export { formatAutorCargoBadge } from './autor-badges-format'
+
 export interface AutorBadge {
   sedeNome: string | null
   cargoNome: string | null
@@ -167,20 +169,6 @@ export async function getBadgesPorAutorTenant(
     })
   }
   return map
-}
-
-/** Texto único do badge cargo + área (evita duplicar se o perfil já traz a área). */
-export function formatAutorCargoBadge(
-  cargoNome: string | null,
-  departamentoNome: string | null,
-): string | null {
-  const cargo = cargoNome?.trim() || null
-  const depto = departamentoNome?.trim() || null
-  if (cargo && depto) {
-    if (cargo === depto || cargo.includes(depto)) return cargo
-    return `${cargo} · ${depto}`
-  }
-  return cargo ?? depto
 }
 
 export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
