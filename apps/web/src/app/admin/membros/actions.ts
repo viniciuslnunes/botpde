@@ -472,3 +472,57 @@ export async function exportarCadastroLgeCsv(): Promise<
   const filename = `lge-${tenant.slug}-${new Date().toISOString().slice(0, 10)}.csv`
   return { ok: true, csv, filename }
 }
+
+/**
+ * Corrige / transfere a unidade territorial do membro (SaasMembro.sedeId).
+ * Afeta KPIs da Visão da torcida, contagens em Sedes e escopo de eventos.
+ */
+export async function reatribuirSedeMembro(
+  membroId: string,
+  sedeId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
+
+  const membro = await db.saasMembro.findFirst({
+    where: { id: membroId, tenantId: tenant.id },
+    select: { id: true, sedeId: true },
+  })
+  if (!membro) return { ok: false, error: 'Membro não encontrado.' }
+
+  let sedeAlvoId: string | null = sedeId?.trim() || null
+  if (sedeAlvoId) {
+    const sede = await db.sede.findFirst({
+      where: { id: sedeAlvoId, tenantId: tenant.id, ativa: true },
+      select: { id: true },
+    })
+    if (!sede) return { ok: false, error: 'Unidade não encontrada ou inativa.' }
+    sedeAlvoId = sede.id
+  }
+
+  if (membro.sedeId === sedeAlvoId) return { ok: true }
+
+  await db.saasMembro.update({
+    where: { id: membro.id },
+    data: { sedeId: sedeAlvoId },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'MEMBRO_SEDE_REATRIBUIDA',
+      entidade: 'SaasMembro',
+      entidadeId: membro.id,
+      detalhes: {
+        sedeIdAntes: membro.sedeId,
+        sedeIdDepois: sedeAlvoId,
+      },
+    },
+  })
+
+  revalidatePath('/admin/membros')
+  revalidatePath(`/admin/membros/${membro.id}`)
+  revalidatePath('/admin/sedes')
+  revalidatePath('/admin/torcida')
+  return { ok: true }
+}

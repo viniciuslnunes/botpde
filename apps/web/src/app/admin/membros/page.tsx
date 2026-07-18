@@ -36,7 +36,7 @@ const TIPO_BADGE: Record<string, string> = {
 export default async function MembrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; pagina?: string }>
+  searchParams: Promise<{ status?: string; q?: string; pagina?: string; sede?: string }>
 }) {
   // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
   // esconder o link no menu não basta, a URL direta precisa ser bloqueada.
@@ -50,12 +50,18 @@ export default async function MembrosPage({
   const params = await searchParams
   const statusFiltro = (params.status as StatusFilter) ?? 'TODOS'
   const busca = params.q ?? ''
+  const sedeFiltro = params.sede ?? ''
   const pagina = Math.max(1, parseInt(params.pagina ?? '1', 10))
   const porPagina = 20
 
   const where = {
     tenantId: tenant.id,
     ...(statusFiltro !== 'TODOS' ? { status: statusFiltro } : {}),
+    ...(sedeFiltro === 'nenhuma'
+      ? { sedeId: null }
+      : sedeFiltro
+        ? { sedeId: sedeFiltro }
+        : {}),
     ...(busca
       ? {
           OR: [
@@ -68,12 +74,13 @@ export default async function MembrosPage({
       : {}),
   }
 
-  const [membros, total, contagens] = await Promise.all([
+  const [membros, total, contagens, sedes] = await Promise.all([
     db.saasMembro.findMany({
       where,
       include: {
         user: { select: { nome: true, email: true, avatarUrl: true } },
         departamento: { select: { id: true, nome: true } },
+        sede: { select: { id: true, nome: true, tipo: true } },
       },
       orderBy: { criadoEm: 'desc' },
       skip: (pagina - 1) * porPagina,
@@ -85,7 +92,15 @@ export default async function MembrosPage({
       where: { tenantId: tenant.id },
       _count: true,
     }),
+    db.sede.findMany({
+      where: { tenantId: tenant.id, ativa: true },
+      orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+      select: { id: true, nome: true, tipo: true },
+    }),
   ])
+
+  type SedeOpt = { id: string; nome: string; tipo: string }
+  const sedesOpts: SedeOpt[] = sedes
 
   const totalPaginas = Math.ceil(total / porPagina)
 
@@ -196,7 +211,13 @@ export default async function MembrosPage({
 
   function buildHref(overrides: Record<string, string | undefined>) {
     const p = new URLSearchParams()
-    const merged = { status: statusFiltro, q: busca, pagina: String(pagina), ...overrides }
+    const merged = {
+      status: statusFiltro,
+      q: busca,
+      sede: sedeFiltro,
+      pagina: String(pagina),
+      ...overrides,
+    }
     for (const [k, v] of Object.entries(merged)) {
       if (v && v !== 'TODOS' && v !== '' && v !== '1') p.set(k, v)
     }
@@ -232,8 +253,8 @@ export default async function MembrosPage({
           }))}
         />
 
-        {/* Busca */}
-        <form method="GET" action="/admin/membros" className="mt-3">
+        {/* Busca + filtro unidade */}
+        <form method="GET" action="/admin/membros" className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           {statusFiltro !== 'TODOS' && (
             <input type="hidden" name="status" value={statusFiltro} />
           )}
@@ -242,8 +263,27 @@ export default async function MembrosPage({
             name="q"
             defaultValue={busca}
             placeholder="Buscar por nome, cidade, telefone ou Discord..."
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+            className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
           />
+          <select
+            name="sede"
+            defaultValue={sedeFiltro}
+            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-56"
+          >
+            <option value="">Todas as unidades</option>
+            <option value="nenhuma">Sem unidade</option>
+            {sedesOpts.map((s: SedeOpt) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Filtrar
+          </button>
         </form>
         </div>
       </div>
@@ -270,6 +310,7 @@ export default async function MembrosPage({
               telefone: membro.telefone,
               idade: membro.idade,
               departamentoNome: membro.departamento?.nome ?? null,
+              sedeNome: membro.sede?.nome ?? null,
               // Prova de vínculo só existe/importa para sócio (dado RESTRITO).
               imagemProva: isSocio ? membro.imagemProva : null,
               numeroAssociado: isSocio ? membro.numeroAssociado : null,

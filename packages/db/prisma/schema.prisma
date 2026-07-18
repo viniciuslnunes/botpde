@@ -196,6 +196,7 @@ model User {
   pedidos              SaasPedido[]
   carrinhoItens        SaasCarrinhoItem[]
   eventosRsvp          EventoRsvp[]
+  sedesResponsavel     Sede[]               @relation("SedeResponsavel")
   posts                Post[]
   auditLogs            AuditLog[]           @relation("AuditAtor")
   announcements        Announcement[]
@@ -668,6 +669,9 @@ model Sede {
   lng         Float?
   capacidade  Int?
   responsavel String?
+  /// Usuário responsável pela unidade (liderança local). Identidade; poder vem via Caso B (owner).
+  responsavelUserId String? @map("responsavel_user_id")
+  responsavelUser   User?   @relation("SedeResponsavel", fields: [responsavelUserId], references: [id], onDelete: SetNull)
   telefone    String?
   horarios    String?
   descricao   String?
@@ -690,6 +694,7 @@ model Sede {
 
   @@index([tenantId])
   @@index([sedeId])
+  @@index([responsavelUserId])
   @@map("saas_sedes")
 }
 
@@ -718,6 +723,8 @@ model Evento {
   lng       Float?
   /// Valor da vaga (caravana paga). Null = caravana sem cobrança.
   valorVaga Decimal? @map("valor_vaga") @db.Decimal(12, 2)
+  /// Override de lotação. Null = usa `Sede.capacidade` quando houver sede.
+  capacidade Int?
 
   criadoPorId      String?  @map("criado_por_id")
   criadoEm         DateTime @default(now()) @map("criado_em")
@@ -757,6 +764,7 @@ model EventoRsvp {
 enum RsvpStatus {
   CONFIRMADO
   RECUSADO
+  LISTA_ESPERA
 }
 
 enum TipoEvento {
@@ -1521,6 +1529,9 @@ enum TipoNotificacao {
   MEMBRO_SOLICITADO
   COBRANCA_PENDENTE
   COBRANCA_VENCIDA
+  EVENTO_LEMBRETE
+  EVENTO_RSVP
+  EVENTO_DIA_GESTOR
 }
 
 // ─── MENSAGERIA (DM 1×1 e grupos — ver ARCHITECTURE.md §6 item 27) ──────────
