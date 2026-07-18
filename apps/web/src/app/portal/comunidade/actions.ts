@@ -1912,43 +1912,61 @@ export async function reagirPost(
 }
 
 export async function denunciarPost(postId: string, motivo: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
   const parsed = denunciaSchema.safeParse({ postId, motivo })
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Denúncia inválida')
 
-  const limiterKey = `report:${tenant.id}:${session.user.id}`
+  // Mesmo gate de reação/comentário: post visível no feed (CN / hierarquia /
+  // alianças) pode ser denunciado; a fila fica no tenant dono do post.
+  const [ctx, post] = await Promise.all([
+    resolverContextoEngajamento(),
+    db.post.findUnique({
+      where: { id: parsed.data.postId },
+      select: {
+        id: true,
+        autorId: true,
+        tenantId: true,
+        oculto: true,
+        visibilidade: true,
+        tenant: { select: { afiliacaoId: true, sintetico: true } },
+      },
+    }) as Promise<PostEngajavelLite | null>,
+  ])
+
+  if (!post || !(await podeEngajarPostVisivel(ctx, post))) {
+    throw new Error('Post não encontrado')
+  }
+  if (post.autorId === ctx.viewerId) {
+    throw new Error('Não é possível denunciar o próprio post.')
+  }
+
+  const { viewerId, tenantId, afiliacaoId } = ctx
+  const limiterKey = `report:${tenantId ?? `nacional:${afiliacaoId}`}:${viewerId}`
   if (excedeuLimiteEngajamento(limiterKey)) {
     throw new Error('Você atingiu o limite de denúncias por minuto.')
   }
   registrarAcaoEngajamento(limiterKey)
 
-  const post = await db.post.findFirst({
-    where: { id: parsed.data.postId, tenantId: tenant.id },
-    select: { id: true, autorId: true },
-  })
-  if (!post) throw new Error('Post não encontrado')
+  const denunciaTenantId = post.tenantId
 
   const denuncia = await db.denuncia.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: denunciaTenantId,
       postId: post.id,
-      denuncianteId: session.user.id,
+      denuncianteId: viewerId,
       motivo: parsed.data.motivo,
     },
   })
 
   await notificarDenunciaPost({
-    tenantId: tenant.id,
+    tenantId: denunciaTenantId,
     motivo: parsed.data.motivo,
-    denuncianteUserId: session.user.id,
+    denuncianteUserId: viewerId,
   })
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
+      tenantId: denunciaTenantId,
+      atorId: viewerId,
       acao: 'POST_DENUNCIADO',
       entidade: 'Denuncia',
       entidadeId: denuncia.id,

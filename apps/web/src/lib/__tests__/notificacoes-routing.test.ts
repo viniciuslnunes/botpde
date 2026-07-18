@@ -174,6 +174,29 @@ describe('notificarAdminsPorPermissao', () => {
     })
     expect(mocks.emitPing).toHaveBeenCalled()
   })
+
+  it('notifica o denunciante quando ele é o único elegível (solo admin)', async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: 'super-1' }])
+    mocks.userRoleFindMany.mockResolvedValue([])
+
+    const count = await notificarDenunciaPost({
+      tenantId: 'tenant-x',
+      motivo: 'TESTE DENÚNCIA',
+      denuncianteUserId: 'super-1',
+    })
+
+    expect(count).toBe(1)
+    expect(mocks.notificacaoCreateMany).toHaveBeenCalledTimes(1)
+    expect(mocks.notificacaoCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'super-1',
+          tipo: 'DENUNCIA_NOVA',
+          titulo: 'Nova denúncia pendente',
+        }),
+      ]),
+    })
+  })
 })
 
 describe('notificarNovoMembroPendente', () => {

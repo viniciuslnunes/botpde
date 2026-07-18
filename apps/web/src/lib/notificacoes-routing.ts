@@ -198,20 +198,45 @@ export async function notificarNovoMembroPendente(params: {
   ])
 }
 
+/**
+ * Fan-out de denúncia: evita notificar o próprio denunciante quando há outros
+ * moderadores; se ele for o único elegível (solo admin / modo operador), ainda
+ * registra no inbox para o sino e a Moderação não ficarem mudos no auto-teste.
+ */
+async function notificarDenunciaAdmins(
+  permission: string,
+  params: {
+    tenantId: string
+    motivo: string
+    denuncianteUserId: string
+    titulo: string
+  },
+): Promise<number> {
+  const destinoBase = {
+    tenantId: params.tenantId,
+    tipo: 'DENUNCIA_NOVA' as const,
+    titulo: params.titulo,
+    corpo: params.motivo.slice(0, 140),
+    link: '/admin/comunidade/moderacao',
+    atorId: params.denuncianteUserId,
+  }
+  const comExclusao = await notificarAdminsPorPermissao(permission, {
+    ...destinoBase,
+    excetoUserId: params.denuncianteUserId,
+  })
+  if (comExclusao > 0) return comExclusao
+  return notificarAdminsPorPermissao(permission, destinoBase)
+}
+
 /** Denúncia de post — moderadores de comunidade com permissão efetiva. */
 export async function notificarDenunciaPost(params: {
   tenantId: string
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarAdminsPorPermissao(PERMISSIONS.COMMUNITY_MODERATE, {
-    tenantId: params.tenantId,
-    tipo: 'DENUNCIA_NOVA',
+  return notificarDenunciaAdmins(PERMISSIONS.COMMUNITY_MODERATE, {
+    ...params,
     titulo: 'Nova denúncia pendente',
-    corpo: params.motivo.slice(0, 140),
-    link: '/admin/comunidade/moderacao',
-    atorId: params.denuncianteUserId,
-    excetoUserId: params.denuncianteUserId,
   })
 }
 
@@ -221,14 +246,9 @@ export async function notificarDenunciaMensagem(params: {
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarAdminsPorPermissao(PERMISSIONS.MESSAGES_MODERATE, {
-    tenantId: params.tenantId,
-    tipo: 'DENUNCIA_NOVA',
+  return notificarDenunciaAdmins(PERMISSIONS.MESSAGES_MODERATE, {
+    ...params,
     titulo: 'Nova denúncia de mensagem',
-    corpo: params.motivo.slice(0, 140),
-    link: '/admin/comunidade/moderacao',
-    atorId: params.denuncianteUserId,
-    excetoUserId: params.denuncianteUserId,
   })
 }
 
