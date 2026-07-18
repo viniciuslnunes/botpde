@@ -216,12 +216,12 @@ function PortalScene({
                       Vinicius
                     </span>
                     <Hotspot token="brand.primary" focus={focus} label="Badge primária">
-                      <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary))]">
+                      <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))]">
                         Sócio
                       </span>
                     </Hotspot>
                     <Hotspot token="brand.secondary" focus={focus} label="Badge secundária">
-                      <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-secondary))]">
+                      <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-secondary-fg))]">
                         Destaque
                       </span>
                     </Hotspot>

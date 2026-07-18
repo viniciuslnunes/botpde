@@ -66,9 +66,12 @@ export const ACTION_TOKEN_HINTS = /** @type {const} */ ({
   info: 'Dicas e status neutro-informativo',
 })
 
-/** Defaults alinhados ao emerald/red/amber/blue usados hoje no app. */
+/**
+ * Defaults de ação. Sucesso usa azul (não verde): em futebol BR, verde é
+ * identidade de vários clubes e cor de rivalidade para outros — nunca forçar.
+ */
 export const DEFAULT_ACTIONS = /** @type {const} */ ({
-  success: '#059669',
+  success: '#1d4ed8',
   danger: '#dc2626',
   warning: '#d97706',
   info: '#2563eb',
@@ -302,22 +305,39 @@ export function paletaDoClube(nome, apelido) {
 
 /**
  * Deriva overrides leves de superfície a partir da cor primária (tint no hue).
- * Não força dark "drenched" — só um leve tom no background-subtle.
+ * Cobre fundo, sutil, superfície e elevada — sem “drenched” pesado.
  * @param {string} primaryHex
  * @returns {{ light: Record<string, string>, dark: Record<string, string>, secondary: string }}
  */
 export function derivarSuperficiesDaMarca(primaryHex) {
   const secondary = contrasteTextoSobre(primaryHex) === 'light' ? '#ffffff' : '#0a0a0a'
 
-  // Mix bem suave com o default (≈8% da marca no subtle light; ≈12% no dark).
+  // Light: página branca → sutil/elevada com tint suave da marca.
+  const lightBg = mixHex('#ffffff', primaryHex, 0.03)
   const lightSubtle = mixHex('#f9fafb', primaryHex, 0.08)
+  const lightSurface = mixHex('#ffffff', primaryHex, 0.04)
+  const lightRaised = mixHex('#f4f4f5', primaryHex, 0.1)
+
+  // Dark: zinc base → tint progressivo (página < sutil < surface < raised).
+  const darkBg = mixHex('#09090b', primaryHex, 0.06)
   const darkSubtle = mixHex('#18181b', primaryHex, 0.14)
   const darkSurface = mixHex('#18181b', primaryHex, 0.1)
+  const darkRaised = mixHex('#27272a', primaryHex, 0.16)
 
   return {
     secondary,
-    light: { backgroundSubtle: lightSubtle },
-    dark: { backgroundSubtle: darkSubtle, surface: darkSurface },
+    light: {
+      background: lightBg,
+      backgroundSubtle: lightSubtle,
+      surface: lightSurface,
+      surfaceRaised: lightRaised,
+    },
+    dark: {
+      background: darkBg,
+      backgroundSubtle: darkSubtle,
+      surface: darkSurface,
+      surfaceRaised: darkRaised,
+    },
   }
 }
 
@@ -374,26 +394,82 @@ function clampHexLightness(hex, minL = 0.22, maxL = 0.62) {
 }
 
 /**
- * Deriva cores de ação legíveis a partir da marca (semânticas reconhecíveis).
- * @param {string} primaryHex
+ * Hue “verde de campo” (≈90–165°) com saturação mínima — identidade ou rivalidade.
+ * @param {string} hex
+ * @returns {boolean}
  */
-export function derivarAcoesDaMarca(primaryHex) {
-  const { h } = hexToHsl(primaryHex)
-  // Sucesso fica em verde; perigo em vermelho; warning âmbar; info perto da marca ou azul.
-  const success = mixHex('#059669', hslToHex((h + 140) % 360, 0.55, 0.38), 0.25)
-  const danger = mixHex('#dc2626', hslToHex((h + 20) % 360, 0.7, 0.42), 0.2)
-  const warning = mixHex('#d97706', hslToHex((h + 40) % 360, 0.75, 0.45), 0.2)
-  const info = clampHexLightness(
-    mixHex('#2563eb', primaryHex, 0.35),
-    0.28,
-    0.55,
+export function isVerdeIdentidade(hex) {
+  if (typeof hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) return false
+  const { h, s } = hexToHsl(hex)
+  return s >= 0.18 && h >= 85 && h <= 165
+}
+
+/**
+ * Remove verdes de uma lista quando a identidade da torcida/clube não é verde
+ * (evita sugerir cor de rival por acidente de harmonia ou ruído de extrator).
+ * @param {string[]} hexes
+ * @param {string[]} identidadeHexes cores da marca/clube/escudo que definem o contexto
+ * @returns {string[]}
+ */
+export function filtrarVerdeForaDeContexto(hexes, identidadeHexes = []) {
+  const identidadeAceitaVerde = identidadeHexes.some(isVerdeIdentidade)
+  if (identidadeAceitaVerde) return hexes.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
+  return hexes.filter(
+    (c) => /^#[0-9a-fA-F]{6}$/.test(c) && !isVerdeIdentidade(c),
   )
-  return {
-    success: clampHexLightness(success, 0.28, 0.48),
-    danger: clampHexLightness(danger, 0.32, 0.5),
-    warning: clampHexLightness(warning, 0.35, 0.52),
-    info,
+}
+
+/**
+ * Texto de marca legível sobre superfície (badges / soft buttons).
+ * Preto em fundo escuro (ou branco em fundo claro) some — clareia/escurece o hue.
+ * @param {string} brandHex
+ * @param {string} surfaceHex
+ * @param {number} [minRatio]
+ * @returns {string}
+ */
+export function corMarcaLegivel(brandHex, surfaceHex, minRatio = 3.2) {
+  if (contrasteRatio(brandHex, surfaceHex) >= minRatio) return brandHex
+  const { h, s, l } = hexToHsl(brandHex)
+  const surfaceDark = luminanciaRelativa(surfaceHex) < 0.45
+  if (surfaceDark) {
+    const targetL = s < 0.12 ? 0.78 : Math.max(0.55, Math.min(0.72, l + 0.42))
+    return hslToHex(h, s < 0.12 ? 0 : Math.max(s, 0.2), targetL)
   }
+  const targetL = s < 0.12 ? 0.22 : Math.min(0.38, Math.max(0.16, l - 0.35))
+  return hslToHex(h, s < 0.12 ? 0 : Math.max(s, 0.2), targetL)
+}
+
+/**
+ * Deriva cores de ação a partir da marca/clube.
+ * Sucesso só é verde se a identidade já for verde (ex.: Palmeiras, Goiás).
+ * Caso contrário usa azul (ou tom da marca) — nunca injeta verde de rivalidade.
+ * @param {string} primaryHex
+ * @param {{ secondary?: string | null, accents?: string[] }} [opts]
+ */
+export function derivarAcoesDaMarca(primaryHex, opts = {}) {
+  const { h } = hexToHsl(primaryHex)
+  const verdesNaMarca = [primaryHex, opts.secondary, ...(opts.accents ?? [])]
+    .filter(Boolean)
+    .filter(isVerdeIdentidade)
+  const marcaEhVerde = verdesNaMarca.length > 0
+
+  const success = marcaEhVerde
+    ? clampHexLightness(/** @type {string} */ (verdesNaMarca[0]), 0.28, 0.45)
+    : clampHexLightness(mixHex('#1d4ed8', primaryHex, 0.28), 0.28, 0.48)
+
+  const danger = clampHexLightness(
+    mixHex('#dc2626', hslToHex((h + 8) % 360, 0.72, 0.42), 0.25),
+    0.32,
+    0.5,
+  )
+  const warning = clampHexLightness(
+    mixHex('#d97706', hslToHex((h + 35) % 360, 0.7, 0.45), 0.2),
+    0.35,
+    0.52,
+  )
+  const info = clampHexLightness(mixHex('#2563eb', primaryHex, 0.3), 0.28, 0.55)
+
+  return { success, danger, warning, info }
 }
 
 /**
@@ -405,89 +481,147 @@ export function derivarAcoesDaMarca(primaryHex) {
  *   secondary: string,
  *   actions: { success: string, danger: string, warning: string, info: string },
  *   swatches: string[],
- *   fonte: 'harmonia' | 'clube' | 'escudo' | 'preset'
+ *   fonte: 'torcida' | 'harmonia' | 'clube' | 'escudo' | 'preset'
  * }} PaletaSugerida
  */
 
 /**
- * Gera paletas harmônicas a partir de uma cor semente (marca atual, clube ou escudo).
- * @param {string} seedHex
- * @param {{ clube?: { primary: string, secondary: string, accents?: string[] } | null, extraidas?: string[] }} [opts]
+ * Paletas sugeridas no contexto da torcida e do clube afiliado.
+ * Ordem: marca da torcida → escudo → clube → variação monocromática → alto contraste.
+ * Não sugere harmônicas genéricas (análoga/complementar) que inventam cores de rival.
+ * @param {string} seedHex cor primária atual da torcida
+ * @param {{
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ *   extraidas?: string[],
+ *   secondary?: string | null,
+ * }} [opts]
  * @returns {PaletaSugerida[]}
  */
 export function gerarPaletasSugeridas(seedHex, opts = {}) {
   const seed =
     typeof seedHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(seedHex)
       ? seedHex
-      : DEFAULT_ACTIONS.info
-  const { h, s, l } = hexToHsl(seed)
+      : DEFAULT_TENANT_DESIGN.brand.primary
+  const seedSecondary =
+    typeof opts.secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(opts.secondary)
+      ? opts.secondary
+      : null
+  const { h, s } = hexToHsl(seed)
   const surfaces = derivarSuperficiesDaMarca(seed)
+
+  const identidadeBase = [
+    seed,
+    seedSecondary,
+    opts.clube?.primary,
+    opts.clube?.secondary,
+    ...(opts.clube?.accents ?? []),
+  ].filter(Boolean)
 
   /** @type {PaletaSugerida[]} */
   const out = []
 
-  // 1) Marca atual + ações derivadas
+  // 1) Marca da torcida (prioridade)
   {
-    const primary = clampHexLightness(seed, 0.12, 0.55)
-    const actions = derivarAcoesDaMarca(primary)
+    const primary = seed
+    const secondary = seedSecondary ?? surfaces.secondary
+    const actions = derivarAcoesDaMarca(primary, {
+      secondary,
+      accents: opts.clube?.accents,
+    })
     out.push({
-      id: 'marca-harmonizada',
-      nome: 'Marca harmonizada',
-      descricao: 'Mantém sua cor e equilibra aprovar/reprovar/alerta',
+      id: 'marca-torcida',
+      nome: 'Marca da torcida',
+      descricao: 'Sua cor atual + ações sem introduzir cor de rival',
       primary,
-      secondary: surfaces.secondary,
+      secondary,
       actions,
-      swatches: [primary, surfaces.secondary, actions.success, actions.danger, actions.warning],
-      fonte: 'harmonia',
+      swatches: filtrarVerdeForaDeContexto(
+        [primary, secondary, actions.danger, actions.warning, actions.success],
+        identidadeBase,
+      ),
+      fonte: 'torcida',
     })
   }
 
-  // 2) Análoga
-  {
-    const primary = hslToHex(h, Math.max(0.35, s), Math.min(0.45, Math.max(0.25, l)))
-    const secondary = hslToHex((h + 28) % 360, Math.max(0.25, s * 0.8), 0.42)
-    const actions = derivarAcoesDaMarca(primary)
+  // 2) Escudo / logo da torcida
+  const extraRaw = (opts.extraidas ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
+  // Identidade = torcida + clube; não usar o extrator como “permissão” de verde.
+  const extra = filtrarVerdeForaDeContexto(extraRaw, identidadeBase)
+  if (extra.length >= 2) {
+    const primary = extra[0]
+    const secondary = extra[1]
+    const accents = extra.slice(2, 5)
+    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
     out.push({
-      id: 'analoga',
-      nome: 'Análoga',
-      descricao: 'Tons vizinhos no círculo cromático — visual coeso',
-      primary: clampHexLightness(primary),
-      secondary: clampHexLightness(secondary, 0.2, 0.7),
-      actions,
-      swatches: [primary, secondary, actions.info, actions.success],
-      fonte: 'harmonia',
-    })
-  }
-
-  // 3) Complementar (energia de torcida)
-  {
-    const primary = clampHexLightness(seed)
-    const accent = hslToHex((h + 180) % 360, Math.max(0.45, s), 0.42)
-    const actions = {
-      ...derivarAcoesDaMarca(primary),
-      danger: clampHexLightness(accent, 0.3, 0.5),
-    }
-    out.push({
-      id: 'complementar',
-      nome: 'Complementar',
-      descricao: 'Contraste forte — destaque em ações destrutivas',
+      id: 'escudo',
+      nome: 'Do escudo / logo',
+      descricao: 'Extraído da imagem da torcida',
       primary,
-      secondary: contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a',
+      secondary,
       actions,
-      swatches: [primary, accent, actions.success, actions.warning],
-      fonte: 'harmonia',
+      swatches: extra.slice(0, 5),
+      fonte: 'escudo',
     })
   }
 
-  // 4) Monocromática
+  // 3) Clube afiliado
+  if (opts.clube?.primary) {
+    const primary = opts.clube.primary
+    const secondary =
+      opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
+    const accents = opts.clube.accents ?? []
+    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
+    out.push({
+      id: 'clube',
+      nome: 'Paleta do clube',
+      descricao: 'Cores oficiais do time afiliado',
+      primary,
+      secondary,
+      actions,
+      swatches: filtrarVerdeForaDeContexto(
+        [primary, secondary, ...accents.slice(0, 2)],
+        [primary, secondary, ...accents],
+      ),
+      fonte: 'clube',
+    })
+  }
+
+  // 4) Torcida + clube (quando há ambos e diferem)
+  if (
+    opts.clube?.primary &&
+    opts.clube.primary.toLowerCase() !== seed.toLowerCase()
+  ) {
+    const primary = seed
+    const secondary = opts.clube.secondary || opts.clube.primary
+    const accents = [
+      ...(opts.clube.accents ?? []),
+      opts.clube.primary,
+    ].filter((c, i, arr) => arr.indexOf(c) === i)
+    const actions = derivarAcoesDaMarca(primary, { secondary, accents })
+    out.push({
+      id: 'torcida-clube',
+      nome: 'Torcida + clube',
+      descricao: 'Marca da torcida com apoio das cores do time',
+      primary,
+      secondary,
+      actions,
+      swatches: filtrarVerdeForaDeContexto(
+        [primary, secondary, ...accents.slice(0, 2)],
+        [...identidadeBase, primary, secondary, ...accents],
+      ),
+      fonte: 'torcida',
+    })
+  }
+
+  // 5) Monocromática — só a família da marca (sem hue estrangeiro)
   {
     const primary = hslToHex(h, Math.max(0.2, s * 0.7), 0.28)
     const secondary = hslToHex(h, Math.max(0.1, s * 0.4), 0.72)
-    const actions = derivarAcoesDaMarca(primary)
+    const actions = derivarAcoesDaMarca(primary, { secondary: seedSecondary })
     out.push({
       id: 'mono',
       nome: 'Monocromática',
-      descricao: 'Só a família da marca — sóbria e profissional',
+      descricao: 'Só a família da marca — sem cores de fora',
       primary: clampHexLightness(primary, 0.15, 0.4),
       secondary: clampHexLightness(secondary, 0.55, 0.85),
       actions,
@@ -501,52 +635,24 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     })
   }
 
-  // 5) Clube (se houver)
-  if (opts.clube?.primary) {
-    const primary = opts.clube.primary
-    const secondary = opts.clube.secondary || derivarSuperficiesDaMarca(primary).secondary
-    const actions = derivarAcoesDaMarca(primary)
-    out.unshift({
-      id: 'clube',
-      nome: 'Paleta do clube',
-      descricao: 'Cores oficiais do time afiliado',
-      primary,
-      secondary,
-      actions,
-      swatches: [primary, secondary, ...(opts.clube.accents ?? []).slice(0, 2), actions.success],
-      fonte: 'clube',
-    })
-  }
-
-  // 6) Escudo — usa 1ª cor extraída como semente
-  const extra = (opts.extraidas ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c))
-  if (extra.length >= 2) {
-    const primary = clampHexLightness(extra[0])
-    const secondary = extra[1]
-    const actions = derivarAcoesDaMarca(primary)
-    out.splice(opts.clube ? 1 : 0, 0, {
-      id: 'escudo',
-      nome: 'Do escudo / logo',
-      descricao: 'Extraído da imagem da torcida',
-      primary,
-      secondary,
-      actions,
-      swatches: extra.slice(0, 5),
-      fonte: 'escudo',
-    })
-  }
-
-  // 7) Preset alto contraste
+  // 6) Alto contraste — leitura máxima; sucesso azul (não verde)
   {
     const primary = clampHexLightness(seed, 0.1, 0.35)
+    const actions = derivarAcoesDaMarca(primary, {
+      secondary: '#ffffff',
+      accents: opts.clube?.accents,
+    })
     out.push({
       id: 'alto-contraste',
       nome: 'Alto contraste',
-      descricao: 'Prioriza leitura — ações semânticas clássicas',
+      descricao: 'Prioriza leitura — positivo sem verde forçado',
       primary,
       secondary: '#ffffff',
-      actions: { ...DEFAULT_ACTIONS },
-      swatches: [primary, '#ffffff', DEFAULT_ACTIONS.success, DEFAULT_ACTIONS.danger],
+      actions,
+      swatches: filtrarVerdeForaDeContexto(
+        [primary, '#ffffff', actions.success, actions.danger],
+        identidadeBase,
+      ),
       fonte: 'preset',
     })
   }

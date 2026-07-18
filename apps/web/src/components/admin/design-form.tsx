@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -162,7 +161,7 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
   })
 }
 
-/** Color field with popover + resolved swatch (shows default when empty). */
+/** Color field: swatch abre o seletor nativo direto; hex editável ao lado. */
 function ColorField({
   label,
   value,
@@ -183,30 +182,18 @@ function ColorField({
   token?: TokenFocus
   onFocusToken?: (t: TokenFocus) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value ?? resolved)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const panelId = useId()
+  const colorInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setDraft(value ?? resolved)
   }, [value, resolved])
 
-  useEffect(() => {
-    if (!open) return
-    function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-
   const display = value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : resolved
 
   return (
     <div
-      ref={wrapRef}
-      className="relative space-y-1.5"
+      className="space-y-1.5"
       onMouseEnter={() => token && onFocusToken?.(token)}
       onFocusCapture={() => token && onFocusToken?.(token)}
     >
@@ -225,12 +212,22 @@ function ColorField({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => colorInputRef.current?.click()}
           className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-sky-400/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
           style={{ backgroundColor: display }}
-          title="Abrir seletor"
+          title="Escolher cor"
+          aria-label={`${label}: escolher cor`}
+        />
+        <input
+          ref={colorInputRef}
+          type="color"
+          value={display}
+          onChange={(e) => {
+            onChange(e.target.value)
+            setDraft(e.target.value)
+          }}
+          className="sr-only"
+          tabIndex={-1}
         />
         <input
           type="text"
@@ -255,26 +252,6 @@ function ColorField({
       </div>
       {!value && allowEmpty ? (
         <p className="text-[10px] text-[rgb(var(--foreground-muted))]">Padrão · {resolved}</p>
-      ) : null}
-
-      {open ? (
-        <div
-          id={panelId}
-          className="absolute left-0 top-full z-30 mt-2 w-[220px] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 shadow-xl"
-        >
-          <input
-            type="color"
-            value={display}
-            onChange={(e) => {
-              onChange(e.target.value)
-              setDraft(e.target.value)
-            }}
-            className="h-28 w-full cursor-pointer rounded-lg border-0 bg-transparent p-0"
-          />
-          <p className="mt-2 text-center font-mono text-xs text-[rgb(var(--foreground-muted))]">
-            {display}
-          </p>
-        </div>
       ) : null}
     </div>
   )
@@ -308,14 +285,14 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
         'rounded-xl border px-3 py-2.5',
         fails.length > 0
           ? 'border-amber-500/40 bg-amber-500/10'
-          : 'border-emerald-500/30 bg-emerald-500/10',
+          : 'border-[rgb(var(--color-info)_/_0.35)] bg-[rgb(var(--color-info)_/_0.1)]',
       ].join(' ')}
     >
       <div className="flex items-start gap-2">
         {fails.length > 0 ? (
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
         ) : (
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-info-fg))]" />
         )}
         <div className="min-w-0 flex-1 space-y-1">
           <p
@@ -323,7 +300,7 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
               'text-sm font-medium',
               fails.length > 0
                 ? 'text-amber-900 dark:text-amber-100'
-                : 'text-emerald-900 dark:text-emerald-100',
+                : 'text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             {fails.length > 0
@@ -337,7 +314,7 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
                   className={[
                     'mt-0.5 h-3 w-3 shrink-0',
                     c.ok
-                      ? 'text-emerald-600 dark:text-emerald-400'
+                      ? 'text-[rgb(var(--color-info-fg))]'
                       : 'text-amber-600 dark:text-amber-300',
                   ].join(' ')}
                 />
@@ -446,6 +423,7 @@ export function DesignForm({
   const paletasSugeridas = useMemo(
     () =>
       gerarPaletasSugeridas(design.brand.primary, {
+        secondary: design.brand.secondary,
         clube: clubePaleta
           ? {
               primary: clubePaleta.primary,
@@ -455,7 +433,7 @@ export function DesignForm({
           : null,
         extraidas: extracted,
       }),
-    [design.brand.primary, clubePaleta, extracted],
+    [design.brand.primary, design.brand.secondary, clubePaleta, extracted],
   )
 
   const contrastChecks = useMemo(
@@ -508,7 +486,7 @@ export function DesignForm({
 
   return (
     <div data-persist-bar-root className="pb-24">
-      <div className="flex flex-col gap-6 xl:grid xl:h-[calc(100vh-11rem)] xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-stretch xl:gap-6">
+      <div className="flex flex-col gap-6 xl:grid xl:h-[calc(100vh-11rem)] xl:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:items-stretch xl:gap-6">
         {/* Inspector */}
         <div className="flex min-h-0 flex-col gap-4 xl:overflow-hidden">
           <div
@@ -551,8 +529,8 @@ export function DesignForm({
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Geradas da sua cor, do clube e do escudo. Um clique aplica marca + ações +
-                    fundos tintados.
+                    Prioridade: marca da torcida, escudo e clube afiliado. Sem
+                    cores de rivalidade inventadas por harmonia genérica.
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -627,7 +605,7 @@ export function DesignForm({
                   <button
                     type="button"
                     onClick={() => {
-                      const pack = paletasSugeridas.find((p) => p.id === 'marca-harmonizada')
+                      const pack = paletasSugeridas.find((p) => p.id === 'marca-torcida')
                       if (pack) applyPaletaCompleta(pack)
                     }}
                     className="text-left text-xs font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
@@ -788,6 +766,13 @@ export function DesignForm({
                         }}
                         {...fieldProps}
                       />
+                      {key === 'background' || key === 'surfaceRaised' ? (
+                        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                          {key === 'background'
+                            ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca.'
+                            : 'Cartões elevados, popovers e menus. Ao aplicar uma paleta, fica um pouco mais clara/tintada que a superfície.'}
+                        </p>
+                      ) : null}
                     )
                   })}
                 </div>

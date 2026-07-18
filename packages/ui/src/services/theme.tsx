@@ -16,6 +16,7 @@ import {
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
   contrasteTextoSobre,
+  corMarcaLegivel,
   hexToCssRgb,
   resolveTenantDesign,
   SURFACE_CSS_VARS,
@@ -85,14 +86,31 @@ export function applyTenantDesign(
   root.style.setProperty('--color-secondary', hexToCssRgb(secondaryHex))
   root.style.setProperty('--secondary', hexToCssRgb(secondaryHex))
 
+  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const overrides = mode === 'dark' ? design.dark : design.light
+  const surfaceHex =
+    (overrides as Record<string, string | undefined>).surface ??
+    (defaults as Record<string, string>).surface
+
+  root.style.setProperty(
+    '--color-primary-fg',
+    hexToCssRgb(corMarcaLegivel(primary, surfaceHex)),
+  )
+  root.style.setProperty(
+    '--color-secondary-fg',
+    hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex)),
+  )
+
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   for (const key of ACTION_TOKEN_KEYS) {
     const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
-    root.style.setProperty(cssVar, hexToCssRgb(actions[key as keyof typeof actions]))
+    const hex = actions[key as keyof typeof actions]
+    root.style.setProperty(cssVar, hexToCssRgb(hex))
+    root.style.setProperty(
+      `${cssVar}-fg`,
+      hexToCssRgb(corMarcaLegivel(hex, surfaceHex)),
+    )
   }
-
-  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
-  const overrides = mode === 'dark' ? design.dark : design.light
 
   for (const key of SURFACE_TOKEN_KEYS) {
     const cssVar = SURFACE_CSS_VARS[key as keyof typeof SURFACE_CSS_VARS]
@@ -151,11 +169,20 @@ export function tenantDesignCriticalCss(
   lines.push(`--color-secondary:${hexToCssRgb(secondaryHex)}`)
   lines.push(`--secondary:${hexToCssRgb(secondaryHex)}`)
 
+  const surfaceHex =
+    (overrides as Record<string, string | undefined>).surface ??
+    (defaults as Record<string, string>).surface
+  lines.push(`--color-primary-fg:${hexToCssRgb(corMarcaLegivel(primary, surfaceHex))}`)
+  lines.push(
+    `--color-secondary-fg:${hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex))}`,
+  )
+
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   for (const key of ACTION_TOKEN_KEYS) {
-    lines.push(
-      `${ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]}:${hexToCssRgb(actions[key as keyof typeof actions])}`,
-    )
+    const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
+    const hex = actions[key as keyof typeof actions]
+    lines.push(`${cssVar}:${hexToCssRgb(hex)}`)
+    lines.push(`${cssVar}-fg:${hexToCssRgb(corMarcaLegivel(hex, surfaceHex))}`)
   }
 
   for (const key of SURFACE_TOKEN_KEYS) {

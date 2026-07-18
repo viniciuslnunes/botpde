@@ -34,11 +34,20 @@
   --color-secondary: 124 58 237;
   --secondary: var(--color-secondary);
 
-  /* Ações semânticas (aprovar / reprovar / alerta / info) */
-  --color-success: 5 150 105;   /* #059669 */
+  /* Ações semânticas (aprovar / reprovar / alerta / info).
+     Sucesso default = azul — verde só quando a identidade do clube/torcida for verde. */
+  --color-success: 29 78 216;   /* #1d4ed8 */
   --color-danger: 220 38 38;    /* #dc2626 */
   --color-warning: 217 119 6;   /* #d97706 */
   --color-info: 37 99 235;      /* #2563eb */
+
+  /* Texto legível sobre tint da marca (badges / soft) — tema sobrescreve */
+  --color-primary-fg: var(--color-primary);
+  --color-secondary-fg: var(--color-secondary);
+  --color-success-fg: var(--color-success);
+  --color-danger-fg: var(--color-danger);
+  --color-warning-fg: var(--color-warning);
+  --color-info-fg: var(--color-info);
 
   /* Grade .app-shell-bg — sobrescrita pelo TenantDesignBridge */
   --grid-enabled: 1;
@@ -115,7 +124,7 @@ body {
 }
 .btn-secondary-soft {
   background-color: rgb(var(--color-secondary) / 0.12);
-  color: rgb(var(--color-secondary));
+  color: rgb(var(--color-secondary-fg));
   border: 1px solid rgb(var(--color-secondary) / 0.35);
 }
 .btn-secondary-soft:hover {
@@ -123,7 +132,7 @@ body {
 }
 .badge-secondary {
   background-color: rgb(var(--color-secondary) / 0.14);
-  color: rgb(var(--color-secondary));
+  color: rgb(var(--color-secondary-fg));
 }
 
 /* ── Botões de ação semântica (módulo Design) ─────────────────── */
@@ -157,7 +166,7 @@ body {
 }
 .btn-danger-soft {
   background-color: rgb(var(--color-danger) / 0.1);
-  color: rgb(var(--color-danger));
+  color: rgb(var(--color-danger-fg));
   border: 1px solid rgb(var(--color-danger) / 0.28);
 }
 .btn-danger-soft:hover {
@@ -165,7 +174,7 @@ body {
 }
 .btn-warning-soft {
   background-color: rgb(var(--color-warning) / 0.1);
-  color: rgb(var(--color-warning));
+  color: rgb(var(--color-warning-fg));
   border: 1px solid rgb(var(--color-warning) / 0.28);
 }
 .btn-warning-soft:hover {
@@ -173,7 +182,7 @@ body {
 }
 .btn-success-soft {
   background-color: rgb(var(--color-success) / 0.1);
-  color: rgb(var(--color-success));
+  color: rgb(var(--color-success-fg));
   border: 1px solid rgb(var(--color-success) / 0.28);
 }
 .btn-success-soft:hover {

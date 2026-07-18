@@ -11,12 +11,12 @@ export type BadgeVariant =
 
 const VARIANT_CLASS: Record<BadgeVariant, string> = {
   neutral: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-  primary: 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]',
-  secondary: 'bg-[rgb(var(--color-secondary)_/_0.14)] text-[rgb(var(--color-secondary))]',
-  success: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success))]',
-  warning: 'bg-[rgb(var(--color-warning)_/_0.14)] text-[rgb(var(--color-warning))]',
-  danger: 'bg-[rgb(var(--color-danger)_/_0.14)] text-[rgb(var(--color-danger))]',
-  info: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info))]',
+  primary: 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]',
+  secondary: 'bg-[rgb(var(--color-secondary)_/_0.14)] text-[rgb(var(--color-secondary-fg))]',
+  success: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success-fg))]',
+  warning: 'bg-[rgb(var(--color-warning)_/_0.14)] text-[rgb(var(--color-warning-fg))]',
+  danger: 'bg-[rgb(var(--color-danger)_/_0.14)] text-[rgb(var(--color-danger-fg))]',
+  info: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info-fg))]',
 }
 
 export interface BadgeProps {

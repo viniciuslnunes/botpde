@@ -23,7 +23,7 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
   version: 1,
   brand: { primary: '#RRGGBB', secondary: '#RRGGBB' | null },
   actions: {
-    success: '#059669',  // aprovar / positivo → --color-success
+    success: '#1d4ed8',  // aprovar / positivo → --color-success (azul; verde só se for identidade)
     danger: '#dc2626',   // reprovar / excluir → --color-danger
     warning: '#d97706',  // pendente / alerta → --color-warning
     info: '#2563eb',     // informativo → --color-info
@@ -46,13 +46,22 @@ Consumidores: `Badge` (`success`/`danger`/`warning`/`info`), diálogos de confir
 
 ## Sugestões de cor
 
-1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — harmônicas a partir da
-   primária atual (marca harmonizada, análoga, complementar, mono), mais clube,
-   escudo/logo e preset alto contraste. Um clique via `aplicarPaletaAoDesign`
-   preenche marca + ações + tint de superfícies.
-2. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube`.
-3. **Escudo/logo** — `extrairPaletaDeImagem` (canvas) alimenta a sugestão “Do escudo”.
-4. **Antes/depois** na prévia — compara rascunho com o design já salvo.
+1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — no contexto da torcida e do
+   clube afiliado, nesta ordem: **marca da torcida** → **escudo/logo** →
+   **paleta do clube** → **torcida + clube** → monocromática → alto contraste.
+   Um clique via `aplicarPaletaAoDesign` preenche marca + ações + tint de
+   superfícies.
+2. **Rivalidade / identidade** — sucesso **não** é verde por padrão. Verde só
+   entra em ações/swatches se já fizer parte da identidade (clube/torcida).
+   Harmônicas genéricas (análoga/complementar) foram removidas para não
+   inventar cor de rival.
+3. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube`.
+4. **Escudo/logo** — `extrairPaletaDeImagem` (canvas) alimenta a sugestão “Do
+   escudo”; verdes fora de contexto são filtrados.
+5. **Antes/depois** na prévia — compara rascunho com o design já salvo.
+
+Badges e soft-buttons usam `--color-*-fg` (`corMarcaLegivel`) para o texto não
+sumir quando a marca é preto em fundo escuro (ou branco em fundo claro).
 
 ## Actions
 

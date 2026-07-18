@@ -53,8 +53,8 @@ export default async function DesignPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container flex items-center gap-3">
+      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5">
+        <div className="flex items-center gap-3">
           <Palette className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Design</h1>
@@ -66,17 +66,15 @@ export default async function DesignPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto py-6">
-        <div className="app-container max-w-6xl">
-          <DesignForm
-            initialDesign={design}
-            corPrimaria={tenant.corPrimaria}
-            tenantNome={tenant.nome}
-            clubeNome={afiliacao?.nome ?? null}
-            clubeApelido={afiliacao?.apelido ?? null}
-            imagemUrls={imagemUrls}
-          />
-        </div>
+      <div className="flex-1 overflow-auto px-4 py-6">
+        <DesignForm
+          initialDesign={design}
+          corPrimaria={tenant.corPrimaria}
+          tenantNome={tenant.nome}
+          clubeNome={afiliacao?.nome ?? null}
+          clubeApelido={afiliacao?.apelido ?? null}
+          imagemUrls={imagemUrls}
+        />
       </div>
     </div>
   )
