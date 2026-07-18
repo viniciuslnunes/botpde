@@ -50,7 +50,7 @@ export function ComunidadeLayoutChrome({
         >
           <div className="sticky top-20 space-y-4">
             <ComunidadeSalasAside salas={salas} />
-            <ComunidadeChatPanel currentUserId={currentUserId} />
+            <ComunidadeChatPanel currentUserId={currentUserId} liveUpdates={showRail} />
           </div>
         </aside>
       ) : null}

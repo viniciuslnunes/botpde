@@ -19,11 +19,11 @@ export const SSE_HEADERS = {
   'X-Accel-Buffering': 'no',
 } as const
 
-const HEARTBEAT_MS = 12_000
+const HEARTBEAT_MS = 10_000
 /** Avisa o client para reconectar antes do proxy HTTP/2 cortar sujo. */
-const RECONNECT_SIGNAL_MS = 25_000
+const RECONNECT_SIGNAL_MS = 18_000
 /** Fecha o stream se o client não tiver saído após o sinal. */
-const MAX_STREAM_MS = 30_000
+const MAX_STREAM_MS = 22_000
 
 type SubscribeFn = (onPing: () => void) => () => void
 

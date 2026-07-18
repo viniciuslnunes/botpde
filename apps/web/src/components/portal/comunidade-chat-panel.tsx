@@ -44,6 +44,8 @@ function setStoredExpanded(value: boolean) {
 
 interface ComunidadeChatPanelProps {
   currentUserId: string
+  /** Quando false (rail oculta fora do feed), não abre SSE nem polling de inbox. */
+  liveUpdates?: boolean
 }
 
 type BloqueioInbox = 'nenhum' | 'cadastro_pendente' | 'sem_vinculo' | 'cadastro_reprovado'
@@ -59,7 +61,10 @@ function aplicarBloqueioResumo(data: {
   return 'nenhum'
 }
 
-export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps) {
+export function ComunidadeChatPanel({
+  currentUserId,
+  liveUpdates = true,
+}: ComunidadeChatPanelProps) {
   const expanded = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const [conversas, setConversas] = useState<InboxItemDto[]>([])
   const [naoLidas, setNaoLidas] = useState(0)
@@ -113,17 +118,18 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
   }, [])
 
   useEffect(() => {
+    if (!liveUpdates) return
     const timer = window.setTimeout(() => void carregarResumo(), 0)
     return () => window.clearTimeout(timer)
-  }, [carregarResumo])
+  }, [carregarResumo, liveUpdates])
 
   useVisibleInterval(() => {
     void carregarResumo()
-  }, 60_000, !expanded)
+  }, 60_000, liveUpdates && !expanded)
 
   useInboxStream(() => {
     void carregarResumo()
-  }, !expanded)
+  }, liveUpdates && !expanded)
 
   useEffect(() => {
     if (!expanded) return
