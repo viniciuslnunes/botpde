@@ -67,7 +67,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
     return [
       'flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-full transition-colors',
       active
-        ? 'text-[rgb(var(--primary))]'
+        ? 'text-[rgb(var(--color-primary-fg))]'
         : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
     ].join(' ')
   }
@@ -127,7 +127,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.04 }}
             transition={springSnappy}
-            className="mx-1 flex items-center justify-center rounded-full bg-[rgb(var(--primary))] text-white shadow-lg shadow-[rgb(var(--primary)_/_0.4)]"
+            className="mx-1 flex items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] shadow-lg shadow-[rgb(var(--primary)_/_0.4)]"
             style={{ height: '3.25rem', width: '3.25rem' }}
           >
             <Plus className="h-6 w-6" strokeWidth={2.5} />

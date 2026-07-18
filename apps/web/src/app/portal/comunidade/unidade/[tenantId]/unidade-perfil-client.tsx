@@ -89,7 +89,7 @@ export function UnidadePerfilClient({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
               {labelTipoUnidade(perfil.tipo)}
               {isPropriaUnidade && ' · Sua unidade'}
             </p>
@@ -153,7 +153,7 @@ export function UnidadePerfilClient({
                   disabled={pending || !conteudo.trim()}
                   whileTap={{ scale: 0.96 }}
                   transition={springSnappy}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
                 >
                   {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                   Publicar como unidade
@@ -194,7 +194,7 @@ export function UnidadePerfilClient({
                     className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
                   >
                     <div className="flex items-start gap-2">
-                      <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+                      <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-semibold text-[rgb(var(--foreground))]">{c.titulo}</h3>
@@ -247,7 +247,7 @@ export function UnidadePerfilClient({
                       href={`/portal/eventos/${ev.id}`}
                       className="flex items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
-                      <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+                      <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                       <div>
                         <p className="font-semibold text-[rgb(var(--foreground))]">{ev.titulo}</p>
                         <p className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -265,7 +265,7 @@ export function UnidadePerfilClient({
       </AnimatePresence>
 
       <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
-        <Link href={linkCanalComunidade(perfil.canalOficialId)} className="text-[rgb(var(--primary))] hover:underline">
+        <Link href={linkCanalComunidade(perfil.canalOficialId)} className="text-[rgb(var(--color-primary-fg))] hover:underline">
           Ver canal completo →
         </Link>
       </p>

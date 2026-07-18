@@ -169,7 +169,7 @@ export function PortalNavbar({
             >
               <MessageCircle className="h-4 w-4" />
               {unreadMessages > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1 text-[10px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] px-1 text-[10px] font-bold text-[rgb(var(--color-primary-on))]">
                   {unreadMessages > 99 ? '99+' : unreadMessages}
                 </span>
               )}
@@ -234,7 +234,7 @@ export function PortalNavbar({
                         onClick={() => setUserDropOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                       >
-                        <Shield className="h-4 w-4 text-[rgb(var(--primary))]" />
+                        <Shield className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
                         Área Admin
                       </Link>
                     )}
@@ -297,7 +297,7 @@ export function PortalNavbar({
                 <MessageCircle className="h-4 w-4" />
                 Mensagens
                 {unreadMessages > 0 && (
-                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-[11px] font-bold text-white">
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] px-1.5 text-[11px] font-bold text-[rgb(var(--color-primary-on))]">
                     {unreadMessages > 99 ? '99+' : unreadMessages}
                   </span>
                 )}
@@ -323,7 +323,7 @@ export function PortalNavbar({
                   href="/admin"
                   prefetch={false}
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--primary)_/_0.1)]"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.1)]"
                 >
                   <Shield className="h-4 w-4" />
                   Área Admin

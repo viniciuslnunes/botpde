@@ -47,7 +47,7 @@ export async function ComunidadeUserCardSection({
                 </p>
               )}
               {departamentosLabel && (
-                <p className="truncate text-[11px] text-[rgb(var(--primary))]">
+                <p className="truncate text-[11px] text-[rgb(var(--color-primary-fg))]">
                   {departamentosLabel}
                 </p>
               )}

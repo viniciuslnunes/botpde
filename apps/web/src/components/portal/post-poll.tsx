@@ -139,7 +139,7 @@ export function PostPoll({ enquete: enqueteInicial, isAuthor = false }: PostPoll
             onClick={encerrar}
             whileTap={{ scale: 0.95 }}
             transition={springSnappy}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--primary))]"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--color-primary-fg))]"
           >
             <Square className="h-3 w-3" />
             Encerrar

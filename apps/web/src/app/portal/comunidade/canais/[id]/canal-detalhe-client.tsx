@@ -73,7 +73,7 @@ export function CanalDetalheClient({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--primary))]">
+            <span className="inline-flex rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-0.5 text-[11px] font-semibold text-[rgb(var(--color-primary-fg))]">
               {canal.canalOficial ? 'Canal oficial' : 'Comunidade temática'}
             </span>
             <h1 className="mt-1.5 text-xl font-bold text-[rgb(var(--foreground))]">{canal.nome ?? 'Canal'}</h1>
@@ -94,7 +94,7 @@ export function CanalDetalheClient({
             {canal.canalOficial && (
               <Link
                 href={linkUnidadeComunidade(canal.tenantId)}
-                className="text-center text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="text-center text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Perfil da unidade
               </Link>
@@ -114,7 +114,7 @@ export function CanalDetalheClient({
                 onClick={inscrever}
                 whileTap={{ scale: 0.96 }}
                 transition={springSnappy}
-                className="rounded-full bg-[rgb(var(--primary))] px-4 py-1.5 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="rounded-full bg-[rgb(var(--color-primary))] px-4 py-1.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Inscrever
               </m.button>
@@ -141,7 +141,7 @@ export function CanalDetalheClient({
             disabled={pending || !conteudo.trim()}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Publicar

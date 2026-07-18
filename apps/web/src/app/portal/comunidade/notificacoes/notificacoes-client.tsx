@@ -138,7 +138,7 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
             disabled={pending}
             whileTap={{ scale: 0.98 }}
             transition={springSnappy}
-            className="text-xs font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-50"
+            className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-50"
           >
             {pending ? 'Marcando…' : 'Marcar todas como lidas'}
           </m.button>

@@ -321,7 +321,7 @@ export function ComunidadeSearchBar() {
                               onClick={() => setAberto(false)}
                               onMouseEnter={() => setAtivo(idx)}
                               className={[
-                                'inline-flex items-center gap-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--surface))]',
+                                'inline-flex items-center gap-1 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--surface))]',
                                 ativo === idx ? 'bg-[rgb(var(--surface))]' : '',
                               ].join(' ')}
                             >
@@ -380,7 +380,7 @@ export function ComunidadeSearchBar() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
                   transition={springSnappy}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--primary)_/_0.08)]"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--primary)_/_0.08)]"
                 >
                   Ver todos os resultados
                   <ArrowRight className="h-4 w-4" />

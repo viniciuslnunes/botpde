@@ -110,7 +110,7 @@ export function PerfilSobre({
           </div>
           <Link
             href="/portal/carteirinha"
-            className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+            className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Ver →
           </Link>

@@ -276,7 +276,7 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 transition-colors hover:border-[rgb(var(--border-strong))]"
     >
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
         <ExternalLink className="h-4 w-4" />
       </div>
       <div className="min-w-0">

@@ -45,10 +45,10 @@ export async function ComunidadeAsideWidgets({
         <MotionReveal index={widgetIndex++}>
           <Link
             href={`/portal/eventos/${proximoEvento.id}`}
-            className="block rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
+            className="block rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--color-primary)_/_0.5)]"
           >
             <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-              <Calendar className="h-4 w-4 text-[rgb(var(--primary))]" />
+              <Calendar className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
               Próximo evento
             </h2>
             <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">
@@ -78,7 +78,7 @@ export async function ComunidadeAsideWidgets({
                   rel="noopener noreferrer"
                   className="group block"
                 >
-                  <p className="line-clamp-2 text-xs font-medium text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--primary))]">
+                  <p className="line-clamp-2 text-xs font-medium text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
                     {n.titulo}
                   </p>
                   <p className="mt-0.5 truncate text-[11px] text-[rgb(var(--foreground-muted))]">
@@ -104,7 +104,7 @@ export async function ComunidadeAsideWidgets({
                 <Link
                   key={h.tag}
                   href={`/portal/comunidade/hashtag/${encodeURIComponent(h.tag)}`}
-                  className="rounded-full bg-[rgb(var(--primary)_/_0.08)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.15)]"
+                  className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.2)]"
                 >
                   #{h.tag}
                   <span className="ml-1 text-[10px] opacity-70">{h.total}</span>

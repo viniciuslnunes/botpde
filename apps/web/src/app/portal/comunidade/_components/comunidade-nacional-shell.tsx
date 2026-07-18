@@ -81,7 +81,7 @@ export async function ComunidadeNacionalShell({
           href="/portal/comunidade/classificacao"
           className="flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--primary)_/_0.5)]"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]">
             <ListOrdered className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">

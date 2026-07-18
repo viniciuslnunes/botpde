@@ -30,7 +30,7 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
       className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
     >
       <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-        <Video className="h-4 w-4 text-[rgb(var(--primary))]" />
+        <Video className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
         Abrir uma sala
       </h2>
 
@@ -80,7 +80,7 @@ export function CriarSalaForm({ eventos }: CriarSalaFormProps) {
           disabled={pending}
           whileTap={{ scale: pending ? 1 : 0.96 }}
           transition={springSnappy}
-          className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-xl bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-60"
         >
           {pending ? 'Criando…' : 'Criar sala'}
         </m.button>

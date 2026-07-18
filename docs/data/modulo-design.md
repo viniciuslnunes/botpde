@@ -72,11 +72,11 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
 4. Vars de texto legível: `--color-primary-fg` (alias `--primary-fg`),
    `--color-secondary-fg`, `--color-success-fg` / `--color-success-on`, …  
-   Soft/badge/menu/tab/nome em mensagem → `*-fg`; botão sólido → `*-on`
-   (`resolveActionTextColors`; override em `brandFg` / `actionsFg`).  
-   **Proibido** `text-[rgb(var(--primary))]` em texto sobre fundo escuro com
-   marca preta — some. Preenchimento sólido pode usar `--color-primary` +
-   `*-on` e ring com `*-fg` quando a marca é P&B.
+   Soft/badge/menu/tab/link/ícone → `*-fg` (também `.text-primary` /
+   `.bg-primary-soft` / `.btn-primary` em `globals.css`); botão sólido → `*-on`.  
+   **Proibido** `text-[rgb(var(--primary))]` ou fill crua em texto/ícone —
+   com marca preta some no escuro (ex.: “Ver todas”, “Diretoria”, ícone do
+   próximo evento).
 
 ## Sugestões de cor
 

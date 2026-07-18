@@ -143,7 +143,7 @@ export function ComunicadosSection({
             >
               <div className="flex flex-wrap items-center gap-2">
                 {a.fixado && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--primary))]">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
                     <Pin className="h-3.5 w-3.5" /> Fixado
                   </span>
                 )}

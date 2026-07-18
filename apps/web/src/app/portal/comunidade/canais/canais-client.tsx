@@ -76,7 +76,7 @@ export function CanaisClient({
             onClick={() => setCriando((v) => !v)}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
             Novo canal
@@ -127,7 +127,7 @@ export function CanaisClient({
             <button
               type="submit"
               disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
               Criar canal
@@ -157,7 +157,7 @@ export function CanaisClient({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={u.logoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.12)] text-sm font-bold text-[rgb(var(--primary))]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.12)] text-sm font-bold text-[rgb(var(--color-primary-fg))]">
                     {u.nome.charAt(0)}
                   </div>
                 )}
@@ -270,7 +270,7 @@ function CanalCard({
           onClick={() => onEntrar(canal.id)}
           whileTap={{ scale: 0.94 }}
           transition={springSnappy}
-          className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
         >
           Inscrever
         </m.button>

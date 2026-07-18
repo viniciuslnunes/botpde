@@ -21,7 +21,7 @@ export function ComunidadeSalasPanel({ salas }: ComunidadeSalasPanelProps) {
         </h2>
         <Link
           href="/portal/comunidade/salas"
-          className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+          className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Ver todas
         </Link>
@@ -37,7 +37,7 @@ export function ComunidadeSalasPanel({ salas }: ComunidadeSalasPanelProps) {
             <Link
               key={sala.id}
               href={`/portal/comunidade/salas/${sala.id}`}
-              className="block rounded-xl border border-[rgb(var(--border))] p-3 transition-colors hover:border-[rgb(var(--primary)_/_0.5)] hover:bg-[rgb(var(--background-subtle))]"
+              className="block rounded-xl border border-[rgb(var(--border))] p-3 transition-colors hover:border-[rgb(var(--color-primary)_/_0.5)] hover:bg-[rgb(var(--background-subtle))]"
             >
               <div className="flex items-center gap-2">
                 <Video className="h-3.5 w-3.5 shrink-0 text-red-500" />
@@ -50,7 +50,7 @@ export function ComunidadeSalasPanel({ salas }: ComunidadeSalasPanelProps) {
                   <Users className="h-3 w-3" />
                   {sala._count.participantes} online
                 </span>
-                <span className="rounded-full bg-[rgb(var(--primary))] px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.35)]">
                   Entrar
                 </span>
               </div>

@@ -280,7 +280,7 @@ export function PostEngagement({
           >
             {totalR > 0 && (
               <m.span layout className="inline-flex items-center gap-1">
-                <Heart className="h-3.5 w-3.5 fill-[rgb(var(--primary))] text-[rgb(var(--primary))]" />
+                <Heart className="h-3.5 w-3.5 fill-[rgb(var(--color-primary-fg))] text-[rgb(var(--color-primary-fg))]" />
                 {totalR}
               </m.span>
             )}
@@ -302,7 +302,7 @@ export function PostEngagement({
           className={[
             btnBase,
             reacao === 'CURTIR'
-              ? 'text-[rgb(var(--primary))]'
+              ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
@@ -361,7 +361,7 @@ export function PostEngagement({
           className={[
             btnBase,
             comentariosAbertos
-              ? 'text-[rgb(var(--primary))]'
+              ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
@@ -375,7 +375,7 @@ export function PostEngagement({
             className={[
               btnBase,
               repostando
-                ? 'text-[rgb(var(--primary))]'
+                ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
@@ -390,7 +390,7 @@ export function PostEngagement({
           className={[
             btnBase,
             salvo
-              ? 'text-[rgb(var(--primary))]'
+              ? 'text-[rgb(var(--color-primary-fg))]'
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
@@ -430,7 +430,7 @@ export function PostEngagement({
               disabled={pending}
               whileTap={{ scale: 0.96 }}
               transition={springSnappy}
-              className="shrink-0 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
             >
               Compartilhar
             </m.button>
@@ -568,7 +568,7 @@ export function PostEngagement({
                   whileTap={{ scale: 0.9 }}
                   transition={springSnappy}
                   aria-label="Enviar comentário"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
                 </m.button>

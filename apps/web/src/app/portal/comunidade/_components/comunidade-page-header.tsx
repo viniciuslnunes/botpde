@@ -33,7 +33,7 @@ export function ComunidadePageHeader({
         <ArrowLeft className="h-[18px] w-[18px]" />
       </Link>
 
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
         <Icon className="h-5 w-5" />
       </span>
 

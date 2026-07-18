@@ -17,7 +17,7 @@ export function ComunidadeFeedEmpty({ filtro }: ComunidadeFeedEmptyProps) {
         filtro === 'seguindo' ? (
           <>
             Siga membros da torcida para ver as publicações deles aqui, ou volte para{' '}
-            <Link href="/portal/comunidade" className="font-medium text-[rgb(var(--primary))] hover:underline">
+            <Link href="/portal/comunidade" className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
               Descobrir
             </Link>
             .

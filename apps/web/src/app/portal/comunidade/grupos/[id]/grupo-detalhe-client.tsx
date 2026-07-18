@@ -56,7 +56,7 @@ export function GrupoDetalheClient({
         transition={springSnappy}
         className="card-soft flex items-start gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
       >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-lg font-bold text-[rgb(var(--primary))]">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[rgb(var(--primary)_/_0.12)] text-lg font-bold text-[rgb(var(--color-primary-fg))]">
           {(grupo.nome ?? 'G').charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0">
@@ -114,7 +114,7 @@ export function GrupoDetalheClient({
                 disabled={pending || !conteudo.trim()}
                 whileTap={{ scale: 0.96 }}
                 transition={springSnappy}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Publicar

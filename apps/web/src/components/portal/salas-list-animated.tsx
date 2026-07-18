@@ -18,8 +18,8 @@ export function SalasListAnimated({ salas, canHost }: SalasListAnimatedProps) {
     return (
       <MotionEmptyState
         icon={
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)]">
-            <Video className="h-6 w-6 text-[rgb(var(--primary))]" />
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.1)]">
+            <Video className="h-6 w-6 text-[rgb(var(--color-primary-fg))]" />
           </div>
         }
         title="Nenhuma sala aberta agora"
@@ -51,7 +51,7 @@ export function SalasListAnimated({ salas, canHost }: SalasListAnimatedProps) {
               <div className="min-w-0">
                 <h3 className="truncate font-semibold text-[rgb(var(--foreground))]">{sala.titulo}</h3>
                 {sala.evento && (
-                  <span className="mt-1 inline-block rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--primary))]">
+                  <span className="mt-1 inline-block rounded-full bg-[rgb(var(--color-primary)_/_0.12)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
                     {sala.evento.titulo}
                   </span>
                 )}

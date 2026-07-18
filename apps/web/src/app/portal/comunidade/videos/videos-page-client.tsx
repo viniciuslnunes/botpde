@@ -38,7 +38,7 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
             className={[
               'relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               modo === 'reels'
-                ? 'text-[rgb(var(--primary))]'
+                ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -62,7 +62,7 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
             className={[
               'relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               modo === 'grid'
-                ? 'text-[rgb(var(--primary))]'
+                ? 'text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -85,7 +85,7 @@ export function VideosPageClient({ posts }: VideosPageClientProps) {
             onClick={() => setReelsFullscreen(true)}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             Tela cheia
           </m.button>

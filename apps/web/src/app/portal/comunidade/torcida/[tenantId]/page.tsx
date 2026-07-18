@@ -74,7 +74,7 @@ export default async function TorcidaComunidadePublicaPage({
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--primary))]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
               Publicações públicas
             </p>
             <h1 className="text-xl font-bold uppercase tracking-wide text-[rgb(var(--foreground))]">

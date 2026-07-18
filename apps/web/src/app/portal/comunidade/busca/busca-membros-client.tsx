@@ -228,7 +228,7 @@ export function BuscaMembrosClient() {
               <Link
                 key={h.tag}
                 href={`/portal/comunidade/hashtag/${encodeURIComponent(h.tag)}`}
-                className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--background-subtle))]"
+                className="rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 #{h.tag}
                 <span className="ml-1.5 text-xs text-[rgb(var(--foreground-muted))]">{h.total}</span>

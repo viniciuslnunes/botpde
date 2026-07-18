@@ -97,7 +97,7 @@ export function NotificationAvatar({
     return (
       <span
         aria-hidden="true"
-        className={`inline-flex ${circulo} shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]`}
+        className={`inline-flex ${circulo} shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]`}
       >
         <Icone className={icone} />
       </span>
@@ -109,7 +109,7 @@ export function NotificationAvatar({
       <Avatar nome={ator.nome} avatarUrl={ator.avatarUrl} size={size === 'sm' ? 'sm' : 'md'} />
       <span
         aria-hidden="true"
-        className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--primary))]"
+        className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--color-primary-fg))]"
       >
         <Icone className="h-2.5 w-2.5" />
       </span>

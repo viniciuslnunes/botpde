@@ -41,10 +41,11 @@
   --color-warning: 217 119 6;   /* #d97706 */
   --color-info: 37 99 235;      /* #2563eb */
 
-  /* Texto legível sobre tint da marca (badges / soft) — tema sobrescreve */
-  --color-primary-fg: var(--color-primary);
+  /* Texto legível sobre tint da marca (badges / soft) — tema sobrescreve.
+     NÃO usar var(--color-primary) aqui: com marca preta o texto some no escuro. */
+  --color-primary-fg: 91 33 182;
   --color-primary-on: 255 255 255;
-  --color-secondary-fg: var(--color-secondary);
+  --color-secondary-fg: 91 33 182;
   --color-secondary-on: 255 255 255;
   --primary-fg: var(--color-primary-fg);
   --secondary-fg: var(--color-secondary-fg);
@@ -74,6 +75,9 @@
   --border-strong: 63 63 70;         /* zinc-700 */
   --surface: 24 24 27;               /* zinc-900 */
   --surface-raised: 39 39 42;        /* zinc-800 */
+  /* Fallback legível no escuro até o bridge do tenant aplicar a marca */
+  --color-primary-fg: 196 181 253;
+  --color-secondary-fg: 196 181 253;
 }
 
 @theme inline {
@@ -103,14 +107,30 @@ body {
 .bg-primary {
   background-color: rgb(var(--color-primary));
 }
+/* Texto/ícone de marca — sempre legível (P&B no escuro). Nunca a fill crua. */
 .text-primary {
-  color: rgb(var(--color-primary));
+  color: rgb(var(--color-primary-fg));
 }
 .border-primary {
   border-color: rgb(var(--color-primary));
 }
 .ring-primary {
   --tw-ring-color: rgb(var(--color-primary) / 0.5);
+}
+.btn-primary {
+  background-color: rgb(var(--color-primary));
+  color: rgb(var(--color-primary-on));
+}
+.btn-primary:hover {
+  filter: brightness(0.92);
+}
+.bg-primary-soft {
+  background-color: rgb(var(--color-primary) / 0.14);
+  color: rgb(var(--color-primary-fg));
+}
+.badge-primary {
+  background-color: rgb(var(--color-primary) / 0.14);
+  color: rgb(var(--color-primary-fg));
 }
 
 /* Secundária — CTAs auxiliares, badges outline, destaques leves */
@@ -254,15 +274,13 @@ body {
   }
 }
 
-/* Modal de confirmação (DialogProvider) */
-@keyframes torcida-dialog-backdrop-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
+/* Modal de confirmação (DialogProvider)
+ *
+ * NÃO animar opacity no backdrop com fill-mode `both`: se a animação não
+ * rodar (aba em background, HMR, reduced-motion race), o overlay fica em
+ * opacity:0 com pointer-events ativos e “trava” a UI inteira — inclusive o
+ * sidebar do admin. O hit-target precisa ser sempre visível; anima só o painel.
+ */
 @keyframes torcida-dialog-panel-in {
   from {
     opacity: 0;
@@ -273,14 +291,10 @@ body {
     transform: translateY(0) scale(1);
   }
 }
-.torcida-dialog-backdrop {
-  animation: torcida-dialog-backdrop-in 160ms ease-out both;
-}
 .torcida-dialog-panel {
-  animation: torcida-dialog-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: torcida-dialog-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  .torcida-dialog-backdrop,
   .torcida-dialog-panel {
     animation: none;
   }

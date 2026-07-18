@@ -155,7 +155,7 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
           <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
           <span className="text-sm font-semibold text-[rgb(var(--foreground))]">Mensagens</span>
           {naoLidas > 0 && (
-            <span className="rounded-full bg-[rgb(var(--primary))] px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="rounded-full bg-[rgb(var(--color-primary))] px-1.5 py-0.5 text-[10px] font-bold text-[rgb(var(--color-primary-on))]">
               {naoLidas > 99 ? '99+' : naoLidas}
             </span>
           )}
@@ -171,7 +171,7 @@ export function ComunidadeChatPanel({ currentUserId }: ComunidadeChatPanelProps)
           prefetch={false}
           title="Abrir em tela cheia"
           aria-label="Abrir mensagens em tela cheia"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Link>

@@ -356,9 +356,9 @@ function ComposerBody({
   }
 
   const toolBtnClass =
-    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]'
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]'
   const toolBtnActiveClass =
-    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))] transition-colors'
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))] transition-colors'
 
   function insertEmoji(emoji: string) {
     const el = textareaRef.current
@@ -551,7 +551,7 @@ function ComposerBody({
             <button
               type="button"
               onClick={() => setOpcoes((prev) => [...prev, ''])}
-              className="text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+              className="text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
             >
               + Adicionar opção
             </button>
@@ -648,7 +648,7 @@ function ComposerBody({
           {/* Prévia do embed detectado */}
           {embedUrl && embedProvider && (
             <div className="mt-3 ml-[52px] flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2">
-              <Link2 className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+              <Link2 className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-[rgb(var(--foreground))]">
                   Publicação do {EMBED_HOSTS[embedProvider]}
@@ -770,7 +770,7 @@ function ComposerBody({
                     className={[
                       toolBtnClass,
                       extrasOpen || modoEnquete || modoEvento
-                        ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                        ? 'bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                         : '',
                     ].join(' ')}
                   >
@@ -835,7 +835,7 @@ function ComposerBody({
                           onClick={toggleEnquete}
                           className={[
                             'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                            modoEnquete ? 'font-medium text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground))]',
+                            modoEnquete ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
                           ].join(' ')}
                         >
                           <BarChart3 className="h-4 w-4 shrink-0" />
@@ -851,7 +851,7 @@ function ComposerBody({
                             onClick={toggleEvento}
                             className={[
                               'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                              modoEvento ? 'font-medium text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground))]',
+                              modoEvento ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
                             ].join(' ')}
                           >
                             <CalendarDays className="h-4 w-4 shrink-0" />
@@ -943,7 +943,7 @@ function ComposerBody({
               <button
                 type="submit"
                 disabled={!podePublicar}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
               >
                 {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 <span className="max-sm:sr-only">
