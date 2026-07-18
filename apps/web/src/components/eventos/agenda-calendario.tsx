@@ -5,6 +5,19 @@ import { useMemo, useState } from 'react'
 import { Bus, CalendarDays, ChevronLeft, ChevronRight, Clock, Drum, MapPin } from 'lucide-react'
 import type { TipoEvento } from '@torcida/db'
 import { TIPO_EVENTO_LABEL } from '@torcida/types'
+import {
+  addCalendarDays,
+  dayKeyInZone,
+  formatMonthYear,
+  formatTimeShort,
+  formatWeekdayLong,
+  parseDateOnly,
+  sameCalendarDay,
+  startOfMonthParts,
+  startOfWeekMonday,
+  todayPartsInZone,
+  type CalendarParts,
+} from '@/lib/format-datetime'
 
 export type AgendaCalItem = {
   id: string
@@ -14,43 +27,6 @@ export type AgendaCalItem = {
   href: string
   fotoUrl?: string | null
   local?: string | null
-}
-
-function startOfWeek(d: Date) {
-  const x = new Date(d)
-  const day = x.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  x.setDate(x.getDate() + diff)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1)
-}
-
-function sameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
-}
-
-function addDays(d: Date, n: number) {
-  const x = new Date(d)
-  x.setDate(x.getDate() + n)
-  return x
-}
-
-function dayKey(d: Date) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
-
-function horaLabel(iso: string) {
-  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(
-    new Date(iso),
-  )
 }
 
 const DIA_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
@@ -109,7 +85,7 @@ function EventoDiaCard({ e }: { e: AgendaCalItem }) {
           </span>
           <span className="inline-flex items-center gap-1 text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
             <Clock className="h-3 w-3 text-[rgb(var(--foreground-muted))]" />
-            {horaLabel(e.dataIso)}
+            {formatTimeShort(e.dataIso)}
           </span>
         </div>
         <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--primary))]">
@@ -136,9 +112,15 @@ function MesChip({ e }: { e: AgendaCalItem }) {
       className="flex items-center gap-1 truncate rounded-md bg-[rgb(var(--surface))] px-1 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${TIPO_DOT[tipo]}`} />
-      <span className="truncate">{horaLabel(e.dataIso)} {e.titulo}</span>
+      <span className="truncate">
+        {formatTimeShort(e.dataIso)} {e.titulo}
+      </span>
     </Link>
   )
+}
+
+function resolveInitialParts(dataRefIso?: string): CalendarParts {
+  return dataRefIso ? parseDateOnly(dataRefIso) : todayPartsInZone()
 }
 
 export function AgendaCalendario({
@@ -154,30 +136,27 @@ export function AgendaCalendario({
   basePath: string
   tipoFiltro?: string
 }) {
-  const initial = dataRefIso ? new Date(dataRefIso) : new Date()
-  const [cursor, setCursor] = useState(initial)
-  const [diaSelecionado, setDiaSelecionado] = useState(() => {
-    const base = dataRefIso ? new Date(dataRefIso) : new Date()
-    return startOfWeek(base)
-  })
+  const [cursor, setCursor] = useState(() => resolveInitialParts(dataRefIso))
+  const [diaSelecionado, setDiaSelecionado] = useState(() =>
+    startOfWeekMonday(resolveInitialParts(dataRefIso)),
+  )
 
-  const weekStart = useMemo(() => startOfWeek(cursor), [cursor])
+  const weekStart = useMemo(() => startOfWeekMonday(cursor), [cursor])
   const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)),
     [weekStart],
   )
 
   const monthDays = useMemo(() => {
-    const start = startOfMonth(cursor)
-    const gridStart = startOfWeek(start)
-    return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
+    const start = startOfMonthParts(cursor)
+    const gridStart = startOfWeekMonday(start)
+    return Array.from({ length: 42 }, (_, i) => addCalendarDays(gridStart, i))
   }, [cursor])
 
   const byDay = useMemo(() => {
     const map = new Map<string, AgendaCalItem[]>()
     for (const item of itens) {
-      const d = new Date(item.dataIso)
-      const key = dayKey(d)
+      const key = dayKeyInZone(item.dataIso)
       const list = map.get(key) ?? []
       list.push(item)
       map.set(key, list)
@@ -188,33 +167,37 @@ export function AgendaCalendario({
     return map
   }, [itens])
 
+  const hoje = todayPartsInZone()
+  const hojeKey = dayKeyInZone(hoje)
+
   // Mantém dia selecionado dentro da semana visível
   const diaAtivo = useMemo(() => {
-    const inWeek = weekDays.some((d) => sameDay(d, diaSelecionado))
+    const inWeek = weekDays.some((d) => sameCalendarDay(d, diaSelecionado))
     if (inWeek) return diaSelecionado
-    const hoje = new Date()
-    const hojeNaSemana = weekDays.find((d) => sameDay(d, hoje))
+    const hojeParts = todayPartsInZone()
+    const hojeNaSemana = weekDays.find((d) => sameCalendarDay(d, hojeParts))
     return hojeNaSemana ?? weekDays[0]!
-  }, [weekDays, diaSelecionado])
+  }, [weekDays, diaSelecionado, hojeKey])
 
-  const eventosDoDia = byDay.get(dayKey(diaAtivo)) ?? []
+  const eventosDoDia = byDay.get(dayKeyInZone(diaAtivo)) ?? []
 
   function nav(delta: number) {
     setCursor((c) => {
-      const n = new Date(c)
-      if (vista === 'semana') n.setDate(n.getDate() + delta * 7)
-      else n.setMonth(n.getMonth() + delta)
-      return n
+      if (vista === 'semana') return addCalendarDays(c, delta * 7)
+      const monthIndex = c.month - 1 + delta
+      const year = c.year + Math.floor(monthIndex / 12)
+      const month = ((monthIndex % 12) + 12) % 12
+      return { year, month: month + 1, day: 1 }
     })
     if (vista === 'semana') {
-      setDiaSelecionado((d) => addDays(d, delta * 7))
+      setDiaSelecionado((d) => addCalendarDays(d, delta * 7))
     }
   }
 
-  const mesTitulo = cursor.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  const mesTitulo = formatMonthYear(cursor)
 
-  function hrefComData(d: Date) {
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  function hrefComData(d: CalendarParts) {
+    const iso = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
     const params = new URLSearchParams()
     params.set('vista', vista)
     params.set('data', iso)
@@ -228,7 +211,7 @@ export function AgendaCalendario({
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-4 sm:px-5">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              {cursor.getFullYear()}
+              {cursor.year}
             </p>
             <h2 className="text-2xl font-bold capitalize tracking-tight text-[rgb(var(--foreground))]">
               {mesTitulo}
@@ -257,10 +240,10 @@ export function AgendaCalendario({
         <div className="border-b border-[rgb(var(--border))] px-3 py-3 sm:px-4">
           <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {weekDays.map((day, i) => {
-              const key = dayKey(day)
+              const key = dayKeyInZone(day)
               const count = byDay.get(key)?.length ?? 0
-              const ativo = sameDay(day, diaAtivo)
-              const hoje = sameDay(day, new Date())
+              const ativo = sameCalendarDay(day, diaAtivo)
+              const isHoje = sameCalendarDay(day, hoje)
               return (
                 <button
                   key={key}
@@ -282,7 +265,7 @@ export function AgendaCalendario({
                     {DIA_LABEL[i]}
                   </span>
                   <span className="mt-0.5 text-lg font-bold tabular-nums sm:text-xl">
-                    {day.getDate()}
+                    {day.day}
                   </span>
                   <span
                     className={[
@@ -291,7 +274,7 @@ export function AgendaCalendario({
                         ? 'bg-transparent'
                         : ativo
                           ? 'bg-white'
-                          : hoje
+                          : isHoje
                             ? 'bg-[rgb(var(--primary))]'
                             : 'bg-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
@@ -306,11 +289,7 @@ export function AgendaCalendario({
         <div className="space-y-3 p-4 sm:p-5">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold capitalize text-[rgb(var(--foreground))]">
-              {diaAtivo.toLocaleDateString('pt-BR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
+              {formatWeekdayLong(diaAtivo)}
             </h3>
             <p className="text-xs tabular-nums text-[rgb(var(--foreground-muted))]">
               {eventosDoDia.length === 0
@@ -351,7 +330,7 @@ export function AgendaCalendario({
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-            {cursor.getFullYear()}
+            {cursor.year}
           </p>
           <h2 className="text-xl font-bold capitalize tracking-tight text-[rgb(var(--foreground))] sm:text-2xl">
             {mesTitulo}
@@ -386,10 +365,10 @@ export function AgendaCalendario({
       </div>
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {monthDays.map((day) => {
-          const key = dayKey(day)
+          const key = dayKeyInZone(day)
           const events = byDay.get(key) ?? []
-          const inMonth = day.getMonth() === cursor.getMonth()
-          const hoje = sameDay(day, new Date())
+          const inMonth = day.month === cursor.month
+          const isHoje = sameCalendarDay(day, hoje)
           return (
             <div
               key={key}
@@ -398,19 +377,19 @@ export function AgendaCalendario({
                 inMonth
                   ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.35)]'
                   : 'border-transparent opacity-35',
-                hoje ? 'ring-1 ring-[rgb(var(--primary))]' : '',
+                isHoje ? 'ring-1 ring-[rgb(var(--primary))]' : '',
               ].join(' ')}
             >
               <Link
                 href={hrefComData(day)}
                 className={[
                   'mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold',
-                  hoje
+                  isHoje
                     ? 'bg-[rgb(var(--primary))] text-white'
                     : 'text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >
-                {day.getDate()}
+                {day.day}
               </Link>
               <ul className="space-y-0.5">
                 {events.slice(0, 2).map((e) => (
