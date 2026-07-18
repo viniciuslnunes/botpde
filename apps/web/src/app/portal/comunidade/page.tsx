@@ -59,7 +59,12 @@ export default async function ComunidadePage({
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <ComunidadeFeedShell
-        tenant={{ id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId }}
+        tenant={{
+          id: tenant.id,
+          nome: tenant.nome,
+          afiliacaoId: tenant.afiliacaoId,
+          balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
+        }}
         currentUser={currentUser}
         cursor={params.cursor}
         filtro={filtro}

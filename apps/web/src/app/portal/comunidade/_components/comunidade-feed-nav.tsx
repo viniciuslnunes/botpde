@@ -22,10 +22,12 @@ export async function ComunidadeFeedNav({
   tenantId,
   userId,
   currentUserId,
+  mostrarBalanco = false,
 }: {
   tenantId: string
   userId: string
   currentUserId: string
+  mostrarBalanco?: boolean
 }) {
   const badges = await getResumoBadgesComunidade(tenantId, userId)
 
@@ -34,6 +36,7 @@ export async function ComunidadeFeedNav({
       currentUserId={currentUserId}
       notificacoesNaoLidas={badges.notificacoesNaoLidas}
       solicitacoesPendentes={badges.solicitacoesPendentes}
+      mostrarBalanco={mostrarBalanco}
     />
   )
 }

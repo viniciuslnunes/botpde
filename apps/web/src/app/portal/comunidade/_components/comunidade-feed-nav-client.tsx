@@ -13,6 +13,7 @@ import {
   Bell,
   Radio,
   ListOrdered,
+  Scale,
   type LucideIcon,
 } from 'lucide-react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
@@ -33,10 +34,13 @@ export function ComunidadeFeedNavClient({
   currentUserId,
   notificacoesNaoLidas = 0,
   solicitacoesPendentes = 0,
+  mostrarBalanco = false,
 }: {
   currentUserId: string
   notificacoesNaoLidas?: number
   solicitacoesPendentes?: number
+  /** Prestação de contas pública — só quando o Presidente publicou o balanço. */
+  mostrarBalanco?: boolean
 }) {
   const pathname = usePathname()
 
@@ -49,6 +53,9 @@ export function ComunidadeFeedNavClient({
     { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users },
     { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio },
     { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
+    ...(mostrarBalanco
+      ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
+      : []),
     {
       href: '/portal/comunidade/notificacoes',
       label: 'Notificações',
