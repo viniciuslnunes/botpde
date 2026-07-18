@@ -43,6 +43,7 @@ import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-anim
 import { Avatar } from '@/components/portal/avatar'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { springSnappy } from '@/lib/motion-presets'
+import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import type {
   GrupoDetalheItem,
   MembroGrupoItem,
@@ -58,20 +59,65 @@ interface CurrentUser {
 
 type GrupoAba = 'mural' | 'membros' | 'pedidos' | 'sobre' | 'config'
 
+interface PageInfo {
+  hasMore: boolean
+  nextCursor: string | null
+}
+
 interface GrupoDetalheClientProps {
   grupo: GrupoDetalheItem
   posts: PostSocialItem[]
+  pageInfo: PageInfo
   salvoIds: string[]
   currentUser: CurrentUser
-  pedidos: MembroGrupoPendenteItem[]
-  membros: MembroGrupoItem[]
+  /** null = aba ainda não carregada no servidor */
+  pedidos: MembroGrupoPendenteItem[] | null
+  membros: MembroGrupoItem[] | null
   tabInicial?: GrupoAba
+}
+
+function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
+  return {
+    id: preview.id,
+    tenantId: preview.tenantId,
+    titulo: null,
+    conteudo: preview.conteudo,
+    imagemUrl: preview.midiaUrls[0] ?? null,
+    midiaUrls: preview.midiaUrls,
+    tipo: 'MEMBRO',
+    visibilidade: preview.visibilidade,
+    fixado: false,
+    criadoEm: new Date(preview.criadoEm),
+    autorId: preview.autor.id,
+    postOrigemId: null,
+    comunicadoOrigemId: null,
+    eventoId: null,
+    tenant: { nome: preview.tenantNome },
+    autor: {
+      id: preview.autor.id,
+      nome: preview.autor.nome,
+      nickname: null,
+      avatarUrl: preview.autor.avatarUrl,
+      sedeNome: null,
+      cargoNome: null,
+      departamentoNome: null,
+    },
+    totalReacoes: 0,
+    totalComentarios: 0,
+    minhaReacao: null,
+    postOrigem: null,
+    comunicadoOrigem: null,
+    evento: null,
+    enquete: null,
+    grupo: null,
+  }
 }
 
 export function GrupoDetalheClient({
   grupo: grupoInicial,
   posts: postsIniciais,
-  salvoIds,
+  pageInfo: pageInfoInicial,
+  salvoIds: salvoIdsIniciais,
   currentUser,
   pedidos: pedidosIniciais,
   membros: membrosIniciais,
@@ -82,7 +128,10 @@ export function GrupoDetalheClient({
   const [grupo, setGrupo] = useState(grupoInicial)
   const [pedidos, setPedidos] = useState(pedidosIniciais)
   const [membros, setMembros] = useState(membrosIniciais)
-  const [aba, setAba] = useState<GrupoAba>(grupoInicial.souMembro ? tabInicial : 'sobre')
+  const [aba, setAba] = useState<GrupoAba>(tabInicial)
+  const [posts, setPosts] = useState(postsIniciais)
+  const [pageInfo, setPageInfo] = useState(pageInfoInicial)
+  const [salvoIds] = useState(salvoIdsIniciais)
   const [conteudo, setConteudo] = useState('')
   const [nomeEdit, setNomeEdit] = useState(grupoInicial.nome ?? '')
   const [descEdit, setDescEdit] = useState(grupoInicial.descricao ?? '')
@@ -91,20 +140,66 @@ export function GrupoDetalheClient({
   const [codigoConvite, setCodigoConvite] = useState(grupoInicial.codigoConvite)
   const [somenteAdminEdit, setSomenteAdminEdit] = useState(grupoInicial.somenteAdminPublica)
   const [pending, startTransition] = useTransition()
+  const [publicando, startPublicar] = useTransition()
+  const [carregandoMais, setCarregandoMais] = useState(false)
+
+  function irParaAba(id: GrupoAba) {
+    setAba(id)
+    const url = new URL(window.location.href)
+    if (id === 'mural') url.searchParams.delete('tab')
+    else url.searchParams.set('tab', id)
+    router.replace(url.pathname + url.search, { scroll: false })
+  }
 
   function publicar(e: React.FormEvent) {
     e.preventDefault()
     if (!conteudo.trim()) return
-    startTransition(async () => {
-      const result = await publicarPostGrupo(grupo.id, conteudo.trim())
+    const texto = conteudo.trim()
+    setConteudo('')
+    startPublicar(async () => {
+      const result = await publicarPostGrupo(grupo.id, texto)
       if (!result.success) {
+        setConteudo(texto)
         toast.error(result.message ?? 'Não foi possível publicar.')
         return
       }
-      setConteudo('')
+      if (result.preview) {
+        const novo = previewParaPostSocial(result.preview)
+        setPosts((prev) => [novo, ...prev.filter((p) => p.id !== novo.id)])
+      }
       toast.success('Publicado no mural!')
-      router.refresh()
     })
+  }
+
+  async function carregarMais() {
+    if (!pageInfo.nextCursor || carregandoMais) return
+    setCarregandoMais(true)
+    try {
+      const url = new URL(
+        `/api/comunidade/grupos/${grupo.id}/posts`,
+        window.location.origin,
+      )
+      url.searchParams.set('cursor', pageInfo.nextCursor)
+      url.searchParams.set('take', '20')
+      const res = await fetch(url.toString(), { credentials: 'include' })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? 'Erro ao carregar mais posts.')
+      }
+      const data = (await res.json()) as {
+        posts: PostSocialItem[]
+        pageInfo: PageInfo
+      }
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id))
+        return [...prev, ...data.posts.filter((p) => !seen.has(p.id))]
+      })
+      setPageInfo(data.pageInfo)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Não foi possível carregar mais.')
+    } finally {
+      setCarregandoMais(false)
+    }
   }
 
   function entrar() {
@@ -112,6 +207,7 @@ export function GrupoDetalheClient({
       try {
         await entrarGrupoPublico(grupo.id)
         toast.success('Você entrou no grupo!')
+        router.replace(`/portal/comunidade/grupos/${grupo.id}`)
         router.refresh()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível entrar.')
@@ -160,12 +256,12 @@ export function GrupoDetalheClient({
     startTransition(async () => {
       try {
         await decidirPedidoGrupo(grupo.id, userId, aprovar)
-        const pedido = pedidos.find((p) => p.userId === userId)
-        setPedidos((prev) => prev.filter((p) => p.userId !== userId))
+        const pedido = (pedidos ?? []).find((p) => p.userId === userId)
+        setPedidos((prev) => (prev ?? []).filter((p) => p.userId !== userId))
         if (aprovar && pedido) {
           setGrupo((g) => ({ ...g, membros: g.membros + 1 }))
           setMembros((prev) => [
-            ...prev,
+            ...(prev ?? []),
             {
               userId: pedido.userId,
               nome: pedido.nome,
@@ -177,7 +273,6 @@ export function GrupoDetalheClient({
           ])
         }
         toast.success(aprovar ? 'Pedido aprovado.' : 'Pedido recusado.')
-        router.refresh()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível decidir.')
       }
@@ -189,10 +284,9 @@ export function GrupoDetalheClient({
     startTransition(async () => {
       try {
         await removerMembroGrupo(grupo.id, userId)
-        setMembros((prev) => prev.filter((m) => m.userId !== userId))
+        setMembros((prev) => (prev ?? []).filter((m) => m.userId !== userId))
         setGrupo((g) => ({ ...g, membros: Math.max(0, g.membros - 1) }))
         toast.success('Membro removido.')
-        router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
       }
@@ -203,13 +297,14 @@ export function GrupoDetalheClient({
     startTransition(async () => {
       try {
         await alterarPapelGrupo(grupo.id, userId, papel)
-        setMembros((prev) => prev.map((m) => (m.userId === userId ? { ...m, papel } : m)))
+        setMembros((prev) =>
+          (prev ?? []).map((m) => (m.userId === userId ? { ...m, papel } : m)),
+        )
         if (userId === currentUser.id) {
           setGrupo((g) => ({ ...g, souAdmin: papel === 'ADMIN' }))
-          if (papel === 'MEMBRO') setAba('membros')
+          if (papel === 'MEMBRO') irParaAba('membros')
         }
         toast.success(papel === 'ADMIN' ? 'Administrador adicionado.' : 'Admin removido.')
-        router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível alterar.')
       }
@@ -223,7 +318,6 @@ export function GrupoDetalheClient({
         setCodigoConvite(codigo)
         setGrupo((g) => ({ ...g, codigoConvite: codigo }))
         toast.success('Link de convite gerado.')
-        router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível gerar.')
       }
@@ -238,7 +332,6 @@ export function GrupoDetalheClient({
         setCodigoConvite(null)
         setGrupo((g) => ({ ...g, codigoConvite: null }))
         toast.success('Convite revogado.')
-        router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível revogar.')
       }
@@ -275,7 +368,6 @@ export function GrupoDetalheClient({
           somenteAdminPublica: somenteAdminEdit,
         }))
         toast.success('Configurações salvas.')
-        router.refresh()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.')
       }
@@ -300,7 +392,6 @@ export function GrupoDetalheClient({
       })
       setGrupo((g) => ({ ...g, avatarUrl: url }))
       toast.success('Foto do grupo atualizada.')
-      router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Falha no upload.')
     } finally {
@@ -321,7 +412,6 @@ export function GrupoDetalheClient({
       })
       setGrupo((g) => ({ ...g, avatarUrl: null }))
       toast.success('Foto removida.')
-      router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
     } finally {
@@ -329,6 +419,7 @@ export function GrupoDetalheClient({
     }
   }
 
+  const pedidosCount = pedidos?.length ?? 0
   const tabs = grupo.souMembro
     ? [
         { kind: 'button' as const, id: 'mural', label: 'Mural' },
@@ -342,14 +433,14 @@ export function GrupoDetalheClient({
         {
           kind: 'button' as const,
           id: 'membros',
-          label: `Membros${membros.length > 0 ? ` (${membros.length})` : ''}`,
+          label: `Membros (${grupo.membros})`,
         },
         ...(grupo.souAdmin
           ? [
               {
                 kind: 'button' as const,
                 id: 'pedidos',
-                label: pedidos.length > 0 ? `Pedidos (${pedidos.length})` : 'Pedidos',
+                label: pedidosCount > 0 ? `Pedidos (${pedidosCount})` : 'Pedidos',
               },
             ]
           : []),
@@ -462,7 +553,7 @@ export function GrupoDetalheClient({
         activeId={aba}
         onTabChange={(id) => {
           if (id === 'chat') return
-          setAba(id as GrupoAba)
+          irParaAba(id as GrupoAba)
         }}
         items={tabs}
       />
@@ -504,7 +595,12 @@ export function GrupoDetalheClient({
             transition={springSnappy}
             className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
           >
-            {membros.length === 0 ? (
+            {membros === null ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-[rgb(var(--foreground-muted))]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando membros…
+              </div>
+            ) : membros.length === 0 ? (
               <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhum membro ativo.</p>
             ) : (
               <ul className="divide-y divide-[rgb(var(--border))]">
@@ -565,7 +661,12 @@ export function GrupoDetalheClient({
                 Pedidos de entrada
               </h2>
             </div>
-            {pedidos.length === 0 ? (
+            {pedidos === null ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-[rgb(var(--foreground-muted))]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando pedidos…
+              </div>
+            ) : pedidos.length === 0 ? (
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 Nenhum pedido pendente. Em grupos privados, solicitações aparecem aqui.
               </p>
@@ -798,8 +899,8 @@ export function GrupoDetalheClient({
                 </p>
               </div>
               <ul className="divide-y divide-[rgb(var(--border))] rounded-xl border border-[rgb(var(--border))]">
-                {membros.map((membro) => {
-                  const admins = membros.filter((m) => m.papel === 'ADMIN').length
+                {(membros ?? []).map((membro) => {
+                  const admins = (membros ?? []).filter((m) => m.papel === 'ADMIN').length
                   const podeRebaixar = membro.papel === 'ADMIN' && admins > 1
                   return (
                     <li key={membro.userId} className="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -859,12 +960,12 @@ export function GrupoDetalheClient({
                 />
                 <m.button
                   type="submit"
-                  disabled={pending || !conteudo.trim()}
+                  disabled={publicando || !conteudo.trim()}
                   whileTap={{ scale: 0.96 }}
                   transition={springSnappy}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {publicando && <Loader2 className="h-4 w-4 animate-spin" />}
                   Publicar
                 </m.button>
               </form>
@@ -875,13 +976,33 @@ export function GrupoDetalheClient({
             )}
 
             <ComunidadePostsAnimated
-              posts={postsIniciais}
+              posts={posts}
               currentUser={currentUser}
               salvoIds={salvoIds}
               podeModerarGrupo={grupo.souAdmin}
               emptyTitle="Nenhuma publicação no mural ainda."
-              emptyDescription="Seja o primeiro!"
+              emptyDescription={
+                grupo.somenteAdminPublica && !grupo.souAdmin
+                  ? 'Aguarde uma publicação dos administradores.'
+                  : 'Seja o primeiro a publicar!'
+              }
             />
+
+            {pageInfo.hasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  disabled={carregandoMais}
+                  onClick={() => void carregarMais()}
+                  className="inline-flex items-center gap-2 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+                >
+                  {carregandoMais ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  {carregandoMais ? 'Carregando…' : 'Carregar mais'}
+                </button>
+              </div>
+            )}
           </m.div>
         )}
       </AnimatePresence>

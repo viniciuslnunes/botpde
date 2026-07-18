@@ -356,6 +356,43 @@ export function postInclude(userId?: string) {
   } as const
 }
 
+/**
+ * Include enxuto para mural de grupo — sem comunicado/evento (raros no mural).
+ * Mantém engajamento, enquete e repost.
+ */
+export function postIncludeGrupo(userId?: string) {
+  return {
+    tenant: { select: { nome: true } },
+    autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+    postOrigem: {
+      select: {
+        id: true,
+        conteudo: true,
+        oculto: true,
+        midiaUrls: true,
+        autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+      },
+    },
+    enquete: {
+      select: {
+        id: true,
+        encerradaEm: true,
+        opcoes: {
+          orderBy: { ordem: 'asc' as const },
+          select: { id: true, texto: true, _count: { select: { votos: true } } },
+        },
+        votos: userId
+          ? { where: { userId }, select: { opcaoId: true }, take: 1 }
+          : ({ where: { id: '' }, select: { opcaoId: true }, take: 1 } as const),
+      },
+    },
+    _count: { select: { reacoes: true, comentarios: true } },
+    reacoes: userId
+      ? { where: { userId }, select: { tipo: true }, take: 1 }
+      : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
+  } as const
+}
+
 interface FeedCursor {
   id: string
   criadoEmIso: string
@@ -1590,22 +1627,50 @@ export async function getPostsDoGrupo(
   conversaId: string,
   tenantId: string,
   userId: string,
-): Promise<PostSocialItem[]> {
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+
   const membro: { id: string } | null = await db.membroConversa.findFirst({
     where: { conversaId, ...filtroMembroGrupoAtivo(userId) },
     select: { id: true },
   })
-  if (!membro) return []
+  if (!membro) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
+
+  const grupo: { id: string } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tenantId, tipo: 'GRUPO', comunidade: true },
+    select: { id: true },
+  })
+  if (!grupo) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
 
   const postsRaw = (await db.post.findMany({
-    where: { conversaId, tenantId, oculto: false },
-    orderBy: { criadoEm: 'desc' },
-    take: 50,
-    include: postInclude(userId),
+    where: {
+      conversaId,
+      tenantId,
+      oculto: false,
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postIncludeGrupo(userId),
   })) as PostRaw[]
 
-  const posts = postsRaw.map(projetarPost)
-  return finalizarPosts(posts)
+  const hasMore = postsRaw.length > take
+  const pagina = await finalizarPosts(postsRaw.slice(0, take).map(projetarPost))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
 }
 
 /**
@@ -1650,6 +1715,20 @@ export const getPostsDosMeusGrupos = cache(async function getPostsDosMeusGrupos(
 export async function getPostIdsSalvos(userId: string, tenantId: string): Promise<Set<string>> {
   const rows: Array<{ postId: string }> = await db.postSalvo.findMany({
     where: { userId, tenantId },
+    select: { postId: true },
+  })
+  return new Set(rows.map((r) => r.postId))
+}
+
+/** Salvos só dos posts já carregados na página (evita set completo do tenant). */
+export async function getPostIdsSalvosParaPosts(
+  userId: string,
+  tenantId: string,
+  postIds: string[],
+): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set()
+  const rows: Array<{ postId: string }> = await db.postSalvo.findMany({
+    where: { userId, tenantId, postId: { in: postIds } },
     select: { postId: true },
   })
   return new Set(rows.map((r) => r.postId))

@@ -6,7 +6,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import {
   getGrupoPorId,
   getPostsDoGrupo,
-  getPostIdsSalvos,
+  getPostIdsSalvosParaPosts,
   getPedidosPendentesGrupo,
   getMembrosGrupo,
 } from '@/lib/feed'
@@ -39,15 +39,38 @@ export default async function GrupoDetalhePage({
   if (!grupo) notFound()
 
   const tabInicial = parseTab(tab)
+  // Não-membro só vê Sobre; força a aba e evita queries de mural/membros.
+  const abaEfetiva: GrupoTab = grupo.souMembro ? tabInicial : 'sobre'
 
-  const [posts, salvoIds, pedidos, membros] = await Promise.all([
-    grupo.souMembro ? getPostsDoGrupo(id, tenant.id, session.user.id) : Promise.resolve([]),
-    getPostIdsSalvos(session.user.id, tenant.id),
-    grupo.souAdmin
+  const carregarMural = grupo.souMembro && abaEfetiva === 'mural'
+  const carregarMembros =
+    grupo.souMembro && (abaEfetiva === 'membros' || abaEfetiva === 'config')
+  const carregarPedidos = grupo.souAdmin && abaEfetiva === 'pedidos'
+
+  const [mural, membros, pedidos] = await Promise.all([
+    carregarMural
+      ? getPostsDoGrupo(id, tenant.id, session.user.id, { take: 20 })
+      : Promise.resolve({
+          posts: [],
+          pageInfo: { hasMore: false, nextCursor: null as string | null },
+        }),
+    carregarMembros
+      ? getMembrosGrupo(id, tenant.id, session.user.id)
+      : Promise.resolve(null),
+    carregarPedidos
       ? getPedidosPendentesGrupo(id, tenant.id, session.user.id)
-      : Promise.resolve([]),
-    grupo.souMembro ? getMembrosGrupo(id, tenant.id, session.user.id) : Promise.resolve([]),
+      : Promise.resolve(null),
   ])
+
+  const salvoIds = carregarMural
+    ? [
+        ...(await getPostIdsSalvosParaPosts(
+          session.user.id,
+          tenant.id,
+          mural.posts.map((p) => p.id),
+        )),
+      ]
+    : []
 
   return (
     <div className="space-y-4">
@@ -60,12 +83,14 @@ export default async function GrupoDetalhePage({
       </Link>
 
       <GrupoDetalheClient
+        key={`${id}-${abaEfetiva}`}
         grupo={grupo}
-        posts={posts}
-        salvoIds={[...salvoIds]}
+        posts={mural.posts}
+        pageInfo={mural.pageInfo}
+        salvoIds={salvoIds}
         pedidos={pedidos}
         membros={membros}
-        tabInicial={tabInicial}
+        tabInicial={abaEfetiva}
         currentUser={{
           id: session.user.id,
           nome: session.user.name ?? null,
