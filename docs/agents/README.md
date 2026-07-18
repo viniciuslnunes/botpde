@@ -141,6 +141,22 @@ Agentes: `product-strategy`, `data-model`, `research-dominio`, `implementation`,
 `ux-review`, `qa-verification`, `rbac`.
 
 
+## StickyPersistBar — some ao limpar dirty (2026-07-17)
+
+Inteligência da barra Salvar/Cancelar compartilhada (admin Design, loja, sedes,
+config/departamentos, onboarding).
+
+| Regra | Detalhe |
+|-------|---------|
+| Dirty / pending | `locked` → barra sempre visível, borda de destaque |
+| Limpo no load | Oculta; scroll pode mostrar; idle/clique fora → some |
+| Sair de locked | Salvar, Descartar ou **reverter campos ao baseline** → **some na hora** |
+| Anti-padrão | Ficar no visual cinza (unlocked) com hint/Ctrl+S sumidos e CTAs disabled |
+| Fix | `setVisible(false)` ao destravar em `use-persist-bar-visibility.ts`; limpar `focusLocked` em `StickyPersistBar` quando `locked` vira false |
+| Doc | `docs/frontend/motion.md` § barra; `docs/data/modulo-design.md` § estúdio |
+
+Agentes: `ux-review`, `implementation`, `qa-verification`.
+
 ## Benchmark competitivo (gestão de torcidas) — 2026-07-16
 
 Inteligência de mercado em `docs/knowledge/concorrentes-gestao.md` (TorcidaWeb,

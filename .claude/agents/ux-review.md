@@ -69,6 +69,10 @@ comunicar validação real (não placeholder decorativo).
   visível. Detalhe: mapa se houver lat/lng; card da partida se vinculada;
   check-in QR com feedback de fila offline. Vocabulário: caravana/ensaio/jogo.
   Ver `docs/data/modulo-eventos.md`.
+- **StickyPersistBar** (admin Design, loja, sedes, config, onboarding — **não**
+  Comunidade): dirty → aparece; ao reverter ao baseline / Descartar / salvar →
+  **some na hora**. Regressão: barra cinza com botões disabled e texto/atalho
+  sumidos. Ver `docs/frontend/motion.md` e `docs/data/modulo-design.md`.
 - Consistência com `@torcida/ui` e tokens; não introduzir estilos soltos.
 - Salas (Meet): lista/lobby, grid de chamada, chat, enquetes, presença e o gesto de
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho

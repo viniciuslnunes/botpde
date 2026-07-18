@@ -20,6 +20,8 @@ type Options = {
  * Regra (admin / departamentos / loja / onboarding — não comunidade):
  * — sem alterações: começa oculta; scroll → aparece; idle ou clique fora → some
  * — `locked` (dirty / pending / foco) → sempre visível
+ * — ao sair de `locked` (salvar / descartar / reverter ao baseline) → some na hora
+ *   (não permanece no estado “cinza” com botões disabled)
  *
  * Scroll: listeners `passive` + rAF (mesmo padrão de `useScrollChromeVisibility`).
  */
@@ -36,6 +38,10 @@ export function usePersistBarVisibility(options: Options = {}): boolean {
       setVisible(true)
       return
     }
+
+    // Saiu do locked: esconde imediatamente. Sem isso a barra fica no visual
+    // “unlocked” (borda neutra, hint/atalho sumidos, CTAs disabled) até idle/clique.
+    setVisible(false)
 
     let lastY = window.scrollY
     let ticking = false

@@ -544,8 +544,11 @@ banner/busca/painel lateral):**
 - **Scroll chrome com rAF-throttle**: listeners de scroll sempre `passive`,
   coalescidos por `requestAnimationFrame` (nunca `setState` cru no handler de
   scroll). Referência: `use-scroll-chrome-visibility.ts` (Comunidade) e
-  `use-persist-bar-visibility.ts` + `StickyPersistBar` (admin/loja/onboarding —
-  Salvar/Cancelar fixos; **não** na Comunidade).
+  `use-persist-bar-visibility.ts` + `StickyPersistBar` (admin/loja/onboarding/
+  design — Salvar/Cancelar fixos; **não** na Comunidade). Ao sair de `locked`
+  (dirty→limpo: salvar, descartar ou reverter campos), a barra **some na hora**
+  (`setVisible(false)`); não permanece no visual unlocked/cinza. Detalhe em
+  `docs/frontend/motion.md`.
 
 **Alerta de anti-padrão — fan-out N+1 em checagens por item:** checagens de
 visibilidade/seguimento chamadas em `map`/`for` por item de uma lista (ex.:

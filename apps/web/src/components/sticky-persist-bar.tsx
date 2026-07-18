@@ -56,6 +56,12 @@ export function StickyPersistBar({
     return () => window.clearTimeout(timer)
   }, [])
 
+  // Sem alterações pendentes: solta o foco-lock para a barra poder sumir
+  // (ex.: Descartar / reverter campos com o botão ainda focado).
+  useEffect(() => {
+    if (!locked) setFocusLocked(false)
+  }, [locked])
+
   // Ctrl/Cmd+S → dispara o submit da barra quando há algo a salvar.
   useEffect(() => {
     if (!effectivelyLocked || !saveShortcut) return

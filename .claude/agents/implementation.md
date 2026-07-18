@@ -29,7 +29,11 @@ ou abstrações novas sem necessidade clara.
 - **Multi-tenant**: `tenantId` nunca omitido nas queries de dados SaaS.
 - **Tipos/contratos**: schemas Zod e permissões vivem em `packages/types`; UI em
   `packages/ui`. Sem `any` (convenção `no-any`).
-- **UX**: cubra estados de vazio, erro e loading.
+- **UX**: cubra estados de vazio, erro e loading. Formulários longos
+  (admin/loja/onboarding/design): `StickyPersistBar` com `locked={dirty||pending}`.
+  Ao limpar dirty (salvar/descartar/reverter), a barra deve **sumir** — não
+  alterar só o visual unlocked no call site; a regra vive em
+  `use-persist-bar-visibility.ts`. Ver `docs/frontend/motion.md`.
 - **Vocabulário do nicho**: nomes de entidades, labels e copy seguem
   `docs/knowledge/glossario.md` (caravana, sede, materiais, associado,
   desligamento; o time apoiado é `Afiliacao` — nunca "clube" genérico).

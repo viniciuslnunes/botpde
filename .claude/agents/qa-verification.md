@@ -95,6 +95,11 @@ Em mudanças que tocam membros/cadastro, verifique também:
   (default) ou Sem área; reprovar/reverter limpa membership. Vitest:
   `onboarding.test.ts` (“grava preferência sem UserDepartamento”).
   Repair: `db:repair-departamento-orfaos -- --dry-run`.
+- StickyPersistBar (Design e demais forms admin/loja/onboarding): alterar um
+  campo → barra aparece; reverter ao valor original (ou Descartar) → barra
+  **desaparece** (não fica cinza/disabled). Regressão = `visible` preso após
+  sair de `locked`. Doc: `docs/frontend/motion.md`, `docs/agents/README.md`
+  § StickyPersistBar.
 
 ## Entregável
 - Checklist DoD preenchido com evidência (saída de comando quando aplicável).

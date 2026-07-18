@@ -2,6 +2,9 @@
 
 Menu admin **Design** (`/admin/design`), permissão `settings:manage`.
 
+Inteligência de domínio (rivalidade cromática, P&B, prioridade torcida→clube):
+[`docs/knowledge/identidade-visual-cores.md`](../knowledge/identidade-visual-cores.md).
+
 ## O que personaliza
 
 | Área | Tokens / campos |
@@ -34,43 +37,67 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
 }
 ```
 
-Consumidores: `Badge` (`success`/`danger`/`warning`/`info`), diálogos de confirmação
+Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confirmação
 (`variante: success|destructive`), classes `.btn-success`, `.btn-danger`,
-`.btn-danger-soft`, etc. em `globals.css`.
+`.btn-*-soft`, etc. em `globals.css`.
 
 ## Runtime
 
 1. `TenantDesignBridge` nos layouts portal/admin aplica CSS vars via `applyTenantDesign`.
 2. Grade `.app-shell-bg` usa `--grid-size`, `--grid-line`, `--grid-opacity`, `--grid-base`; `html[data-grid=off]` desliga o padrão.
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
+4. Vars de texto legível: `--color-primary-fg`, `--color-secondary-fg`,
+   `--color-success-fg`, … (`corMarcaLegivel` contra a superfície ativa).
+   Nav portal (`navbar.tsx`) e menu admin (`sidebar.tsx`) usam `*-fg` no
+   estado ativo + ring — **proibido** `text-[rgb(var(--primary))]` com marca
+   preta (some no dark).
 
 ## Sugestões de cor
 
-1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — no contexto da torcida e do
-   clube afiliado, nesta ordem: **marca da torcida** → **escudo/logo** →
-   **paleta do clube** → **torcida + clube** → monocromática → alto contraste.
-   Cada card mostra **3 cores** (primária · secundária · destaque) via
-   `limitarSwatches`. Um clique via `aplicarPaletaAoDesign` preenche marca +
-   ações + tint de superfícies.
-2. **Rivalidade / identidade** — sucesso **não** é verde por padrão. Verde só
-   entra em ações/swatches se já fizer parte da identidade (clube/torcida).
-   Preto/branco/cinza não recebem saturação artificial (evita “marrom” a partir
-   do preto). Harmônicas genéricas (análoga/complementar) foram removidas.
-3. **Paleta do clube** — mapa `CLUBE_PALETAS` / `paletaDoClube`.
-4. **Escudo/logo** — `extrairPaletaDeImagem` (canvas) alimenta a sugestão “Do
-   escudo”; verdes fora de contexto são filtrados.
-5. **Antes/depois** na prévia — compara rascunho com o design já salvo.
+1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — ordem: **marca da
+   torcida** → **escudo/logo** → **paleta do clube** → **torcida + clube** →
+   monocromática → alto contraste. Cada card: **3 cores** + hex
+   (`limitarSwatches`). Clique → `aplicarPaletaAoDesign` (marca + ações +
+   tint de superfícies).
+2. **Rivalidade / identidade** — ver knowledge acima. Sucesso default azul;
+   verde só se identidade já for verde; neutros sem saturação artificial;
+   sem análoga/complementar.
+3. **Paleta do clube** — `CLUBE_PALETAS` / `paletaDoClube`.
+4. **Escudo/logo** — `extrairPaletaDeImagem`; verdes fora de contexto
+   filtrados.
+5. **Superfícies derivadas** — `derivarSuperficiesDaMarca` preenche
+   `background`, `backgroundSubtle`, `surface` e `surfaceRaised` (light/dark)
+   com tint leve; não deixar fundo/elevada “vazios” no padrão do sistema.
+6. **Antes/depois** na prévia.
 
-Badges e soft-buttons usam `--color-*-fg` (`corMarcaLegivel`) para o texto não
-sumir quando a marca é preto em fundo escuro (ou branco em fundo claro).
+## UX do estúdio (`/admin/design`)
+
+- Layout **full-bleed**: sem `app-container` / `max-w-6xl`; padding lateral
+  **16px** (`px-4`) — inspector + prévia precisam de largura.
+- Seletor de cor: swatch abre o **color picker nativo** direto (sem popover
+  intermediário).
+- Prévia multi-cena (Portal / Admin / Login) com hotspots; contraste WCAG
+  no rodapé usa token info (não emerald).
 
 ## Actions
 
 - `salvarDesignTenant(design)` — Zod + audit `TENANT_DESIGN_ATUALIZADO`
 - `restaurarDesignPadrao()` — volta ao violeta padrão Torcida
 
+## Código-chave
+
+| Peça | Onde |
+|------|------|
+| Schema + paletas + contraste | `packages/types/src/design.js` |
+| CSS vars / `applyTenantDesign` | `packages/ui/src/services/theme.tsx` |
+| Badge | `packages/ui/src/components/badge.tsx` |
+| Form + paletas UI | `apps/web/src/components/admin/design-form.tsx` |
+| Prévia | `apps/web/src/components/admin/design-studio-preview.tsx` |
+| Página | `apps/web/src/app/admin/design/page.tsx` |
+
 ## Fora de escopo (por enquanto)
 
 - Upload de logo na UI
 - Tipografia customizada
 - Refatoração de todos os `style={{ backgroundColor: corPrimaria }}` inline
+  (migrar gradualmente para `*-fg` onde for texto sobre fundo escuro)

@@ -83,6 +83,10 @@ Comportamento (`usePersistBarVisibility`):
 - sem alterações: começa **oculta** (sem flash); scroll → aparece; idle (~1,8s) ou
   clique fora do form → some
 - `locked` (dirty / pending / foco na barra) → permanece, com borda de destaque
+- ao sair de `locked` (salvar / descartar / **reverter campos ao baseline**) →
+  **some na hora** — não fica no estado cinza com hint/atalho sumidos e CTAs
+  disabled (regressão 2026-07-17; fix em `use-persist-bar-visibility` +
+  limpeza de `focusLocked` em `StickyPersistBar`)
 - Ctrl/Cmd+S salva quando `saveShortcut` (default) e há `type="submit"`
 - spacer de conteúdo é interno (não precisa de `StickyPersistBarSpacer`)
 
