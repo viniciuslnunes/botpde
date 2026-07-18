@@ -2,7 +2,24 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { ImagePlus, Smile, Send, X, Loader2, Link2, Sticker as StickerIcon, Play, BarChart3, AtSign, CalendarDays, Plus } from 'lucide-react'
+import {
+  ImagePlus,
+  Smile,
+  Send,
+  X,
+  Loader2,
+  Link2,
+  Sticker as StickerIcon,
+  Play,
+  BarChart3,
+  AtSign,
+  CalendarDays,
+  Plus,
+  ChevronDown,
+  Globe2,
+  Users,
+  Lock,
+} from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
@@ -231,6 +248,14 @@ function ComposerBody({
     : modoEvento
       ? texto.trim().length > 0 && eventoId.length > 0 && !pending
       : texto.trim().length > 0 && !enviando && !pending
+
+  const alcanceSelectValue = alcanceNacional ? 'PUBLICO_NACIONAL' : visibilidade
+  const AlcanceIcon =
+    alcanceSelectValue === 'PRIVADO'
+      ? Lock
+      : alcanceSelectValue === 'TENANT'
+        ? Users
+        : Globe2
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -672,8 +697,7 @@ function ComposerBody({
             </p>
           )}
 
-          <div className="mt-3 space-y-2.5 border-t border-[rgb(var(--border))] pt-3 sm:space-y-0">
-            <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 border-t border-[rgb(var(--border))] pt-3">
               <div className="flex min-w-0 items-center gap-1">
                 <button
                   type="button"
@@ -901,49 +925,56 @@ function ComposerBody({
                 />
               </div>
 
-              {!somentePublico && (
-                <select
-                  value={alcanceNacional ? 'PUBLICO_NACIONAL' : visibilidade}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === 'PUBLICO_NACIONAL') {
-                      setVisibilidade('PUBLICO')
-                      setAlcanceNacional(true)
-                      return
-                    }
-                    setVisibilidade(v as 'PUBLICO' | 'TENANT' | 'PRIVADO')
-                    setAlcanceNacional(false)
-                  }}
-                  aria-label="Visibilidade do post"
-                  className="max-w-[9.5rem] shrink-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs text-[rgb(var(--foreground-muted))] sm:max-w-none"
-                >
-                  <option value="PUBLICO">Público</option>
-                  <option value="TENANT">Só torcida</option>
-                  <option value="PRIVADO">Só seguidores</option>
-                  {podePublicarNacional && (
-                    <option value="PUBLICO_NACIONAL">Torcida e torcedores</option>
-                  )}
-                </select>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              {somentePublico && (
+            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {somentePublico ? (
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para torcedores do clube
                 </span>
+              ) : (
+                <div className="relative">
+                  <AlcanceIcon
+                    aria-hidden
+                    className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
+                  />
+                  <select
+                    value={alcanceSelectValue}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === 'PUBLICO_NACIONAL') {
+                        setVisibilidade('PUBLICO')
+                        setAlcanceNacional(true)
+                        return
+                      }
+                      setVisibilidade(v as 'PUBLICO' | 'TENANT' | 'PRIVADO')
+                      setAlcanceNacional(false)
+                    }}
+                    aria-label="Visibilidade do post"
+                    className="h-9 max-w-[11.5rem] cursor-pointer appearance-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-8 pr-8 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color] hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)] sm:max-w-none"
+                  >
+                    <option value="PUBLICO">Público</option>
+                    <option value="TENANT">Só torcida</option>
+                    <option value="PRIVADO">Só seguidores</option>
+                    {podePublicarNacional && (
+                      <option value="PUBLICO_NACIONAL">Torcida e torcedores</option>
+                    )}
+                  </select>
+                  <ChevronDown
+                    aria-hidden
+                    className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
+                  />
+                </div>
               )}
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={!podePublicar}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
               >
                 {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 <span className="max-sm:sr-only">
