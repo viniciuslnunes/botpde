@@ -620,6 +620,10 @@ export function DesignForm({
                     emptyLabel="Remover"
                     {...fieldProps}
                   />
+                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                    Aparece no botão Curtir, badge Destaque, faixa do evento e link “Criar conta”
+                    (cena Login). Passe o mouse neste campo para destacar na prévia.
+                  </p>
                   <button
                     type="button"
                     onClick={() => {

@@ -96,6 +96,36 @@ body {
   --tw-ring-color: rgb(var(--color-primary) / 0.5);
 }
 
+/* Secundária — CTAs auxiliares, badges outline, destaques leves */
+.bg-secondary {
+  background-color: rgb(var(--color-secondary));
+}
+.text-secondary {
+  color: rgb(var(--color-secondary));
+}
+.border-secondary {
+  border-color: rgb(var(--color-secondary));
+}
+.btn-secondary {
+  background-color: rgb(var(--color-secondary));
+  color: #fff;
+}
+.btn-secondary:hover {
+  filter: brightness(0.92);
+}
+.btn-secondary-soft {
+  background-color: rgb(var(--color-secondary) / 0.12);
+  color: rgb(var(--color-secondary));
+  border: 1px solid rgb(var(--color-secondary) / 0.35);
+}
+.btn-secondary-soft:hover {
+  background-color: rgb(var(--color-secondary) / 0.18);
+}
+.badge-secondary {
+  background-color: rgb(var(--color-secondary) / 0.14);
+  color: rgb(var(--color-secondary));
+}
+
 /* ── Botões de ação semântica (módulo Design) ─────────────────── */
 .btn-success {
   background-color: rgb(var(--color-success));

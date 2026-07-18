@@ -220,6 +220,11 @@ function PortalScene({
                         Sócio
                       </span>
                     </Hotspot>
+                    <Hotspot token="brand.secondary" focus={focus} label="Badge secundária">
+                      <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-secondary))]">
+                        Destaque
+                      </span>
+                    </Hotspot>
                     <span className="text-[10px] text-[rgb(var(--foreground-muted))]">agora</span>
                   </div>
                   <p className="mt-1.5 text-sm leading-relaxed text-[rgb(var(--foreground))]">
@@ -235,12 +240,20 @@ function PortalScene({
                         Comentar
                       </button>
                     </Hotspot>
+                    <Hotspot token="brand.secondary" focus={focus} label="Botão secundário">
+                      <button
+                        type="button"
+                        className="btn-secondary-soft rounded-lg px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Curtir
+                      </button>
+                    </Hotspot>
                     <Hotspot token="surfaceRaised" focus={focus} label="Superfície elevada">
                       <button
                         type="button"
                         className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))]"
                       >
-                        Curtir
+                        Compartilhar
                       </button>
                     </Hotspot>
                   </div>
@@ -250,7 +263,14 @@ function PortalScene({
           </Hotspot>
 
           <Hotspot token="surface" focus={focus} label="Cartão de evento / RSVP">
-            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+            <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              <Hotspot token="brand.secondary" focus={focus} label="Faixa secundária">
+                <div
+                  className="h-1 w-full"
+                  style={{ backgroundColor: 'rgb(var(--color-secondary))' }}
+                />
+              </Hotspot>
+              <div className="p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 Próximo evento
               </p>
@@ -288,6 +308,7 @@ function PortalScene({
                     Não vou
                   </span>
                 </Hotspot>
+              </div>
               </div>
             </div>
           </Hotspot>
@@ -469,6 +490,14 @@ function EntrarScene({
               >
                 Entrar
               </button>
+            </Hotspot>
+            <Hotspot token="brand.secondary" focus={focus} label="Link secundário" className="mt-3">
+              <p className="text-center text-xs">
+                <span className="text-[rgb(var(--foreground-muted))]">Não tem conta? </span>
+                <span className="font-semibold text-[rgb(var(--color-secondary))] underline-offset-2">
+                  Criar conta
+                </span>
+              </p>
             </Hotspot>
           </div>
         </Hotspot>

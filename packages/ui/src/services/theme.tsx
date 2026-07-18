@@ -15,6 +15,7 @@ import {
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
+  contrasteTextoSobre,
   hexToCssRgb,
   resolveTenantDesign,
   SURFACE_CSS_VARS,
@@ -76,13 +77,13 @@ export function applyTenantDesign(
   root.style.setProperty('--primary', rgb)
   root.style.setProperty('--color-primary-raw', primary)
 
-  if (design.brand.secondary) {
-    root.style.setProperty('--color-secondary', hexToCssRgb(design.brand.secondary))
-    root.style.setProperty('--secondary', hexToCssRgb(design.brand.secondary))
-  } else {
-    root.style.removeProperty('--color-secondary')
-    root.style.removeProperty('--secondary')
-  }
+  // Sempre define secundária: se o tenant não escolheu, deriva contraste da primária
+  // para botões/badges auxiliares não ficarem “mortos”.
+  const secondaryHex =
+    design.brand.secondary ??
+    (contrasteTextoSobre(primary) === 'light' ? '#f4f4f5' : '#27272a')
+  root.style.setProperty('--color-secondary', hexToCssRgb(secondaryHex))
+  root.style.setProperty('--secondary', hexToCssRgb(secondaryHex))
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   for (const key of ACTION_TOKEN_KEYS) {
@@ -144,10 +145,11 @@ export function tenantDesignCriticalCss(
     `--grid-opacity:${design.grid.lineOpacity}`,
   ]
 
-  if (design.brand.secondary) {
-    lines.push(`--color-secondary:${hexToCssRgb(design.brand.secondary)}`)
-    lines.push(`--secondary:${hexToCssRgb(design.brand.secondary)}`)
-  }
+  const secondaryHex =
+    design.brand.secondary ??
+    (contrasteTextoSobre(primary) === 'light' ? '#f4f4f5' : '#27272a')
+  lines.push(`--color-secondary:${hexToCssRgb(secondaryHex)}`)
+  lines.push(`--secondary:${hexToCssRgb(secondaryHex)}`)
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   for (const key of ACTION_TOKEN_KEYS) {
