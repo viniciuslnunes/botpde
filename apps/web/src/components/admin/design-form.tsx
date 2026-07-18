@@ -222,6 +222,17 @@ function buildContrastChecksForMode(
     },
   ]
 
+  // Grade: linha vs base (visível nos dois temas; null = herda superfície do tema)
+  const grid = gridResolved(design, mode)
+  pairs.push({
+    id: 'grid-line',
+    label: 'Linha da grade',
+    fg: grid.line,
+    bg: grid.base,
+    min: 1.4,
+    tip: 'Linha da grade some no fundo — ajuste cor da linha ou deixe Automático.',
+  })
+
   for (const key of ACTION_TOKEN_KEYS) {
     const fill = actions[key]
     const text = resolveActionTextColors(fill, actionsFg[key], s.surface)
@@ -293,47 +304,63 @@ function dualThemeTextStatus(
   })
 }
 
-/** Pares de superfície ligados a um token (para dica inline na aba Superfícies). */
-function surfaceTokenContrastHint(
+/** Pares de superfície por token — usado nas amostras dual-tema. */
+function surfaceTokenPairs(
   design: TenantDesign,
   key: (typeof SURFACE_TOKEN_KEYS)[number],
-): { mode: PreviewMode; label: string; ratio: number; ok: boolean }[] {
-  const out: { mode: PreviewMode; label: string; ratio: number; ok: boolean }[] =
-    []
-  for (const mode of ['light', 'dark'] as const) {
-    const s = resolveSurfaces(design, mode)
-    const push = (label: string, fg: string, bg: string, min = 4.5) => {
-      const ratio = contrasteRatio(fg, bg)
-      out.push({ mode, label, ratio, ok: ratio >= min })
-    }
-    switch (key) {
-      case 'background':
-        push('texto no fundo', s.foreground, s.background)
-        break
-      case 'backgroundSubtle':
-        push('texto no sutil', s.foreground, s.backgroundSubtle)
-        break
-      case 'foreground':
-        push('no fundo', s.foreground, s.background)
-        push('no cartão', s.foreground, s.surface)
-        break
-      case 'foregroundMuted':
-        push('no fundo', s.foregroundMuted, s.background)
-        push('no cartão', s.foregroundMuted, s.surface)
-        break
-      case 'surface':
-        push('texto no cartão', s.foreground, s.surface)
-        break
-      case 'surfaceRaised':
-        push('texto elevada', s.foreground, s.surfaceRaised)
-        break
-      case 'border':
-      case 'borderStrong':
-        // Bordas não entram no WCAG de texto; sem dica numérica.
-        break
-    }
+  mode: PreviewMode,
+): { label: string; fg: string; bg: string; min: number }[] {
+  const s = resolveSurfaces(design, mode)
+  switch (key) {
+    case 'background':
+      return [{ label: 'Texto', fg: s.foreground, bg: s.background, min: 4.5 }]
+    case 'backgroundSubtle':
+      return [{ label: 'Texto', fg: s.foreground, bg: s.backgroundSubtle, min: 4.5 }]
+    case 'foreground':
+      return [
+        { label: 'Fundo', fg: s.foreground, bg: s.background, min: 4.5 },
+        { label: 'Cartão', fg: s.foreground, bg: s.surface, min: 4.5 },
+      ]
+    case 'foregroundMuted':
+      return [
+        { label: 'Fundo', fg: s.foregroundMuted, bg: s.background, min: 4.5 },
+        { label: 'Cartão', fg: s.foregroundMuted, bg: s.surface, min: 4.5 },
+      ]
+    case 'surface':
+      return [{ label: 'Texto', fg: s.foreground, bg: s.surface, min: 4.5 }]
+    case 'surfaceRaised':
+      return [{ label: 'Texto', fg: s.foreground, bg: s.surfaceRaised, min: 4.5 }]
+    case 'border':
+      return [
+        {
+          label: 'Sobre fundo',
+          fg: s.border,
+          bg: s.background,
+          min: 1.2,
+        },
+      ]
+    case 'borderStrong':
+      return [
+        {
+          label: 'Sobre fundo',
+          fg: s.borderStrong,
+          bg: s.background,
+          min: 1.5,
+        },
+      ]
+    default:
+      return []
   }
-  return out
+}
+
+function gridResolved(design: TenantDesign, mode: PreviewMode) {
+  const s = resolveSurfaces(design, mode)
+  return {
+    line: design.grid.lineColor ?? s.foreground,
+    base: design.grid.baseColor ?? s.backgroundSubtle,
+    autoLine: !design.grid.lineColor,
+    autoBase: !design.grid.baseColor,
+  }
 }
 
 /** Color field: swatch abre o seletor nativo direto; hex editável ao lado. */
@@ -754,6 +781,186 @@ function DualThemeTextSamples({
   )
 }
 
+function statusColor(onBg: string, ok: boolean) {
+  const light = contrasteTextoSobre(onBg) === 'light'
+  if (ok) return light ? '#7dd3fc' : '#0369a1'
+  return light ? '#fbbf24' : '#b45309'
+}
+
+function labelMuted(onBg: string) {
+  return contrasteTextoSobre(onBg) === 'light'
+    ? 'rgba(255,255,255,0.65)'
+    : 'rgba(0,0,0,0.5)'
+}
+
+/** Amostra visual claro/escuro para um token de superfície. */
+function DualThemeSurfaceSamples({
+  design,
+  tokenKey,
+}: {
+  design: TenantDesign
+  tokenKey: (typeof SURFACE_TOKEN_KEYS)[number]
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {(['light', 'dark'] as const).map((mode) => {
+        const s = resolveSurfaces(design, mode)
+        const pairs = surfaceTokenPairs(design, tokenKey, mode)
+        const worst = pairs.reduce(
+          (acc, p) => {
+            const ratio = contrasteRatio(p.fg, p.bg)
+            return ratio < acc.ratio ? { ratio, ok: ratio >= p.min } : acc
+          },
+          { ratio: 99, ok: true },
+        )
+        const canvas =
+          tokenKey === 'background' || tokenKey === 'backgroundSubtle'
+            ? s[tokenKey]
+            : tokenKey === 'surfaceRaised'
+              ? s.surfaceRaised
+              : s.surface
+        const sampleFg =
+          tokenKey === 'foregroundMuted' ? s.foregroundMuted : s.foreground
+        const sampleBorder =
+          tokenKey === 'borderStrong' ? s.borderStrong : s.border
+
+        return (
+          <div
+            key={mode}
+            className="space-y-1.5 rounded-lg border p-2"
+            style={{
+              backgroundColor: canvas,
+              borderColor: sampleBorder,
+            }}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: labelMuted(canvas) }}
+              >
+                {mode === 'dark' ? 'Escuro' : 'Claro'}
+              </span>
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: statusColor(canvas, worst.ok) }}
+              >
+                {worst.ok ? 'OK' : `Fraco ${worst.ratio.toFixed(1)}:1`}
+              </span>
+            </div>
+            {tokenKey === 'border' || tokenKey === 'borderStrong' ? (
+              <div
+                className="rounded-md px-2 py-2 text-[10px] font-medium"
+                style={{
+                  backgroundColor: s.surface,
+                  border: `2px solid ${sampleBorder}`,
+                  color: s.foreground,
+                }}
+              >
+                Borda no cartão
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p
+                  className="text-[11px] font-semibold leading-snug"
+                  style={{ color: sampleFg }}
+                >
+                  Título de exemplo
+                </p>
+                {tokenKey === 'foregroundMuted' ||
+                tokenKey === 'background' ||
+                tokenKey === 'backgroundSubtle' ||
+                tokenKey === 'surface' ||
+                tokenKey === 'surfaceRaised' ? (
+                  <p className="text-[10px]" style={{ color: s.foregroundMuted }}>
+                    Texto secundário / legenda
+                  </p>
+                ) : null}
+                {pairs.map((p) => {
+                  const ratio = contrasteRatio(p.fg, p.bg)
+                  const ok = ratio >= p.min
+                  return (
+                    <p
+                      key={p.label}
+                      className="text-[10px] tabular-nums"
+                      style={{ color: statusColor(canvas, ok) }}
+                    >
+                      {p.label} {ratio.toFixed(1)}:1{ok ? '' : '!'}
+                    </p>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Prévia da grade nos dois temas (linha/base compartilhada ou automática). */
+function DualThemeGridSamples({ design }: { design: TenantDesign }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {(['light', 'dark'] as const).map((mode) => {
+        const s = resolveSurfaces(design, mode)
+        const g = gridResolved(design, mode)
+        const ratio = contrasteRatio(g.line, g.base)
+        const ok = ratio >= 1.4
+        const size = Math.max(16, Math.min(32, design.grid.sizePx / 2))
+        const lr = parseInt(g.line.slice(1, 3), 16)
+        const lg = parseInt(g.line.slice(3, 5), 16)
+        const lb = parseInt(g.line.slice(5, 7), 16)
+        const lineCss = `rgb(${lr} ${lg} ${lb} / ${design.grid.lineOpacity})`
+        return (
+          <div
+            key={mode}
+            className="space-y-1.5 overflow-hidden rounded-lg border border-[rgb(var(--border))] p-2"
+            style={{
+              backgroundColor: g.base,
+              backgroundImage: design.grid.enabled
+                ? `linear-gradient(${lineCss} 1px, transparent 1px), linear-gradient(90deg, ${lineCss} 1px, transparent 1px)`
+                : 'none',
+              backgroundSize: `${size}px ${size}px`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: labelMuted(g.base) }}
+              >
+                {mode === 'dark' ? 'Escuro' : 'Claro'}
+              </span>
+              <span
+                className="text-[10px] font-medium"
+                style={{ color: statusColor(g.base, ok) }}
+              >
+                {ok ? 'OK' : `Fraco ${ratio.toFixed(1)}:1`}
+              </span>
+            </div>
+            <div
+              className="rounded-md border px-2 py-1.5 text-[10px] font-medium shadow-sm"
+              style={{
+                backgroundColor: s.surface,
+                borderColor: s.border,
+                color: s.foreground,
+              }}
+            >
+              Cartão sobre a grade
+            </div>
+            <p
+              className="text-[10px] tabular-nums"
+              style={{ color: s.foregroundMuted }}
+            >
+              Linha {g.autoLine ? 'auto' : g.line.toUpperCase()} · Base{' '}
+              {g.autoBase ? 'auto' : g.base.toUpperCase()} · {ratio.toFixed(1)}:1
+            </p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function DesignForm({
   initialDesign,
   corPrimaria,
@@ -874,7 +1081,6 @@ export function DesignForm({
   const contrastChecks = useMemo(() => buildContrastChecks(design), [design])
 
   const surfacesResolved = resolveSurfaces(design, previewMode)
-  const surfacesOverrides = previewMode === 'dark' ? design.dark : design.light
 
   function patch(partial: Partial<TenantDesign>) {
     setDesign((d) => ({ ...d, ...partial }))
@@ -1291,7 +1497,7 @@ export function DesignForm({
             {section === 'fundo' ? (
               <SectionFrame
                 title="Fundo e grade"
-                description="A área quadriculada atrás dos cartões na prévia."
+                description="A grade é compartilhada; linha/base vazias herdam as superfícies de cada tema. Amostras mostram claro e escuro."
               >
                 <label
                   className="flex items-center gap-2 text-sm text-[rgb(var(--foreground))]"
@@ -1324,7 +1530,7 @@ export function DesignForm({
                       onChange={(e) =>
                         patch({ grid: { ...design.grid, sizePx: Number(e.target.value) } })
                       }
-                      className="w-full accent-[rgb(var(--primary))]"
+                      className="w-full accent-[rgb(var(--color-primary))]"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1342,29 +1548,40 @@ export function DesignForm({
                           grid: { ...design.grid, lineOpacity: Number(e.target.value) },
                         })
                       }
-                      className="w-full accent-[rgb(var(--primary))]"
+                      className="w-full accent-[rgb(var(--color-primary))]"
                     />
                   </div>
                   <ColorField
                     label="Cor da linha"
                     value={design.grid.lineColor}
-                    resolved={design.grid.lineColor ?? surfacesResolved.foreground}
+                    resolved={
+                      design.grid.lineColor ??
+                      resolveSurfaces(design, 'light').foreground
+                    }
                     token="grid"
                     onChange={(v) => patch({ grid: { ...design.grid, lineColor: v } })}
                     allowEmpty
-                    emptyLabel="Usar texto"
+                    emptyLabel="Automático por tema"
                     {...fieldProps}
                   />
                   <ColorField
                     label="Cor de fundo da grade"
                     value={design.grid.baseColor}
-                    resolved={design.grid.baseColor ?? surfacesResolved.backgroundSubtle}
+                    resolved={
+                      design.grid.baseColor ??
+                      resolveSurfaces(design, 'light').backgroundSubtle
+                    }
                     token="backgroundSubtle"
                     onChange={(v) => patch({ grid: { ...design.grid, baseColor: v } })}
                     allowEmpty
-                    emptyLabel="Usar fundo sutil"
+                    emptyLabel="Automático por tema"
                     {...fieldProps}
                   />
+                  <DualThemeGridSamples design={design} />
+                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                    Automático: linha = texto principal e base = fundo sutil de cada
+                    tema. Cor fixa vale nos dois — confira as amostras acima.
+                  </p>
                 </div>
               </SectionFrame>
             ) : null}
@@ -1372,81 +1589,94 @@ export function DesignForm({
             {section === 'superficies' ? (
               <SectionFrame
                 title="Superfícies"
-                description={`Editando modo ${previewMode === 'dark' ? 'escuro' : 'claro'} — troque na prévia. O painel de contraste abaixo avalia os dois temas.`}
+                description="Cada token tem cor no claro e no escuro. Edite os dois lados — a prévia segue o modo destacado."
               >
-                <div className="grid gap-4">
-                  {SURFACE_TOKEN_KEYS.map((key) => {
-                    const tokenMap: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], TokenFocus>> =
-                      {
-                        background: 'background',
-                        backgroundSubtle: 'backgroundSubtle',
-                        foreground: 'foreground',
-                        foregroundMuted: 'foregroundMuted',
-                        border: 'border',
-                        surface: 'surface',
-                        surfaceRaised: 'surfaceRaised',
-                      }
-                    const hints = surfaceTokenContrastHint(design, key)
-                    const lightHints = hints.filter((h) => h.mode === 'light')
-                    const darkHints = hints.filter((h) => h.mode === 'dark')
+                <div
+                  className="flex gap-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5"
+                  role="group"
+                  aria-label="Tema das superfícies na prévia"
+                >
+                  {(['light', 'dark'] as const).map((mode) => {
+                    const active = previewMode === mode
                     return (
-                      <div key={key} className="grid gap-1.5">
-                        <ColorField
-                          label={SURFACE_TOKEN_LABELS[key]}
-                          value={surfacesOverrides[key] ?? null}
-                          resolved={surfacesResolved[key]}
-                          token={tokenMap[key] ?? null}
-                          allowEmpty
-                          emptyLabel="Usar padrão"
-                          onChange={(v) => {
-                            const next = { ...surfacesOverrides }
-                            if (v == null) delete next[key]
-                            else next[key] = v
-                            if (previewMode === 'dark') patch({ dark: next })
-                            else patch({ light: next })
-                          }}
-                          {...fieldProps}
-                        />
-                        {hints.length > 0 ? (
-                          <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                            <span
-                              className={
-                                lightHints.some((h) => !h.ok)
-                                  ? 'font-medium text-amber-700 dark:text-amber-300'
-                                  : undefined
-                              }
-                            >
-                              Claro{' '}
-                              {lightHints
-                                .map(
-                                  (h) =>
-                                    `${h.label} ${h.ratio.toFixed(1)}:1${h.ok ? '' : '!'}`,
-                                )
-                                .join(' · ') || '—'}
-                            </span>
-                            {' · '}
-                            <span
-                              className={
-                                darkHints.some((h) => !h.ok)
-                                  ? 'font-medium text-amber-700 dark:text-amber-300'
-                                  : undefined
-                              }
-                            >
-                              Escuro{' '}
-                              {darkHints
-                                .map(
-                                  (h) =>
-                                    `${h.label} ${h.ratio.toFixed(1)}:1${h.ok ? '' : '!'}`,
-                                )
-                                .join(' · ') || '—'}
-                            </span>
-                          </p>
-                        ) : null}
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setPreviewMode(mode)}
+                        className={[
+                          'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                          active
+                            ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                            : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                        ].join(' ')}
+                      >
+                        {mode === 'dark' ? 'Prévia escura' : 'Prévia clara'}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="grid gap-5">
+                  {SURFACE_TOKEN_KEYS.map((key) => {
+                    const tokenMap: Partial<
+                      Record<(typeof SURFACE_TOKEN_KEYS)[number], TokenFocus>
+                    > = {
+                      background: 'background',
+                      backgroundSubtle: 'backgroundSubtle',
+                      foreground: 'foreground',
+                      foregroundMuted: 'foregroundMuted',
+                      border: 'border',
+                      surface: 'surface',
+                      surfaceRaised: 'surfaceRaised',
+                    }
+                    const lightVal = design.light?.[key] ?? null
+                    const darkVal = design.dark?.[key] ?? null
+                    const lightResolved = resolveSurfaces(design, 'light')[key]
+                    const darkResolved = resolveSurfaces(design, 'dark')[key]
+                    return (
+                      <div key={key} className="space-y-2">
+                        <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                          {SURFACE_TOKEN_LABELS[key]}
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <ColorField
+                            label="Claro"
+                            value={lightVal}
+                            resolved={lightResolved}
+                            token={tokenMap[key] ?? null}
+                            allowEmpty
+                            emptyLabel="Usar padrão"
+                            onChange={(v) => {
+                              const next = { ...(design.light ?? {}) }
+                              if (v == null) delete next[key]
+                              else next[key] = v
+                              patch({ light: next })
+                              if (previewMode !== 'light') setPreviewMode('light')
+                            }}
+                            {...fieldProps}
+                          />
+                          <ColorField
+                            label="Escuro"
+                            value={darkVal}
+                            resolved={darkResolved}
+                            token={tokenMap[key] ?? null}
+                            allowEmpty
+                            emptyLabel="Usar padrão"
+                            onChange={(v) => {
+                              const next = { ...(design.dark ?? {}) }
+                              if (v == null) delete next[key]
+                              else next[key] = v
+                              patch({ dark: next })
+                              if (previewMode !== 'dark') setPreviewMode('dark')
+                            }}
+                            {...fieldProps}
+                          />
+                        </div>
+                        <DualThemeSurfaceSamples design={design} tokenKey={key} />
                         {key === 'background' || key === 'surfaceRaised' ? (
                           <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                             {key === 'background'
-                              ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca.'
-                              : 'Menu/popover na prévia Portal e painel “Ações rápidas” no Admin. Texto do painel acompanha o contraste da cor escolhida.'}
+                              ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca nos dois temas.'
+                              : 'Menu/popover e painéis elevados. Texto acompanha o contraste de cada tema.'}
                           </p>
                         ) : null}
                       </div>
@@ -1502,7 +1732,7 @@ export function DesignForm({
           type="button"
           onClick={handleSave}
           disabled={pending || !dirty}
-          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] disabled:opacity-40"
           style={{ backgroundColor: design.brand.primary }}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
