@@ -68,7 +68,7 @@ describe('createSsePingResponse', () => {
     expect(unsub).toHaveBeenCalled()
   })
 
-  it('fecha limpo após MAX_STREAM_MS com bye', async () => {
+  it('sinaliza reconnect antes do bye e fecha limpo', async () => {
     vi.useFakeTimers()
     const unsub = vi.fn()
     const res = createSsePingResponse(() => unsub)
@@ -76,7 +76,22 @@ describe('createSsePingResponse', () => {
     const decoder = new TextDecoder()
 
     await reader.read() // connected
-    vi.advanceTimersByTime(55_000)
+
+    vi.advanceTimersByTime(50_000)
+
+    let sawReconnect = false
+    for (let i = 0; i < 8; i++) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      const text = decoder.decode(chunk.value)
+      if (text.includes('data: reconnect')) {
+        sawReconnect = true
+        break
+      }
+    }
+    expect(sawReconnect).toBe(true)
+
+    vi.advanceTimersByTime(5_000)
 
     let text = ''
     for (;;) {

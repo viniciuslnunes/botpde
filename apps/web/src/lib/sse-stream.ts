@@ -7,7 +7,11 @@
  * - `no-transform` pede ao proxy para não comprimir o stream
  * - heartbeat evita idle cut; close limpo antes do teto do proxy
  * - enqueue após close também gera PROTOCOL_ERROR
+ * - `data: reconnect` antes do close: o cliente troca a conexão limpo;
+ *   comentário `: bye` o EventSource não vê → proxy RST vira PROTOCOL_ERROR
  */
+
+import { SSE_RECONNECT_DATA } from '@/lib/sse-protocol'
 
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
@@ -16,7 +20,9 @@ export const SSE_HEADERS = {
 } as const
 
 const HEARTBEAT_MS = 15_000
-/** Fecha limpo antes do proxy HTTP/2 cortar sujo (~5–15 min). */
+/** Avisa o client para reconectar antes do proxy HTTP/2 cortar sujo. */
+const RECONNECT_SIGNAL_MS = 50_000
+/** Fecha o stream se o client não tiver saído após o sinal. */
 const MAX_STREAM_MS = 55_000
 
 type SubscribeFn = (onPing: () => void) => () => void
@@ -32,6 +38,7 @@ export function createSsePingResponse(
   const encoder = new TextEncoder()
   let unsubscribe: () => void = () => {}
   let heartbeat: ReturnType<typeof setInterval> | undefined
+  let reconnectSignal: ReturnType<typeof setTimeout> | undefined
   let maxLife: ReturnType<typeof setTimeout> | undefined
   let closed = false
   let onAbort: (() => void) | undefined
@@ -43,6 +50,7 @@ export function createSsePingResponse(
         closed = true
         unsubscribe()
         if (heartbeat) clearInterval(heartbeat)
+        if (reconnectSignal) clearTimeout(reconnectSignal)
         if (maxLife) clearTimeout(maxLife)
         if (onAbort) signal?.removeEventListener('abort', onAbort)
       }
@@ -89,8 +97,12 @@ export function createSsePingResponse(
         if (!safeEnqueue(': keep-alive\n\n')) return
       }, HEARTBEAT_MS)
 
+      reconnectSignal = setTimeout(() => {
+        // EventSource só entrega `data:` — o client fecha e reabre limpo.
+        safeEnqueue(`data: ${SSE_RECONNECT_DATA}\n\n`)
+      }, RECONNECT_SIGNAL_MS)
+
       maxLife = setTimeout(() => {
-        // Bye limpo → cliente reconecta sem RST PROTOCOL_ERROR.
         safeEnqueue(': bye\n\n')
         closeClean()
       }, MAX_STREAM_MS)
@@ -99,6 +111,7 @@ export function createSsePingResponse(
       closed = true
       unsubscribe()
       if (heartbeat) clearInterval(heartbeat)
+      if (reconnectSignal) clearTimeout(reconnectSignal)
       if (maxLife) clearTimeout(maxLife)
       if (onAbort) signal?.removeEventListener('abort', onAbort)
     },

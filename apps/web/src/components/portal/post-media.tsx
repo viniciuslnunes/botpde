@@ -324,7 +324,7 @@ function SocialEmbed({ url }: { url: string }) {
         <iframe
           src={`https://www.youtube-nocookie.com/embed/${id}`}
           title="YouTube"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
           allowFullScreen
           className="h-full w-full"
         />
