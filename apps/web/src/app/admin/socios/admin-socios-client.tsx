@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
@@ -119,6 +119,8 @@ export function EmitirCarteirinhaModal({
   const [userId, setUserId] = useState(initialUserId ?? '')
   const [nome, setNome] = useState(initialMembro?.nome ?? '')
   const [validade, setValidade] = useState(getValidadePadrao)
+  const formIds = useId()
+  const firstFieldRef = useRef<HTMLSelectElement>(null)
   const { formRef, markPristine } = useTrackedForm({
     title: 'Nova carteirinha',
     enabled: open,
@@ -129,6 +131,24 @@ export function EmitirCarteirinhaModal({
     const ok = await confirmDiscard()
     if (ok) onClose()
   }
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') void closeForm()
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const t = window.setTimeout(() => firstFieldRef.current?.focus(), 0)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+      window.clearTimeout(t)
+    }
+    // closeForm fecha sobre confirmDiscard/onClose estáveis o suficiente no ciclo do modal
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reamarra ao abrir/fechar
+  }, [open])
 
   function onSelectMembro(id: string) {
     setUserId(id)
@@ -152,6 +172,10 @@ export function EmitirCarteirinhaModal({
   }
 
   if (!open) return null
+
+  const idMembro = `${formIds}-membro`
+  const idNome = `${formIds}-nome`
+  const idValidade = `${formIds}-validade`
 
   return (
     <div
@@ -185,10 +209,15 @@ export function EmitirCarteirinhaModal({
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            <label
+              htmlFor={idMembro}
+              className="block text-sm font-medium text-[rgb(var(--foreground))]"
+            >
               Membro
             </label>
             <select
+              ref={firstFieldRef}
+              id={idMembro}
               name="userId"
               required
               value={userId}
@@ -206,10 +235,14 @@ export function EmitirCarteirinhaModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            <label
+              htmlFor={idNome}
+              className="block text-sm font-medium text-[rgb(var(--foreground))]"
+            >
               Nome na carteirinha
             </label>
             <input
+              id={idNome}
               name="nome"
               required
               value={nome}
@@ -220,10 +253,14 @@ export function EmitirCarteirinhaModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            <label
+              htmlFor={idValidade}
+              className="block text-sm font-medium text-[rgb(var(--foreground))]"
+            >
               Válida até
             </label>
             <input
+              id={idValidade}
               name="validade"
               type="date"
               value={validade}
@@ -374,6 +411,7 @@ function EmitirLinhaButton({
 export function AdminSociosClient({
   socios,
   elegiveis,
+  elegiveisModal,
   contagens,
   statusFiltro,
   busca,
@@ -381,6 +419,8 @@ export function AdminSociosClient({
 }: {
   socios: SocioEmitidoItem[]
   elegiveis: MembroElegivelItem[]
+  /** Opções do select de emissão (cap server-side). */
+  elegiveisModal: MembroElegivelItem[]
   contagens: {
     emitidas: number
     ativos: number
@@ -397,18 +437,6 @@ export function AdminSociosClient({
 
   const isAguardando = statusFiltro === 'aguardando'
 
-  const elegiveisFiltrados = useMemo(() => {
-    if (!busca.trim()) return elegiveis
-    const q = busca.trim().toLowerCase()
-    return elegiveis.filter(
-      (m) =>
-        m.nome.toLowerCase().includes(q) ||
-        (m.cidade?.toLowerCase().includes(q) ?? false) ||
-        (m.discordTag?.toLowerCase().includes(q) ?? false) ||
-        (m.telefone?.includes(q) ?? false),
-    )
-  }, [elegiveis, busca])
-
   function abrirEmit(userId?: string) {
     setEmitUserId(userId ?? null)
     setEmitOpen(true)
@@ -418,6 +446,7 @@ export function AdminSociosClient({
     const p = new URLSearchParams()
     if (status && status !== 'todos') p.set('status', status)
     if (busca) p.set('q', busca)
+    // troca de aba volta à página 1
     const qs = p.toString()
     return `/admin/socios${qs ? `?${qs}` : ''}`
   }
@@ -473,7 +502,12 @@ export function AdminSociosClient({
               <button
                 type="button"
                 onClick={() => abrirEmit()}
-                disabled={elegiveis.length === 0}
+                disabled={contagens.aguardando === 0 || elegiveisModal.length === 0}
+                title={
+                  contagens.aguardando === 0
+                    ? 'Nenhum sócio aprovado aguardando carteirinha'
+                    : undefined
+                }
                 className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
@@ -542,7 +576,7 @@ export function AdminSociosClient({
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
           {isAguardando ? (
-            elegiveisFiltrados.length === 0 ? (
+            elegiveis.length === 0 ? (
               <MotionEmptyState
                 icon={
                   busca ? (
@@ -559,7 +593,7 @@ export function AdminSociosClient({
                 description={
                   busca
                     ? 'Tente outro termo de busca.'
-                    : socios.length > 0
+                    : contagens.emitidas > 0
                       ? 'Todos os sócios aprovados já têm carteirinha.'
                       : 'Quando um sócio for aprovado em Membros, ele aparece aqui para emissão.'
                 }
@@ -601,7 +635,7 @@ export function AdminSociosClient({
                     </thead>
                     <tbody className="divide-y divide-[rgb(var(--border))]">
                       <AnimatePresence initial={false}>
-                        {elegiveisFiltrados.map((membro) => (
+                        {elegiveis.map((membro) => (
                           <m.tr
                             key={membro.userId}
                             layout
@@ -808,7 +842,7 @@ export function AdminSociosClient({
           key={emitUserId ?? 'blank'}
           open
           onClose={() => setEmitOpen(false)}
-          membrosElegiveis={elegiveis}
+          membrosElegiveis={elegiveisModal}
           initialUserId={emitUserId}
         />
       )}
