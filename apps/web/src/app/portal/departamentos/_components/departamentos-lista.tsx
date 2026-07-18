@@ -169,7 +169,7 @@ export async function DepartamentosSection() {
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
 
-  const [meusDepartamentos, gestorDe, todosTenant]: [
+  const [memberships, gestorDe, todosTenant]: [
     MembershipLite[],
     GestorLite[],
     DeptoHubBase[],
@@ -218,7 +218,7 @@ export async function DepartamentosSection() {
   const diretoriaId = todosTenant.find((d) => d.slug === 'diretoria')?.id ?? null
   const departamentos = resolverDepartamentosHub({
     todos: todosTenant.filter((d) => !LEGACY.has(d.slug)),
-    membershipIds: meusDepartamentos
+    membershipIds: memberships
       .filter((m) => !LEGACY.has(m.departamento.slug))
       .map((m) => m.departamentoId),
     gestorIds: gestorDe.map((g) => g.departamentoId),
