@@ -749,30 +749,31 @@ export function DesignForm({
                         surfaceRaised: 'surfaceRaised',
                       }
                     return (
-                      <ColorField
-                        key={key}
-                        label={SURFACE_TOKEN_LABELS[key]}
-                        value={surfacesOverrides[key] ?? null}
-                        resolved={surfacesResolved[key]}
-                        token={tokenMap[key] ?? null}
-                        allowEmpty
-                        emptyLabel="Usar padrão"
-                        onChange={(v) => {
-                          const next = { ...surfacesOverrides }
-                          if (v == null) delete next[key]
-                          else next[key] = v
-                          if (previewMode === 'dark') patch({ dark: next })
-                          else patch({ light: next })
-                        }}
-                        {...fieldProps}
-                      />
-                      {key === 'background' || key === 'surfaceRaised' ? (
-                        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                          {key === 'background'
-                            ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca.'
-                            : 'Cartões elevados, popovers e menus. Ao aplicar uma paleta, fica um pouco mais clara/tintada que a superfície.'}
-                        </p>
-                      ) : null}
+                      <div key={key} className="grid gap-1.5">
+                        <ColorField
+                          label={SURFACE_TOKEN_LABELS[key]}
+                          value={surfacesOverrides[key] ?? null}
+                          resolved={surfacesResolved[key]}
+                          token={tokenMap[key] ?? null}
+                          allowEmpty
+                          emptyLabel="Usar padrão"
+                          onChange={(v) => {
+                            const next = { ...surfacesOverrides }
+                            if (v == null) delete next[key]
+                            else next[key] = v
+                            if (previewMode === 'dark') patch({ dark: next })
+                            else patch({ light: next })
+                          }}
+                          {...fieldProps}
+                        />
+                        {key === 'background' || key === 'surfaceRaised' ? (
+                          <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                            {key === 'background'
+                              ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca.'
+                              : 'Cartões elevados, popovers e menus. Ao aplicar uma paleta, fica um pouco mais clara/tintada que a superfície.'}
+                          </p>
+                        ) : null}
+                      </div>
                     )
                   })}
                 </div>
