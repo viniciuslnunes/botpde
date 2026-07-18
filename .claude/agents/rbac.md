@@ -22,6 +22,10 @@ Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de ac
   de pedidos (`STORE_VIEW_ORDERS` ou `STORE_MANAGE`). `assertAdmin`/`assertOwner` foram
   removidos.
 - Loja: `STORE_MANAGE` vs `STORE_VIEW_ORDERS` — ver `docs/data/modulo-loja.md`.
+- Agenda / eventos: `EVENTS_CREATE` (criar) vs `EVENTS_MANAGE` (editar, check-in,
+  CSV, waitlist admin) — ver `docs/data/modulo-eventos.md`. `Partida` é global
+  (sem gate por tenant); mutações de partida ainda passam pelo admin autenticado
+  com permissão de eventos do tenant que vincula.
 - Testes: `apps/web/src/lib/__tests__/rbac.test.ts` e `visibilidade-cross-tenant.test.ts`.
 
 ## Invariantes que você defende

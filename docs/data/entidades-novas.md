@@ -22,12 +22,17 @@
 - Back-ref: `tenants Tenant[]`, `partidas Partida[]`, `noticias Noticia[]`.
 - Em `Tenant`: adicionar `afiliacaoId String?` + relação (onDelete: SetNull).
 
-### `Partida` (por afiliação)
-Jogos/calendário/resultados; alimenta `Evento`.
-- `id, afiliacaoId (FK, Cascade), adversario, competicao?, dataHora, local?,
-  mando (MandoJogo: CASA|FORA), placar?, status, fonteExternalId?, criadoEm`
-- Em `Evento`: adicionar `partidaId String?` (evento ligado a um jogo).
+### `Partida` (por afiliação) — ✅ no schema (2026-07-17)
 
+Jogos/calendário/resultados; alimenta `Evento` via `partidaId`. **Implementado** —
+ver `packages/db/prisma/schema.prisma` e `docs/data/modulo-eventos.md`. Sync externo
+ainda **não** — cadastro manual / partida rápida; decisão aberta #7 (provedor API).
+
+- `id, afiliacaoId (FK, Cascade), adversario, competicao?, dataHora, local?,
+  mando (MandoJogo: CASA|FORA), placarCasa?, placarFora?, status (StatusPartida),
+  fonteExternalId?, criadoEm`
+- Em `Evento`: `partidaId String?` (SetNull) + `serieId?`, `lat?`/`lng?`, `fotoUrl?`
+- `EventoRsvp.criadoEm` + status `LISTA_ESPERA` (fila FIFO)
 ### `Noticia` (por afiliação)
 Feed informativo curado.
 - `id, afiliacaoId (FK, Cascade), titulo, resumo?, url, fonte, publicadoEm,
@@ -69,7 +74,8 @@ Staging + auditoria da importação da base existente (prioridade #1 de dados).
 
 ## Enums novos
 
-- `MandoJogo`: CASA, FORA
+- `MandoJogo`: CASA, FORA — ✅ em uso com `Partida`
+- `StatusPartida`: AGENDADA, AO_VIVO, ENCERRADA, CANCELADA — ✅ com `Partida`
 - `StatusAlianca`: SUGERIDA, PENDENTE, ATIVA, ENCERRADA
 - `ConfiancaRecomendacao`: ALTA, MEDIA, BAIXA
 - `OrigemImportacao`: CSV, BOT, DISCORD

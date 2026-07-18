@@ -118,6 +118,28 @@ aprovar “no escuro” sem mostrar o departamento.
 
 Agentes: `data-model`, `rbac`, `implementation`, `ux-review`, `qa-verification`.
 
+## Agenda unificada + `Partida` — entregue (2026-07-17)
+
+Hub único de eventos (decisão **1A** + fases **2C**). Commit `36071fa`.
+Doc canônico: `docs/data/modulo-eventos.md`; decisão arquitetural: `ARCHITECTURE.md` §5.11.
+
+| Entrega | Detalhe |
+|---------|---------|
+| Hub | `/admin/eventos`, `/portal/eventos`; vistas lista/semana/mês; redirects caravanas/bateria |
+| Capacidade | `LISTA_ESPERA` FIFO (`criadoEm`); promove ao liberar vaga |
+| Série | `serieId` + edit/delete esta\|futuras |
+| Mapa | `lat`/`lng` + embed OSM |
+| Check-in | QR + fila offline (localStorage) |
+| `Partida` | Global por `Afiliacao`; vínculo `Evento.partidaId`; cadastro rápido |
+| Cron | `GET /api/cron/eventos-lembretes` |
+
+**Anti-padrões:** apps separados caravanas/bateria; scrapar Google Sports SERP;
+tratar Sofascore widgets como sync de `Partida`. Fontes de jogos:
+`docs/knowledge/futebol-dados-publicos.md`. Decisão aberta #7 = provedor API.
+
+Agentes: `product-strategy`, `data-model`, `research-dominio`, `implementation`,
+`ux-review`, `qa-verification`, `rbac`.
+
 
 ## Benchmark competitivo (gestão de torcidas) — 2026-07-16
 

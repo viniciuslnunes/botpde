@@ -80,6 +80,12 @@ Em mudanças que tocam membros/cadastro, verifique também:
   retorna membros; Network 200. Regressão: SQL `DISTINCT`+`similarity` →
   Postgres `42P10`. Página `/busca` = `completa` (canais/follow). Ver
   `docs/data/modulo-comunidade.md` § busca.
+- Agenda: mutações com `EVENTS_CREATE`/`EVENTS_MANAGE` + `AuditLog`;
+  `Partida` queries **sem** filtro `tenantId` (global); waitlist promove por
+  `criadoEm`; série edita/apaga só futuras quando escopo = futuras; redirects
+  `/portal/caravanas*` e `/portal/bateria*` intactos. Smoke: criar evento com
+  capacidade 1 → 2º RSVP vira `LISTA_ESPERA`; check-in offline reenvia ao
+  online. Doc: `docs/data/modulo-eventos.md`.
 - Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
   (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
   inscritos digitais com torcedores presenciais.

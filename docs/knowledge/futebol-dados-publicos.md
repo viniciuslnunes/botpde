@@ -75,3 +75,44 @@ Dois tiers em `Afiliacao` (seed offline, nunca API em runtime):
 
 Agentes: `research-dominio` (novos fatos aqui), `data-model` (schema),
 `implementation` (seed), `ux-review` (copy dos tiers), `qa-verification` (testes).
+
+---
+
+## Calendário / tabela / painel “Sports” do Google — o que **não** existe de graça
+
+> Consulta **2026-07-17**. Confiança: **alta** (documentação Google + ausência de
+> produto público; painel SERP observado na UI).
+
+Usuários (e stakeholders) frequentemente pedem “a API do Google Sports” — o painel
+rico da busca (tabela, próximos jogos, notícias, técnico) ao pesquisar um clube.
+**Não há API oficial gratuita da Google que devolva esse painel estruturado.**
+
+| Caminho Google | O que entrega | Serve para `Partida` / tabela? |
+|----------------|---------------|--------------------------------|
+| Knowledge Graph Search API | Entidades (nome, tipo, descrição) | **Não** — sem standings/fixtures |
+| Custom Search JSON API | Resultados de busca (links/snippets); free tier limitado | **Não** — não é dado esportivo estruturado |
+| “Sports widget” / painel SERP | Só na UI da Busca Google | **Sem API pública** documentada |
+| Scraping da SERP | HTML frágil | **Proibido** pelos ToS; quebra fácil; risco legal |
+
+Scrapers comerciais (ex.: SerpApi e similares) podem expor o painel via proxy pago —
+**terceiro pago**, não Google oficial; rate limits e ToS do scraper se aplicam.
+Não tratar como “API Google grátis” em plano de produto.
+
+### O que o Torcida SaaS deve usar em vez disso
+
+Para popular `Partida` (global por `Afiliacao`) e enriquecer Agenda:
+
+| Camada | Uso no produto | Notas |
+|--------|----------------|-------|
+| Cadastro manual / “partida rápida” | Já entregue (2026-07-17) | Form admin + vínculo `Evento.partidaId` |
+| API de futebol (ex. API-Football / equivalentes) | Sync futuro de calendário/placar | Decisão aberta #7 — avaliar plano free/pago |
+| Wikidata / dados abertos | Spike opcional (fixtures limitados) | Cobertura desigual BR |
+| RSS / imprensa | Notícias (`Noticia`), não jogos | Curadoria via `news-curator` |
+| Sofascore **widgets** oficiais | Display na Comunidade | Embed iframe — **não** alimenta `Partida` |
+
+Doc operacional Agenda: `docs/data/modulo-eventos.md`. Widgets:
+`docs/data/modulo-sofascore-widgets.md`.
+
+**Regra para agentes:** se alguém pedir “integrar Google Sports / tabela Google”,
+responder com esta seção; propor sync via provedor de futebol ou entrada manual —
+nunca scraping SERP nem inventar endpoint Google inexistente.

@@ -17,6 +17,11 @@ vazio nem widget genérico).
 Only official Sofascore iframe embeds — nunca scraping nem endpoint não documentado, e
 nunca construir URL de embed manualmente a partir de IDs.
 
+**Não confundir com sync de `Partida`:** widgets são **só visualização** na Comunidade.
+Não populam calendário/placar no banco. Ingestão de jogos = modelo `Partida` +
+cadastro manual ou API de futebol futura — ver `docs/data/modulo-eventos.md` e
+`docs/knowledge/futebol-dados-publicos.md` (Google Sports ≠ API gratuita).
+
 ## Onde cadastrar embeds
 
 Arquivo: `packages/types/src/sofascore-widgets.js`, array `SOFASCORE_WIDGETS`.

@@ -63,6 +63,12 @@ comunicar validação real (não placeholder decorativo).
   falha de API nunca deve parecer “Nenhum resultado para …”. Typeahead usa
   `modo=rapida` (resultados enxutos); “Ver todos” leva à página completa.
   Ver `docs/data/modulo-comunidade.md` § busca.
+- Agenda (`/portal/eventos`, `/admin/eventos`): hub único — não sugerir voltar
+  apps separados caravanas/bateria. Calendário lista/semana/mês; RSVP ≠
+  check-in (presença é status próprio). Lotação cheia → lista de espera
+  visível. Detalhe: mapa se houver lat/lng; card da partida se vinculada;
+  check-in QR com feedback de fila offline. Vocabulário: caravana/ensaio/jogo.
+  Ver `docs/data/modulo-eventos.md`.
 - Consistência com `@torcida/ui` e tokens; não introduzir estilos soltos.
 - Salas (Meet): lista/lobby, grid de chamada, chat, enquetes, presença e o gesto de
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho

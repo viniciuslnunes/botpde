@@ -44,6 +44,8 @@ operacional** antes de expandir para comunidade/informação.
 - `futebol-dados-publicos.md` — card de clube no onboarding usa IBOPE Repucom
   (Top 50, inscritos digitais) + teto 10 mil fora do ranking; valor social da
   plataforma = sócios/torcedores reais online (dado próprio, não IBOPE).
+  **Jogos:** não priorizar “API Google Sports” — não existe gratuita/oficial
+  para o painel SERP; sync de `Partida` = decisão #7 (API de futebol) ou manual.
 
 Dores recorrentes do nicho para priorização: caravanas (logística + listas de
 embarque + pagamento), inadimplência de mensalidade, inventário de patrimônio
@@ -84,6 +86,13 @@ aprovação da diretoria (com opção Sem área). Doc canônico:
 `docs/data/modulo-departamentos.md`. Ao priorizar onboarding/admin de membros,
 preserve essa regra — é alinhada à admissão estatutária
 (`estrutura-governanca.md`).
+
+## Agenda unificada (já entregue — 2026-07-17)
+Não reabrir épico de “app Caravanas vs app Bateria” separados: hub único
+`/admin|portal/eventos` com `Evento.tipo` (decisão **1A** + fases **2C**).
+`Partida` + vínculo manual entregues; **próximo valor** em jogos = sync API
+(decisão #7), não reimplementar calendário. Gaps restantes: bilheteria/ônibus,
+PWA check-in, placar ao vivo. Doc: `docs/data/modulo-eventos.md`.
 
 ## Como trabalhar
 1. Enquadre o problema por domínio (Operação, Mobilização, Comunidade, Alianças,

@@ -16,9 +16,12 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
 
 ## Fontes de verdade (leia antes de opinar)
 - `ARCHITECTURE.md` §5.4 (provedor DB), §5.6 (plano de 5 fases concluído),
-  §5.6.1 (Comunidade 2026-07-16).
+  §5.6.1 (Comunidade 2026-07-16), §5.11 (Agenda 2026-07-17).
 - `docs/data/modulo-comunidade-performance.md` — entregas A–D/C, padrões,
   **ganhos estimados por cenário (%)**, Fases E–F e gatilhos para reabrir.
+- `docs/data/modulo-eventos.md` — listagens por janela (semana/mês), não
+  carregar o histórico inteiro; cache de escopo/sedes; cron lembretes fora do
+  request do usuário.
 - `CLAUDE.md` — convenções de cache, multi-tenant e Prisma.
 - Cache: `apps/web/src/lib/tenant.ts`, `hierarquia.ts`, `comunidade.ts`, `feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`, `stories.ts`, `salas.ts`.

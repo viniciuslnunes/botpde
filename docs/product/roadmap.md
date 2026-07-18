@@ -35,12 +35,20 @@ por depto, worktree de acesso) — ver `docs/data/modulo-departamentos.md`.
 2. Modelo de **Alianças**: `Alianca`, visibilidade `'allied'`, `/admin/aliancas`,
    permissão `ALLIANCES_MANAGE`; recomendações do agente `aliancas-torcidas`.
 3. Integração de **jogos/calendário/resultados** (`Partida`) → alimenta eventos.
+   **Parcial (2026-07-17):** modelo + vínculo `Evento.partidaId` + cadastro rápido
+   entregues (`modulo-eventos.md`). **Falta:** sync automático via provedor
+   (decisão #7 — Google Sports descartado).
 4. Iniciar **tRPC** (API central interna) — base para mobile e ingestão externa.
 
 **Entregue além do previsto:** recomendações automáticas de aliança, co-irmãs
 (mesma afiliação, confiança ALTA sempre), grafo nacional de rivalidade
 (`RivalidadeClube`/`RivalidadeTorcida`, ver item 5 da Fase 3 abaixo — já
 entregue, não só planejado) e herança de aliança pela worktree inteira.
+
+**Entregue fora de ordem (2026-07-17):** **Agenda unificada** — hub `/admin|portal/eventos`
+(lista/semana/mês), capacidade + lista de espera, recorrência/`serieId`, mapa,
+check-in QR + fila offline, lembretes cron, redirects caravanas/bateria.
+Ver `docs/data/modulo-eventos.md` (commit `36071fa`).
 
 **Resultado:** comunidade com aliados + primeira camada de informação confiável.
 

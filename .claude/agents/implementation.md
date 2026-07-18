@@ -93,3 +93,10 @@ cadastro. Membership em `aprovarMembro` (`admin/membros/actions.ts`); UI em
 `member-actions.tsx` (Aprovar e incluir / Sem área). Equipe:
 filtrar PENDENTE/REPROVADO sem `deleteMany` no GET. Repair:
 `db:repair-departamento-orfaos`. Ver `docs/data/modulo-departamentos.md`.
+**Agenda / eventos:** hub único — `docs/data/modulo-eventos.md`. Libs:
+`eventos-serie.ts`, `eventos-waitlist.ts`, `partidas.ts`, `checkin-offline.ts`,
+`eventos-tipo.ts`. Actions: `admin/eventos/actions.ts`, `admin/partidas/actions.ts`,
+`portal/eventos/actions.ts`. `Partida` **sem** `tenantId` (global por afiliação).
+Waitlist: `promoverProximoDaEspera` na saída de CONFIRMADO. Série: escopo
+esta|futuras. **Não** scrapar Google Sports; widgets Sofascore ≠ ingestão de
+`Partida`. Cron: `api/cron/eventos-lembretes`.

@@ -741,6 +741,24 @@ inteligência de fontes: `docs/knowledge/futebol-dados-publicos.md`.
 - **Onboarding Fase 3**: filtro UF no passo clube; comunidade nacional para torcedor global
   sem torcida na plataforma (`comunidade-nacional-shell.tsx`).
 
+### 5.11 Agenda unificada + `Partida` (2026-07-17)
+
+Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
+`docs/data/modulo-eventos.md`. Fontes de jogos / anti-padrão Google Sports:
+`docs/knowledge/futebol-dados-publicos.md`.
+
+- **Superfícies:** `/admin/eventos`, `/portal/eventos`; redirects de
+  `/portal/caravanas*` e `/portal/bateria*`. Vistas lista / semana / mês.
+- **`Evento`:** `serieId` (recorrência semanal + edit/delete esta\|futuras),
+  `partidaId`, `lat`/`lng`, `capacidade` (+ waitlist `LISTA_ESPERA` FIFO por
+  `EventoRsvp.criadoEm`), `fotoUrl`.
+- **`Partida`:** global por `Afiliacao` (sem `tenantId`); mando/status enums;
+  cadastro manual / partida rápida. Sync API externo = decisão aberta #7.
+- **Ops:** cron lembretes; ICS; mural `?eventoId=`; QR + fila offline
+  (`checkin-offline.ts`); mapa OSM embutido.
+- **Não fazer:** scrapar SERP Google Sports; tratar widgets Sofascore como ingestão
+  de `Partida`.
+
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
 - ~~**Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)**~~

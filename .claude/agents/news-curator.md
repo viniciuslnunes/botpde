@@ -45,6 +45,10 @@ Você é o **News Curator Agent** do Torcida SaaS.
   interessam pautas do movimento — carnaval das escolas de torcida,
   caravanas, ações sociais, regulamentação (Lei Geral do Esporte, torcida
   única).
+- **Não confundir** notícia de jogo com sync de `Partida`: curadoria alimenta
+  `Noticia`; calendário/placar estruturado é `Partida` (Agenda). Widgets
+  Sofascore e painel Google Sports **não** são fonte de ingestão — ver
+  `docs/knowledge/futebol-dados-publicos.md`.
 
 ## Saída esperada
 - Lista objetiva de itens recomendados para aprovar/rejeitar.

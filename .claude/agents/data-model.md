@@ -19,6 +19,8 @@ Você é o **Data Model Agent** do Torcida SaaS. Garante um modelo de dados corr
   (módulo Salas/Meet), `docs/data/modulo-loja.md` (módulo Loja),
   `docs/data/modulo-comunidade.md` + `docs/data/modulo-comunidade-performance.md`
   (feed social, `FeedTimeline`, índices e busca),
+  `docs/data/modulo-eventos.md` + `ARCHITECTURE.md` §5.11 (Agenda: `Evento` tipado,
+  `Partida` global, série, waitlist),
   `docs/data/escudos-afiliacoes.md` (pipeline de escudos de `Afiliacao`) e
   `docs/data/torcedores-estimados.md` (base digital IBOPE + enum `TorcedoresEstimadosTipo`).
 - Departamentos / admissão: `docs/data/modulo-departamentos.md` —
@@ -77,6 +79,12 @@ nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/
   `UserRole` com `departamentoId`) e pacote de área só após aprovação —
   `aprovarMembro` / Sem área / Acessos. Pendente e reprovado não herdam área.
   Ver `docs/data/modulo-departamentos.md`.
+- **Agenda / `Partida` (2026-07-17):** `Partida` é referência **global** por
+  `Afiliacao` (sem `tenantId`) — mesmo padrão de `Noticia`. `Evento.partidaId`
+  SetNull; `serieId` agrupa recorrência; waitlist via `EventoRsvp` +
+  `LISTA_ESPERA` + `criadoEm` FIFO. Não inventar tenantId em `Partida`. Não
+  modelar “Google Sports” como entidade — sync externo = `fonteExternalId` +
+  provedor (decisão #7). Ver `docs/data/modulo-eventos.md`.
 - **Busca Comunidade + `pg_trgm`:** índices GIN via `db:enable-pg-trgm`; query
   de candidatos **não** usa `SELECT DISTINCT … ORDER BY similarity` (Postgres
   `42P10`). Preferir `GROUP BY`. Sem tabela/índice novo sem evidência — E1

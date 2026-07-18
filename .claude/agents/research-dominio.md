@@ -41,11 +41,15 @@ web para o que ela não cobre:
   `docs/data/escudos-afiliacoes.md`).
 - `futebol-dados-publicos.md` — IBOPE Ranking Digital (inscritos vs torcedores);
   ver `docs/data/torcedores-estimados.md` para pipeline operacional.
+  **Também:** calendário/tabela — Google Sports SERP **não** tem API oficial
+  gratuita; não propor scraping. Alternativas para `Partida`: API de futebol,
+  Wikidata, cadastro manual (já no produto).
 - Alianças/rivalidades são do agente `aliancas-torcidas` (`aliancas.md`).
 - `concorrentes-gestao.md` — SaaS de gestão (TorcidaWeb, Softaliza, TorcidasPRO,
   Clube Control): pricing, módulos, gaps vs. domínio de organizada. Plano de
   produto derivado: `docs/product/plano-paridade-concorrentes.md` (você **não**
-  reescreve o plano; só atualiza o knowledge de concorrentes).
+  reescreve o plano; só atualiza o knowledge de concorrentes). Matriz §5 eventos
+  atualizada 2026-07-17 (Agenda/QR/capacidade).
 
 **Você é co-mantenedor desta base**: quando uma pesquisa sua produzir fato novo
 verificável, atualize o arquivo certo em `docs/knowledge/` (só lá), seguindo o

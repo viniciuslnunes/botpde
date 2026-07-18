@@ -9,8 +9,9 @@ cenário %**, live UX: ping pós-fan-out / auto-refetch no topo, **engajamento
 overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
 **publish + nav-back** 2026-07-17: prepend otimista / chrome no layout /
 `React.cache` salas·tenant, e **busca** 2026-07-17: `modo=rapida` + SQL
-`GROUP BY` — sem `DISTINCT`+`similarity`); agente `performance` para auditorias
-novas.
+`GROUP BY` — sem `DISTINCT`+`similarity`); **Agenda** 2026-07-17:
+`docs/data/modulo-eventos.md` + `ARCHITECTURE.md` §5.11; agente `performance`
+para auditorias novas.
 
 ## O que é
 
@@ -109,10 +110,16 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
   portal `/portal/patrimonio`, admin `/admin/patrimonio`.
-- **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`):
-  `docs/data/modulo-caravanas.md`, `docs/data/modulo-bateria.md`.
-- **Sofascore Widgets** — embeds oficiais por clube na comunidade: cadastro em
-  `packages/types/src/sofascore-widgets.js`; ver `docs/data/modulo-sofascore-widgets.md`.
+- **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`);
+  hubs legado redirecionam para Agenda: `docs/data/modulo-caravanas.md`,
+  `docs/data/modulo-bateria.md`.
+- **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos` (lista/semana/mês);
+  `Partida` global por `Afiliacao`; série/waitlist/mapa/QR offline; ver
+  `docs/data/modulo-eventos.md` e `ARCHITECTURE.md` §5.11. Fontes de jogos:
+  `docs/knowledge/futebol-dados-publicos.md` (Google Sports ≠ API gratuita).
+- **Sofascore Widgets** — embeds oficiais por clube na comunidade (display only;
+  não sync de `Partida`): `packages/types/src/sofascore-widgets.js`; ver
+  `docs/data/modulo-sofascore-widgets.md`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`; engajamento (reação/comentário CN):
   `comunidade/actions.ts` (`resolverContextoEngajamento`, `podeEngajarPostVisivel`);
@@ -120,8 +127,6 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `GROUP BY` (nunca `DISTINCT`+`ORDER BY similarity`); ver
   `docs/data/modulo-comunidade.md` (§ engajamento / § busca) e
   `docs/data/modulo-comunidade-performance.md`.
-- **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos`; plugins
-  Caravanas/Bateria por `Evento.tipo`; ver `docs/data/modulo-eventos.md`.
 - **Design** — personalização visual do tenant (`/admin/design`): marca, grade
   `.app-shell-bg`, superfícies claro/escuro; `Tenant.design` + sugestões por
   clube/escudo; ver `docs/data/modulo-design.md`.

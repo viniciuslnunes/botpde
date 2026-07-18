@@ -19,7 +19,7 @@
 
 | # | Decisão | Opções | Nota |
 |---|---|---|---|
-| 7 | Provedor de API de jogos | ex.: API-Football, outros | Spike técnico na Fase 2: avaliar limites do plano free antes de fechar |
+| 7 | Provedor de API de jogos | API-Football, TheSportsDB, outros pagos; Wikidata spike | **2026-07-17:** Google Sports / painel SERP **descartado** como fonte — sem API oficial gratuita; Knowledge Graph ≠ fixtures; scraping SERP fora. Modelo `Partida` + cadastro manual já entregues. Spike: limites do plano free do provedor escolhido antes de fechar. Ver `docs/knowledge/futebol-dados-publicos.md` |
 | 11 | Lock otimista no estoque da Loja | Adicionar campo `version`/lock otimista aos itens de estoque JSON, vs. manter read-modify-write | Sob concorrência real (duas compras simultâneas do mesmo item) o mapa de estoque pode ser sobrescrito. Achado da auditoria de 2026-07-16 (agente `loja`) |
 | 12 | Remover `fazerPedido` (deprecated) | Remover quando não houver mais chamador do fluxo single-item antigo | Hoje delega a `adicionarAoCarrinho`; resquício do fluxo pré multi-item. Achado da auditoria de 2026-07-16 (agente `loja`) |
 | 13 | Modelo de preço do SaaS vs mercado | Preço **fixo** (estilo Clube Control R$350–500) vs faixa por **sócios ativos/adimplentes** (TorcidaWeb / TorcidasPRO) | Benchmark 2026-07-16 em `docs/knowledge/concorrentes-gestao.md`; impacta GTM antes de vender cobrança como ROI |

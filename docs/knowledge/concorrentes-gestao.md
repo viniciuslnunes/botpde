@@ -182,29 +182,30 @@ mercado. Priorização em `plano-paridade-concorrentes.md`.
 
 | Feature | TW | SF | TP | CC | Nós | Notas |
 |---|:-:|:-:|:-:|:-:|:-:|---|
-| Calendário / agenda | ● | ● | · | ● | ✓ | Eventos + Partida parcial |
-| Eventos gerais + RSVP | · | ● | ~ | ● | ✓ | TP menciona eventos nos termos |
+| Calendário / agenda | ● | ● | · | ● | ✓ | Hub Agenda + `Partida` (manual; sync API aberto) |
+| Eventos gerais + RSVP | · | ● | ~ | ● | ✓ | + lista de espera / capacidade |
 | Tipos de evento custom | · | · | · | ● | ~ | Temos GERAL/CARAVANA/ENSAIO fixos |
-| Check-in por QR | · | ● | · | ● | ✗ | SF credenciamento; CC eventos |
+| Check-in por QR | · | ● | · | ● | ✓ | Admin + fila offline (browser) |
 | Lista de presença / embarque | · | · | · | · | ✓ | Caravanas/bateria |
-| Planejamento de viagens / caravanas | ● | · | · | · | ~ | TW marketing; nós plugin sem pagamento |
+| Planejamento de viagens / caravanas | ● | · | · | · | ~ | TW marketing; nós plugin + hub Agenda |
 | Compra de ingressos em grupo | ● | · | · | · | ✗ | TW |
 | Bilheteria (presencial + online) | · | · | · | ● | ✗ | |
 | Categorias ingresso (VIP/meia/cortesia) | · | · | · | ● | ✗ | |
 | Caixa de bilheteria (abertura/fechamento) | · | · | · | ● | ✗ | |
-| Pagamento de vaga em caravana | · | · | · | · | ✗ | Nenhum detalha bem; dor nossa de domínio |
+| Pagamento de vaga em caravana | · | · | · | · | ~ | Fluxo parcial no detalhe do evento |
 | Ônibus / mapa de assentos | · | · | · | · | ✗ | |
 | Credenciamento científico / anais | · | ● | · | · | ✗ | SF (irrelevante p/ torcida) |
 | Certificados automáticos | · | ● | · | · | ✗ | SF Academy |
 
 ### Gaps nossos (relevantes ao nicho)
 
-1. Check-in via QR (reusar carteirinha)  
+1. ~~Check-in via QR~~ — ✓ (2026-07-17; fila offline no browser; PWA completa ainda horizonte)
 2. Bilheteria / ingressos pagos  
-3. Pagamento de vaga caravana  
+3. Pagamento de vaga caravana (completar + financeiro do evento)  
 4. Ingressos em grupo / viagens (TW)  
 5. Fechamento financeiro do evento  
-6. Capacidade/lotação enforced  
+6. ~~Capacidade/lotação enforced~~ — ✓ lista de espera FIFO  
+7. Sync externo de `Partida` (API de futebol — **não** Google Sports SERP)  
 
 ---
 

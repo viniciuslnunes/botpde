@@ -15,7 +15,7 @@
 | [`cultura-ideologia.md`](cultura-ideologia.md) | Origem, gerações, escolas de samba, política e valores | `ux-review`, `news-curator`, `product-strategy` |
 | [`contexto-legal.md`](contexto-legal.md) | Estatuto do Torcedor, Lei Geral do Esporte, torcida única, cadastro | `product-strategy`, `data-model`, `rbac`, `qa-verification` |
 | [`glossario.md`](glossario.md) | Jargão do nicho para UX, copy e moderação | `ux-review`, `implementation`, `news-curator` |
-| [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital, limitações inscritos vs torcedores | `research-dominio`, `product-strategy`, `ux-review` |
+| [`futebol-dados-publicos.md`](futebol-dados-publicos.md) | IBOPE Ranking Digital; **APIs de jogos** (Google Sports ≠ API gratuita; alternativas para `Partida`) | `research-dominio`, `product-strategy`, `data-model`, `ux-review` |
 | [`concorrentes-gestao.md`](concorrentes-gestao.md) | **Catálogo atômico de gaps** vs TorcidaWeb / Softaliza / TorcidasPRO / Clube Control (~110+ features; matrizes por domínio + ranking P0–P3) | `research-dominio`, `product-strategy` |
 
 **Dados operacionais relacionados** (fora de `knowledge/`):
@@ -24,6 +24,7 @@
 |-----|----------|
 | [`docs/data/escudos-afiliacoes.md`](../data/escudos-afiliacoes.md) | Escudos de `Afiliacao` (Soccer Wiki, Ogol, Cloudinary) |
 | [`docs/data/torcedores-estimados.md`](../data/torcedores-estimados.md) | Base digital IBOPE + teto conservador no onboarding |
+| [`docs/data/modulo-eventos.md`](../data/modulo-eventos.md) | Agenda unificada (eventos/caravanas/bateria), `Partida`, capacidade, série |
 | [`docs/data/modulo-comunidade-performance.md`](../data/modulo-comunidade-performance.md) | Feed, timeline, busca, caches e plano futuro Comunidade |
 | [`docs/product/plano-paridade-concorrentes.md`](../product/plano-paridade-concorrentes.md) | O que integrar do mercado (fases A–D: caixa, LGE, QR, sede) |
 
