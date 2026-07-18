@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { m } from 'motion/react'
 import { CalendarX, ChevronRight, Clock, MapPin, Users } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { EventoTipoBadge } from '@/components/eventos/evento-tipo-badge'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export interface EventoCardItem {
@@ -16,6 +17,8 @@ export interface EventoCardItem {
   diasLabel: string | null
   rsvpStatus?: string
   confirmados: number
+  tipo?: string
+  lotacaoLabel?: string
 }
 
 function RsvpBadge({ status }: { status?: string }) {
@@ -23,6 +26,13 @@ function RsvpBadge({ status }: { status?: string }) {
     return (
       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
         Confirmado ✓
+      </span>
+    )
+  }
+  if (status === 'LISTA_ESPERA') {
+    return (
+      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+        Lista de espera
       </span>
     )
   }
@@ -41,6 +51,7 @@ function EventoCardLink({ evento }: { evento: EventoCardItem }) {
     <m.div variants={staggerItem} whileTap={{ scale: 0.98 }} transition={springSnappy}>
       <Link
         href={`/portal/eventos/${evento.id}`}
+        prefetch
         className={[
           'group flex flex-col gap-3 rounded-xl border p-5 transition-all hover:shadow-md',
           evento.passado
@@ -51,13 +62,14 @@ function EventoCardLink({ evento }: { evento: EventoCardItem }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              {evento.tipo && <EventoTipoBadge tipo={evento.tipo} />}
               <h3 className="font-semibold text-[rgb(var(--foreground))]">{evento.titulo}</h3>
               {evento.diasLabel && (
                 <span
                   className={[
                     'rounded-full px-2 py-0.5 text-xs font-semibold',
                     evento.diasLabel === 'Hoje' || evento.diasLabel === 'Amanhã'
-                      ? 'bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300'
+                      ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                   ].join(' ')}
                 >
@@ -84,7 +96,9 @@ function EventoCardLink({ evento }: { evento: EventoCardItem }) {
               )}
               <span className="flex items-center gap-1">
                 <Users className="h-3.5 w-3.5" />
-                {evento.confirmados} {evento.passado ? 'presença(s)' : 'confirmado(s)'}
+                {evento.lotacaoLabel
+                  ? `${evento.lotacaoLabel} confirmados`
+                  : `${evento.confirmados} ${evento.passado ? 'presença(s)' : 'confirmado(s)'}`}
               </span>
             </div>
           </div>

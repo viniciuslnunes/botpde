@@ -45,7 +45,7 @@ export const resolverProximaAcaoArea = cache(async function resolverProximaAcaoA
       return {
         titulo: ensaios[0].titulo,
         descricao: 'Próximo ensaio da bateria.',
-        href: `/portal/bateria/${ensaios[0].id}`,
+        href: `/portal/eventos/${ensaios[0].id}`,
         cta: 'Abrir ensaio',
       }
     }
@@ -57,7 +57,7 @@ export const resolverProximaAcaoArea = cache(async function resolverProximaAcaoA
       return {
         titulo: cars[0].titulo,
         descricao: 'Próxima caravana — RSVP e embarque.',
-        href: `/portal/caravanas/${cars[0].id}`,
+        href: `/portal/eventos/${cars[0].id}`,
         cta: 'Abrir caravana',
       }
     }

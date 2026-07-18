@@ -2,7 +2,12 @@
 
 import { useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { criarEvento, editarEvento, excluirEvento, type EventoState } from '@/app/admin/eventos/actions'
+import {
+  criarEvento,
+  editarEvento,
+  excluirEvento,
+  type EventoState,
+} from '@/app/admin/eventos/actions'
 import { Trash2, CalendarPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
@@ -14,6 +19,8 @@ import { useTrackedForm } from '@/lib/unsaved-changes'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
 
+export type SedeOption = { id: string; nome: string; capacidade: number | null }
+
 /** Valor datetime-local no formato esperado pelo input */
 function toDatetimeLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -21,10 +28,10 @@ function toDatetimeLocal(date: Date): string {
 }
 
 function TipoSelect({
-  defaultValue = 'GERAL',
+  value = 'GERAL',
   onChange,
 }: {
-  defaultValue?: string
+  value?: string
   onChange?: (tipo: string) => void
 }) {
   return (
@@ -32,18 +39,89 @@ function TipoSelect({
       <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
         Tipo
       </label>
+      <div className="grid grid-cols-3 gap-2">
+        {TIPOS.map((t) => (
+          <label
+            key={t}
+            className={[
+              'cursor-pointer rounded-lg border px-2 py-2 text-center text-xs font-semibold transition-colors',
+              value === t
+                ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
+            ].join(' ')}
+          >
+            <input
+              type="radio"
+              name="tipo"
+              value={t}
+              className="sr-only"
+              checked={value === t}
+              onChange={() => onChange?.(t)}
+            />
+            {TIPO_EVENTO_LABEL[t]}
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SedeSelect({
+  sedes,
+  defaultValue,
+  errors,
+}: {
+  sedes: SedeOption[]
+  defaultValue?: string | null
+  errors?: string[]
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Escopo territorial
+      </label>
       <select
-        name="tipo"
-        defaultValue={defaultValue}
-        onChange={(e) => onChange?.(e.target.value)}
+        name="sedeId"
+        defaultValue={defaultValue ?? 'global'}
         className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
       >
-        {TIPOS.map((t) => (
-          <option key={t} value={t}>
-            {TIPO_EVENTO_LABEL[t]}
+        <option value="global">Toda a torcida (global)</option>
+        {sedes.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nome}
+            {s.capacidade != null ? ` · lotação ${s.capacidade}` : ''}
           </option>
         ))}
       </select>
+      <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Global aparece para todos; unidade só para quem está vinculado àquela sede.
+      </p>
+      <FieldError errors={errors} />
+    </div>
+  )
+}
+
+function CapacidadeField({
+  defaultValue,
+  errors,
+}: {
+  defaultValue?: number | null
+  errors?: string[]
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+        Capacidade (opcional)
+      </label>
+      <Input
+        name="capacidade"
+        type="number"
+        min="1"
+        step="1"
+        placeholder="Usa a lotação da sede se vazio"
+        defaultValue={defaultValue != null && defaultValue > 0 ? String(defaultValue) : ''}
+      />
+      <FieldError errors={errors} />
     </div>
   )
 }
@@ -82,17 +160,20 @@ export function CriarEventoForm({
   redirectTo,
   submitLabel = 'Criar evento',
   lockTipo = false,
+  sedes = [],
+  onCancel,
 }: {
   defaultTipo?: string
   redirectTo?: string
   submitLabel?: string
   lockTipo?: boolean
+  sedes?: SedeOption[]
+  onCancel?: () => void
 }) {
   const [state, setState] = useState<EventoState>({})
   const [tipo, setTipo] = useState(defaultTipo)
   const { formRef } = useTrackedForm({ title: 'Novo evento' })
 
-  // Padrão: amanhã às 12h
   const amanha = new Date()
   amanha.setDate(amanha.getDate() + 1)
   amanha.setHours(12, 0, 0, 0)
@@ -111,7 +192,7 @@ export function CriarEventoForm({
       {lockTipo ? (
         <input type="hidden" name="tipo" value={defaultTipo} />
       ) : (
-        <TipoSelect defaultValue={defaultTipo} onChange={setTipo} />
+        <TipoSelect value={tipo} onChange={setTipo} />
       )}
 
       <AnimatePresence>
@@ -134,7 +215,7 @@ export function CriarEventoForm({
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
           Título <span className="text-red-500">*</span>
         </label>
-        <Input name="titulo" type="text" placeholder="Ex: Jogo Corinthians x Santos" required />
+        <Input name="titulo" type="text" placeholder="Ex: Concentração na sede" required />
         <FieldError errors={state.errors?.titulo} />
       </div>
 
@@ -161,6 +242,9 @@ export function CriarEventoForm({
         </div>
       </div>
 
+      <SedeSelect sedes={sedes} errors={state.errors?.sedeId} />
+      <CapacidadeField errors={state.errors?.capacidade} />
+
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
         <ValorVagaField errors={state.errors?.valorVaga} />
       )}
@@ -178,7 +262,18 @@ export function CriarEventoForm({
         <FieldError errors={state.errors?.descricao} />
       </div>
 
-      <SubmitButton label={submitLabel} icon={<CalendarPlus className="h-4 w-4" />} />
+      <div className="flex flex-wrap items-center gap-2">
+        <SubmitButton label={submitLabel} icon={<CalendarPlus className="h-4 w-4" />} />
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
     </form>
   )
 }
@@ -191,10 +286,20 @@ type EventoData = {
   data: Date
   local: string | null
   tipo?: string
+  sedeId?: string | null
+  capacidade?: number | null
   valorVaga?: number | { toNumber(): number } | null
 }
 
-export function EditarEventoForm({ evento }: { evento: EventoData }) {
+export function EditarEventoForm({
+  evento,
+  sedes = [],
+  redirectTo,
+}: {
+  evento: EventoData
+  sedes?: SedeOption[]
+  redirectTo?: string
+}) {
   const [state, setState] = useState<EventoState>({})
   const [tipo, setTipo] = useState(evento.tipo ?? 'GERAL')
   const { formRef } = useTrackedForm({
@@ -218,6 +323,7 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
       }}
       className="space-y-4"
     >
+      {redirectTo && <input type="hidden" name="redirectTo" value={redirectTo} />}
       <AnimatePresence>
         {state.message && (
           <m.div
@@ -234,7 +340,7 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
         )}
       </AnimatePresence>
 
-      <TipoSelect defaultValue={evento.tipo ?? 'GERAL'} onChange={setTipo} />
+      <TipoSelect value={tipo} onChange={setTipo} />
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -266,6 +372,9 @@ export function EditarEventoForm({ evento }: { evento: EventoData }) {
           <FieldError errors={state.errors?.local} />
         </div>
       </div>
+
+      <SedeSelect sedes={sedes} defaultValue={evento.sedeId} errors={state.errors?.sedeId} />
+      <CapacidadeField defaultValue={evento.capacidade} errors={state.errors?.capacidade} />
 
       {tipo === 'CARAVANA' && (
         <ValorVagaField defaultValue={valorDefault} errors={state.errors?.valorVaga} />

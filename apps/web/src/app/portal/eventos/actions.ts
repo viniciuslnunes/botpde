@@ -5,36 +5,84 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { assertMembroAtivo } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
+import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
+import { notificarSafe } from '@/lib/notificacoes'
+import type { RsvpStatus } from '@torcida/db'
 
-export async function responderRsvp(eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') {
+export type RsvpResult =
+  | { ok: true; status: RsvpStatus }
+  | { ok: false; error: string; status?: RsvpStatus }
+
+export async function responderRsvp(
+  eventoId: string,
+  status: 'CONFIRMADO' | 'RECUSADO' | 'LISTA_ESPERA',
+): Promise<RsvpResult> {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!session?.user?.id) throw new Error('Não autenticado')
-  if (!tenant) throw new Error('Tenant não encontrado')
+  if (!session?.user?.id) return { ok: false, error: 'Não autenticado' }
+  if (!tenant) return { ok: false, error: 'Tenant não encontrado' }
 
-  // Carteirinha e status de associação influenciam ações restritas — membro
-  // pendente/reprovado ou sócio com carteirinha vencida não confirma
-  // presença em evento oficial.
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const evento = await db.evento.findUnique({
     where: { id: eventoId },
-    select: { tenantId: true, data: true },
+    select: {
+      tenantId: true,
+      data: true,
+      titulo: true,
+      criadoPorId: true,
+      capacidade: true,
+      sede: { select: { capacidade: true } },
+      _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+    },
   })
 
-  if (!evento || evento.tenantId !== tenant.id) throw new Error('Evento não encontrado')
-  if (new Date(evento.data) < new Date()) throw new Error('Evento já encerrado')
+  if (!evento || evento.tenantId !== tenant.id) {
+    return { ok: false, error: 'Evento não encontrado' }
+  }
+  if (new Date(evento.data) < new Date()) {
+    return { ok: false, error: 'Evento já encerrado' }
+  }
+
+  let statusFinal: RsvpStatus = status
+
+  if (status === 'CONFIRMADO') {
+    const cap = capacidadeEfetiva(evento)
+    const atual = await db.eventoRsvp.findUnique({
+      where: { eventoId_userId: { eventoId, userId: session.user.id } },
+      select: { status: true },
+    })
+    const jaConfirmado = atual?.status === 'CONFIRMADO'
+    const confirmados =
+      jaConfirmado ? evento._count.rsvps : evento._count.rsvps
+    if (!jaConfirmado && lotacaoCheia(confirmados, cap)) {
+      statusFinal = 'LISTA_ESPERA'
+    }
+  }
 
   await db.eventoRsvp.upsert({
     where: { eventoId_userId: { eventoId, userId: session.user.id } },
-    update: { status },
-    create: { eventoId, userId: session.user.id, status },
+    update: { status: statusFinal },
+    create: { eventoId, userId: session.user.id, status: statusFinal },
   })
+
+  if (evento.criadoPorId && evento.criadoPorId !== session.user.id && statusFinal === 'CONFIRMADO') {
+    await notificarSafe({
+      userId: evento.criadoPorId,
+      tenantId: tenant.id,
+      tipo: 'EVENTO_RSVP',
+      titulo: 'Nova confirmação',
+      corpo: `Alguém confirmou presença em “${evento.titulo}”.`,
+      link: `/admin/eventos/${eventoId}`,
+      atorId: session.user.id,
+    })
+  }
 
   revalidatePath(`/portal/eventos/${eventoId}`)
   revalidatePath('/portal/eventos')
   revalidatePath('/portal/caravanas')
   revalidatePath('/portal/bateria')
-  revalidatePath(`/portal/caravanas/${eventoId}`)
-  revalidatePath(`/portal/bateria/${eventoId}`)
+  revalidatePath(`/admin/eventos/${eventoId}`)
   revalidatePath('/portal')
+
+  return { ok: true, status: statusFinal }
 }

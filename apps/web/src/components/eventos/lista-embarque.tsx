@@ -2,14 +2,16 @@
 
 import { CheckInButton } from '@/app/admin/eventos/[id]/checkin-button'
 import { CheckInPorQr } from '@/components/eventos/checkin-por-qr'
-import { UserCheck, UserX } from 'lucide-react'
+import { ExportEmbarqueCsvButton } from '@/components/eventos/export-embarque-csv'
+import { PromoverEsperaButton } from '@/components/eventos/promover-espera-button'
+import { UserCheck, UserX, Hourglass } from 'lucide-react'
 
 export type EmbarqueRow = {
   id: string
   userId: string
   nome: string
   email: string
-  status: 'CONFIRMADO' | 'RECUSADO'
+  status: 'CONFIRMADO' | 'RECUSADO' | 'LISTA_ESPERA'
   checkedInAt: string | null
 }
 
@@ -18,14 +20,17 @@ export function ListaEmbarque({
   itens,
   podeGerir,
   labelCheckin = 'Embarque',
+  tituloEvento,
 }: {
   eventoId: string
   itens: EmbarqueRow[]
   podeGerir: boolean
   labelCheckin?: string
+  tituloEvento?: string
 }) {
   const confirmados = itens.filter((i) => i.status === 'CONFIRMADO')
   const recusados = itens.filter((i) => i.status === 'RECUSADO')
+  const espera = itens.filter((i) => i.status === 'LISTA_ESPERA')
   const embarcados = confirmados.filter((i) => i.checkedInAt).length
 
   if (itens.length === 0 && !podeGerir) {
@@ -42,10 +47,19 @@ export function ListaEmbarque({
         <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
           Lista de {labelCheckin.toLowerCase()}
         </h2>
-        <p className="text-xs text-[rgb(var(--foreground-muted))]">
-          {embarcados}/{confirmados.length} com check-in · {confirmados.length} confirmado
-          {confirmados.length === 1 ? '' : 's'}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            {embarcados}/{confirmados.length} com check-in · {confirmados.length} confirmado
+            {confirmados.length === 1 ? '' : 's'}
+            {espera.length > 0 ? ` · ${espera.length} na espera` : ''}
+          </p>
+          {podeGerir && (
+            <ExportEmbarqueCsvButton
+              titulo={tituloEvento ?? labelCheckin}
+              itens={itens}
+            />
+          )}
+        </div>
       </div>
 
       {podeGerir && <CheckInPorQr eventoId={eventoId} />}
@@ -82,6 +96,26 @@ export function ListaEmbarque({
                 ) : (
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">Aguardando</span>
                 )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {espera.length > 0 && (
+        <div>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <Hourglass className="h-3.5 w-3.5" />
+            Lista de espera ({espera.length})
+          </p>
+          <ul className="space-y-1.5">
+            {espera.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-2 text-sm text-[rgb(var(--foreground))]"
+              >
+                <span className="truncate">{r.nome}</span>
+                {podeGerir && <PromoverEsperaButton eventoId={eventoId} userId={r.userId} />}
               </li>
             ))}
           </ul>

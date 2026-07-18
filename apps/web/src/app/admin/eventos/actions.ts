@@ -35,7 +35,9 @@ function formToEvento(formData: FormData) {
     data: formData.get('data'),
     local: formData.get('local') || undefined,
     tipo: formData.get('tipo') || 'GERAL',
+    sedeId: formData.get('sedeId') || null,
     valorVaga: formData.get('valorVaga') || undefined,
+    capacidade: formData.get('capacidade') || undefined,
   }
 }
 
@@ -53,10 +55,18 @@ export async function criarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo, valorVaga } = parsed.data
+  const { titulo, descricao, data, local, tipo, valorVaga, sedeId, capacidade } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
+  }
+
+  if (sedeId) {
+    const sede = await db.sede.findFirst({
+      where: { id: sedeId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
   }
 
   const redirectTo = formData.get('redirectTo')
@@ -68,6 +78,8 @@ export async function criarEvento(
       descricao: descricao ?? null,
       data: dataComp,
       local: local ?? null,
+      sedeId: sedeId ?? null,
+      capacidade: capacidade ?? null,
       valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
       criadoPorId: session.user.id,
     },
@@ -81,15 +93,16 @@ export async function criarEvento(
       acao: 'EVENTO_CRIADO',
       entidade: 'Evento',
       entidadeId: evento.id,
-      detalhes: { tipo: evento.tipo },
+      detalhes: { tipo: evento.tipo, sedeId: sedeId ?? null },
     },
   })
 
   revalidateEventoPaths(evento.id, evento.tipo)
-  if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
-    redirect(redirectTo)
+  // Sempre abre o cockpit do evento recém-criado
+  if (typeof redirectTo === 'string' && redirectTo.startsWith('/admin')) {
+    redirect(`/admin/eventos/${evento.id}`)
   }
-  redirect('/admin/eventos')
+  redirect(`/portal/eventos/${evento.id}`)
 }
 
 export async function editarEvento(
@@ -104,7 +117,7 @@ export async function editarEvento(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { titulo, descricao, data, local, tipo, valorVaga } = parsed.data
+  const { titulo, descricao, data, local, tipo, valorVaga, sedeId, capacidade } = parsed.data
   const dataComp = new Date(data)
   if (Number.isNaN(dataComp.getTime())) {
     return { errors: { data: ['Data inválida'] } }
@@ -119,6 +132,14 @@ export async function editarEvento(
     return { message: 'Evento não encontrado.' }
   }
 
+  if (sedeId) {
+    const sede = await db.sede.findFirst({
+      where: { id: sedeId, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!sede) return { errors: { sedeId: ['Sede inválida'] } }
+  }
+
   await db.evento.update({
     where: { id: existing.id },
     data: {
@@ -127,6 +148,8 @@ export async function editarEvento(
       data: dataComp,
       local: local ?? null,
       tipo,
+      sedeId: sedeId ?? null,
+      capacidade: capacidade ?? null,
       valorVaga: tipo === 'CARAVANA' && valorVaga != null ? valorVaga : null,
     },
   })
@@ -138,7 +161,7 @@ export async function editarEvento(
       acao: 'EVENTO_EDITADO',
       entidade: 'Evento',
       entidadeId: eventoId,
-      detalhes: { tipo },
+      detalhes: { tipo, sedeId: sedeId ?? null },
     },
   })
 
@@ -147,7 +170,7 @@ export async function editarEvento(
   if (typeof redirectTo === 'string' && redirectTo.startsWith('/')) {
     redirect(redirectTo)
   }
-  redirect('/admin/eventos')
+  redirect(`/admin/eventos/${eventoId}`)
 }
 
 /**
@@ -255,6 +278,71 @@ export async function registrarCheckInPorQr(
 
   revalidateEventoPaths(eventoId, evento.tipo)
   return { ok: true, nome: socio.nome }
+}
+
+export async function promoverDaListaEspera(
+  eventoId: string,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.EVENTS_MANAGE)
+
+  const evento = await db.evento.findUnique({
+    where: { id: eventoId },
+    select: {
+      tenantId: true,
+      tipo: true,
+      capacidade: true,
+      sede: { select: { capacidade: true } },
+      _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+    },
+  })
+  if (!evento || evento.tenantId !== tenant.id) {
+    return { ok: false, error: 'Evento não encontrado' }
+  }
+
+  const { capacidadeEfetiva, lotacaoCheia } = await import('@/lib/eventos-capacidade')
+  const cap = capacidadeEfetiva(evento)
+  if (lotacaoCheia(evento._count.rsvps, cap)) {
+    return { ok: false, error: 'Lotação esgotada' }
+  }
+
+  const rsvp = await db.eventoRsvp.findUnique({
+    where: { eventoId_userId: { eventoId, userId } },
+    select: { status: true },
+  })
+  if (!rsvp || rsvp.status !== 'LISTA_ESPERA') {
+    return { ok: false, error: 'Membro não está na lista de espera' }
+  }
+
+  await db.eventoRsvp.update({
+    where: { eventoId_userId: { eventoId, userId } },
+    data: { status: 'CONFIRMADO' },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'EVENTO_PROMOVER_ESPERA',
+      entidade: 'EventoRsvp',
+      entidadeId: eventoId,
+      detalhes: { userId },
+    },
+  })
+
+  const { notificarSafe } = await import('@/lib/notificacoes')
+  await notificarSafe({
+    userId,
+    tenantId: tenant.id,
+    tipo: 'EVENTO_RSVP',
+    titulo: 'Vaga liberada',
+    corpo: 'Você saiu da lista de espera e está confirmado no evento.',
+    link: `/portal/eventos/${eventoId}`,
+    atorId: session.user.id,
+  })
+
+  revalidateEventoPaths(eventoId, evento.tipo)
+  return { ok: true }
 }
 
 export async function excluirEvento(eventoId: string) {

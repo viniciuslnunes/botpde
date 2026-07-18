@@ -82,7 +82,7 @@ export async function BateriaEnsaiosAside({
               {proximos.map((e) => (
                 <li key={e.id} className="text-xs">
                   <Link
-                    href={`/portal/bateria/${e.id}`}
+                    href={`/portal/eventos/${e.id}`}
                     className="font-medium text-[rgb(var(--foreground))] hover:underline"
                   >
                     {e.titulo}

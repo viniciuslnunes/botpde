@@ -47,7 +47,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'socios', label: 'Sócios', href: '/admin/socios', permissao: PERMISSIONS.MEMBERS_VIEW, secao: 'pessoas' },
   {
     id: 'eventos',
-    label: 'Eventos',
+    label: 'Agenda',
     href: '/admin/eventos',
     // Criar eventos (EVENTS_CREATE) é operação de portal/área; admin = gerir.
     permissao: PERMISSIONS.EVENTS_MANAGE,

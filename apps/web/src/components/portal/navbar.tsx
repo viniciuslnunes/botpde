@@ -33,7 +33,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 const navLinks = [
   { href: '/portal/comunidade', label: 'Comunidade', icon: Users, prefetch: 'hover' as const },
   { href: '/portal/carteirinha', label: 'Carteirinha', icon: CreditCard, prefetch: 'hover' as const },
-  { href: '/portal/eventos', label: 'Eventos', icon: Calendar, prefetch: 'hover' as const },
+  { href: '/portal/eventos', label: 'Agenda', icon: Calendar, prefetch: 'hover' as const },
   { href: '/portal/sedes', label: 'Sedes', icon: MapPin, prefetch: 'hover' as const },
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
