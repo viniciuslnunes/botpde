@@ -56,7 +56,7 @@ function LojaPrecoRange({
     <div>
       <div className="flex items-baseline justify-between gap-2">
         <label className="text-xs font-semibold uppercase text-[rgb(var(--foreground-muted))]">Faixa de preço</label>
-        <span className="text-sm font-semibold tabular-nums text-[rgb(var(--primary))]">
+        <span className="text-sm font-semibold tabular-nums text-[rgb(var(--color-primary-fg))]">
           {formatarPrecoCurto(minVal)} – {formatarPrecoCurto(maxVal)}
         </span>
       </div>

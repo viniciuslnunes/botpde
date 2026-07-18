@@ -54,7 +54,7 @@ export function LojaCarrossel({ produtos }: { produtos: LojaProdutoCard[] }) {
             <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />
             <div className="p-3">
               <p className="font-medium text-sm line-clamp-2">{p.nome}</p>
-              <p className="mt-1 text-sm font-bold text-[rgb(var(--primary))]">
+              <p className="mt-1 text-sm font-bold text-[rgb(var(--color-primary-fg))]">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.preco))}
               </p>
             </div>

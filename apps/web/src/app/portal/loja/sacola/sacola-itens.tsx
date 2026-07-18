@@ -123,7 +123,7 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
                   <div className="min-w-0">
                     <Link
                       href={`/portal/loja/${item.produto.id}`}
-                      className="font-semibold leading-snug hover:text-[rgb(var(--primary))] line-clamp-2"
+                      className="font-semibold leading-snug hover:text-[rgb(var(--color-primary-fg))] line-clamp-2"
                     >
                       {item.produto.nome}
                     </Link>
@@ -177,7 +177,7 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
       <m.div layout transition={springSnappy} className="space-y-4 border-t border-[rgb(var(--foreground-muted)_/_0.2)] pt-5">
         <div className="flex items-baseline justify-between">
           <span className="text-base font-semibold">Subtotal</span>
-          <m.span layout className="text-xl font-bold tabular-nums text-[rgb(var(--primary))]">
+          <m.span layout className="text-xl font-bold tabular-nums text-[rgb(var(--color-primary-fg))]">
             {formatarPreco(subtotal)}
           </m.span>
         </div>

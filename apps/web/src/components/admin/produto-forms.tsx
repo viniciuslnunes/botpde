@@ -253,7 +253,7 @@ function ProdutoFormFields({
               className={[
                 'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                 tamanhosSel.includes(t)
-                  ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                   : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
             >

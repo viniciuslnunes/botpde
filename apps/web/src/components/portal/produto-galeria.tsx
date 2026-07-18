@@ -151,7 +151,7 @@ export function ProdutoGaleria({ imagensUrl, nome }: ProdutoGaleriaProps) {
                   <span
                     className={[
                       'text-xs font-medium',
-                      ativo ? 'text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground-muted))]',
+                      ativo ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                   >
                     {rotulo}

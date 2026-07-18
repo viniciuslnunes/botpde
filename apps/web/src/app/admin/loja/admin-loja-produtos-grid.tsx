@@ -46,7 +46,7 @@ function ProdutoCard({ produto }: { produto: AdminProdutoItem }) {
           )}
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-lg font-bold text-[rgb(var(--primary))]">{produto.precoLabel}</span>
+          <span className="text-lg font-bold text-[rgb(var(--color-primary-fg))]">{produto.precoLabel}</span>
           <span className="text-xs text-[rgb(var(--foreground-muted))]">{produto.vendidos} itens vendidos</span>
         </div>
         <p className="text-xs text-[rgb(var(--foreground-muted))]">Estoque: {produto.estoqueLabel}</p>

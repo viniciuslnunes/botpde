@@ -61,7 +61,7 @@ export default async function PortalLojaPage({
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
           Produtos exclusivos dos Gaviões da Fiel
         </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-3 py-1 text-xs font-medium text-[rgb(var(--primary))]">
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
           <Tag className="h-3.5 w-3.5" />
           Primeira compra: cupom <strong>EUSOUGAVIAO</strong> (10% off)
         </div>

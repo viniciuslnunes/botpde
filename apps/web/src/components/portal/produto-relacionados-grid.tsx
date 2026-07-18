@@ -30,8 +30,8 @@ export function ProdutoRelacionadosGrid({ produtos }: { produtos: ProdutoRelacio
           >
             <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />
             <div className="p-3">
-              <p className="text-sm font-medium line-clamp-2 group-hover:text-[rgb(var(--primary))]">{p.nome}</p>
-              <p className="mt-1 text-sm font-bold text-[rgb(var(--primary))]">{p.precoLabel}</p>
+              <p className="text-sm font-medium line-clamp-2 group-hover:text-[rgb(var(--color-primary-fg))]">{p.nome}</p>
+              <p className="mt-1 text-sm font-bold text-[rgb(var(--color-primary-fg))]">{p.precoLabel}</p>
             </div>
           </Link>
         </m.div>

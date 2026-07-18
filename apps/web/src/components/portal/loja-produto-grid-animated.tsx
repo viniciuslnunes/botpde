@@ -59,11 +59,11 @@ export function LojaProdutoGridAnimated({
             </div>
             <div className="flex flex-1 flex-col p-4">
               {p.tenantBadge && (
-                <span className="mb-1 inline-flex w-fit rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                <span className="mb-1 inline-flex w-fit rounded-full bg-[rgb(var(--color-primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
                   {p.tenantBadge}
                 </span>
               )}
-              <h3 className="flex-1 font-semibold leading-snug line-clamp-2 group-hover:text-[rgb(var(--primary))]">
+              <h3 className="flex-1 font-semibold leading-snug line-clamp-2 group-hover:text-[rgb(var(--color-primary-fg))]">
                 {p.nome}
               </h3>
               <div className="mt-3 flex items-end justify-between gap-2">
@@ -73,7 +73,7 @@ export function LojaProdutoGridAnimated({
                       {p.precoOriginalLabel}
                     </span>
                   )}
-                  <span className="text-lg font-bold text-[rgb(var(--primary))]">{p.precoLabel}</span>
+                  <span className="text-lg font-bold text-[rgb(var(--color-primary-fg))]">{p.precoLabel}</span>
                 </div>
                 {p.esgotado && (
                   <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">

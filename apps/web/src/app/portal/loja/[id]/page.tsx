@@ -143,7 +143,7 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
               {produto.tenantId !== tenant.id && (
 
-                <span className="rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--primary))]">
+                <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.15)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
 
                   {formatNomeTorcida(produto.tenant.nome)}
 
@@ -193,7 +193,7 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
               )}
 
-              <span className="text-3xl font-bold text-[rgb(var(--primary))]">
+              <span className="text-3xl font-bold text-[rgb(var(--color-primary-fg))]">
 
                 {formatarPreco(produto.preco)}
 

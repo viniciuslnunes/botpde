@@ -20,7 +20,7 @@ export function LojaCategoriaChips({ chips }: { chips: LojaCategoriaChip[] }) {
             href={chip.href}
             className={`rounded-full px-3 py-1 text-sm font-medium border ${
               chip.active
-                ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                 : 'border-[rgb(var(--foreground-muted)_/_0.35)] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.5)]'
             }`}
           >
