@@ -40,6 +40,7 @@ import {
   listarDestinatariosPorPermissoes,
   menuIdParaTipo,
   notificarAdminsPorPermissao,
+  notificarDenunciaMensagem,
   notificarDenunciaPost,
   notificarNovoMembroPendente,
   POLITICA_POR_TIPO,
@@ -194,6 +195,47 @@ describe('notificarAdminsPorPermissao', () => {
           tipo: 'DENUNCIA_NOVA',
           titulo: 'Nova denúncia pendente',
         }),
+      ]),
+    })
+  })
+
+  it('inclui o denunciante elegível mesmo com outros moderadores (sino instantâneo)', async () => {
+    mocks.notificacaoCreateMany.mockResolvedValue({ count: 2 })
+    mocks.userRoleFindMany.mockResolvedValue([
+      {
+        userId: 'mod-1',
+        role: {
+          permissions: [],
+          permissionsExtras: [PERMISSIONS.COMMUNITY_MODERATE],
+          departamentoId: null,
+          papelNoDepartamento: null,
+          departamento: null,
+        },
+      },
+      {
+        userId: 'super-1',
+        role: {
+          permissions: [],
+          permissionsExtras: [PERMISSIONS.MESSAGES_MODERATE],
+          departamentoId: null,
+          papelNoDepartamento: null,
+          departamento: null,
+        },
+      },
+    ])
+    mocks.userFindMany.mockResolvedValue([{ id: 'super-1' }])
+
+    const count = await notificarDenunciaMensagem({
+      tenantId: 'tenant-x',
+      motivo: 'teste denuncia',
+      denuncianteUserId: 'super-1',
+    })
+
+    expect(count).toBe(2)
+    expect(mocks.notificacaoCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ userId: 'mod-1', titulo: 'Nova denúncia de mensagem' }),
+        expect.objectContaining({ userId: 'super-1', titulo: 'Nova denúncia de mensagem' }),
       ]),
     })
   })

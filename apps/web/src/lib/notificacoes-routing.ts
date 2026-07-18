@@ -199,12 +199,15 @@ export async function notificarNovoMembroPendente(params: {
 }
 
 /**
- * Fan-out de denúncia: evita notificar o próprio denunciante quando há outros
- * moderadores; se ele for o único elegível (solo admin / modo operador), ainda
- * registra no inbox para o sino e a Moderação não ficarem mudos no auto-teste.
+ * Fan-out de denúncia: notifica todos os elegíveis (moderadores + super-admins),
+ * inclusive o denunciante se ele também for elegível.
+ *
+ * Membros comuns não entram na lista (sem permissão de moderação) — o `exceto`
+ * antigo só silenciava operador/mod que testava a própria denúncia quando havia
+ * outro destinatário, deixando sino e badge da Moderação mudos.
  */
 async function notificarDenunciaAdmins(
-  permission: string,
+  permissions: string | string[],
   params: {
     tenantId: string
     motivo: string
@@ -212,20 +215,14 @@ async function notificarDenunciaAdmins(
     titulo: string
   },
 ): Promise<number> {
-  const destinoBase = {
+  return notificarAdminsPorPermissao(permissions, {
     tenantId: params.tenantId,
-    tipo: 'DENUNCIA_NOVA' as const,
+    tipo: 'DENUNCIA_NOVA',
     titulo: params.titulo,
     corpo: params.motivo.slice(0, 140),
     link: '/admin/comunidade/moderacao',
     atorId: params.denuncianteUserId,
-  }
-  const comExclusao = await notificarAdminsPorPermissao(permission, {
-    ...destinoBase,
-    excetoUserId: params.denuncianteUserId,
   })
-  if (comExclusao > 0) return comExclusao
-  return notificarAdminsPorPermissao(permission, destinoBase)
 }
 
 /** Denúncia de post — moderadores de comunidade com permissão efetiva. */
@@ -234,22 +231,28 @@ export async function notificarDenunciaPost(params: {
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarDenunciaAdmins(PERMISSIONS.COMMUNITY_MODERATE, {
-    ...params,
-    titulo: 'Nova denúncia pendente',
-  })
+  return notificarDenunciaAdmins(
+    [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
+    {
+      ...params,
+      titulo: 'Nova denúncia pendente',
+    },
+  )
 }
 
-/** Denúncia de mensagem — moderadores de mensagens com permissão efetiva. */
+/** Denúncia de mensagem — moderadores de mensagens/comunidade (OR). */
 export async function notificarDenunciaMensagem(params: {
   tenantId: string
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarDenunciaAdmins(PERMISSIONS.MESSAGES_MODERATE, {
-    ...params,
-    titulo: 'Nova denúncia de mensagem',
-  })
+  return notificarDenunciaAdmins(
+    [PERMISSIONS.MESSAGES_MODERATE, PERMISSIONS.COMMUNITY_MODERATE],
+    {
+      ...params,
+      titulo: 'Nova denúncia de mensagem',
+    },
+  )
 }
 
 /** Comunicado urgente: membros aprovados + admins de comunicados (sem duplicar). */

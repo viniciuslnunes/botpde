@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { assertConversaAccess } from '@/lib/mensageria-api'
@@ -15,7 +16,10 @@ export async function POST(
 ) {
   try {
     const { id: conversaId, mensagemId } = await context.params
-    const { userId, tenant, conversa } = await assertConversaAccess(conversaId)
+    // Moderação/inbox usam o tenant do host — não o tenant de criação da conversa
+    // (DM/grupo podem ter sido abertos noutro contexto; leitura é por participação).
+    const { userId, tenant } = await assertConversaAccess(conversaId)
+    const denunciaTenantId = tenant.id
 
     const body: unknown = await request.json()
     const parsed = denunciaSchema.safeParse(body)
@@ -26,7 +30,7 @@ export async function POST(
       )
     }
 
-    const limiterKey = `report-msg:${tenant.id}:${userId}`
+    const limiterKey = `report-msg:${denunciaTenantId}:${userId}`
     if (excedeuLimiteEngajamento(limiterKey)) {
       return NextResponse.json(
         { error: 'Você atingiu o limite de denúncias por minuto.' },
@@ -49,7 +53,7 @@ export async function POST(
 
     const denuncia: { id: string } = await db.denunciaMensagem.create({
       data: {
-        tenantId: conversa.tenantId,
+        tenantId: denunciaTenantId,
         mensagemId: mensagem.id,
         denuncianteId: userId,
         motivo: parsed.data.motivo,
@@ -58,14 +62,14 @@ export async function POST(
     })
 
     await notificarDenunciaMensagem({
-      tenantId: conversa.tenantId,
+      tenantId: denunciaTenantId,
       motivo: parsed.data.motivo,
       denuncianteUserId: userId,
     })
 
     await db.auditLog.create({
       data: {
-        tenantId: conversa.tenantId,
+        tenantId: denunciaTenantId,
         atorId: userId,
         acao: 'MENSAGEM_DENUNCIADA',
         entidade: 'DenunciaMensagem',
@@ -73,6 +77,8 @@ export async function POST(
         detalhes: { mensagemId: mensagem.id, conversaId },
       },
     })
+
+    revalidatePath('/admin/comunidade/moderacao')
 
     return NextResponse.json({ ok: true })
   } catch (error) {
