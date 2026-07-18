@@ -286,11 +286,18 @@ async function AgendaConteudo({
   }
 
   if (vista !== 'lista') {
-    type CalRow = { id: string; titulo: string; tipo: TipoEvento; data: Date }
+    type CalRow = {
+      id: string
+      titulo: string
+      tipo: TipoEvento
+      data: Date
+      fotoUrl: string | null
+      local: string | null
+    }
     const janela = janelaCalendario(vista, dataRef)
     const calEventos: CalRow[] = await db.evento.findMany({
       where: { ...baseWhere, data: { gte: janela.gte, lt: janela.lt } },
-      select: { id: true, titulo: true, tipo: true, data: true },
+      select: { id: true, titulo: true, tipo: true, data: true, fotoUrl: true, local: true },
       orderBy: { data: 'asc' },
       take: 120,
     })
@@ -300,6 +307,8 @@ async function AgendaConteudo({
       tipo: e.tipo,
       dataIso: e.data.toISOString(),
       href: `/portal/eventos/${e.id}`,
+      fotoUrl: e.fotoUrl,
+      local: e.local,
     }))
     return (
       <AgendaCalendario
