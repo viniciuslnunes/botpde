@@ -82,9 +82,9 @@ describe('rotulos e moduloPortal canonicos', () => {
   })
 
   it('thin wrappers deixam claro que compõem outro módulo', () => {
-    expect(rotuloAreaDepartamento('feminino', 'comunidade')).toMatch(/Compõe/i)
-    expect(rotuloAreaDepartamento('social-e-eventos', 'eventos')).toMatch(/Compõe/i)
-    expect(rotuloAreaDepartamento('comunicacao', 'comunidade')).toMatch(/Compõe/i)
+    expect(rotuloAreaDepartamento('feminino', 'comunidade')).toMatch(/Via/i)
+    expect(rotuloAreaDepartamento('social-e-eventos', 'eventos')).toMatch(/Via/i)
+    expect(rotuloAreaDepartamento('comunicacao', 'comunidade')).toMatch(/Via/i)
   })
 
   it('carnaval é plugin de barracão (não thin Compõe)', () => {

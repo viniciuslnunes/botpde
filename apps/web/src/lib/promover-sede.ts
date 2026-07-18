@@ -24,7 +24,7 @@ function slugifyTenantNome(nome: string): string {
 }
 
 async function slugTenantUnico(base: string): Promise<string> {
-  let slug = base || 'unidade'
+  const slug = base || 'unidade'
   let n = 0
   while (true) {
     const candidate = n === 0 ? slug : `${slug}-${n}`

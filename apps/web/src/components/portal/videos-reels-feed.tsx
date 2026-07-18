@@ -120,6 +120,14 @@ export function VideosReelsFeed({
     return () => observer.disconnect()
   }, [reels.length, mounted])
 
+  const scrollToIndex = useCallback(
+    (idx: number) => {
+      const el = containerRef.current?.querySelector(`[data-idx="${idx}"]`)
+      el?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+    },
+    [reduceMotion],
+  )
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose?.()
@@ -143,12 +151,7 @@ export function VideosReelsFeed({
       document.removeEventListener('keydown', onKey)
       if (fullscreen) document.body.style.overflow = ''
     }
-  }, [onClose, activeIdx, reels.length, fullscreen])
-
-  function scrollToIndex(idx: number) {
-    const el = containerRef.current?.querySelector(`[data-idx="${idx}"]`)
-    el?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-  }
+  }, [onClose, activeIdx, reels.length, fullscreen, scrollToIndex])
 
   function onVideoTap() {
     const now = Date.now()
