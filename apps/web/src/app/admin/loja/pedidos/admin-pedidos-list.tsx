@@ -91,10 +91,10 @@ export function AdminPedidosFiltros({ options }: AdminPedidosFiltrosProps) {
         <m.div key={opt.value} whileTap={{ scale: 0.96 }} transition={springSnappy}>
           <Link
             href={opt.href}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm ${
               opt.active
-                ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]'
+                ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))]'
+                : 'border-[rgb(var(--border))] font-medium text-[rgb(var(--foreground-muted))]'
             }`}
           >
             {opt.label}

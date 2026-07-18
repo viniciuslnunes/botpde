@@ -4,6 +4,7 @@ import type { PostSocialItem } from './feed'
 export interface AutorBadge {
   sedeNome: string | null
   cargoNome: string | null
+  departamentoNome: string | null
 }
 
 function chave(autorId: string, tenantId: string): string {
@@ -26,12 +27,22 @@ export async function getBadgesPorAutorTenant(
   const tenantIds = [...new Set(unicos.map((p) => p.tenantId))]
 
   const [membros, roles]: [
-    Array<{ userId: string; tenantId: string; sede: { nome: string } | null }>,
+    Array<{
+      userId: string
+      tenantId: string
+      sede: { nome: string } | null
+      departamento: { nome: string } | null
+    }>,
     Array<{ userId: string; tenantId: string; role: { nome: string } }>,
   ] = await Promise.all([
     db.saasMembro.findMany({
       where: { userId: { in: autorIds }, tenantId: { in: tenantIds }, status: 'APROVADO' },
-      select: { userId: true, tenantId: true, sede: { select: { nome: true } } },
+      select: {
+        userId: true,
+        tenantId: true,
+        sede: { select: { nome: true } },
+        departamento: { select: { nome: true } },
+      },
     }),
     db.userRole.findMany({
       where: { userId: { in: autorIds }, tenantId: { in: tenantIds } },
@@ -46,6 +57,7 @@ export async function getBadgesPorAutorTenant(
     map.set(chave(p.autorId, p.tenantId), {
       sedeNome: membro?.sede?.nome ?? null,
       cargoNome: role?.role.nome ?? null,
+      departamentoNome: membro?.departamento?.nome ?? null,
     })
   }
   return map
@@ -61,7 +73,12 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     if (!b) return p
     return {
       ...p,
-      autor: { ...p.autor, sedeNome: b.sedeNome, cargoNome: b.cargoNome },
+      autor: {
+        ...p.autor,
+        sedeNome: b.sedeNome,
+        cargoNome: b.cargoNome,
+        departamentoNome: b.departamentoNome,
+      },
     }
   })
 }

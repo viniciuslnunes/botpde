@@ -532,10 +532,10 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
               onClick={() => setSoComPessoas((v) => !v)}
               aria-pressed={soComPessoas}
               className={[
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors',
+                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs transition-colors',
                 soComPessoas
-                  ? 'border-[rgb(var(--color-primary)_/_0.4)] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
-                  : 'border-[rgb(var(--border))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
+                  ? 'border-[rgb(var(--color-primary)_/_0.4)] bg-[rgb(var(--color-primary)_/_0.1)] font-semibold text-[rgb(var(--color-primary-fg))]'
+                  : 'border-[rgb(var(--border))] font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
               title="Ocultar departamentos sem pessoas"
             >

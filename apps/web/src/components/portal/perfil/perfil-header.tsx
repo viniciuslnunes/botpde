@@ -68,7 +68,7 @@ export function PerfilHeader({
           {nome ?? 'Membro'}
         </h1>
         {nickname && (
-          <p className="mt-0.5 text-sm font-medium text-[rgb(var(--primary))]">@{nickname}</p>
+          <p className="mt-0.5 text-sm font-medium text-[rgb(var(--color-primary-fg))]">@{nickname}</p>
         )}
         <p className="mt-0.5 text-sm uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           {tenantNome}

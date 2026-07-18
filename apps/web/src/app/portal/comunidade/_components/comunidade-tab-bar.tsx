@@ -46,10 +46,10 @@ export function ComunidadeTabBar({
             type="button"
             onClick={() => onTabChange?.(item.id)}
             className={[
-              'relative -mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+              'relative -mb-px border-b-2 px-3 py-2 text-sm transition-colors',
               ativo
-                ? 'border-transparent text-[rgb(var(--color-primary-fg))]'
-                : 'border-transparent text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                ? 'border-transparent font-semibold text-[rgb(var(--color-primary-fg))]'
+                : 'border-transparent font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             {item.label}

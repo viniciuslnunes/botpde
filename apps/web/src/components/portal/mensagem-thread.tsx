@@ -623,7 +623,7 @@ export function MensagemThread({
             className={[
               'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
               painelMembros
-                ? 'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
@@ -681,7 +681,7 @@ export function MensagemThread({
                     <button
                       type="button"
                       onClick={() => void carregarHistorico()}
-                      className="rounded-lg px-3 py-1 text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+                      className="rounded-lg px-3 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.08)]"
                     >
                       Carregar mensagens anteriores
                     </button>
@@ -751,7 +751,7 @@ export function MensagemThread({
               exit={{ opacity: 0, y: 8 }}
               transition={springSnappy}
               onClick={() => scrollToBottom(true)}
-              className="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[rgb(var(--primary))] px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:opacity-90"
+              className="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-3.5 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] shadow-lg ring-1 ring-inset ring-[rgb(var(--color-primary-fg)_/_0.35)] hover:opacity-90"
             >
               {novasPendentes > 99 ? '99+' : novasPendentes}{' '}
               {novasPendentes === 1 ? 'nova' : 'novas'}
@@ -821,9 +821,9 @@ export function MensagemThread({
               whileTap={{ scale: 0.92 }}
               transition={springSnappy}
               className={[
-                'flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]',
+                'flex h-9 w-9 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]',
                 anexoMenuOpen || emojiOpen || stickerOpen
-                  ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                   : '',
               ].join(' ')}
             >
@@ -959,7 +959,7 @@ export function MensagemThread({
             whileTap={{ scale: 0.94 }}
             transition={springSnappy}
             aria-label="Enviar mensagem"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--primary))] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {enviando || uploadPendente ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1018,12 +1018,12 @@ function MensagemBubble({
           className={[
             'rounded-2xl px-3.5 py-2',
             minha
-              ? 'rounded-br-md bg-[rgb(var(--primary))] text-white'
+              ? 'rounded-br-md bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] ring-1 ring-inset ring-[rgb(var(--color-primary-fg)_/_0.35)]'
               : 'rounded-bl-md border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]',
           ].join(' ')}
         >
           {isConversaGrupoLike(conversaTipo) && !minha && (
-            <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--primary))]">
+            <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
               {msg.autor.nome ?? 'Membro'}
             </p>
           )}
@@ -1243,7 +1243,7 @@ function PainelMembros({
                 {membro.userId === currentUserId && ' (você)'}
               </span>
               {membro.papel === 'ADMIN' && (
-                <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--primary))]">
+                <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
                   Admin
                 </span>
               )}
@@ -1254,7 +1254,7 @@ function PainelMembros({
                   onClick={() => void transferirAdmin(membro.userId)}
                   whileTap={{ scale: 0.95 }}
                   transition={springSnappy}
-                  className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+                  className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.08)]"
                 >
                   Tornar admin
                 </m.button>
@@ -1281,7 +1281,7 @@ function PainelMembros({
           <button
             type="button"
             onClick={() => setAdicionando((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--primary))] hover:bg-[rgb(var(--primary)_/_0.08)]"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--color-primary)_/_0.08)]"
           >
             <UserPlus className="h-3.5 w-3.5" /> Adicionar participante
           </button>

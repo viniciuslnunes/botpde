@@ -39,7 +39,7 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
               {post.autor.nome ?? 'Membro'}
             </ComunidadePrefetchLink>
             {showTenantBadge && (
-              <span className="rounded-full bg-[rgb(var(--primary)_/_0.1)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--primary))]">
+              <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
                 {post.tenant.nome}
               </span>
             )}
@@ -48,8 +48,13 @@ export function FeedPostCard({ post, showTenantBadge = false, currentUser, isAut
                 {post.autor.sedeNome}
               </span>
             )}
+            {post.autor.departamentoNome && (
+              <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
+                {post.autor.departamentoNome}
+              </span>
+            )}
             {post.autor.cargoNome && (
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+              <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-secondary-fg))]">
                 {post.autor.cargoNome}
               </span>
             )}

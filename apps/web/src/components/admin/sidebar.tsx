@@ -102,10 +102,10 @@ function NavItems({ items, badges, pathname, onNavigate }: NavItemsProps) {
               href={item.href}
               onClick={onNavigate}
               className={[
-                'app-action group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                'app-action group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
                 active
-                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                  : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                  : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
               <Icon

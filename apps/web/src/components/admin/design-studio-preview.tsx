@@ -166,10 +166,10 @@ function PortalScene({
               <span
                 key={item.label}
                 className={[
-                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs',
                   item.active
-                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                    : 'text-[rgb(var(--foreground-muted))]',
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                    : 'font-medium text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -472,10 +472,10 @@ function AdminScene({
             <div
               key={label}
               className={[
-                'rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                'rounded-lg px-2.5 py-1.5 text-xs',
                 i === 1
-                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                  : 'text-[rgb(var(--foreground-muted))]',
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                  : 'font-medium text-[rgb(var(--foreground-muted))]',
               ].join(' ')}
             >
               {label}

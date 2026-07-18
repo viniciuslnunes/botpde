@@ -231,10 +231,10 @@ export function AdminMembrosTabs({ tabs }: { tabs: AdminMembrosTab[] }) {
           <Link
             href={tab.href}
             className={[
-              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
               tab.active
-                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             {tab.label}

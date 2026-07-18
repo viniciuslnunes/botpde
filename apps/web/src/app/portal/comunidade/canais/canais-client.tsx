@@ -237,7 +237,7 @@ function CanalCard({
         <p className="font-semibold text-[rgb(var(--foreground))]">
           {canal.nome ?? 'Canal'}
           {canal.canalOficial && (
-            <span className="ml-2 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--primary))]">
+            <span className="ml-2 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
               Oficial
             </span>
           )}

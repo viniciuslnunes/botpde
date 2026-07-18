@@ -88,6 +88,7 @@ export interface PostSocialItem {
     avatarUrl: string | null
     sedeNome: string | null
     cargoNome: string | null
+    departamentoNome: string | null
   }
   totalReacoes: number
   totalComentarios: number
@@ -169,6 +170,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
       ...autor,
       sedeNome: null,
       cargoNome: null,
+      departamentoNome: null,
     },
     totalReacoes: _count.reacoes,
     totalComentarios: _count.comentarios,
@@ -254,6 +256,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
       ...post.autor,
       sedeNome: null,
       cargoNome: null,
+      departamentoNome: null,
     },
     totalReacoes: 0,
     totalComentarios: 0,

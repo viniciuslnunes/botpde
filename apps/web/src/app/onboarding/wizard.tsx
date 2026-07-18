@@ -450,10 +450,10 @@ function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
               />
             </div>
             <span
-              className={`text-[11px] font-medium ${
+              className={`text-[11px] ${
                 atual
-                  ? 'text-[rgb(var(--foreground))]'
-                  : 'text-[rgb(var(--foreground-muted))]'
+                  ? 'font-semibold text-[rgb(var(--foreground))]'
+                  : 'font-medium text-[rgb(var(--foreground-muted))]'
               }`}
             >
               {p.label}

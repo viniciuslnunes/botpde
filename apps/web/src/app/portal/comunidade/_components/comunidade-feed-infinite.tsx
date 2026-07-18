@@ -53,6 +53,7 @@ function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
       avatarUrl: preview.autor.avatarUrl,
       sedeNome: null,
       cargoNome: null,
+      departamentoNome: null,
     },
     totalReacoes: 0,
     totalComentarios: 0,

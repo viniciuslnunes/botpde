@@ -254,7 +254,7 @@ export function MensagensShell({
                             : 'Conversa iniciada'}
                       </p>
                       {c.naoLidas > 0 && (
-                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-[11px] font-bold text-white">
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] px-1.5 text-[11px] font-bold text-[rgb(var(--color-primary-on))] ring-1 ring-inset ring-[rgb(var(--color-primary-fg)_/_0.35)]">
                           {c.naoLidas > 99 ? '99+' : c.naoLidas}
                         </span>
                       )}
@@ -467,7 +467,7 @@ function NovaConversaModal({
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.85 }}
                         transition={springSnappy}
-                        className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--primary))]"
+                        className="inline-flex items-center gap-1 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2.5 py-1 text-xs font-medium text-[rgb(var(--color-primary-fg))]"
                       >
                         {c.nome ?? 'Membro'}
                         <button

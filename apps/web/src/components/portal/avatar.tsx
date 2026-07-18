@@ -70,7 +70,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className }: AvatarProps)
       aria-hidden="true"
       className={[
         base,
-        'bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]',
+        'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]',
         className ?? '',
       ].join(' ')}
     >

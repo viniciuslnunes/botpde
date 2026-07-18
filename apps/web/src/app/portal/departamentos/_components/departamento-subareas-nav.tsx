@@ -37,10 +37,10 @@ export function DepartamentoSubareasNav({ subareas }: { subareas: readonly Subar
                 href={href}
                 aria-current={current ? 'true' : undefined}
                 className={[
-                  'shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'shrink-0 rounded-lg border px-3 py-1.5 text-xs transition-colors',
                   current
-                    ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                    : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.35)] hover:text-[rgb(var(--foreground))]',
+                    ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))]'
+                    : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] font-medium text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.35)] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
                 {s.label}

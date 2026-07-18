@@ -463,12 +463,12 @@ export function AliancaForms({
                 aria-selected={active}
                 onClick={() => setTab(item.id)}
                 className={[
-                  'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                   active
-                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                     : item.highlight
-                      ? 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
-                      : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                      ? 'font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
+                      : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
                 <Icon className="h-4 w-4 shrink-0" />

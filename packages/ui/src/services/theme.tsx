@@ -136,8 +136,10 @@ export function applyTenantDesign(
 
   root.style.setProperty('--color-primary-fg', hexToCssRgb(primaryText.fg))
   root.style.setProperty('--color-primary-on', hexToCssRgb(primaryText.on))
+  root.style.setProperty('--primary-fg', hexToCssRgb(primaryText.fg))
   root.style.setProperty('--color-secondary-fg', hexToCssRgb(secondaryText.fg))
   root.style.setProperty('--color-secondary-on', hexToCssRgb(secondaryText.on))
+  root.style.setProperty('--secondary-fg', hexToCssRgb(secondaryText.fg))
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = design.actionsFg ?? {}
@@ -224,8 +226,10 @@ export function tenantDesignCriticalCss(
   )
   lines.push(`--color-primary-fg:${hexToCssRgb(primaryText.fg)}`)
   lines.push(`--color-primary-on:${hexToCssRgb(primaryText.on)}`)
+  lines.push(`--primary-fg:${hexToCssRgb(primaryText.fg)}`)
   lines.push(`--color-secondary-fg:${hexToCssRgb(secondaryText.fg)}`)
   lines.push(`--color-secondary-on:${hexToCssRgb(secondaryText.on)}`)
+  lines.push(`--secondary-fg:${hexToCssRgb(secondaryText.fg)}`)
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = design.actionsFg ?? {}
