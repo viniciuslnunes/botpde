@@ -33,6 +33,15 @@ type Props = {
   onDisponivelChange?: (disponivel: boolean) => void
 }
 
+function sanitizarNick(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20)
+}
+
+/**
+ * Campo de @nickname — input **não controlado** (o DOM guarda o valor).
+ * Controlar com `value` + setState em cada tecla quebrava a digitação em
+ * alguns browsers/overlays; a checagem de disponibilidade lê o DOM.
+ */
 export function NicknameField({
   id: idProp,
   name = 'nickname',
@@ -49,11 +58,20 @@ export function NicknameField({
 }: Props) {
   const autoId = useId()
   const id = idProp ?? `nickname-${autoId}`
-  const [value, setValue] = useState(defaultValue)
-  const [status, setStatus] = useState<NicknameStatus>({ kind: 'idle' })
+  const inputRef = useRef<HTMLInputElement>(null)
   const dirtyRef = useRef(Boolean(defaultValue && !suggestFromNome))
   const onDisponivelChangeRef = useRef(onDisponivelChange)
   onDisponivelChangeRef.current = onDisponivelChange
+
+  const [checkValue, setCheckValue] = useState(() => sanitizarNick(defaultValue))
+  const [status, setStatus] = useState<NicknameStatus>({ kind: 'idle' })
+
+  function escreverInput(next: string) {
+    const el = inputRef.current
+    if (!el) return
+    el.value = next
+    setCheckValue(next)
+  }
 
   // Sugestão automática a partir do nome (só se o usuário ainda não editou o @).
   useEffect(() => {
@@ -62,7 +80,7 @@ export function NicknameField({
 
     const nome = suggestFromNome.trim()
     if (nome.length < 3) {
-      setValue('')
+      if (!dirtyRef.current) escreverInput('')
       setStatus({ kind: 'idle' })
       return
     }
@@ -77,7 +95,7 @@ export function NicknameField({
           )
           if (!res.ok || dirtyRef.current) return
           const data = (await res.json()) as { nickname: string | null }
-          if (data.nickname) setValue(data.nickname)
+          if (data.nickname && !dirtyRef.current) escreverInput(data.nickname)
         } catch (err) {
           if (err instanceof DOMException && err.name === 'AbortError') return
         }
@@ -88,11 +106,12 @@ export function NicknameField({
       clearTimeout(timer)
       ctrl.abort()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage ao nome
   }, [suggestFromNome])
 
   // Checagem de disponibilidade do valor atual.
   useEffect(() => {
-    const normalizado = normalizarNickname(value)
+    const normalizado = normalizarNickname(checkValue)
     if (!normalizado) {
       setStatus({ kind: 'idle' })
       return
@@ -152,7 +171,7 @@ export function NicknameField({
       clearTimeout(timer)
       ctrl.abort()
     }
-  }, [value, nicknameAtual])
+  }, [checkValue, nicknameAtual])
 
   useEffect(() => {
     onDisponivelChangeRef.current?.(status.kind === 'available')
@@ -199,38 +218,53 @@ export function NicknameField({
         </label>
       )}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]">@</span>
+        <span className="text-sm font-medium text-[rgb(var(--foreground-muted))]" aria-hidden>
+          @
+        </span>
         <Input
+          ref={inputRef}
           id={id}
           name={name}
           type="text"
           inputMode="text"
           enterKeyHint="done"
-          value={value}
-          onChange={(e) => {
+          defaultValue={sanitizarNick(defaultValue)}
+          onInput={(e) => {
             dirtyRef.current = true
-            // Aceita maiúsculas na digitação; o schema normaliza para minúsculas no submit.
-            setValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))
+            const el = e.currentTarget
+            const next = sanitizarNick(el.value)
+            if (el.value !== next) {
+              const start = el.selectionStart
+              el.value = next
+              if (start != null) {
+                const pos = Math.min(start, next.length)
+                el.setSelectionRange(pos, pos)
+              }
+            }
+            setCheckValue(next)
           }}
           onPaste={(e) => {
             e.preventDefault()
             dirtyRef.current = true
             const pasted = e.clipboardData.getData('text')
-            setValue(normalizarNickname(pasted).replace(/[^a-z0-9_]/g, '').slice(0, 20))
+            const next = sanitizarNick(normalizarNickname(pasted))
+            escreverInput(next)
           }}
           placeholder="seu_apelido"
-          autoComplete="username"
+          autoComplete="off"
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
           maxLength={20}
-          pattern="[a-zA-Z0-9_]*"
           required={required}
           autoFocus={autoFocus}
           aria-invalid={
             status.kind === 'unavailable' || status.kind === 'invalid' || Boolean(errors?.length)
           }
-          className="flex-1"
+          className="relative z-10 flex-1"
+          data-1p-ignore
+          data-lpignore="true"
+          data-form-type="other"
         />
       </div>
       {feedback}

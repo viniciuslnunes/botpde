@@ -36,7 +36,7 @@ export function PerfilForm({
     <form
       ref={formRef}
       action={action}
-      className="space-y-5"
+      className="space-y-5 [&_input]:pointer-events-auto [&_input]:relative [&_input]:z-10"
       onSubmit={(e) => {
         if (!nickDisponivel) e.preventDefault()
       }}
@@ -72,7 +72,6 @@ export function PerfilForm({
         id="nickname"
         defaultValue={nickname ?? ''}
         nicknameAtual={nickname}
-        suggestFromNome={nickname ? undefined : nome}
         label={
           <>
             Apelido (@usuário) <span className="text-red-500">*</span>
@@ -81,10 +80,11 @@ export function PerfilForm({
         helperText={
           nickname
             ? 'Você pode alterar seu @ a qualquer momento (desde que esteja livre). Letras, números e _ · 3 a 20 caracteres.'
-            : 'Defina um @ único — aparece abaixo do seu nome no feed. Letras, números e _ · 3 a 20 caracteres.'
+            : 'Digite um @ único — aparece abaixo do seu nome no feed. Letras, números e _ · 3 a 20 caracteres.'
         }
         errors={state.errors?.nickname}
         onDisponivelChange={setNickDisponivel}
+        autoFocus={!nickname}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
