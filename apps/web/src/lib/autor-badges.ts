@@ -1,4 +1,5 @@
 import { db } from '@torcida/db'
+import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
 import type { PostSocialItem } from './feed'
 
 export interface AutorBadge {
@@ -7,8 +8,61 @@ export interface AutorBadge {
   departamentoNome: string | null
 }
 
+type TipoSede = 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+
+type RoleBadgeLite = {
+  nome: string
+  isSystem: boolean
+  ordem: number
+  departamentoNome: string | null
+}
+
 function chave(autorId: string, tenantId: string): string {
   return `${autorId}:${tenantId}`
+}
+
+/** Prioridade de cargo de sistema no badge do feed (menor = mais alto). */
+function prioridadeSistema(nome: string): number {
+  switch (nome) {
+    case SYSTEM_ROLES.OWNER:
+      return 0
+    case SYSTEM_ROLES.VICE:
+      return 1
+    case SYSTEM_ROLES.ADMIN:
+      return 2
+    case SYSTEM_ROLES.MEMBER:
+      return 9
+    default:
+      return 5
+  }
+}
+
+export function escolherCargoPrincipal(roles: RoleBadgeLite[]): RoleBadgeLite | null {
+  if (roles.length === 0) return null
+  return [...roles].sort((a, b) => {
+    if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1
+    if (a.isSystem && b.isSystem) {
+      return prioridadeSistema(a.nome) - prioridadeSistema(b.nome)
+    }
+    return a.ordem - b.ordem || a.nome.localeCompare(b.nome)
+  })[0]!
+}
+
+export function rotuloCargoBadge(role: RoleBadgeLite, tipoSede: TipoSede): string {
+  return role.isSystem ? rotuloCargoSistema(role.nome, tipoSede) : role.nome
+}
+
+/**
+ * Departamento/área de atuação: membership real (UserDepartamento), depois
+ * departamento do perfil principal, depois preferência do cadastro.
+ */
+export function resolverDepartamentoBadge(args: {
+  memberships: string[]
+  roleDepartamento: string | null
+  preferencia: string | null
+}): string | null {
+  if (args.memberships.length > 0) return args.memberships.join(' · ')
+  return args.roleDepartamento ?? args.preferencia
 }
 
 export async function getBadgesPorAutorTenant(
@@ -26,41 +80,107 @@ export async function getBadgesPorAutorTenant(
   const autorIds = [...new Set(unicos.map((p) => p.autorId))]
   const tenantIds = [...new Set(unicos.map((p) => p.tenantId))]
 
-  const [membros, roles]: [
+  const [membros, roles, memberships]: [
     Array<{
       userId: string
       tenantId: string
-      sede: { nome: string } | null
+      sede: { nome: string; tipo: TipoSede } | null
       departamento: { nome: string } | null
     }>,
-    Array<{ userId: string; tenantId: string; role: { nome: string } }>,
+    Array<{
+      userId: string
+      tenantId: string
+      role: {
+        nome: string
+        isSystem: boolean
+        ordem: number
+        departamento: { nome: string } | null
+      }
+    }>,
+    Array<{
+      userId: string
+      tenantId: string
+      departamento: { nome: string }
+    }>,
   ] = await Promise.all([
     db.saasMembro.findMany({
       where: { userId: { in: autorIds }, tenantId: { in: tenantIds }, status: 'APROVADO' },
       select: {
         userId: true,
         tenantId: true,
-        sede: { select: { nome: true } },
+        sede: { select: { nome: true, tipo: true } },
         departamento: { select: { nome: true } },
       },
     }),
     db.userRole.findMany({
       where: { userId: { in: autorIds }, tenantId: { in: tenantIds } },
-      select: { userId: true, tenantId: true, role: { select: { nome: true } } },
+      select: {
+        userId: true,
+        tenantId: true,
+        role: {
+          select: {
+            nome: true,
+            isSystem: true,
+            ordem: true,
+            departamento: { select: { nome: true } },
+          },
+        },
+      },
+    }),
+    db.userDepartamento.findMany({
+      where: { userId: { in: autorIds }, tenantId: { in: tenantIds } },
+      select: {
+        userId: true,
+        tenantId: true,
+        departamento: { select: { nome: true } },
+      },
+      orderBy: { criadoEm: 'asc' },
     }),
   ])
 
   const map = new Map<string, AutorBadge>()
   for (const p of unicos) {
     const membro = membros.find((m) => m.userId === p.autorId && m.tenantId === p.tenantId)
-    const role = roles.find((r) => r.userId === p.autorId && r.tenantId === p.tenantId)
+    const rolesDoAutor = roles
+      .filter((r) => r.userId === p.autorId && r.tenantId === p.tenantId)
+      .map((r) => ({
+        nome: r.role.nome,
+        isSystem: r.role.isSystem,
+        ordem: r.role.ordem,
+        departamentoNome: r.role.departamento?.nome ?? null,
+      }))
+    const principal = escolherCargoPrincipal(rolesDoAutor)
+    const tipoSede: TipoSede = membro?.sede?.tipo ?? 'SEDE'
+    const deptoNomes = memberships
+      .filter((m) => m.userId === p.autorId && m.tenantId === p.tenantId)
+      .map((m) => m.departamento.nome)
+      .filter((nome, i, arr) => arr.indexOf(nome) === i)
+
     map.set(chave(p.autorId, p.tenantId), {
       sedeNome: membro?.sede?.nome ?? null,
-      cargoNome: role?.role.nome ?? null,
-      departamentoNome: membro?.departamento?.nome ?? null,
+      cargoNome: principal ? rotuloCargoBadge(principal, tipoSede) : null,
+      departamentoNome: resolverDepartamentoBadge({
+        memberships: deptoNomes,
+        roleDepartamento: principal?.departamentoNome ?? null,
+        preferencia: membro?.departamento?.nome ?? null,
+      }),
     })
   }
   return map
+}
+
+/** Texto único do badge cargo + área (evita duplicar se o perfil já traz a área). */
+export function formatAutorCargoBadge(
+  cargoNome: string | null,
+  departamentoNome: string | null,
+): string | null {
+  const cargo = cargoNome?.trim() || null
+  const depto = departamentoNome?.trim() || null
+  if (cargo && depto) {
+    if (cargo === depto || cargo.includes(depto)) return cargo
+    return `${cargo} · ${depto}`
+  }
+  return cargo ?? depto
 }
 
 export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise<PostSocialItem[]> {

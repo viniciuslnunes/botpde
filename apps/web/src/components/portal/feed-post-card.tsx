@@ -13,6 +13,7 @@ import { PostRepostEmbed } from './post-repost-embed'
 import { PostComunicadoEmbed } from './post-comunicado-embed'
 import { PostEventoEmbed } from './post-evento-embed'
 import type { PostSocialItem } from '@/lib/feed'
+import { formatAutorCargoBadge } from '@/lib/autor-badges'
 
 interface FeedPostCardProps {
   post: PostSocialItem
@@ -33,6 +34,7 @@ export function FeedPostCard({
 }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
   const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
+  const cargoBadge = formatAutorCargoBadge(post.autor.cargoNome, post.autor.departamentoNome)
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
@@ -57,14 +59,9 @@ export function FeedPostCard({
                 {post.autor.sedeNome}
               </span>
             )}
-            {post.autor.departamentoNome && (
-              <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
-                {post.autor.departamentoNome}
-              </span>
-            )}
-            {post.autor.cargoNome && (
+            {cargoBadge && (
               <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-secondary-fg))]">
-                {post.autor.cargoNome}
+                {cargoBadge}
               </span>
             )}
             {post.fixado && (
