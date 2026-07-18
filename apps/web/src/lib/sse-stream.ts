@@ -7,7 +7,7 @@
  * - `no-transform` pede ao proxy para não comprimir o stream
  * - heartbeat evita idle cut; close limpo antes do teto do proxy
  * - enqueue após close também gera PROTOCOL_ERROR
- * - `data: reconnect` antes do close: o cliente troca a conexão limpo;
+ * - `data: reconnect` (~25s) antes do close: o cliente troca a conexão limpo;
  *   comentário `: bye` o EventSource não vê → proxy RST vira PROTOCOL_ERROR
  */
 
@@ -19,11 +19,11 @@ export const SSE_HEADERS = {
   'X-Accel-Buffering': 'no',
 } as const
 
-const HEARTBEAT_MS = 15_000
+const HEARTBEAT_MS = 12_000
 /** Avisa o client para reconectar antes do proxy HTTP/2 cortar sujo. */
-const RECONNECT_SIGNAL_MS = 50_000
+const RECONNECT_SIGNAL_MS = 25_000
 /** Fecha o stream se o client não tiver saído após o sinal. */
-const MAX_STREAM_MS = 55_000
+const MAX_STREAM_MS = 30_000
 
 type SubscribeFn = (onPing: () => void) => () => void
 

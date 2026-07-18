@@ -77,7 +77,7 @@ describe('createSsePingResponse', () => {
 
     await reader.read() // connected
 
-    vi.advanceTimersByTime(50_000)
+    vi.advanceTimersByTime(25_000)
 
     let sawReconnect = false
     for (let i = 0; i < 8; i++) {
