@@ -117,7 +117,7 @@ export default async function EventosPage({ searchParams }: Props) {
   const tipoParsed = TipoEventoSchema.safeParse(sp.tipo)
   const tipoFiltro = tipoParsed.success ? tipoParsed.data : undefined
   const vista =
-    sp.vista === 'lista' || sp.vista === 'mes' ? sp.vista : 'semana'
+    sp.vista === 'lista' || sp.vista === 'semana' ? sp.vista : 'mes'
   const q = (sp.q ?? '').trim()
 
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
@@ -152,7 +152,7 @@ export default async function EventosPage({ searchParams }: Props) {
     const v =
       extra.vista !== undefined
         ? extra.vista
-        : vista !== 'semana'
+        : vista !== 'mes'
           ? vista
           : undefined
     const data = extra.data !== undefined ? extra.data : sp.data
@@ -228,14 +228,14 @@ export default async function EventosPage({ searchParams }: Props) {
           >
             {(
               [
-                ['semana', 'Semana'],
                 ['mes', 'Mês'],
+                ['semana', 'Semana'],
                 ['lista', 'Grade'],
               ] as const
             ).map(([id, label]) => (
               <Link
                 key={id}
-                href={hrefFiltro({ vista: id === 'semana' ? '' : id })}
+                href={hrefFiltro({ vista: id === 'mes' ? '' : id })}
                 prefetch
                 className={[
                   'rounded-md px-2.5 py-1.5 font-medium transition-colors',
