@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, startTransition } from 'react'
+import { createPortal } from 'react-dom'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, m } from 'motion/react'
 import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
@@ -161,7 +162,7 @@ export function MensagensShell({
               onClick={() => setModal('dm')}
               title="Nova conversa"
               aria-label="Nova conversa"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
@@ -170,7 +171,7 @@ export function MensagensShell({
               onClick={() => setModal('grupo')}
               title="Novo grupo"
               aria-label="Novo grupo"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--primary))]"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--color-primary-fg))]"
             >
               <Users className="h-4 w-4" />
             </button>
@@ -351,7 +352,13 @@ function NovaConversaModal({
   const [nome, setNome] = useState('')
   const [selecionados, setSelecionados] = useState<ContatoDto[]>([])
   const [criando, setCriando] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -375,7 +382,12 @@ function NovaConversaModal({
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onEsc)
-    return () => document.removeEventListener('keydown', onEsc)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onEsc)
+      document.body.style.overflow = prevOverflow
+    }
   }, [onClose])
 
   async function criar(payload: unknown) {
@@ -408,7 +420,11 @@ function NovaConversaModal({
 
   const idsSelecionados = new Set(selecionados.map((c) => c.id))
 
-  return (
+  if (!mounted) return null
+
+  // Portal em document.body: o painel de mensagens fica numa coluna sem z-index
+  // enquanto a busca sticky do feed usa z-20 — fixed+z-50 no painel perde o stacking.
+  return createPortal(
     <m.div
       ref={overlayRef}
       role="dialog"
@@ -558,6 +574,7 @@ function NovaConversaModal({
           </div>
         )}
       </m.div>
-    </m.div>
+    </m.div>,
+    document.body,
   )
 }
