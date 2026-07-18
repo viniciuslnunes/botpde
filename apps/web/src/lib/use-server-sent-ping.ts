@@ -3,11 +3,12 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Railway fecha HTTP/2 ~5 min — reconectamos limpo antes disso para evitar
- * `ERR_HTTP2_PROTOCOL_ERROR` no console. EventSource já reconecta em erro;
- * o timer só antecipa o corte sujo do proxy.
+ * Railway/Fastly: corte sujo de HTTP/2 vira ERR_HTTP2_PROTOCOL_ERROR no console.
+ * Reconectamos limpo antes do teto de request (~15 min) e, em erro, fechamos o
+ * EventSource (senão ele martela reconnect sozinho e multiplica o ruído).
  */
-const RECONNECT_MS = 4 * 60 * 1000
+const PROACTIVE_RECONNECT_MS = 12 * 60 * 1000
+const ERROR_RECONNECT_MS = 5_000
 
 /**
  * Transporte SSE puro: abre `endpoint` com EventSource e chama `onPing` a cada
@@ -29,29 +30,39 @@ export function useServerSentPing(
 
     let source: EventSource | null = null
     let disposed = false
-    let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+    let proactiveTimer: ReturnType<typeof setTimeout> | undefined
+    let errorTimer: ReturnType<typeof setTimeout> | undefined
+
+    const clearTimers = () => {
+      if (proactiveTimer) clearTimeout(proactiveTimer)
+      if (errorTimer) clearTimeout(errorTimer)
+      proactiveTimer = undefined
+      errorTimer = undefined
+    }
 
     const open = () => {
       if (disposed) return
+      clearTimers()
       source?.close()
       source = new EventSource(endpoint)
       source.onmessage = () => onPingRef.current()
-      // Erro: o browser reconecta sozinho; só limpamos se já descartamos o hook.
       source.onerror = () => {
-        if (disposed) source?.close()
+        // Fecha para desligar o auto-reconnect nativo; reagendamos nós.
+        source?.close()
+        source = null
+        if (disposed) return
+        errorTimer = setTimeout(open, ERROR_RECONNECT_MS)
       }
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      reconnectTimer = setTimeout(() => {
-        // Fecha limpo e reabre antes do timeout do Railway (~5 min).
+      proactiveTimer = setTimeout(() => {
         open()
-      }, RECONNECT_MS)
+      }, PROACTIVE_RECONNECT_MS)
     }
 
     open()
 
     return () => {
       disposed = true
-      if (reconnectTimer) clearTimeout(reconnectTimer)
+      clearTimers()
       source?.close()
     }
   }, [endpoint, enabled])

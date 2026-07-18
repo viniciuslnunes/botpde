@@ -9,15 +9,16 @@ export const dynamic = 'force-dynamic'
  * polling com backoff continua como fallback.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: conversaId } = await context.params
     await assertConversaAccess(conversaId)
 
-    return createSsePingResponse((onPing) =>
-      subscribeConversaMensagem(conversaId, onPing),
+    return createSsePingResponse(
+      (onPing) => subscribeConversaMensagem(conversaId, onPing),
+      request.signal,
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Não autorizado'

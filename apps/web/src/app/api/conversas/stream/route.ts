@@ -8,12 +8,15 @@ export const dynamic = 'force-dynamic'
  * SSE de pings da inbox de mensagens. Client refetcha lista/resumo;
  * polling permanece como fallback.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
     return new Response('Não autenticado', { status: 401 })
   }
   const userId = session.user.id
 
-  return createSsePingResponse((onPing) => subscribeInboxMensagem(userId, onPing))
+  return createSsePingResponse(
+    (onPing) => subscribeInboxMensagem(userId, onPing),
+    request.signal,
+  )
 }

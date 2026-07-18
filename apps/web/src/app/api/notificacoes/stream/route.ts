@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  * (useNotificationStream) só recebe "tem novidade" e refaz o fetch da lista;
  * o polling existente continua como fallback.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user?.id) {
     return new Response('Não autenticado', { status: 401 })
@@ -22,7 +22,8 @@ export async function GET() {
   const userId = session.user.id
   const tenantId = tenant.id
 
-  return createSsePingResponse((onPing) =>
-    subscribeNotificacaoPing(tenantId, userId, onPing),
+  return createSsePingResponse(
+    (onPing) => subscribeNotificacaoPing(tenantId, userId, onPing),
+    request.signal,
   )
 }

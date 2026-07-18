@@ -17,13 +17,17 @@ describe('createSsePingResponse', () => {
 
     expect(res.headers.get('Content-Type')).toBe(SSE_HEADERS['Content-Type'])
     expect(res.headers.get('X-Accel-Buffering')).toBe('no')
+    // Hop-by-hop proibido em HTTP/2 — causa ERR_HTTP2_PROTOCOL_ERROR no Chrome.
+    expect(res.headers.get('Connection')).toBeNull()
     expect(res.body).toBeTruthy()
 
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
 
     const first = await reader.read()
-    expect(decoder.decode(first.value)).toContain(': connected')
+    const firstText = decoder.decode(first.value)
+    expect(firstText).toContain(': connected')
+    expect(firstText).toContain('retry: 5000')
 
     emit?.()
     const second = await reader.read()
@@ -48,5 +52,17 @@ describe('createSsePingResponse', () => {
     expect(() => {
       vi.advanceTimersByTime(20_000)
     }).not.toThrow()
+  })
+
+  it('fecha no abort do request.signal', async () => {
+    const unsub = vi.fn()
+    const ac = new AbortController()
+    const res = createSsePingResponse(() => unsub, ac.signal)
+    const reader = res.body!.getReader()
+    await reader.read()
+    ac.abort()
+    // dá um tick para o listener rodar
+    await Promise.resolve()
+    expect(unsub).toHaveBeenCalled()
   })
 })
