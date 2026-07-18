@@ -49,5 +49,9 @@ export default defineConfig({
         storageState: './e2e/.auth/user.json',
       },
     },
+    {
+      name: 'measure',
+      testMatch: /.*\.measure\.ts/,
+    },
   ],
 })

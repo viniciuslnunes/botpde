@@ -1,26 +1,21 @@
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
 import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered } from 'lucide-react'
-import { Avatar } from '@/components/portal/avatar'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
+import { ComunidadeFeedBootstrap } from './comunidade-feed-bootstrap'
 import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeFeedNav, ComunidadeFeedNavFallback } from './comunidade-feed-nav'
+import { ComunidadeComposerSection } from './comunidade-composer-section'
+import {
+  ComunidadeUserCardSection,
+  ComunidadeUserCardFallback,
+} from './comunidade-user-card-section'
 import type { SalaAtivaListItem } from '@/lib/salas'
-
-const FeedComposer = dynamic(
-  () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
-  {
-    loading: () => (
-      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-    ),
-  },
-)
 
 interface CurrentUser {
   id: string
@@ -28,43 +23,20 @@ interface CurrentUser {
   avatarUrl: string | null
 }
 
-interface UserCardInfo {
-  numeroSocio: number | null
-  numeroAssociado: string | null
-  tipo: 'SOCIO' | 'TORCEDOR' | null
-  departamentos: string[]
-}
-
 interface ComunidadeFeedShellProps {
   tenant: { id: string; nome: string; afiliacaoId: string | null }
   currentUser: CurrentUser
-  userCard?: UserCardInfo
   cursor?: string
-  perfilPrivado?: boolean
-  /** `data` em ISO — serializado na page antes de cruzar para o FeedComposer (client). */
-  eventosComposer?: import('@/lib/eventos').EventoComposerItem[]
-  bloqueioPublicacao?: string | null
-  somentePublico?: boolean
   filtro?: 'descobrir' | 'seguindo'
   /** Clube do torcedor global (banner quando feed usa tenant proxy). */
   clubeNacional?: { id: string; nome: string; apelido: string | null } | null
-  /** COMMUNITY_POST_NACIONAL — libera "Torcida e torcedores" no composer. */
-  podePublicarNacional?: boolean
+  /** Banner CN — true enquanto o composer carrega o estado real. */
+  somentePublicoHint?: boolean
   salasAtivas?: SalaAtivaListItem[]
 }
 
 function ComunicadosFallback() {
   return <div className="h-16 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-}
-
-function PostsFallback() {
-  return (
-    <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-36 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-      ))}
-    </div>
-  )
 }
 
 function AsideWidgetsFallback() {
@@ -76,64 +48,44 @@ function AsideWidgetsFallback() {
   )
 }
 
+function ComposerFallback() {
+  return (
+    <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+  )
+}
+
 export function ComunidadeFeedShell({
   tenant,
   currentUser,
-  userCard = { numeroSocio: null, numeroAssociado: null, tipo: null, departamentos: [] },
   cursor,
-  perfilPrivado = false,
-  eventosComposer = [],
-  bloqueioPublicacao = null,
-  somentePublico = false,
   filtro = 'descobrir',
   clubeNacional = null,
-  podePublicarNacional = false,
+  somentePublicoHint = false,
   salasAtivas = [],
 }: ComunidadeFeedShellProps) {
-  const numeroExibido =
-    userCard.numeroSocio != null
-      ? String(userCard.numeroSocio).padStart(5, '0')
-      : userCard.numeroAssociado?.trim() || null
-  const departamentosLabel =
-    userCard.departamentos.length > 0 ? userCard.departamentos.join(' · ') : null
-
   return (
     <>
       <aside className="hidden lg:block">
         <div className="sticky top-20 space-y-4">
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-            <Link
-              href={
-                currentUser.id
-                  ? `/portal/comunidade/perfil/${currentUser.id}`
-                  : '/portal/comunidade'
+          {currentUser.id ? (
+            <Suspense
+              fallback={
+                <ComunidadeUserCardFallback
+                  tenantNome={tenant.nome}
+                  userName={currentUser.nome}
+                  userAvatar={currentUser.avatarUrl}
+                />
               }
-              className="flex items-start gap-3 rounded-xl outline-offset-2 transition-opacity hover:opacity-90"
             >
-              <Avatar nome={currentUser.nome} avatarUrl={currentUser.avatarUrl} size="md" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                  {currentUser.nome ?? 'Torcedor'}
-                </p>
-                <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
-                {(numeroExibido || departamentosLabel) && (
-                  <div className="mt-1.5 space-y-0.5">
-                    {numeroExibido && (
-                      <p className="truncate text-[11px] font-medium tabular-nums text-[rgb(var(--foreground-muted))]">
-                        Nº {numeroExibido}
-                        {userCard.tipo === 'SOCIO' ? ' · Sócio' : ''}
-                      </p>
-                    )}
-                    {departamentosLabel && (
-                      <p className="truncate text-[11px] text-[rgb(var(--primary))]">
-                        {departamentosLabel}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Link>
-          </div>
+              <ComunidadeUserCardSection
+                tenantId={tenant.id}
+                tenantNome={tenant.nome}
+                userId={currentUser.id}
+                userName={currentUser.nome}
+                userAvatar={currentUser.avatarUrl}
+              />
+            </Suspense>
+          ) : null}
 
           {currentUser.id ? (
             <Suspense fallback={<ComunidadeFeedNavFallback />}>
@@ -157,7 +109,7 @@ export function ComunidadeFeedShell({
       </aside>
 
       <main className="min-w-0 space-y-4">
-        {clubeNacional && somentePublico && (
+        {clubeNacional && somentePublicoHint && (
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
             Feed da comunidade nacional de{' '}
             <strong className="text-[rgb(var(--foreground))]">
@@ -204,15 +156,14 @@ export function ComunidadeFeedShell({
         )}
 
         {currentUser.id && (
-          <FeedComposer
-            userName={currentUser.nome}
-            userAvatar={currentUser.avatarUrl}
-            perfilPrivado={perfilPrivado}
-            eventos={eventosComposer}
-            bloqueioPublicacao={bloqueioPublicacao}
-            somentePublico={somentePublico}
-            podePublicarNacional={podePublicarNacional}
-          />
+          <Suspense fallback={<ComposerFallback />}>
+            <ComunidadeComposerSection
+              tenantId={tenant.id}
+              userId={currentUser.id}
+              userName={currentUser.nome}
+              userAvatar={currentUser.avatarUrl}
+            />
+          </Suspense>
         )}
 
         <Suspense fallback={<ComunicadosFallback />}>
@@ -221,7 +172,16 @@ export function ComunidadeFeedShell({
 
         <FeedLiveBanner filtro={filtro} />
 
-        <Suspense fallback={<PostsFallback />}>
+        <Suspense
+          fallback={
+            <ComunidadeFeedBootstrap
+              tenantId={tenant.id}
+              currentUser={currentUser}
+              filtro={filtro}
+              cursor={cursor ?? null}
+            />
+          }
+        >
           <ComunidadePostsSection
             tenantId={tenant.id}
             currentUser={currentUser}

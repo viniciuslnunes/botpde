@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
+import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 
 /**
  * Segmented control "Descobrir / Seguindo" no topo do feed, no padrão social.
@@ -22,7 +22,7 @@ export function ComunidadeFeedTabs() {
       {tabs.map((tab) => {
         const ativo = tab.id === filtro
         return (
-          <Link
+          <ComunidadePrefetchLink
             key={tab.id}
             href={tab.href}
             scroll={false}
@@ -42,7 +42,7 @@ export function ComunidadeFeedTabs() {
                 transition={springSnappy}
               />
             )}
-          </Link>
+          </ComunidadePrefetchLink>
         )
       })}
     </nav>

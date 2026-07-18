@@ -140,7 +140,8 @@ export function torcidaAcessivelNoHost(_tenantSlug: string): boolean {
  * Não delega a getTenantFromHost() inteiro — em single-tenant o TENANT_SLUG do deploy
  * (ex.: Gaviões) não pode vencer o contexto correto de outro usuário.
  */
-export async function getActiveTenant(
+/** Deduplica layout + page (e portal) no mesmo request RSC. */
+export const getActiveTenant = cache(async function getActiveTenant(
   userId?: string,
   email?: string | null,
 ): Promise<Tenant | null> {
@@ -179,7 +180,7 @@ export async function getActiveTenant(
   if (fallback) return fetchTenantBySlug(fallback)
 
   return null
-}
+})
 
 /**
  * Busca a base de permissões do usuário no tenant: permissões dos perfis (roles)

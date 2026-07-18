@@ -1,32 +1,18 @@
 import { auth } from '@/lib/auth'
-import { checarPodePublicarNoFeed } from '@/lib/authz'
-import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import dynamic from 'next/dynamic'
-import { db } from '@torcida/db'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeNacionalShell } from './_components/comunidade-nacional-shell'
-import { ComunidadeSalasAside } from './_components/comunidade-salas-aside'
-import { getPerfilMembroForPortal } from '@/lib/social'
-import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas } from '@/lib/salas'
 
-const ComunidadeChatPanel = dynamic(
-  () =>
-    import('@/components/portal/comunidade-chat-panel').then((mod) => mod.ComunidadeChatPanel),
-  {
-    loading: () => (
-      <div className="h-56 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-    ),
-  },
-)
-
 export const metadata: Metadata = { title: 'Comunidade' }
 
+/**
+ * Page do feed: contexto + salas (cacheadas). Composer/card e posts
+ * carregam sob Suspense — voltar de Buscar/Classificação pinta o shell cedo.
+ */
 export default async function ComunidadePage({
   searchParams,
 }: {
@@ -58,86 +44,21 @@ export default async function ComunidadePage({
   const tenant = ctx.tenant
   const salasAtivas = await listSalasAtivas(tenant.id)
   const currentUser = {
-    id: session?.user?.id ?? '',
-    nome: session?.user?.name ?? null,
-    avatarUrl: session?.user?.image ?? null,
-  }
-
-  let perfilPrivado = false
-  let eventosComposer: EventoComposerItem[] = []
-  let bloqueioPublicacao: string | null = null
-  let somentePublico = false
-  let podePublicarNacional = false
-  let userCard: {
-    numeroSocio: number | null
-    numeroAssociado: string | null
-    tipo: 'SOCIO' | 'TORCEDOR' | null
-    departamentos: string[]
-  } = { numeroSocio: null, numeroAssociado: null, tipo: null, departamentos: [] }
-
-  if (session?.user?.id != null) {
-    const [perfil, eventos, bloqueio, membro, socio, deptos, { rolePermissions, overrides }] =
-      await Promise.all([
-        getPerfilMembroForPortal(session.user.id, tenant.id),
-        getEventosParaComposer(tenant.id, session.user.id),
-        checarPodePublicarNoFeed(session.user.id, tenant.id),
-        db.saasMembro.findUnique({
-          where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-          select: { status: true, tipo: true, numeroAssociado: true, nome: true },
-        }),
-        db.saasSocio.findUnique({
-          where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-          select: { numeroSocio: true },
-        }),
-        db.userDepartamento.findMany({
-          where: { tenantId: tenant.id, userId: session.user.id },
-          select: { departamento: { select: { nome: true, ordem: true } } },
-          orderBy: { departamento: { ordem: 'asc' } },
-        }) as Promise<Array<{ departamento: { nome: string; ordem: number } }>>,
-        getUserPermissionsInTenant(session.user.id, tenant.id),
-      ])
-    perfilPrivado = perfil.perfilPrivado
-    eventosComposer = eventos
-    bloqueioPublicacao = bloqueio
-    somentePublico = bloqueio === null && membro?.status !== 'APROVADO'
-    podePublicarNacional = hasPermission(
-      calculateEffectivePermissions(rolePermissions, overrides),
-      PERMISSIONS.COMMUNITY_POST_NACIONAL,
-    )
-    userCard = {
-      numeroSocio: socio?.numeroSocio ?? null,
-      numeroAssociado: membro?.numeroAssociado ?? null,
-      tipo: membro?.tipo ?? null,
-      departamentos: deptos.map((d: { departamento: { nome: string } }) => d.departamento.nome),
-    }
-    if (membro?.nome?.trim()) {
-      currentUser.nome = membro.nome.trim()
-    }
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl: session.user.image ?? null,
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <ComunidadeFeedShell
         tenant={{ id: tenant.id, nome: tenant.nome, afiliacaoId: tenant.afiliacaoId }}
         currentUser={currentUser}
-        userCard={userCard}
         cursor={params.cursor}
-        perfilPrivado={perfilPrivado}
-        eventosComposer={eventosComposer}
-        bloqueioPublicacao={bloqueioPublicacao}
-        somentePublico={somentePublico}
-        podePublicarNacional={podePublicarNacional}
         filtro={filtro}
         clubeNacional={ctx.afiliacao}
         salasAtivas={salasAtivas}
       />
-
-      <aside className="hidden xl:block">
-        <div className="sticky top-20 space-y-4">
-          <ComunidadeSalasAside salas={salasAtivas} />
-          {currentUser.id && <ComunidadeChatPanel currentUserId={currentUser.id} />}
-        </div>
-      </aside>
     </div>
   )
 }

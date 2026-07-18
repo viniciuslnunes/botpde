@@ -13,6 +13,18 @@ export type ComunidadeFeedPage<TPost> = {
   pageInfo: PageInfo
 }
 
+/** Mantém o feed ao navegar Buscar/Classificação ↔ Feed (layout preserva o provider). */
+export const COMUNIDADE_FEED_GC_MS = 20 * 60 * 1000
+
+export function comunidadeFeedQueryKey(
+  endpoint: string,
+  tenantId: string,
+  viewerId: string,
+  filtro?: string,
+) {
+  return ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? ''] as const
+}
+
 async function fetchFeedPage<TPost>(params: {
   endpoint: string
   cursor: string | null
@@ -41,7 +53,7 @@ async function fetchFeedPage<TPost>(params: {
 
 /**
  * Infinite scroll do feed/rede via TanStack Query (dedupe, cache, retry).
- * SSR entrega a 1ª página em `initialData`.
+ * SSR pode seedar a 1ª página; cache quente no layout não é sobrescrito.
  */
 export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options: {
   endpoint: string
@@ -52,6 +64,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   initialPageInfo: PageInfo
   initialCursor: string | null
   take?: number
+  /** Quando false (bootstrap Suspense), não grava página vazia como initialData. */
+  seedFromSsr?: boolean
 }) {
   const {
     endpoint,
@@ -62,13 +76,22 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     initialPageInfo,
     initialCursor,
     take = 20,
+    seedFromSsr = true,
   } = options
 
   const queryClient = useQueryClient()
   const queryKey = useMemo(
-    () => ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? ''] as const,
+    () => comunidadeFeedQueryKey(endpoint, tenantId, viewerId, filtro),
     [endpoint, tenantId, viewerId, filtro],
   )
+
+  const cached = queryClient.getQueryData<{
+    pages: ComunidadeFeedPage<TPost>[]
+    pageParams: Array<string | null>
+  }>(queryKey)
+
+  const shouldSeed =
+    seedFromSsr && initialPosts.length > 0 && (!cached || cached.pages.length === 0)
 
   const query = useInfiniteQuery({
     queryKey,
@@ -80,14 +103,20 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         filtro,
         signal,
       }),
-    initialPageParam: initialCursor as string | null,
+    initialPageParam: (shouldSeed ? initialCursor : null) as string | null,
     getNextPageParam: (last) =>
       last.pageInfo.hasMore ? last.pageInfo.nextCursor : undefined,
-    initialData: {
-      pages: [{ posts: initialPosts, pageInfo: initialPageInfo }],
-      pageParams: [initialCursor],
-    },
+    // Só seeda se não há cache — senão o QueryClient (layout) já tem a lista.
+    ...(shouldSeed
+      ? {
+          initialData: {
+            pages: [{ posts: initialPosts, pageInfo: initialPageInfo }],
+            pageParams: [initialCursor],
+          },
+        }
+      : {}),
     staleTime: 30_000,
+    gcTime: COMUNIDADE_FEED_GC_MS,
   })
 
   const posts = useMemo(() => {
@@ -133,7 +162,6 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         queryClient.setQueryData(
           queryKey,
           (prev: { pages: ComunidadeFeedPage<TPost>[]; pageParams: Array<string | null> } | undefined) => {
-            // Refetch do topo: mescla otimistas locais que a API ainda não devolveu.
             if (cursor == null) {
               const freshIds = new Set(fresh.posts.map((p) => p.id))
               const kept =

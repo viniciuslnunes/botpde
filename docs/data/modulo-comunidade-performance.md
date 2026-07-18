@@ -107,6 +107,13 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    centenas de queries) e mascara erros de Server Action em produção como
    *“An error occurred in the Server Components render”*. Notificações e
    `AuditLog` de comentário saem via `after()` + `notificarSafe`.
+9. **Voltar ao feed sem skeleton bloqueante** — Suspense dos posts usa
+   `ComunidadeFeedBootstrap` (TanStack no layout, `gcTime` 20 min). Aside
+   salas/chat no layout (`ComunidadeLayoutChrome`) fica `display:none` fora
+   do feed (sem unmount). Composer/card sob Suspense com `React.cache`.
+   `listSalasAtivas` e `getActiveTenant` em `React.cache` (salas também tem
+   `unstable_cache`) para dedupe layout + page no mesmo request. Medir:
+   `e2e/feed-nav-back.measure.ts`.
 
 ## Engajamento — hot path (2026-07-17)
 

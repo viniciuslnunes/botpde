@@ -72,6 +72,7 @@ export function ComunidadeFeedInfinite({
   initialPageInfo,
   initialCursor,
   salvoIds,
+  seedFromSsr = true,
 }: {
   tenantId: string
   currentUser: CurrentUser
@@ -80,6 +81,8 @@ export function ComunidadeFeedInfinite({
   initialPageInfo: PageInfo
   initialCursor: string | null
   salvoIds: string[]
+  /** false no bootstrap do Suspense — evita seed vazio e usa cache/API. */
+  seedFromSsr?: boolean
 }) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
 
@@ -99,6 +102,7 @@ export function ComunidadeFeedInfinite({
     initialPosts,
     initialPageInfo,
     initialCursor,
+    seedFromSsr,
   })
 
   const windowing = useFeedWindow(posts.length)

@@ -26,7 +26,12 @@ setup('autenticar usuário de teste', async ({ page }) => {
   await page.locator('#email-senha').fill(email)
   await page.locator('#senha').fill(senha)
   await page.getByRole('button', { name: /entrar com e-mail/i }).click()
-  await page.waitForURL('**/portal')
+  // Super-admin pode ir para /super-admin/torcidas; sócio comum para /portal.
+  await page.waitForURL(/\/(portal|super-admin)/)
+  if (page.url().includes('/super-admin')) {
+    await page.goto('/portal/comunidade')
+    await page.waitForURL('**/portal/**')
+  }
 
   const cookies = await page.context().cookies()
   if (!cookies.some((c) => c.name.includes('session-token'))) {

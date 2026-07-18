@@ -10,6 +10,7 @@ export function ComunidadeQueryProvider({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30_000,
+            gcTime: 20 * 60 * 1000,
             refetchOnWindowFocus: false,
             retry: 1,
           },

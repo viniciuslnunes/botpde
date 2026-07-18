@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
@@ -52,7 +53,9 @@ type CreateSalaInput = {
   eventoId?: string
 }
 
-export async function listSalasAtivas(tenantId: string): Promise<SalaAtivaListItem[]> {
+export const listSalasAtivas = cache(async function listSalasAtivas(
+  tenantId: string,
+): Promise<SalaAtivaListItem[]> {
   const salas = await unstable_cache(
     async () =>
       (db.salaReuniao.findMany({
@@ -78,7 +81,7 @@ export async function listSalasAtivas(tenantId: string): Promise<SalaAtivaListIt
         }
       : null,
   }))
-}
+})
 
 export async function getSalaById(tenantId: string, salaId: string): Promise<SalaDetalhe | null> {
   const sala: SalaDetalhe | null = await (db.salaReuniao.findFirst({

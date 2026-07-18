@@ -25,6 +25,23 @@ que falta.
 Documentação local da conta (super-admin de teste, **gitignored**):
 `e2e/CREDENTIALS.local.md` — template em `e2e/CREDENTIALS.local.example.md`.
 
+### Medir latência de publicação (sob demanda)
+
+```bash
+pnpm --filter @torcida/web exec playwright test e2e/publish-latency.measure.ts --project=measure
+```
+
+Imprime `loginMs` / `actionMs` / `cardMs` (clique Publicar → texto no feed).
+Não roda no CI padrão — projeto `measure` separado.
+
+### Medir voltar ao feed (Buscar / Classificação)
+
+```bash
+pnpm --filter @torcida/web exec playwright test e2e/feed-nav-back.measure.ts --project=measure
+```
+
+Reporta `firstPostMs` e contagens de `conversas/resumo`, `feed` API, RSC.
+
 `e2e/.auth/user.json` (sessão) e `e2e/screenshots/` (PNGs) **não são commitados**
 (ver `.gitignore`) — são artefato local para revisão, não fixture de CI.
 
