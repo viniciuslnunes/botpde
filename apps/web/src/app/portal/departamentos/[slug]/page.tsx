@@ -94,44 +94,52 @@ export default async function DepartamentoHomePage({
 }: {
   params: Promise<Params>
 }) {
-  const session = await auth()
+  const [session, tenant, { slug }] = await Promise.all([
+    auth(),
+    getTenantFromHost(),
+    params,
+  ])
   if (!session?.user?.id) redirect('/entrar')
-
-  const tenant = await getTenantFromHost()
   if (!tenant) redirect('/')
 
-  const { slug } = await params
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
 
   // Torcedor/Sócio são TipoMembro — nunca home de departamento.
   if (isDepartamentoLegado(slug)) notFound()
 
-  const depto: DeptoRow | null = await db.departamento.findFirst({
-    where: { tenantId: tenant.id, slug },
-    select: {
-      id: true,
-      nome: true,
-      slug: true,
-      cor: true,
-      moduloPortal: true,
-      permissions: true,
-      permissionsGestor: true,
-      meta: true,
-      canalConversaId: true,
-      canalConversa: { select: { id: true, nome: true } },
-    },
-  })
+  // Gate: depto + memberships + diretoria são independentes → um round-trip.
+  const [depto, memberships, diretoriaRow]: [
+    DeptoRow | null,
+    Array<{ departamentoId: string }>,
+    { id: string } | null,
+  ] = await Promise.all([
+    db.departamento.findFirst({
+      where: { tenantId: tenant.id, slug },
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        cor: true,
+        moduloPortal: true,
+        permissions: true,
+        permissionsGestor: true,
+        meta: true,
+        canalConversaId: true,
+        canalConversa: { select: { id: true, nome: true } },
+      },
+    }),
+    db.userDepartamento.findMany({
+      where: { userId: session.user.id, tenantId: tenant.id },
+      select: { departamentoId: true },
+    }),
+    db.departamento.findFirst({
+      where: { tenantId: tenant.id, slug: 'diretoria' },
+      select: { id: true },
+    }),
+  ])
   if (!depto || isDepartamentoLegado(depto)) notFound()
 
-  const memberships: Array<{ departamentoId: string }> = await db.userDepartamento.findMany({
-    where: { userId: session.user.id, tenantId: tenant.id },
-    select: { departamentoId: true },
-  })
   const membershipIds = memberships.map((m) => m.departamentoId)
-  const diretoriaRow: { id: string } | null = await db.departamento.findFirst({
-    where: { tenantId: tenant.id, slug: 'diretoria' },
-    select: { id: true },
-  })
   const podeAbrir = podeAbrirDepartamentoPortal({
     departamentoId: depto.id,
     membershipIds,
@@ -142,16 +150,19 @@ export default async function DepartamentoHomePage({
 
   const isMembroDaArea = membershipIds.includes(depto.id)
 
-  const gestao: { id: string } | null = await db.departamentoGestor.findFirst({
-    where: { userId: session.user.id, departamentoId: depto.id },
-    select: { id: true },
-  })
+  // Gestão e permissões efetivas são independentes → paralelizar.
+  const [gestao, { rolePermissions, overrides }]: [
+    { id: string } | null,
+    Awaited<ReturnType<typeof getUserPermissionsInTenant>>,
+  ] = await Promise.all([
+    db.departamentoGestor.findFirst({
+      where: { userId: session.user.id, departamentoId: depto.id },
+      select: { id: true },
+    }),
+    getUserPermissionsInTenant(session.user.id, tenant.id),
+  ])
   const isGestor = Boolean(gestao) || isSuperAdmin
 
-  const { rolePermissions, overrides } = await getUserPermissionsInTenant(
-    session.user.id,
-    tenant.id,
-  )
   const effectivePermissions = calculateEffectivePermissions(rolePermissions, overrides)
   const podeAprovar =
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.MEMBERS_APPROVE)
@@ -164,22 +175,24 @@ export default async function DepartamentoHomePage({
   const podeModerar =
     isSuperAdmin || hasPermission(effectivePermissions, PERMISSIONS.COMMUNITY_MODERATE)
 
-  const acessoCaravanas = await resolveAcessoPluginEvento(
-    session.user.id,
-    tenant.id,
-    'caravanas',
-    rolePermissions,
-    overrides,
-    isSuperAdmin,
-  )
-  const acessoBateria = await resolveAcessoPluginEvento(
-    session.user.id,
-    tenant.id,
-    'bateria',
-    rolePermissions,
-    overrides,
-    isSuperAdmin,
-  )
+  const [acessoCaravanas, acessoBateria] = await Promise.all([
+    resolveAcessoPluginEvento(
+      session.user.id,
+      tenant.id,
+      'caravanas',
+      rolePermissions,
+      overrides,
+      isSuperAdmin,
+    ),
+    resolveAcessoPluginEvento(
+      session.user.id,
+      tenant.id,
+      'bateria',
+      rolePermissions,
+      overrides,
+      isSuperAdmin,
+    ),
+  ])
 
   type EquipeUserLite = {
     id: string
@@ -346,31 +359,35 @@ export default async function DepartamentoHomePage({
     }
   }
 
-  const proximaAcao = await resolverProximaAcaoArea({
-    tenantId: tenant.id,
-    slug: depto.slug,
-    panel,
-    isGestor,
-    totalPendentes,
-    podeVerFinanceiro,
-  })
-
   type CanalOpcao = { id: string; nome: string | null }
-  const canaisDisponiveis: CanalOpcao[] = isGestor
-    ? await db.conversa.findMany({
-        where: { tenantId: tenant.id, tipo: 'CANAL' },
-        orderBy: { nome: 'asc' },
-        select: { id: true, nome: true },
-        take: 40,
-      })
-    : []
-
-  let carnavalProximos = 0
-  if (panel === 'carnaval') {
-    carnavalProximos = await db.evento.count({
-      where: { tenantId: tenant.id, tipo: 'GERAL', data: { gte: new Date() } },
-    })
-  }
+  // Próxima ação, canais e contagem de carnaval são independentes → um round-trip.
+  const [proximaAcao, canaisDisponiveis, carnavalProximos]: [
+    Awaited<ReturnType<typeof resolverProximaAcaoArea>>,
+    CanalOpcao[],
+    number,
+  ] = await Promise.all([
+    resolverProximaAcaoArea({
+      tenantId: tenant.id,
+      slug: depto.slug,
+      panel,
+      isGestor,
+      totalPendentes,
+      podeVerFinanceiro,
+    }),
+    isGestor
+      ? db.conversa.findMany({
+          where: { tenantId: tenant.id, tipo: 'CANAL' },
+          orderBy: { nome: 'asc' },
+          select: { id: true, nome: true },
+          take: 40,
+        })
+      : Promise.resolve([]),
+    panel === 'carnaval'
+      ? db.evento.count({
+          where: { tenantId: tenant.id, tipo: 'GERAL', data: { gte: new Date() } },
+        })
+      : Promise.resolve(0),
+  ])
 
   return (
     <div className="space-y-6">
