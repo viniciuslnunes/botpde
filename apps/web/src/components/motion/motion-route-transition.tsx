@@ -14,8 +14,8 @@ interface MotionRouteTransitionProps {
  *
  * `mode="sync"` (default): enter/exit em paralelo. Evita congelar o conteúdo
  * quando o exit não completa (footgun conhecido com `mode="wait"` no App Router).
- * Exit/initial usam `pointerEvents: 'none'` (ver `routePage`) para não
- * interceptar cliques no sidebar enquanto a opacidade anima a 0.
+ * Página entrante fica clicável por padrão; só o *exit* desliga hits (ver
+ * `routePage`) para camada em opacity:0 não capturar o sidebar.
  */
 export function MotionRouteTransition({
   children,

@@ -22,18 +22,14 @@ export default async function DefinirApelidoPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  if (isSuperAdminEmail(session.user.email)) {
-    redirect('/super-admin/torcidas')
-  }
-
   const user: { nickname: string | null; nome: string | null } | null = await db.user.findUnique({
     where: { id: session.user.id },
     select: { nickname: true, nome: true },
   })
 
-  // Já tem @ → segue o fluxo normal pós-login
+  // Já tem @ → segue o fluxo normal pós-login (super-admin volta ao painel).
   if (user?.nickname) {
-    redirect('/auth/contexto')
+    redirect(isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto')
   }
 
   const sugestao = await primeiraSugestaoLivre(

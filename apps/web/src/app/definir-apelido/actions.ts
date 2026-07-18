@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { nicknameSchema } from '@torcida/types'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -63,5 +64,9 @@ export async function definirApelido(
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   // Mesmo padrão do login: o cliente navega para preservar o cookie de sessão.
-  return { redirectTo: '/auth/contexto' }
+  return {
+    redirectTo: isSuperAdminEmail(session.user.email)
+      ? '/super-admin/torcidas'
+      : '/auth/contexto',
+  }
 }
