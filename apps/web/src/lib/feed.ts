@@ -742,7 +742,7 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
   const sugestoes: SugestaoAutorAside[] = []
   const candidatosDePerfil = perfisPublicos.slice(0, 4)
   if (candidatosDePerfil.length > 0) {
-    // Proteção extra contra dados antigos: filtra por privacidade efetiva (sócio aprovado pode ter perfil_privado=false no banco).
+    // Filtra por privacidade efetiva (torcedor forçado público; sócio usa preferência gravada).
     const memberInfos: Array<NonNullable<VinculoPrivacidadePerfil> & {
       userId: string
     }> = await db.saasMembro.findMany({

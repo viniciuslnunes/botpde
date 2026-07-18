@@ -3,7 +3,6 @@ import {
   podeVerConteudoSocialSync,
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
-  socioAprovadoPrivacidadeObrigatoria,
   torcedorAprovadoPublicoObrigatorio,
 } from '@/lib/perfil-social'
 
@@ -20,13 +19,16 @@ describe('resolverAvatarSocial', () => {
 })
 
 describe('resolverPerfilPrivadoEfetivo', () => {
-  it('sócio aprovado é sempre privado', () => {
+  it('sócio aprovado respeita preferência gravada', () => {
+    expect(
+      resolverPerfilPrivadoEfetivo(true, { tipo: 'SOCIO', status: 'APROVADO' }),
+    ).toBe(true)
     expect(
       resolverPerfilPrivadoEfetivo(false, { tipo: 'SOCIO', status: 'APROVADO' }),
-    ).toBe(true)
+    ).toBe(false)
     expect(
       resolverPerfilPrivadoEfetivo(undefined, { tipo: 'SOCIO', status: 'APROVADO' }),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('sócio pendente respeita preferência (default público)', () => {
@@ -52,18 +54,6 @@ describe('resolverPerfilPrivadoEfetivo', () => {
 
   it('sem vínculo assume público', () => {
     expect(resolverPerfilPrivadoEfetivo(undefined, null)).toBe(false)
-  })
-})
-
-describe('socioAprovadoPrivacidadeObrigatoria', () => {
-  it('identifica sócio aprovado', () => {
-    expect(socioAprovadoPrivacidadeObrigatoria({ tipo: 'SOCIO', status: 'APROVADO' })).toBe(
-      true,
-    )
-    expect(socioAprovadoPrivacidadeObrigatoria({ tipo: 'TORCEDOR', status: 'APROVADO' })).toBe(
-      false,
-    )
-    expect(socioAprovadoPrivacidadeObrigatoria(null)).toBe(false)
   })
 })
 

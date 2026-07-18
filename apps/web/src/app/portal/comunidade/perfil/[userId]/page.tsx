@@ -12,7 +12,6 @@ import {
   podeVerConteudoSocial,
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
-  socioAprovadoPrivacidadeObrigatoria,
   torcedorAprovadoPublicoObrigatorio,
 } from '@/lib/perfil-social'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
@@ -114,9 +113,9 @@ export default async function PerfilComunidadePage({
     perfilBase.perfilPrivado,
     membro ? { tipo: membro.tipo, status: membro.status } : null,
   )
-  const privacidadeBloqueada =
-    socioAprovadoPrivacidadeObrigatoria(membro ? { tipo: membro.tipo, status: membro.status } : null) ||
-    torcedorAprovadoPublicoObrigatorio(membro ? { tipo: membro.tipo, status: membro.status } : null)
+  const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(
+    membro ? { tipo: membro.tipo, status: membro.status } : null,
+  )
   const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
   const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge] = isSelf

@@ -28,8 +28,9 @@ Função central: `podeVerConteudoSocial` em `apps/web/src/lib/perfil-social.ts`
 Permalink de posts usa também `podeVerPost` em `apps/web/src/lib/feed.ts` (perfil +
 visibilidade do post).
 
-- **Perfil público** (`perfilPrivado: false`): posts públicos visíveis no feed e perfil.
-- **Perfil privado** (default): só o próprio usuário e seguidores com status `APROVADO` veem publicações, fotos e atividade.
+- **Perfil público** (`perfilPrivado: false`): posts visíveis no feed conforme a visibilidade do post (`PUBLICO` / `TENANT` / `PRIVADO`).
+- **Perfil privado**: só o próprio usuário e seguidores com status `APROVADO` veem publicações, fotos e atividade — a visibilidade do post não abre o conteúdo para quem não segue.
+- **Sócio aprovado**: entra com perfil privado (`privatizarPerfilAoAprovarSocio`); pode tornar público depois na aba Sobre. Torcedor permanece sempre público.
 - O feed principal (`/portal/comunidade`) prioriza **descoberta** (posts públicos de fora da rede).
 - **Minha rede** (`/portal/comunidade/rede`) mostra só posts de quem você segue + os seus.
 
