@@ -9,6 +9,9 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  ACTION_CSS_VARS,
+  ACTION_TOKEN_KEYS,
+  DEFAULT_ACTIONS,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
@@ -28,6 +31,12 @@ export type TenantDesign = {
     lineOpacity: number
     lineColor: string | null
     baseColor: string | null
+  }
+  actions: {
+    success: string
+    danger: string
+    warning: string
+    info: string
   }
   light: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
   dark: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
@@ -73,6 +82,12 @@ export function applyTenantDesign(
   } else {
     root.style.removeProperty('--color-secondary')
     root.style.removeProperty('--secondary')
+  }
+
+  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  for (const key of ACTION_TOKEN_KEYS) {
+    const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
+    root.style.setProperty(cssVar, hexToCssRgb(actions[key as keyof typeof actions]))
   }
 
   const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
@@ -132,6 +147,13 @@ export function tenantDesignCriticalCss(
   if (design.brand.secondary) {
     lines.push(`--color-secondary:${hexToCssRgb(design.brand.secondary)}`)
     lines.push(`--secondary:${hexToCssRgb(design.brand.secondary)}`)
+  }
+
+  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  for (const key of ACTION_TOKEN_KEYS) {
+    lines.push(
+      `${ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]}:${hexToCssRgb(actions[key as keyof typeof actions])}`,
+    )
   }
 
   for (const key of SURFACE_TOKEN_KEYS) {

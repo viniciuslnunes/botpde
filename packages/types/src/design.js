@@ -44,6 +44,53 @@ const SurfaceTokensSchema = z
   })
   .strict()
 
+/** Cores semânticas de fluxo (aprovar, reprovar, alerta, info). */
+export const ACTION_TOKEN_KEYS = /** @type {const} */ ([
+  'success',
+  'danger',
+  'warning',
+  'info',
+])
+
+export const ACTION_TOKEN_LABELS = /** @type {const} */ ({
+  success: 'Aprovar / positivo',
+  danger: 'Reprovar / cancelar / destrutivo',
+  warning: 'Atenção / pendente',
+  info: 'Informativo',
+})
+
+export const ACTION_TOKEN_HINTS = /** @type {const} */ ({
+  success: 'Botões de aprovar, confirmar positivo e badges de sucesso',
+  danger: 'Reprovar, excluir, cancelar inscrição e badges de erro',
+  warning: 'Pendências, lista de espera e avisos',
+  info: 'Dicas e status neutro-informativo',
+})
+
+/** Defaults alinhados ao emerald/red/amber/blue usados hoje no app. */
+export const DEFAULT_ACTIONS = /** @type {const} */ ({
+  success: '#059669',
+  danger: '#dc2626',
+  warning: '#d97706',
+  info: '#2563eb',
+})
+
+const ActionsTokensSchema = z
+  .object({
+    success: hexColor.default(DEFAULT_ACTIONS.success),
+    danger: hexColor.default(DEFAULT_ACTIONS.danger),
+    warning: hexColor.default(DEFAULT_ACTIONS.warning),
+    info: hexColor.default(DEFAULT_ACTIONS.info),
+  })
+  .strict()
+
+/** @type {Record<(typeof ACTION_TOKEN_KEYS)[number], string>} */
+export const ACTION_CSS_VARS = {
+  success: '--color-success',
+  danger: '--color-danger',
+  warning: '--color-warning',
+  info: '--color-info',
+}
+
 export const TenantDesignSchema = z
   .object({
     version: z.literal(1),
@@ -62,6 +109,7 @@ export const TenantDesignSchema = z
         baseColor: hexOrNull.default(null),
       })
       .strict(),
+    actions: ActionsTokensSchema.default({ ...DEFAULT_ACTIONS }),
     light: SurfaceTokensSchema.default({}),
     dark: SurfaceTokensSchema.default({}),
   })
@@ -102,6 +150,7 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
     lineColor: null,
     baseColor: null,
   },
+  actions: { ...DEFAULT_ACTIONS },
   light: {},
   dark: {},
 })
@@ -122,6 +171,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
     return {
       ...DEFAULT_TENANT_DESIGN,
       brand: { primary, secondary: null },
+      actions: { ...DEFAULT_ACTIONS },
     }
   }
 
@@ -131,12 +181,14 @@ export function resolveTenantDesign(raw, corPrimaria) {
     return {
       ...parsed.data,
       brand: { ...parsed.data.brand, primary },
+      actions: { ...DEFAULT_ACTIONS, ...parsed.data.actions },
     }
   }
 
   return {
     ...DEFAULT_TENANT_DESIGN,
     brand: { primary, secondary: null },
+    actions: { ...DEFAULT_ACTIONS },
   }
 }
 
@@ -154,6 +206,7 @@ export function designFromPrimary(primary, secondary = null) {
       secondary:
         secondary && /^#[0-9a-fA-F]{6}$/.test(secondary) ? secondary : null,
     },
+    actions: { ...DEFAULT_ACTIONS },
   }
 }
 

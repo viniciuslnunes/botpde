@@ -7,6 +7,7 @@ Menu admin **Design** (`/admin/design`), permissão `settings:manage`.
 | Área | Tokens / campos |
 |------|-----------------|
 | Marca | `brand.primary` (sincroniza `Tenant.corPrimaria`), `brand.secondary` opcional |
+| Ações / status | `actions.success`, `danger`, `warning`, `info` — botões e badges de fluxo |
 | Grade | `grid.enabled`, `sizePx` (24–96), `lineOpacity`, `lineColor`, `baseColor` |
 | Superfícies (claro/escuro) | `background`, `backgroundSubtle`, `foreground`, `foregroundMuted`, `border`, `borderStrong`, `surface`, `surfaceRaised` |
 
@@ -21,11 +22,21 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
 {
   version: 1,
   brand: { primary: '#RRGGBB', secondary: '#RRGGBB' | null },
+  actions: {
+    success: '#059669',  // aprovar / positivo → --color-success
+    danger: '#dc2626',   // reprovar / excluir → --color-danger
+    warning: '#d97706',  // pendente / alerta → --color-warning
+    info: '#2563eb',     // informativo → --color-info
+  },
   grid: { enabled, sizePx, lineOpacity, lineColor, baseColor },
   light: { /* overrides parciais */ },
   dark: { /* overrides parciais */ },
 }
 ```
+
+Consumidores: `Badge` (`success`/`danger`/`warning`/`info`), diálogos de confirmação
+(`variante: success|destructive`), classes `.btn-success`, `.btn-danger`,
+`.btn-danger-soft`, etc. em `globals.css`.
 
 ## Runtime
 

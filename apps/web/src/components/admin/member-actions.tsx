@@ -62,7 +62,7 @@ export function MemberActions({ membroId, status, departamentoNome }: MemberActi
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           onClick={() => void handleAprovar(true)}
-          className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+          className="btn-success app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
         >
           <Check className="h-3 w-3" />
           Aprovar
@@ -79,7 +79,7 @@ export function MemberActions({ membroId, status, departamentoNome }: MemberActi
         )}
         <button
           onClick={() => void handleReprovar()}
-          className="app-action flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+          className="btn-danger-soft app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
         >
           <X className="h-3 w-3" />
           Reprovar
@@ -102,7 +102,7 @@ export function MemberActions({ membroId, status, departamentoNome }: MemberActi
         <>
           <button
             onClick={() => void handleAprovar(true)}
-            className="app-action flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
+            className="btn-success app-action flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-[filter]"
           >
             <Check className="h-3 w-3" />
             Aprovar

@@ -49,8 +49,8 @@ export function RsvpButtons({ eventoId, statusAtual, lotacaoEsgotada = false }: 
             className={[
               'flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-60',
               status === 'CONFIRMADO'
-                ? 'bg-emerald-600 text-white ring-2 ring-emerald-500 ring-offset-2'
-                : 'border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+                ? 'btn-success ring-2 ring-[rgb(var(--color-success))] ring-offset-2 ring-offset-[rgb(var(--background))]'
+                : 'btn-success-soft',
             ].join(' ')}
           >
             {pending ? (
@@ -70,8 +70,8 @@ export function RsvpButtons({ eventoId, statusAtual, lotacaoEsgotada = false }: 
             className={[
               'flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-60',
               status === 'LISTA_ESPERA'
-                ? 'bg-amber-600 text-white ring-2 ring-amber-500 ring-offset-2'
-                : 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300',
+                ? 'btn-warning ring-2 ring-[rgb(var(--color-warning))] ring-offset-2 ring-offset-[rgb(var(--background))]'
+                : 'btn-warning-soft',
             ].join(' ')}
           >
             {pending ? (
@@ -92,7 +92,7 @@ export function RsvpButtons({ eventoId, statusAtual, lotacaoEsgotada = false }: 
           className={[
             'flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-60',
             status === 'RECUSADO'
-              ? 'bg-red-600 text-white ring-2 ring-red-500 ring-offset-2'
+              ? 'btn-danger ring-2 ring-[rgb(var(--color-danger))] ring-offset-2 ring-offset-[rgb(var(--background))]'
               : 'border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >

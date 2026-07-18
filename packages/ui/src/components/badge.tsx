@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
 
-export type BadgeVariant = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
+export type BadgeVariant = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info'
 
 const VARIANT_CLASS: Record<BadgeVariant, string> = {
   neutral: 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-  primary: 'bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary))]',
-  success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
-  warning: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  danger: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+  primary: 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]',
+  success: 'bg-[rgb(var(--color-success)_/_0.14)] text-[rgb(var(--color-success))]',
+  warning: 'bg-[rgb(var(--color-warning)_/_0.14)] text-[rgb(var(--color-warning))]',
+  danger: 'bg-[rgb(var(--color-danger)_/_0.14)] text-[rgb(var(--color-danger))]',
+  info: 'bg-[rgb(var(--color-info)_/_0.14)] text-[rgb(var(--color-info))]',
 }
 
 export interface BadgeProps {

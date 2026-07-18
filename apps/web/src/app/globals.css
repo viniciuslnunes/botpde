@@ -34,6 +34,12 @@
   --color-secondary: 124 58 237;
   --secondary: var(--color-secondary);
 
+  /* Ações semânticas (aprovar / reprovar / alerta / info) */
+  --color-success: 5 150 105;   /* #059669 */
+  --color-danger: 220 38 38;    /* #dc2626 */
+  --color-warning: 217 119 6;   /* #d97706 */
+  --color-info: 37 99 235;      /* #2563eb */
+
   /* Grade .app-shell-bg — sobrescrita pelo TenantDesignBridge */
   --grid-enabled: 1;
   --grid-size: 48px;
@@ -88,6 +94,60 @@ body {
 }
 .ring-primary {
   --tw-ring-color: rgb(var(--color-primary) / 0.5);
+}
+
+/* ── Botões de ação semântica (módulo Design) ─────────────────── */
+.btn-success {
+  background-color: rgb(var(--color-success));
+  color: #fff;
+}
+.btn-success:hover {
+  filter: brightness(0.92);
+}
+.btn-danger {
+  background-color: rgb(var(--color-danger));
+  color: #fff;
+}
+.btn-danger:hover {
+  filter: brightness(0.92);
+}
+.btn-warning {
+  background-color: rgb(var(--color-warning));
+  color: #fff;
+}
+.btn-warning:hover {
+  filter: brightness(0.92);
+}
+.btn-info {
+  background-color: rgb(var(--color-info));
+  color: #fff;
+}
+.btn-info:hover {
+  filter: brightness(0.92);
+}
+.btn-danger-soft {
+  background-color: rgb(var(--color-danger) / 0.1);
+  color: rgb(var(--color-danger));
+  border: 1px solid rgb(var(--color-danger) / 0.28);
+}
+.btn-danger-soft:hover {
+  background-color: rgb(var(--color-danger) / 0.16);
+}
+.btn-warning-soft {
+  background-color: rgb(var(--color-warning) / 0.1);
+  color: rgb(var(--color-warning));
+  border: 1px solid rgb(var(--color-warning) / 0.28);
+}
+.btn-warning-soft:hover {
+  background-color: rgb(var(--color-warning) / 0.16);
+}
+.btn-success-soft {
+  background-color: rgb(var(--color-success) / 0.1);
+  color: rgb(var(--color-success));
+  border: 1px solid rgb(var(--color-success) / 0.28);
+}
+.btn-success-soft:hover {
+  background-color: rgb(var(--color-success) / 0.16);
 }
 
 @keyframes nav-progress {

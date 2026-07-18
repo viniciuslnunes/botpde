@@ -9,12 +9,17 @@ import {
   Grid3x3,
   Layers,
   Contrast,
+  MousePointerClick,
 } from 'lucide-react'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
+  DEFAULT_ACTIONS,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
+  ACTION_TOKEN_HINTS,
+  ACTION_TOKEN_KEYS,
+  ACTION_TOKEN_LABELS,
   SURFACE_TOKEN_KEYS,
   SURFACE_TOKEN_LABELS,
   contrasteRatio,
@@ -191,6 +196,7 @@ export function DesignForm({
     next.light = { ...next.light, ...derived.light }
     next.dark = { ...next.dark, ...derived.dark }
     next.grid = { ...design.grid }
+    next.actions = { ...DEFAULT_ACTIONS, ...design.actions }
     setDesign(next)
   }
 
@@ -342,6 +348,70 @@ export function DesignForm({
               Sem sugestões automáticas — defina a afiliação ou envie um logo para extrair cores.
             </p>
           ) : null}
+        </div>
+      </section>
+
+      {/* Ações e status */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <MousePointerClick className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+          <h2 className="text-base font-semibold text-[rgb(var(--foreground))]">Ações e status</h2>
+        </div>
+        <p className="text-sm text-[rgb(var(--foreground-muted))]">
+          Cores de botões e badges em fluxos como aprovar, reprovar, cancelar e avisos.
+        </p>
+        <div className="grid gap-5 sm:grid-cols-2">
+          {ACTION_TOKEN_KEYS.map((key) => (
+            <div key={key} className="space-y-2">
+              <ColorField
+                label={ACTION_TOKEN_LABELS[key]}
+                value={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
+                onChange={(v) => {
+                  if (!v) return
+                  patch({
+                    actions: {
+                      ...DEFAULT_ACTIONS,
+                      ...design.actions,
+                      [key]: v,
+                    },
+                  })
+                }}
+              />
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                {ACTION_TOKEN_HINTS[key]}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs text-[rgb(var(--foreground-muted))]">Preview:</span>
+          <button
+            type="button"
+            className="btn-success rounded-lg px-3 py-1.5 text-xs font-semibold"
+          >
+            Aprovar
+          </button>
+          <button
+            type="button"
+            className="btn-danger-soft rounded-lg px-3 py-1.5 text-xs font-semibold"
+          >
+            Reprovar
+          </button>
+          <button
+            type="button"
+            className="btn-warning rounded-lg px-3 py-1.5 text-xs font-semibold"
+          >
+            Atenção
+          </button>
+          <span className="rounded-full bg-[rgb(var(--color-success)_/_0.14)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--color-success))]">
+            Ativo
+          </span>
+          <span className="rounded-full bg-[rgb(var(--color-danger)_/_0.14)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--color-danger))]">
+            Reprovado
+          </span>
+          <span className="rounded-full bg-[rgb(var(--color-warning)_/_0.14)] px-2.5 py-0.5 text-xs font-medium text-[rgb(var(--color-warning))]">
+            Pendente
+          </span>
         </div>
       </section>
 

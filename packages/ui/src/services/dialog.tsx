@@ -146,14 +146,15 @@ const VARIANT_UI: Record<
   },
   destructive: {
     icon: AlertTriangle,
-    iconWrap: 'bg-red-500/12 text-red-600 dark:text-red-400',
-    confirmBtn: 'bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600',
+    iconWrap: 'bg-[rgb(var(--color-danger)_/_0.12)] text-[rgb(var(--color-danger))]',
+    confirmBtn:
+      'bg-[rgb(var(--color-danger))] text-white hover:opacity-90 focus-visible:outline-[rgb(var(--color-danger))]',
   },
   success: {
     icon: CheckCircle2,
-    iconWrap: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+    iconWrap: 'bg-[rgb(var(--color-success)_/_0.12)] text-[rgb(var(--color-success))]',
     confirmBtn:
-      'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:outline-emerald-600',
+      'bg-[rgb(var(--color-success))] text-white hover:opacity-90 focus-visible:outline-[rgb(var(--color-success))]',
   },
 }
 
