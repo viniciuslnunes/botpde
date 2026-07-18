@@ -2,9 +2,10 @@
  * Uma assinatura long-poll por endpoint — navbar + chat + feed banner não
  * abrem N conexões.
  *
- * Usa `fetch` + body finito (não EventSource / ReadableStream longo):
- * - Railway/HTTP/2 RST em streams abertos → ERR_HTTP2_PROTOCOL_ERROR
- * - long-poll devolve ping|idle e fecha; abort no soft-nav = canceled limpo
+ * Usa `fetch` + long-poll finito (não EventSource / stream de minutos):
+ * - Railway/HTTP/2 RST em streams longos → ERR_HTTP2_PROTOCOL_ERROR
+ * - hold sem TTFB → 502 no edge; helper faz flush imediato e fecha em ping|idle
+ * - abort no soft-nav = canceled limpo
  */
 
 import { SSE_IDLE_DATA, SSE_PING_DATA } from '@/lib/sse-protocol'

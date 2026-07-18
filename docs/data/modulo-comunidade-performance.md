@@ -128,8 +128,8 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    pede clique. Debounce `FEED_SSE_DEBOUNCE_MS` (250ms). Ping do servidor só
    após fan-out da timeline (`feed-timeline-queue`), para o filtro Seguindo
    já ter a linha materializada. **Transporte = long-poll ~25s** (`ping`|`idle`,
-   body finito) — não hold de `ReadableStream` aberto; no Railway/HTTP/2 o
-   edge RST mid-stream vira `ERR_HTTP2_PROTOCOL_ERROR`.
+   flush imediato de `: connected`) — hold sem TTFB gerava 502 no Railway;
+   stream aberto por minutos → edge RST mid-stream vira `ERR_HTTP2_PROTOCOL_ERROR`.
 5. **Chat colapsado = resumo** — inbox completa só quando o usuário expande.
 6. **Uma leitura, vários consumidores** — dados compartilhados (ex.: salas)
    no layout chrome ou page, com `React.cache` se layout + page chamam a

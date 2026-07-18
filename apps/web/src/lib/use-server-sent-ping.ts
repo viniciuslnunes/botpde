@@ -13,7 +13,7 @@ import { subscribeSharedSse } from '@/lib/sse-shared-source'
  * ERR_HTTP2_PROTOCOL_ERROR e pode envenenar soft-nav do App Router.
  *
  * Mitigações (`sse-shared-source` + `sse-nav-gate` + `sse-stream`):
- * - long-poll com body finito (ping|idle ≤ ~25s) — sem ReadableStream aberto
+ * - long-poll ≤ ~25s com flush imediato + fecha em ping|idle (evita 502 e H2 RST)
  * - fetch + abort = canceled limpo (não PROTOCOL_ERROR do EventSource)
  * - um ciclo por endpoint; soft-nav fecha antes do fetch RSC; backoff + circuit
  */
