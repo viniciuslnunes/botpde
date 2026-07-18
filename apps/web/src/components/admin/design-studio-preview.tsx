@@ -14,8 +14,10 @@ import {
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
   DEFAULT_ACTIONS,
+  DEFAULT_ACTIONS_FG,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
+  resolveActionTextColors,
 } from '@torcida/types'
 
 export type PreviewScene = 'portal' | 'admin' | 'entrar'
@@ -85,7 +87,7 @@ function Hotspot({
     >
       {children}
       {active ? (
-        <span className="pointer-events-none absolute -top-2 left-2 z-20 translate-y-[-100%] rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+        <span className="pointer-events-none absolute left-1 top-1 z-20 max-w-[calc(100%-0.5rem)] truncate rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
           {label}
         </span>
       ) : null}
@@ -122,6 +124,13 @@ function PortalScene({
   focus: TokenFocus
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const surfaces = resolveSurfaces(design, mode)
+  const actionText = (key: keyof typeof DEFAULT_ACTIONS) =>
+    resolveActionTextColors(
+      actions[key],
+      design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key],
+      surfaces.surface,
+    )
   const nav = [
     { icon: Home, label: 'Início' },
     { icon: Users, label: 'Comunidade', active: true },
@@ -280,8 +289,11 @@ function PortalScene({
               <div className="mt-3 flex flex-wrap gap-2">
                 <Hotspot token="actions.success" focus={focus} label="Aprovar / positivo">
                   <span
-                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-                    style={{ backgroundColor: actions.success }}
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: actions.success,
+                      color: actionText('success').on,
+                    }}
                   >
                     <Check className="h-3 w-3" />
                     Vou comparecer
@@ -289,8 +301,11 @@ function PortalScene({
                 </Hotspot>
                 <Hotspot token="actions.warning" focus={focus} label="Atenção / pendente">
                   <span
-                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-                    style={{ backgroundColor: actions.warning }}
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: actions.warning,
+                      color: actionText('warning').on,
+                    }}
                   >
                     Lista de espera
                   </span>
@@ -299,7 +314,7 @@ function PortalScene({
                   <span
                     className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold"
                     style={{
-                      color: actions.danger,
+                      color: actionText('danger').fg,
                       borderColor: `${actions.danger}44`,
                       backgroundColor: `${actions.danger}1a`,
                     }}
@@ -330,6 +345,13 @@ function AdminScene({
   focus: TokenFocus
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const surfaces = resolveSurfaces(design, mode)
+  const actionText = (key: keyof typeof DEFAULT_ACTIONS) =>
+    resolveActionTextColors(
+      actions[key],
+      design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key],
+      surfaces.surface,
+    )
 
   return (
     <div className="flex h-full min-h-[420px] flex-col">
@@ -392,8 +414,11 @@ function AdminScene({
                     <div className="flex flex-wrap gap-1.5">
                       <Hotspot token="actions.success" focus={focus} label="Botão aprovar">
                         <span
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white"
-                          style={{ backgroundColor: actions.success }}
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
+                          style={{
+                            backgroundColor: actions.success,
+                            color: actionText('success').on,
+                          }}
                         >
                           <Check className="h-3 w-3" />
                           Aprovar
@@ -403,7 +428,7 @@ function AdminScene({
                         <span
                           className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold"
                           style={{
-                            color: actions.danger,
+                            color: actionText('danger').fg,
                             borderColor: `${actions.danger}44`,
                             backgroundColor: `${actions.danger}1a`,
                           }}
@@ -416,7 +441,7 @@ function AdminScene({
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                           style={{
-                            color: actions.warning,
+                            color: actionText('warning').fg,
                             backgroundColor: `${actions.warning}24`,
                           }}
                         >

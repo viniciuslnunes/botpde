@@ -26,10 +26,17 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
   version: 1,
   brand: { primary: '#RRGGBB', secondary: '#RRGGBB' | null },
   actions: {
-    success: '#1d4ed8',  // aprovar / positivo → --color-success (azul; verde só se for identidade)
-    danger: '#dc2626',   // reprovar / excluir → --color-danger
-    warning: '#d97706',  // pendente / alerta → --color-warning
-    info: '#2563eb',     // informativo → --color-info
+    success: '#1d4ed8',
+    danger: '#dc2626',
+    warning: '#d97706',
+    info: '#2563eb',
+  },
+  actionsFg: {
+    // opcional — null = automático (contraste no botão / legível no badge)
+    success: '#ffffff' | null,
+    danger: null,
+    warning: null,
+    info: null,
   },
   grid: { enabled, sizePx, lineOpacity, lineColor, baseColor },
   light: { /* overrides parciais */ },
@@ -47,20 +54,21 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 2. Grade `.app-shell-bg` usa `--grid-size`, `--grid-line`, `--grid-opacity`, `--grid-base`; `html[data-grid=off]` desliga o padrão.
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
 4. Vars de texto legível: `--color-primary-fg`, `--color-secondary-fg`,
-   `--color-success-fg`, … (`corMarcaLegivel` contra a superfície ativa).
-   Nav portal (`navbar.tsx`) e menu admin (`sidebar.tsx`) usam `*-fg` no
-   estado ativo + ring — **proibido** `text-[rgb(var(--primary))]` com marca
-   preta (some no dark).
+   `--color-success-fg` / `--color-success-on`, …  
+   Soft/badge → `*-fg`; botão sólido → `*-on`
+   (`resolveActionTextColors`; override em `actionsFg`). Nav portal e sidebar
+   admin usam `*-fg` no ativo + ring — **proibido**
+   `text-[rgb(var(--primary))]` com marca preta.
 
 ## Sugestões de cor
 
-1. **Paletas sugeridas** (`gerarPaletasSugeridas`) — ordem: **marca da
-   torcida** → **escudo/logo** → **paleta do clube** → **torcida + clube** →
-   monocromática → alto contraste. Cada card: **3 cores** + hex
-   (`limitarSwatches`). Clique → `aplicarPaletaAoDesign` (marca + ações +
-   tint de superfícies). A UI do estúdio gera a lista a partir do **design
-   salvo (baseline)**, não do rascunho — senão aplicar “Do escudo” regenerava
-   todas as cards com a nova primária.
+1. **Paletas sugeridas** (`gerarPaletasSugeridas` + `resolverMarcaTorcida`) —
+   ordem: **marca da torcida** → **escudo/logo** → **paleta do clube** →
+   **torcida + clube** → monocromática → alto contraste.  
+   Se `corPrimaria` ainda for o roxo da plataforma (`#7c3aed`), a marca usa
+   `TORCIDA_CORES_PRIMARIAS[slug]` (ex. `pde-gavioes-fiel` → `#1a1a1a`) ou a
+   paleta do clube — **nunca** tratar o default do produto como identidade da
+   torcida. Cada card: **3 cores** + hex. Lista gerada do baseline + slug.
 2. **Rivalidade / identidade** — ver knowledge acima. Sucesso default azul;
    verde só se identidade já for verde; neutros sem saturação artificial;
    sem análoga/complementar.
@@ -76,10 +84,13 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 
 - Layout **full-bleed**: sem `app-container` / `max-w-6xl`; padding lateral
   **16px** (`px-4`) — inspector + prévia precisam de largura.
+- Inspector: scroll com `px-1`/`pr-2`; cards de ação com `p-3` (swatches
+  não colados na barra de rolagem).
+- Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
 - Seletor de cor: swatch abre o **color picker nativo** direto (sem popover
   intermediário).
-- Prévia multi-cena (Portal / Admin / Login) com hotspots; contraste WCAG
-  no rodapé usa token info (não emerald).
+- Hotspots na prévia: label **dentro** do contorno (não flutua fora do layout).
+- Contraste WCAG no rodapé usa token info (não emerald).
 
 ## Actions
 

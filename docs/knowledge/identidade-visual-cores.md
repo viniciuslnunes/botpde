@@ -36,10 +36,10 @@ neutro (`#1d4ed8`) ou tom derivado da marca — nunca emerald “de dashboard”
 ## Regras de produto (obrigatórias)
 
 1. **Prioridade das sugestões de paleta**  
-   Marca da **torcida** → escudo/logo da torcida → paleta do **clube**
-   afiliado → combinação torcida+clube → variações sóbrias (mono / alto
-   contraste). Sem harmônicas genéricas (análoga/complementar) que inventam
-   hue de rival.
+   Marca da **torcida** (catálogo por slug — ex. Gaviões `#1a1a1a` — **nunca**
+   o roxo `#7c3aed` da plataforma quando a cor do tenant ainda é o default) →
+   escudo/logo → paleta do **clube** afiliado → combinação torcida+clube →
+   variações sóbrias. Sem harmônicas genéricas.
 
 2. **Três cores por card**  
    Cada paleta sugerida exibe no máximo **3** swatches: primária ·

@@ -18,6 +18,7 @@ import {
   contrasteTextoSobre,
   corMarcaLegivel,
   hexToCssRgb,
+  resolveActionTextColors,
   resolveTenantDesign,
   SURFACE_CSS_VARS,
   SURFACE_TOKEN_KEYS,
@@ -39,6 +40,12 @@ export type TenantDesign = {
     danger: string
     warning: string
     info: string
+  }
+  actionsFg?: {
+    success: string | null
+    danger: string | null
+    warning: string | null
+    info: string | null
   }
   light: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
   dark: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
@@ -102,14 +109,15 @@ export function applyTenantDesign(
   )
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const actionsFg = design.actionsFg ?? {}
   for (const key of ACTION_TOKEN_KEYS) {
     const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
     const hex = actions[key as keyof typeof actions]
+    const override = (actionsFg as Record<string, string | null | undefined>)[key]
+    const text = resolveActionTextColors(hex, override, surfaceHex)
     root.style.setProperty(cssVar, hexToCssRgb(hex))
-    root.style.setProperty(
-      `${cssVar}-fg`,
-      hexToCssRgb(corMarcaLegivel(hex, surfaceHex)),
-    )
+    root.style.setProperty(`${cssVar}-fg`, hexToCssRgb(text.fg))
+    root.style.setProperty(`${cssVar}-on`, hexToCssRgb(text.on))
   }
 
   for (const key of SURFACE_TOKEN_KEYS) {
@@ -178,11 +186,15 @@ export function tenantDesignCriticalCss(
   )
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const actionsFg = design.actionsFg ?? {}
   for (const key of ACTION_TOKEN_KEYS) {
     const cssVar = ACTION_CSS_VARS[key as keyof typeof ACTION_CSS_VARS]
     const hex = actions[key as keyof typeof actions]
+    const override = (actionsFg as Record<string, string | null | undefined>)[key]
+    const text = resolveActionTextColors(hex, override, surfaceHex)
     lines.push(`${cssVar}:${hexToCssRgb(hex)}`)
-    lines.push(`${cssVar}-fg:${hexToCssRgb(corMarcaLegivel(hex, surfaceHex))}`)
+    lines.push(`${cssVar}-fg:${hexToCssRgb(text.fg)}`)
+    lines.push(`${cssVar}-on:${hexToCssRgb(text.on)}`)
   }
 
   for (const key of SURFACE_TOKEN_KEYS) {

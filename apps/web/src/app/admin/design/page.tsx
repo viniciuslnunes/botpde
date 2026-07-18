@@ -71,6 +71,7 @@ export default async function DesignPage() {
           initialDesign={design}
           corPrimaria={tenant.corPrimaria}
           tenantNome={tenant.nome}
+          tenantSlug={tenant.slug}
           clubeNome={afiliacao?.nome ?? null}
           clubeApelido={afiliacao?.apelido ?? null}
           imagemUrls={imagemUrls}

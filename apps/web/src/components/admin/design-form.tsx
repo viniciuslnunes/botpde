@@ -26,6 +26,7 @@ import {
   ACTION_TOKEN_KEYS,
   ACTION_TOKEN_LABELS,
   DEFAULT_ACTIONS,
+  DEFAULT_ACTIONS_FG,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
@@ -35,7 +36,9 @@ import {
   contrasteRatio,
   contrasteTextoSobre,
   gerarPaletasSugeridas,
+  isCorPadraoPlataforma,
   paletaDoClube,
+  resolveActionTextColors,
   resolveTenantDesign,
 } from '@torcida/types'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
@@ -57,6 +60,8 @@ type Props = {
   initialDesign: TenantDesign
   corPrimaria: string
   tenantNome: string
+  /** slug do tenant — catálogo de cores (ex.: pde-gavioes-fiel → preto). */
+  tenantSlug: string
   clubeNome: string | null
   clubeApelido: string | null
   imagemUrls: string[]
@@ -341,6 +346,7 @@ export function DesignForm({
   initialDesign,
   corPrimaria,
   tenantNome,
+  tenantSlug,
   clubeNome,
   clubeApelido,
   imagemUrls,
@@ -353,6 +359,7 @@ export function DesignForm({
     () => ({
       ...baseline,
       actions: { ...DEFAULT_ACTIONS, ...baseline.actions },
+      actionsFg: { ...DEFAULT_ACTIONS_FG, ...(baseline.actionsFg ?? {}) },
     }),
     [baseline],
   )
@@ -420,12 +427,13 @@ export function DesignForm({
     [clubeNome, clubeApelido],
   )
 
-  // Semente = marca salva (baseline), não o rascunho. Se usar design.brand,
-  // aplicar "Do escudo" regenerava todas as cards com a nova primária.
+  // Semente estável (baseline) + catálogo por slug: se a cor salva ainda for o
+  // roxo da plataforma, “Marca da torcida” usa preto/cores curadas (Gaviões etc.).
   const paletasSugeridas = useMemo(
     () =>
       gerarPaletasSugeridas(normalizedBaseline.brand.primary, {
         secondary: normalizedBaseline.brand.secondary,
+        slug: tenantSlug,
         clube: clubePaleta
           ? {
               primary: clubePaleta.primary,
@@ -438,6 +446,7 @@ export function DesignForm({
     [
       normalizedBaseline.brand.primary,
       normalizedBaseline.brand.secondary,
+      tenantSlug,
       clubePaleta,
       extracted,
     ],
@@ -493,9 +502,9 @@ export function DesignForm({
 
   return (
     <div data-persist-bar-root className="pb-24">
-      <div className="flex flex-col gap-6 xl:grid xl:h-[calc(100vh-11rem)] xl:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:items-stretch xl:gap-6">
-        {/* Inspector */}
-        <div className="flex min-h-0 flex-col gap-4 xl:overflow-hidden">
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:items-start xl:gap-6">
+        {/* Inspector — altura natural; scroll só se o conteúdo passar do viewport */}
+        <div className="flex flex-col gap-4 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:overflow-x-hidden xl:pr-2">
           <div
             className="flex shrink-0 gap-1 overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
             role="tablist"
@@ -524,7 +533,14 @@ export function DesignForm({
             })}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-5 xl:overflow-y-auto xl:pr-1">
+          <div className="space-y-5 px-0.5">
+            {isCorPadraoPlataforma(design.brand.primary) ? (
+              <p className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+                A cor atual é o <strong>roxo padrão da plataforma</strong>, não a
+                marca da torcida. Em Paletas sugeridas, use{' '}
+                <strong>Marca da torcida</strong> (catálogo) e salve.
+              </p>
+            ) : null}
             {section === 'identidade' ? (
               <SectionFrame
                 title="Identidade"
@@ -536,9 +552,9 @@ export function DesignForm({
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Baseadas na marca salva, no escudo e no clube (3 cores cada).
-                    Aplicar uma opção muda só a prévia — a lista de sugestões
-                    permanece estável até salvar.
+                    Marca da torcida vem do catálogo (ex.: Gaviões = preto), não
+                    do roxo da plataforma. Escudo e clube completam. 3 cores
+                    cada; aplicar muda só a prévia até salvar.
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -642,31 +658,63 @@ export function DesignForm({
                 title="Ações e status"
                 description="Olhe a cena Admin na prévia: aprovar, reprovar e pendente."
               >
-                <div className="grid gap-4">
-                  {ACTION_TOKEN_KEYS.map((key) => (
-                    <div key={key} className="space-y-1">
-                      <ColorField
-                        label={ACTION_TOKEN_LABELS[key]}
-                        value={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
-                        resolved={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
-                        token={`actions.${key}` as TokenFocus}
-                        onChange={(v) => {
-                          if (!v) return
-                          patch({
-                            actions: {
-                              ...DEFAULT_ACTIONS,
-                              ...design.actions,
-                              [key]: v,
-                            },
-                          })
-                        }}
-                        {...fieldProps}
-                      />
-                      <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                        {ACTION_TOKEN_HINTS[key]}
-                      </p>
-                    </div>
-                  ))}
+                <div className="grid gap-3">
+                  {ACTION_TOKEN_KEYS.map((key) => {
+                    const fill = design.actions?.[key] ?? DEFAULT_ACTIONS[key]
+                    const fgOverride =
+                      design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key] ?? null
+                    const autoText = resolveActionTextColors(
+                      fill,
+                      null,
+                      surfacesResolved.surface,
+                    )
+                    return (
+                      <div
+                        key={key}
+                        className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+                      >
+                        <ColorField
+                          label={ACTION_TOKEN_LABELS[key]}
+                          value={fill}
+                          resolved={fill}
+                          token={`actions.${key}` as TokenFocus}
+                          onChange={(v) => {
+                            if (!v) return
+                            patch({
+                              actions: {
+                                ...DEFAULT_ACTIONS,
+                                ...design.actions,
+                                [key]: v,
+                              },
+                            })
+                          }}
+                          {...fieldProps}
+                        />
+                        <ColorField
+                          label="Cor do texto"
+                          value={fgOverride}
+                          resolved={autoText.on}
+                          token={`actions.${key}` as TokenFocus}
+                          allowEmpty
+                          emptyLabel="Automático"
+                          onChange={(v) => {
+                            patch({
+                              actionsFg: {
+                                ...DEFAULT_ACTIONS_FG,
+                                ...(design.actionsFg ?? {}),
+                                [key]: v,
+                              },
+                            })
+                          }}
+                          {...fieldProps}
+                        />
+                        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                          {ACTION_TOKEN_HINTS[key]}. Texto vazio = contraste
+                          automático no botão e no badge.
+                        </p>
+                      </div>
+                    )
+                  })}
                 </div>
               </SectionFrame>
             ) : null}
@@ -814,7 +862,7 @@ export function DesignForm({
         </div>
 
         {/* Studio preview — dominant */}
-        <div className="flex min-h-[520px] flex-col gap-3 xl:min-h-0">
+        <div className="flex min-h-[520px] flex-col gap-3 xl:sticky xl:top-4 xl:h-[calc(100vh-11rem)] xl:min-h-0">
           <DesignStudioPreview
             design={design}
             baselineDesign={normalizedBaseline}

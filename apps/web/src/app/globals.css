@@ -48,6 +48,10 @@
   --color-danger-fg: var(--color-danger);
   --color-warning-fg: var(--color-warning);
   --color-info-fg: var(--color-info);
+  --color-success-on: 255 255 255;
+  --color-danger-on: 255 255 255;
+  --color-warning-on: 255 255 255;
+  --color-info-on: 255 255 255;
 
   /* Grade .app-shell-bg — sobrescrita pelo TenantDesignBridge */
   --grid-enabled: 1;
@@ -138,28 +142,28 @@ body {
 /* ── Botões de ação semântica (módulo Design) ─────────────────── */
 .btn-success {
   background-color: rgb(var(--color-success));
-  color: #fff;
+  color: rgb(var(--color-success-on));
 }
 .btn-success:hover {
   filter: brightness(0.92);
 }
 .btn-danger {
   background-color: rgb(var(--color-danger));
-  color: #fff;
+  color: rgb(var(--color-danger-on));
 }
 .btn-danger:hover {
   filter: brightness(0.92);
 }
 .btn-warning {
   background-color: rgb(var(--color-warning));
-  color: #fff;
+  color: rgb(var(--color-warning-on));
 }
 .btn-warning:hover {
   filter: brightness(0.92);
 }
 .btn-info {
   background-color: rgb(var(--color-info));
-  color: #fff;
+  color: rgb(var(--color-info-on));
 }
 .btn-info:hover {
   filter: brightness(0.92);

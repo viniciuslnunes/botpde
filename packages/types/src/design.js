@@ -77,6 +77,14 @@ export const DEFAULT_ACTIONS = /** @type {const} */ ({
   info: '#2563eb',
 })
 
+/** Overrides opcionais de texto em botão/badge de ação (null = automático). */
+export const DEFAULT_ACTIONS_FG = /** @type {const} */ ({
+  success: null,
+  danger: null,
+  warning: null,
+  info: null,
+})
+
 const ActionsTokensSchema = z
   .object({
     success: hexColor.default(DEFAULT_ACTIONS.success),
@@ -85,6 +93,16 @@ const ActionsTokensSchema = z
     info: hexColor.default(DEFAULT_ACTIONS.info),
   })
   .strict()
+
+const ActionsFgSchema = z
+  .object({
+    success: hexOrNull.optional(),
+    danger: hexOrNull.optional(),
+    warning: hexOrNull.optional(),
+    info: hexOrNull.optional(),
+  })
+  .strict()
+  .default({})
 
 /** @type {Record<(typeof ACTION_TOKEN_KEYS)[number], string>} */
 export const ACTION_CSS_VARS = {
@@ -113,6 +131,8 @@ export const TenantDesignSchema = z
       })
       .strict(),
     actions: ActionsTokensSchema.default({ ...DEFAULT_ACTIONS }),
+    /** Texto em botão sólido / badge soft — null = auto (contraste / legível). */
+    actionsFg: ActionsFgSchema,
     light: SurfaceTokensSchema.default({}),
     dark: SurfaceTokensSchema.default({}),
   })
@@ -154,6 +174,7 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
     baseColor: null,
   },
   actions: { ...DEFAULT_ACTIONS },
+  actionsFg: { ...DEFAULT_ACTIONS_FG },
   light: {},
   dark: {},
 })
@@ -175,6 +196,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
       ...DEFAULT_TENANT_DESIGN,
       brand: { primary, secondary: null },
       actions: { ...DEFAULT_ACTIONS },
+      actionsFg: { ...DEFAULT_ACTIONS_FG },
     }
   }
 
@@ -185,6 +207,10 @@ export function resolveTenantDesign(raw, corPrimaria) {
       ...parsed.data,
       brand: { ...parsed.data.brand, primary },
       actions: { ...DEFAULT_ACTIONS, ...parsed.data.actions },
+      actionsFg: {
+        ...DEFAULT_ACTIONS_FG,
+        ...(parsed.data.actionsFg ?? {}),
+      },
     }
   }
 
@@ -192,6 +218,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
     ...DEFAULT_TENANT_DESIGN,
     brand: { primary, secondary: null },
     actions: { ...DEFAULT_ACTIONS },
+    actionsFg: { ...DEFAULT_ACTIONS_FG },
   }
 }
 
@@ -267,6 +294,153 @@ function normalizeClubeKey(nome) {
     .replace(/\s+fc$/i, '')
     .replace(/\s+futebol\s+clube$/i, '')
     .trim()
+}
+
+/**
+ * Cor primária default da plataforma (produto Torcida), NÃO de nenhuma torcida.
+ * Se o tenant ainda estiver com esta cor, as sugestões usam o catálogo curado.
+ */
+export const COR_PRIMARIA_PLATAFORMA = '#7c3aed'
+
+/**
+ * Cores primárias curadas por slug (espelho de `packages/db/src/data/torcidas-brasil.js`).
+ * @type {Record<string, string>}
+ */
+export const TORCIDA_CORES_PRIMARIAS = {
+  'pde-gavioes-fiel': '#1a1a1a',
+  'camisa-12-corinthians': '#111111',
+  'pavilhao-nove': '#2d2d2d',
+  'mancha-alviverde': '#006437',
+  'tup-palmeiras': '#006437',
+  'tti-sao-paulo': '#e4002b',
+  'dragoes-da-real': '#c8102e',
+  'torcida-jovem-santos': '#ffffff',
+  'furia-independente-guarani': '#006b3f',
+  'raca-tricolor-paulista': '#e31e24',
+  'torcida-jovem-flamengo': '#c8102e',
+  'raca-rubro-negra': '#c8102e',
+  'forca-jovem-vasco': '#000000',
+  'young-flu': '#7b0044',
+  'forca-flu': '#7b0044',
+  'furia-jovem-botafogo': '#000000',
+  'galoucura': '#000000',
+  'mafia-azul': '#003da5',
+  'pavilhao-independente-cruzeiro': '#003da5',
+  'seita-verde': '#006b3f',
+  'geral-do-gremio': '#0080c8',
+  'torcida-jovem-gremio': '#0080c8',
+  'camisa-12-inter': '#e30613',
+  'falange-grena-caxias': '#8b0000',
+  'imperio-alviverde': '#006b3f',
+  'furia-caterva': '#e30613',
+  'torcida-jovem-avai': '#0066cc',
+  'torcida-jovem-figueirense': '#000000',
+  'trem-bala-fortaleza': '#e30613',
+  'esquadrao-tricolor-bahia': '#003da5',
+  'barra-brava-sport': '#e30613',
+  'inferno-verde-goias': '#006b3f',
+}
+
+/**
+ * @param {string | null | undefined} hex
+ * @returns {boolean}
+ */
+export function isCorPadraoPlataforma(hex) {
+  return (
+    typeof hex === 'string' &&
+    hex.toLowerCase() === COR_PRIMARIA_PLATAFORMA.toLowerCase()
+  )
+}
+
+/**
+ * Paleta curada da torcida (slug do tenant) + apoio do clube afiliado.
+ * @param {string | null | undefined} slug
+ * @param {{ primary: string, secondary: string, accents?: string[] } | null | undefined} [clube]
+ * @returns {{ primary: string, secondary: string, accents: string[], fonte: 'catalogo' } | null}
+ */
+export function paletaDaTorcida(slug, clube = null) {
+  if (!slug || typeof slug !== 'string') return null
+  const primary = TORCIDA_CORES_PRIMARIAS[slug]
+  if (!primary) return null
+  const secondary =
+    clube?.secondary ||
+    (contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a')
+  return {
+    primary,
+    secondary,
+    accents: clube?.accents ?? [],
+    fonte: 'catalogo',
+  }
+}
+
+/**
+ * Resolve a marca efetiva para sugestões: nunca tratar o roxo da plataforma
+ * como “cor da torcida” se houver catálogo ou paleta do clube.
+ * @param {{
+ *   corPrimaria?: string | null,
+ *   secondary?: string | null,
+ *   slug?: string | null,
+ *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
+ * }} opts
+ * @returns {{ primary: string, secondary: string, accents: string[], fonte: 'tenant' | 'catalogo' | 'clube' | 'plataforma' }}
+ */
+export function resolverMarcaTorcida(opts = {}) {
+  const clube = opts.clube ?? null
+  const catalogo = paletaDaTorcida(opts.slug, clube)
+  const corAtual =
+    typeof opts.corPrimaria === 'string' && /^#[0-9a-fA-F]{6}$/.test(opts.corPrimaria)
+      ? opts.corPrimaria
+      : null
+  const secundariaAtual =
+    typeof opts.secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(opts.secondary)
+      ? opts.secondary
+      : null
+
+  // Cor personalizada da torcida (não é o default do produto).
+  if (corAtual && !isCorPadraoPlataforma(corAtual)) {
+    const secondary =
+      secundariaAtual ||
+      catalogo?.secondary ||
+      clube?.secondary ||
+      (contrasteTextoSobre(corAtual) === 'light' ? '#ffffff' : '#0a0a0a')
+    return {
+      primary: corAtual,
+      secondary,
+      accents: catalogo?.accents?.length
+        ? catalogo.accents
+        : (clube?.accents ?? []),
+      fonte: 'tenant',
+    }
+  }
+
+  if (catalogo) {
+    return {
+      primary: catalogo.primary,
+      secondary: secundariaAtual || catalogo.secondary,
+      accents: catalogo.accents,
+      fonte: 'catalogo',
+    }
+  }
+
+  if (clube?.primary) {
+    return {
+      primary: clube.primary,
+      secondary: secundariaAtual || clube.secondary,
+      accents: clube.accents ?? [],
+      fonte: 'clube',
+    }
+  }
+
+  return {
+    primary: corAtual || COR_PRIMARIA_PLATAFORMA,
+    secondary:
+      secundariaAtual ||
+      (contrasteTextoSobre(corAtual || COR_PRIMARIA_PLATAFORMA) === 'light'
+        ? '#ffffff'
+        : '#0a0a0a'),
+    accents: [],
+    fonte: 'plataforma',
+  }
 }
 
 /**
@@ -442,6 +616,25 @@ export function corMarcaLegivel(brandHex, surfaceHex, minRatio = 3.2) {
 }
 
 /**
+ * Texto de botão sólido (`on`) e de badge/soft (`fg`) para uma ação.
+ * Override manual em `actionsFg` aplica aos dois; senão: on = contraste no
+ * preenchimento, fg = legível sobre a superfície.
+ * @param {string} actionHex
+ * @param {string | null | undefined} overrideHex
+ * @param {string} surfaceHex
+ * @returns {{ on: string, fg: string }}
+ */
+export function resolveActionTextColors(actionHex, overrideHex, surfaceHex) {
+  if (typeof overrideHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrideHex)) {
+    return { on: overrideHex, fg: overrideHex }
+  }
+  return {
+    on: contrasteTextoSobre(actionHex) === 'light' ? '#ffffff' : '#0a0a0a',
+    fg: corMarcaLegivel(actionHex, surfaceHex),
+  }
+}
+
+/**
  * Deriva cores de ação a partir da marca/clube.
  * Sucesso só é verde se a identidade já for verde (ex.: Palmeiras, Goiás).
  * Caso contrário usa azul (ou tom da marca) — nunca injeta verde de rivalidade.
@@ -539,23 +732,25 @@ function destaqueDaPaleta(primary, secondary, clube, fallback) {
  * Paletas sugeridas no contexto da torcida e do clube afiliado.
  * Ordem: marca da torcida → escudo → clube → variação monocromática → alto contraste.
  * Não sugere harmônicas genéricas (análoga/complementar) que inventam cores de rival.
- * @param {string} seedHex cor primária atual da torcida
+ * @param {string} seedHex cor primária atual (tenant) — se for o roxo da plataforma,
+ *   a marca da torcida usa catálogo/clube via `opts.slug`
  * @param {{
  *   clube?: { primary: string, secondary: string, accents?: string[] } | null,
  *   extraidas?: string[],
  *   secondary?: string | null,
+ *   slug?: string | null,
  * }} [opts]
  * @returns {PaletaSugerida[]}
  */
 export function gerarPaletasSugeridas(seedHex, opts = {}) {
-  const seed =
-    typeof seedHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(seedHex)
-      ? seedHex
-      : DEFAULT_TENANT_DESIGN.brand.primary
-  const seedSecondary =
-    typeof opts.secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(opts.secondary)
-      ? opts.secondary
-      : null
+  const marca = resolverMarcaTorcida({
+    corPrimaria: seedHex,
+    secondary: opts.secondary,
+    slug: opts.slug,
+    clube: opts.clube ?? null,
+  })
+  const seed = marca.primary
+  const seedSecondary = marca.secondary
   const { h, s } = hexToHsl(seed)
   const surfaces = derivarSuperficiesDaMarca(seed)
 
@@ -565,29 +760,41 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
     opts.clube?.primary,
     opts.clube?.secondary,
     ...(opts.clube?.accents ?? []),
+    ...marca.accents,
   ].filter(Boolean)
 
   /** @type {PaletaSugerida[]} */
   const out = []
 
-  // 1) Marca da torcida (prioridade) — exatamente 3 cores: primária, secundária, destaque
+  const descricaoMarca =
+    marca.fonte === 'catalogo'
+      ? 'Cores curadas desta torcida (não o roxo padrão da plataforma)'
+      : marca.fonte === 'clube'
+        ? 'Ainda sem cor própria — usando a paleta do clube afiliado'
+        : marca.fonte === 'plataforma'
+          ? 'Padrão da plataforma — personalize a primária'
+          : 'Primária · secundária · destaque (sem inventar cor de rival)'
+
+  // 1) Marca da torcida (prioridade) — exatamente 3 cores
   {
     const primary = seed
-    const secondary = seedSecondary ?? surfaces.secondary
+    const secondary = seedSecondary
     const actions = derivarAcoesDaMarca(primary, {
       secondary,
-      accents: opts.clube?.accents,
+      accents: marca.accents.length ? marca.accents : opts.clube?.accents,
     })
     const destaque = destaqueDaPaleta(
       primary,
       secondary,
-      opts.clube,
+      opts.clube
+        ? { ...opts.clube, accents: marca.accents.length ? marca.accents : opts.clube.accents }
+        : { primary, secondary, accents: marca.accents },
       actions.danger,
     )
     out.push({
       id: 'marca-torcida',
       nome: 'Marca da torcida',
-      descricao: 'Primária · secundária · destaque (sem inventar cor de rival)',
+      descricao: descricaoMarca,
       primary,
       secondary,
       actions,
@@ -742,6 +949,7 @@ export function aplicarPaletaAoDesign(design, paleta) {
       secondary: paleta.secondary,
     },
     actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
+    actionsFg: design.actionsFg ?? { ...DEFAULT_ACTIONS_FG },
     light: { ...(design.light ?? {}), ...derived.light },
     dark: { ...(design.dark ?? {}), ...derived.dark },
     grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,
