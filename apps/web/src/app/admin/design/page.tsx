@@ -59,7 +59,7 @@ export default async function DesignPage() {
           <div>
             <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Design</h1>
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Ajuste cores com prévia ao vivo · salve para aplicar a toda a torcida ·{' '}
+              Estúdio visual · passe o mouse nos controles e veja na prévia ·{' '}
               {tenant.nome}
             </p>
           </div>

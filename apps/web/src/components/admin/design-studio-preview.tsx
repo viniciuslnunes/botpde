@@ -1,0 +1,572 @@
+'use client'
+
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import {
+  Bell,
+  Calendar,
+  Check,
+  Home,
+  MessageCircle,
+  ShoppingBag,
+  Users,
+  X,
+} from 'lucide-react'
+import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
+import {
+  DEFAULT_ACTIONS,
+  DEFAULT_SURFACE_DARK,
+  DEFAULT_SURFACE_LIGHT,
+} from '@torcida/types'
+
+export type PreviewScene = 'portal' | 'admin' | 'entrar'
+export type PreviewMode = 'light' | 'dark'
+
+export type TokenFocus =
+  | 'brand.primary'
+  | 'brand.secondary'
+  | 'actions.success'
+  | 'actions.danger'
+  | 'actions.warning'
+  | 'actions.info'
+  | 'grid'
+  | 'background'
+  | 'backgroundSubtle'
+  | 'foreground'
+  | 'foregroundMuted'
+  | 'border'
+  | 'surface'
+  | 'surfaceRaised'
+  | null
+
+type Props = {
+  design: TenantDesign
+  mode: PreviewMode
+  scene: PreviewScene
+  tenantNome: string
+  focus: TokenFocus
+  onSceneChange: (s: PreviewScene) => void
+  onModeChange: (m: PreviewMode) => void
+}
+
+function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
+  const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const overrides = mode === 'dark' ? design.dark : design.light
+  return { ...defaults, ...overrides }
+}
+
+function Hotspot({
+  token,
+  focus,
+  label,
+  children,
+  className = '',
+}: {
+  token: NonNullable<TokenFocus>
+  focus: TokenFocus
+  label: string
+  children: ReactNode
+  className?: string
+}) {
+  const active = focus === token
+  return (
+    <div
+      data-token={token}
+      className={[
+        'relative transition-[box-shadow,outline] duration-150',
+        className,
+        active
+          ? 'z-10 rounded-lg outline outline-2 outline-offset-2 outline-sky-400 shadow-[0_0_0_4px_rgba(56,189,248,0.25)]'
+          : '',
+      ].join(' ')}
+    >
+      {children}
+      {active ? (
+        <span className="pointer-events-none absolute -top-2 left-2 z-20 translate-y-[-100%] rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+          {label}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function gridStyle(design: TenantDesign, mode: PreviewMode): CSSProperties {
+  const surfaces = resolveSurfaces(design, mode)
+  const lineHex = design.grid.lineColor ?? surfaces.foreground
+  const base = design.grid.baseColor ?? surfaces.backgroundSubtle
+  const r = parseInt(lineHex.slice(1, 3), 16)
+  const g = parseInt(lineHex.slice(3, 5), 16)
+  const b = parseInt(lineHex.slice(5, 7), 16)
+  const opacity = design.grid.lineOpacity
+  return {
+    backgroundColor: base,
+    backgroundImage: design.grid.enabled
+      ? `linear-gradient(rgb(${r} ${g} ${b} / ${opacity}) 1px, transparent 1px), linear-gradient(90deg, rgb(${r} ${g} ${b} / ${opacity}) 1px, transparent 1px)`
+      : 'none',
+    backgroundSize: `${design.grid.sizePx}px ${design.grid.sizePx}px`,
+  }
+}
+
+function PortalScene({
+  design,
+  mode,
+  tenantNome,
+  focus,
+}: {
+  design: TenantDesign
+  mode: PreviewMode
+  tenantNome: string
+  focus: TokenFocus
+}) {
+  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const nav = [
+    { icon: Home, label: 'Início' },
+    { icon: Users, label: 'Comunidade', active: true },
+    { icon: Calendar, label: 'Agenda' },
+    { icon: ShoppingBag, label: 'Loja' },
+  ]
+
+  return (
+    <div className="flex h-full min-h-[420px] flex-col">
+      <Hotspot token="surface" focus={focus} label="Superfície (navbar)" className="shrink-0">
+        <header className="flex items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 backdrop-blur-sm">
+          <Hotspot token="brand.primary" focus={focus} label="Cor primária">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
+              style={{ backgroundColor: design.brand.primary }}
+            >
+              {tenantNome.slice(0, 1)}
+            </div>
+          </Hotspot>
+          <Hotspot token="foreground" focus={focus} label="Texto principal" className="min-w-0">
+            <span className="truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
+              {tenantNome}
+            </span>
+          </Hotspot>
+          <nav className="ml-2 hidden items-center gap-0.5 sm:flex">
+            {nav.map((item) => (
+              <span
+                key={item.label}
+                className={[
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                  item.active
+                    ? 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]'
+                    : 'text-[rgb(var(--foreground-muted))]',
+                ].join(' ')}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </span>
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <Hotspot token="border" focus={focus} label="Borda">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
+                <Bell className="h-3.5 w-3.5" />
+              </span>
+            </Hotspot>
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span
+                className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold text-white"
+                style={{ backgroundColor: design.brand.primary }}
+              >
+                2
+              </span>
+            </span>
+          </div>
+        </header>
+      </Hotspot>
+
+      <Hotspot
+        token="grid"
+        focus={focus}
+        label="Fundo e grade"
+        className="min-h-0 flex-1"
+      >
+        <div className="h-full space-y-3 overflow-auto p-4" style={gridStyle(design, mode)}>
+          <Hotspot token="backgroundSubtle" focus={focus} label="Fundo sutil (área sob a grade)">
+            <div className="mb-1">
+              <Hotspot token="foreground" focus={focus} label="Título">
+                <h2 className="text-lg font-bold text-[rgb(var(--foreground))]">Comunidade</h2>
+              </Hotspot>
+              <Hotspot token="foregroundMuted" focus={focus} label="Texto secundário">
+                <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                  Feed da torcida — posts, reações e avisos
+                </p>
+              </Hotspot>
+            </div>
+          </Hotspot>
+
+          <Hotspot token="surface" focus={focus} label="Superfície (cartão)">
+            <article className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                  style={{ backgroundColor: design.brand.primary }}
+                >
+                  V
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                      Vinicius
+                    </span>
+                    <Hotspot token="brand.primary" focus={focus} label="Badge primária">
+                      <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary))]">
+                        Sócio
+                      </span>
+                    </Hotspot>
+                    <span className="text-[10px] text-[rgb(var(--foreground-muted))]">agora</span>
+                  </div>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[rgb(var(--foreground))]">
+                    Quem vai no ensaio de sexta? Bateria precisa de mais gente no fundo.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Hotspot token="brand.primary" focus={focus} label="Botão primário">
+                      <button
+                        type="button"
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+                        style={{ backgroundColor: design.brand.primary }}
+                      >
+                        Comentar
+                      </button>
+                    </Hotspot>
+                    <Hotspot token="surfaceRaised" focus={focus} label="Superfície elevada">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))]"
+                      >
+                        Curtir
+                      </button>
+                    </Hotspot>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </Hotspot>
+
+          <Hotspot token="surface" focus={focus} label="Cartão de evento / RSVP">
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Próximo evento
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[rgb(var(--foreground))]">
+                Ensaio da bateria · Sexta 20h
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Hotspot token="actions.success" focus={focus} label="Aprovar / positivo">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ backgroundColor: actions.success }}
+                  >
+                    <Check className="h-3 w-3" />
+                    Vou comparecer
+                  </span>
+                </Hotspot>
+                <Hotspot token="actions.warning" focus={focus} label="Atenção / pendente">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ backgroundColor: actions.warning }}
+                  >
+                    Lista de espera
+                  </span>
+                </Hotspot>
+                <Hotspot token="actions.danger" focus={focus} label="Reprovar / cancelar">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      color: actions.danger,
+                      borderColor: `${actions.danger}44`,
+                      backgroundColor: `${actions.danger}1a`,
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                    Não vou
+                  </span>
+                </Hotspot>
+              </div>
+            </div>
+          </Hotspot>
+        </div>
+      </Hotspot>
+    </div>
+  )
+}
+
+function AdminScene({
+  design,
+  mode,
+  tenantNome,
+  focus,
+}: {
+  design: TenantDesign
+  mode: PreviewMode
+  tenantNome: string
+  focus: TokenFocus
+}) {
+  const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+
+  return (
+    <div className="flex h-full min-h-[420px] flex-col">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5">
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
+          style={{ backgroundColor: design.brand.primary }}
+        >
+          {tenantNome.slice(0, 1)}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{tenantNome}</p>
+          <p className="text-[10px] text-[rgb(var(--foreground-muted))]">Administração</p>
+        </div>
+      </header>
+      <div className="flex min-h-0 flex-1">
+        <aside className="hidden w-40 shrink-0 border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 sm:block">
+          {['Dashboard', 'Membros', 'Agenda', 'Design'].map((label, i) => (
+            <div
+              key={label}
+              className={[
+                'rounded-lg px-2.5 py-1.5 text-xs font-medium',
+                i === 1
+                  ? 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary))]'
+                  : 'text-[rgb(var(--foreground-muted))]',
+              ].join(' ')}
+            >
+              {label}
+            </div>
+          ))}
+        </aside>
+        <Hotspot token="grid" focus={focus} label="Fundo e grade" className="min-w-0 flex-1">
+          <div className="h-full space-y-3 overflow-auto p-4" style={gridStyle(design, mode)}>
+            <Hotspot token="foreground" focus={focus} label="Título da página">
+              <h2 className="text-lg font-bold text-[rgb(var(--foreground))]">Membros pendentes</h2>
+            </Hotspot>
+            <Hotspot token="foregroundMuted" focus={focus} label="Descrição">
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                Aprove ou reprove solicitações de sócio
+              </p>
+            </Hotspot>
+
+            <Hotspot token="surface" focus={focus} label="Superfície (linha)">
+              <div className="overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+                {[
+                  { nome: 'Ana Silva', depto: 'Bateria' },
+                  { nome: 'Carlos Mendes', depto: 'Comunicação' },
+                ].map((row, idx) => (
+                  <div
+                    key={row.nome}
+                    className={[
+                      'flex flex-wrap items-center justify-between gap-3 px-4 py-3',
+                      idx > 0 ? 'border-t border-[rgb(var(--border))]' : '',
+                    ].join(' ')}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-[rgb(var(--foreground))]">{row.nome}</p>
+                      <p className="text-xs text-[rgb(var(--foreground-muted))]">{row.depto}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Hotspot token="actions.success" focus={focus} label="Botão aprovar">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                          style={{ backgroundColor: actions.success }}
+                        >
+                          <Check className="h-3 w-3" />
+                          Aprovar
+                        </span>
+                      </Hotspot>
+                      <Hotspot token="actions.danger" focus={focus} label="Botão reprovar">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold"
+                          style={{
+                            color: actions.danger,
+                            borderColor: `${actions.danger}44`,
+                            backgroundColor: `${actions.danger}1a`,
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                          Reprovar
+                        </span>
+                      </Hotspot>
+                      <Hotspot token="actions.warning" focus={focus} label="Badge pendente">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                          style={{
+                            color: actions.warning,
+                            backgroundColor: `${actions.warning}24`,
+                          }}
+                        >
+                          Pendente
+                        </span>
+                      </Hotspot>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Hotspot>
+          </div>
+        </Hotspot>
+      </div>
+    </div>
+  )
+}
+
+function EntrarScene({
+  design,
+  mode,
+  tenantNome,
+  focus,
+}: {
+  design: TenantDesign
+  mode: PreviewMode
+  tenantNome: string
+  focus: TokenFocus
+}) {
+  return (
+    <Hotspot token="grid" focus={focus} label="Fundo e grade" className="h-full min-h-[420px]">
+      <div
+        className="flex h-full flex-col items-center justify-center p-6"
+        style={gridStyle(design, mode)}
+      >
+        <Hotspot token="surface" focus={focus} label="Superfície (cartão de login)" className="w-full max-w-xs">
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-lg">
+            <div className="mb-5 text-center">
+              <Hotspot token="brand.primary" focus={focus} label="Cor primária" className="inline-flex">
+                <div
+                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-md"
+                  style={{ backgroundColor: design.brand.primary }}
+                >
+                  {tenantNome.slice(0, 1)}
+                </div>
+              </Hotspot>
+              <Hotspot token="foreground" focus={focus} label="Título">
+                <p className="text-base font-bold text-[rgb(var(--foreground))]">{tenantNome}</p>
+              </Hotspot>
+              <Hotspot token="foregroundMuted" focus={focus} label="Texto secundário">
+                <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                  Portal do associado
+                </p>
+              </Hotspot>
+            </div>
+            <Hotspot token="border" focus={focus} label="Borda / campos">
+              <div className="space-y-2">
+                <div className="h-9 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 text-xs leading-9 text-[rgb(var(--foreground-muted))]">
+                  E-mail
+                </div>
+                <div className="h-9 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 text-xs leading-9 text-[rgb(var(--foreground-muted))]">
+                  Senha
+                </div>
+              </div>
+            </Hotspot>
+            <Hotspot token="brand.primary" focus={focus} label="Botão entrar" className="mt-4">
+              <button
+                type="button"
+                className="w-full rounded-lg py-2.5 text-sm font-semibold text-white"
+                style={{ backgroundColor: design.brand.primary }}
+              >
+                Entrar
+              </button>
+            </Hotspot>
+          </div>
+        </Hotspot>
+      </div>
+    </Hotspot>
+  )
+}
+
+const SCENES: { id: PreviewScene; label: string; hint: string }[] = [
+  { id: 'portal', label: 'Portal', hint: 'O que o associado vê' },
+  { id: 'admin', label: 'Admin', hint: 'Aprovar membros e painéis' },
+  { id: 'entrar', label: 'Login', hint: 'Tela de entrada' },
+]
+
+/**
+ * Prévia de estúdio: cenas fiéis à app + hotspots ligados aos tokens do editor.
+ */
+export function DesignStudioPreview({
+  design,
+  mode,
+  scene,
+  tenantNome,
+  focus,
+  onSceneChange,
+  onModeChange,
+}: Props) {
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!rootRef.current) return
+    applyTenantDesign(design, mode, rootRef.current)
+  }, [design, mode])
+
+  useEffect(() => {
+    if (!focus || !rootRef.current) return
+    const el = rootRef.current.querySelector(`[data-token="${focus}"]`)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [focus, scene])
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Prévia da aplicação</p>
+          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+            Passe o mouse nos controles à esquerda — a área afetada acende aqui. Nada muda de
+            verdade até salvar.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-0.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5">
+            {SCENES.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                title={s.hint}
+                onClick={() => onSceneChange(s.id)}
+                className={[
+                  'rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  scene === s.id
+                    ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                    : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                ].join(' ')}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-0.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5">
+            {(['dark', 'light'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => onModeChange(m)}
+                className={[
+                  'rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  mode === m
+                    ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                    : 'text-[rgb(var(--foreground-muted))]',
+                ].join(' ')}
+              >
+                {m === 'dark' ? 'Escuro' : 'Claro'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={rootRef}
+        className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/5 dark:ring-white/5"
+      >
+        {scene === 'portal' ? (
+          <PortalScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+        ) : null}
+        {scene === 'admin' ? (
+          <AdminScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+        ) : null}
+        {scene === 'entrar' ? (
+          <EntrarScene design={design} mode={mode} tenantNome={tenantNome} focus={focus} />
+        ) : null}
+      </div>
+    </div>
+  )
+}

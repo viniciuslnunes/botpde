@@ -2,16 +2,15 @@
 
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   useTransition,
-  type CSSProperties,
   type ReactNode,
 } from 'react'
 import {
   AlertTriangle,
-  Check,
   CheckCircle2,
   Contrast,
   Grid3x3,
@@ -21,7 +20,6 @@ import {
   Palette,
   RotateCcw,
   Sparkles,
-  X,
 } from 'lucide-react'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
@@ -47,8 +45,13 @@ import { runPersistAction } from '@/lib/toast-action'
 import { extrairPaletaDeImagem } from '@/lib/extrair-paleta'
 import { restaurarDesignPadrao, salvarDesignTenant } from '@/app/admin/design/actions'
 import { useTheme } from 'next-themes'
+import {
+  DesignStudioPreview,
+  type PreviewMode,
+  type PreviewScene,
+  type TokenFocus,
+} from '@/components/admin/design-studio-preview'
 
-type SurfaceMode = 'light' | 'dark'
 type EditorSection = 'identidade' | 'acoes' | 'fundo' | 'superficies'
 
 type Props = {
@@ -76,91 +79,13 @@ const SECTIONS: { id: EditorSection; label: string; icon: typeof Palette }[] = [
   { id: 'superficies', label: 'Superfícies', icon: Layers },
 ]
 
-function ColorField({
-  label,
-  value,
-  onChange,
-  allowEmpty,
-  emptyLabel = 'Automático',
-}: {
-  label: string
-  value: string | null
-  onChange: (v: string | null) => void
-  allowEmpty?: boolean
-  emptyLabel?: string
-}) {
-  const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => {
-    setDraft(value ?? '')
-  }, [value])
-
-  const hex = value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#888888'
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-sm font-medium text-[rgb(var(--foreground))]">{label}</label>
-        {allowEmpty ? (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="text-xs text-[rgb(var(--foreground-muted))] underline-offset-2 hover:underline"
-          >
-            {emptyLabel}
-          </button>
-        ) : null}
-      </div>
-      <div className="flex items-center gap-2">
-        <div
-          className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm"
-          style={{ backgroundColor: value ?? 'transparent' }}
-        />
-        <input
-          type="color"
-          value={hex}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-14 cursor-pointer rounded-lg border border-[rgb(var(--border))] bg-transparent p-0.5"
-        />
-        <input
-          type="text"
-          value={draft}
-          placeholder="#RRGGBB"
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) {
-              setDraft(v)
-              if (v === '' && allowEmpty) onChange(null)
-              else if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
-            }
-          }}
-          onBlur={() => {
-            const v = draft.trim()
-            if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
-            else setDraft(value ?? '')
-          }}
-          className="w-28 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 font-mono text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          maxLength={7}
-        />
-      </div>
-    </div>
-  )
-}
-
-function resolveSurfaces(design: TenantDesign, mode: SurfaceMode) {
+function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
   const defaults = mode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
   const overrides = mode === 'dark' ? design.dark : design.light
-  return {
-    background: overrides.background ?? defaults.background,
-    backgroundSubtle: overrides.backgroundSubtle ?? defaults.backgroundSubtle,
-    foreground: overrides.foreground ?? defaults.foreground,
-    foregroundMuted: overrides.foregroundMuted ?? defaults.foregroundMuted,
-    border: overrides.border ?? defaults.border,
-    borderStrong: overrides.borderStrong ?? defaults.borderStrong,
-    surface: overrides.surface ?? defaults.surface,
-    surfaceRaised: overrides.surfaceRaised ?? defaults.surfaceRaised,
-  }
+  return { ...defaults, ...overrides }
 }
 
-function buildContrastChecks(design: TenantDesign, mode: SurfaceMode): ContrastCheck[] {
+function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastCheck[] {
   const s = resolveSurfaces(design, mode)
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const primaryOnBtn = contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
@@ -180,7 +105,7 @@ function buildContrastChecks(design: TenantDesign, mode: SurfaceMode): ContrastC
       fg: s.foreground,
       bg: s.background,
       min: 4.5,
-      tip: 'Aumente o contraste do texto principal ou escureça/clareie o fundo da página.',
+      tip: 'Aumente o contraste do texto principal ou ajuste o fundo.',
     },
     {
       id: 'title-subtle',
@@ -188,15 +113,15 @@ function buildContrastChecks(design: TenantDesign, mode: SurfaceMode): ContrastC
       fg: s.foreground,
       bg: s.backgroundSubtle,
       min: 4.5,
-      tip: 'Títulos em áreas com grade usam o fundo sutil — ajuste texto ou fundo sutil.',
+      tip: 'Áreas com grade usam fundo sutil — título pode sumir.',
     },
     {
       id: 'muted',
-      label: 'Texto secundário no fundo',
+      label: 'Texto secundário',
       fg: s.foregroundMuted,
       bg: s.background,
       min: 4.5,
-      tip: 'Descrições e labels ficam ilegíveis. Escureça o texto secundário.',
+      tip: 'Descrições ilegíveis. Escureça o texto secundário.',
     },
     {
       id: 'card',
@@ -204,23 +129,23 @@ function buildContrastChecks(design: TenantDesign, mode: SurfaceMode): ContrastC
       fg: s.foreground,
       bg: s.surface,
       min: 4.5,
-      tip: 'Cartões e painéis precisam de texto legível sobre a superfície.',
+      tip: 'Cartões precisam de texto legível.',
     },
     {
       id: 'primary-btn',
-      label: 'Texto no botão primário',
+      label: 'Botão primário',
       fg: primaryOnBtn,
       bg: design.brand.primary,
       min: 4.5,
-      tip: 'A cor primária está muito clara ou escura demais para texto branco/preto.',
+      tip: 'Cor primária fraca para texto do botão.',
     },
     {
       id: 'success-btn',
-      label: 'Texto no botão aprovar',
+      label: 'Botão aprovar',
       fg: successOnBtn,
       bg: actions.success,
       min: 3,
-      tip: 'Ajuste a cor de sucesso para o texto do botão continuar legível.',
+      tip: 'Ajuste a cor de sucesso.',
     },
   ]
 
@@ -237,213 +162,120 @@ function buildContrastChecks(design: TenantDesign, mode: SurfaceMode): ContrastC
   })
 }
 
-function DesignLivePreview({
-  design,
-  mode,
-  tenantNome,
-  onModeChange,
+/** Color field with popover + resolved swatch (shows default when empty). */
+function ColorField({
+  label,
+  value,
+  resolved,
+  onChange,
+  allowEmpty,
+  emptyLabel = 'Usar padrão',
+  token,
+  onFocusToken,
 }: {
-  design: TenantDesign
-  mode: SurfaceMode
-  tenantNome: string
-  onModeChange: (m: SurfaceMode) => void
+  label: string
+  value: string | null
+  /** Valor efetivo exibido no swatch (inclui default). */
+  resolved: string
+  onChange: (v: string | null) => void
+  allowEmpty?: boolean
+  emptyLabel?: string
+  token?: TokenFocus
+  onFocusToken?: (t: TokenFocus) => void
 }) {
-  const rootRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(value ?? resolved)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
-    if (!rootRef.current) return
-    applyTenantDesign(design, mode, rootRef.current)
-  }, [design, mode])
+    setDraft(value ?? resolved)
+  }, [value, resolved])
 
-  const checks = useMemo(() => buildContrastChecks(design, mode), [design, mode])
-  const fails = checks.filter((c) => !c.ok)
+  useEffect(() => {
+    if (!open) return
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const display = value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : resolved
 
   return (
-    <div className="space-y-3">
+    <div
+      ref={wrapRef}
+      className="relative space-y-1.5"
+      onMouseEnter={() => token && onFocusToken?.(token)}
+      onFocusCapture={() => token && onFocusToken?.(token)}
+    >
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Prévia ao vivo</p>
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Só aqui — a plataforma só muda ao salvar
+        <label className="text-sm font-medium text-[rgb(var(--foreground))]">{label}</label>
+        {allowEmpty && value ? (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs text-[rgb(var(--foreground-muted))] underline-offset-2 hover:underline"
+          >
+            {emptyLabel}
+          </button>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((v) => !v)}
+          className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-sky-400/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          style={{ backgroundColor: display }}
+          title="Abrir seletor"
+        />
+        <input
+          type="text"
+          value={draft}
+          placeholder={resolved}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) {
+              setDraft(v)
+              if (v === '' && allowEmpty) onChange(null)
+              else if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
+            }
+          }}
+          onBlur={() => {
+            const v = draft.trim()
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
+            else setDraft(value ?? resolved)
+          }}
+          className="w-full min-w-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 font-mono text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          maxLength={7}
+        />
+      </div>
+      {!value && allowEmpty ? (
+        <p className="text-[10px] text-[rgb(var(--foreground-muted))]">Padrão · {resolved}</p>
+      ) : null}
+
+      {open ? (
+        <div
+          id={panelId}
+          className="absolute left-0 top-full z-30 mt-2 w-[220px] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 shadow-xl"
+        >
+          <input
+            type="color"
+            value={display}
+            onChange={(e) => {
+              onChange(e.target.value)
+              setDraft(e.target.value)
+            }}
+            className="h-28 w-full cursor-pointer rounded-lg border-0 bg-transparent p-0"
+          />
+          <p className="mt-2 text-center font-mono text-xs text-[rgb(var(--foreground-muted))]">
+            {display}
           </p>
         </div>
-        <div className="flex gap-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-0.5">
-          {(['dark', 'light'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => onModeChange(m)}
-              className={[
-                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                mode === m
-                  ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
-                  : 'text-[rgb(var(--foreground-muted))]',
-              ].join(' ')}
-            >
-              {m === 'dark' ? 'Escuro' : 'Claro'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div
-        ref={rootRef}
-        className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] shadow-lg"
-        data-design-preview
-      >
-        {/* Mini shell — herda CSS vars do rootRef */}
-        <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold text-white"
-              style={{ backgroundColor: 'rgb(var(--color-primary))' }}
-            >
-              {tenantNome.slice(0, 1)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-[rgb(var(--foreground))]">
-                {tenantNome}
-              </p>
-              <p className="text-[10px] text-[rgb(var(--foreground-muted))]">Administração</p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="space-y-3 p-3"
-          style={{
-            ...gridPreviewStyle(design, mode),
-            minHeight: 280,
-          }}
-        >
-          <div>
-            <h3 className="text-base font-bold text-[rgb(var(--foreground))]">Título da página</h3>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Texto secundário — descrições e labels
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Cartão de conteúdo</p>
-                <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
-                  Superfície elevada sobre o fundo com grade. Assim fica o portal e o admin.
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary))]">
-                Badge
-              </span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white"
-                style={{ backgroundColor: 'rgb(var(--color-primary))' }}
-              >
-                Primário
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-2.5 py-1.5 text-[11px] font-medium text-[rgb(var(--foreground))]"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Fluxo de aprovação
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--color-success))] px-2.5 py-1.5 text-[11px] font-semibold text-white">
-                <Check className="h-3 w-3" />
-                Aprovar
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--color-danger)_/_0.28)] bg-[rgb(var(--color-danger)_/_0.1)] px-2.5 py-1.5 text-[11px] font-semibold text-[rgb(var(--color-danger))]">
-                <X className="h-3 w-3" />
-                Reprovar
-              </span>
-              <span className="rounded-lg bg-[rgb(var(--color-warning))] px-2.5 py-1.5 text-[11px] font-semibold text-white">
-                Pendente
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-[rgb(var(--color-success)_/_0.14)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-success))]">
-                Aprovado
-              </span>
-              <span className="rounded-full bg-[rgb(var(--color-danger)_/_0.14)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-danger))]">
-                Reprovado
-              </span>
-              <span className="rounded-full bg-[rgb(var(--color-warning)_/_0.14)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-warning))]">
-                Na fila
-              </span>
-              <span className="rounded-full bg-[rgb(var(--color-info)_/_0.14)] px-2 py-0.5 text-[10px] font-medium text-[rgb(var(--color-info))]">
-                Info
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Contraste */}
-      <div
-        className={[
-          'rounded-xl border px-3 py-2.5',
-          fails.length > 0
-            ? 'border-amber-500/40 bg-amber-500/10'
-            : 'border-emerald-500/30 bg-emerald-500/10',
-        ].join(' ')}
-      >
-        <div className="flex items-start gap-2">
-          {fails.length > 0 ? (
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
-          )}
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <p
-              className={[
-                'text-sm font-medium',
-                fails.length > 0
-                  ? 'text-amber-900 dark:text-amber-100'
-                  : 'text-emerald-900 dark:text-emerald-100',
-              ].join(' ')}
-            >
-              {fails.length > 0
-                ? `${fails.length} problema${fails.length > 1 ? 's' : ''} de contraste`
-                : 'Contraste OK neste modo'}
-            </p>
-            <ul className="space-y-1">
-              {checks.map((c) => (
-                <li key={c.id} className="flex items-start gap-2 text-xs">
-                  <Contrast
-                    className={[
-                      'mt-0.5 h-3 w-3 shrink-0',
-                      c.ok
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-amber-600 dark:text-amber-300',
-                    ].join(' ')}
-                  />
-                  <span
-                    className={
-                      c.ok
-                        ? 'text-[rgb(var(--foreground-muted))]'
-                        : 'text-amber-900 dark:text-amber-100'
-                    }
-                  >
-                    <span className="font-medium">{c.label}</span>
-                    {' · '}
-                    {c.ratio.toFixed(1)}:1
-                    {!c.ok ? ` (mín. ${c.min}:1) — ${c.tip}` : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+      ) : null}
     </div>
   )
 }
@@ -468,6 +300,66 @@ function SectionFrame({
   )
 }
 
+function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
+  const fails = checks.filter((c) => !c.ok)
+  return (
+    <div
+      className={[
+        'rounded-xl border px-3 py-2.5',
+        fails.length > 0
+          ? 'border-amber-500/40 bg-amber-500/10'
+          : 'border-emerald-500/30 bg-emerald-500/10',
+      ].join(' ')}
+    >
+      <div className="flex items-start gap-2">
+        {fails.length > 0 ? (
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+        ) : (
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+        )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p
+            className={[
+              'text-sm font-medium',
+              fails.length > 0
+                ? 'text-amber-900 dark:text-amber-100'
+                : 'text-emerald-900 dark:text-emerald-100',
+            ].join(' ')}
+          >
+            {fails.length > 0
+              ? `${fails.length} contraste${fails.length > 1 ? 's' : ''} fraco${fails.length > 1 ? 's' : ''} — títulos/textos podem sumir`
+              : 'Contraste OK neste modo'}
+          </p>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {checks.map((c) => (
+              <li key={c.id} className="flex items-start gap-1.5 text-[11px]">
+                <Contrast
+                  className={[
+                    'mt-0.5 h-3 w-3 shrink-0',
+                    c.ok
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-600 dark:text-amber-300',
+                  ].join(' ')}
+                />
+                <span
+                  className={
+                    c.ok
+                      ? 'text-[rgb(var(--foreground-muted))]'
+                      : 'text-amber-900 dark:text-amber-100'
+                  }
+                >
+                  <span className="font-medium">{c.label}</span> {c.ratio.toFixed(1)}:1
+                  {!c.ok ? ` — ${c.tip}` : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function DesignForm({
   initialDesign,
   corPrimaria,
@@ -480,20 +372,27 @@ export function DesignForm({
     () => resolveTenantDesign(initialDesign, corPrimaria) as TenantDesign,
     [initialDesign, corPrimaria],
   )
-  const [design, setDesign] = useState<TenantDesign>(() => ({
-    ...baseline,
-    actions: { ...DEFAULT_ACTIONS, ...baseline.actions },
-  }))
+  const normalizedBaseline = useMemo(
+    () => ({
+      ...baseline,
+      actions: { ...DEFAULT_ACTIONS, ...baseline.actions },
+    }),
+    [baseline],
+  )
+
+  const [design, setDesign] = useState<TenantDesign>(normalizedBaseline)
   const [section, setSection] = useState<EditorSection>('identidade')
-  const [previewMode, setPreviewMode] = useState<SurfaceMode>('dark')
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('dark')
+  const [scene, setScene] = useState<PreviewScene>('portal')
+  const [focus, setFocus] = useState<TokenFocus>(null)
   const [pending, startTransition] = useTransition()
   const [extracted, setExtracted] = useState<string[]>([])
   const [extracting, setExtracting] = useState(false)
   const { resolvedTheme } = useTheme()
 
   const dirty = useMemo(
-    () => JSON.stringify(design) !== JSON.stringify({ ...baseline, actions: { ...DEFAULT_ACTIONS, ...baseline.actions } }),
-    [design, baseline],
+    () => JSON.stringify(design) !== JSON.stringify(normalizedBaseline),
+    [design, normalizedBaseline],
   )
 
   useUnsavedChanges({
@@ -503,11 +402,10 @@ export function DesignForm({
     changes: dirty ? ['Cores e tokens do tema'] : [],
   })
 
-  // Mantém o documento no design SALVO — draft só na prévia.
   useEffect(() => {
-    const mode = (resolvedTheme === 'light' ? 'light' : 'dark') as SurfaceMode
-    applyTenantDesign(baseline, mode)
-  }, [baseline, resolvedTheme])
+    const mode = (resolvedTheme === 'light' ? 'light' : 'dark') as PreviewMode
+    applyTenantDesign(normalizedBaseline, mode)
+  }, [normalizedBaseline, resolvedTheme])
 
   useEffect(() => {
     let cancelled = false
@@ -532,10 +430,25 @@ export function DesignForm({
     }
   }, [imagemUrls])
 
+  // Auto-scene when switching section
+  useEffect(() => {
+    if (section === 'acoes') setScene('admin')
+    else if (section === 'identidade') setScene('portal')
+    else if (section === 'fundo') setScene('portal')
+  }, [section])
+
   const clubePaleta = useMemo(
     () => paletaDoClube(clubeNome, clubeApelido),
     [clubeNome, clubeApelido],
   )
+
+  const contrastChecks = useMemo(
+    () => buildContrastChecks(design, previewMode),
+    [design, previewMode],
+  )
+
+  const surfacesResolved = resolveSurfaces(design, previewMode)
+  const surfacesOverrides = previewMode === 'dark' ? design.dark : design.light
 
   function patch(partial: Partial<TenantDesign>) {
     setDesign((d) => ({ ...d, ...partial }))
@@ -549,10 +462,12 @@ export function DesignForm({
     next.grid = { ...design.grid }
     next.actions = { ...DEFAULT_ACTIONS, ...design.actions }
     setDesign(next)
+    setFocus('brand.primary')
   }
 
   function handleCancel() {
-    setDesign({ ...baseline, actions: { ...DEFAULT_ACTIONS, ...baseline.actions } })
+    setDesign(normalizedBaseline)
+    setFocus(null)
   }
 
   function handleSave() {
@@ -573,18 +488,18 @@ export function DesignForm({
     })
   }
 
-  const surfaces = previewMode === 'dark' ? design.dark : design.light
-  const surfaceDefaults = previewMode === 'dark' ? DEFAULT_SURFACE_DARK : DEFAULT_SURFACE_LIGHT
+  const fieldProps = {
+    onFocusToken: setFocus,
+  }
 
   return (
     <div data-persist-bar-root className="pb-24">
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start lg:gap-8">
-        {/* Controles */}
-        <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-6 xl:grid xl:h-[calc(100vh-11rem)] xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-stretch xl:gap-6">
+        {/* Inspector */}
+        <div className="flex min-h-0 flex-col gap-4 xl:overflow-hidden">
           <div
-            className="flex gap-1 overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
+            className="flex shrink-0 gap-1 overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
             role="tablist"
-            aria-label="Seções do design"
           >
             {SECTIONS.map((s) => {
               const Icon = s.icon
@@ -597,7 +512,7 @@ export function DesignForm({
                   aria-selected={active}
                   onClick={() => setSection(s.id)}
                   className={[
-                    'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors sm:text-sm',
                     active
                       ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
                       : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -610,296 +525,297 @@ export function DesignForm({
             })}
           </div>
 
-          {/* Preview no mobile (acima dos controles) */}
-          <div className="lg:hidden">
-            <DesignLivePreview
-              design={design}
-              mode={previewMode}
-              tenantNome={tenantNome}
-              onModeChange={setPreviewMode}
-            />
-          </div>
-
-          {section === 'identidade' ? (
-            <SectionFrame
-              title="Identidade"
-              description="Cores da marca em botões, badges e destaques."
-            >
-              <div className="grid gap-5 sm:grid-cols-2">
-                <ColorField
-                  label="Cor primária"
-                  value={design.brand.primary}
-                  onChange={(v) => {
-                    if (v) patch({ brand: { ...design.brand, primary: v } })
-                  }}
-                />
-                <ColorField
-                  label="Cor secundária"
-                  value={design.brand.secondary}
-                  onChange={(v) => patch({ brand: { ...design.brand, secondary: v } })}
-                  allowEmpty
-                  emptyLabel="Remover"
-                />
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
-                  <Sparkles className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
-                  Sugestões
+          <div className="min-h-0 flex-1 space-y-5 xl:overflow-y-auto xl:pr-1">
+            {section === 'identidade' ? (
+              <SectionFrame
+                title="Identidade"
+                description="Passe o mouse nos campos — a prévia destaca onde a cor aparece."
+              >
+                <div className="grid gap-4">
+                  <ColorField
+                    label="Cor primária"
+                    value={design.brand.primary}
+                    resolved={design.brand.primary}
+                    token="brand.primary"
+                    onChange={(v) => {
+                      if (v) patch({ brand: { ...design.brand, primary: v } })
+                    }}
+                    {...fieldProps}
+                  />
+                  <ColorField
+                    label="Cor secundária"
+                    value={design.brand.secondary}
+                    resolved={design.brand.secondary ?? '#888888'}
+                    token="brand.secondary"
+                    onChange={(v) => patch({ brand: { ...design.brand, secondary: v } })}
+                    allowEmpty
+                    emptyLabel="Remover"
+                    {...fieldProps}
+                  />
                 </div>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                  Clique para aplicar na prévia (ainda não salva).
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {clubePaleta ? (
-                    <button
-                      type="button"
-                      onClick={() => applySuggestion(clubePaleta.primary, clubePaleta.secondary)}
-                      className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-left transition-colors hover:border-[rgb(var(--primary))]"
-                    >
-                      <span className="flex -space-x-1">
-                        <span
-                          className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
-                          style={{ backgroundColor: clubePaleta.primary }}
-                        />
-                        <span
-                          className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
-                          style={{ backgroundColor: clubePaleta.secondary }}
-                        />
+
+                <div className="space-y-2 border-t border-[rgb(var(--border))] pt-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
+                    <Sparkles className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
+                    Sugestões do clube / escudo
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {clubePaleta ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applySuggestion(clubePaleta.primary, clubePaleta.secondary)
+                        }
+                        className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-left transition-colors hover:border-sky-400"
+                      >
+                        <span className="flex -space-x-1">
+                          <span
+                            className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
+                            style={{ backgroundColor: clubePaleta.primary }}
+                          />
+                          <span
+                            className="h-6 w-6 rounded-full border-2 border-[rgb(var(--surface))]"
+                            style={{ backgroundColor: clubePaleta.secondary }}
+                          />
+                        </span>
+                        <span className="text-xs font-medium text-[rgb(var(--foreground))]">
+                          Paleta · {clubeApelido ?? clubeNome}
+                        </span>
+                      </button>
+                    ) : null}
+                    {extracting ? (
+                      <span className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Lendo escudo…
                       </span>
-                      <span className="text-xs font-medium text-[rgb(var(--foreground))]">
-                        Paleta do clube
-                        {clubeNome ? ` · ${clubeApelido ?? clubeNome}` : ''}
-                      </span>
-                    </button>
-                  ) : null}
-                  {extracting ? (
-                    <span className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Lendo escudo…
-                    </span>
-                  ) : null}
-                  {extracted.map((hex) => (
-                    <button
-                      key={hex}
-                      type="button"
-                      onClick={() => applySuggestion(hex)}
-                      className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 transition-colors hover:border-[rgb(var(--primary))]"
-                    >
-                      <span
-                        className="h-6 w-6 rounded-full border border-[rgb(var(--border))]"
-                        style={{ backgroundColor: hex }}
+                    ) : null}
+                    {extracted.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        onClick={() => applySuggestion(hex)}
+                        className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 transition-colors hover:border-sky-400"
+                      >
+                        <span
+                          className="h-6 w-6 rounded-full border border-[rgb(var(--border))]"
+                          style={{ backgroundColor: hex }}
+                        />
+                        <span className="font-mono text-xs text-[rgb(var(--foreground-muted))]">
+                          {hex}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </SectionFrame>
+            ) : null}
+
+            {section === 'acoes' ? (
+              <SectionFrame
+                title="Ações e status"
+                description="Olhe a cena Admin na prévia: aprovar, reprovar e pendente."
+              >
+                <div className="grid gap-4">
+                  {ACTION_TOKEN_KEYS.map((key) => (
+                    <div key={key} className="space-y-1">
+                      <ColorField
+                        label={ACTION_TOKEN_LABELS[key]}
+                        value={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
+                        resolved={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
+                        token={`actions.${key}` as TokenFocus}
+                        onChange={(v) => {
+                          if (!v) return
+                          patch({
+                            actions: {
+                              ...DEFAULT_ACTIONS,
+                              ...design.actions,
+                              [key]: v,
+                            },
+                          })
+                        }}
+                        {...fieldProps}
                       />
-                      <span className="font-mono text-xs text-[rgb(var(--foreground-muted))]">
-                        {hex}
-                      </span>
-                    </button>
+                      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                        {ACTION_TOKEN_HINTS[key]}
+                      </p>
+                    </div>
                   ))}
                 </div>
-              </div>
-            </SectionFrame>
-          ) : null}
+              </SectionFrame>
+            ) : null}
 
-          {section === 'acoes' ? (
-            <SectionFrame
-              title="Ações e status"
-              description="Botões e badges de aprovar, reprovar, cancelar e avisos."
-            >
-              <div className="grid gap-5 sm:grid-cols-2">
-                {ACTION_TOKEN_KEYS.map((key) => (
-                  <div key={key} className="space-y-1.5">
-                    <ColorField
-                      label={ACTION_TOKEN_LABELS[key]}
-                      value={design.actions?.[key] ?? DEFAULT_ACTIONS[key]}
-                      onChange={(v) => {
-                        if (!v) return
-                        patch({
-                          actions: {
-                            ...DEFAULT_ACTIONS,
-                            ...design.actions,
-                            [key]: v,
-                          },
-                        })
-                      }}
+            {section === 'fundo' ? (
+              <SectionFrame
+                title="Fundo e grade"
+                description="A área quadriculada atrás dos cartões na prévia."
+              >
+                <label
+                  className="flex items-center gap-2 text-sm text-[rgb(var(--foreground))]"
+                  onMouseEnter={() => setFocus('grid')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={design.grid.enabled}
+                    onChange={(e) =>
+                      patch({ grid: { ...design.grid, enabled: e.target.checked } })
+                    }
+                    className="rounded border-[rgb(var(--border))]"
+                  />
+                  Exibir grade quadriculada
+                </label>
+                <div
+                  className="space-y-4"
+                  onMouseEnter={() => setFocus('grid')}
+                >
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-[rgb(var(--foreground))]">
+                      Célula ({design.grid.sizePx}px)
+                    </label>
+                    <input
+                      type="range"
+                      min={24}
+                      max={96}
+                      step={4}
+                      value={design.grid.sizePx}
+                      onChange={(e) =>
+                        patch({ grid: { ...design.grid, sizePx: Number(e.target.value) } })
+                      }
+                      className="w-full accent-[rgb(var(--primary))]"
                     />
-                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                      {ACTION_TOKEN_HINTS[key]}
-                    </p>
                   </div>
-                ))}
-              </div>
-            </SectionFrame>
-          ) : null}
-
-          {section === 'fundo' ? (
-            <SectionFrame
-              title="Fundo e grade"
-              description="Padrão quadriculado do shell. Veja o resultado na prévia."
-            >
-              <label className="flex items-center gap-2 text-sm text-[rgb(var(--foreground))]">
-                <input
-                  type="checkbox"
-                  checked={design.grid.enabled}
-                  onChange={(e) =>
-                    patch({ grid: { ...design.grid, enabled: e.target.checked } })
-                  }
-                  className="rounded border-[rgb(var(--border))]"
-                />
-                Exibir grade quadriculada
-              </label>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-[rgb(var(--foreground))]">
-                    Tamanho da célula ({design.grid.sizePx}px)
-                  </label>
-                  <input
-                    type="range"
-                    min={24}
-                    max={96}
-                    step={4}
-                    value={design.grid.sizePx}
-                    onChange={(e) =>
-                      patch({ grid: { ...design.grid, sizePx: Number(e.target.value) } })
-                    }
-                    className="w-full accent-[rgb(var(--primary))]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-[rgb(var(--foreground))]">
-                    Opacidade ({Math.round(design.grid.lineOpacity * 1000) / 10}%)
-                  </label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={0.12}
-                    step={0.005}
-                    value={design.grid.lineOpacity}
-                    onChange={(e) =>
-                      patch({
-                        grid: { ...design.grid, lineOpacity: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full accent-[rgb(var(--primary))]"
-                  />
-                </div>
-                <ColorField
-                  label="Cor da linha"
-                  value={design.grid.lineColor}
-                  onChange={(v) => patch({ grid: { ...design.grid, lineColor: v } })}
-                  allowEmpty
-                  emptyLabel="Usar texto"
-                />
-                <ColorField
-                  label="Cor de fundo da grade"
-                  value={design.grid.baseColor}
-                  onChange={(v) => patch({ grid: { ...design.grid, baseColor: v } })}
-                  allowEmpty
-                  emptyLabel="Usar fundo sutil"
-                />
-              </div>
-            </SectionFrame>
-          ) : null}
-
-          {section === 'superficies' ? (
-            <SectionFrame
-              title="Superfícies"
-              description="Fundos, textos e bordas. Alterne Escuro/Claro na prévia para auditar cada modo."
-            >
-              <p className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">
-                Editando tokens do modo{' '}
-                <strong className="text-[rgb(var(--foreground))]">
-                  {previewMode === 'dark' ? 'escuro' : 'claro'}
-                </strong>
-                . Use o seletor da prévia para trocar.
-              </p>
-              <div className="grid gap-5 sm:grid-cols-2">
-                {SURFACE_TOKEN_KEYS.map((key) => (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-[rgb(var(--foreground))]">
+                      Opacidade ({Math.round(design.grid.lineOpacity * 1000) / 10}%)
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.12}
+                      step={0.005}
+                      value={design.grid.lineOpacity}
+                      onChange={(e) =>
+                        patch({
+                          grid: { ...design.grid, lineOpacity: Number(e.target.value) },
+                        })
+                      }
+                      className="w-full accent-[rgb(var(--primary))]"
+                    />
+                  </div>
                   <ColorField
-                    key={key}
-                    label={SURFACE_TOKEN_LABELS[key]}
-                    value={surfaces[key] ?? null}
+                    label="Cor da linha"
+                    value={design.grid.lineColor}
+                    resolved={design.grid.lineColor ?? surfacesResolved.foreground}
+                    token="grid"
+                    onChange={(v) => patch({ grid: { ...design.grid, lineColor: v } })}
                     allowEmpty
-                    emptyLabel={`Padrão (${surfaceDefaults[key]})`}
-                    onChange={(v) => {
-                      const next = { ...surfaces }
-                      if (v == null) delete next[key]
-                      else next[key] = v
-                      if (previewMode === 'dark') patch({ dark: next })
-                      else patch({ light: next })
-                    }}
+                    emptyLabel="Usar texto"
+                    {...fieldProps}
                   />
-                ))}
-              </div>
-            </SectionFrame>
-          ) : null}
+                  <ColorField
+                    label="Cor de fundo da grade"
+                    value={design.grid.baseColor}
+                    resolved={design.grid.baseColor ?? surfacesResolved.backgroundSubtle}
+                    token="backgroundSubtle"
+                    onChange={(v) => patch({ grid: { ...design.grid, baseColor: v } })}
+                    allowEmpty
+                    emptyLabel="Usar fundo sutil"
+                    {...fieldProps}
+                  />
+                </div>
+              </SectionFrame>
+            ) : null}
 
-          <button
-            type="button"
-            onClick={handleRestore}
-            disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Restaurar padrão
-          </button>
+            {section === 'superficies' ? (
+              <SectionFrame
+                title="Superfícies"
+                description={`Editando modo ${previewMode === 'dark' ? 'escuro' : 'claro'} — troque na prévia.`}
+              >
+                <div className="grid gap-4">
+                  {SURFACE_TOKEN_KEYS.map((key) => {
+                    const tokenMap: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], TokenFocus>> =
+                      {
+                        background: 'background',
+                        backgroundSubtle: 'backgroundSubtle',
+                        foreground: 'foreground',
+                        foregroundMuted: 'foregroundMuted',
+                        border: 'border',
+                        surface: 'surface',
+                        surfaceRaised: 'surfaceRaised',
+                      }
+                    return (
+                      <ColorField
+                        key={key}
+                        label={SURFACE_TOKEN_LABELS[key]}
+                        value={surfacesOverrides[key] ?? null}
+                        resolved={surfacesResolved[key]}
+                        token={tokenMap[key] ?? null}
+                        allowEmpty
+                        emptyLabel="Usar padrão"
+                        onChange={(v) => {
+                          const next = { ...surfacesOverrides }
+                          if (v == null) delete next[key]
+                          else next[key] = v
+                          if (previewMode === 'dark') patch({ dark: next })
+                          else patch({ light: next })
+                        }}
+                        {...fieldProps}
+                      />
+                    )
+                  })}
+                </div>
+              </SectionFrame>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={pending}
+              className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Restaurar padrão
+            </button>
+          </div>
         </div>
 
-        {/* Prévia sticky (desktop) */}
-        <aside className="sticky top-4 hidden lg:block">
-          <DesignLivePreview
+        {/* Studio preview — dominant */}
+        <div className="flex min-h-[520px] flex-col gap-3 xl:min-h-0">
+          <DesignStudioPreview
             design={design}
             mode={previewMode}
+            scene={scene}
             tenantNome={tenantNome}
+            focus={focus}
+            onSceneChange={setScene}
             onModeChange={setPreviewMode}
           />
-        </aside>
+          <ContrastPanel checks={contrastChecks} />
+        </div>
       </div>
 
       <StickyPersistBar
         locked={dirty || pending}
-        dirtyLabel={dirty ? 'Alterações no design (não salvas)' : undefined}
+        dirtyLabel={dirty ? 'Prévia não salva — só você está vendo' : undefined}
       >
         <button
           type="button"
           onClick={handleCancel}
           disabled={pending || !dirty}
-          className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-opacity disabled:opacity-40"
+          className="rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] disabled:opacity-40"
         >
-          Cancelar
+          Descartar
         </button>
         <button
           type="button"
           onClick={handleSave}
           disabled={pending || !dirty}
-          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
           style={{ backgroundColor: design.brand.primary }}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Salvar design
+          Salvar e aplicar à torcida
         </button>
       </StickyPersistBar>
     </div>
   )
-}
-
-function hexToRgbInline(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `${r} ${g} ${b}`
-}
-
-function gridPreviewStyle(design: TenantDesign, mode: SurfaceMode): CSSProperties {
-  const surfaces = resolveSurfaces(design, mode)
-  const lineHex = design.grid.lineColor ?? surfaces.foreground
-  const base = design.grid.baseColor ?? surfaces.backgroundSubtle
-  const line = hexToRgbInline(lineHex)
-  const opacity = design.grid.lineOpacity
-  return {
-    backgroundColor: base,
-    backgroundImage: design.grid.enabled
-      ? `linear-gradient(rgb(${line} / ${opacity}) 1px, transparent 1px), linear-gradient(90deg, rgb(${line} / ${opacity}) 1px, transparent 1px)`
-      : 'none',
-    backgroundSize: `${design.grid.sizePx}px ${design.grid.sizePx}px`,
-  }
 }
