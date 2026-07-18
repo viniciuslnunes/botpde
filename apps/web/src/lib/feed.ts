@@ -1623,7 +1623,7 @@ export async function getPedidosPendentesGrupo(
   }))
 }
 
-export async function getPostsDoGrupo(
+export const getPostsDoGrupo = cache(async function getPostsDoGrupo(
   conversaId: string,
   tenantId: string,
   userId: string,
@@ -1671,7 +1671,7 @@ export async function getPostsDoGrupo(
       nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
     },
   }
-}
+})
 
 /**
  * Feed só dos murais dos grupos do viewer (aba "Meus grupos").

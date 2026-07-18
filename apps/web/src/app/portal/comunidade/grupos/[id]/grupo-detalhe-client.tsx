@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { useConfirmAction } from '@/lib/confirm-action'
 import {
   publicarPostGrupo,
   entrarGrupoPublico,
@@ -139,9 +140,14 @@ export function GrupoDetalheClient({
   const [uploadingFoto, setUploadingFoto] = useState(false)
   const [codigoConvite, setCodigoConvite] = useState(grupoInicial.codigoConvite)
   const [somenteAdminEdit, setSomenteAdminEdit] = useState(grupoInicial.somenteAdminPublica)
-  const [pending, startTransition] = useTransition()
+  const [pendingMembership, startMembership] = useTransition()
+  const [pendingPedidos, startPedidos] = useTransition()
+  const [pendingMembros, startMembros] = useTransition()
+  const [pendingConfig, startConfig] = useTransition()
   const [publicando, startPublicar] = useTransition()
+  const [busyUserId, setBusyUserId] = useState<string | null>(null)
   const [carregandoMais, setCarregandoMais] = useState(false)
+  const confirmAction = useConfirmAction()
 
   function irParaAba(id: GrupoAba) {
     setAba(id)
@@ -203,7 +209,7 @@ export function GrupoDetalheClient({
   }
 
   function entrar() {
-    startTransition(async () => {
+    startMembership(async () => {
       try {
         await entrarGrupoPublico(grupo.id)
         toast.success('Você entrou no grupo!')
@@ -216,7 +222,7 @@ export function GrupoDetalheClient({
   }
 
   function pedir() {
-    startTransition(async () => {
+    startMembership(async () => {
       try {
         await pedirEntradaGrupo(grupo.id)
         setGrupo((g) => ({ ...g, pedidoPendente: true }))
@@ -228,7 +234,7 @@ export function GrupoDetalheClient({
   }
 
   function sair() {
-    startTransition(async () => {
+    startMembership(async () => {
       try {
         await sairGrupo(grupo.id)
         toast.success('Você saiu do grupo.')
@@ -241,7 +247,7 @@ export function GrupoDetalheClient({
   }
 
   function silenciar() {
-    startTransition(async () => {
+    startMembership(async () => {
       try {
         const { silenciada } = await alternarSilencioGrupo(grupo.id)
         setGrupo((g) => ({ ...g, silenciada }))
@@ -253,7 +259,8 @@ export function GrupoDetalheClient({
   }
 
   function decidir(userId: string, aprovar: boolean) {
-    startTransition(async () => {
+    setBusyUserId(userId)
+    startPedidos(async () => {
       try {
         await decidirPedidoGrupo(grupo.id, userId, aprovar)
         const pedido = (pedidos ?? []).find((p) => p.userId === userId)
@@ -275,26 +282,31 @@ export function GrupoDetalheClient({
         toast.success(aprovar ? 'Pedido aprovado.' : 'Pedido recusado.')
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível decidir.')
+      } finally {
+        setBusyUserId(null)
       }
     })
   }
 
   function removerMembro(userId: string) {
-    if (!confirm('Remover este membro do grupo?')) return
-    startTransition(async () => {
-      try {
+    void confirmAction({
+      titulo: 'Remover este membro do grupo?',
+      descricao: 'A pessoa sai do grupo e perde acesso ao mural e ao chat. Pode pedir entrada de novo depois.',
+      labelConfirmar: 'Remover',
+      variante: 'destructive',
+      cancelled: 'Remoção cancelada.',
+      run: async () => {
         await removerMembroGrupo(grupo.id, userId)
         setMembros((prev) => (prev ?? []).filter((m) => m.userId !== userId))
         setGrupo((g) => ({ ...g, membros: Math.max(0, g.membros - 1) }))
-        toast.success('Membro removido.')
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
-      }
+      },
+      success: 'Membro removido.',
     })
   }
 
   function alterarPapel(userId: string, papel: 'ADMIN' | 'MEMBRO') {
-    startTransition(async () => {
+    setBusyUserId(userId)
+    startMembros(async () => {
       try {
         await alterarPapelGrupo(grupo.id, userId, papel)
         setMembros((prev) =>
@@ -307,12 +319,14 @@ export function GrupoDetalheClient({
         toast.success(papel === 'ADMIN' ? 'Administrador adicionado.' : 'Admin removido.')
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Não foi possível alterar.')
+      } finally {
+        setBusyUserId(null)
       }
     })
   }
 
   function gerarConvite() {
-    startTransition(async () => {
+    startConfig(async () => {
       try {
         const { codigo } = await gerarCodigoConviteGrupo(grupo.id)
         setCodigoConvite(codigo)
@@ -325,16 +339,18 @@ export function GrupoDetalheClient({
   }
 
   function revogarConvite() {
-    if (!confirm('Revogar o link atual? Quem tiver o link antigo não poderá mais entrar.')) return
-    startTransition(async () => {
-      try {
+    void confirmAction({
+      titulo: 'Revogar o link atual?',
+      descricao: 'Quem tiver o link antigo não poderá mais entrar. Você pode gerar um novo depois.',
+      labelConfirmar: 'Revogar',
+      variante: 'destructive',
+      cancelled: 'Revogação cancelada.',
+      run: async () => {
         await revogarCodigoConviteGrupo(grupo.id)
         setCodigoConvite(null)
         setGrupo((g) => ({ ...g, codigoConvite: null }))
-        toast.success('Convite revogado.')
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Não foi possível revogar.')
-      }
+      },
+      success: 'Convite revogado.',
     })
   }
 
@@ -351,7 +367,7 @@ export function GrupoDetalheClient({
 
   function salvarConfig(e: React.FormEvent) {
     e.preventDefault()
-    startTransition(async () => {
+    startConfig(async () => {
       try {
         await atualizarGrupo({
           conversaId: grupo.id,
@@ -494,7 +510,7 @@ export function GrupoDetalheClient({
           {!grupo.souMembro && !grupo.pedidoPendente && grupo.publica && (
             <button
               type="button"
-              disabled={pending}
+              disabled={pendingMembership}
               onClick={entrar}
               className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
             >
@@ -504,7 +520,7 @@ export function GrupoDetalheClient({
           {!grupo.souMembro && !grupo.pedidoPendente && !grupo.publica && (
             <button
               type="button"
-              disabled={pending}
+              disabled={pendingMembership}
               onClick={pedir}
               className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
             >
@@ -520,7 +536,7 @@ export function GrupoDetalheClient({
             <>
               <button
                 type="button"
-                disabled={pending}
+                disabled={pendingMembership}
                 onClick={silenciar}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
               >
@@ -536,7 +552,7 @@ export function GrupoDetalheClient({
               </button>
               <button
                 type="button"
-                disabled={pending}
+                disabled={pendingMembership}
                 onClick={sair}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
               >
@@ -630,7 +646,7 @@ export function GrupoDetalheClient({
                     {grupo.souAdmin && membro.userId !== currentUser.id && (
                       <button
                         type="button"
-                        disabled={pending}
+                        disabled={pendingMembros && busyUserId === membro.userId}
                         title="Remover do grupo"
                         onClick={() => removerMembro(membro.userId)}
                         className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2 py-1 text-xs text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
@@ -687,7 +703,7 @@ export function GrupoDetalheClient({
                     <div className="flex shrink-0 gap-1.5">
                       <button
                         type="button"
-                        disabled={pending}
+                        disabled={pendingPedidos && busyUserId === p.userId}
                         onClick={() => decidir(p.userId, true)}
                         className="inline-flex items-center gap-1 rounded-lg bg-[rgb(var(--primary))] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
                       >
@@ -696,7 +712,7 @@ export function GrupoDetalheClient({
                       </button>
                       <button
                         type="button"
-                        disabled={pending}
+                        disabled={pendingPedidos && busyUserId === p.userId}
                         onClick={() => decidir(p.userId, false)}
                         className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium disabled:opacity-50"
                       >
@@ -734,7 +750,7 @@ export function GrupoDetalheClient({
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={uploadingFoto || pending}
+                    disabled={uploadingFoto || pendingConfig}
                     onClick={() => fotoRef.current?.click()}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                   >
@@ -748,7 +764,7 @@ export function GrupoDetalheClient({
                   {grupo.avatarUrl && (
                     <button
                       type="button"
-                      disabled={uploadingFoto || pending}
+                      disabled={uploadingFoto || pendingConfig}
                       onClick={() => void removerFoto()}
                       className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                     >
@@ -849,10 +865,10 @@ export function GrupoDetalheClient({
 
               <button
                 type="submit"
-                disabled={pending || nomeEdit.trim().length < 3}
+                disabled={pendingConfig || nomeEdit.trim().length < 3}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
               >
-                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {pendingConfig && <Loader2 className="h-4 w-4 animate-spin" />}
                 Salvar alterações
               </button>
             </form>
@@ -873,19 +889,19 @@ export function GrupoDetalheClient({
                     /portal/comunidade/grupos/convite/{codigoConvite}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={pending} onClick={() => void copiarConvite()} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                    <button type="button" disabled={pendingConfig} onClick={() => void copiarConvite()} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                       <Copy className="h-4 w-4" /> Copiar
                     </button>
-                    <button type="button" disabled={pending} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                    <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                       <RefreshCw className="h-4 w-4" /> Regenerar
                     </button>
-                    <button type="button" disabled={pending} onClick={revogarConvite} className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                    <button type="button" disabled={pendingConfig} onClick={revogarConvite} className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                       Revogar
                     </button>
                   </div>
                 </div>
               ) : (
-                <button type="button" disabled={pending} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                <button type="button" disabled={pendingConfig} onClick={gerarConvite} className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
                   <Link2 className="h-4 w-4" /> Gerar link de convite
                 </button>
               )}
@@ -902,6 +918,7 @@ export function GrupoDetalheClient({
                 {(membros ?? []).map((membro) => {
                   const admins = (membros ?? []).filter((m) => m.papel === 'ADMIN').length
                   const podeRebaixar = membro.papel === 'ADMIN' && admins > 1
+                  const rowBusy = pendingMembros && busyUserId === membro.userId
                   return (
                     <li key={membro.userId} className="flex items-center justify-between gap-3 px-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
@@ -917,11 +934,11 @@ export function GrupoDetalheClient({
                         </div>
                       </div>
                       {membro.papel === 'MEMBRO' ? (
-                        <button type="button" disabled={pending} onClick={() => alterarPapel(membro.userId, 'ADMIN')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                        <button type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'ADMIN')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                           Tornar admin
                         </button>
                       ) : podeRebaixar ? (
-                        <button type="button" disabled={pending} onClick={() => alterarPapel(membro.userId, 'MEMBRO')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
+                        <button type="button" disabled={rowBusy} onClick={() => alterarPapel(membro.userId, 'MEMBRO')} className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50">
                           Remover admin
                         </button>
                       ) : (

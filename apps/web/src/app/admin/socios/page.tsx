@@ -62,20 +62,12 @@ export default async function SociosPage({
     podeEmitir = hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
   }
 
-  // IDs leves para elegibilidade (NOT IN) — sem puxar carteirinhas inteiras
-  const idsComCarteirinha: { userId: string }[] = await db.saasSocio.findMany({
-    where: { tenantId: tenant.id },
-    select: { userId: true },
-  })
-  const userIdsComCarteirinha = idsComCarteirinha.map((s) => s.userId)
-
+  // Anti-join via User.socios — evita NOT IN gigante em tenants grandes
   const elegivelWhere = {
     tenantId: tenant.id,
     status: 'APROVADO' as const,
     tipo: 'SOCIO' as const,
-    ...(userIdsComCarteirinha.length > 0
-      ? { userId: { notIn: userIdsComCarteirinha } }
-      : {}),
+    user: { socios: { none: { tenantId: tenant.id } } },
   }
 
   const [emitidas, ativos, vencendo, vencidos, aguardando] = await Promise.all([

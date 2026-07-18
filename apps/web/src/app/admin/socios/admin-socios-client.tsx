@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { AnimatePresence, m } from 'motion/react'
+import { m } from 'motion/react'
 import {
   AlertTriangle,
   Check,
@@ -27,7 +27,7 @@ import {
 import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
-import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { springSnappy } from '@/lib/motion-presets'
 
 export interface SocioEmitidoItem {
   id: string
@@ -607,12 +607,7 @@ export function AdminSociosClient({
                     o acesso no portal.
                   </p>
                 </div>
-                <m.div
-                  variants={staggerContainer}
-                  initial="hidden"
-                  animate="show"
-                  className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-                >
+                <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
                   <table className="w-full min-w-[40rem] text-sm">
                     <thead>
                       <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
@@ -634,64 +629,58 @@ export function AdminSociosClient({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[rgb(var(--border))]">
-                      <AnimatePresence initial={false}>
-                        {elegiveis.map((membro) => (
-                          <m.tr
-                            key={membro.userId}
-                            layout
-                            variants={staggerItem}
-                            initial="hidden"
-                            animate="show"
-                            className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <Avatar url={membro.avatarUrl} nome={membro.nome} />
-                                <div className="min-w-0">
-                                  <p className="font-medium text-[rgb(var(--foreground))]">
-                                    {membro.nome}
-                                  </p>
-                                  <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                                    {[membro.discordTag, membro.telefone]
-                                      .filter(Boolean)
-                                      .join(' · ') || '—'}
-                                  </p>
-                                </div>
+                      {elegiveis.map((membro) => (
+                        <tr
+                          key={membro.userId}
+                          className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar url={membro.avatarUrl} nome={membro.nome} />
+                              <div className="min-w-0">
+                                <p className="font-medium text-[rgb(var(--foreground))]">
+                                  {membro.nome}
+                                </p>
+                                <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                                  {[membro.discordTag, membro.telefone]
+                                    .filter(Boolean)
+                                    .join(' · ') || '—'}
+                                </p>
                               </div>
-                            </td>
-                            <td className="hidden px-4 py-3 md:table-cell">
+                            </div>
+                          </td>
+                          <td className="hidden px-4 py-3 md:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {membro.sedeNome ?? '—'}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {membro.cidade ?? '—'}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 xl:table-cell">
+                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                              {membro.aprovadoEmLabel ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {podeEmitir ? (
+                              <EmitirLinhaButton
+                                membro={membro}
+                                onEmitir={abrirEmit}
+                              />
+                            ) : (
                               <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                                {membro.sedeNome ?? '—'}
+                                Sem permissão
                               </span>
-                            </td>
-                            <td className="hidden px-4 py-3 lg:table-cell">
-                              <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                                {membro.cidade ?? '—'}
-                              </span>
-                            </td>
-                            <td className="hidden px-4 py-3 xl:table-cell">
-                              <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                                {membro.aprovadoEmLabel ?? '—'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {podeEmitir ? (
-                                <EmitirLinhaButton
-                                  membro={membro}
-                                  onEmitir={abrirEmit}
-                                />
-                              ) : (
-                                <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                                  Sem permissão
-                                </span>
-                              )}
-                            </td>
-                          </m.tr>
-                        ))}
-                      </AnimatePresence>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
-                </m.div>
+                </div>
               </MotionReveal>
             )
           ) : socios.length === 0 ? (
@@ -709,11 +698,11 @@ export function AdminSociosClient({
               description={
                 busca ? (
                   'Tente outro nome ou número.'
-                ) : elegiveis.length > 0 ? (
+                ) : contagens.aguardando > 0 ? (
                   <span>
-                    Há {elegiveis.length} sócio
-                    {elegiveis.length !== 1 ? 's' : ''} aprovado
-                    {elegiveis.length !== 1 ? 's' : ''} sem carteirinha.{' '}
+                    Há {contagens.aguardando} sócio
+                    {contagens.aguardando !== 1 ? 's' : ''} aprovado
+                    {contagens.aguardando !== 1 ? 's' : ''} sem carteirinha.{' '}
                     <Link
                       href={tabsHref('aguardando')}
                       className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
@@ -729,12 +718,7 @@ export function AdminSociosClient({
             />
           ) : (
             <MotionReveal index={0}>
-              <m.div
-                variants={staggerContainer}
-                initial="hidden"
-                animate="show"
-                className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-              >
+              <div className="overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
                 <table className="w-full min-w-[40rem] text-sm">
                   <thead>
                     <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
@@ -756,82 +740,85 @@ export function AdminSociosClient({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[rgb(var(--border))]">
-                    <AnimatePresence initial={false}>
-                      {socios.map((socio) => (
-                        <m.tr
-                          key={socio.id}
-                          layout
-                          variants={staggerItem}
-                          initial="hidden"
-                          animate="show"
-                          className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
-                        >
-                          <td className="px-4 py-3">
-                            <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
-                              {String(socio.numeroSocio).padStart(5, '0')}
+                    {socios.map((socio) => (
+                      <tr
+                        key={socio.id}
+                        className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
+                            {String(socio.numeroSocio).padStart(5, '0')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar url={socio.avatarUrl} nome={socio.nome} />
+                            <span className="font-medium text-[rgb(var(--foreground))]">
+                              {socio.nome}
                             </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar url={socio.avatarUrl} nome={socio.nome} />
-                              <span className="font-medium text-[rgb(var(--foreground))]">
-                                {socio.nome}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="hidden px-4 py-3 md:table-cell">
-                            <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                              {socio.email ?? '—'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {socio.vencida ? (
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                              ) : socio.vencendo ? (
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                              ) : (
-                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />
-                              )}
-                              <span
-                                className={[
-                                  'text-sm',
-                                  socio.vencida
-                                    ? 'text-red-600 dark:text-red-400'
-                                    : socio.vencendo
-                                      ? 'text-amber-600 dark:text-amber-400'
-                                      : 'text-[rgb(var(--foreground))]',
-                                ].join(' ')}
-                              >
-                                {socio.validadeLabel}
-                              </span>
-                              {socio.vencida && (
-                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
-                                  Vencida
-                                </span>
-                              )}
-                              {socio.vencendo && (
-                                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                                  Vence em breve
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            {podeEmitir ? (
-                              <SocioActions socio={socio} />
+                          </div>
+                        </td>
+                        <td className="hidden px-4 py-3 md:table-cell">
+                          <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                            {socio.email ?? '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {socio.vencida ? (
+                              <AlertTriangle
+                                aria-hidden
+                                className="h-3.5 w-3.5 shrink-0 text-red-500"
+                              />
+                            ) : socio.vencendo ? (
+                              <AlertTriangle
+                                aria-hidden
+                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                              />
                             ) : (
-                              <span className="block text-right text-xs text-[rgb(var(--foreground-muted))]">
-                                —
+                              <CheckCircle2
+                                aria-hidden
+                                className="h-3.5 w-3.5 shrink-0 text-green-500"
+                              />
+                            )}
+                            <span
+                              className={[
+                                'text-sm',
+                                socio.vencida
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : socio.vencendo
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-[rgb(var(--foreground))]',
+                              ].join(' ')}
+                            >
+                              {socio.validadeLabel}
+                            </span>
+                            {socio.vencida && (
+                              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900 dark:text-red-300">
+                                Vencida
                               </span>
                             )}
-                          </td>
-                        </m.tr>
-                      ))}
-                    </AnimatePresence>
+                            {socio.vencendo && (
+                              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                                Vence em breve
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {podeEmitir ? (
+                            <SocioActions socio={socio} />
+                          ) : (
+                            <span className="block text-right text-xs text-[rgb(var(--foreground-muted))]">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
-              </m.div>
+              </div>
             </MotionReveal>
           )}
         </div>

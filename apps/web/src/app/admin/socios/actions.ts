@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { novoQrTokenSocio } from '@/lib/pix-gateway'
@@ -9,6 +10,27 @@ import { PERMISSIONS } from '@torcida/types'
 // Carteirinha/sócio reaproveita MEMBERS_APPROVE — não existe permissão
 // dedicada para "gerenciar sócios" ainda; emitir/renovar/revogar carteirinha
 // é parte do mesmo fluxo de aprovação de associado.
+
+const EmitirCarteirinhaSchema = z.object({
+  userId: z.string().uuid('Membro inválido'),
+  nome: z.string().trim().min(1, 'Nome obrigatório').max(120),
+  validade: z
+    .string()
+    .min(1, 'Validade obrigatória')
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), 'Data de validade inválida'),
+})
+
+const RenovarCarteirinhaSchema = z.object({
+  socioId: z.string().uuid('Carteirinha inválida'),
+  novaValidade: z
+    .string()
+    .min(1, 'Validade obrigatória')
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), 'Data de validade inválida'),
+})
+
+const RevogarCarteirinhaSchema = z.object({
+  socioId: z.string().uuid('Carteirinha inválida'),
+})
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -19,14 +41,17 @@ function isUniqueViolation(err: unknown): boolean {
 export async function emitirCarteirinha(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  const userId = String(formData.get('userId') ?? '').trim()
-  const nome = String(formData.get('nome') ?? '').trim()
-  const validadeStr = String(formData.get('validade') ?? '').trim()
+  const parsed = EmitirCarteirinhaSchema.safeParse({
+    userId: String(formData.get('userId') ?? ''),
+    nome: String(formData.get('nome') ?? ''),
+    validade: String(formData.get('validade') ?? ''),
+  })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  }
 
-  if (!userId || !nome || !validadeStr) throw new Error('Todos os campos são obrigatórios')
-
-  const validade = new Date(validadeStr)
-  if (isNaN(validade.getTime())) throw new Error('Data de validade inválida')
+  const { userId, nome } = parsed.data
+  const validade = new Date(parsed.data.validade)
 
   const membro = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
@@ -96,11 +121,21 @@ export async function emitirCarteirinha(formData: FormData) {
 export async function renovarCarteirinha(socioId: string, novaValidade: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  const validade = new Date(novaValidade)
-  if (isNaN(validade.getTime())) throw new Error('Data de validade inválida')
+  const parsed = RenovarCarteirinhaSchema.safeParse({ socioId, novaValidade })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  }
+
+  const validade = new Date(parsed.data.novaValidade)
+
+  const socio = await db.saasSocio.findFirst({
+    where: { id: parsed.data.socioId, tenantId: tenant.id },
+    select: { id: true },
+  })
+  if (!socio) throw new Error('Carteirinha não encontrada')
 
   await db.saasSocio.update({
-    where: { id: socioId, tenantId: tenant.id },
+    where: { id: socio.id },
     data: { validade },
   })
 
@@ -110,8 +145,8 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
       atorId: session.user.id,
       acao: 'SOCIO_CARTEIRINHA_RENOVADA',
       entidade: 'SaasSocio',
-      entidadeId: socioId,
-      detalhes: { novaValidade },
+      entidadeId: socio.id,
+      detalhes: { novaValidade: parsed.data.novaValidade },
     },
   })
 
@@ -121,14 +156,19 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
 export async function revogarCarteirinha(socioId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
+  const parsed = RevogarCarteirinhaSchema.safeParse({ socioId })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  }
+
   const socio = await db.saasSocio.findFirst({
-    where: { id: socioId, tenantId: tenant.id },
+    where: { id: parsed.data.socioId, tenantId: tenant.id },
     select: { id: true, nome: true, numeroSocio: true },
   })
   if (!socio) throw new Error('Carteirinha não encontrada')
 
   await db.saasSocio.delete({
-    where: { id: socio.id, tenantId: tenant.id },
+    where: { id: socio.id },
   })
 
   await db.auditLog.create({
