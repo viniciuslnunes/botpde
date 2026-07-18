@@ -6,6 +6,12 @@ import { MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { editarPost, excluirPost, fixarPostPerfil } from '@/app/portal/comunidade/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import {
+  paraTextoLegivel,
+  podarMencoes,
+  serializarMencoes,
+  type MencaoParsed,
+} from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 
 interface FeedPostMenuProps {
@@ -15,12 +21,21 @@ interface FeedPostMenuProps {
 }
 
 export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPostMenuProps) {
+  const inicial = paraTextoLegivel(conteudoInicial)
   const [open, setOpen] = useState(false)
   const [editando, setEditando] = useState(false)
-  const [texto, setTexto] = useState(conteudoInicial)
+  const [texto, setTexto] = useState(inicial.texto)
+  const [mencoes, setMencoes] = useState<MencaoParsed[]>(inicial.mencoes)
   const [pinned, setPinned] = useState(fixado)
   const [pending, startTransition] = useTransition()
   const confirmAction = useConfirmAction()
+
+  function abrirEdicao() {
+    const next = paraTextoLegivel(conteudoInicial)
+    setTexto(next.texto)
+    setMencoes(next.mencoes)
+    setEditando(true)
+  }
 
   if (editando) {
     return (
@@ -35,7 +50,7 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
           e.preventDefault()
           startTransition(async () => {
             try {
-              await editarPost(postId, texto)
+              await editarPost(postId, serializarMencoes(texto, mencoes))
               setEditando(false)
               toast.success('Post atualizado.')
             } catch (err) {
@@ -46,7 +61,17 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
       >
         <textarea
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => {
+            const { texto: legivel, mencoes: coladas } = paraTextoLegivel(e.target.value)
+            setTexto(legivel)
+            setMencoes((prev) => {
+              const merged = [...prev]
+              for (const m of coladas) {
+                if (!merged.some((x) => x.userId === m.userId)) merged.push(m)
+              }
+              return podarMencoes(legivel, merged)
+            })
+          }}
           maxLength={3000}
           rows={3}
           className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
@@ -67,7 +92,9 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
             transition={springSnappy}
             onClick={() => {
               setEditando(false)
-              setTexto(conteudoInicial)
+              const next = paraTextoLegivel(conteudoInicial)
+              setTexto(next.texto)
+              setMencoes(next.mencoes)
             }}
             className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs"
           >
@@ -144,7 +171,7 @@ export function FeedPostMenu({ postId, conteudoInicial, fixado = false }: FeedPo
                 animate="show"
                 onClick={() => {
                   setOpen(false)
-                  setEditando(true)
+                  abrirEdicao()
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
               >

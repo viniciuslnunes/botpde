@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Loader2 } from 'lucide-react'
 import { Avatar } from './avatar'
-import { formatarMencao } from '@/lib/comunidade-social'
+import {
+  formatarMencaoLegivel,
+  type MencaoParsed,
+} from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springSnappy } from '@/lib/motion-presets'
 
 interface MembroMencao {
@@ -13,9 +16,14 @@ interface MembroMencao {
   avatarUrl: string | null
 }
 
+export interface MencaoSelecionada extends MencaoParsed {
+  /** Texto legível a inserir no composer (`@Nome `). */
+  texto: string
+}
+
 interface MentionPickerProps {
   query: string
-  onSelect: (mencao: string) => void
+  onSelect: (mencao: MencaoSelecionada) => void
   onClose: () => void
 }
 
@@ -96,24 +104,33 @@ export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) 
             animate="show"
             variants={{ show: { transition: { staggerChildren: 0.04 } } }}
           >
-            {membros.map((membro, i) => (
-              <m.button
-                key={membro.id}
-                type="button"
-                custom={i}
-                variants={menuItemStagger}
-                whileHover={{ x: 2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={springSnappy}
-                onClick={() => onSelect(formatarMencao(membro.nome ?? 'Membro', membro.id))}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
-              >
-                <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="xs" />
-                <span className="truncate font-medium text-[rgb(var(--foreground))]">
-                  {membro.nome ?? 'Membro'}
-                </span>
-              </m.button>
-            ))}
+            {membros.map((membro, i) => {
+              const nome = membro.nome?.trim() || 'Membro'
+              return (
+                <m.button
+                  key={membro.id}
+                  type="button"
+                  custom={i}
+                  variants={menuItemStagger}
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={springSnappy}
+                  onClick={() =>
+                    onSelect({
+                      nome,
+                      userId: membro.id,
+                      texto: formatarMencaoLegivel(nome),
+                    })
+                  }
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="xs" />
+                  <span className="truncate font-medium text-[rgb(var(--foreground))]">
+                    {nome}
+                  </span>
+                </m.button>
+              )
+            })}
           </m.div>
         )}
       </AnimatePresence>
@@ -124,6 +141,8 @@ export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) 
 /** Detecta se o cursor está após um @ sem menção fechada. */
 export function detectarMencaoAtiva(texto: string, cursor: number): string | null {
   const antes = texto.slice(0, cursor)
+  // Espaço/quebra após @… = menção já concluída (ex.: "@Ellen Akemi ").
+  if (/\s$/.test(antes)) return null
   const match = antes.match(/@([\p{L}\p{N}_\s]{0,30})$/u)
   if (!match) return null
   if (antes.endsWith(']') || antes.includes('](user:')) return null

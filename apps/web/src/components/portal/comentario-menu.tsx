@@ -6,6 +6,12 @@ import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { editarComentario, excluirComentario } from '@/app/portal/comunidade/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import {
+  paraTextoLegivel,
+  podarMencoes,
+  serializarMencoes,
+  type MencaoParsed,
+} from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 
 interface ComentarioMenuProps {
@@ -27,7 +33,9 @@ export function ComentarioMenu({
 }: ComentarioMenuProps) {
   const [open, setOpen] = useState(false)
   const [editando, setEditando] = useState(false)
-  const [texto, setTexto] = useState(conteudoInicial)
+  const inicial = paraTextoLegivel(conteudoInicial)
+  const [texto, setTexto] = useState(inicial.texto)
+  const [mencoes, setMencoes] = useState<MencaoParsed[]>(inicial.mencoes)
   const [pending, startTransition] = useTransition()
   const confirmAction = useConfirmAction()
 
@@ -77,7 +85,9 @@ export function ComentarioMenu({
                       animate="show"
                       onClick={() => {
                         setOpen(false)
-                        setTexto(conteudoInicial)
+                        const next = paraTextoLegivel(conteudoInicial)
+                        setTexto(next.texto)
+                        setMencoes(next.mencoes)
                         setEditando(true)
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[rgb(var(--background-subtle))]"
@@ -127,7 +137,7 @@ export function ComentarioMenu({
           className="mt-1 space-y-2"
           onSubmit={(e) => {
             e.preventDefault()
-            const next = texto.trim()
+            const next = serializarMencoes(texto, mencoes).trim()
             if (!next) return
             startTransition(async () => {
               try {
@@ -143,7 +153,17 @@ export function ComentarioMenu({
         >
           <textarea
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => {
+              const { texto: legivel, mencoes: coladas } = paraTextoLegivel(e.target.value)
+              setTexto(legivel)
+              setMencoes((prev) => {
+                const merged = [...prev]
+                for (const m of coladas) {
+                  if (!merged.some((x) => x.userId === m.userId)) merged.push(m)
+                }
+                return podarMencoes(legivel, merged)
+              })
+            }}
             maxLength={500}
             rows={2}
             autoFocus
@@ -165,7 +185,9 @@ export function ComentarioMenu({
               transition={springSnappy}
               onClick={() => {
                 setEditando(false)
-                setTexto(conteudoInicial)
+                const next = paraTextoLegivel(conteudoInicial)
+                setTexto(next.texto)
+                setMencoes(next.mencoes)
               }}
               className="rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs"
             >

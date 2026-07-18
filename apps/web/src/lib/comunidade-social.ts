@@ -5,6 +5,10 @@ export interface MencaoParsed {
   userId: string
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /** Extrai IDs de usuários mencionados no formato @[Nome](user:uuid). */
 export function extrairMencoes(conteudo: string): MencaoParsed[] {
   const vistos = new Set<string>()
@@ -17,6 +21,50 @@ export function extrairMencoes(conteudo: string): MencaoParsed[] {
       vistos.add(userId)
       result.push({ nome: m[1], userId })
     }
+  }
+  return result
+}
+
+/** Token persistido no banco / notificação. */
+export function formatarMencaoToken(nome: string, userId: string): string {
+  const safe = nome.trim() || 'Membro'
+  return `@[${safe}](user:${userId})`
+}
+
+/** Texto legível no composer: @Nome (sem o token cru). */
+export function formatarMencaoLegivel(nome: string): string {
+  const safe = nome.trim() || 'Membro'
+  return `@${safe} `
+}
+
+/** Converte @[Nome](user:id) → @Nome e devolve as menções rastreadas. */
+export function paraTextoLegivel(conteudo: string): { texto: string; mencoes: MencaoParsed[] } {
+  const mencoes = extrairMencoes(conteudo)
+  if (mencoes.length === 0) return { texto: conteudo, mencoes }
+  const re = new RegExp(MENCAO_REGEX.source, MENCAO_REGEX.flags)
+  const texto = conteudo.replace(re, (_full, nome: string) => `@${nome}`)
+  return { texto, mencoes }
+}
+
+/** Remove menções cujo @Nome sumiu do texto legível. */
+export function podarMencoes(texto: string, mencoes: MencaoParsed[]): MencaoParsed[] {
+  return mencoes.filter((m) => {
+    const re = new RegExp(`@${escapeRegExp(m.nome)}(?![\\p{L}\\p{N}_])`, 'u')
+    return re.test(texto)
+  })
+}
+
+/**
+ * Volta @Nome → @[Nome](user:id) para persistir.
+ * Nomes mais longos primeiro evitam colisão parcial.
+ */
+export function serializarMencoes(texto: string, mencoes: MencaoParsed[]): string {
+  if (mencoes.length === 0) return texto
+  const sorted = [...mencoes].sort((a, b) => b.nome.length - a.nome.length)
+  let result = texto
+  for (const m of sorted) {
+    const re = new RegExp(`@${escapeRegExp(m.nome)}(?![\\p{L}\\p{N}_])`, 'gu')
+    result = result.replace(re, formatarMencaoToken(m.nome, m.userId))
   }
   return result
 }
@@ -45,10 +93,9 @@ export function extrairHashtags(conteudo: string): string[] {
   return result
 }
 
-/** Insere menção no texto (para o composer). */
+/** Insere menção no texto (token persistido — preferir formatarMencaoLegivel no composer). */
 export function formatarMencao(nome: string, userId: string): string {
-  const safe = nome.trim() || 'Membro'
-  return `@[${safe}](user:${userId}) `
+  return `${formatarMencaoToken(nome, userId)} `
 }
 
 export type TipoReacaoSocial = 'CURTIR' | 'FORCA' | 'VAMOS' | 'PRESENTE'

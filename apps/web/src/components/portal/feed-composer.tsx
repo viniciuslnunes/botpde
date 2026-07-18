@@ -29,7 +29,13 @@ import { emitirPostPublicado } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
-import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
+import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import {
+  paraTextoLegivel,
+  podarMencoes,
+  serializarMencoes,
+  type MencaoParsed,
+} from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
@@ -208,6 +214,7 @@ function ComposerBody({
     eventoPreselecionado ?? eventos[0]?.id ?? '',
   )
   const [texto, setTexto] = useState('')
+  const [mencoes, setMencoes] = useState<MencaoParsed[]>([])
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
   const [visibilidade, setVisibilidade] = useState<'PUBLICO' | 'TENANT' | 'PRIVADO'>(
@@ -274,15 +281,28 @@ function ComposerBody({
   })
 
   function handleTextoChange(value: string, cursor?: number) {
-    setTexto(value)
-    const pos = cursor ?? value.length
-    setMencaoQuery(detectarMencaoAtiva(value, pos))
+    const { texto: legivel, mencoes: coladas } = paraTextoLegivel(value)
+    setTexto(legivel)
+    setMencoes((prev) => {
+      const merged = [...prev]
+      for (const m of coladas) {
+        if (!merged.some((x) => x.userId === m.userId)) merged.push(m)
+      }
+      return podarMencoes(legivel, merged)
+    })
+    const pos = cursor ?? legivel.length
+    setMencaoQuery(detectarMencaoAtiva(legivel, Math.min(pos, legivel.length)))
   }
 
-  function inserirMencao(mencao: string) {
+  function inserirMencao(selecionada: MencaoSelecionada) {
     const el = textareaRef.current
+    const trecho = selecionada.texto
     if (!el) {
-      setTexto((t) => t + mencao)
+      setTexto((t) => t + trecho)
+      setMencoes((prev) => [
+        ...prev.filter((m) => m.userId !== selecionada.userId),
+        { nome: selecionada.nome, userId: selecionada.userId },
+      ])
       setMencaoQuery(null)
       return
     }
@@ -291,12 +311,16 @@ function ComposerBody({
     if (!query) return
     const antes = texto.slice(0, cursor - query.length - 1)
     const depois = texto.slice(cursor)
-    const next = antes + mencao + depois
+    const next = antes + trecho + depois
     setTexto(next)
+    setMencoes((prev) => [
+      ...prev.filter((m) => m.userId !== selecionada.userId),
+      { nome: selecionada.nome, userId: selecionada.userId },
+    ])
     setMencaoQuery(null)
     requestAnimationFrame(() => {
       el.focus()
-      const pos = antes.length + mencao.length
+      const pos = antes.length + trecho.length
       el.selectionStart = el.selectionEnd = pos
     })
   }
@@ -304,6 +328,7 @@ function ComposerBody({
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    fd.set('conteudo', serializarMencoes(texto, mencoes))
     startTransition(() => {
       if (modoEnquete) {
         pollAction(fd)

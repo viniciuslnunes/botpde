@@ -9,8 +9,9 @@ interface PostConteudoRichProps {
 
 function renderSegment(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = []
+  // Grupos: 1–2 menção (nome, userId); 3 hashtag.
   const combined = new RegExp(
-    `${MENCAO_REGEX.source}|${HASHTAG_REGEX.source}`,
+    `(?:${MENCAO_REGEX.source})|(?:${HASHTAG_REGEX.source})`,
     'giu',
   )
   let last = 0
@@ -25,20 +26,21 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
         <ComunidadePrefetchLink
           key={`${keyPrefix}-m-${i}`}
           href={`/portal/comunidade/perfil/${userId}`}
-          className="font-semibold text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="font-semibold text-[rgb(var(--foreground))] underline decoration-[rgb(var(--foreground)_/_0.45)] underline-offset-2 hover:decoration-[rgb(var(--foreground))]"
         >
           @{nome}
         </ComunidadePrefetchLink>,
       )
     } else if (m[0].startsWith('#')) {
-      const tag = m[1].toLowerCase()
+      const raw = m[3] ?? m[1]
+      const tag = raw.toLowerCase()
       nodes.push(
         <ComunidadePrefetchLink
           key={`${keyPrefix}-h-${i}`}
           href={`/portal/comunidade/hashtag/${encodeURIComponent(tag)}`}
-          className="font-semibold text-[rgb(var(--color-primary-fg))] hover:underline"
+          className="font-semibold text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.45)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
         >
-          #{m[1]}
+          #{raw}
         </ComunidadePrefetchLink>,
       )
     }

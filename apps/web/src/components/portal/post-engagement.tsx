@@ -14,7 +14,14 @@ import {
   removerPostSalvo,
   type ComentarioPostItem,
 } from '@/app/portal/comunidade/actions'
-import type { TipoReacaoSocial } from '@/lib/comunidade-social'
+import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import {
+  paraTextoLegivel,
+  podarMencoes,
+  serializarMencoes,
+  type MencaoParsed,
+  type TipoReacaoSocial,
+} from '@/lib/comunidade-social'
 import {
   collapsePanel,
   menuItemStagger,
@@ -25,7 +32,6 @@ import {
 import { Avatar } from './avatar'
 import { ComentarioMenu } from './comentario-menu'
 import { PostConteudoRich } from './post-conteudo-rich'
-import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
 
 interface CurrentUser {
   id: string
@@ -94,6 +100,7 @@ export function PostEngagement({
   const [comentariosAbertos, setComentariosAbertos] = useState(false)
   const [carregandoComentarios, setCarregandoComentarios] = useState(false)
   const [comentario, setComentario] = useState('')
+  const [mencoesComentario, setMencoesComentario] = useState<MencaoParsed[]>([])
   const [denunciando, setDenunciando] = useState(false)
   const [repostando, setRepostando] = useState(false)
   const [comentarioRepost, setComentarioRepost] = useState('')
@@ -149,12 +156,12 @@ export function PostEngagement({
 
   function enviarComentario(e: React.FormEvent) {
     e.preventDefault()
-    const texto = comentario.trim()
-    if (!texto || pending) return
+    const persistido = serializarMencoes(comentario, mencoesComentario).trim()
+    if (!persistido || pending) return
     const tempId = `tmp-${Date.now()}`
     const otimista: ComentarioPostItem = {
       id: tempId,
-      conteudo: texto,
+      conteudo: persistido,
       criadoEm: new Date().toISOString(),
       autor: {
         id: currentUser.id,
@@ -165,16 +172,20 @@ export function PostEngagement({
     setComentarios((prev) => [...prev, otimista])
     setTotalC((n) => n + 1)
     setComentario('')
+    setMencoesComentario([])
+    setMencaoQuery(null)
     setComentariosAbertos(true)
     startTransition(async () => {
       try {
-        const salvoComentario = await comentarPost(postId, texto)
+        const salvoComentario = await comentarPost(postId, persistido)
         setComentarios((prev) => prev.map((c) => (c.id === tempId ? salvoComentario : c)))
         comentariosCarregadosRef.current = true
       } catch (err) {
         setComentarios((prev) => prev.filter((c) => c.id !== tempId))
         setTotalC((n) => Math.max(0, n - 1))
+        const { texto, mencoes } = paraTextoLegivel(persistido)
         setComentario(texto)
+        setMencoesComentario(mencoes)
         toast.error(err instanceof Error ? err.message : 'Não foi possível comentar.')
       }
     })
@@ -219,14 +230,28 @@ export function PostEngagement({
   }
 
   function handleComentarioChange(value: string, cursor?: number) {
-    setComentario(value)
-    setMencaoQuery(detectarMencaoAtiva(value, cursor ?? value.length))
+    const { texto: legivel, mencoes: coladas } = paraTextoLegivel(value)
+    setComentario(legivel)
+    setMencoesComentario((prev) => {
+      const merged = [...prev]
+      for (const m of coladas) {
+        if (!merged.some((x) => x.userId === m.userId)) merged.push(m)
+      }
+      return podarMencoes(legivel, merged)
+    })
+    const pos = cursor ?? legivel.length
+    setMencaoQuery(detectarMencaoAtiva(legivel, Math.min(pos, legivel.length)))
   }
 
-  function inserirMencaoComentario(mencao: string) {
+  function inserirMencaoComentario(selecionada: MencaoSelecionada) {
     const el = inputRef.current
+    const trecho = selecionada.texto
     if (!el) {
-      setComentario((t) => t + mencao)
+      setComentario((t) => t + trecho)
+      setMencoesComentario((prev) => [
+        ...prev.filter((m) => m.userId !== selecionada.userId),
+        { nome: selecionada.nome, userId: selecionada.userId },
+      ])
       setMencaoQuery(null)
       return
     }
@@ -235,12 +260,16 @@ export function PostEngagement({
     if (!query) return
     const antes = comentario.slice(0, cursor - query.length - 1)
     const depois = comentario.slice(cursor)
-    const next = antes + mencao + depois
+    const next = antes + trecho + depois
     setComentario(next)
+    setMencoesComentario((prev) => [
+      ...prev.filter((m) => m.userId !== selecionada.userId),
+      { nome: selecionada.nome, userId: selecionada.userId },
+    ])
     setMencaoQuery(null)
     requestAnimationFrame(() => {
       el.focus()
-      const pos = antes.length + mencao.length
+      const pos = antes.length + trecho.length
       el.selectionStart = el.selectionEnd = pos
     })
   }
