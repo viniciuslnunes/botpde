@@ -27,8 +27,8 @@ export async function CaravanasAgendaAside({
           <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Caravanas</h2>
         </div>
         <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-          Você faz parte de {nome}, mas o acesso à agenda de caravanas exige ser membro desta
-          área ou ter permissão de eventos.
+          Você faz parte de {nome}, mas o acesso à agenda de caravanas exige ser membro deste
+          departamento ou ter permissão de eventos.
         </p>
       </div>
     )

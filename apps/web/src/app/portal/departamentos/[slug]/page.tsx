@@ -529,8 +529,8 @@ function PainelDominio({
         {isGestor
           ? totalPendentes > 0
             ? `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} na fila. Aprove ou reprove sem sair do portal.`
-            : 'Fila de solicitações nesta área. Quando alguém pedir ingresso, aparece aqui.'
-          : 'Você é membro desta área. A gestão da Diretoria é feita pelos gestores.'}
+            : 'Fila de solicitações neste departamento. Quando alguém pedir ingresso, aparece aqui.'
+          : 'Você é membro deste departamento. A gestão da Diretoria é feita pelos gestores.'}
       </p>
       {isGestor && operacaoHref && (
         <Link

@@ -24,7 +24,7 @@ export function DepartamentoSubareasNav({ subareas }: { subareas: readonly Subar
     <div className="sticky top-0 z-10 -mx-1 bg-[rgb(var(--background)_/_0.92)] px-1 py-2 backdrop-blur-sm">
       <div className="relative">
         <nav
-          aria-label="Subáreas"
+          aria-label="Seções do departamento"
           className="app-scrollbar-none flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {subareas.map((s) => {

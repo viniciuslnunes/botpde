@@ -134,7 +134,7 @@ export function DepartamentoEquipe({
         <p className="mt-4 text-center text-xs text-[rgb(var(--foreground-muted))]">
           {isGestor
             ? 'Ainda sem pessoas. Use a busca acima para incluir o primeiro membro.'
-            : 'Sem pessoas nesta área'}
+            : 'Sem pessoas neste departamento'}
         </p>
       ) : (
         <div className="mt-4 space-y-3">
@@ -184,7 +184,7 @@ export function DepartamentoEquipe({
             <div className="pt-1">
               <RelationStem label="equipe" />
               <p className="text-center text-xs text-[rgb(var(--foreground-muted))]">
-                Ainda sem colaboradores nesta área
+                Ainda sem colaboradores neste departamento
               </p>
             </div>
           )}
@@ -212,7 +212,7 @@ function RemoverMembroButton({
       type="button"
       onClick={() => {
         void confirmAction({
-          titulo: `Remover ${label} desta área?`,
+          titulo: `Remover ${label} deste departamento?`,
           descricao: 'A pessoa sai da equipe. Pode ser incluída de novo depois.',
           labelConfirmar: 'Remover',
           variante: 'destructive',
@@ -224,7 +224,7 @@ function RemoverMembroButton({
             fd.set('targetUserId', targetUserId)
             return removerMembroArea({}, fd)
           },
-          success: `${label} removido da área`,
+          success: `${label} removido do departamento`,
         })
       }}
       className="app-action inline-flex min-h-9 min-w-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
@@ -250,7 +250,7 @@ function AdicionarMembroForm({
   const [buscou, setBuscou] = useState(false)
   const [pendingSearch, startSearch] = useTransition()
   const [state, action, pending] = useActionState(adicionarMembroArea, {} as ActionState)
-  useActionStateToast(state, pending, 'Membro adicionado à área')
+  useActionStateToast(state, pending, 'Membro adicionado ao departamento')
 
   const qBusca = q.trim().length >= 2 ? q.trim() : ''
   const candidatosVisiveis = qBusca ? candidatos : []

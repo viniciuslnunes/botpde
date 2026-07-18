@@ -77,7 +77,7 @@ export default async function PortalBateriaPage() {
             href="/portal/departamentos/bateria"
             className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
           >
-            Área do departamento
+            Ver departamento
           </Link>
         </div>
       </MotionReveal>

@@ -9,7 +9,7 @@ export const DEPARTAMENTO_THIN_COPY = Object.freeze({
   'social-e-eventos': {
     titulo: 'Social e eventos',
     descricao:
-      'Festas, churrascos e ações na sede — a agenda vive em Eventos; esta área reúne a equipe que organiza.',
+      'Festas, churrascos e ações na sede — a agenda vive em Eventos; este departamento reúne a equipe que organiza.',
     ctaModulo: 'Abrir eventos',
   },
   'materiais-loja': {
@@ -27,13 +27,13 @@ export const DEPARTAMENTO_THIN_COPY = Object.freeze({
   feminino: {
     titulo: 'Feminino',
     descricao:
-      'Organização das mulheres na torcida: equipe desta área, agenda de ações em Eventos e presença na Comunidade.',
+      'Organização das mulheres na torcida: equipe deste departamento, agenda de ações em Eventos e presença na Comunidade.',
     ctaModulo: 'Abrir comunidade',
   },
   carnaval: {
     titulo: 'Carnaval',
     descricao:
-      'Concentração e ensaios de rua em Eventos; checklist do barracão na home da área — sem ERP de escola.',
+      'Concentração e ensaios de rua em Eventos; checklist do barracão na home do departamento — sem ERP de escola.',
     ctaModulo: 'Abrir eventos',
   },
 })

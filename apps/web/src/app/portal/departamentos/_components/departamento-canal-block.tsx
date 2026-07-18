@@ -37,7 +37,7 @@ export function DepartamentoCanalBlock({
           <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-              {canal.nome?.trim() || 'Canal da área'}
+              {canal.nome?.trim() || 'Canal do departamento'}
             </p>
             {isGestor && (
               <details className="group mt-0.5">
@@ -60,7 +60,7 @@ export function DepartamentoCanalBlock({
                         setError(res.error)
                         return
                       }
-                      toast.success('Canal da área atualizado')
+                      toast.success('Canal do departamento atualizado')
                     })
                   }}
                 />
@@ -86,11 +86,11 @@ export function DepartamentoCanalBlock({
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-[rgb(var(--foreground-muted))] [&::-webkit-details-marker]:hidden">
         <MessageCircle className="h-4 w-4 text-[rgb(var(--primary))]" />
-        Vincular canal da área
+        Vincular canal do departamento
         <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
       </summary>
       <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-        Escolha um canal existente da Comunidade para a equipe desta área.
+        Escolha um canal existente da Comunidade para a equipe deste departamento.
       </p>
       <CanalVincularForm
         departamentoId={departamentoId}
@@ -107,7 +107,7 @@ export function DepartamentoCanalBlock({
               setError(res.error)
               return
             }
-            toast.success('Canal da área vinculado')
+            toast.success('Canal do departamento vinculado')
           })
         }}
       />

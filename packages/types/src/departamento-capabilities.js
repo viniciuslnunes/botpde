@@ -40,7 +40,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     features: ['equipe', 'avisos'],
     portalPanel: 'diretoria',
     kind: 'plugin',
-    mission: 'Governança e admissão: fila de sócios, equipe da prancheta e visão das demais áreas.',
+    mission: 'Governança e admissão: fila de sócios, equipe da prancheta e visão dos demais departamentos.',
     subareas: [
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
       { id: 'fila', label: 'Fila de membros', feature: 'avisos' },
@@ -144,7 +144,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     features: ['equipe', 'modulo', 'avisos', 'agenda'],
     portalPanel: 'generico',
     kind: 'thin',
-    mission: 'Organização das mulheres na torcida — equipe da área e presença na Comunidade.',
+    mission: 'Organização das mulheres na torcida — equipe do departamento e presença na Comunidade.',
     subareas: [
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
       { id: 'agenda', label: 'Ações', feature: 'agenda', href: '/portal/eventos' },
@@ -158,7 +158,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     portalPanel: 'carnaval',
     kind: 'plugin',
     mission:
-      'Concentração e ensaios de rua em Eventos; checklist do barracão na área — sem ERP de escola.',
+      'Concentração e ensaios de rua em Eventos; checklist do barracão no departamento — sem ERP de escola.',
     subareas: [
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
       { id: 'agenda', label: 'Cronograma', feature: 'agenda', href: '/portal/eventos' },

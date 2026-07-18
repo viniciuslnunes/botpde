@@ -16,7 +16,7 @@ export const resolverProximaAcaoArea = cache(async function resolverProximaAcaoA
   if (panel === 'diretoria' && isGestor && totalPendentes > 0) {
     return {
       titulo: `${totalPendentes} solicitação${totalPendentes === 1 ? '' : 'ões'} pendente${totalPendentes === 1 ? '' : 's'}`,
-      descricao: 'Aprove ou reprove na fila desta área.',
+      descricao: 'Aprove ou reprove na fila deste departamento.',
       href: '#fila',
       cta: 'Ver fila',
     }

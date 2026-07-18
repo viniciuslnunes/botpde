@@ -92,7 +92,7 @@ export default async function PortalFinanceiroPage({ searchParams }: Props) {
             href="/portal/departamentos/financeiro"
             className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
           >
-            Área do departamento
+            Ver departamento
           </Link>
         </div>
       </MotionReveal>
