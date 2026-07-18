@@ -39,7 +39,7 @@ export function DepartamentoSubareasNav({ subareas }: { subareas: readonly Subar
                 className={[
                   'shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
                   current
-                    ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                    ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                     : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground-muted))] hover:border-[rgb(var(--primary)_/_0.35)] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >

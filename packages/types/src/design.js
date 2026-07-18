@@ -637,21 +637,34 @@ export function corMarcaLegivel(brandHex, surfaceHex, minRatio = 3.2) {
 
 /**
  * Texto de botão sólido (`on`) e de badge/soft (`fg`) para uma ação.
- * Override manual em `actionsFg` aplica aos dois; senão: on = contraste no
- * preenchimento, fg = legível sobre a superfície.
+ *
+ * - Automático: `on` contraste no preenchimento; `fg` tom da ação legível na
+ *   superfície do tema (claro/escuro) — badge soft usa wash ~14% sobre a surface.
+ * - Override manual: só é aplicado onde o contraste fecha (≥3:1). Se branco
+ *   funciona no botão mas falha no badge claro (ou o inverso), aquele contexto
+ *   volta ao automático — assim mudar num tema não quebra o outro.
+ *
  * @param {string} actionHex
  * @param {string | null | undefined} overrideHex
- * @param {string} surfaceHex
+ * @param {string} surfaceHex superfície do modo ativo (light/dark)
  * @returns {{ on: string, fg: string }}
  */
 export function resolveActionTextColors(actionHex, overrideHex, surfaceHex) {
+  const autoOn = contrasteTextoSobre(actionHex) === 'light' ? '#ffffff' : '#0a0a0a'
+  const autoFg = corMarcaLegivel(actionHex, surfaceHex)
+  /** Aprox. de `bg color / 0.14` sobre a superfície (Badge / soft). */
+  const softBg = mixHex(surfaceHex, actionHex, 0.14)
+  const minRatio = 3
+
   if (typeof overrideHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(overrideHex)) {
-    return { on: overrideHex, fg: overrideHex }
+    return {
+      on:
+        contrasteRatio(overrideHex, actionHex) >= minRatio ? overrideHex : autoOn,
+      fg: contrasteRatio(overrideHex, softBg) >= minRatio ? overrideHex : autoFg,
+    }
   }
-  return {
-    on: contrasteTextoSobre(actionHex) === 'light' ? '#ffffff' : '#0a0a0a',
-    fg: corMarcaLegivel(actionHex, surfaceHex),
-  }
+
+  return { on: autoOn, fg: autoFg }
 }
 
 /**
@@ -960,20 +973,25 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
 
 /**
  * Swatches (até 3) a partir do design atual — para cards de paleta.
+ * Ordem alinhada às sugeridas: primária → secundária → destaque (danger/aviso),
+ * nunca `success` (em marcas P&B o sucesso vira cinza #242424 e parece uma
+ * “terceira cor” fantasma diferente do vermelho da marca).
  * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
  * @returns {string[]}
  */
 export function swatchesDoDesign(design) {
   const actions = { ...DEFAULT_ACTIONS, ...(design.actions ?? {}) }
+  const primary = design.brand?.primary
   const secondary =
     design.brand?.secondary && /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
       ? design.brand.secondary
-      : actions.danger
+      : '#ffffff'
   return limitarSwatches([
-    design.brand.primary,
+    primary,
     secondary,
-    actions.success,
     actions.danger,
+    actions.warning,
+    actions.info,
   ])
 }
 
@@ -1061,10 +1079,16 @@ export function capturarPaletaDoDesign(design, nome) {
 
 /**
  * Aplica uma paleta sugerida sobre um design existente (preserva grade e paletas salvas).
+ * Superfícies só são rederivadas quando a primária muda — evita “repintar” o tema
+ * ao reaplicar a mesma marca (ex.: Marca da torcida com #1a1a1a de novo).
  * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
  * @param {PaletaSugerida} paleta
  */
 export function aplicarPaletaAoDesign(design, paleta) {
+  const primaryAnterior =
+    typeof design.brand?.primary === 'string' ? design.brand.primary.toLowerCase() : ''
+  const primaryNova = String(paleta.primary || '').toLowerCase()
+  const mesmaPrimaria = primaryAnterior !== '' && primaryAnterior === primaryNova
   const derived = derivarSuperficiesDaMarca(paleta.primary)
   return {
     ...design,
@@ -1078,8 +1102,12 @@ export function aplicarPaletaAoDesign(design, paleta) {
       ? { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}), ...paleta.actionsFg }
       : (design.actionsFg ?? { ...DEFAULT_ACTIONS_FG }),
     customPalettes: design.customPalettes ?? [],
-    light: { ...(design.light ?? {}), ...derived.light },
-    dark: { ...(design.dark ?? {}), ...derived.dark },
+    light: mesmaPrimaria
+      ? { ...(design.light ?? {}) }
+      : { ...(design.light ?? {}), ...derived.light },
+    dark: mesmaPrimaria
+      ? { ...(design.dark ?? {}) }
+      : { ...(design.dark ?? {}), ...derived.dark },
     grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,
   }
 }

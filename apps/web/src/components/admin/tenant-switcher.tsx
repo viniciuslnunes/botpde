@@ -164,7 +164,7 @@ export function TenantSwitcher({
     : 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
   const itemActive = isSuper
     ? 'bg-violet-950/60 text-violet-200'
-    : 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+    : 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
   const mutedClass = isSuper ? 'text-zinc-500' : 'text-[rgb(var(--foreground-muted))]'
   const sectionClass = isSuper
     ? 'flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500'

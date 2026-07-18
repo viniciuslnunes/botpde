@@ -93,7 +93,7 @@ export function AdminPedidosFiltros({ options }: AdminPedidosFiltrosProps) {
             href={opt.href}
             className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${
               opt.active
-                ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
                 : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]'
             }`}
           >

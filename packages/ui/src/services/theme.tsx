@@ -124,8 +124,18 @@ export function applyTenantDesign(
     hexToCssRgb(corMarcaLegivel(primary, surfaceHex)),
   )
   root.style.setProperty(
+    '--color-primary-on',
+    hexToCssRgb(contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a'),
+  )
+  root.style.setProperty(
     '--color-secondary-fg',
     hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex)),
+  )
+  root.style.setProperty(
+    '--color-secondary-on',
+    hexToCssRgb(
+      contrasteTextoSobre(secondaryHex) === 'light' ? '#ffffff' : '#0a0a0a',
+    ),
   )
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
@@ -202,7 +212,13 @@ export function tenantDesignCriticalCss(
     (defaults as Record<string, string>).surface
   lines.push(`--color-primary-fg:${hexToCssRgb(corMarcaLegivel(primary, surfaceHex))}`)
   lines.push(
+    `--color-primary-on:${hexToCssRgb(contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a')}`,
+  )
+  lines.push(
     `--color-secondary-fg:${hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex))}`,
+  )
+  lines.push(
+    `--color-secondary-on:${hexToCssRgb(contrasteTextoSobre(secondaryHex) === 'light' ? '#ffffff' : '#0a0a0a')}`,
   )
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }

@@ -534,7 +534,7 @@ export function OrganizacaoMural({ tree }: { tree: OrganizacaoTree }) {
               className={[
                 'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors',
                 soComPessoas
-                  ? 'border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                  ? 'border-[rgb(var(--color-primary)_/_0.4)] bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]'
                   : 'border-[rgb(var(--border))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
               ].join(' ')}
               title="Ocultar departamentos sem pessoas"

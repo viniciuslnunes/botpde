@@ -101,6 +101,8 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
   não colados na barra de rolagem).
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
   Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
+  Texto manual só vale onde o contraste fecha (botão sólido vs badge soft);
+  no outro contexto volta ao automático — recalcula por tema claro/escuro.
 - Seletor de cor: swatch abre o **color picker nativo** direto (sem popover
   intermediário).
 - Prévia **sem** overlay de hotspot/label ao focar token — estado não salvo

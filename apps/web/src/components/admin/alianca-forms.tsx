@@ -465,7 +465,7 @@ export function AliancaForms({
                 className={[
                   'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                     : item.highlight
                       ? 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]'
                       : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
@@ -478,9 +478,9 @@ export function AliancaForms({
                     className={[
                       'rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
                       active
-                        ? 'bg-[rgb(var(--primary))] text-white'
+                        ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                         : item.highlight
-                          ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
+                          ? 'bg-[rgb(var(--color-primary)_/_0.18)] text-[rgb(var(--color-primary-fg))]'
                           : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                   >
@@ -549,7 +549,7 @@ export function AliancaForms({
                               `Proposta enviada para ${item.tenantSugeridoNome}`,
                             )
                           }
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3.5 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-60"
                         >
                           {pending ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -570,7 +570,7 @@ export function AliancaForms({
                           type="button"
                           disabled={pending}
                           onClick={() => proporManualFromRec(item)}
-                          className="text-sm font-medium text-[rgb(var(--primary))] hover:underline disabled:opacity-60"
+                          className="text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline disabled:opacity-60"
                         >
                           Propor mesmo assim
                         </button>
@@ -728,7 +728,7 @@ export function AliancaForms({
                     setTab('enviadas')
                   }, 'Proposta enviada com sucesso')
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-medium text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Handshake className="h-4 w-4" />}
                 Enviar proposta

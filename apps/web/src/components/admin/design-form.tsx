@@ -42,6 +42,7 @@ import {
   designParaPaletaSugerida,
   gerarPaletasSugeridas,
   isCorPadraoPlataforma,
+  mixHex,
   paletaDoClube,
   resolveActionTextColors,
   resolveTenantDesign,
@@ -97,8 +98,8 @@ function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
 function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastCheck[] {
   const s = resolveSurfaces(design, mode)
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
+  const actionsFg = { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}) }
   const primaryOnBtn = contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
-  const successOnBtn = contrasteTextoSobre(actions.success) === 'light' ? '#ffffff' : '#0a0a0a'
 
   const pairs: {
     id: string
@@ -148,15 +149,31 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
       min: 4.5,
       tip: 'Cor primária fraca para texto do botão.',
     },
-    {
-      id: 'success-btn',
-      label: 'Botão aprovar',
-      fg: successOnBtn,
-      bg: actions.success,
-      min: 3,
-      tip: 'Ajuste a cor de sucesso.',
-    },
   ]
+
+  for (const key of ACTION_TOKEN_KEYS) {
+    const fill = actions[key]
+    const text = resolveActionTextColors(fill, actionsFg[key], s.surface)
+    const softBg = mixHex(s.surface, fill, 0.14)
+    pairs.push(
+      {
+        id: `${key}-btn`,
+        label: `Botão ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
+        fg: text.on,
+        bg: fill,
+        min: 3,
+        tip: `Ajuste a cor ou o texto de ${ACTION_TOKEN_LABELS[key]}.`,
+      },
+      {
+        id: `${key}-soft`,
+        label: `Badge ${ACTION_TOKEN_LABELS[key].split(' / ')[0]!.toLowerCase()}`,
+        fg: text.fg,
+        bg: softBg,
+        min: 3,
+        tip: `Texto do badge soft ilegível neste tema (${mode}). Use Automático ou outra cor.`,
+      },
+    )
+  }
 
   return pairs.map((p) => {
     const ratio = contrasteRatio(p.fg, p.bg)
@@ -290,6 +307,7 @@ function SectionFrame({
 function PaletaCard({
   paleta,
   badge,
+  applyLabel = 'Aplicar',
   onApply,
   onRemove,
 }: {
@@ -300,6 +318,7 @@ function PaletaCard({
     swatches: string[]
   }
   badge?: string
+  applyLabel?: string
   onApply: () => void
   onRemove?: () => void
 }) {
@@ -323,7 +342,7 @@ function PaletaCard({
             </p>
           </div>
           <span className="shrink-0 rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))] opacity-0 transition-opacity group-hover:opacity-100">
-            Aplicar
+            {applyLabel}
           </span>
         </div>
         <div className="mt-2.5 space-y-1.5">
@@ -571,6 +590,8 @@ export function DesignForm({
   function applyPaletaCompleta(
     paleta: ReturnType<typeof gerarPaletasSugeridas>[number],
   ) {
+    // “Paleta atual” é só espelho do rascunho — reaplicar só rederiva e suja o tema.
+    if (paleta.id === 'atual') return
     setDesign(aplicarPaletaAoDesign(design, paleta) as TenantDesign)
     setFocus(null)
     setCompareAtivo(false)
@@ -686,6 +707,7 @@ export function DesignForm({
                     <PaletaCard
                       paleta={paletaAtual}
                       badge="Atual"
+                      applyLabel="Em uso"
                       onApply={() => applyPaletaCompleta(paletaAtual)}
                     />
                     {paletasSalvas.map((p) => {
@@ -815,6 +837,11 @@ export function DesignForm({
                     const fill = design.actions?.[key] ?? DEFAULT_ACTIONS[key]
                     const fgOverride =
                       design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key] ?? null
+                    const effective = resolveActionTextColors(
+                      fill,
+                      fgOverride,
+                      surfacesResolved.surface,
+                    )
                     const autoText = resolveActionTextColors(
                       fill,
                       null,
@@ -860,9 +887,34 @@ export function DesignForm({
                           }}
                           {...fieldProps}
                         />
+                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
+                            style={{
+                              backgroundColor: fill,
+                              color: effective.on,
+                            }}
+                          >
+                            Botão {effective.on.toUpperCase()}
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
+                            style={{
+                              backgroundColor: mixHex(
+                                surfacesResolved.surface,
+                                fill,
+                                0.14,
+                              ),
+                              color: effective.fg,
+                            }}
+                          >
+                            Badge {effective.fg.toUpperCase()}
+                          </span>
+                        </div>
                         <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                          {ACTION_TOKEN_HINTS[key]}. Texto vazio = contraste
-                          automático no botão e no badge.
+                          {ACTION_TOKEN_HINTS[key]}. Automático recalcula no
+                          claro/escuro. Manual só vale onde o contraste fecha —
+                          no outro contexto (botão vs badge) volta ao automático.
                         </p>
                       </div>
                     )
@@ -1013,8 +1065,8 @@ export function DesignForm({
           </div>
         </div>
 
-        {/* Studio preview — dominant */}
-        <div className="flex min-h-[520px] flex-col gap-3 xl:sticky xl:top-4 xl:h-[calc(100vh-11rem)] xl:min-h-0">
+        {/* Studio preview — altura pelo conteúdo; sticky com teto no viewport */}
+        <div className="flex flex-col gap-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto">
           <DesignStudioPreview
             design={design}
             baselineDesign={normalizedBaseline}

@@ -591,7 +591,7 @@ export function AccessUserPanel({
               className={[
                 'inline-flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 active
-                  ? 'border border-b-0 border-[rgb(var(--border))] -mb-px bg-[rgb(var(--surface))] text-[rgb(var(--primary))]'
+                  ? 'border border-b-0 border-[rgb(var(--border))] -mb-px bg-[rgb(var(--surface))] text-[rgb(var(--color-primary-fg))]'
                   : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
@@ -600,7 +600,7 @@ export function AccessUserPanel({
                 className={[
                   'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
                   active
-                    ? 'bg-[rgb(var(--primary))] text-white'
+                    ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                     : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >
@@ -1010,7 +1010,7 @@ function PerfilManagePanel({
           className={[
             'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium',
             atribuido
-              ? 'border-[rgb(var(--primary)_/_0.45)] bg-[rgb(var(--primary)_/_0.08)] text-[rgb(var(--primary))]'
+              ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.08)] text-[rgb(var(--color-primary-fg))]'
               : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
           ].join(' ')}
         >
@@ -1321,7 +1321,7 @@ function DepartamentoAreasPanel({
                   className={[
                     'ml-auto rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors',
                     selecionado
-                      ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
+                      ? 'bg-[rgb(var(--color-primary)_/_0.15)] text-[rgb(var(--color-primary-fg))]'
                       : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >

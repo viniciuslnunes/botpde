@@ -138,7 +138,7 @@ function PortalScene({
   ]
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col">
+    <div className="flex flex-col">
       <Hotspot token="surface" focus={focus} label="Superfície (navbar)" className="shrink-0">
         <header className="flex items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 backdrop-blur-sm">
           <Hotspot token="brand.primary" focus={focus} label="Cor primária">
@@ -193,9 +193,8 @@ function PortalScene({
         token="grid"
         focus={focus}
         label="Fundo e grade"
-        className="min-h-0 flex-1"
       >
-        <div className="h-full space-y-3 overflow-auto p-4" style={gridStyle(design, mode)}>
+        <div className="space-y-3 p-4" style={gridStyle(design, mode)}>
           <Hotspot token="backgroundSubtle" focus={focus} label="Fundo sutil (área sob a grade)">
             <div className="mb-1">
               <Hotspot token="foreground" focus={focus} label="Título">
@@ -447,7 +446,7 @@ function AdminScene({
     )
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col">
+    <div className="flex flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5">
         <div
           className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
@@ -460,7 +459,7 @@ function AdminScene({
           <p className="text-[10px] text-[rgb(var(--foreground-muted))]">Administração</p>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1">
+      <div className="flex flex-1">
         <aside className="hidden w-40 shrink-0 border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 sm:block">
           {['Dashboard', 'Membros', 'Agenda', 'Design'].map((label, i) => (
             <div
@@ -477,7 +476,7 @@ function AdminScene({
           ))}
         </aside>
         <Hotspot token="grid" focus={focus} label="Fundo e grade" className="min-w-0 flex-1">
-          <div className="h-full space-y-3 overflow-auto p-4" style={gridStyle(design, mode)}>
+          <div className="space-y-3 p-4" style={gridStyle(design, mode)}>
             <Hotspot token="foreground" focus={focus} label="Título da página">
               <h2 className="text-lg font-bold text-[rgb(var(--foreground))]">Membros pendentes</h2>
             </Hotspot>
@@ -600,9 +599,9 @@ function EntrarScene({
   focus: TokenFocus
 }) {
   return (
-    <Hotspot token="grid" focus={focus} label="Fundo e grade" className="h-full min-h-[420px]">
+    <Hotspot token="grid" focus={focus} label="Fundo e grade">
       <div
-        className="flex h-full flex-col items-center justify-center p-6"
+        className="flex flex-col items-center justify-center p-8"
         style={gridStyle(design, mode)}
       >
         <Hotspot token="surface" focus={focus} label="Superfície (cartão de login)" className="w-full max-w-xs">
@@ -697,7 +696,7 @@ export function DesignStudioPreview({
   }, [focus, scene, showingBefore])
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
@@ -773,7 +772,7 @@ export function DesignStudioPreview({
 
       <div
         ref={rootRef}
-        className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/5 dark:ring-white/5"
+        className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/5 dark:ring-white/5"
       >
         {scene === 'portal' ? (
           <PortalScene
