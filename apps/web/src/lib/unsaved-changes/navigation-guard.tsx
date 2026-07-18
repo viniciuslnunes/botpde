@@ -69,6 +69,9 @@ export function NavigationGuard() {
 
       event.preventDefault()
       event.stopPropagation()
+      // Evita outline de foco no link parecer “navegação bem-sucedida” enquanto
+      // o modal de descarte está aberto (ou invisível por bug de animação).
+      anchor.blur()
 
       confirmingRef.current = true
       try {

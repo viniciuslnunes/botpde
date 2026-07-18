@@ -52,16 +52,22 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     if (pendingConfirmRef.current) return pendingConfirmRef.current
 
     const promise = new Promise<boolean>((resolve) => {
+      let settled = false
+      const settle = (value: boolean) => {
+        if (settled) return
+        settled = true
+        pendingConfirmRef.current = null
+        resolve(value)
+      }
+
       open(UnsavedChangesDialog, {
         entries: current,
         onConfirm: () => {
           setEntries([])
-          pendingConfirmRef.current = null
-          resolve(true)
+          settle(true)
         },
         onCancel: () => {
-          pendingConfirmRef.current = null
-          resolve(false)
+          settle(false)
         },
       })
     })

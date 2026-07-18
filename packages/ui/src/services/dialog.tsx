@@ -240,7 +240,7 @@ function ConfirmDialog({
 
   return (
     <div
-      className="torcida-dialog-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      className="torcida-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="presentation"
       onClick={() => {
         if (!busy) onCancel('dismiss')

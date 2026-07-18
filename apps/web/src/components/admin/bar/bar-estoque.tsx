@@ -30,6 +30,7 @@ export function RegistrarCompraBarForm({ produtos }: { produtos: BarProdutoSeria
   const [open, setOpen] = useState(false)
   const formId = useId()
   const { formRef, markPristine, isDirty, changes } = useTrackedForm({
+    id: 'bar-registrar-compra',
     title: 'Registrar compra',
     enabled: open,
     labels: {

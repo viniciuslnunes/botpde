@@ -9,10 +9,14 @@ interface MotionRouteTransitionProps {
   routeKey: string
 }
 
-/** Transição fade/slide entre rotas ou painéis — base reutilizável. */
+/** Transição fade/slide entre rotas ou painéis — base reutilizável.
+ *
+ * `mode="sync"` (default): enter/exit em paralelo. Evita congelar o conteúdo
+ * quando o exit não completa (footgun conhecido com `mode="wait"` no App Router).
+ */
 export function MotionRouteTransition({ children, routeKey }: MotionRouteTransitionProps) {
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <m.div
         key={routeKey}
         variants={routePage}

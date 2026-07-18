@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import type { UnsavedChangeEntry } from './types'
 import { AlertTriangle } from 'lucide-react'
 
@@ -20,9 +21,21 @@ export function UnsavedChangesDialog({ entries, onConfirm, onCancel, onClose }: 
     onClose()
   }
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      handleCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // handleCancel fecha e resolve a promise — deps estáveis via closures de props
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- montar uma vez por abertura
+  }, [])
+
   return (
     <div
-      className="torcida-dialog-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+      className="torcida-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="presentation"
       onClick={handleCancel}
     >
