@@ -621,11 +621,11 @@ export function DesignForm({
 
   return (
     <div data-persist-bar-root className="pb-24">
-      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:items-start xl:gap-6">
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] xl:items-start xl:gap-6">
         {/* Inspector — altura natural; scroll só se o conteúdo passar do viewport */}
         <div className="flex flex-col gap-4 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:overflow-x-hidden xl:pr-2">
           <div
-            className="flex shrink-0 gap-1 overflow-x-auto rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
+            className="flex shrink-0 gap-0.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
             role="tablist"
           >
             {SECTIONS.map((s) => {
@@ -639,14 +639,14 @@ export function DesignForm({
                   aria-selected={active}
                   onClick={() => setSection(s.id)}
                   className={[
-                    'flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors sm:text-sm',
+                    'flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-1.5 py-2 text-xs font-medium transition-colors sm:gap-1.5 sm:px-2 sm:text-sm',
                     active
                       ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
                       : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
                   ].join(' ')}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {s.label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{s.label}</span>
                 </button>
               )
             })}
