@@ -330,6 +330,11 @@ const comentarioSchema = z.object({
   conteudo: z.string().trim().min(1, 'Comentário é obrigatório').max(500),
 })
 
+const editarComentarioSchema = z.object({
+  comentarioId: z.string().min(1),
+  conteudo: z.string().trim().min(1, 'Comentário é obrigatório').max(500),
+})
+
 const reacaoSchema = z.object({
   postId: z.string().min(1),
   tipo: reacaoTipoSchema,
@@ -981,6 +986,96 @@ export async function comentarPost(
       nome: session.user.name ?? null,
       avatarUrl: session.user.image ?? null,
     },
+  }
+}
+
+export async function editarComentario(
+  comentarioId: string,
+  conteudo: string,
+): Promise<ComentarioPostItem> {
+  const parsed = editarComentarioSchema.safeParse({ comentarioId, conteudo })
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Comentário inválido')
+
+  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+  if (erroMencoes) throw new Error(erroMencoes)
+
+  const { session, viewerId, tenantId } = await resolverContextoEngajamento()
+
+  const existente: {
+    id: string
+    postId: string
+    conteudo: string
+    criadoEm: Date
+  } | null = await db.comentario.findFirst({
+    where: { id: parsed.data.comentarioId, autorId: viewerId },
+    select: { id: true, postId: true, conteudo: true, criadoEm: true },
+  })
+  if (!existente) throw new Error('Comentário não encontrado')
+
+  const atualizado: { id: string; conteudo: string; criadoEm: Date } = await db.comentario.update({
+    where: { id: existente.id },
+    data: { conteudo: parsed.data.conteudo },
+    select: { id: true, conteudo: true, criadoEm: true },
+  })
+
+  if (tenantId) {
+    after(() => {
+      void db.auditLog
+        .create({
+          data: {
+            tenantId,
+            atorId: viewerId,
+            acao: 'POST_COMENTARIO_EDITADO',
+            entidade: 'Comentario',
+            entidadeId: atualizado.id,
+            detalhes: { postId: existente.postId },
+          },
+        })
+        .catch(() => undefined)
+    })
+  }
+
+  return {
+    id: atualizado.id,
+    conteudo: atualizado.conteudo,
+    criadoEm: atualizado.criadoEm.toISOString(),
+    autor: {
+      id: viewerId,
+      nome: session.user.name ?? null,
+      avatarUrl: session.user.image ?? null,
+    },
+  }
+}
+
+export async function excluirComentario(comentarioId: string): Promise<void> {
+  const id = z.string().min(1).safeParse(comentarioId)
+  if (!id.success) throw new Error('Comentário inválido')
+
+  const { viewerId, tenantId } = await resolverContextoEngajamento()
+
+  const existente: { id: string; postId: string } | null = await db.comentario.findFirst({
+    where: { id: id.data, autorId: viewerId },
+    select: { id: true, postId: true },
+  })
+  if (!existente) throw new Error('Comentário não encontrado')
+
+  await db.comentario.delete({ where: { id: existente.id } })
+
+  if (tenantId) {
+    after(() => {
+      void db.auditLog
+        .create({
+          data: {
+            tenantId,
+            atorId: viewerId,
+            acao: 'POST_COMENTARIO_EXCLUIDO',
+            entidade: 'Comentario',
+            entidadeId: existente.id,
+            detalhes: { postId: existente.postId },
+          },
+        })
+        .catch(() => undefined)
+    })
   }
 }
 

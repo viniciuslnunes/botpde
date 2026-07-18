@@ -23,6 +23,7 @@ import {
   springSnappy,
 } from '@/lib/motion-presets'
 import { Avatar } from './avatar'
+import { ComentarioMenu } from './comentario-menu'
 import { PostConteudoRich } from './post-conteudo-rich'
 import { MentionPicker, detectarMencaoAtiva } from './mention-picker'
 
@@ -494,26 +495,50 @@ export function PostEngagement({
               initial="hidden"
               animate="show"
             >
-              {comentarios.map((c, i) => (
-                <m.div
-                  key={c.id}
-                  custom={i}
-                  variants={menuItemStagger}
-                  layout
-                  className="flex items-start gap-2"
-                >
-                  <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
-                  <div className="min-w-0 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
-                    <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
-                      {c.autor.id === currentUser.id ? 'Você' : (c.autor.nome ?? 'Membro')}
-                    </p>
-                    <PostConteudoRich
-                      conteudo={c.conteudo}
-                      className="text-sm text-[rgb(var(--foreground))]"
-                    />
-                  </div>
-                </m.div>
-              ))}
+              {comentarios.map((c, i) => {
+                const proprio = c.autor.id === currentUser.id
+                const autorLabel = proprio ? 'Você' : (c.autor.nome ?? 'Membro')
+                const conteudo = (
+                  <PostConteudoRich
+                    conteudo={c.conteudo}
+                    className="text-sm text-[rgb(var(--foreground))]"
+                  />
+                )
+                return (
+                  <m.div
+                    key={c.id}
+                    custom={i}
+                    variants={menuItemStagger}
+                    layout
+                    className="flex items-start gap-2"
+                  >
+                    <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />
+                    {proprio && !c.id.startsWith('tmp-') ? (
+                      <ComentarioMenu
+                        comentarioId={c.id}
+                        conteudoInicial={c.conteudo}
+                        autorLabel={autorLabel}
+                        onEditado={(next) => {
+                          setComentarios((prev) =>
+                            prev.map((item) => (item.id === c.id ? { ...item, conteudo: next } : item)),
+                          )
+                        }}
+                        onExcluido={() => {
+                          setComentarios((prev) => prev.filter((item) => item.id !== c.id))
+                          setTotalC((n) => Math.max(0, n - 1))
+                        }}
+                      >
+                        {conteudo}
+                      </ComentarioMenu>
+                    ) : (
+                      <div className="min-w-0 flex-1 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2">
+                        <p className="text-xs font-semibold text-[rgb(var(--foreground))]">{autorLabel}</p>
+                        {conteudo}
+                      </div>
+                    )}
+                  </m.div>
+                )
+              })}
             </m.div>
 
             {comentariosAbertos && (
