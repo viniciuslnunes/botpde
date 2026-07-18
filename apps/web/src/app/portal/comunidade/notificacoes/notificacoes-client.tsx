@@ -7,11 +7,13 @@ import { AnimatePresence, m } from 'motion/react'
 import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { marcarTodasNotificacoesLidas } from '@/app/portal/comunidade/actions'
+import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
 import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
 import {
+  markNavbarNotificationRead,
   markNavbarNotificationsRead,
   refreshNavbarContext,
 } from '@/lib/use-navbar-context'
@@ -105,6 +107,15 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
         void carregar(filtro)
         toast.error(e instanceof Error ? e.message : 'Erro ao marcar notificações.')
       }
+    })
+  }
+
+  function abrirNotificacao(item: NotificacaoSocialItem) {
+    if (item.lida) return
+    setItens((prev) => prev.map((n) => (n.id === item.id ? { ...n, lida: true } : n)))
+    markNavbarNotificationRead(item.id)
+    startTransition(() => {
+      void marcarNotificacaoLida(item.id)
     })
   }
 
@@ -211,6 +222,7 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
                   >
                     <Link
                       href={item.link ?? '/portal/comunidade'}
+                      onClick={() => abrirNotificacao(item)}
                       className={[
                         'block rounded-xl border border-[rgb(var(--border))] p-3 transition-colors',
                         item.lida

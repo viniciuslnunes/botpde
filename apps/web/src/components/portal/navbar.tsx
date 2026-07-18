@@ -20,6 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
+import { markNavbarNotificationRead } from '@/lib/use-navbar-context'
 import { useNavbarContext } from '@/lib/use-navbar-context'
 import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
@@ -177,6 +178,7 @@ export function PortalNavbar({
             <NotificationBell
               initialItems={notifications}
               unreadCount={unreadNotifications}
+              onMarkRead={markNavbarNotificationRead}
             />
             <div className="hidden sm:block">
               <ThemeToggle />

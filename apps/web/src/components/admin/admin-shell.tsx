@@ -20,7 +20,7 @@ import {
 } from '@/components/portal/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
-import { useAdminNavbarContext } from '@/lib/use-admin-navbar-context'
+import { useAdminNavbarContext, markAdminNavbarNotificationRead } from '@/lib/use-admin-navbar-context'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
@@ -132,6 +132,7 @@ function AdminTopbar({
             unreadCount={unreadNotifications}
             verTodasHref="/admin/notificacoes"
             verTodasLabel="Ver alertas operacionais"
+            onMarkRead={markAdminNavbarNotificationRead}
           />
           <div className="hidden sm:block">
             <ThemeToggle />

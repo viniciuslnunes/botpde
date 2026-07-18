@@ -7,6 +7,7 @@ import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoReviewButtons } from '@/components/portal/seguimento-buttons'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { decrementNavbarUnread } from '@/lib/use-navbar-context'
 
 export interface SeguimentoPendenteItem {
   id: string
@@ -106,7 +107,11 @@ export function SeguimentoPendentesList({
               onAprovar={aprovar}
               onRejeitar={rejeitar}
               onSeguirDeVolta={seguirDeVolta}
-              onResolved={() => remover(item.id)}
+              onResolved={() => {
+                remover(item.id)
+                // Aprovar/rejeitar limpa a notificação SEGUIMENTO_PENDENTE no servidor.
+                decrementNavbarUnread(1)
+              }}
             />
           </m.div>
         ))}

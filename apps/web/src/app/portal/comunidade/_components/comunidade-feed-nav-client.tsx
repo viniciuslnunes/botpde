@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   Rss,
@@ -17,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
+import { subscribeNavbarUnread } from '@/lib/use-navbar-context'
 
 type NavItem = {
   href: string
@@ -43,6 +45,12 @@ export function ComunidadeFeedNavClient({
   mostrarBalanco?: boolean
 }) {
   const pathname = usePathname()
+  /** Contagem ao vivo do cache da navbar; SSR até a primeira atualização. */
+  const [liveUnread, setLiveUnread] = useState<number | null>(null)
+
+  useEffect(() => subscribeNavbarUnread(setLiveUnread), [])
+
+  const notifBadge = liveUnread ?? notificacoesNaoLidas
 
   const navItems: NavItem[] = [
     { href: '/portal/comunidade', label: 'Feed', icon: Rss },
@@ -60,7 +68,7 @@ export function ComunidadeFeedNavClient({
       href: '/portal/comunidade/notificacoes',
       label: 'Notificações',
       icon: Bell,
-      badge: notificacoesNaoLidas,
+      badge: notifBadge,
     },
     {
       href: '/portal/comunidade/seguindo',

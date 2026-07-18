@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import type { TipoNotificacao } from '@torcida/db'
@@ -24,31 +24,36 @@ function formatarData(data: Date | string) {
   )
 }
 
+function itemsSignatureOf(items: NotificationItem[]): string {
+  return items.map((item) => `${item.id}:${item.lida ? 1 : 0}`).join('|')
+}
+
 export function NotificationBell({
   initialItems,
   unreadCount: unreadCountProp,
   verTodasHref = '/portal/comunidade/notificacoes',
   verTodasLabel = 'Ver todas as notificações',
+  onMarkRead,
 }: {
   initialItems: NotificationItem[]
   /** Contagem server-side de não lidas (pode exceder itens carregados no dropdown). */
   unreadCount?: number
   verTodasHref?: string
   verTodasLabel?: string
+  /** Patch otimista do badge no contexto da navbar (portal ou admin). */
+  onMarkRead?: (id: string) => void
 }) {
+  const initialSignature = itemsSignatureOf(initialItems)
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
+  const [itemsSignature, setItemsSignature] = useState(initialSignature)
   const [pending, startTransition] = useTransition()
 
-  const initialSignature = useMemo(
-    () => initialItems.map((item) => `${item.id}:${item.lida ? 1 : 0}`).join('|'),
-    [initialItems],
-  )
-
-  // Layout do admin/portal revalida sem remount — mantém a lista alinhada ao SSR.
-  useEffect(() => {
+  // Alinha lista ao SSR/contexto sem effect (React: ajustar state durante render).
+  if (itemsSignature !== initialSignature) {
+    setItemsSignature(initialSignature)
     setItems(initialItems)
-  }, [initialSignature, initialItems])
+  }
 
   const unreadFromItems = useMemo(() => items.filter((item) => !item.lida).length, [items])
   const unreadCount = unreadCountProp ?? unreadFromItems
@@ -56,6 +61,7 @@ export function NotificationBell({
   function marcarLida(item: NotificationItem) {
     if (item.lida) return
     setItems((current) => current.map((x) => (x.id === item.id ? { ...x, lida: true } : x)))
+    onMarkRead?.(item.id)
     startTransition(() => marcarNotificacaoLida(item.id))
   }
 

@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Bell } from 'lucide-react'
 import { auth } from '@/lib/auth'
@@ -7,8 +6,8 @@ import type { TipoNotificacao } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
-import { marcarTodasNotificacoesAdminLidas } from '@/app/actions/notificacoes'
-import { NotificationAvatar } from '@/components/portal/notification-item-visual'
+import { AdminMarcarTodasLidasButton } from '@/app/admin/notificacoes/admin-marcar-todas-lidas-button'
+import { AdminNotificacaoLink } from '@/app/admin/notificacoes/admin-notificacao-link'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { redirect } from 'next/navigation'
@@ -23,13 +22,6 @@ type NotificacaoAdminRow = {
   link: string | null
   lida: boolean
   criadoEm: Date
-}
-
-function formatarData(data: Date) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(data)
 }
 
 export default async function AdminNotificacoesPage() {
@@ -70,16 +62,7 @@ export default async function AdminNotificacoesPage() {
               Alertas operacionais desta torcida (alianças, denúncias, comunicados).
             </p>
           </div>
-          {notificacoes.some((n) => !n.lida) && (
-            <form action={marcarTodasNotificacoesAdminLidas}>
-              <button
-                type="submit"
-                className="app-action rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-              >
-                Marcar todas como lidas
-              </button>
-            </form>
-          )}
+          {notificacoes.some((n) => !n.lida) && <AdminMarcarTodasLidasButton />}
         </div>
       </MotionReveal>
 
@@ -93,30 +76,15 @@ export default async function AdminNotificacoesPage() {
         <ul className="space-y-2">
           {notificacoes.map((n) => (
             <li key={n.id}>
-              <Link
-                href={n.link ?? '/admin'}
-                className={[
-                  'block rounded-xl border border-[rgb(var(--border))] px-4 py-3 transition-colors',
-                  n.lida
-                    ? 'bg-[rgb(var(--surface))] hover:bg-[rgb(var(--background-subtle))]'
-                    : 'bg-[rgb(var(--primary)_/_0.06)] hover:bg-[rgb(var(--primary)_/_0.1)]',
-                ].join(' ')}
-              >
-                <span className="flex items-start gap-2.5">
-                  <NotificationAvatar ator={null} tipo={n.tipo} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[rgb(var(--foreground))]">{n.titulo}</p>
-                    {n.corpo && (
-                      <p className="mt-1 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                        {n.corpo}
-                      </p>
-                    )}
-                    <p className="mt-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-                      {formatarData(n.criadoEm)}
-                    </p>
-                  </span>
-                </span>
-              </Link>
+              <AdminNotificacaoLink
+                id={n.id}
+                tipo={n.tipo}
+                titulo={n.titulo}
+                corpo={n.corpo}
+                link={n.link}
+                lida={n.lida}
+                criadoEm={n.criadoEm}
+              />
             </li>
           ))}
         </ul>

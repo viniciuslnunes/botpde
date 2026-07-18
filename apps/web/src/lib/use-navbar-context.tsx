@@ -23,7 +23,7 @@ let cached: NavbarContext | null = null
 let cachedAt = 0
 let inflight: Promise<NavbarContext> | null = null
 
-/** Assinantes do patch otimista (ex.: zerar badge ao marcar todas como lidas). */
+/** Assinantes do patch otimista (sino, nav lateral, rollback). */
 const listeners = new Set<(data: NavbarContext) => void>()
 
 /** Última contagem de não lidas do chat — detecta aumento sem duplicar entre polls. */
@@ -34,21 +34,70 @@ const TOAST_DURATION_MS = 6000
 /** Vigia singleton do portal — só há um navbar de portal montado por vez. */
 const notificarNovas = criarVigiaDeNotificacoes('/portal/comunidade/notificacoes')
 
+function emptyContext(): NavbarContext {
+  return {
+    unreadMessages: 0,
+    unreadNotifications: 0,
+    hasAdminAreaAccess: false,
+    isAdmin: false,
+    notifications: [],
+  }
+}
+
+function publish(next: NavbarContext): void {
+  cached = next
+  cachedAt = Date.now()
+  for (const listener of listeners) listener(next)
+}
+
 /**
  * Zera o badge do sino imediatamente e marca os itens em cache como lidos.
  * Usado por "marcar todas como lidas" antes do round-trip da Server Action.
  */
 export function markNavbarNotificationsRead(): void {
-  const next: NavbarContext = {
-    unreadMessages: cached?.unreadMessages ?? 0,
+  const base = cached ?? emptyContext()
+  publish({
+    ...base,
     unreadNotifications: 0,
-    hasAdminAreaAccess: cached?.hasAdminAreaAccess ?? false,
-    isAdmin: cached?.isAdmin ?? false,
-    notifications: (cached?.notifications ?? []).map((n) => ({ ...n, lida: true })),
+    notifications: base.notifications.map((n) => ({ ...n, lida: true })),
+  })
+}
+
+/**
+ * Marca uma notificação como lida no cache e decrementa o badge (mín. 0).
+ * Se o item não está no dropdown, ainda assim decrementa — o clique veio de item não lido.
+ */
+export function markNavbarNotificationRead(id: string): void {
+  const base = cached ?? emptyContext()
+  const inList = base.notifications.find((n) => n.id === id)
+  if (inList?.lida) return
+
+  publish({
+    ...base,
+    unreadNotifications: Math.max(0, base.unreadNotifications - 1),
+    notifications: base.notifications.map((n) =>
+      n.id === id ? { ...n, lida: true } : n,
+    ),
+  })
+}
+
+/** Decrementa o badge sem id (ex.: aprovar/rejeitar seguimento que limpa notif no servidor). */
+export function decrementNavbarUnread(by = 1): void {
+  if (by <= 0) return
+  const base = cached ?? emptyContext()
+  publish({
+    ...base,
+    unreadNotifications: Math.max(0, base.unreadNotifications - by),
+  })
+}
+
+/** Assina mudanças do contador de não lidas (nav lateral da Comunidade). */
+export function subscribeNavbarUnread(listener: (unread: number) => void): () => void {
+  const wrapped = (data: NavbarContext) => listener(data.unreadNotifications)
+  listeners.add(wrapped)
+  return () => {
+    listeners.delete(wrapped)
   }
-  cached = next
-  cachedAt = Date.now()
-  for (const listener of listeners) listener(next)
 }
 
 /**
@@ -80,13 +129,7 @@ function notificarMensagemNova(
 async function fetchNavbarContext(): Promise<NavbarContext> {
   const res = await fetch('/api/portal/navbar-context', { cache: 'no-store' })
   if (!res.ok) {
-    return {
-      unreadMessages: 0,
-      unreadNotifications: 0,
-      hasAdminAreaAccess: false,
-      isAdmin: false,
-      notifications: [],
-    }
+    return emptyContext()
   }
   const data = (await res.json()) as NavbarContext & { isAdmin?: boolean }
   return {
@@ -109,6 +152,7 @@ function loadNavbarContext(force = false): Promise<NavbarContext> {
     .then((data) => {
       cached = data
       cachedAt = Date.now()
+      for (const listener of listeners) listener(data)
       return data
     })
     .finally(() => {
@@ -118,12 +162,9 @@ function loadNavbarContext(force = false): Promise<NavbarContext> {
   return inflight
 }
 
-/** Recarrega o contexto da navbar e notifica assinantes (rollback após falha otimista). */
+/** Recarrega o contexto da navbar (rollback após falha otimista). */
 export function refreshNavbarContext(force = true): Promise<NavbarContext> {
-  return loadNavbarContext(force).then((data) => {
-    for (const listener of listeners) listener(data)
-    return data
-  })
+  return loadNavbarContext(force)
 }
 
 export function useNavbarContext() {
