@@ -52,8 +52,8 @@ export default async function DesignPage() {
   ].filter((u): u is string => Boolean(u))
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-5">
+    <div className="flex min-h-0 flex-col xl:h-[calc(100dvh-3.5rem)] xl:overflow-hidden">
+      <div className="shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-4 sm:py-5">
         <div className="flex items-center gap-3">
           <Palette className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
           <div>
@@ -66,7 +66,7 @@ export default async function DesignPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 py-6">
+      <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:py-5 xl:overflow-hidden">
         <DesignForm
           initialDesign={design}
           corPrimaria={tenant.corPrimaria}

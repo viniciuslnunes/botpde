@@ -267,7 +267,7 @@ export function AdminShell({
           onMobileClose={() => setMobileOpen(false)}
         />
 
-        <main className="app-shell-bg min-w-0 flex-1 overflow-auto">
+        <main className="app-shell-bg min-h-0 min-w-0 flex-1 overflow-auto">
           {operatorBanner}
           {children}
         </main>

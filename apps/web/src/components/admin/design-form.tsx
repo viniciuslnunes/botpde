@@ -3,7 +3,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -189,6 +188,25 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
 }
 
 /** Color field: swatch abre o seletor nativo direto; hex editável ao lado. */
+const HEX6 = /^#[0-9a-fA-F]{6}$/
+
+/** Normaliza digitação/cola (#RGB, #RRGGBB, ou hex sem #) para #rrggbb. */
+function normalizeHexInput(raw: string): string | null {
+  const t = raw.trim().replace(/^#/, '').toLowerCase()
+  if (/^[0-9a-f]{6}$/.test(t)) return `#${t}`
+  if (/^[0-9a-f]{3}$/.test(t)) {
+    return `#${t[0]}${t[0]}${t[1]}${t[1]}${t[2]}${t[2]}`
+  }
+  return null
+}
+
+/** Aceita rascunho parcial enquanto digita (#, #f, #ff0, ff0000, …). */
+function isHexDraft(raw: string): boolean {
+  const t = raw.trim()
+  if (t === '' || t === '#') return true
+  return /^#?[0-9a-fA-F]{0,6}$/.test(t)
+}
+
 function ColorField({
   label,
   value,
@@ -210,13 +228,32 @@ function ColorField({
   onFocusToken?: (t: TokenFocus) => void
 }) {
   const [draft, setDraft] = useState(value ?? resolved)
-  const colorInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setDraft(value ?? resolved)
   }, [value, resolved])
 
-  const display = value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : resolved
+  const display =
+    value && HEX6.test(value)
+      ? value
+      : HEX6.test(resolved)
+        ? resolved
+        : '#888888'
+
+  function commitDraft(raw: string) {
+    const normalized = normalizeHexInput(raw)
+    if (normalized) {
+      setDraft(normalized)
+      onChange(normalized)
+      return
+    }
+    if (raw.trim() === '' && allowEmpty) {
+      setDraft('')
+      onChange(null)
+      return
+    }
+    setDraft(value ?? resolved)
+  }
 
   return (
     <div
@@ -237,43 +274,54 @@ function ColorField({
         ) : null}
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => colorInputRef.current?.click()}
-          className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm transition hover:border-[rgb(var(--foreground-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--border-strong))]"
+        {/*
+          type=color visível no swatch (opacity-0). Clique programático em
+          input sr-only/clipado é bloqueado no Chrome/Edge — o picker não abre.
+        */}
+        <div
+          className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-[rgb(var(--border))] shadow-sm"
           style={{ backgroundColor: display }}
           title="Escolher cor"
-          aria-label={`${label}: escolher cor`}
-        />
-        <input
-          ref={colorInputRef}
-          type="color"
-          value={display}
-          onChange={(e) => {
-            onChange(e.target.value)
-            setDraft(e.target.value)
-          }}
-          className="sr-only"
-          tabIndex={-1}
-        />
+        >
+          <input
+            type="color"
+            value={display}
+            onChange={(e) => {
+              onChange(e.target.value)
+              setDraft(e.target.value)
+            }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label={`${label}: escolher cor`}
+          />
+        </div>
         <input
           type="text"
           value={draft}
           placeholder={resolved}
+          spellCheck={false}
+          autoComplete="off"
+          inputMode="text"
           onChange={(e) => {
             const v = e.target.value
-            if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) {
-              setDraft(v)
-              if (v === '' && allowEmpty) onChange(null)
-              else if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
+            if (!isHexDraft(v)) return
+            setDraft(v)
+            if (v.trim() === '' && allowEmpty) {
+              onChange(null)
+              return
             }
+            const normalized = normalizeHexInput(v)
+            if (normalized) onChange(normalized)
           }}
-          onBlur={() => {
-            const v = draft.trim()
-            if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
-            else setDraft(value ?? resolved)
+          onBlur={() => commitDraft(draft)}
+          onPaste={(e) => {
+            const pasted = e.clipboardData.getData('text')
+            const normalized = normalizeHexInput(pasted)
+            if (!normalized) return
+            e.preventDefault()
+            setDraft(normalized)
+            onChange(normalized)
           }}
-          className="w-full min-w-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 font-mono text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+          className="w-full min-w-0 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 font-mono text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--border-strong))]"
           maxLength={7}
         />
       </div>
@@ -392,7 +440,7 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
   return (
     <div
       className={[
-        'rounded-xl border px-3 py-2.5',
+        'shrink-0 rounded-xl border px-3 py-2.5',
         fails.length > 0
           ? 'border-amber-500/40 bg-amber-500/10'
           : 'border-[rgb(var(--color-info)_/_0.35)] bg-[rgb(var(--color-info)_/_0.1)]',
@@ -417,7 +465,7 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
               ? `${fails.length} contraste${fails.length > 1 ? 's' : ''} fraco${fails.length > 1 ? 's' : ''} — títulos/textos podem sumir`
               : 'Contraste OK neste modo'}
           </p>
-          <ul className="grid gap-1 sm:grid-cols-2">
+          <ul className="grid max-h-[11rem] gap-1 overflow-y-auto sm:grid-cols-2">
             {checks.map((c) => (
               <li key={c.id} className="flex items-start gap-1.5 text-[11px]">
                 <Contrast
@@ -641,12 +689,12 @@ export function DesignForm({
   }
 
   return (
-    <div data-persist-bar-root className="pb-24">
-      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)] xl:items-start xl:gap-6">
-        {/* Inspector — altura natural; scroll só se o conteúdo passar do viewport */}
-        <div className="flex flex-col gap-4 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto xl:overflow-x-hidden xl:pr-2">
+    <div data-persist-bar-root className="flex min-h-0 flex-col xl:min-h-0 xl:flex-1">
+      <div className="flex min-h-0 flex-col gap-6 xl:min-h-0 xl:flex-1 xl:flex-row xl:gap-6">
+        {/* Inspector — no desktop, scroll interno; a página não estica */}
+        <div className="flex min-h-0 w-full flex-col gap-4 xl:w-[min(460px,42%)] xl:shrink-0 xl:overflow-y-auto xl:overflow-x-hidden xl:pr-2">
           <div
-            className="flex shrink-0 gap-0.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1"
+            className="sticky top-0 z-10 flex shrink-0 gap-0.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-1 shadow-[0_8px_16px_-12px_rgba(0,0,0,0.45)]"
             role="tablist"
           >
             {SECTIONS.map((s) => {
@@ -1065,8 +1113,8 @@ export function DesignForm({
           </div>
         </div>
 
-        {/* Studio preview — altura pelo conteúdo; sticky com teto no viewport */}
-        <div className="flex flex-col gap-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-11rem)] xl:overflow-y-auto">
+        {/* Prévia — scroll interno no desktop (sem sticky que alonga a página) */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 xl:overflow-y-auto">
           <DesignStudioPreview
             design={design}
             baselineDesign={normalizedBaseline}

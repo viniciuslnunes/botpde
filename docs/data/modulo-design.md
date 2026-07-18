@@ -97,8 +97,11 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 
 - Layout **full-bleed**: sem `app-container` / `max-w-6xl`; padding lateral
   **16px** (`px-4`) — inspector + prévia precisam de largura.
-- Inspector: scroll com `px-1`/`pr-2`; cards de ação com `p-3` (swatches
-  não colados na barra de rolagem).
+- Desktop (`xl+`): página trava na altura do viewport (`100dvh` − topbar);
+  colunas em flex com scroll interno — sem scroll longo da página nem sticky
+  que deixa “vazio” abaixo da prévia.
+- Inspector: scroll com `px-1`/`pr-2`; tabs sticky no topo da coluna; cards de
+  ação com `p-3` (swatches não colados na barra de rolagem).
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
   Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
   Texto manual só vale onde o contraste fecha (botão sólido vs badge soft);
