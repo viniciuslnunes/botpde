@@ -58,12 +58,10 @@ export function AdminDashboardKpis({
   alertas,
   kpis,
   secundarios,
-  corPrimaria,
 }: {
   alertas: AdminAlertaItem[]
   kpis: AdminKpiItem[]
   secundarios: AdminKpiSecundario[]
-  corPrimaria: string
 }) {
   return (
     <div className="space-y-7">
@@ -87,34 +85,43 @@ export function AdminDashboardKpis({
         {kpis.map((k) => {
           const Icon = ICONS[k.icon] ?? Users
           const inner = (
-            <m.div variants={staggerItem} whileTap={k.href ? { scale: 0.98 } : undefined} transition={springSnappy}>
-              <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-                <div className="flex items-start justify-between">
-                  <div>
+            <m.div
+              variants={staggerItem}
+              whileTap={k.href ? { scale: 0.98 } : undefined}
+              transition={springSnappy}
+              className="h-full"
+            >
+              <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+                <div className="flex flex-1 items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                       {k.label}
                     </p>
                     <p className="mt-2 text-4xl font-bold text-[rgb(var(--foreground))]">{k.value}</p>
-                    {k.badge && (
-                      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        <TrendingUp className="h-3 w-3" />
-                        {k.badge}
-                      </p>
-                    )}
+                    <div className="mt-1 min-h-5">
+                      {k.badge ? (
+                        <p className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <TrendingUp className="h-3 w-3 shrink-0" />
+                          {k.badge}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="rounded-xl bg-[rgb(var(--background-subtle))] p-2.5">
-                    <Icon className="h-5 w-5" style={{ color: corPrimaria }} />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]">
+                    <Icon className="h-5 w-5" aria-hidden />
                   </div>
                 </div>
               </div>
             </m.div>
           )
           return k.href ? (
-            <Link key={k.label} href={k.href} className="block">
+            <Link key={k.label} href={k.href} className="block h-full">
               {inner}
             </Link>
           ) : (
-            <div key={k.label}>{inner}</div>
+            <div key={k.label} className="h-full">
+              {inner}
+            </div>
           )
         })}
       </m.div>

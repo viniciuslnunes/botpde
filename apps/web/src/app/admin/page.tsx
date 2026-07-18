@@ -159,7 +159,6 @@ async function DashboardKpis({ tenant }: { tenant: TenantInfo }) {
       alertas={alertas}
       kpis={kpis}
       secundarios={secundarios}
-      corPrimaria={tenant.corPrimaria}
     />
   )
 }
