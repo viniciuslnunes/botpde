@@ -10,6 +10,7 @@ Inteligência de domínio (rivalidade cromática, P&B, prioridade torcida→club
 | Área | Tokens / campos |
 |------|-----------------|
 | Marca | `brand.primary` (sincroniza `Tenant.corPrimaria`), `brand.secondary` opcional |
+| Texto da marca | `brandFg.primary` / `brandFg.secondary` — menus, tabs, badges soft (`*-fg`) e botão sólido (`*-on`); null = automático |
 | Ações / status | `actions.success`, `danger`, `warning`, `info` — botões e badges de fluxo |
 | Grade | `grid.enabled`, `sizePx` (24–96), `lineOpacity`, `lineColor`, `baseColor` |
 | Superfícies (claro/escuro) | `background`, `backgroundSubtle`, `foreground`, `foregroundMuted`, `border`, `borderStrong`, `surface`, `surfaceRaised` |
@@ -25,6 +26,11 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
 {
   version: 1,
   brand: { primary: '#RRGGBB', secondary: '#RRGGBB' | null },
+  brandFg: {
+    // opcional — null = automático (legível em menus/tabs; contraste no botão)
+    primary: '#ffffff' | null,
+    secondary: null,
+  },
   actions: {
     success: '#1d4ed8',
     danger: '#dc2626',
@@ -66,10 +72,10 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 3. Toggle claro/escuro do usuário (`next-themes`) escolhe qual conjunto `light`/`dark` aplicar.
 4. Vars de texto legível: `--color-primary-fg`, `--color-secondary-fg`,
    `--color-success-fg` / `--color-success-on`, …  
-   Soft/badge → `*-fg`; botão sólido → `*-on`
-   (`resolveActionTextColors`; override em `actionsFg`). Nav portal e sidebar
-   admin usam `*-fg` no ativo + ring — **proibido**
-   `text-[rgb(var(--primary))]` com marca preta.
+   Soft/badge/menu/tab → `*-fg`; botão sólido → `*-on`
+   (`resolveActionTextColors`; override em `brandFg` / `actionsFg`). Nav portal,
+   sidebar admin e abas (Membros, Sócios, Cobranças, Acessos) usam `*-fg` no
+   ativo + ring — **proibido** `text-[rgb(var(--primary))]` com marca preta.
 
 ## Sugestões de cor
 
@@ -102,6 +108,8 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
   que deixa “vazio” abaixo da prévia.
 - Inspector: scroll com `px-1`/`pr-2`; tabs sticky no topo da coluna; cards de
   ação com `p-3` (swatches não colados na barra de rolagem).
+- Aba **Identidade**: cor primária/secundária + **texto da marca** (menus/tabs;
+  vazio = automático — clareia P&B no escuro).
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
   Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
   Texto manual só vale onde o contraste fecha (botão sólido vs badge soft);

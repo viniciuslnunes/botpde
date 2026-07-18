@@ -85,6 +85,15 @@ export const DEFAULT_ACTIONS_FG = /** @type {const} */ ({
   info: null,
 })
 
+/**
+ * Overrides de texto da marca em menus/tabs soft (`*-fg`) e botão sólido (`*-on`).
+ * null = automático (`corMarcaLegivel` / contraste no preenchimento).
+ */
+export const DEFAULT_BRAND_FG = /** @type {const} */ ({
+  primary: null,
+  secondary: null,
+})
+
 const ActionsTokensSchema = z
   .object({
     success: hexColor.default(DEFAULT_ACTIONS.success),
@@ -100,6 +109,14 @@ const ActionsFgSchema = z
     danger: hexOrNull.optional(),
     warning: hexOrNull.optional(),
     info: hexOrNull.optional(),
+  })
+  .strict()
+  .default({})
+
+const BrandFgSchema = z
+  .object({
+    primary: hexOrNull.optional(),
+    secondary: hexOrNull.optional(),
   })
   .strict()
   .default({})
@@ -147,6 +164,11 @@ export const TenantDesignSchema = z
     actions: ActionsTokensSchema.default({ ...DEFAULT_ACTIONS }),
     /** Texto em botão sólido / badge soft — null = auto (contraste / legível). */
     actionsFg: ActionsFgSchema,
+    /**
+     * Texto da marca em menus/tabs/badges soft (`--color-*-fg`) e botão sólido
+     * (`--color-*-on`) — null = automático.
+     */
+    brandFg: BrandFgSchema,
     /** Paletas criadas pela torcida (além das sugeridas pelo sistema). */
     customPalettes: z.array(CustomPaletteSchema).max(20).default([]),
     light: SurfaceTokensSchema.default({}),
@@ -191,6 +213,7 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
   },
   actions: { ...DEFAULT_ACTIONS },
   actionsFg: { ...DEFAULT_ACTIONS_FG },
+  brandFg: { ...DEFAULT_BRAND_FG },
   customPalettes: [],
   light: {},
   dark: {},
@@ -214,6 +237,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
       brand: { primary, secondary: null },
       actions: { ...DEFAULT_ACTIONS },
       actionsFg: { ...DEFAULT_ACTIONS_FG },
+      brandFg: { ...DEFAULT_BRAND_FG },
       customPalettes: [],
     }
   }
@@ -229,6 +253,10 @@ export function resolveTenantDesign(raw, corPrimaria) {
         ...DEFAULT_ACTIONS_FG,
         ...(parsed.data.actionsFg ?? {}),
       },
+      brandFg: {
+        ...DEFAULT_BRAND_FG,
+        ...(parsed.data.brandFg ?? {}),
+      },
       customPalettes: parsed.data.customPalettes ?? [],
     }
   }
@@ -238,6 +266,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
     brand: { primary, secondary: null },
     actions: { ...DEFAULT_ACTIONS },
     actionsFg: { ...DEFAULT_ACTIONS_FG },
+    brandFg: { ...DEFAULT_BRAND_FG },
     customPalettes: [],
   }
 }
@@ -1097,6 +1126,8 @@ export function aplicarPaletaAoDesign(design, paleta) {
       primary: paleta.primary,
       secondary: paleta.secondary,
     },
+    // Nova marca: volta texto da marca ao automático (evita override da paleta anterior).
+    brandFg: { ...DEFAULT_BRAND_FG },
     actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
     actionsFg: paleta.actionsFg
       ? { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}), ...paleta.actionsFg }

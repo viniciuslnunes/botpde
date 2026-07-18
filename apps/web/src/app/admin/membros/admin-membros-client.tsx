@@ -127,7 +127,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                         />
                       )
                     ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-xs font-bold text-[rgb(var(--primary))]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--color-primary)_/_0.14)] text-xs font-bold text-[rgb(var(--color-primary-fg))]">
                         {membro.inicial}
                       </div>
                     )}
@@ -233,7 +233,7 @@ export function AdminMembrosTabs({ tabs }: { tabs: AdminMembrosTab[] }) {
             className={[
               'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
               tab.active
-                ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
@@ -243,7 +243,7 @@ export function AdminMembrosTabs({ tabs }: { tabs: AdminMembrosTab[] }) {
                 className={[
                   'rounded-full px-1.5 py-0.5 text-xs font-semibold',
                   tab.active
-                    ? 'bg-[rgb(var(--primary))] text-white'
+                    ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                     : tab.countClass ?? 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >

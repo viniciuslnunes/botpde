@@ -99,7 +99,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
               className={[
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                 active
-                  ? 'bg-[rgb(var(--primary)_/_0.15)] text-[rgb(var(--primary))]'
+                  ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                   : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >

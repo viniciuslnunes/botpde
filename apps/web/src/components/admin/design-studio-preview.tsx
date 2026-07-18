@@ -18,7 +18,6 @@ import {
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   contrasteTextoSobre,
-  corMarcaLegivel,
   resolveActionTextColors,
 } from '@torcida/types'
 
@@ -113,11 +112,19 @@ function PortalScene({
   const surfaces = resolveSurfaces(design, mode)
   const primaryOnBtn =
     contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
-  const primaryFg = corMarcaLegivel(design.brand.primary, surfaces.surface)
+  const primaryFg = resolveActionTextColors(
+    design.brand.primary,
+    design.brandFg?.primary,
+    surfaces.surface,
+  ).fg
   const secondaryHex =
     design.brand.secondary ??
     (contrasteTextoSobre(design.brand.primary) === 'light' ? '#f4f4f5' : '#27272a')
-  const secondaryFg = corMarcaLegivel(secondaryHex, surfaces.surface)
+  const secondaryFg = resolveActionTextColors(
+    secondaryHex,
+    design.brandFg?.secondary,
+    surfaces.surface,
+  ).fg
   const raisedOn =
     contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
   const raisedMuted =

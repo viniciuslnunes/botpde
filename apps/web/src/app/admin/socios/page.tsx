@@ -123,7 +123,7 @@ export default async function SociosPage({
                 className={[
                   'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                     : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                 ].join(' ')}
               >
@@ -133,7 +133,7 @@ export default async function SociosPage({
                     className={[
                       'rounded-full px-1.5 py-0.5 text-xs font-semibold',
                       active
-                        ? 'bg-[rgb(var(--primary))] text-white'
+                        ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                         : tab.key === 'vencendo'
                         ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                         : tab.key === 'vencidos'

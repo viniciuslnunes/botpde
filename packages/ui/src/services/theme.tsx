@@ -16,7 +16,6 @@ import {
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
   contrasteTextoSobre,
-  corMarcaLegivel,
   hexToCssRgb,
   resolveActionTextColors,
   resolveTenantDesign,
@@ -28,6 +27,10 @@ import {
 export type TenantDesign = {
   version: 1
   brand: { primary: string; secondary: string | null }
+  brandFg?: {
+    primary: string | null
+    secondary: string | null
+  }
   grid: {
     enabled: boolean
     sizePx: number
@@ -119,24 +122,22 @@ export function applyTenantDesign(
     (overrides as Record<string, string | undefined>).surface ??
     (defaults as Record<string, string>).surface
 
-  root.style.setProperty(
-    '--color-primary-fg',
-    hexToCssRgb(corMarcaLegivel(primary, surfaceHex)),
+  const brandFg = design.brandFg ?? { primary: null, secondary: null }
+  const primaryText = resolveActionTextColors(
+    primary,
+    brandFg.primary,
+    surfaceHex,
   )
-  root.style.setProperty(
-    '--color-primary-on',
-    hexToCssRgb(contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a'),
+  const secondaryText = resolveActionTextColors(
+    secondaryHex,
+    brandFg.secondary,
+    surfaceHex,
   )
-  root.style.setProperty(
-    '--color-secondary-fg',
-    hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex)),
-  )
-  root.style.setProperty(
-    '--color-secondary-on',
-    hexToCssRgb(
-      contrasteTextoSobre(secondaryHex) === 'light' ? '#ffffff' : '#0a0a0a',
-    ),
-  )
+
+  root.style.setProperty('--color-primary-fg', hexToCssRgb(primaryText.fg))
+  root.style.setProperty('--color-primary-on', hexToCssRgb(primaryText.on))
+  root.style.setProperty('--color-secondary-fg', hexToCssRgb(secondaryText.fg))
+  root.style.setProperty('--color-secondary-on', hexToCssRgb(secondaryText.on))
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = design.actionsFg ?? {}
@@ -210,16 +211,21 @@ export function tenantDesignCriticalCss(
   const surfaceHex =
     (overrides as Record<string, string | undefined>).surface ??
     (defaults as Record<string, string>).surface
-  lines.push(`--color-primary-fg:${hexToCssRgb(corMarcaLegivel(primary, surfaceHex))}`)
-  lines.push(
-    `--color-primary-on:${hexToCssRgb(contrasteTextoSobre(primary) === 'light' ? '#ffffff' : '#0a0a0a')}`,
+  const brandFg = design.brandFg ?? { primary: null, secondary: null }
+  const primaryText = resolveActionTextColors(
+    primary,
+    brandFg.primary,
+    surfaceHex,
   )
-  lines.push(
-    `--color-secondary-fg:${hexToCssRgb(corMarcaLegivel(secondaryHex, surfaceHex))}`,
+  const secondaryText = resolveActionTextColors(
+    secondaryHex,
+    brandFg.secondary,
+    surfaceHex,
   )
-  lines.push(
-    `--color-secondary-on:${hexToCssRgb(contrasteTextoSobre(secondaryHex) === 'light' ? '#ffffff' : '#0a0a0a')}`,
-  )
+  lines.push(`--color-primary-fg:${hexToCssRgb(primaryText.fg)}`)
+  lines.push(`--color-primary-on:${hexToCssRgb(primaryText.on)}`)
+  lines.push(`--color-secondary-fg:${hexToCssRgb(secondaryText.fg)}`)
+  lines.push(`--color-secondary-on:${hexToCssRgb(secondaryText.on)}`)
 
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = design.actionsFg ?? {}

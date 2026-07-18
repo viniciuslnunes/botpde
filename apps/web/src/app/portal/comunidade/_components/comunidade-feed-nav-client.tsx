@@ -85,7 +85,7 @@ export function ComunidadeFeedNavClient({
             className={[
               'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
               active
-                ? 'bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--primary))]'
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >

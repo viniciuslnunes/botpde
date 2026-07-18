@@ -28,6 +28,7 @@ import {
   ACTION_TOKEN_LABELS,
   DEFAULT_ACTIONS,
   DEFAULT_ACTIONS_FG,
+  DEFAULT_BRAND_FG,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
   DEFAULT_TENANT_DESIGN,
@@ -98,7 +99,13 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
   const s = resolveSurfaces(design, mode)
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}) }
-  const primaryOnBtn = contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
+  const brandFg = { ...DEFAULT_BRAND_FG, ...(design.brandFg ?? {}) }
+  const primaryText = resolveActionTextColors(
+    design.brand.primary,
+    brandFg.primary,
+    s.surface,
+  )
+  const primarySoftBg = mixHex(s.surface, design.brand.primary, 0.14)
 
   const pairs: {
     id: string
@@ -143,10 +150,18 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
     {
       id: 'primary-btn',
       label: 'Botão primário',
-      fg: primaryOnBtn,
+      fg: primaryText.on,
       bg: design.brand.primary,
       min: 4.5,
-      tip: 'Cor primária fraca para texto do botão.',
+      tip: 'Ajuste a primária ou o texto da primária.',
+    },
+    {
+      id: 'primary-menu',
+      label: 'Menu / tab ativo',
+      fg: primaryText.fg,
+      bg: primarySoftBg,
+      min: 3,
+      tip: 'Texto de abas some no escuro — use Automático ou outra cor de texto.',
     },
   ]
 
@@ -847,6 +862,70 @@ export function DesignForm({
                     }}
                     {...fieldProps}
                   />
+                  {(() => {
+                    const primaryFg =
+                      design.brandFg?.primary ?? DEFAULT_BRAND_FG.primary ?? null
+                    const primaryText = resolveActionTextColors(
+                      design.brand.primary,
+                      primaryFg,
+                      surfacesResolved.surface,
+                    )
+                    const autoPrimary = resolveActionTextColors(
+                      design.brand.primary,
+                      null,
+                      surfacesResolved.surface,
+                    )
+                    return (
+                      <>
+                        <ColorField
+                          label="Texto da primária (menus / tabs)"
+                          value={primaryFg}
+                          resolved={autoPrimary.fg}
+                          token="brand.primary"
+                          allowEmpty
+                          emptyLabel="Automático"
+                          onChange={(v) => {
+                            patch({
+                              brandFg: {
+                                ...DEFAULT_BRAND_FG,
+                                ...(design.brandFg ?? {}),
+                                primary: v,
+                              },
+                            })
+                          }}
+                          {...fieldProps}
+                        />
+                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium"
+                            style={{
+                              backgroundColor: mixHex(
+                                surfacesResolved.surface,
+                                design.brand.primary,
+                                0.14,
+                              ),
+                              color: primaryText.fg,
+                            }}
+                          >
+                            Menu ativo
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold"
+                            style={{
+                              backgroundColor: design.brand.primary,
+                              color: primaryText.on,
+                            }}
+                          >
+                            Contagem
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                          Texto em abas (Membros, Sócios…), sidebar e badges soft.
+                          Automático clareia marca preta no escuro.
+                        </p>
+                      </>
+                    )
+                  })()}
                   <ColorField
                     label="Cor secundária"
                     value={design.brand.secondary}
@@ -857,9 +936,65 @@ export function DesignForm({
                     emptyLabel="Remover"
                     {...fieldProps}
                   />
+                  {(() => {
+                    const secondaryHex =
+                      design.brand.secondary ??
+                      (contrasteTextoSobre(design.brand.primary) === 'light'
+                        ? '#f4f4f5'
+                        : '#27272a')
+                    const secondaryFg =
+                      design.brandFg?.secondary ?? DEFAULT_BRAND_FG.secondary ?? null
+                    const secondaryText = resolveActionTextColors(
+                      secondaryHex,
+                      secondaryFg,
+                      surfacesResolved.surface,
+                    )
+                    const autoSecondary = resolveActionTextColors(
+                      secondaryHex,
+                      null,
+                      surfacesResolved.surface,
+                    )
+                    return (
+                      <>
+                        <ColorField
+                          label="Texto da secundária"
+                          value={secondaryFg}
+                          resolved={autoSecondary.fg}
+                          token="brand.secondary"
+                          allowEmpty
+                          emptyLabel="Automático"
+                          onChange={(v) => {
+                            patch({
+                              brandFg: {
+                                ...DEFAULT_BRAND_FG,
+                                ...(design.brandFg ?? {}),
+                                secondary: v,
+                              },
+                            })
+                          }}
+                          {...fieldProps}
+                        />
+                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold"
+                            style={{
+                              backgroundColor: mixHex(
+                                surfacesResolved.surface,
+                                secondaryHex,
+                                0.14,
+                              ),
+                              color: secondaryText.fg,
+                            }}
+                          >
+                            Badge soft {secondaryText.fg.toUpperCase()}
+                          </span>
+                        </div>
+                      </>
+                    )
+                  })()}
                   <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                    Aparece no botão Curtir, badge Destaque, faixa do evento e link “Criar conta”
-                    (cena Login).
+                    Secundária: botão Curtir, badge Destaque, faixa do evento e link
+                    “Criar conta” (cena Login).
                   </p>
                   <button
                     type="button"
@@ -1113,8 +1248,8 @@ export function DesignForm({
           </div>
         </div>
 
-        {/* Prévia — scroll interno no desktop (sem sticky que alonga a página) */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 xl:overflow-y-auto">
+        {/* Prévia — scroll interno; pr alinha com o respiro da esquerda / barra */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 xl:overflow-y-auto xl:pr-3">
           <DesignStudioPreview
             design={design}
             baselineDesign={normalizedBaseline}
