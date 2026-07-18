@@ -24,6 +24,10 @@ export function isPixGatewayConfigured(): boolean {
 /**
  * Gera cobrança Pix. Em `mock`, cria payload determinístico para demos/dev
  * (sem provedor externo). Mercado Pago: Preference/Pix API mínima.
+ *
+ * `metadata`/`externalReference` são opcionais e só afetam o provedor MP;
+ * o default preserva o comportamento histórico das cobranças de associação
+ * (metadata `{ cobrancaId }`, external_reference = cobrancaId).
  */
 export async function criarCobrancaPix(input: {
   cobrancaId: string
@@ -31,21 +35,63 @@ export async function criarCobrancaPix(input: {
   valor: number
   descricao: string
   payerEmail?: string | null
+  metadata?: Record<string, string>
+  externalReference?: string
 }): Promise<PixChargeResult> {
   const provider = getPixProvider()
   if (provider === 'mercadopago') {
-    return criarPixMercadoPago(input)
+    return criarPixMercadoPago({
+      referencia: input.cobrancaId,
+      valor: input.valor,
+      descricao: input.descricao,
+      payerEmail: input.payerEmail,
+      externalReference: input.externalReference ?? input.cobrancaId,
+      metadata: input.metadata ?? { cobrancaId: input.cobrancaId },
+    })
   }
-  return criarPixMock(input)
+  return criarPixMock({
+    referencia: input.cobrancaId,
+    tenantSlug: input.tenantSlug,
+    valor: input.valor,
+  })
 }
 
-function criarPixMock(input: {
-  cobrancaId: string
+/**
+ * Cobrança Pix para uma venda do Bar (`BarVenda`). Mesma lógica MP/mock das
+ * cobranças de associação, mas com metadata `{ tipo: 'bar', vendaId }` para o
+ * webhook diferenciar a origem.
+ */
+export async function criarCobrancaPixBar(input: {
+  vendaId: string
   tenantSlug: string
   valor: number
   descricao: string
+  payerEmail?: string | null
+}): Promise<PixChargeResult> {
+  const provider = getPixProvider()
+  if (provider === 'mercadopago') {
+    return criarPixMercadoPago({
+      referencia: input.vendaId,
+      valor: input.valor,
+      descricao: input.descricao,
+      payerEmail: input.payerEmail,
+      externalReference: input.vendaId,
+      metadata: { tipo: 'bar', vendaId: input.vendaId },
+    })
+  }
+  return criarPixMock({
+    referencia: input.vendaId,
+    tenantSlug: input.tenantSlug,
+    valor: input.valor,
+  })
+}
+
+function criarPixMock(input: {
+  referencia: string
+  tenantSlug: string
+  valor: number
 }): PixChargeResult {
-  const externalId = `mock_${input.cobrancaId}`
+  const externalId = `mock_${input.referencia}`
   const valorStr = input.valor.toFixed(2)
   // Payload legível para demos — não é EMV real; validação via webhook mock.
   const copiaCola = [
@@ -53,17 +99,19 @@ function criarPixMock(input: {
     `BR.GOV.BCB.PIX0114${input.tenantSlug.slice(0, 14).padEnd(14, '0')}`,
     `52040000530398654${String(valorStr.length).padStart(2, '0')}${valorStr}`,
     `5802BR5913TORCIDA SAAS6009SAO PAULO62`,
-    `05${String(input.cobrancaId.length).padStart(2, '0')}${input.cobrancaId}`,
+    `05${String(input.referencia.length).padStart(2, '0')}${input.referencia}`,
     '6304MOCK',
   ].join('')
   return { provider: 'mock', externalId, copiaCola }
 }
 
 async function criarPixMercadoPago(input: {
-  cobrancaId: string
+  referencia: string
   valor: number
   descricao: string
   payerEmail?: string | null
+  externalReference: string
+  metadata: Record<string, string>
 }): Promise<PixChargeResult> {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()
   if (!token) throw new Error('MERCADOPAGO_ACCESS_TOKEN ausente')
@@ -73,7 +121,7 @@ async function criarPixMercadoPago(input: {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'X-Idempotency-Key': input.cobrancaId,
+      'X-Idempotency-Key': input.referencia,
     },
     body: JSON.stringify({
       transaction_amount: input.valor,
@@ -82,8 +130,8 @@ async function criarPixMercadoPago(input: {
       payer: {
         email: input.payerEmail || 'associado@torcida.local',
       },
-      external_reference: input.cobrancaId,
-      metadata: { cobrancaId: input.cobrancaId },
+      external_reference: input.externalReference,
+      metadata: input.metadata,
     }),
   })
 
@@ -114,7 +162,19 @@ export function assinarWebhookMock(cobrancaId: string): string {
 }
 
 export function verificarWebhookMock(cobrancaId: string, signature: string): boolean {
-  const expected = assinarWebhookMock(cobrancaId)
+  return compararAssinatura(assinarWebhookMock(cobrancaId), signature)
+}
+
+/** Token opaco para webhook mock do Bar: HMAC(vendaId) em namespace próprio. */
+export function assinarWebhookMockBar(vendaId: string): string {
+  return createHmac('sha256', env.AUTH_SECRET).update(`pix-mock-bar:${vendaId}`).digest('hex')
+}
+
+export function verificarWebhookMockBar(vendaId: string, signature: string): boolean {
+  return compararAssinatura(assinarWebhookMockBar(vendaId), signature)
+}
+
+function compararAssinatura(expected: string, signature: string): boolean {
   try {
     const a = Buffer.from(expected, 'hex')
     const b = Buffer.from(signature, 'hex')

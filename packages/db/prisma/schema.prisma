@@ -160,6 +160,13 @@ model Tenant {
   patrimonioItens       PatrimonioItem[]
   planosAssociacao      PlanoAssociacao[]
   cobrancasAssociacao   CobrancaAssociacao[]
+  barCategorias           BarCategoria[]
+  barProdutos             BarProduto[]
+  barVendas               BarVenda[]
+  barMovimentacoesEstoque BarMovimentacaoEstoque[]
+
+  /// Config: exibir o balanço financeiro consolidado aos associados no portal.
+  balancoFinanceiroVisivel Boolean @default(false) @map("balanco_financeiro_visivel")
 
   @@map("saas_tenants")
 }
@@ -239,6 +246,9 @@ model User {
   patrimonioItensResponsavel   PatrimonioItem[]       @relation("PatrimonioItemResponsavel")
   cobrancasAssociacao          CobrancaAssociacao[]
   cobrancasAssociacaoCriadas   CobrancaAssociacao[]   @relation("CobrancaAssociacaoCriadoPor")
+  barProdutosCriados           BarProduto[]           @relation("BarProdutoCriadoPor")
+  barVendasOperadas            BarVenda[]             @relation("BarVendaOperador")
+  barMovimentacoesEstoque      BarMovimentacaoEstoque[] @relation("BarMovimentacaoOperador")
 
   @@map("saas_users")
 }
@@ -693,6 +703,10 @@ model Sede {
 
   eventos Evento[]
   membros SaasMembro[]
+  barCategorias           BarCategoria[]
+  barProdutos             BarProduto[]
+  barVendas               BarVenda[]
+  barMovimentacoesEstoque BarMovimentacaoEstoque[]
 
   @@index([tenantId])
   @@index([sedeId])
@@ -1945,6 +1959,7 @@ enum CategoriaFinanceiroLancamento {
   EVENTO
   CARAVANA
   PATRIMONIO
+  BAR
   DOACAO
   OUTROS
 }
@@ -1997,4 +2012,181 @@ enum StatusPatrimonioItem {
   EM_USO
   MANUTENCAO
   BAIXADO
+}
+
+// ─── BAR (PDV da sede/subsede/PDE) ───────────────────────────────────────────
+// Catálogo, vendas e estoque isolados por `tenantId` + `sedeId`.
+// Cada torcida (tenant) tem seu bar; dentro dela, cada unidade (SEDE /
+// SUBSEDE / PONTO_ENCONTRO) tem catálogo e estoque próprios.
+// Integra com o livro-caixa via `financeiroLancamentoId` (categoria BAR).
+
+model BarCategoria {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Unidade dona deste catálogo (SEDE / SUBSEDE / PDE). Isola estoque entre unidades.
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  nome  String
+  slug  String
+  ordem Int     @default(0)
+  ativo Boolean @default(true)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  produtos BarProduto[]
+
+  @@unique([tenantId, sedeId, slug])
+  @@index([tenantId, sedeId])
+  @@map("saas_bar_categorias")
+}
+
+model BarProduto {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  categoriaId String?       @map("categoria_id")
+  categoria   BarCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  nome      String
+  descricao String?
+  preco     Decimal @db.Decimal(10, 2)
+  /// Custo médio ponderado por entradas de estoque — base do lucro estimado.
+  custoMedio Decimal @default(0) @map("custo_medio") @db.Decimal(10, 2)
+
+  estoque       Int     @default(0)
+  estoqueMinimo Int?    @map("estoque_minimo")
+  imagemUrl     String? @map("imagem_url")
+  ativo         Boolean @default(true)
+  destaque      Boolean @default(false)
+  ordem         Int     @default(0)
+
+  criadoPorId String? @map("criado_por_id")
+  criadoPor   User?   @relation("BarProdutoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  vendaItens    BarVendaItem[]
+  movimentacoes BarMovimentacaoEstoque[]
+
+  @@index([tenantId, sedeId, ativo])
+  @@index([categoriaId])
+  @@map("saas_bar_produtos")
+}
+
+model BarVenda {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  operadorId String @map("operador_id")
+  operador   User   @relation("BarVendaOperador", fields: [operadorId], references: [id], onDelete: Cascade)
+
+  subtotal Decimal @db.Decimal(10, 2)
+  desconto Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
+  metodoPagamento MetodoPagamentoBar @map("metodo_pagamento")
+  status          StatusVendaBar     @default(PENDENTE)
+
+  gatewayProvider   String?   @map("gateway_provider")
+  gatewayExternalId String?   @map("gateway_external_id")
+  pixCopiaCola      String?   @map("pix_copia_cola")
+  pagoEm            DateTime? @map("pago_em")
+
+  /// Lançamento gerado no livro-caixa (categoria BAR) quando a venda é paga.
+  financeiroLancamentoId String? @map("financeiro_lancamento_id")
+  observacao             String?
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  itens         BarVendaItem[]
+  movimentacoes BarMovimentacaoEstoque[]
+
+  @@index([tenantId, sedeId, criadoEm])
+  @@index([tenantId, sedeId, status])
+  @@index([gatewayExternalId])
+  @@map("saas_bar_vendas")
+}
+
+model BarVendaItem {
+  id      String   @id @default(uuid())
+  vendaId String   @map("venda_id")
+  venda   BarVenda @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+  produtoId String?     @map("produto_id")
+  produto   BarProduto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+
+  /// Snapshot do nome no momento da venda (produto pode ser removido depois).
+  produtoNome String  @map("produto_nome")
+  quantidade  Int
+  precoUnit   Decimal @map("preco_unit") @db.Decimal(10, 2)
+  custoUnit   Decimal @default(0) @map("custo_unit") @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  @@index([vendaId])
+  @@index([produtoId])
+  @@map("saas_bar_venda_itens")
+}
+
+model BarMovimentacaoEstoque {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sedeId String @map("sede_id")
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  produtoId String     @map("produto_id")
+  produto   BarProduto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  tipo       TipoMovEstoqueBar
+  /// Sempre positiva; a direção vem de `tipo` (ENTRADA / SAIDA / AJUSTE).
+  quantidade Int
+  custoTotal Decimal? @map("custo_total") @db.Decimal(10, 2)
+  motivo     String?
+
+  vendaId String?   @map("venda_id")
+  venda   BarVenda? @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+
+  /// Lançamento de despesa no livro-caixa quando a entrada tem custo.
+  financeiroLancamentoId String? @map("financeiro_lancamento_id")
+
+  operadorId String? @map("operador_id")
+  operador   User?   @relation("BarMovimentacaoOperador", fields: [operadorId], references: [id], onDelete: SetNull)
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([tenantId, sedeId, produtoId, criadoEm])
+  @@map("saas_bar_estoque_mov")
+}
+
+enum MetodoPagamentoBar {
+  PIX
+  DINHEIRO
+  CARTAO_DEBITO
+  CARTAO_CREDITO
+}
+
+enum StatusVendaBar {
+  PENDENTE
+  PAGA
+  CANCELADA
+}
+
+enum TipoMovEstoqueBar {
+  ENTRADA
+  SAIDA
+  AJUSTE
 }

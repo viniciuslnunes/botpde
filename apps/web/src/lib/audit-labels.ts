@@ -46,6 +46,19 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   PEDIDO_CRIADO: 'Pedido criado',
   PEDIDO_STATUS_ATUALIZADO: 'Status do pedido atualizado',
 
+  // Bar (PDV)
+  BAR_VENDA_REGISTRADA: 'Venda do bar registrada',
+  BAR_VENDA_PIX_WEBHOOK: 'Venda do bar confirmada (PIX)',
+  BAR_VENDA_PIX_CONFIRMADA_MOCK: 'Venda do bar confirmada (PIX mock)',
+  BAR_VENDA_CANCELADA: 'Venda do bar cancelada',
+  BAR_COMPRA_REGISTRADA: 'Compra de insumo do bar',
+  BAR_PRODUTO_CRIADO: 'Produto do bar criado',
+  BAR_PRODUTO_EDITADO: 'Produto do bar editado',
+  BAR_PRODUTO_EXCLUIDO: 'Produto do bar excluído',
+  BAR_CATEGORIA_CRIADA: 'Categoria do bar criada',
+  BAR_CATEGORIA_EXCLUIDA: 'Categoria do bar excluída',
+  BAR_BALANCO_ALTERADO: 'Visibilidade do balanço alterada',
+
   // Comunidade / moderação
   POST_CRIADO: 'Post criado',
   POST_ATUALIZADO: 'Post atualizado',

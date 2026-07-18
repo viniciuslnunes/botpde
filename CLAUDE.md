@@ -111,6 +111,10 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   Repair: `db:repair-departamento-orfaos`.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
+- **Bar** — PDV do bar da sede (`/admin/bar`): catálogo, estoque, venda rápida com
+  PIX real (gateway reusado) ou Dinheiro/Cartão; estoque isolado por torcida e
+  por unidade (SEDE/SUBSEDE/PDE via `sedeId`); integra o Financeiro (categoria
+  `BAR`); ver `docs/data/modulo-bar.md`.
 - **Patrimônio** — inventário (`PatrimonioItem`): `docs/data/modulo-patrimonio.md`;
   portal `/portal/patrimonio`, admin `/admin/patrimonio`.
 - **Caravanas / Bateria** — plugins sobre `Evento.tipo` (`CARAVANA` / `ENSAIO`);

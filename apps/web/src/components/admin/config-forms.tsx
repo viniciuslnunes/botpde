@@ -17,6 +17,7 @@ import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
   salvarAfiliacao,
+  salvarBalancoFinanceiroVisivel,
   criarRole,
   atualizarRole,
   excluirRole,
@@ -91,6 +92,63 @@ export function PerfilTenantForm({ nome }: PerfilTenantFormProps) {
         </button>
       </div>
     </form>
+  )
+}
+
+// ── Balanço financeiro (prestação de contas) ─────────────────────────────────
+
+interface BalancoVisivelFormProps {
+  visivel: boolean
+}
+
+export function BalancoVisivelForm({ visivel }: BalancoVisivelFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(visivel)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('balancoFinanceiroVisivel', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarBalancoFinanceiroVisivel(fd), {
+        success: next
+          ? 'Balanço visível no portal para membros.'
+          : 'Balanço oculto do portal.',
+      })
+      if (!ok) setAtivo(!next)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Quando ativo, membros logados veem totais e totais por categoria em{' '}
+        <Link
+          href="/portal/balanco"
+          className="font-medium text-[rgb(var(--primary))] underline-offset-2 hover:underline"
+        >
+          /portal/balanco
+        </Link>
+        . Lançamentos individuais permanecem só no Financeiro (permissão).
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ativo}
+          disabled={pending}
+          onChange={(e) => salvar(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--primary))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Publicar balanço financeiro no portal
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending ? 'Salvando…' : ativo ? 'Visível para membros' : 'Oculto'}
+          </span>
+        </span>
+      </label>
+    </div>
   )
 }
 

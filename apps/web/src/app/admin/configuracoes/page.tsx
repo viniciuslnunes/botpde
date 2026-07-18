@@ -2,11 +2,12 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, MessageSquare, Flag } from 'lucide-react'
+import { Settings, MessageSquare, Flag, Scale } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   AfiliacaoForm,
+  BalancoVisivelForm,
 } from '@/components/admin/config-forms'
 import type { Metadata } from 'next'
 
@@ -59,6 +60,13 @@ export default async function ConfiguracoesPage() {
       title: 'Afiliação',
       description: 'Defina qual time a torcida apoia para contexto global de notícias',
       ownerOnly: true,
+    },
+    {
+      id: 'balanco',
+      icon: Scale,
+      title: 'Balanço financeiro',
+      description: 'Prestação de contas agregada para membros no portal (sem lançamentos individuais)',
+      ownerOnly: false,
     },
   ]
 
@@ -120,6 +128,11 @@ export default async function ConfiguracoesPage() {
                     <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
                   ) : section.id === 'afiliacao' ? (
                     <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
+                  ) : section.id === 'balanco' ? (
+                    <BalancoVisivelForm
+                      key={String(tenant.balancoFinanceiroVisivel)}
+                      visivel={tenant.balancoFinanceiroVisivel}
+                    />
                   ) : null}
                 </div>
               </div>

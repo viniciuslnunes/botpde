@@ -104,6 +104,34 @@ export async function salvarDiscordGuildId(formData: FormData) {
   invalidateTenantCache(tenant.slug)
 }
 
+/** Expõe agregados financeiros (não lançamentos) em `/portal/balanco`. */
+export async function salvarBalancoFinanceiroVisivel(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+
+  const visivel = formData.get('balancoFinanceiroVisivel') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { balancoFinanceiroVisivel: visivel },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'BAR_BALANCO_ALTERADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { visivel },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/portal/balanco')
+  revalidatePath('/portal')
+  invalidateTenantCache(tenant.slug)
+}
+
 const afiliacaoSchema = z.object({
   afiliacaoId: z
     .string()

@@ -88,12 +88,22 @@ export default async function PortalFinanceiroPage({ searchParams }: Props) {
               </p>
             </div>
           </div>
-          <Link
-            href="/portal/departamentos/financeiro"
-            className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
-          >
-            Ver departamento
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {tenant.balancoFinanceiroVisivel && (
+              <Link
+                href="/portal/balanco"
+                className="text-sm font-medium text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--color-primary-fg))] hover:underline"
+              >
+                Balanço público
+              </Link>
+            )}
+            <Link
+              href="/portal/departamentos/financeiro"
+              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline"
+            >
+              Ver departamento
+            </Link>
+          </div>
         </div>
       </MotionReveal>
 

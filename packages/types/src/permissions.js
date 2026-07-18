@@ -19,6 +19,10 @@ export const PERMISSIONS = /** @type {const} */ ({
   STORE_VIEW_ORDERS: 'store:view_orders',
   STORE_MANAGE: 'store:manage',
 
+  // Bar (PDV da sede/subsede)
+  BAR_OPERATE: 'bar:operate',
+  BAR_MANAGE: 'bar:manage',
+
   // Eventos
   EVENTS_CREATE: 'events:create',
   EVENTS_MANAGE: 'events:manage',
@@ -113,6 +117,14 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
     items: [
       { key: PERMISSIONS.STORE_VIEW_ORDERS, label: 'Ver pedidos' },
       { key: PERMISSIONS.STORE_MANAGE, label: 'Gerenciar produtos' },
+    ],
+  },
+  {
+    label: 'Bar',
+    base: PERMISSIONS.BAR_OPERATE,
+    items: [
+      { key: PERMISSIONS.BAR_OPERATE, label: 'Operar PDV / registrar vendas' },
+      { key: PERMISSIONS.BAR_MANAGE, label: 'Gerenciar catálogo, estoque e vendas' },
     ],
   },
   {
@@ -230,6 +242,7 @@ export function applyPermissionCascade(prevSelected, nextSelected) {
 export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
   { key: 'eventos', label: 'Eventos' },
   { key: 'loja', label: 'Loja / Materiais' },
+  { key: 'bar', label: 'Bar' },
   { key: 'comunidade', label: 'Comunidade e comunicados' },
   { key: 'sedes', label: 'Sedes e subsedes' },
   { key: 'financeiro', label: 'Financeiro' },
@@ -248,6 +261,7 @@ export const DEPARTAMENTO_MODULOS = /** @type {const} */ ([
 export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   eventos: { href: '/portal/eventos', disponivel: true },
   loja: { href: '/portal/loja', disponivel: true },
+  bar: { href: '/portal/bar', disponivel: true },
   comunidade: { href: '/portal/comunidade', disponivel: true },
   sedes: { href: '/portal/sedes', disponivel: true },
   // Diretoria / pessoas: home da área no portal (sem fila admin para membros)
@@ -265,6 +279,7 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
 export const DEPARTAMENTO_MODULO_ADMIN_ROTA = /** @type {const} */ ({
   eventos: '/admin/eventos',
   loja: '/admin/loja',
+  bar: '/admin/bar',
   comunidade: '/admin/comunidade',
   sedes: '/admin/sedes',
   membros: '/admin/membros',

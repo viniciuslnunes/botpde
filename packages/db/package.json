@@ -14,6 +14,7 @@
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
     "seed:agenda-demo": "node scripts/seed-agenda-demo.js",
     "seed:loja-gavioes": "node --use-system-ca scripts/seed-loja-gavioes.js",
+    "seed:bar-gavioes": "node scripts/seed-bar-gavioes.js",
     "seed:afiliacoes": "node --use-system-ca scripts/seed-afiliacoes.js",
     "seed:escudos-soccerwiki": "node --use-system-ca scripts/seed-escudos-soccerwiki.js",
     "seed:escudos-ogol": "node --use-system-ca scripts/seed-escudos-ogol.js",

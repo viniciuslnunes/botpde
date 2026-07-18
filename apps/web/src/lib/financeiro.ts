@@ -99,6 +99,46 @@ export const resumirFinanceiro = cache(async function resumirFinanceiro(
   }
 })
 
+export type FinanceiroCategoriaResumo = {
+  categoria: CategoriaFinanceiroLancamento
+  receitas: number
+  despesas: number
+  saldo: number
+}
+
+/** Agregados por categoria (sem lançamentos individuais) — página Balanço. */
+export const resumirFinanceiroPorCategoria = cache(async function resumirFinanceiroPorCategoria(
+  tenantId: string,
+  filtro?: FinanceiroFiltro,
+): Promise<FinanceiroCategoriaResumo[]> {
+  const grouped: Array<{
+    tipo: TipoFinanceiroLancamento
+    categoria: CategoriaFinanceiroLancamento
+    _sum: { valor: Prisma.Decimal | null }
+  }> = await db.financeiroLancamento.groupBy({
+    by: ['tipo', 'categoria'],
+    where: buildWhere(tenantId, filtro),
+    _sum: { valor: true },
+  })
+
+  const mapa = new Map<CategoriaFinanceiroLancamento, FinanceiroCategoriaResumo>()
+  for (const row of grouped) {
+    const atual = mapa.get(row.categoria) ?? {
+      categoria: row.categoria,
+      receitas: 0,
+      despesas: 0,
+      saldo: 0,
+    }
+    const soma = toNumber(row._sum.valor ?? 0)
+    if (row.tipo === 'RECEITA') atual.receitas += soma
+    else atual.despesas += soma
+    atual.saldo = atual.receitas - atual.despesas
+    mapa.set(row.categoria, atual)
+  }
+
+  return [...mapa.values()].sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo))
+})
+
 export const listarLancamentosFinanceiro = cache(async function listarLancamentosFinanceiro(
   tenantId: string,
   opts?: { filtro?: FinanceiroFiltro; pageSize?: number },

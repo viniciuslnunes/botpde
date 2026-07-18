@@ -7,6 +7,7 @@ export const CategoriaFinanceiroSchema = z.enum([
   'EVENTO',
   'CARAVANA',
   'PATRIMONIO',
+  'BAR',
   'DOACAO',
   'OUTROS',
 ])
@@ -116,6 +117,7 @@ export const CATEGORIA_FINANCEIRO_LABEL = {
   EVENTO: 'Evento / festa',
   CARAVANA: 'Caravana',
   PATRIMONIO: 'Patrimônio',
+  BAR: 'Bar',
   DOACAO: 'Doação',
   OUTROS: 'Outros',
 }

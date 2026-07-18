@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
+import { confirmarVendaBarPaga } from '@/lib/bar'
 import { baixarCobrancaComoPaga } from '@/lib/cobrancas'
-import { getPixProvider, verificarWebhookMock } from '@/lib/pix-gateway'
+import { getPixProvider, verificarWebhookMock, verificarWebhookMockBar } from '@/lib/pix-gateway'
 
 const mockSchema = z.object({
   cobrancaId: z.string().uuid(),
+  signature: z.string().min(1),
+})
+
+const mockBarSchema = z.object({
+  tipo: z.literal('bar'),
+  vendaId: z.string().uuid(),
   signature: z.string().min(1),
 })
 
@@ -60,9 +67,60 @@ async function processarPagamento(cobrancaId: string, tenantId: string) {
   return { ok: true as const }
 }
 
+async function processarPagamentoBar(vendaId: string, tenantId: string) {
+  // Ator do lançamento: quem gerou a cobrança não existe no webhook; usamos o
+  // operador da venda como fallback dentro de `confirmarVendaBarPaga`.
+  const result = await confirmarVendaBarPaga({ tenantId, vendaId, atorId: null })
+  if (!result.ok) return { ok: false as const, error: result.error }
+
+  await db.auditLog.create({
+    data: {
+      tenantId,
+      atorId: null,
+      acao: 'BAR_VENDA_PIX_WEBHOOK',
+      entidade: 'BarVenda',
+      entidadeId: vendaId,
+    },
+  })
+  return { ok: true as const }
+}
+
+async function resolverVendaBar(ref: string): Promise<{ id: string; tenantId: string } | null> {
+  type Row = { id: string; tenantId: string }
+  const byId: Row | null = await db.barVenda.findFirst({
+    where: { id: ref },
+    select: { id: true, tenantId: true },
+  })
+  if (byId) return byId
+  const byExt: Row | null = await db.barVenda.findFirst({
+    where: { gatewayExternalId: ref },
+    select: { id: true, tenantId: true },
+  })
+  return byExt
+}
+
 export async function POST(request: NextRequest) {
   const json = await request.json().catch(() => null)
   if (!json) return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
+
+  const mockBarParsed = mockBarSchema.safeParse(json)
+  if (mockBarParsed.success) {
+    const { vendaId, signature } = mockBarParsed.data
+    if (!verificarWebhookMockBar(vendaId, signature)) {
+      return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 })
+    }
+
+    type Row = { id: string; tenantId: string }
+    const venda: Row | null = await db.barVenda.findFirst({
+      where: { id: vendaId },
+      select: { id: true, tenantId: true },
+    })
+    if (!venda) return NextResponse.json({ error: 'Venda não encontrada' }, { status: 404 })
+
+    const res = await processarPagamentoBar(venda.id, venda.tenantId)
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+    return NextResponse.json({ ok: true })
+  }
 
   const mockParsed = mockSchema.safeParse(json)
   if (mockParsed.success) {
@@ -106,11 +164,21 @@ export async function POST(request: NextRequest) {
       const payment = (await payRes.json()) as {
         status?: string
         external_reference?: string
-        metadata?: { cobrancaId?: string }
+        metadata?: { tipo?: string; cobrancaId?: string; vendaId?: string }
       }
 
       if (payment.status !== 'approved') {
         return NextResponse.json({ ok: true, ignored: true })
+      }
+
+      if (payment.metadata?.tipo === 'bar') {
+        const ref =
+          payment.metadata?.vendaId ?? payment.external_reference ?? paymentId
+        const venda = await resolverVendaBar(ref)
+        if (!venda) return NextResponse.json({ error: 'Venda não mapeada' }, { status: 404 })
+        const res = await processarPagamentoBar(venda.id, venda.tenantId)
+        if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+        return NextResponse.json({ ok: true })
       }
 
       const cobrancaId =
