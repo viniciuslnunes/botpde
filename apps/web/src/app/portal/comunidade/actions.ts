@@ -14,7 +14,7 @@ import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
-import { canFollowUser, getOrCreatePerfilMembro, getSeguimentoStatus } from '@/lib/social'
+import { canFollowUser, getOrCreatePerfilMembro, getPerfilMembroForPortal, getSeguimentoStatus } from '@/lib/social'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
@@ -318,6 +318,18 @@ async function resolverAlcanceNacional(
   return hasPermission(effective, PERMISSIONS.COMMUNITY_POST_NACIONAL)
 }
 
+/** Perfil privado não publica como PUBLICO (composer esconde a opção; servidor reforça). */
+async function erroPublicoComPerfilPrivado(
+  userId: string,
+  tenantId: string,
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO',
+): Promise<string | null> {
+  if (visibilidade !== 'PUBLICO') return null
+  const { perfilPrivado } = await getPerfilMembroForPortal(userId, tenantId)
+  if (!perfilPrivado) return null
+  return 'Perfil privado não permite publicação pública. Use Só torcida ou Só seguidores.'
+}
+
 function parseMidias(raw: FormDataEntryValue | null): unknown {
   if (typeof raw !== 'string' || raw.trim() === '') return []
   try {
@@ -396,6 +408,13 @@ export async function publicarPost(
 
     const erroMencoes = erroMencoesExcessivas(conteudo)
     if (erroMencoes) return { message: erroMencoes }
+
+    const erroPerfil = await erroPublicoComPerfilPrivado(
+      session.user.id,
+      tenant.id,
+      visibilidade,
+    )
+    if (erroPerfil) return { message: erroPerfil }
 
     const alcanceNacional = await resolverAlcanceNacional(
       session.user.id,
@@ -1118,6 +1137,13 @@ export async function publicarEnquete(
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
 
+  const erroPerfil = await erroPublicoComPerfilPrivado(
+    session.user.id,
+    tenant.id,
+    parsed.data.visibilidade,
+  )
+  if (erroPerfil) return { message: erroPerfil }
+
   const alcanceNacional = await resolverAlcanceNacional(
     session.user.id,
     tenant.id,
@@ -1459,6 +1485,13 @@ export async function publicarPostEvento(
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) return { message: erroMencoes }
+
+  const erroPerfil = await erroPublicoComPerfilPrivado(
+    session.user.id,
+    tenant.id,
+    parsed.data.visibilidade,
+  )
+  if (erroPerfil) return { message: erroPerfil }
 
   const alcanceNacional = await resolverAlcanceNacional(
     session.user.id,
@@ -2364,7 +2397,7 @@ export async function alternarSilencioGrupo(conversaId: string): Promise<{ silen
 export async function publicarPostGrupo(
   conversaId: string,
   conteudo: string,
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; message?: string; preview?: PostPublicadoPreview }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
   await assertMembroAtivo(tenant.id, session.user.id)
 
@@ -2454,7 +2487,24 @@ export async function publicarPostGrupo(
 
   revalidatePath(`/portal/comunidade/grupos/${conversa.id}`)
   revalidatePath('/portal/comunidade')
-  return { success: true }
+
+  return {
+    success: true,
+    preview: previewDoPost({
+      post: {
+        id: post.id,
+        tenantId: post.tenantId,
+        conteudo: post.conteudo,
+        midiaUrls: post.midiaUrls,
+        visibilidade: post.visibilidade,
+        criadoEm: post.criadoEm,
+      },
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      autorAvatar: session.user.image ?? null,
+      tenantNome: tenant.nome,
+    }),
+  }
 }
 
 export async function publicarMomentoStory(

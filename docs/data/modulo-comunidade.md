@@ -28,7 +28,7 @@ Função central: `podeVerConteudoSocial` em `apps/web/src/lib/perfil-social.ts`
 Permalink de posts usa também `podeVerPost` em `apps/web/src/lib/feed.ts` (perfil +
 visibilidade do post).
 
-- **Perfil público** (`perfilPrivado: false`): posts visíveis no feed conforme a visibilidade do post (`PUBLICO` / `TENANT` / `PRIVADO`).
+- **Perfil público** (`perfilPrivado: false`): posts visíveis no feed conforme a visibilidade do post (`PUBLICO` / `TENANT` / `PRIVADO`). Com perfil **privado**, o composer não lista `PUBLICO` (só `TENANT` / `PRIVADO`); o servidor rejeita tentativa de bypass.
 - **Perfil privado**: só o próprio usuário e seguidores com status `APROVADO` veem publicações, fotos e atividade — a visibilidade do post não abre o conteúdo para quem não segue.
 - **Sócio**: default privado (aprovação + create sem preferência). Pode tornar público na aba Sobre e salvar; upload de capa/foto não altera a privacidade.
 - **Torcedor**: permanece sempre público.

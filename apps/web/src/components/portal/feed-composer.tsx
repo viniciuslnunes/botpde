@@ -247,8 +247,15 @@ function ComposerBody({
       ? texto.trim().length > 0 && eventoId.length > 0 && !pending
       : texto.trim().length > 0 && !enviando && !pending
 
+  // Perfil privado: sem opção Pública (só torcida / seguidores).
+  const visibilidadeEfetiva: 'PUBLICO' | 'TENANT' | 'PRIVADO' =
+    !somentePublico && perfilPrivado && visibilidade === 'PUBLICO' ? 'PRIVADO' : visibilidade
   const AlcanceIcon =
-    visibilidade === 'PRIVADO' ? Lock : visibilidade === 'TENANT' ? Users : Globe2
+    visibilidadeEfetiva === 'PRIVADO'
+      ? Lock
+      : visibilidadeEfetiva === 'TENANT'
+        ? Users
+        : Globe2
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
@@ -495,7 +502,7 @@ function ComposerBody({
       className={dragOver ? 'rounded-xl outline-2 outline-dashed outline-[rgb(var(--primary))]' : ''}
     >
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
-      <input type="hidden" name="visibilidade" value={visibilidade} />
+      <input type="hidden" name="visibilidade" value={visibilidadeEfetiva} />
       {modoEnquete && (
         <input type="hidden" name="opcoes" value={JSON.stringify(opcoesValidas)} />
       )}
@@ -947,14 +954,14 @@ function ComposerBody({
                     className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[rgb(var(--foreground-muted))]"
                   />
                   <select
-                    value={visibilidade}
+                    value={visibilidadeEfetiva}
                     onChange={(e) =>
                       setVisibilidade(e.target.value as 'PUBLICO' | 'TENANT' | 'PRIVADO')
                     }
                     aria-label="Visibilidade do post"
                     className="h-9 max-w-[11.5rem] cursor-pointer appearance-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-8 pr-8 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color] hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)] sm:max-w-none"
                   >
-                    <option value="PUBLICO">Público</option>
+                    {!perfilPrivado && <option value="PUBLICO">Público</option>}
                     <option value="TENANT">Só torcida</option>
                     <option value="PRIVADO">Só seguidores</option>
                   </select>
