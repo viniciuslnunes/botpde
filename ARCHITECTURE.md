@@ -574,6 +574,7 @@ checklist: **`docs/data/modulo-comunidade-performance.md`**.
 | Live UX | Auto-refetch no topo (~250ms); banner “novos posts” só se rolado |
 | Engajamento (2026-07-17) | Overlay reação/comentário sem `revalidatePath` do feed; gate CN via `resolverContextoEngajamento` + `podeEngajarPostVisivel`; notifs em `after()` |
 | Publish + nav-back (2026-07-17) | Prepend otimista (`comunidade:post-publicado`); sem `revalidatePath`/`router.refresh` no publish; Descobrir unificado; chrome no layout + `ComunidadeFeedBootstrap` + `React.cache` salas/tenant; measure e2e |
+| Busca (2026-07-17) | Fix `GROUP BY` (não `DISTINCT`+`ORDER BY similarity` / `42P10`); `modo=rapida` no typeahead; `postIncludeBusca`; erro ≠ vazio — `docs/data/modulo-comunidade.md` § busca |
 
 **Pós-deploy obrigatório:** `db:push` (timeline + índices), `db:enable-pg-trgm`.
 
