@@ -8,6 +8,7 @@ import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminMembroLgeForm } from '../admin-membro-lge-form'
+import { AdminMembroSedeForm } from '../admin-membro-sede-form'
 import { MemberActions } from '@/components/admin/member-actions'
 import type { Metadata } from 'next'
 
@@ -46,6 +47,7 @@ export default async function MembroDetalhePage({ params }: Props) {
     profissao: string | null
     dataNascimento: Date | null
     planoAssociacaoId: string | null
+    sedeId: string | null
     planoAssociacao: { nome: string } | null
     departamento: { id: string; nome: string } | null
     user: { email: string | null }
@@ -70,6 +72,7 @@ export default async function MembroDetalhePage({ params }: Props) {
       profissao: true,
       dataNascimento: true,
       planoAssociacaoId: true,
+      sedeId: true,
       planoAssociacao: { select: { nome: true } },
       departamento: { select: { id: true, nome: true } },
       user: { select: { email: true } },
@@ -78,21 +81,37 @@ export default async function MembroDetalhePage({ params }: Props) {
 
   if (!membro) notFound()
 
-  const planos: { id: string; nome: string }[] = await db.planoAssociacao.findMany({
-    where: { tenantId: tenant.id, ativo: true },
-    orderBy: { nome: 'asc' },
-    select: { id: true, nome: true },
-  })
+  const [planos, sedes]: [
+    { id: string; nome: string }[],
+    { id: string; nome: string; tipo: string }[],
+  ] = await Promise.all([
+    db.planoAssociacao.findMany({
+      where: { tenantId: tenant.id, ativo: true },
+      orderBy: { nome: 'asc' },
+      select: { id: true, nome: true },
+    }),
+    db.sede.findMany({
+      where: { tenantId: tenant.id, ativa: true },
+      orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+      select: { id: true, nome: true, tipo: true },
+    }),
+  ])
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
   let podeDesligar = isSuperAdmin
-  if (!podeDesligar && session.user.id) {
+  let podeReatribuirSede = isSuperAdmin
+  if (session.user.id) {
     const { rolePermissions, overrides } = await getUserPermissionsInTenant(
       session.user.id,
       tenant.id,
     )
     const effective = calculateEffectivePermissions(rolePermissions, overrides)
-    podeDesligar = hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
+    if (!podeDesligar) {
+      podeDesligar = hasPermission(effective, PERMISSIONS.MEMBERS_DISMISS)
+    }
+    if (!podeReatribuirSede) {
+      podeReatribuirSede = hasPermission(effective, PERMISSIONS.MEMBERS_APPROVE)
+    }
   }
 
   return (
@@ -142,6 +161,13 @@ export default async function MembroDetalhePage({ params }: Props) {
           Motivo do desligamento: {membro.desligadoMotivo}
         </p>
       )}
+
+      <AdminMembroSedeForm
+        membroId={membro.id}
+        sedeIdAtual={membro.sedeId}
+        sedes={sedes}
+        canEdit={podeReatribuirSede}
+      />
 
       <AdminMembroLgeForm
         membroId={membro.id}

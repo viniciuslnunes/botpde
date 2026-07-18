@@ -1,20 +1,47 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useState, useTransition } from 'react'
+import dynamic from 'next/dynamic'
+import Image from 'next/image'
+import Link from 'next/link'
 import {
   criarSede,
   editarSede,
   alterarStatusSede,
   type SedeState,
 } from '@/app/admin/sedes/actions'
-import { Loader2, MapPin, Power, PowerOff } from 'lucide-react'
-import { FieldError, Input, Select, Textarea, SubmitButton } from '@torcida/ui'
+import {
+  Crosshair,
+  Loader2,
+  MapPin,
+  Power,
+  PowerOff,
+} from 'lucide-react'
+import { FieldError, Input, Select, Textarea } from '@torcida/ui'
+import { StickyPersistBar } from '@/components/sticky-persist-bar'
+import {
+  buildGeocodeQuery,
+  buildStreetViewImageUrl,
+  geocodeLatLng,
+  isGoogleMapsConfigured,
+} from '@/lib/google-maps'
+import { tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 
+const SedesMap = dynamic(
+  () => import('@/components/portal/sedes-map').then((m) => m.SedesMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-44 w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]" />
+    ),
+  },
+)
+
 type SedeOption = { id: string; nome: string; tipo: string }
 
-type SedeData = {
+export type SedeFormData = {
   id: string
   nome: string
   tipo: string
@@ -25,21 +52,289 @@ type SedeData = {
   cep: string | null
   capacidade: number | null
   responsavel: string | null
+  responsavelUserId: string | null
   telefone: string | null
   horarios: string | null
   descricao: string | null
+  fotoUrl: string | null
+  lat: number | null
+  lng: number | null
   ativa: boolean
 }
 
+export type ResponsavelCandidato = {
+  id: string
+  nome: string | null
+  email: string | null
+}
+
+const FORM_LABELS: Record<string, string> = {
+  nome: 'Nome',
+  tipo: 'Tipo',
+  sedeId: 'Sede pai',
+  endereco: 'Endereço',
+  cidade: 'Cidade',
+  estado: 'Estado',
+  cep: 'CEP',
+  capacidade: 'Capacidade',
+  responsavel: 'Responsável',
+  responsavelUserId: 'Liderança',
+  telefone: 'Telefone',
+  horarios: 'Horários',
+  descricao: 'Descrição',
+  fotoUrl: 'Foto',
+  lat: 'Latitude',
+  lng: 'Longitude',
+}
+
+function SedeLocalizacaoFields({
+  formId,
+  defaults,
+  state,
+}: {
+  formId: string
+  defaults?: Partial<SedeFormData>
+  state: SedeState
+}) {
+  const [lat, setLat] = useState(defaults?.lat != null ? String(defaults.lat) : '')
+  const [lng, setLng] = useState(defaults?.lng != null ? String(defaults.lng) : '')
+  const [fotoUrl, setFotoUrl] = useState(defaults?.fotoUrl ?? '')
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
+  const mapsConfigured = isGoogleMapsConfigured()
+
+  const latN = lat.trim() ? Number(lat) : null
+  const lngN = lng.trim() ? Number(lng) : null
+  const hasCoords =
+    latN != null && lngN != null && Number.isFinite(latN) && Number.isFinite(lngN)
+
+  const previewSede = {
+    endereco: defaults?.endereco,
+    cidade: defaults?.cidade,
+    estado: defaults?.estado,
+    lat: hasCoords ? latN : null,
+    lng: hasCoords ? lngN : null,
+    fotoUrl: fotoUrl.trim() || null,
+  }
+
+  const streetViewUrl =
+    previewSede.fotoUrl ??
+    (mapsConfigured
+      ? buildStreetViewImageUrl(
+          {
+            ...previewSede,
+            // lê endereço atual do form se possível via DOM no render — usa defaults + coords
+          },
+          { width: 640, height: 280 },
+        )
+      : null)
+
+  async function geocodificar() {
+    const form = document.getElementById(formId) as HTMLFormElement | null
+    if (!form) return
+    const fd = new FormData(form)
+    const query = buildGeocodeQuery({
+      endereco: String(fd.get('endereco') ?? ''),
+      cidade: String(fd.get('cidade') ?? ''),
+      estado: String(fd.get('estado') ?? ''),
+    })
+    if (!query) {
+      setGeoStatus('error')
+      return
+    }
+    setGeoStatus('loading')
+    const coords = await geocodeLatLng(query)
+    if (!coords) {
+      setGeoStatus('error')
+      return
+    }
+    setLat(String(coords.lat))
+    setLng(String(coords.lng))
+    setGeoStatus('ok')
+    // dispara input event para o tracked form marcar dirty
+    form.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          <MapPin className="h-3.5 w-3.5" />
+          Localização
+        </h3>
+        {mapsConfigured && (
+          <button
+            type="button"
+            onClick={() => void geocodificar()}
+            disabled={geoStatus === 'loading'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
+          >
+            {geoStatus === 'loading' ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Crosshair className="h-3 w-3" />
+            )}
+            Geocodificar endereço
+          </button>
+        )}
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          Endereço
+        </label>
+        <Input
+          name="endereco"
+          type="text"
+          defaultValue={defaults?.endereco ?? ''}
+          placeholder="Rua, número, complemento"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            CEP
+          </label>
+          <Input name="cep" type="text" defaultValue={defaults?.cep ?? ''} placeholder="00000-000" />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Cidade
+          </label>
+          <Input
+            name="cidade"
+            type="text"
+            defaultValue={defaults?.cidade ?? ''}
+            placeholder="São Paulo"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Estado
+          </label>
+          <Input
+            name="estado"
+            type="text"
+            defaultValue={defaults?.estado ?? ''}
+            placeholder="SP"
+            maxLength={2}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Latitude
+          </label>
+          <Input
+            name="lat"
+            type="text"
+            inputMode="decimal"
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+            placeholder="-23.5505"
+          />
+          <FieldError errors={state.errors?.lat} />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Longitude
+          </label>
+          <Input
+            name="lng"
+            type="text"
+            inputMode="decimal"
+            value={lng}
+            onChange={(e) => setLng(e.target.value)}
+            placeholder="-46.6333"
+          />
+          <FieldError errors={state.errors?.lng} />
+        </div>
+      </div>
+
+      {geoStatus === 'error' && (
+        <p className="text-xs text-red-500" role="alert">
+          Não foi possível geocodificar. Confira endereço/cidade/UF ou preencha lat/lng manualmente.
+        </p>
+      )}
+      {geoStatus === 'ok' && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+          Coordenadas atualizadas a partir do endereço.
+        </p>
+      )}
+
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+          URL da foto (opcional)
+        </label>
+        <Input
+          name="fotoUrl"
+          type="url"
+          value={fotoUrl}
+          onChange={(e) => setFotoUrl(e.target.value)}
+          placeholder="https://…"
+        />
+        <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+          Se vazio, o portal usa Street View quando a chave do Maps estiver configurada.
+        </p>
+        <FieldError errors={state.errors?.fotoUrl} />
+      </div>
+
+      {(streetViewUrl || hasCoords) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {streetViewUrl && (
+            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+              <Image
+                src={streetViewUrl}
+                alt="Prévia da fachada"
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 40vw"
+                unoptimized
+              />
+            </div>
+          )}
+          {hasCoords && (
+            <SedesMap
+              sedes={[
+                {
+                  id: defaults?.id ?? 'preview',
+                  nome: defaults?.nome ?? 'Local',
+                  lat: latN,
+                  lng: lngN,
+                },
+              ]}
+              selectedId={defaults?.id ?? 'preview'}
+              onSelect={() => undefined}
+              className="h-44 w-full lg:h-full lg:min-h-[11rem]"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SedeFormFields({
+  formId,
   state,
   sedes,
+  candidatos,
   defaults,
 }: {
+  formId: string
   state: SedeState
   sedes: SedeOption[]
-  defaults?: Partial<SedeData>
+  candidatos: ResponsavelCandidato[]
+  defaults?: Partial<SedeFormData>
 }) {
+  const [tipo, setTipo] = useState<TipoSede>((defaults?.tipo as TipoSede) ?? 'PONTO_ENCONTRO')
+  const paisPermitidos = tiposPaiPermitidos(tipo)
+  const sedesPai = paisPermitidos
+    ? sedes.filter((s) => paisPermitidos.includes(s.tipo as TipoSede))
+    : []
+
   return (
     <>
       {state.message && (
@@ -48,18 +343,24 @@ function SedeFormFields({
         </div>
       )}
 
-      {/* Tipo + Nome */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Tipo <span className="text-red-500">*</span>
           </label>
-          <Select name="tipo" defaultValue={defaults?.tipo ?? 'PONTO_ENCONTRO'}>
+          <Select
+            name="tipo"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as TipoSede)}
+          >
             <option value="SEDE">Sede</option>
             <option value="SUBSEDE">Subsede</option>
             <option value="PONTO_ENCONTRO">Ponto de Encontro</option>
           </Select>
           <FieldError errors={state.errors?.tipo} />
+          <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+            Hierarquia: Sede → Subsede → Ponto de encontro
+          </p>
         </div>
 
         <div className="sm:col-span-2">
@@ -77,66 +378,32 @@ function SedeFormFields({
         </div>
       </div>
 
-      {/* Sede pai */}
-      {sedes.length > 0 && (
+      {paisPermitidos === null ? (
+        <input type="hidden" name="sedeId" value="" />
+      ) : (
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Pertence à sede
+            Pertence à sede <span className="text-red-500">*</span>
           </label>
-          <Select name="sedeId" defaultValue={defaults?.sedeId ?? ''}>
-            <option value="">— Independente (sede principal) —</option>
-            {sedes.map((s) => (
+          <Select name="sedeId" defaultValue={defaults?.sedeId ?? ''} required>
+            <option value="">— Selecione a unidade pai —</option>
+            {sedesPai.map((s) => (
               <option key={s.id} value={s.id}>
                 [{s.tipo === 'SEDE' ? 'Sede' : s.tipo === 'SUBSEDE' ? 'Subsede' : 'PE'}] {s.nome}
               </option>
             ))}
           </Select>
           <FieldError errors={state.errors?.sedeId} />
+          {sedesPai.length === 0 && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+              Cadastre uma {tipo === 'SUBSEDE' ? 'Sede' : 'Sede ou Subsede'} antes de criar este tipo.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Localização */}
-      <div className="space-y-3">
-        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          <MapPin className="h-3.5 w-3.5" />
-          Localização
-        </h3>
+      <SedeLocalizacaoFields formId={formId} defaults={defaults} state={state} />
 
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Endereço
-          </label>
-          <Input
-            name="endereco"
-            type="text"
-            defaultValue={defaults?.endereco ?? ''}
-            placeholder="Rua, número, complemento"
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="sm:col-span-1">
-            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              CEP
-            </label>
-            <Input name="cep" type="text" defaultValue={defaults?.cep ?? ''} placeholder="00000-000" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Cidade
-            </label>
-            <Input name="cidade" type="text" defaultValue={defaults?.cidade ?? ''} placeholder="São Paulo" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Estado
-            </label>
-            <Input name="estado" type="text" defaultValue={defaults?.estado ?? ''} placeholder="SP" maxLength={2} />
-          </div>
-        </div>
-      </div>
-
-      {/* Informações operacionais */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
           Informações operacionais
@@ -145,15 +412,35 @@ function SedeFormFields({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Responsável
+              Liderança (membro)
+            </label>
+            <Select name="responsavelUserId" defaultValue={defaults?.responsavelUserId ?? ''}>
+              <option value="">Sem liderança vinculada</option>
+              {candidatos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome ?? c.email ?? c.id}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+              Usado como owner ao promover a unidade a tenant próprio.
+            </p>
+            <FieldError errors={state.errors?.responsavelUserId} />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Nome de contato (texto)
             </label>
             <Input
               name="responsavel"
               type="text"
               defaultValue={defaults?.responsavel ?? ''}
-              placeholder="Nome do responsável"
+              placeholder="Preenchido automaticamente se escolher liderança"
             />
           </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Telefone
@@ -165,9 +452,6 @@ function SedeFormFields({
               placeholder="(11) 99999-9999"
             />
           </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Capacidade (pessoas)
@@ -180,17 +464,18 @@ function SedeFormFields({
               placeholder="Ex: 500"
             />
           </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-              Horários de funcionamento
-            </label>
-            <Input
-              name="horarios"
-              type="text"
-              defaultValue={defaults?.horarios ?? ''}
-              placeholder="Ex: Seg–Sex 10h–18h"
-            />
-          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Horários de funcionamento
+          </label>
+          <Input
+            name="horarios"
+            type="text"
+            defaultValue={defaults?.horarios ?? ''}
+            placeholder="Ex: Seg–Sex 10h–18h"
+          />
         </div>
 
         <div>
@@ -211,46 +496,129 @@ function SedeFormFields({
 }
 
 /* ── Criar ────────────────────────────────────────────────────────────────── */
-export function CriarSedeForm({ sedes }: { sedes: SedeOption[] }) {
+export function CriarSedeForm({
+  sedes,
+  candidatos,
+  onCancel,
+}: {
+  sedes: SedeOption[]
+  candidatos: ResponsavelCandidato[]
+  onCancel?: () => void
+}) {
+  const formId = useId()
   const [state, setState] = useState<SedeState>({})
-  const { formRef } = useTrackedForm({ title: 'Nova sede' })
+  const [pending, startTransition] = useTransition()
+  const { formRef, isDirty, changes } = useTrackedForm({
+    title: 'Nova sede',
+    labels: FORM_LABELS,
+  })
 
   return (
     <form
+      id={formId}
       ref={formRef}
-      action={async (fd) => {
-        await submitRedirectAction(() => criarSede({}, fd), setState, {
-          success: 'Sede criada.',
+      data-persist-bar-root=""
+      action={(fd) => {
+        startTransition(async () => {
+          await submitRedirectAction(() => criarSede({}, fd), setState, {
+            success: 'Sede criada.',
+          })
         })
       }}
       className="space-y-5"
     >
-      <SedeFormFields state={state} sedes={sedes} />
-      <SubmitButton label="Criar sede" />
+      <SedeFormFields formId={formId} state={state} sedes={sedes} candidatos={candidatos} />
+      <StickyPersistBar
+        locked={pending || isDirty}
+        dirtyLabel={
+          isDirty ? (changes.length === 1 ? changes[0] : `${changes.length} campos alterados`) : undefined
+        }
+        hint="Preencha os dados e confirme a criação."
+      >
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Cancelar
+          </button>
+        )}
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending}
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {pending ? 'Criando…' : 'Criar sede'}
+        </button>
+      </StickyPersistBar>
     </form>
   )
 }
 
 /* ── Editar ───────────────────────────────────────────────────────────────── */
-export function EditarSedeForm({ sede, sedes }: { sede: SedeData; sedes: SedeOption[] }) {
+export function EditarSedeForm({
+  sede,
+  sedes,
+  candidatos,
+}: {
+  sede: SedeFormData
+  sedes: SedeOption[]
+  candidatos: ResponsavelCandidato[]
+}) {
+  const formId = useId()
   const [state, setState] = useState<SedeState>({})
-  const { formRef } = useTrackedForm({
+  const [pending, startTransition] = useTransition()
+  const { formRef, isDirty, changes } = useTrackedForm({
     id: `editar-sede-${sede.id}`,
     title: 'Editar sede',
+    labels: FORM_LABELS,
   })
 
   return (
     <form
+      id={formId}
       ref={formRef}
-      action={async (fd) => {
-        await submitRedirectAction(() => editarSede(sede.id, {}, fd), setState, {
-          success: 'Sede atualizada.',
+      data-persist-bar-root=""
+      action={(fd) => {
+        startTransition(async () => {
+          await submitRedirectAction(() => editarSede(sede.id, {}, fd), setState, {
+            success: 'Sede atualizada.',
+          })
         })
       }}
       className="space-y-5"
     >
-      <SedeFormFields state={state} sedes={sedes.filter((s) => s.id !== sede.id)} defaults={sede} />
-      <SubmitButton label="Salvar alterações" />
+      <SedeFormFields
+        formId={formId}
+        state={state}
+        sedes={sedes.filter((s) => s.id !== sede.id)}
+        candidatos={candidatos}
+        defaults={sede}
+      />
+      <StickyPersistBar
+        locked={pending || isDirty}
+        dirtyLabel={
+          isDirty ? (changes.length === 1 ? changes[0] : `${changes.length} campos alterados`) : undefined
+        }
+        hint="Salve para publicar no portal e no mapa."
+      >
+        <Link
+          href="/admin/sedes"
+          className="rounded-xl border border-[rgb(var(--border))] px-5 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+        >
+          Cancelar
+        </Link>
+        <button
+          type="submit"
+          form={formId}
+          disabled={pending}
+          className="rounded-xl bg-[rgb(var(--primary))] px-5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {pending ? 'Salvando…' : 'Salvar alterações'}
+        </button>
+      </StickyPersistBar>
     </form>
   )
 }
@@ -261,6 +629,7 @@ export function ToggleSedeButton({ sedeId, ativa }: { sedeId: string; ativa: boo
 
   return (
     <button
+      type="button"
       onClick={() =>
         startTransition(async () => {
           await runPersistAction(() => alterarStatusSede(sedeId, !ativa), {

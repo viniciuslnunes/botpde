@@ -26,6 +26,8 @@ export interface AdminMembroItem {
   idade?: number | null
   /** Departamento pretendido no onboarding (sócio); null se não informou. */
   departamentoNome?: string | null
+  /** Unidade territorial (Sede/Subsede/PDE). */
+  sedeNome?: string | null
   /** Comprovante de vínculo (só sócio; dado RESTRITO — nunca cachear). */
   imagemProva?: string | null
   numeroAssociado?: string | null
@@ -75,12 +77,15 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
               Departamento
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden lg:table-cell">
+              Unidade
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden xl:table-cell">
               Cidade
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden xl:table-cell">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden 2xl:table-cell">
               Cadastro
             </th>
             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -178,6 +183,11 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                   </span>
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell">
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                    {membro.sedeNome ?? '—'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 hidden xl:table-cell">
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.cidade ?? '—'}</span>
                 </td>
                 <td className="px-4 py-3">
@@ -185,7 +195,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                     {membro.statusLabel}
                   </span>
                 </td>
-                <td className="px-4 py-3 hidden xl:table-cell">
+                <td className="px-4 py-3 hidden 2xl:table-cell">
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.criadoEmLabel}</span>
                 </td>
                 <td className="px-4 py-3">
