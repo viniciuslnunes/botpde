@@ -19,6 +19,7 @@ export type ContextoComunidadePortal =
         afiliacaoId: string | null
         logoUrl: string | null
         corPrimaria: string
+        balancoFinanceiroVisivel: boolean
       }
       afiliacao: AfiliacaoComunidade | null
     }
@@ -51,6 +52,7 @@ export const resolverContextoComunidade = cache(
           afiliacaoId: tenant.afiliacaoId,
           logoUrl: tenant.logoUrl,
           corPrimaria: tenant.corPrimaria,
+          balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
         },
         afiliacao,
       }
