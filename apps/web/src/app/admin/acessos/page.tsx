@@ -5,7 +5,7 @@ import { AccessManager } from '@/components/admin/access-manager'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
 import { assertPermission } from '@/lib/authz'
-import { PERMISSIONS, permissionsOfRole, PAPEL_DEPARTAMENTO } from '@torcida/types'
+import { PERMISSIONS, permissionsOfRole, PAPEL_DEPARTAMENTO, isDepartamentoLegado } from '@torcida/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Controle de acesso — Admin' }
@@ -118,9 +118,7 @@ export default async function AcessosPage({
   })
   // UI de áreas: esconde slugs legados (tipos de membro). O mapa completo
   // abaixo ainda resolve herança de perfis tipo "Membro · Torcedor".
-  const departamentos = departamentosRaw.filter(
-    (d) => d.slug !== 'socio' && d.slug !== 'torcedor' && d.nome !== 'Sócio' && d.nome !== 'Torcedor',
-  )
+  const departamentos = departamentosRaw.filter((d) => !isDepartamentoLegado(d))
 
   // Efetivas exibidas = herança do depto + extras (usar mapa completo, não o filtrado)
   const deptoById = new Map(departamentosRaw.map((d) => [d.id, d]))

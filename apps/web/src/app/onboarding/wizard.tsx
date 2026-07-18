@@ -19,6 +19,7 @@ import {
 import {
   NOME_UF,
 } from '@/lib/regioes-brasil'
+import { isDepartamentoLegado } from '@torcida/types'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -1341,12 +1342,11 @@ function PassoVinculo({
   const [uploadPend, setUploadPend] = useState(false)
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
-  // Filtra residuais "Sócio"/"Torcedor" se ainda existirem no tenant (legado
-  // de aprovações antigas) — tipo de membro não é departamento.
+  // getDepartamentosDoTenant já exclui legados; filtro defensivo no client.
   const departamentosSelecionaveis =
     departamentos === null
       ? null
-      : departamentos.filter((d) => d.nome !== 'Torcedor' && d.nome !== 'Sócio')
+      : departamentos.filter((d) => !isDepartamentoLegado(d))
 
   const unidadeSelecionada = unidadeId
     ? torcida.sedes.find((s) => s.id === unidadeId)

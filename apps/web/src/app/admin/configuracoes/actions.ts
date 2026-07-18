@@ -9,6 +9,7 @@ import {
   applyPermissionCascade,
   DEPARTAMENTO_MODULOS,
   formatNomeTorcida,
+  isDepartamentoLegado,
   PERMISSIONS,
   slugifyDepartamento,
 } from '@torcida/types'
@@ -104,7 +105,7 @@ export async function salvarDiscordGuildId(formData: FormData) {
   invalidateTenantCache(tenant.slug)
 }
 
-/** Expõe agregados financeiros (não lançamentos) em `/portal/balanco`. */
+/** Expõe o balanço detalhado (totais + lançamentos) em `/portal/balanco`. */
 export async function salvarBalancoFinanceiroVisivel(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
 
@@ -433,6 +434,9 @@ export async function criarDepartamento(formData: FormData) {
   const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
+  if (isDepartamentoLegado({ nome, slug: slugifyDepartamento(nome) })) {
+    throw new Error('Torcedor e Sócio são tipos de membro, não departamentos')
+  }
 
   const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
   const permissionsGestor = sanitizeDepartamentoPermissions([
@@ -470,6 +474,7 @@ export async function criarDepartamento(formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/acessos')
+  revalidatePath('/portal/departamentos')
 }
 
 export async function atualizarDepartamento(departamentoId: string, formData: FormData) {
@@ -487,6 +492,9 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
   const moduloPortal = parseModuloPortal(formData)
 
   if (!nome) throw new Error('Nome do departamento é obrigatório')
+  if (isDepartamentoLegado({ nome, slug: slugifyDepartamento(nome) })) {
+    throw new Error('Torcedor e Sócio são tipos de membro, não departamentos')
+  }
 
   const permissions = sanitizeDepartamentoPermissions(permissionsRaw)
   const permissionsGestor = sanitizeDepartamentoPermissions([
@@ -543,6 +551,7 @@ export async function atualizarDepartamento(departamentoId: string, formData: Fo
 
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/acessos')
+  revalidatePath('/portal/departamentos')
 }
 
 export async function excluirDepartamento(departamentoId: string) {

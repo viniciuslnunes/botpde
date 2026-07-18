@@ -175,6 +175,37 @@ const MODULO_LABEL = new Map(DEPARTAMENTO_MODULOS.map((m) => [m.key, m.label]))
 /** Slugs legados (tipo de membro, não área operacional) — não listar no hub. */
 export const DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL = Object.freeze(['socio', 'torcedor'])
 
+const SLUGS_LEGADOS = new Set(DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL)
+
+/** Nomes legados (case-insensitive) — cobre dados antigos com slug fora do padrão. */
+const DEPARTAMENTOS_NOMES_LEGADOS = new Set(['socio', 'sócio', 'torcedor'])
+
+/**
+ * Torcedor / Sócio são tipos de membro (`TipoMembro`), não departamentos.
+ * Aceita slug solto ou `{ slug, nome }` — use em listagens e gates de rota.
+ *
+ * @param {string | { slug?: string | null, nome?: string | null } | null | undefined} slugOrDept
+ * @param {string | null | undefined} [nome]
+ * @returns {boolean}
+ */
+export function isDepartamentoLegado(slugOrDept, nome) {
+  const slug =
+    typeof slugOrDept === 'string' || slugOrDept == null
+      ? slugOrDept
+      : slugOrDept.slug
+  const nomeResolvido =
+    typeof slugOrDept === 'object' && slugOrDept != null
+      ? (slugOrDept.nome ?? nome)
+      : nome
+
+  const slugNorm = typeof slug === 'string' ? slug.trim().toLowerCase() : ''
+  if (SLUGS_LEGADOS.has(slugNorm)) return true
+
+  const nomeNorm =
+    typeof nomeResolvido === 'string' ? nomeResolvido.trim().toLowerCase() : ''
+  return DEPARTAMENTOS_NOMES_LEGADOS.has(nomeNorm)
+}
+
 /**
  * @param {string} slug
  * @returns {DepartamentoCapability | null}

@@ -13,6 +13,7 @@ import {
   hrefHomeDepartamento,
   hrefModuloPortal,
   hrefOperacaoAdmin,
+  isDepartamentoLegado,
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   podeTerVice,
@@ -243,6 +244,16 @@ describe('departamento capabilities', () => {
     expect(capabilityPorSlug('patrimonio')?.portalPanel).toBe('patrimonio')
     expect(capabilityPorSlug('caravanas')?.moduloPortal).toBe('caravanas')
     expect(capabilityPorSlug('bateria')?.moduloPortal).toBe('bateria')
+  })
+
+  it('Torcedor e Sócio não são departamentos (slug ou nome)', () => {
+    expect(isDepartamentoLegado('torcedor')).toBe(true)
+    expect(isDepartamentoLegado('socio')).toBe(true)
+    expect(isDepartamentoLegado('TORCEDOR')).toBe(true)
+    expect(isDepartamentoLegado({ slug: 'x', nome: 'Torcedor' })).toBe(true)
+    expect(isDepartamentoLegado({ slug: 'financeiro', nome: 'Financeiro' })).toBe(false)
+    expect(isDepartamentoLegado('financeiro')).toBe(false)
+    expect(isDepartamentoLegado(null, 'Sócio')).toBe(true)
   })
 })
 

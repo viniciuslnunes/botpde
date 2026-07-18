@@ -10,6 +10,7 @@ import {
   hasPermission,
   hrefModuloPortal,
   hrefOperacaoAdmin,
+  isDepartamentoLegado,
   missionDepartamento,
   PERMISSIONS,
   resolverModuloPortalDepartamento,
@@ -102,6 +103,9 @@ export default async function DepartamentoHomePage({
   const { slug } = await params
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
 
+  // Torcedor/Sócio são TipoMembro — nunca home de departamento.
+  if (isDepartamentoLegado(slug)) notFound()
+
   const depto: DeptoRow | null = await db.departamento.findFirst({
     where: { tenantId: tenant.id, slug },
     select: {
@@ -117,7 +121,7 @@ export default async function DepartamentoHomePage({
       canalConversa: { select: { id: true, nome: true } },
     },
   })
-  if (!depto) notFound()
+  if (!depto || isDepartamentoLegado(depto)) notFound()
 
   const memberships: Array<{ departamentoId: string }> = await db.userDepartamento.findMany({
     where: { userId: session.user.id, tenantId: tenant.id },

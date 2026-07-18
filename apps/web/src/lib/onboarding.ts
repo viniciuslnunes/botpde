@@ -11,7 +11,7 @@ import {
   type StatsTorcidaOnboarding,
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
@@ -170,6 +170,7 @@ export type DepartamentoOnboarding = {
   id: string
   nome: string
   cor: string
+  slug: string
 }
 
 export type EstadoOnboarding = {
@@ -473,10 +474,10 @@ export const getDepartamentosDoTenant = cache(
   async (tenantId: string): Promise<DepartamentoOnboarding[]> => {
     const departamentos: DepartamentoOnboarding[] = await db.departamento.findMany({
       where: { tenantId },
-      select: { id: true, nome: true, cor: true },
+      select: { id: true, nome: true, cor: true, slug: true },
       orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
     })
-    return departamentos
+    return departamentos.filter((d) => !isDepartamentoLegado(d))
   },
 )
 

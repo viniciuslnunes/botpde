@@ -10,6 +10,7 @@ import {
   calculateEffectivePermissions,
   canManageDepartamento,
   hasPermission,
+  isDepartamentoLegado,
   mergeBarracaoItem,
   BARRACAO_CHECKLIST,
   PERMISSIONS,
@@ -20,6 +21,7 @@ import {
 } from '@/app/admin/acessos/actions'
 
 const IdSchema = z.string().min(1)
+const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
 
 export type ActionState = { ok?: boolean; error?: string }
 
@@ -52,6 +54,50 @@ async function assertPodeGerirArea(departamentoId: string) {
   }
 
   return { session, tenant }
+}
+
+/** Atualiza só a cor do ícone da área (hub / portal). */
+export async function atualizarCorDepartamento(
+  departamentoId: string,
+  cor: string,
+): Promise<void> {
+  const idParsed = IdSchema.safeParse(departamentoId)
+  const corParsed = CorSchema.safeParse(cor)
+  if (!idParsed.success || !corParsed.success) {
+    throw new Error('Dados inválidos')
+  }
+
+  const { session, tenant } = await assertPodeGerirArea(idParsed.data)
+
+  const depto: { id: string; slug: string; nome: string; cor: string } | null =
+    await db.departamento.findFirst({
+      where: { id: idParsed.data, tenantId: tenant.id },
+      select: { id: true, slug: true, nome: true, cor: true },
+    })
+  if (!depto) throw new Error('Departamento não encontrado')
+  if (isDepartamentoLegado(depto)) {
+    throw new Error('Torcedor e Sócio não são departamentos')
+  }
+
+  await db.departamento.update({
+    where: { id: depto.id },
+    data: { cor: corParsed.data },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'DEPARTAMENTO_COR_ATUALIZADA',
+      entidade: 'Departamento',
+      entidadeId: depto.id,
+      detalhes: { corAntes: depto.cor, cor: corParsed.data, slug: depto.slug },
+    },
+  })
+
+  revalidatePath('/portal/departamentos')
+  revalidatePath(`/portal/departamentos/${depto.slug}`)
+  revalidatePath('/admin/acessos')
 }
 
 export async function adicionarMembroArea(

@@ -1,5 +1,5 @@
 import { db } from '@torcida/db'
-import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema } from '@torcida/types'
+import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema, isDepartamentoLegado } from '@torcida/types'
 
 /** Pessoa exibida no mural organizacional. */
 export interface OrgPerson {
@@ -156,13 +156,7 @@ export async function getOrganizacaoTree(tenantId: string, tenantNome: string): 
     }
   }
 
-  const deptosFiltrados = departamentosRaw.filter(
-    (d) =>
-      d.slug !== 'socio' &&
-      d.slug !== 'torcedor' &&
-      d.nome !== 'Sócio' &&
-      d.nome !== 'Torcedor',
-  )
+  const deptosFiltrados = departamentosRaw.filter((d) => !isDepartamentoLegado(d))
 
   const branches: OrgDepartamentoBranch[] = deptosFiltrados.map((dept) => {
     const gestIds = new Set(

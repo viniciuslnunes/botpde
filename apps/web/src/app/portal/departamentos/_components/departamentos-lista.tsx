@@ -1,12 +1,15 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL,
+  calculateEffectivePermissions,
+  hasPermission,
   hrefHomeDepartamento,
   hrefModuloPortal,
+  isDepartamentoLegado,
+  PERMISSIONS,
   resolverModuloPortalDepartamento,
   rotuloAreaDepartamento,
 } from '@torcida/types'
@@ -21,6 +24,7 @@ import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { ArrowRight, Briefcase, Eye, LayoutGrid, Settings2 } from 'lucide-react'
 import { iconeDepartamento } from './departamento-icone'
+import { DepartamentoCorPicker } from './departamento-cor-picker'
 
 interface MembershipLite {
   departamentoId: string
@@ -30,7 +34,7 @@ interface GestorLite {
   departamentoId: string
 }
 
-const LEGACY = new Set<string>(DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL)
+type DeptoHubCardItem = DeptoHubItem & { podeEditarCor: boolean }
 
 /** Rótulo curto do atalho para o módulo portal (não a home do departamento). */
 function rotuloAtalhoModulo(slug: string): string {
@@ -57,7 +61,7 @@ function rotuloAtalhoModulo(slug: string): string {
   }
 }
 
-function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) {
+function DeptoHubCard({ depto, index }: { depto: DeptoHubCardItem; index: number }) {
   const moduloKey = resolverModuloPortalDepartamento(depto.slug, depto.moduloPortal)
   const homeHref = hrefHomeDepartamento(depto.slug)
   const moduloHref = hrefModuloPortal(moduloKey)
@@ -80,12 +84,21 @@ function DeptoHubCard({ depto, index }: { depto: DeptoHubItem; index: number }) 
     <MotionReveal index={index} className="h-full">
       <div className="flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 transition-[border-color,box-shadow] duration-150 hover:border-[rgb(var(--primary)_/_0.45)] hover:shadow-sm">
         <div className="flex items-start gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
-            style={{ backgroundColor: depto.cor }}
-          >
-            <Icon className="h-5 w-5" aria-hidden />
-          </div>
+          {depto.podeEditarCor ? (
+            <DepartamentoCorPicker
+              departamentoId={depto.id}
+              cor={depto.cor}
+              nome={depto.nome}
+              Icon={Icon}
+            />
+          ) : (
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+              style={{ backgroundColor: depto.cor }}
+            >
+              <Icon className="h-5 w-5" aria-hidden />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="min-w-0 flex-1 truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))]">
@@ -135,7 +148,7 @@ function DeptoHubGrid({
   items,
   indexOffset = 0,
 }: {
-  items: DeptoHubItem[]
+  items: DeptoHubCardItem[]
   indexOffset?: number
 }) {
   return (
@@ -169,10 +182,11 @@ export async function DepartamentosSection() {
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
 
-  const [memberships, gestorDe, todosTenant]: [
+  const [memberships, gestorDe, todosRaw, perms]: [
     MembershipLite[],
     GestorLite[],
     DeptoHubBase[],
+    Awaited<ReturnType<typeof getUserPermissionsInTenant>>,
   ] = await Promise.all([
     db.userDepartamento.findMany({
       where: { userId: session.user.id, tenantId: tenant.id },
@@ -197,10 +211,7 @@ export async function DepartamentosSection() {
       select: { departamentoId: true },
     }),
     db.departamento.findMany({
-      where: {
-        tenantId: tenant.id,
-        slug: { notIn: [...DEPARTAMENTOS_SLUGS_LEGADOS_PORTAL] },
-      },
+      where: { tenantId: tenant.id },
       select: {
         id: true,
         nome: true,
@@ -213,18 +224,28 @@ export async function DepartamentosSection() {
       },
       orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
     }),
+    getUserPermissionsInTenant(session.user.id, tenant.id),
   ])
+
+  const todosTenant = todosRaw.filter((d) => !isDepartamentoLegado(d))
+  const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
+  const podeGerirCoresGlobal =
+    isSuperAdmin || hasPermission(effective, PERMISSIONS.ROLES_MANAGE)
 
   const diretoriaId = todosTenant.find((d) => d.slug === 'diretoria')?.id ?? null
   const departamentos = resolverDepartamentosHub({
-    todos: todosTenant.filter((d) => !LEGACY.has(d.slug)),
+    todos: todosTenant,
     membershipIds: memberships
-      .filter((m) => !LEGACY.has(m.departamento.slug))
+      .filter((m) => !isDepartamentoLegado(m.departamento))
       .map((m) => m.departamentoId),
     gestorIds: gestorDe.map((g) => g.departamentoId),
     diretoriaId,
     isSuperAdmin,
-  })
+  }).map((d) => ({
+    ...d,
+    // Gestor da área ou quem tem roles:manage (Presidência / SA).
+    podeEditarCor: podeGerirCoresGlobal || d.isGestor,
+  }))
 
   if (departamentos.length === 0) {
     return (

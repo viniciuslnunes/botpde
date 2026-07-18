@@ -21,6 +21,7 @@ import {
   PAPEL_DEPARTAMENTO,
   nomePerfilDepartamento,
 } from '../../types/src/permissions.js'
+import { isDepartamentoLegado } from '../../types/src/departamento-capabilities.js'
 
 /** Slugs legados que não são departamentos (são tipos de membro). */
 export const DEPARTAMENTOS_SLUGS_LEGADOS = ['socio', 'torcedor']
@@ -428,9 +429,18 @@ async function runTasks(concurrent, tasks) {
  */
 export async function upsertDepartamentosCanonicos(client, tenantId, opts = {}) {
   const concurrent = opts.concurrent === true
-  const removed = await client.departamento.deleteMany({
-    where: { tenantId, slug: { in: DEPARTAMENTOS_SLUGS_LEGADOS } },
+  // Remove por slug canônico legado e por nome (dados antigos com slug fora do padrão).
+  const candidatosLegados = await client.departamento.findMany({
+    where: { tenantId },
+    select: { id: true, slug: true, nome: true },
   })
+  const legadoIds = candidatosLegados
+    .filter((d) => isDepartamentoLegado(d))
+    .map((d) => d.id)
+  const removed =
+    legadoIds.length > 0
+      ? await client.departamento.deleteMany({ where: { id: { in: legadoIds } } })
+      : { count: 0 }
 
   // Fast-path: a maioria dos tenants não tem rename legado — 2 queries em vez de ~6+.
   if (DEPARTAMENTO_RENAMES.length > 0) {

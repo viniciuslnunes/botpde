@@ -16,6 +16,7 @@ import {
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
+import { isDepartamentoLegado } from '@torcida/types'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -500,11 +501,12 @@ export async function solicitarVinculo(
   // não cria membership até o admin aprovar (aprovarMembro).
   let departamentoId: string | null = null
   if (data.tipo === 'SOCIO' && data.departamentoId) {
-    const dep = await db.departamento.findFirst({
-      where: { id: data.departamentoId, tenantId: tenant.id },
-      select: { id: true },
-    })
-    if (!dep) {
+    const dep: { id: string; slug: string; nome: string } | null =
+      await db.departamento.findFirst({
+        where: { id: data.departamentoId, tenantId: tenant.id },
+        select: { id: true, slug: true, nome: true },
+      })
+    if (!dep || isDepartamentoLegado(dep)) {
       return { errors: { departamentoId: ['Departamento inválido'] } }
     }
     departamentoId = dep.id
