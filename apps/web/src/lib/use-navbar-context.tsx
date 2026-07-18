@@ -23,6 +23,9 @@ let cached: NavbarContext | null = null
 let cachedAt = 0
 let inflight: Promise<NavbarContext> | null = null
 
+/** Assinantes do patch otimista (ex.: zerar badge ao marcar todas como lidas). */
+const listeners = new Set<(data: NavbarContext) => void>()
+
 /** Última contagem de não lidas do chat — detecta aumento sem duplicar entre polls. */
 let lastUnreadMessages: number | null = null
 
@@ -30,6 +33,23 @@ const TOAST_DURATION_MS = 6000
 
 /** Vigia singleton do portal — só há um navbar de portal montado por vez. */
 const notificarNovas = criarVigiaDeNotificacoes('/portal/comunidade/notificacoes')
+
+/**
+ * Zera o badge do sino imediatamente e marca os itens em cache como lidos.
+ * Usado por "marcar todas como lidas" antes do round-trip da Server Action.
+ */
+export function markNavbarNotificationsRead(): void {
+  const next: NavbarContext = {
+    unreadMessages: cached?.unreadMessages ?? 0,
+    unreadNotifications: 0,
+    hasAdminAreaAccess: cached?.hasAdminAreaAccess ?? false,
+    isAdmin: cached?.isAdmin ?? false,
+    notifications: (cached?.notifications ?? []).map((n) => ({ ...n, lida: true })),
+  }
+  cached = next
+  cachedAt = Date.now()
+  for (const listener of listeners) listener(next)
+}
 
 /**
  * Alerta genérico de mensagem nova a partir do contador do chat — não usa a
@@ -98,6 +118,14 @@ function loadNavbarContext(force = false): Promise<NavbarContext> {
   return inflight
 }
 
+/** Recarrega o contexto da navbar e notifica assinantes (rollback após falha otimista). */
+export function refreshNavbarContext(force = true): Promise<NavbarContext> {
+  return loadNavbarContext(force).then((data) => {
+    for (const listener of listeners) listener(data)
+    return data
+  })
+}
+
 export function useNavbarContext() {
   const pathname = usePathname()
   const router = useRouter()
@@ -126,6 +154,14 @@ export function useNavbarContext() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    const onPatch = (data: NavbarContext) => setCtx(data)
+    listeners.add(onPatch)
+    return () => {
+      listeners.delete(onPatch)
+    }
+  }, [])
 
   useVisibleInterval(() => {
     if (onMensagensPage) return

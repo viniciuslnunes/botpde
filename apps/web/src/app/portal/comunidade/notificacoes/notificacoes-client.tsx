@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -10,6 +11,10 @@ import { NotificationAvatar, formatarTituloNotificacao } from '@/components/port
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
+import {
+  markNavbarNotificationsRead,
+  refreshNavbarContext,
+} from '@/lib/use-navbar-context'
 
 const FILTROS: Array<{ id: FiltroNotificacaoSocial; label: string }> = [
   { id: 'todas', label: 'Todas' },
@@ -59,6 +64,7 @@ interface Props {
 }
 
 export function NotificacoesComunidadeClient({ inicial }: Props) {
+  const router = useRouter()
   const [filtro, setFiltro] = useState<FiltroNotificacaoSocial>('todas')
   const [itens, setItens] = useState<NotificacaoSocialItem[]>(inicial)
   const [carregando, setCarregando] = useState(false)
@@ -86,12 +92,17 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
   }
 
   function marcarTodas() {
+    setItens((prev) => prev.map((n) => ({ ...n, lida: true })))
+    markNavbarNotificationsRead()
     startTransition(async () => {
       try {
         await marcarTodasNotificacoesLidas()
-        setItens((prev) => prev.map((n) => ({ ...n, lida: true })))
+        void refreshNavbarContext(true)
+        router.refresh()
         toast.success('Todas as notificações foram marcadas como lidas.')
       } catch (e) {
+        void refreshNavbarContext(true)
+        void carregar(filtro)
         toast.error(e instanceof Error ? e.message : 'Erro ao marcar notificações.')
       }
     })
