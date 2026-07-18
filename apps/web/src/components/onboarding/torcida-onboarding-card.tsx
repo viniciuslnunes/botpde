@@ -13,7 +13,7 @@ type Props = {
 }
 
 /**
- * Card de torcida organizada — escudo circular à esquerda (altura do card),
+ * Card de torcida organizada — logo à esquerda (altura do card),
  * nome e meta à direita.
  */
 export function TorcidaOnboardingCard({

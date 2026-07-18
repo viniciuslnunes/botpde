@@ -55,14 +55,14 @@ export default async function TorcidaComunidadePublicaPage({
                 alt=""
                 width={64}
                 height={64}
-                className="h-16 w-16 shrink-0 rounded-xl border border-[rgb(var(--border))] object-contain"
+                className="h-16 w-16 shrink-0 object-contain"
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoUrl}
                 alt=""
-                className="h-16 w-16 shrink-0 rounded-xl border border-[rgb(var(--border))] object-contain"
+                className="h-16 w-16 shrink-0 object-contain"
               />
             )
           ) : (

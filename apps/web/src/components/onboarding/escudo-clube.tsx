@@ -22,7 +22,7 @@ type Props = {
   apelido?: string | null
   escudoUrl?: string | null
   size?: EscudoClubeSize
-  /** `circle` = borda circular (torcidas); `rounded` = cantos (clubes). */
+  /** Forma do placeholder (sem imagem). Com logo: sem moldura — o PNG fala por si. */
   shape?: EscudoClubeShape
   /** Prioriza decode/fetch (primeiros cards acima da dobra). */
   priority?: boolean
@@ -38,6 +38,7 @@ export function inicialClubeEscudo(nome: string, apelido?: string | null): strin
 
 /**
  * Escudo do clube/torcida no onboarding: frame fixo + object-contain (nunca corta o logo).
+ * Com imagem: sem borda/fundo circular — logo transparente sobre o card.
  * Placeholder neutro quando ausente ou com falha — nunca inventa escudo.
  */
 export function EscudoClube({
@@ -53,22 +54,15 @@ export function EscudoClube({
   const s = SIZES[size]
   const label = apelido || nome
   const mostrarImagem = Boolean(escudoUrl && !imagemFalhou)
-  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-xl'
 
-  const frameClass = [
-    'relative flex shrink-0 items-center justify-center overflow-hidden',
-    radius,
-    'border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',
-    s.box,
-    className ?? '',
-  ]
+  const boxClass = ['relative flex shrink-0 items-center justify-center', s.box, className ?? '']
     .filter(Boolean)
     .join(' ')
 
   if (mostrarImagem && escudoUrl) {
-    const imgClass = 'h-full w-full object-contain p-1.5'
+    const imgClass = 'h-full w-full object-contain'
     return (
-      <div className={frameClass}>
+      <div className={boxClass}>
         {canOptimizeImageUrl(escudoUrl) ? (
           <Image
             src={escudoUrl}
@@ -97,9 +91,16 @@ export function EscudoClube({
     )
   }
 
+  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-xl'
+  const placeholderClass = [
+    boxClass,
+    'overflow-hidden border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',
+    radius,
+  ].join(' ')
+
   const inicial = inicialClubeEscudo(nome, apelido)
   return (
-    <div className={`${frameClass} border-dashed`} aria-hidden="true">
+    <div className={placeholderClass} aria-hidden="true">
       <Shield className={`absolute ${s.icon} text-[rgb(var(--foreground-muted)_/_0.35)]`} />
       <span className={`relative ${s.text} font-bold text-[rgb(var(--foreground-muted))]`}>
         {inicial}

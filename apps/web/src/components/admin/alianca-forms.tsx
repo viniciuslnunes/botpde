@@ -81,7 +81,7 @@ function TorcidaThumb({
   size?: ThumbSize
 }) {
   const s = THUMB_SIZES[size]
-  const className = `${s.box} shrink-0 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] object-contain`
+  const imgClass = `${s.box} shrink-0 object-contain`
 
   if (logoUrl) {
     if (canOptimizeImageUrl(logoUrl)) {
@@ -91,19 +91,19 @@ function TorcidaThumb({
           alt=""
           width={s.px}
           height={s.px}
-          className={className}
+          className={imgClass}
         />
       )
     }
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={logoUrl} alt="" className={className} loading="lazy" decoding="async" />
+      <img src={logoUrl} alt="" className={imgClass} loading="lazy" decoding="async" />
     )
   }
 
   return (
     <div
-      className={`flex ${s.box} shrink-0 items-center justify-center rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] ${s.text} font-bold text-[rgb(var(--foreground-muted))]`}
+      className={`flex ${s.box} shrink-0 items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] ${s.text} font-bold text-[rgb(var(--foreground-muted))]`}
       aria-hidden="true"
     >
       {(nome.charAt(0) || '?').toUpperCase()}

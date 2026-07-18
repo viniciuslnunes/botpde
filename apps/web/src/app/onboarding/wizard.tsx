@@ -767,7 +767,7 @@ function PassoTorcida({
         className="mt-6 flex w-full items-center gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 sm:gap-5 sm:p-5"
       >
         {pending ? (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
           </div>
         ) : (
