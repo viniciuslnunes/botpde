@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(publicUrl('/super-admin/torcidas', request))
   }
 
-  // Apelido obrigatório antes de onboarding/portal (contas novas e antigas).
+  // Nome + @ obrigatórios antes de onboarding/portal (OAuth e contas antigas).
   if (await usuarioPrecisaNickname(session.user.id)) {
     return NextResponse.redirect(publicUrl('/definir-apelido', request))
   }

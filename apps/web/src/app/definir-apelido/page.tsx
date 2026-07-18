@@ -3,15 +3,20 @@ import { redirect } from 'next/navigation'
 import { AtSign } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { candidatosNickname } from '@torcida/types'
+import { candidatosNicknameOAuth } from '@/lib/oauth-perfil'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
-import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { DefinirApelidoForm } from './definir-apelido-form'
 
-export const metadata: Metadata = { title: 'Escolher apelido' }
+export const metadata: Metadata = { title: 'Completar perfil' }
 
-async function primeiraSugestaoLivre(nome: string, userId: string): Promise<string> {
-  for (const candidato of candidatosNickname(nome)) {
+async function primeiraSugestaoLivre(
+  seeds: string[],
+  nome: string,
+  email: string | null,
+  userId: string,
+): Promise<string> {
+  for (const candidato of candidatosNicknameOAuth(seeds, nome, email)) {
     const check = await checarNicknameDisponivel(candidato, userId)
     if (check.ok && check.disponivel) return check.nickname
   }
@@ -22,20 +27,29 @@ export default async function DefinirApelidoPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const user: { nickname: string | null; nome: string | null } | null = await db.user.findUnique({
+  const user: {
+    nickname: string | null
+    nome: string | null
+    email: string | null
+  } | null = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { nickname: true, nome: true },
+    select: { nickname: true, nome: true, email: true },
   })
 
-  // Já tem @ → segue o fluxo normal pós-login (super-admin volta ao painel).
-  if (user?.nickname) {
+  // Perfil completo (nome + e-mail + @) → segue o fluxo normal pós-login.
+  if (user && !(await usuarioPrecisaNickname(session.user.id))) {
     redirect(isSuperAdminEmail(session.user.email) ? '/super-admin/torcidas' : '/auth/contexto')
   }
 
-  const sugestao = await primeiraSugestaoLivre(
-    user?.nome ?? session.user.name ?? '',
-    session.user.id,
-  )
+  const nome = user?.nome?.trim() || session.user.name?.trim() || ''
+  const email = (user?.email ?? session.user.email ?? '').trim()
+  const pedirNome = nome.length < 3
+  const pedirEmail = !email
+  const completarMaisQueNick = pedirNome || pedirEmail
+
+  const sugestao = user?.nickname
+    ? ''
+    : await primeiraSugestaoLivre([], nome, email || null, session.user.id)
 
   return (
     <div className="app-shell-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4">
@@ -47,16 +61,24 @@ export default async function DefinirApelidoPage() {
             <AtSign className="h-7 w-7" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[rgb(var(--foreground))]">
-            Escolha seu apelido
+            {completarMaisQueNick ? 'Complete seu perfil' : 'Escolha seu apelido'}
           </h1>
           <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-            Antes de entrar na comunidade, defina um @ único. É assim que o pessoal te encontra no
-            feed.
+            {completarMaisQueNick
+              ? 'Faltam alguns dados da conta social. Defina como você aparece na comunidade.'
+              : 'Antes de entrar na comunidade, defina um @ único. É assim que o pessoal te encontra no feed.'}
           </p>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 shadow-xl shadow-black/5">
-          <DefinirApelidoForm sugestao={sugestao} nicknameAtual={null} />
+          <DefinirApelidoForm
+            sugestao={sugestao}
+            nicknameAtual={user?.nickname ?? null}
+            nomeAtual={nome}
+            emailAtual={email}
+            pedirNome={pedirNome}
+            pedirEmail={pedirEmail}
+          />
         </div>
       </div>
     </div>

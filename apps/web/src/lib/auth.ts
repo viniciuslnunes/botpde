@@ -9,6 +9,8 @@ import { env, isProd } from '@/lib/env'
 import { excedeuLimite, registrarTentativaFalha } from '@/lib/rate-limit'
 import { resolveSharedCookieDomain } from '@/lib/session-cookie'
 import { registrarUltimoAcesso } from '@/lib/presenca'
+import { extrairPerfilOAuth } from '@/lib/oauth-perfil'
+import { tentarAtribuirNickname } from '@/lib/nickname-disponivel'
 
 // Cookie compartilhado entre subdomínios só quando o host público = ROOT_DOMAIN.
 const cookieDomain = resolveSharedCookieDomain()
@@ -150,20 +152,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         const discordId = account.provider === 'discord' ? account.providerAccountId : undefined
-        const googleId  = account.provider === 'google'  ? account.providerAccountId : undefined
+        const googleId = account.provider === 'google' ? account.providerAccountId : undefined
+        const email = user?.email?.trim().toLowerCase() || undefined
 
         const dbUser = await db.user.findFirst({
           where: {
             OR: [
               ...(discordId ? [{ discordId }] : []),
-              ...(googleId  ? [{ googleId  }] : []),
+              ...(googleId ? [{ googleId }] : []),
+              // Fallback: vinculação por e-mail em findOrCreateUser (mesmo request).
+              ...(email ? [{ email }] : []),
             ],
           },
           select: { id: true },
         })
 
         if (dbUser) {
-          token.sub = dbUser.id   // UUID do banco — usado em session.user.id
+          token.sub = dbUser.id // UUID do banco — usado em session.user.id
         }
       }
       return token
@@ -188,6 +193,7 @@ async function findOrCreateUser(
 ) {
   const discordId = account.provider === 'discord' ? account.providerAccountId : undefined
   const googleId = account.provider === 'google' ? account.providerAccountId : undefined
+  const extraido = extrairPerfilOAuth(account.provider, user, profile)
 
   // Tenta encontrar usuário existente por provider ID ou e-mail
   let existingUser = await db.user.findFirst({
@@ -195,39 +201,41 @@ async function findOrCreateUser(
       OR: [
         ...(discordId ? [{ discordId }] : []),
         ...(googleId ? [{ googleId }] : []),
-        ...(user.email ? [{ email: user.email }] : []),
+        ...(extraido.email ? [{ email: extraido.email }] : []),
       ],
     },
   })
 
   if (existingUser) {
-    // Vincula provider se ainda não vinculado (ex: usuário logou com Discord antes e agora logou com Google)
-    await db.user.update({
+    // Preenche lacunas do perfil com dados do provider; vincula IDs OAuth.
+    // Não sobrescreve nome/e-mail já escolhidos pelo usuário.
+    existingUser = await db.user.update({
       where: { id: existingUser.id },
       data: {
         ...(discordId && !existingUser.discordId ? { discordId } : {}),
         ...(googleId && !existingUser.googleId ? { googleId } : {}),
-        // Google fornece dados mais precisos — usa como fonte preferida
-        ...(account.provider === 'google'
-          ? {
-              nome: user.name ?? existingUser.nome,
-              avatarUrl: user.image ?? existingUser.avatarUrl,
-              email: user.email ?? existingUser.email,
-            }
-          : {}),
+        ...(!existingUser.nome && extraido.nome ? { nome: extraido.nome } : {}),
+        ...(!existingUser.email && extraido.email ? { email: extraido.email } : {}),
+        // Avatar vem do provider — sem upload próprio ainda; mantém fresco no login.
+        ...(extraido.avatarUrl ? { avatarUrl: extraido.avatarUrl } : {}),
       },
     })
   } else {
-    // Cria novo usuário
     existingUser = await db.user.create({
       data: {
-        email: user.email ?? null,
-        nome: user.name ?? null,
-        avatarUrl: user.image ?? null,
+        email: extraido.email,
+        nome: extraido.nome,
+        avatarUrl: extraido.avatarUrl,
         discordId: discordId ?? null,
         googleId: googleId ?? null,
       },
     })
+  }
+
+  // Mesmos campos essenciais do cadastro manual (exceto senha): tenta @ automático.
+  if (!existingUser.nickname && extraido.nicknameSeeds.length > 0) {
+    const nick = await tentarAtribuirNickname(existingUser.id, extraido.nicknameSeeds)
+    if (nick) existingUser = { ...existingUser, nickname: nick }
   }
 
   return existingUser

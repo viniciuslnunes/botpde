@@ -55,13 +55,21 @@ export async function usuarioPrecisaOnboarding(userId: string): Promise<boolean>
   return !perfil?.onboardingConcluidoEm
 }
 
-/** Sem @nickname definido — precisa passar por /definir-apelido. */
+/**
+ * Conta incompleta vs cadastro manual (nome + e-mail + @) — OAuth sem senha é ok.
+ * Redireciona para /definir-apelido até preencher o que falta.
+ */
 export async function usuarioPrecisaNickname(userId: string): Promise<boolean> {
-  const user: { nickname: string | null } | null = await db.user.findUnique({
-    where: { id: userId },
-    select: { nickname: true },
-  })
-  return !user?.nickname
+  const user: { nickname: string | null; nome: string | null; email: string | null } | null =
+    await db.user.findUnique({
+      where: { id: userId },
+      select: { nickname: true, nome: true, email: true },
+    })
+  if (!user) return true
+  if (!user.nickname) return true
+  if (!user.nome || user.nome.trim().length < 3) return true
+  if (!user.email?.trim()) return true
+  return false
 }
 
 /**

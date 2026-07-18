@@ -16,11 +16,14 @@ export type DefinirApelidoState = {
 }
 
 const schema = z.object({
+  nome: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(100),
+  email: z.string().email('E-mail inválido'),
   nickname: nicknameSchema,
 })
 
 /**
- * Define o @nickname (obrigatório). Usado no pós-login OAuth e contas antigas.
+ * Completa nome + e-mail + @nickname. Pós-login OAuth e contas antigas.
+ * Espelha os campos do cadastro manual (exceto senha — OAuth não tem).
  */
 export async function definirApelido(
   _prev: DefinirApelidoState,
@@ -31,12 +34,17 @@ export async function definirApelido(
     return { redirectTo: '/entrar' }
   }
 
-  const parsed = schema.safeParse({ nickname: formData.get('nickname') })
+  const parsed = schema.safeParse({
+    nome: formData.get('nome'),
+    email: formData.get('email'),
+    nickname: formData.get('nickname'),
+  })
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const { nickname } = parsed.data
+  const { nome, nickname } = parsed.data
+  const email = parsed.data.email.trim().toLowerCase()
 
   const nickCheck = await checarNicknameDisponivel(nickname, session.user.id)
   if (!nickCheck.ok) {
@@ -46,16 +54,33 @@ export async function definirApelido(
     return { errors: { nickname: [nickCheck.motivo] } }
   }
 
+  const emailEmUso: { id: string } | null = await db.user.findFirst({
+    where: {
+      email: { equals: email, mode: 'insensitive' },
+      NOT: { id: session.user.id },
+    },
+    select: { id: true },
+  })
+  if (emailEmUso) {
+    return {
+      errors: {
+        email: ['Este e-mail já está em outra conta. Entre com essa conta ou use outro e-mail.'],
+      },
+    }
+  }
+
   try {
     await db.user.update({
       where: { id: session.user.id },
-      data: { nickname },
+      data: { nome: nome.trim(), email, nickname },
     })
   } catch (err) {
     const code =
       err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
     if (code === 'P2002') {
-      return { errors: { nickname: ['Este apelido já está em uso. Escolha outro.'] } }
+      return {
+        message: 'E-mail ou apelido já cadastrado. Escolha outro.',
+      }
     }
     throw err
   }

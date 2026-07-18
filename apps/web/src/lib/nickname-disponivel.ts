@@ -52,3 +52,34 @@ export async function checarNicknameDisponivel(
 
   return { ok: true, nickname, disponivel: true }
 }
+
+/**
+ * Tenta gravar o primeiro @ válido e livre da lista (OAuth).
+ * Não inventa sufixos numéricos — se o handle natural estiver ocupado, deixa
+ * para /definir-apelido (usuário escolhe).
+ */
+export async function tentarAtribuirNickname(
+  userId: string,
+  seeds: string[],
+): Promise<string | null> {
+  for (const seed of seeds) {
+    const check = await checarNicknameDisponivel(seed, userId)
+    if (!check.ok || !check.disponivel) continue
+    try {
+      await db.user.update({
+        where: { id: userId },
+        data: { nickname: check.nickname },
+      })
+      return check.nickname
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code: unknown }).code)
+          : ''
+      // Corrida: outro usuário pegou o @ entre o check e o update.
+      if (code === 'P2002') continue
+      throw err
+    }
+  }
+  return null
+}
