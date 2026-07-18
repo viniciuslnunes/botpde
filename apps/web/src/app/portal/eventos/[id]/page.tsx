@@ -56,7 +56,7 @@ function FotoFallback({ tipo }: { tipo: string }) {
       ? 'from-amber-500/30 to-amber-500/5 text-amber-200'
       : tipo === 'ENSAIO'
         ? 'from-sky-500/30 to-sky-500/5 text-sky-200'
-        : 'from-[rgb(var(--primary)_/_0.35)] to-[rgb(var(--primary)_/_0.06)] text-[rgb(var(--primary))]'
+        : 'from-[rgb(var(--color-primary)_/_0.35)] to-[rgb(var(--color-primary)_/_0.06)] text-[rgb(var(--color-primary-fg))]'
   return (
     <div
       className={`flex h-full min-h-[200px] w-full items-center justify-center bg-gradient-to-br ${tone}`}
@@ -206,7 +206,7 @@ export default async function EventoDetailPage({
 
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-[rgb(var(--foreground-muted))]">
                 <span className="inline-flex items-center gap-1.5 font-medium text-[rgb(var(--foreground))]">
-                  <CalendarDays className="h-4 w-4 shrink-0 text-[rgb(var(--primary))]" />
+                  <CalendarDays className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" />
                   {formatarDataCompleta(new Date(evento.data))}
                 </span>
                 {evento.local && (

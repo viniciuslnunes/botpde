@@ -76,6 +76,7 @@ type Props = {
 type ContrastCheck = {
   id: string
   label: string
+  mode: PreviewMode
   ratio: number
   min: number
   ok: boolean
@@ -95,7 +96,23 @@ function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
   return { ...defaults, ...overrides }
 }
 
-function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastCheck[] {
+function secondaryHexOf(design: TenantDesign): string {
+  if (
+    design.brand.secondary &&
+    /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
+  ) {
+    return design.brand.secondary
+  }
+  return contrasteTextoSobre(design.brand.primary) === 'light'
+    ? '#f4f4f5'
+    : '#27272a'
+}
+
+/** Pares WCAG de um tema — marca, ações e superfícies. */
+function buildContrastChecksForMode(
+  design: TenantDesign,
+  mode: PreviewMode,
+): ContrastCheck[] {
   const s = resolveSurfaces(design, mode)
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const actionsFg = { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}) }
@@ -105,7 +122,15 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
     brandFg.primary,
     s.surface,
   )
+  const secondaryHex = secondaryHexOf(design)
+  const secondaryText = resolveActionTextColors(
+    secondaryHex,
+    brandFg.secondary,
+    s.surface,
+  )
   const primarySoftBg = mixHex(s.surface, design.brand.primary, 0.14)
+  const secondarySoftBg = mixHex(s.surface, secondaryHex, 0.14)
+  const tema = mode === 'dark' ? 'escuro' : 'claro'
 
   const pairs: {
     id: string
@@ -121,7 +146,7 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
       fg: s.foreground,
       bg: s.background,
       min: 4.5,
-      tip: 'Aumente o contraste do texto principal ou ajuste o fundo.',
+      tip: 'Ajuste texto principal ou fundo da página.',
     },
     {
       id: 'title-subtle',
@@ -133,11 +158,19 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
     },
     {
       id: 'muted',
-      label: 'Texto secundário',
+      label: 'Texto secundário no fundo',
       fg: s.foregroundMuted,
       bg: s.background,
       min: 4.5,
-      tip: 'Descrições ilegíveis. Escureça o texto secundário.',
+      tip: 'Descrições ilegíveis — escureça/clareie o texto secundário.',
+    },
+    {
+      id: 'muted-card',
+      label: 'Texto secundário no cartão',
+      fg: s.foregroundMuted,
+      bg: s.surface,
+      min: 4.5,
+      tip: 'Legendas em cartão somem neste tema.',
     },
     {
       id: 'card',
@@ -146,6 +179,14 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
       bg: s.surface,
       min: 4.5,
       tip: 'Cartões precisam de texto legível.',
+    },
+    {
+      id: 'raised',
+      label: 'Texto em superfície elevada',
+      fg: s.foreground,
+      bg: s.surfaceRaised,
+      min: 4.5,
+      tip: 'Menus/popovers usam superfície elevada.',
     },
     {
       id: 'primary-btn',
@@ -161,7 +202,23 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
       fg: primaryText.fg,
       bg: primarySoftBg,
       min: 3,
-      tip: 'Texto de abas some no escuro — use Automático ou outra cor de texto.',
+      tip: 'Texto de abas some — use Automático ou outra cor de texto.',
+    },
+    {
+      id: 'secondary-btn',
+      label: 'Botão secundário',
+      fg: secondaryText.on,
+      bg: secondaryHex,
+      min: 4.5,
+      tip: 'Secundária clara precisa de texto escuro (e vice-versa).',
+    },
+    {
+      id: 'secondary-soft',
+      label: 'Badge / link secundário',
+      fg: secondaryText.fg,
+      bg: secondarySoftBg,
+      min: 3,
+      tip: 'Badge soft ou link da secundária ilegível neste tema.',
     },
   ]
 
@@ -184,7 +241,7 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
         fg: text.fg,
         bg: softBg,
         min: 3,
-        tip: `Texto do badge soft ilegível neste tema (${mode}). Use Automático ou outra cor.`,
+        tip: `Badge soft ilegível no tema ${tema}. Use Automático ou outra cor.`,
       },
     )
   }
@@ -192,14 +249,91 @@ function buildContrastChecks(design: TenantDesign, mode: PreviewMode): ContrastC
   return pairs.map((p) => {
     const ratio = contrasteRatio(p.fg, p.bg)
     return {
-      id: p.id,
+      id: `${mode}:${p.id}`,
       label: p.label,
+      mode,
       ratio,
       min: p.min,
       ok: ratio >= p.min,
       tip: p.tip,
     }
   })
+}
+
+/** Sempre avalia claro e escuro — cores de marca/ação são compartilhadas. */
+function buildContrastChecks(design: TenantDesign): ContrastCheck[] {
+  return [
+    ...buildContrastChecksForMode(design, 'light'),
+    ...buildContrastChecksForMode(design, 'dark'),
+  ]
+}
+
+/** Resumo claro/escuro para um fill + override de texto (marca ou ação). */
+function dualThemeTextStatus(
+  design: TenantDesign,
+  fill: string,
+  fgOverride: string | null,
+): { mode: PreviewMode; softOk: boolean; btnOk: boolean; softRatio: number; btnRatio: number; text: ReturnType<typeof resolveActionTextColors>; softBg: string; surface: string }[] {
+  return (['light', 'dark'] as const).map((mode) => {
+    const s = resolveSurfaces(design, mode)
+    const text = resolveActionTextColors(fill, fgOverride, s.surface)
+    const softBg = mixHex(s.surface, fill, 0.14)
+    const softRatio = contrasteRatio(text.fg, softBg)
+    const btnRatio = contrasteRatio(text.on, fill)
+    return {
+      mode,
+      softOk: softRatio >= 3,
+      btnOk: btnRatio >= 4.5,
+      softRatio,
+      btnRatio,
+      text,
+      softBg,
+      surface: s.surface,
+    }
+  })
+}
+
+/** Pares de superfície ligados a um token (para dica inline na aba Superfícies). */
+function surfaceTokenContrastHint(
+  design: TenantDesign,
+  key: (typeof SURFACE_TOKEN_KEYS)[number],
+): { mode: PreviewMode; label: string; ratio: number; ok: boolean }[] {
+  const out: { mode: PreviewMode; label: string; ratio: number; ok: boolean }[] =
+    []
+  for (const mode of ['light', 'dark'] as const) {
+    const s = resolveSurfaces(design, mode)
+    const push = (label: string, fg: string, bg: string, min = 4.5) => {
+      const ratio = contrasteRatio(fg, bg)
+      out.push({ mode, label, ratio, ok: ratio >= min })
+    }
+    switch (key) {
+      case 'background':
+        push('texto no fundo', s.foreground, s.background)
+        break
+      case 'backgroundSubtle':
+        push('texto no sutil', s.foreground, s.backgroundSubtle)
+        break
+      case 'foreground':
+        push('no fundo', s.foreground, s.background)
+        push('no cartão', s.foreground, s.surface)
+        break
+      case 'foregroundMuted':
+        push('no fundo', s.foregroundMuted, s.background)
+        push('no cartão', s.foregroundMuted, s.surface)
+        break
+      case 'surface':
+        push('texto no cartão', s.foreground, s.surface)
+        break
+      case 'surfaceRaised':
+        push('texto elevada', s.foreground, s.surfaceRaised)
+        break
+      case 'border':
+      case 'borderStrong':
+        // Bordas não entram no WCAG de texto; sem dica numérica.
+        break
+    }
+  }
+  return out
 }
 
 /** Color field: swatch abre o seletor nativo direto; hex editável ao lado. */
@@ -452,6 +586,13 @@ function PaletaCard({
 
 function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
   const fails = checks.filter((c) => !c.ok)
+  const lightFails = fails.filter((c) => c.mode === 'light').length
+  const darkFails = fails.filter((c) => c.mode === 'dark').length
+  const byMode = {
+    light: checks.filter((c) => c.mode === 'light'),
+    dark: checks.filter((c) => c.mode === 'dark'),
+  }
+
   return (
     <div
       className={[
@@ -467,7 +608,7 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
         ) : (
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-info-fg))]" />
         )}
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-2">
           <p
             className={[
               'text-sm font-medium',
@@ -477,35 +618,138 @@ function ContrastPanel({ checks }: { checks: ContrastCheck[] }) {
             ].join(' ')}
           >
             {fails.length > 0
-              ? `${fails.length} contraste${fails.length > 1 ? 's' : ''} fraco${fails.length > 1 ? 's' : ''} — títulos/textos podem sumir`
-              : 'Contraste OK neste modo'}
+              ? `${fails.length} contraste${fails.length > 1 ? 's' : ''} fraco${fails.length > 1 ? 's' : ''} — claro: ${lightFails}, escuro: ${darkFails}`
+              : 'Contraste OK nos temas claro e escuro'}
           </p>
-          <ul className="grid max-h-[11rem] gap-1 overflow-y-auto sm:grid-cols-2">
-            {checks.map((c) => (
-              <li key={c.id} className="flex items-start gap-1.5 text-[11px]">
-                <Contrast
-                  className={[
-                    'mt-0.5 h-3 w-3 shrink-0',
-                    c.ok
-                      ? 'text-[rgb(var(--color-info-fg))]'
-                      : 'text-amber-600 dark:text-amber-300',
-                  ].join(' ')}
-                />
-                <span
-                  className={
-                    c.ok
-                      ? 'text-[rgb(var(--foreground-muted))]'
-                      : 'text-amber-900 dark:text-amber-100'
-                  }
-                >
-                  <span className="font-medium">{c.label}</span> {c.ratio.toFixed(1)}:1
-                  {!c.ok ? ` — ${c.tip}` : null}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(['light', 'dark'] as const).map((mode) => {
+              const list = byMode[mode]
+              const modeFails = list.filter((c) => !c.ok).length
+              return (
+                <div key={mode} className="min-w-0 space-y-1">
+                  <p
+                    className={[
+                      'text-[11px] font-semibold uppercase tracking-wide',
+                      modeFails > 0
+                        ? 'text-amber-800 dark:text-amber-200'
+                        : 'text-[rgb(var(--foreground-muted))]',
+                    ].join(' ')}
+                  >
+                    {mode === 'dark' ? 'Escuro' : 'Claro'}
+                    {modeFails > 0 ? ` · ${modeFails} fraco${modeFails > 1 ? 's' : ''}` : ' · OK'}
+                  </p>
+                  <ul className="max-h-[9rem] space-y-1 overflow-y-auto">
+                    {list.map((c) => (
+                      <li key={c.id} className="flex items-start gap-1.5 text-[11px]">
+                        <Contrast
+                          className={[
+                            'mt-0.5 h-3 w-3 shrink-0',
+                            c.ok
+                              ? 'text-[rgb(var(--color-info-fg))]'
+                              : 'text-amber-600 dark:text-amber-300',
+                          ].join(' ')}
+                        />
+                        <span
+                          className={
+                            c.ok
+                              ? 'text-[rgb(var(--foreground-muted))]'
+                              : 'text-amber-900 dark:text-amber-100'
+                          }
+                        >
+                          <span className="font-medium">{c.label}</span>{' '}
+                          {c.ratio.toFixed(1)}:1
+                          {!c.ok ? ` — ${c.tip}` : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Amostras de texto (soft + sólido) nos dois temas — marca ou ação. */
+function DualThemeTextSamples({
+  design,
+  fill,
+  fgOverride,
+  showLink = false,
+}: {
+  design: TenantDesign
+  fill: string
+  fgOverride: string | null
+  showLink?: boolean
+}) {
+  const rows = dualThemeTextStatus(design, fill, fgOverride)
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {rows.map((row) => {
+        const ok = row.softOk && row.btnOk
+        return (
+          <div
+            key={row.mode}
+            className="space-y-1.5 rounded-lg border border-[rgb(var(--border))] p-2"
+            style={{ backgroundColor: row.surface }}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  color:
+                    contrasteTextoSobre(row.surface) === 'light'
+                      ? 'rgba(255,255,255,0.65)'
+                      : 'rgba(0,0,0,0.5)',
+                }}
+              >
+                {row.mode === 'dark' ? 'Escuro' : 'Claro'}
+              </span>
+              <span
+                className="text-[10px] font-medium"
+                style={{
+                  color: ok
+                    ? contrasteTextoSobre(row.surface) === 'light'
+                      ? '#7dd3fc'
+                      : '#0369a1'
+                    : contrasteTextoSobre(row.surface) === 'light'
+                      ? '#fbbf24'
+                      : '#b45309',
+                }}
+              >
+                {ok
+                  ? 'OK'
+                  : `Fraco ${Math.min(row.softRatio, row.btnRatio).toFixed(1)}:1`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[10px]">
+              <span
+                className="inline-flex items-center rounded-md px-2 py-1 font-medium"
+                style={{ backgroundColor: row.softBg, color: row.text.fg }}
+              >
+                Soft
+              </span>
+              <span
+                className="inline-flex items-center rounded-md px-2 py-1 font-semibold"
+                style={{ backgroundColor: fill, color: row.text.on }}
+              >
+                Botão
+              </span>
+              {showLink ? (
+                <span
+                  className="inline-flex items-center px-1 py-1 font-semibold underline-offset-2"
+                  style={{ color: row.text.fg }}
+                >
+                  Link
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -627,10 +871,7 @@ export function DesignForm({
     [design.customPalettes],
   )
 
-  const contrastChecks = useMemo(
-    () => buildContrastChecks(design, previewMode),
-    [design, previewMode],
-  )
+  const contrastChecks = useMemo(() => buildContrastChecks(design), [design])
 
   const surfacesResolved = resolveSurfaces(design, previewMode)
   const surfacesOverrides = previewMode === 'dark' ? design.dark : design.light
@@ -750,7 +991,7 @@ export function DesignForm({
             {section === 'identidade' ? (
               <SectionFrame
                 title="Identidade"
-                description="Escolha uma paleta pronta ou ajuste a marca. A prévia mostra o resultado na hora."
+                description="Paleta e marca. Amostras de texto mostram contraste no claro e no escuro."
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
@@ -870,11 +1111,6 @@ export function DesignForm({
                   {(() => {
                     const primaryFg =
                       design.brandFg?.primary ?? DEFAULT_BRAND_FG.primary ?? null
-                    const primaryText = resolveActionTextColors(
-                      design.brand.primary,
-                      primaryFg,
-                      surfacesResolved.surface,
-                    )
                     const autoPrimary = resolveActionTextColors(
                       design.brand.primary,
                       null,
@@ -900,33 +1136,15 @@ export function DesignForm({
                           }}
                           {...fieldProps}
                         />
-                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium"
-                            style={{
-                              backgroundColor: mixHex(
-                                surfacesResolved.surface,
-                                design.brand.primary,
-                                0.14,
-                              ),
-                              color: primaryText.fg,
-                            }}
-                          >
-                            Menu ativo
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold"
-                            style={{
-                              backgroundColor: design.brand.primary,
-                              color: primaryText.on,
-                            }}
-                          >
-                            Contagem
-                          </span>
-                        </div>
+                        <DualThemeTextSamples
+                          design={design}
+                          fill={design.brand.primary}
+                          fgOverride={primaryFg}
+                        />
                         <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                           Texto em abas (Membros, Sócios…), sidebar e badges soft.
-                          Automático clareia marca preta no escuro.
+                          Amostra nos dois temas — Automático clareia marca preta no
+                          escuro.
                         </p>
                       </>
                     )
@@ -942,18 +1160,9 @@ export function DesignForm({
                     {...fieldProps}
                   />
                   {(() => {
-                    const secondaryHex =
-                      design.brand.secondary ??
-                      (contrasteTextoSobre(design.brand.primary) === 'light'
-                        ? '#f4f4f5'
-                        : '#27272a')
+                    const secondaryHex = secondaryHexOf(design)
                     const secondaryFg =
                       design.brandFg?.secondary ?? DEFAULT_BRAND_FG.secondary ?? null
-                    const secondaryText = resolveActionTextColors(
-                      secondaryHex,
-                      secondaryFg,
-                      surfacesResolved.surface,
-                    )
                     const autoSecondary = resolveActionTextColors(
                       secondaryHex,
                       null,
@@ -979,40 +1188,16 @@ export function DesignForm({
                           }}
                           {...fieldProps}
                         />
-                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold"
-                            style={{
-                              backgroundColor: mixHex(
-                                surfacesResolved.surface,
-                                secondaryHex,
-                                0.14,
-                              ),
-                              color: secondaryText.fg,
-                            }}
-                          >
-                            Badge soft {secondaryText.fg.toUpperCase()}
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-semibold"
-                            style={{
-                              backgroundColor: secondaryHex,
-                              color: secondaryText.on,
-                            }}
-                          >
-                            Botão {secondaryText.on.toUpperCase()}
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5 px-1 py-1.5 font-semibold underline-offset-2"
-                            style={{ color: secondaryText.fg }}
-                          >
-                            Link {secondaryText.fg.toUpperCase()}
-                          </span>
-                        </div>
+                        <DualThemeTextSamples
+                          design={design}
+                          fill={secondaryHex}
+                          fgOverride={secondaryFg}
+                          showLink
+                        />
                         <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                           Controla o texto sobre a secundária (badge soft, botão
-                          sólido e links). Automático garante leitura se a fill for
-                          branca/preta. Manual só vale onde o contraste fecha.
+                          sólido e links). Manual só vale onde o contraste fecha em
+                          cada tema.
                         </p>
                       </>
                     )
@@ -1035,18 +1220,13 @@ export function DesignForm({
             {section === 'acoes' ? (
               <SectionFrame
                 title="Ações e status"
-                description="Portal: RSVP e aviso informativo. Admin: aprovar, reprovar, pendente e informativo."
+                description="Portal e Admin. Cada cor é validada em claro e escuro (botão + badge)."
               >
                 <div className="grid gap-3">
                   {ACTION_TOKEN_KEYS.map((key) => {
                     const fill = design.actions?.[key] ?? DEFAULT_ACTIONS[key]
                     const fgOverride =
                       design.actionsFg?.[key] ?? DEFAULT_ACTIONS_FG[key] ?? null
-                    const effective = resolveActionTextColors(
-                      fill,
-                      fgOverride,
-                      surfacesResolved.surface,
-                    )
                     const autoText = resolveActionTextColors(
                       fill,
                       null,
@@ -1092,34 +1272,14 @@ export function DesignForm({
                           }}
                           {...fieldProps}
                         />
-                        <div className="flex flex-wrap gap-2 text-[10px] text-[rgb(var(--foreground-muted))]">
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
-                            style={{
-                              backgroundColor: fill,
-                              color: effective.on,
-                            }}
-                          >
-                            Botão {effective.on.toUpperCase()}
-                          </span>
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
-                            style={{
-                              backgroundColor: mixHex(
-                                surfacesResolved.surface,
-                                fill,
-                                0.14,
-                              ),
-                              color: effective.fg,
-                            }}
-                          >
-                            Badge {effective.fg.toUpperCase()}
-                          </span>
-                        </div>
+                        <DualThemeTextSamples
+                          design={design}
+                          fill={fill}
+                          fgOverride={fgOverride}
+                        />
                         <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                          {ACTION_TOKEN_HINTS[key]}. Automático recalcula no
-                          claro/escuro. Manual só vale onde o contraste fecha —
-                          no outro contexto (botão vs badge) volta ao automático.
+                          {ACTION_TOKEN_HINTS[key]}. Avaliado em claro e escuro —
+                          manual só vale onde o contraste fecha (botão vs badge).
                         </p>
                       </div>
                     )
@@ -1212,7 +1372,7 @@ export function DesignForm({
             {section === 'superficies' ? (
               <SectionFrame
                 title="Superfícies"
-                description={`Editando modo ${previewMode === 'dark' ? 'escuro' : 'claro'} — troque na prévia.`}
+                description={`Editando modo ${previewMode === 'dark' ? 'escuro' : 'claro'} — troque na prévia. O painel de contraste abaixo avalia os dois temas.`}
               >
                 <div className="grid gap-4">
                   {SURFACE_TOKEN_KEYS.map((key) => {
@@ -1226,6 +1386,9 @@ export function DesignForm({
                         surface: 'surface',
                         surfaceRaised: 'surfaceRaised',
                       }
+                    const hints = surfaceTokenContrastHint(design, key)
+                    const lightHints = hints.filter((h) => h.mode === 'light')
+                    const darkHints = hints.filter((h) => h.mode === 'dark')
                     return (
                       <div key={key} className="grid gap-1.5">
                         <ColorField
@@ -1244,6 +1407,41 @@ export function DesignForm({
                           }}
                           {...fieldProps}
                         />
+                        {hints.length > 0 ? (
+                          <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                            <span
+                              className={
+                                lightHints.some((h) => !h.ok)
+                                  ? 'font-medium text-amber-700 dark:text-amber-300'
+                                  : undefined
+                              }
+                            >
+                              Claro{' '}
+                              {lightHints
+                                .map(
+                                  (h) =>
+                                    `${h.label} ${h.ratio.toFixed(1)}:1${h.ok ? '' : '!'}`,
+                                )
+                                .join(' · ') || '—'}
+                            </span>
+                            {' · '}
+                            <span
+                              className={
+                                darkHints.some((h) => !h.ok)
+                                  ? 'font-medium text-amber-700 dark:text-amber-300'
+                                  : undefined
+                              }
+                            >
+                              Escuro{' '}
+                              {darkHints
+                                .map(
+                                  (h) =>
+                                    `${h.label} ${h.ratio.toFixed(1)}:1${h.ok ? '' : '!'}`,
+                                )
+                                .join(' · ') || '—'}
+                            </span>
+                          </p>
+                        ) : null}
                         {key === 'background' || key === 'surfaceRaised' ? (
                           <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                             {key === 'background'

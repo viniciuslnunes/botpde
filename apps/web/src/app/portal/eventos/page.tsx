@@ -195,7 +195,7 @@ export default async function EventosPage({ searchParams }: Props) {
             className={[
               'rounded-lg px-2.5 py-1.5 font-medium',
               !tipoFiltro
-                ? 'bg-[rgb(var(--primary))] text-white'
+                ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                 : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
             ].join(' ')}
           >
@@ -209,7 +209,7 @@ export default async function EventosPage({ searchParams }: Props) {
               className={[
                 'rounded-lg px-2.5 py-1.5 font-medium',
                 tipoFiltro === t
-                  ? 'bg-[rgb(var(--primary))] text-white'
+                  ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                   : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
               ].join(' ')}
             >

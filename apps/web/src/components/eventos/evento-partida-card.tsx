@@ -28,7 +28,7 @@ export function EventoPartidaCard({ partida }: { partida: EventoPartidaCardData 
       <p className="mt-1 text-base font-semibold text-[rgb(var(--foreground))]">
         {mando} vs {partida.adversario}
         {temPlacar && (
-          <span className="ml-2 tabular-nums text-[rgb(var(--primary))]">
+          <span className="ml-2 tabular-nums text-[rgb(var(--color-primary-fg))]">
             {partida.placarCasa} × {partida.placarFora}
           </span>
         )}

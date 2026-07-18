@@ -43,7 +43,11 @@
 
   /* Texto legível sobre tint da marca (badges / soft) — tema sobrescreve */
   --color-primary-fg: var(--color-primary);
+  --color-primary-on: 255 255 255;
   --color-secondary-fg: var(--color-secondary);
+  --color-secondary-on: 255 255 255;
+  --primary-fg: var(--color-primary-fg);
+  --secondary-fg: var(--color-secondary-fg);
   --color-success-fg: var(--color-success);
   --color-danger-fg: var(--color-danger);
   --color-warning-fg: var(--color-warning);

@@ -48,7 +48,7 @@ function TipoSelect({
             className={[
               'cursor-pointer rounded-lg border px-2 py-2 text-center text-xs font-semibold transition-colors',
               value === t
-                ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--primary))]'
+                ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]'
                 : 'border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >

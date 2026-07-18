@@ -42,7 +42,7 @@ export function AgendaBusca({
       <Search
         className={[
           'pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2',
-          pending ? 'text-[rgb(var(--primary))]' : 'text-[rgb(var(--foreground-muted))]',
+          pending ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
         ].join(' ')}
       />
       <input

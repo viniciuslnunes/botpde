@@ -48,7 +48,7 @@ function TipoThumbFallback({ tipo }: { tipo?: string }) {
       ? 'from-amber-500/25 to-amber-500/5 text-amber-700 dark:text-amber-300'
       : tipo === 'ENSAIO'
         ? 'from-sky-500/25 to-sky-500/5 text-sky-700 dark:text-sky-300'
-        : 'from-[rgb(var(--primary)_/_0.28)] to-[rgb(var(--primary)_/_0.06)] text-[rgb(var(--primary))]'
+        : 'from-[rgb(var(--color-primary)_/_0.28)] to-[rgb(var(--color-primary)_/_0.06)] text-[rgb(var(--color-primary-fg))]'
   return (
     <div
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${tone}`}
@@ -76,7 +76,7 @@ function EventoGridCard({
           'group flex h-full flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--surface)_/_0.85)] shadow-sm backdrop-blur-sm transition-all',
           evento.passado
             ? 'border-[rgb(var(--border))] opacity-70'
-            : 'border-[rgb(var(--border))] hover:border-[rgb(var(--primary)_/_0.4)] hover:shadow-md',
+            : 'border-[rgb(var(--border))] hover:border-[rgb(var(--color-primary)_/_0.4)] hover:shadow-md',
         ].join(' ')}
       >
         <div className="relative aspect-[5/3] w-full overflow-hidden bg-[rgb(var(--background-subtle))]">
@@ -105,7 +105,7 @@ function EventoGridCard({
 
         <div className="flex flex-1 flex-col gap-2 p-3.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--primary))]">
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
               {evento.titulo}
             </h3>
             {!evento.passado && <RsvpBadge status={evento.rsvpStatus} />}

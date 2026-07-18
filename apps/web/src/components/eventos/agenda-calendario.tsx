@@ -32,19 +32,19 @@ export type AgendaCalItem = {
 const DIA_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
 const TIPO_TINT: Record<string, string> = {
-  GERAL: 'border-l-[rgb(var(--primary))] bg-[rgb(var(--primary)_/_0.08)]',
+  GERAL: 'border-l-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.08)]',
   CARAVANA: 'border-l-amber-500 bg-amber-500/10',
   ENSAIO: 'border-l-sky-500 bg-sky-500/10',
 }
 
 const TIPO_TEXT: Record<string, string> = {
-  GERAL: 'text-[rgb(var(--primary))]',
+  GERAL: 'text-[rgb(var(--color-primary-fg))]',
   CARAVANA: 'text-amber-700 dark:text-amber-300',
   ENSAIO: 'text-sky-700 dark:text-sky-300',
 }
 
 const TIPO_DOT: Record<string, string> = {
-  GERAL: 'bg-[rgb(var(--primary))]',
+  GERAL: 'bg-[rgb(var(--color-primary))]',
   CARAVANA: 'bg-amber-500',
   ENSAIO: 'bg-sky-500',
 }
@@ -88,7 +88,7 @@ function EventoDiaCard({ e }: { e: AgendaCalItem }) {
             {formatTimeShort(e.dataIso)}
           </span>
         </div>
-        <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--primary))]">
+        <h3 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
           {e.titulo}
         </h3>
         {e.local && (
@@ -252,7 +252,7 @@ export function AgendaCalendario({
                   className={[
                     'flex flex-col items-center rounded-2xl px-1 py-2.5 transition-colors sm:py-3',
                     ativo
-                      ? 'bg-[rgb(var(--primary))] text-white shadow-md'
+                      ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))] shadow-md'
                       : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--border)_/_0.55)]',
                   ].join(' ')}
                 >
@@ -275,7 +275,7 @@ export function AgendaCalendario({
                         : ativo
                           ? 'bg-white'
                           : isHoje
-                            ? 'bg-[rgb(var(--primary))]'
+                            ? 'bg-[rgb(var(--color-primary))]'
                             : 'bg-[rgb(var(--foreground-muted))]',
                     ].join(' ')}
                     aria-hidden
@@ -305,7 +305,7 @@ export function AgendaCalendario({
               </p>
               <Link
                 href={hrefComData(diaAtivo)}
-                className="mt-2 inline-block text-xs font-medium text-[rgb(var(--primary))] hover:underline"
+                className="mt-2 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver no filtro de data
               </Link>
@@ -377,7 +377,7 @@ export function AgendaCalendario({
                 inMonth
                   ? 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.35)]'
                   : 'border-transparent opacity-35',
-                isHoje ? 'ring-1 ring-[rgb(var(--primary))]' : '',
+                isHoje ? 'ring-1 ring-[rgb(var(--color-primary))]' : '',
               ].join(' ')}
             >
               <Link
@@ -385,7 +385,7 @@ export function AgendaCalendario({
                 className={[
                   'mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold',
                   isHoje
-                    ? 'bg-[rgb(var(--primary))] text-white'
+                    ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
                     : 'text-[rgb(var(--foreground-muted))]',
                 ].join(' ')}
               >

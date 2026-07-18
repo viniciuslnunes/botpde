@@ -123,7 +123,13 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
   intermediário).
 - Prévia **sem** overlay de hotspot/label ao focar token — estado não salvo
   fica só no rodapé (`StickyPersistBar`).
-- Contraste WCAG no rodapé usa token info (não emerald).
+- Contraste WCAG no rodapé avalia **claro e escuro juntos** (marca, ações e
+  superfícies). Amostras em Identidade/Ações mostram soft+botão nos dois temas;
+  na aba Superfícies cada token exibe a razão claro/escuro do texto relevante.
+  Alertas usam token info (não emerald).
+- **Agenda / Eventos** — badges e CTAs de marca usam `--color-primary-fg` /
+  `--color-primary-on` (nunca `--primary` cru como texto). Com identidade P&B,
+  `EventoTipoBadge` GERAL e “Próximo compromisso” permanecem legíveis no escuro.
 
 ## Actions
 

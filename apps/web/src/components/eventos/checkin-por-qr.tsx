@@ -179,7 +179,7 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
     <div className="space-y-3 rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <label className="flex items-center gap-1.5 text-xs font-semibold text-[rgb(var(--foreground))]">
-          <QrCode className="h-3.5 w-3.5 text-[rgb(var(--primary))]" />
+          <QrCode className="h-3.5 w-3.5 text-[rgb(var(--color-primary-fg))]" />
           Check-in pela carteirinha (QR)
         </label>
         <div className="flex flex-wrap items-center gap-2">
@@ -253,7 +253,7 @@ export function CheckInPorQr({ eventoId }: { eventoId: string }) {
           <button
             type="submit"
             disabled={pending || !payload.trim()}
-            className="rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-medium text-[rgb(var(--color-primary-on))] disabled:opacity-50"
           >
             {pending ? '…' : 'Registrar'}
           </button>

@@ -26,7 +26,7 @@ export function NovoEventoButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] hover:opacity-90"
       >
         <Plus className="h-4 w-4" />
         Novo evento

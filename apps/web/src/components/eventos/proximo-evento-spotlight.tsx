@@ -28,7 +28,7 @@ export function ProximoEventoSpotlight({
   return (
     <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.85)] shadow-sm backdrop-blur-sm">
       <div className="border-b border-[rgb(var(--border))] px-4 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[rgb(var(--primary))]">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[rgb(var(--color-primary-fg))]">
           Próximo compromisso
         </p>
       </div>
@@ -41,7 +41,7 @@ export function ProximoEventoSpotlight({
         <div className="flex flex-wrap items-center gap-1.5">
           <EventoTipoBadge tipo={tipo} />
           {diasLabel && (
-            <span className="rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--primary))]">
+            <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.35)]">
               {diasLabel}
             </span>
           )}
@@ -55,7 +55,7 @@ export function ProximoEventoSpotlight({
         <Link
           href={href}
           prefetch={false}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90"
         >
           Abrir evento
           <ArrowRight className="h-4 w-4" />
