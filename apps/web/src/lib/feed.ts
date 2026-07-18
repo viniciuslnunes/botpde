@@ -205,6 +205,66 @@ export function projetarPost(post: PostRaw): PostSocialItem {
   }
 }
 
+/** Include mínimo para cards de busca (sem engajamento/embeds). */
+export function postIncludeBusca() {
+  return {
+    tenant: { select: { nome: true } },
+    autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+  } as const
+}
+
+type PostBuscaRaw = {
+  id: string
+  tenantId: string
+  titulo: string | null
+  conteudo: string
+  imagemUrl: string | null
+  midiaUrls: string[]
+  tipo: 'INSTITUCIONAL' | 'MEMBRO'
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
+  fixado: boolean
+  criadoEm: Date
+  autorId: string
+  postOrigemId: string | null
+  comunicadoOrigemId: string | null
+  eventoId: string | null
+  tenant: { nome: string }
+  autor: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
+}
+
+/** Projeta post de busca sem carregar reações/enquete/repost. */
+export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
+  return {
+    id: post.id,
+    tenantId: post.tenantId,
+    titulo: post.titulo,
+    conteudo: post.conteudo,
+    imagemUrl: post.imagemUrl,
+    midiaUrls: post.midiaUrls,
+    tipo: post.tipo,
+    visibilidade: post.visibilidade,
+    fixado: post.fixado,
+    criadoEm: post.criadoEm,
+    autorId: post.autorId,
+    postOrigemId: post.postOrigemId,
+    comunicadoOrigemId: post.comunicadoOrigemId,
+    eventoId: post.eventoId,
+    tenant: { nome: formatNomeTorcida(post.tenant.nome) },
+    autor: {
+      ...post.autor,
+      sedeNome: null,
+      cargoNome: null,
+    },
+    totalReacoes: 0,
+    totalComentarios: 0,
+    minhaReacao: null,
+    postOrigem: null,
+    comunicadoOrigem: null,
+    evento: null,
+    enquete: null,
+  }
+}
+
 export function postInclude(userId?: string) {
   return {
     tenant: { select: { nome: true } },

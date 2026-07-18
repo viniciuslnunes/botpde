@@ -177,7 +177,7 @@ porém mais lenta em bases grandes).
 | Badge / nova DM | Poll 15s | SSE (+ poll 60s fallback) | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s** |
 | Publicar post (rede grande) | Fan-out sync na action | Autor sync + fila Redis | **~60–90%** menos tempo na action (∝ seguidores) |
 | SSE entre réplicas | In-memory só na réplica local | Redis pub/sub (`REDIS_URL`) | De **0%** → **~100%** dos pings cruzam réplicas |
-| Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`) | **~30–70%** em bases grandes; pouco em bases pequenas |
+| Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`); dropdown `modo=rapida` (sem canais/badges/follow; posts leves) | **~30–70%** em bases grandes; **~40–60%** menos trabalho no typeahead vs página completa |
 | Assets estáticos (CDN) | Sempre origin Railway | Cloudflare Free | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio |
 | Reação / comentário no feed | `revalidatePath` + RSC do feed | Overlay otimista + mutação leve (`after` notifs) | **~70–95%** menos trabalho no POST |
 

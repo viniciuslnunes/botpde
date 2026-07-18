@@ -31,6 +31,7 @@ export function ComunidadeSearchBar() {
     posts: [],
   })
   const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
   const [ativo, setAtivo] = useState(-1)
   const [, startTransition] = useTransition()
 
@@ -44,16 +45,24 @@ export function ComunidadeSearchBar() {
     setAtivo(-1)
     if (termo.length < 2) {
       setResultado({ membros: [], hashtags: [], posts: [] })
+      setErro(null)
       return
     }
     const controller = new AbortController()
     abortRef.current = controller
     setCarregando(true)
+    setErro(null)
     try {
-      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`, {
-        signal: controller.signal,
-      })
-      if (!res.ok) return
+      const res = await fetch(
+        `/api/comunidade/busca?q=${encodeURIComponent(termo)}&modo=rapida`,
+        {
+          signal: controller.signal,
+        },
+      )
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string }
+        throw new Error(body.error ?? 'Erro na busca')
+      }
       const data = (await res.json()) as BuscaRapidaResponse
       setResultado({
         membros: data.membros.slice(0, 4),
@@ -62,6 +71,8 @@ export function ComunidadeSearchBar() {
       })
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
+      setErro(e instanceof Error ? e.message : 'Erro na busca')
+      setResultado({ membros: [], hashtags: [], posts: [] })
     } finally {
       if (abortRef.current === controller) setCarregando(false)
     }
@@ -154,7 +165,7 @@ export function ComunidadeSearchBar() {
               inputRef.current?.blur()
             }
           }}
-          placeholder="Buscar membros, hashtags, posts…"
+          placeholder="Buscar membros, hashtags, posts�"
           aria-label="Buscar na comunidade"
           role="combobox"
           aria-haspopup="listbox"
@@ -179,6 +190,7 @@ export function ComunidadeSearchBar() {
               onClick={() => {
                 setQ('')
                 setDebounced('')
+                setErro(null)
                 setResultado({ membros: [], hashtags: [], posts: [] })
                 inputRef.current?.focus()
               }}
@@ -215,7 +227,7 @@ export function ComunidadeSearchBar() {
                   className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-[rgb(var(--foreground-muted))]"
                 >
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Buscando…
+                  Buscando�
                 </m.div>
               ) : debounced.length < 2 ? (
                 <m.p
@@ -226,6 +238,16 @@ export function ComunidadeSearchBar() {
                   className="px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]"
                 >
                   Digite ao menos 2 caracteres para buscar.
+                </m.p>
+              ) : erro ? (
+                <m.p
+                  key="erro"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="px-4 py-5 text-center text-sm text-red-600 dark:text-red-400"
+                >
+                  {erro}
                 </m.p>
               ) : !temResultados ? (
                 <m.p

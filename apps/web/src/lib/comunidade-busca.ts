@@ -4,10 +4,16 @@ import { getVisibleTenantIds } from './hierarquia'
 import { canFollowUsers } from './social'
 import { getAutoresSemAcesso, resolverAvatarSocial, resolverPerfilPrivadoEfetivo } from './perfil-social'
 import { normalizarHashtag } from './comunidade-social'
-import { postInclude, projetarPost, type PostSocialItem, type PostRaw } from './feed'
+import {
+  postIncludeBusca,
+  projetarPostBusca,
+  type PostSocialItem,
+} from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
 import { formatNomeTorcida } from '@torcida/types'
+
+export type BuscaComunidadeModo = 'rapida' | 'completa'
 
 export interface MembroBuscaItem {
   id: string
@@ -36,6 +42,19 @@ type MembroBuscaRaw = {
   tenant: { nome: string }
 }
 
+type BuscaLimites = {
+  membrosCand: number
+  membrosOut: number
+  hashtags: number
+  postsCand: number
+  postsOut: number
+}
+
+const LIMITES_POR_MODO: Record<BuscaComunidadeModo, BuscaLimites> = {
+  rapida: { membrosCand: 16, membrosOut: 6, hashtags: 6, postsCand: 8, postsOut: 4 },
+  completa: { membrosCand: 40, membrosOut: 20, hashtags: 10, postsCand: 15, postsOut: 10 },
+}
+
 function isPgTrgmUnavailableError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -51,13 +70,16 @@ async function buscarCandidatosMembrosPorTrgm(
   userId: string,
   visibleIds: string[],
   q: string,
+  limit: number,
 ): Promise<string[] | null> {
   if (visibleIds.length === 0) return []
   const termoLike = `%${q}%`
 
   try {
+    // GROUP BY (não DISTINCT): Postgres exige que expressões do ORDER BY
+    // apareçam no SELECT quando há DISTINCT — similarity quebrava a busca inteira.
     const rows = await db.$queryRaw<Array<{ userId: string }>>`
-      SELECT DISTINCT m.user_id AS "userId"
+      SELECT m.user_id AS "userId"
       FROM saas_membros m
       INNER JOIN saas_users u ON u.id = m.user_id
       LEFT JOIN saas_perfis_membro pm
@@ -70,12 +92,13 @@ async function buscarCandidatosMembrosPorTrgm(
           u.nome ILIKE ${termoLike}
           OR COALESCE(pm.bio, '') ILIKE ${termoLike}
         )
+      GROUP BY m.user_id, u.nome
       ORDER BY GREATEST(
         similarity(lower(COALESCE(u.nome, '')), lower(${q})),
-        similarity(lower(COALESCE(pm.bio, '')), lower(${q}))
+        MAX(similarity(lower(COALESCE(pm.bio, '')), lower(${q})))
       ) DESC,
       u.nome ASC NULLS LAST
-      LIMIT 40
+      LIMIT ${limit}
     `
     return rows.map((row: { userId: string }) => row.userId)
   } catch (error) {
@@ -87,6 +110,7 @@ async function buscarCandidatosMembrosPorTrgm(
 async function buscarHashtagsPorTrgm(
   visibleTenantIds: string[],
   normalizedTag: string,
+  limit: number,
 ): Promise<Array<{ tag: string; total: number }> | null> {
   if (visibleTenantIds.length === 0 || normalizedTag.length < 2) return []
   const termoLike = `%${normalizedTag}%`
@@ -100,7 +124,7 @@ async function buscarHashtagsPorTrgm(
         AND h.tag ILIKE ${termoLike}
       GROUP BY h.id, h.tag
       ORDER BY similarity(lower(h.tag), lower(${normalizedTag})) DESC, total DESC, h.tag ASC
-      LIMIT 20
+      LIMIT ${limit}
     `
     return rows
   } catch (error) {
@@ -112,6 +136,7 @@ async function buscarHashtagsPorTrgm(
 async function buscarPostIdsPorTrgm(
   visibleTenantIds: string[],
   termo: string,
+  limit: number,
 ): Promise<string[] | null> {
   if (visibleTenantIds.length === 0) return []
   const termoLike = `%${termo}%`
@@ -127,7 +152,7 @@ async function buscarPostIdsPorTrgm(
         AND p.conversa_id IS NULL
         AND p.conteudo ILIKE ${termoLike}
       ORDER BY similarity(lower(p.conteudo), lower(${termo})) DESC, p.criado_em DESC, p.id DESC
-      LIMIT 15
+      LIMIT ${limit}
     `
     return rows.map((row: { id: string }) => row.id)
   } catch (error) {
@@ -152,14 +177,22 @@ export async function buscarMembrosComunidade(
   tenantId: string,
   userId: string,
   q: string,
-  opts: { visibleTenantIds?: string[] } = {},
+  opts: { visibleTenantIds?: string[]; modo?: BuscaComunidadeModo } = {},
 ): Promise<MembroBuscaItem[]> {
   if (q.length < 2) return []
 
+  const modo = opts.modo ?? 'completa'
+  const limites = LIMITES_POR_MODO[modo]
   const visibleIds = opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
   const bloqueadosIds = await getBloqueadosDoUsuario(userId)
 
-  const trigramCandidateIds = await buscarCandidatosMembrosPorTrgm(tenantId, userId, visibleIds, q)
+  const trigramCandidateIds = await buscarCandidatosMembrosPorTrgm(
+    tenantId,
+    userId,
+    visibleIds,
+    q,
+    limites.membrosCand,
+  )
 
   const rows: MembroBuscaRaw[] = await db.saasMembro.findMany({
     where: {
@@ -192,7 +225,7 @@ export async function buscarMembrosComunidade(
       user: { select: { id: true, nome: true, avatarUrl: true } },
       tenant: { select: { nome: true } },
     },
-    take: 40,
+    take: limites.membrosCand,
   })
 
   const orderedRows =
@@ -208,11 +241,38 @@ export async function buscarMembrosComunidade(
     if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
     vistos.add(r.userId)
     candidatos.push(r)
-    if (candidatos.length >= 20) break
+    if (candidatos.length >= limites.membrosOut) break
   }
   if (candidatos.length === 0) return []
 
   const candidatoIds = candidatos.map((c) => c.userId)
+
+  // Dropdown só mostra avatar/nome/torcida — pula follow + contagens.
+  if (modo === 'rapida') {
+    const perfis: { userId: string; perfilPrivado: boolean; avatarUrl: string | null }[] =
+      await db.perfilMembro.findMany({
+        where: { tenantId, userId: { in: candidatoIds } },
+        select: { userId: true, perfilPrivado: true, avatarUrl: true },
+      })
+    const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
+
+    return candidatos.map((r) => {
+      const perfil = perfilPorId.get(r.userId)
+      return {
+        id: r.user.id,
+        nome: r.user.nome,
+        avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
+        tenantNome: formatNomeTorcida(r.tenant.nome),
+        perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
+          tipo: r.tipo,
+          status: 'APROVADO',
+        }),
+        statusSeguimento: null,
+        seguidores: 0,
+        podeSeguir: false,
+      }
+    })
+  }
 
   const [perfis, seguimentos, contagensRows, podeSeguirLista] = await Promise.all([
     db.perfilMembro.findMany({
@@ -259,12 +319,15 @@ export async function buscarComunidade(
   tenantId: string,
   userId: string,
   q: string,
+  opts: { modo?: BuscaComunidadeModo } = {},
 ): Promise<BuscaComunidadeResult> {
   const termo = q.trim()
   if (termo.length < 2) {
     return { membros: [], hashtags: [], posts: [], canais: [], unidades: [] }
   }
 
+  const modo = opts.modo ?? 'completa'
+  const limites = LIMITES_POR_MODO[modo]
   const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
   const normalizedTag = normalizarHashtag(termo.replace(/^#/, ''))
 
@@ -274,10 +337,12 @@ export async function buscarComunidade(
     string[] | null,
     { canais: CanalItem[]; unidades: UnidadeBuscaItem[] },
   ] = await Promise.all([
-    buscarMembrosComunidade(tenantId, userId, termo, { visibleTenantIds }),
-    buscarHashtagsPorTrgm(visibleTenantIds, normalizedTag),
-    buscarPostIdsPorTrgm(visibleTenantIds, termo),
-    buscarCanaisEUnidades(tenantId, userId, termo, { visibleTenantIds }),
+    buscarMembrosComunidade(tenantId, userId, termo, { visibleTenantIds, modo }),
+    buscarHashtagsPorTrgm(visibleTenantIds, normalizedTag, limites.hashtags),
+    buscarPostIdsPorTrgm(visibleTenantIds, termo, limites.postsCand),
+    modo === 'rapida'
+      ? Promise.resolve({ canais: [] as CanalItem[], unidades: [] as UnidadeBuscaItem[] })
+      : buscarCanaisEUnidades(tenantId, userId, termo, { visibleTenantIds }),
   ])
 
   let hashtagRows: Array<{ tag: string; total: number }>
@@ -291,20 +356,21 @@ export async function buscarComunidade(
           tag: { contains: normalizedTag, mode: 'insensitive' },
         },
         select: { tag: true, _count: { select: { posts: true } } },
-        take: 20,
+        take: limites.hashtags,
       })
     hashtagRows = hashtagFallback.map((h) => ({ tag: h.tag, total: h._count.posts }))
   }
 
-  let postsRaw: PostRaw[]
+  type PostBuscaLoaded = Parameters<typeof projetarPostBusca>[0]
+  let postsRaw: PostBuscaLoaded[]
   if (postIdsTrgm !== null) {
     postsRaw =
       postIdsTrgm.length === 0
         ? []
         : ((await db.post.findMany({
             where: { id: { in: postIdsTrgm } },
-            include: postInclude(userId),
-          })) as PostRaw[])
+            include: postIncludeBusca(),
+          })) as PostBuscaLoaded[])
   } else {
     postsRaw = (await db.post.findMany({
       where: {
@@ -316,28 +382,27 @@ export async function buscarComunidade(
         conteudo: { contains: termo, mode: 'insensitive' },
       },
       orderBy: { criadoEm: 'desc' },
-      take: 15,
-      include: postInclude(userId),
-    })) as PostRaw[]
+      take: limites.postsCand,
+      include: postIncludeBusca(),
+    })) as PostBuscaLoaded[]
   }
 
-  let posts = postsRaw.map(projetarPost)
+  let posts = postsRaw.map(projetarPostBusca)
   if (postIdsTrgm !== null) {
     posts = posts.sort((a, b) => postIdsTrgm.indexOf(a.id) - postIdsTrgm.indexOf(b.id))
   }
   const autorIds = posts.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIds)
-  posts = posts.filter((p) => !semAcesso.has(p.autorId)).slice(0, 10)
+  posts = posts.filter((p) => !semAcesso.has(p.autorId)).slice(0, limites.postsOut)
 
-  const postsComBadges = await enriquecerPostsComBadges(posts)
+  const postsFinais =
+    modo === 'rapida' ? posts : await enriquecerPostsComBadges(posts)
 
   return {
     membros,
-    hashtags: hashtagRows
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10)
-      .map((h) => ({ tag: h.tag, total: h.total })),
-    posts: postsComBadges,
+    // Mantém ordem do ranking (similarity); desempate por volume na query SQL.
+    hashtags: hashtagRows.slice(0, limites.hashtags).map((h) => ({ tag: h.tag, total: h.total })),
+    posts: postsFinais,
     canais: canaisUnidades.canais,
     unidades: canaisUnidades.unidades,
   }

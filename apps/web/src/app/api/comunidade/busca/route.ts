@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
-import { buscarComunidade } from '@/lib/comunidade-busca'
+import { buscarComunidade, type BuscaComunidadeModo } from '@/lib/comunidade-busca'
+
+function resolverModoBusca(raw: string | null): BuscaComunidadeModo {
+  return raw === 'rapida' ? 'rapida' : 'completa'
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +17,8 @@ export async function GET(request: NextRequest) {
     await assertMembroAtivo(tenant.id, session.user.id)
 
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
-    const resultado = await buscarComunidade(tenant.id, session.user.id, q)
+    const modo = resolverModoBusca(request.nextUrl.searchParams.get('modo'))
+    const resultado = await buscarComunidade(tenant.id, session.user.id, q, { modo })
 
     return NextResponse.json(resultado)
   } catch (error) {

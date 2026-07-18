@@ -61,7 +61,7 @@ visibilidade do post).
 | Endpoint | Uso |
 |---|---|
 | `GET /api/comunidade/membros?q=` | Busca membros aprovados em tenants visíveis |
-| `GET /api/comunidade/busca?q=` | Busca unificada (membros + hashtags + posts); ranking com `pg_trgm` quando habilitado |
+| `GET /api/comunidade/busca?q=&modo=` | Busca unificada (membros + hashtags + posts); `modo=rapida` (dropdown do feed) pula canais/unidades, badges e enrich de follow; `modo=completa` (default) na página `/busca` |
 | `GET /api/comunidade/feed?cursor=&take=&filtro=` | Paginação do feed (Descobrir / Seguindo) |
 | `GET /api/comunidade/rede?cursor=&take=` | Paginação de Minha rede |
 | `GET /api/comunidade/feed/stream` | SSE — ping de novos posts (sem payload) |

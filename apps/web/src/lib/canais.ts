@@ -504,10 +504,16 @@ export async function buscarCanaisEUnidades(
     }),
   ])
 
+  const canaisVisiveis = await Promise.all(
+    canalRows.map(async (row) => {
+      const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
+      return podeVer ? row : null
+    }),
+  )
+
   const canais: CanalItem[] = []
-  for (const row of canalRows) {
-    const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
-    if (!podeVer) continue
+  for (const row of canaisVisiveis) {
+    if (!row) continue
     const membro = row.membros[0]
     canais.push({
       id: row.id,
