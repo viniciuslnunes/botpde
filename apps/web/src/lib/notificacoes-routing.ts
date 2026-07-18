@@ -49,6 +49,17 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissaoAdmin: PERMISSIONS.FINANCE_MANAGE,
     menuId: 'cobrancas',
   },
+  EVENTO_LEMBRETE: { escopo: 'hibrido' },
+  EVENTO_RSVP: {
+    escopo: 'hibrido',
+    permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
+    menuId: 'eventos',
+  },
+  EVENTO_DIA_GESTOR: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
+    menuId: 'eventos',
+  },
   DENUNCIA_NOVA: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],

@@ -121,7 +121,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     mission: 'Ritmo na arquibancada: ensaios, presença e escala — sem misturar com festa genérica.',
     subareas: [
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
-      { id: 'ensaios', label: 'Ensaios', feature: 'ensaios', href: '/portal/bateria' },
+      { id: 'ensaios', label: 'Ensaios', feature: 'ensaios', href: '/portal/eventos?tipo=ENSAIO' },
       { id: 'dominio', label: 'Presença', feature: 'ensaios' },
     ],
   },
@@ -134,7 +134,7 @@ export const DEPARTAMENTO_CAPABILITIES = Object.freeze([
     mission: 'Viagens para jogos fora: RSVP, lista de embarque e check-in no dia.',
     subareas: [
       { id: 'equipe', label: 'Equipe', feature: 'equipe' },
-      { id: 'agenda', label: 'Agenda', feature: 'agenda', href: '/portal/caravanas' },
+      { id: 'agenda', label: 'Agenda', feature: 'agenda', href: '/portal/eventos?tipo=CARAVANA' },
       { id: 'embarque', label: 'Embarque', feature: 'embarque' },
     ],
   },

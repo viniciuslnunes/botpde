@@ -1,7 +1,8 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import type { TipoEvento } from '@torcida/db'
+import type { TipoEvento, RsvpStatus } from '@torcida/db'
 import { Prisma } from '@torcida/db'
+import { getEscopoEventosVisiveis } from '@/lib/eventos'
 
 export type EventoPorTipoLite = {
   id: string
@@ -11,6 +12,7 @@ export type EventoPorTipoLite = {
   data: Date
   local: string | null
   valorVaga: { toNumber(): number } | number | null
+  capacidade: number | null
   _count: { rsvps: number }
 }
 
@@ -22,10 +24,12 @@ export type EventoEmbarqueLite = {
   data: Date
   local: string | null
   valorVaga: { toNumber(): number } | number | null
+  capacidade: number | null
+  sedeNome: string | null
   sede: { capacidade: number | null } | null
   rsvps: Array<{
     id: string
-    status: 'CONFIRMADO' | 'RECUSADO'
+    status: RsvpStatus
     checkedInAt: Date | null
     user: {
       id: string
@@ -39,10 +43,17 @@ export type EventoEmbarqueLite = {
 export const listarEventosPorTipo = cache(async function listarEventosPorTipo(
   tenantId: string,
   tipo: TipoEvento,
-  opts?: { futuros?: boolean; limite?: number },
+  opts?: { futuros?: boolean; limite?: number; userId?: string },
 ): Promise<EventoPorTipoLite[]> {
   const agora = new Date()
-  const where: Prisma.EventoWhereInput = { tenantId, tipo }
+  const escopo = opts?.userId
+    ? await getEscopoEventosVisiveis(tenantId, opts.userId)
+    : { tenantId }
+
+  const where: Prisma.EventoWhereInput = {
+    ...escopo,
+    tipo,
+  }
   if (opts?.futuros) where.data = { gte: agora }
   else if (opts?.futuros === false) where.data = { lt: agora }
 
@@ -58,6 +69,7 @@ export const listarEventosPorTipo = cache(async function listarEventosPorTipo(
       data: true,
       local: true,
       valorVaga: true,
+      capacidade: true,
       _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
@@ -115,6 +127,7 @@ export const listarProximosEventosTenant = cache(async function listarProximosEv
       data: true,
       local: true,
       valorVaga: true,
+      capacidade: true,
       _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
     },
   })
@@ -126,7 +139,7 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
   eventoId: string,
   tipoEsperado?: TipoEvento,
 ): Promise<EventoEmbarqueLite | null> {
-  const row: EventoEmbarqueLite | null = await db.evento.findFirst({
+  const row = await db.evento.findFirst({
     where: {
       id: eventoId,
       tenantId,
@@ -140,7 +153,8 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
       data: true,
       local: true,
       valorVaga: true,
-      sede: { select: { capacidade: true } },
+      capacidade: true,
+      sede: { select: { capacidade: true, nome: true } },
       rsvps: {
         orderBy: [{ status: 'asc' }, { id: 'asc' }],
         select: {
@@ -154,5 +168,18 @@ export const getEventoEmbarque = cache(async function getEventoEmbarque(
       },
     },
   })
-  return row
+  if (!row) return null
+  return {
+    id: row.id,
+    tipo: row.tipo,
+    titulo: row.titulo,
+    descricao: row.descricao,
+    data: row.data,
+    local: row.local,
+    valorVaga: row.valorVaga,
+    capacidade: row.capacidade,
+    sedeNome: row.sede?.nome ?? null,
+    sede: row.sede ? { capacidade: row.sede.capacidade } : null,
+    rsvps: row.rsvps,
+  }
 })

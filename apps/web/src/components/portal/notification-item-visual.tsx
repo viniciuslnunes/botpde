@@ -13,6 +13,7 @@ import {
   UserPlus,
   UserX,
   Wallet,
+  Calendar,
   type LucideIcon,
 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -38,6 +39,9 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   MEMBRO_SOLICITADO: UserCog,
   COBRANCA_PENDENTE: Wallet,
   COBRANCA_VENCIDA: Wallet,
+  EVENTO_LEMBRETE: Calendar,
+  EVENTO_RSVP: Calendar,
+  EVENTO_DIA_GESTOR: Calendar,
 }
 
 export interface NotificacaoAtorInfo {

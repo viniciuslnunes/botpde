@@ -120,6 +120,8 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `GROUP BY` (nunca `DISTINCT`+`ORDER BY similarity`); ver
   `docs/data/modulo-comunidade.md` (§ engajamento / § busca) e
   `docs/data/modulo-comunidade-performance.md`.
+- **Eventos / Agenda** — hub `/admin/eventos` e `/portal/eventos`; plugins
+  Caravanas/Bateria por `Evento.tipo`; ver `docs/data/modulo-eventos.md`.
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.

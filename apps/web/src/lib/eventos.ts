@@ -11,7 +11,10 @@ import { getVisibleTenantIds } from './hierarquia'
  * tenant de origem — um evento restrito a uma unidade da sede-mãe não diz
  * respeito a uma subsede/PDE diferente.
  */
-export async function getEscopoEventosVisiveis(tenantId: string, userId: string | undefined) {
+export const getEscopoEventosVisiveis = cache(async function getEscopoEventosVisiveis(
+  tenantId: string,
+  userId: string | undefined,
+) {
   const [membro, tenantsVisiveis] = await Promise.all([
     userId
       ? db.saasMembro.findUnique({
@@ -35,7 +38,7 @@ export async function getEscopoEventosVisiveis(tenantId: string, userId: string 
       ...(ancestrais.length > 0 ? [{ tenantId: { in: ancestrais }, sedeId: null }] : []),
     ],
   }
-}
+})
 
 export interface ProximoEventoItem {
   id: string

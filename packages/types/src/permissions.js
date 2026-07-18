@@ -254,8 +254,8 @@ export const DEPARTAMENTO_MODULO_ROTA = /** @type {const} */ ({
   membros: { href: null, disponivel: false },
   financeiro: { href: '/portal/financeiro', disponivel: true },
   patrimonio: { href: '/portal/patrimonio', disponivel: true },
-  caravanas: { href: '/portal/caravanas', disponivel: true },
-  bateria: { href: '/portal/bateria', disponivel: true },
+  caravanas: { href: '/portal/eventos?tipo=CARAVANA', disponivel: true },
+  bateria: { href: '/portal/eventos?tipo=ENSAIO', disponivel: true },
 })
 
 /**
