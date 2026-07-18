@@ -97,10 +97,16 @@ async function descendantTenantIds(sedeId: string, visitados: Set<string> = new 
   })
 
   const ids: string[] = []
-  for (const filho of filhos) {
+  // Cada `filho` já marca a si mesmo em `visitados` de forma síncrona no início
+  // da chamada (antes do primeiro await), então a recursão dos irmãos pode
+  // rodar em paralelo sem risco de reprocessar um nó (guarda de ciclo intacta).
+  const subArvores = await Promise.all(
+    filhos.map(async (filho) => descendantTenantIds(filho.id, visitados)),
+  )
+  filhos.forEach((filho, i) => {
     if (filho.tenantId) ids.push(filho.tenantId)
-    ids.push(...(await descendantTenantIds(filho.id, visitados)))
-  }
+    ids.push(...subArvores[i])
+  })
   return ids
 }
 
@@ -312,11 +318,15 @@ async function getTenantRelationImpl(
     if (lineageRelation !== 'unrelated') return lineageRelation
   }
 
-  if (await tenantsAreAllied(actorTenantId, targetTenantId)) return 'allied'
-
-  // Só cai em 'rival' quando NÃO há self/hierarquia/allied — a aliança ATIVA
-  // neutraliza a rivalidade herdada do clube (spec-onboarding §3.2).
-  if (await tenantsAreRivais(actorTenantId, targetTenantId)) return 'rival'
+  // Aliança e rivalidade são independentes; o caso comum ('unrelated') precisa
+  // das duas respostas, então rodam em paralelo. A PRECEDÊNCIA é aplicada
+  // depois: aliança ATIVA vence rivalidade herdada do clube (spec-onboarding §3.2).
+  const [aliado, rival] = await Promise.all([
+    tenantsAreAllied(actorTenantId, targetTenantId),
+    tenantsAreRivais(actorTenantId, targetTenantId),
+  ])
+  if (aliado) return 'allied'
+  if (rival) return 'rival'
 
   return 'unrelated'
 }
@@ -441,15 +451,16 @@ export async function getTenantHierarquia(tenantId: string): Promise<{
     cidade: string | null
   }
 
-  const tenants: TenantRow[] = await db.tenant.findMany({
-    where: { id: { in: idsRelevantes } },
-    select: { id: true, nome: true, ativo: true },
-  })
-
-  const sedesPorTenant: SedeInfoRow[] = await db.sede.findMany({
-    where: { tenantId: { in: idsRelevantes } },
-    select: { tenantId: true, tipo: true, cidade: true },
-  })
+  const [tenants, sedesPorTenant]: [TenantRow[], SedeInfoRow[]] = await Promise.all([
+    db.tenant.findMany({
+      where: { id: { in: idsRelevantes } },
+      select: { id: true, nome: true, ativo: true },
+    }),
+    db.sede.findMany({
+      where: { tenantId: { in: idsRelevantes } },
+      select: { tenantId: true, tipo: true, cidade: true },
+    }),
+  ])
   const sedeInfoMap = new Map(sedesPorTenant.map((s) => [s.tenantId, s]))
 
   function toNode(tenantRow: { id: string; nome: string; ativo: boolean }): TenantHierarquiaNode {

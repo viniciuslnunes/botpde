@@ -300,9 +300,10 @@ export const resumirTurnoBar = cache(async function resumirTurnoBar(
 ): Promise<BarTurnoResumo> {
   const whereBase: Prisma.BarVendaWhereInput = { tenantId, turnoId }
 
-  const [pagas, pendentes]: [
+  const [pagas, pendentes, dinheiroAgg]: [
     { _sum: { total: Prisma.Decimal | null }; _count: { _all: number } },
     number,
+    { _sum: { total: Prisma.Decimal | null } },
   ] = await Promise.all([
     db.barVenda.aggregate({
       where: { ...whereBase, status: 'PAGA' },
@@ -310,12 +311,11 @@ export const resumirTurnoBar = cache(async function resumirTurnoBar(
       _count: { _all: true },
     }),
     db.barVenda.count({ where: { ...whereBase, status: 'PENDENTE' } }),
+    db.barVenda.aggregate({
+      where: { ...whereBase, status: 'PAGA', metodoPagamento: 'DINHEIRO' },
+      _sum: { total: true },
+    }),
   ])
-
-  const dinheiroAgg: { _sum: { total: Prisma.Decimal | null } } = await db.barVenda.aggregate({
-    where: { ...whereBase, status: 'PAGA', metodoPagamento: 'DINHEIRO' },
-    _sum: { total: true },
-  })
 
   return {
     totalPago: Number(pagas._sum.total ?? 0),

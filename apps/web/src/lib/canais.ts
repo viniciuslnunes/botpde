@@ -189,10 +189,15 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     ]),
   )
 
+  // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
+  // React.cache, então pares (viewer, tenant) repetidos não repetem query.
+  const visiveis = await Promise.all(
+    rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)),
+  )
+
   const result: CanalItem[] = []
-  for (const row of rows) {
-    const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
-    if (!podeVer) continue
+  rows.forEach((row, i) => {
+    if (!visiveis[i]) return
     const membro = membershipMap.get(row.id)
     result.push({
       id: row.id,
@@ -210,7 +215,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       souAdmin: membro?.papel === 'ADMIN',
       tenantNome: formatNomeTorcida(row.tenant.nome),
     })
-  }
+  })
   return result
 })
 
@@ -330,7 +335,8 @@ export const getPerfilInstitucional = cache(async function getPerfilInstituciona
     if (!alliedOk) return null
   }
 
-  const [tenant, sede, canalOficial] = await Promise.all([
+  // escopoEventos é independente de tenant/sede/canal → entra no mesmo round-trip.
+  const [tenant, sede, canalOficial, escopoEventos] = await Promise.all([
     db.tenant.findUnique({
       where: { id: targetTenantId, ativo: true },
       select: { id: true, nome: true, logoUrl: true, corPrimaria: true },
@@ -340,6 +346,7 @@ export const getPerfilInstitucional = cache(async function getPerfilInstituciona
       select: { tipo: true, cidade: true },
     }),
     getOrCreateCanalOficial(targetTenantId),
+    getEscopoEventosVisiveis(targetTenantId, userId),
   ])
   if (!tenant) return null
 
@@ -347,8 +354,6 @@ export const getPerfilInstitucional = cache(async function getPerfilInstituciona
 
   const canal = await getCanalPorId(canalOficial.id, viewerTenantId, userId)
   if (!canal) return null
-
-  const escopoEventos = await getEscopoEventosVisiveis(targetTenantId, userId)
 
   const [comunicados, postsInstRaw, postsCanalRaw, proximosEventos] = await Promise.all([
     db.announcement.findMany({
@@ -408,18 +413,20 @@ export async function listUnidadesVisiveis(
   viewerTenantId: string,
 ): Promise<UnidadeBuscaItem[]> {
   const visibleIds = await getVisibleTenantIds(viewerTenantId, 'comunidade')
-  const tenants: Array<{ id: string; nome: string; logoUrl: string | null }> =
-    await db.tenant.findMany({
+  const [tenants, sedes]: [
+    Array<{ id: string; nome: string; logoUrl: string | null }>,
+    Array<{ tenantId: string | null; tipo: string; cidade: string | null }>,
+  ] = await Promise.all([
+    db.tenant.findMany({
       where: { id: { in: visibleIds }, ativo: true, sintetico: false },
       select: { id: true, nome: true, logoUrl: true },
       orderBy: { nome: 'asc' },
-    })
-
-  const sedes: Array<{ tenantId: string | null; tipo: string; cidade: string | null }> =
-    await db.sede.findMany({
+    }),
+    db.sede.findMany({
       where: { tenantId: { in: visibleIds } },
       select: { tenantId: true, tipo: true, cidade: true },
-    })
+    }),
+  ])
   const sedeMap = new Map(sedes.filter((s) => s.tenantId).map((s) => [s.tenantId!, s]))
 
   return tenants.map((t) => {
@@ -504,12 +511,22 @@ export async function buscarCanaisEUnidades(
     }),
   ])
 
-  const canaisVisiveis = await Promise.all(
-    canalRows.map(async (row) => {
-      const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
-      return podeVer ? row : null
+  // Visibilidade dos canais e busca de sedes das unidades são independentes.
+  const [canaisVisiveis, sedes]: [
+    Array<(typeof canalRows)[number] | null>,
+    Array<{ tenantId: string | null; tipo: string; cidade: string | null }>,
+  ] = await Promise.all([
+    Promise.all(
+      canalRows.map(async (row) => {
+        const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
+        return podeVer ? row : null
+      }),
+    ),
+    db.sede.findMany({
+      where: { tenantId: { in: tenantRows.map((t) => t.id) } },
+      select: { tenantId: true, tipo: true, cidade: true },
     }),
-  )
+  ])
 
   const canais: CanalItem[] = []
   for (const row of canaisVisiveis) {
@@ -533,11 +550,6 @@ export async function buscarCanaisEUnidades(
     })
   }
 
-  const sedes: Array<{ tenantId: string | null; tipo: string; cidade: string | null }> =
-    await db.sede.findMany({
-      where: { tenantId: { in: tenantRows.map((t) => t.id) } },
-      select: { tenantId: true, tipo: true, cidade: true },
-    })
   const sedeMap = new Map(sedes.filter((s) => s.tenantId).map((s) => [s.tenantId!, s]))
 
   const unidades: UnidadeBuscaItem[] = tenantRows.map((t) => {
