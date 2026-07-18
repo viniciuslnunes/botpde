@@ -75,6 +75,11 @@ create + timeline autor; hashtags/menções/audit em `after()`. Descobrir =
 `feed.posts` unificado (não preferir só `postsSugeridos`). Nav-back: bootstrap
 TanStack + chrome no layout. Ver `modulo-comunidade-performance.md` § publish /
 nav-back.
+**Busca:** `comunidade-busca.ts` + `GET /api/comunidade/busca?modo=`. Typeahead
+→ `modo=rapida`; página → `completa`. SQL membros: `GROUP BY` (nunca
+`DISTINCT` + `ORDER BY similarity` — `42P10`). Posts: `postIncludeBusca` /
+`projetarPostBusca`. Dropdown: erro ≠ “Nenhum resultado”. Canais: `podeVerCanal`
+em paralelo. Ver `docs/data/modulo-comunidade.md` § busca.
 Onboarding — escudos: `EscudoClube`, `docs/data/escudos-afiliacoes.md` (offline only).
 Onboarding — metadados de clube: `ClubeOnboardingMeta`, `getAfiliacoesParaOnboarding`,
 `seed:torcedores-estimados` + `docs/data/torcedores-estimados.md`. Coleta mensual:

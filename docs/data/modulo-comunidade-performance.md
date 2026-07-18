@@ -2,8 +2,10 @@
 
 > Plano de otimização da Comunidade entregue em **2026-07-16** (`0dca679` na
 > `main`). Live UX zero-custo (`f6690cb`): ping SSE pós-fan-out + auto-refetch no
-> topo. Complementa `ARCHITECTURE.md` §5.6 e `docs/data/modulo-comunidade.md`.
-> Agente responsável por novas auditorias: `performance`.
+> topo. **2026-07-17:** engajamento overlay; publish + prepend client; nav-back
+> sem remount; busca typeahead (`modo=rapida`). Complementa `ARCHITECTURE.md`
+> §5.6 e `docs/data/modulo-comunidade.md`. Agente responsável por novas
+> auditorias: `performance`.
 
 ## Objetivo
 
@@ -37,6 +39,34 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | **B4** Timeline materializada | `FeedTimeline`, `feed-timeline.ts`, `actions.ts` | Fan-out on write para rede/seguindo |
 | **B5** Ranking Descobrir | `scoreDescobrirPost`, `rankDescobrirPosts` | Recência + engajamento + boost local |
 | **B6** Busca `pg_trgm` | `comunidade-busca.ts`, `enable-pg-trgm.js` | Similaridade + índices GIN; fallback ILIKE |
+| **B6.1** Busca typeahead (2026-07-17) | `modo=rapida`, `postIncludeBusca`, fix `GROUP BY` | Dropdown leve; SQL DISTINCT+ORDER BY quebrava API (`42P10`) |
+
+### Busca — hot path e armadilhas (2026-07-17)
+
+Commit de referência: `e4a30ee` (fix SQL + `modo=rapida`).
+
+| Superfície | Endpoint | Trabalho |
+|------------|----------|----------|
+| Dropdown do feed (`comunidade-search-bar.tsx`) | `GET /api/comunidade/busca?q=&modo=rapida` | Membros (avatar/nome) + hashtags + posts leves; **sem** canais, badges, follow, contagens |
+| Página `/portal/comunidade/busca` | `GET /api/comunidade/busca?q=` (`completa`) | Tudo acima + canais/unidades + badges + follow |
+
+**Armadilha SQL (regressão clássica):** com `pg_trgm` ligado,
+
+```sql
+SELECT DISTINCT m.user_id … ORDER BY similarity(…)
+```
+
+falha no Postgres (`42P10`). O catch só trata “extensão ausente”; o 400 virava
+“Nenhum resultado” no dropdown se a UI engolia `!res.ok`. **Invariante:**
+candidatos de membros usam `GROUP BY m.user_id, u.nome` +
+`MAX(similarity(bio))`. Ver `docs/data/modulo-comunidade.md` § busca.
+
+**Padrões a preservar:**
+- Typeahead sempre `modo=rapida`; página completa = default.
+- Posts de busca: `postIncludeBusca` / `projetarPostBusca` (não `postInclude` cheio).
+- Erro de API ≠ empty state (dropdown e página).
+- `podeVerCanal` em paralelo na busca completa.
+- **Não** Meilisearch (E1) sem p95 medido **com** `pg_trgm` em produção.
 
 ### Caches e hot paths (pós-B)
 
@@ -47,10 +77,11 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | Canais visíveis | `unstable_cache` + membership por request | 120s base + query leve |
 | Hashtags em alta | `unstable_cache` | 120s |
 | Stories rings | `unstable_cache` + privacidade por request | 60s |
-| Salas ao vivo | `unstable_cache` | 15s |
+| Salas ao vivo | `React.cache` + `unstable_cache` | Por request + 15s cross-request |
 | Privacidade autores | `React.cache` em `getAutoresSemAcesso` | Por request |
 | Eventos composer + aside | `React.cache` `getEventosFuturosVisiveis` | Por request |
-| Salas na página | Uma `listSalasAtivas` em `page.tsx` → props | Por request (cache 15s na lib) |
+| Tenant ativo | `React.cache` `getActiveTenant` | Por request (layout + page) |
+| Salas no chrome | `listSalasAtivas` no layout (`ComunidadeLayoutChrome`) + dedupe `React.cache` se a page também pedir | Por request |
 
 ### Chat e painéis laterais
 
@@ -99,7 +130,8 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
    já ter a linha materializada.
 5. **Chat colapsado = resumo** — inbox completa só quando o usuário expande.
 6. **Uma leitura, vários consumidores** — dados compartilhados (ex.: salas)
-   buscados no nível `page`/shell e passados por props.
+   no layout chrome ou page, com `React.cache` se layout + page chamam a
+   mesma lib no mesmo request.
 7. **Tipos explícitos em queries Prisma** — ver `ARCHITECTURE.md` §5.2.
 8. **Overlay de engajamento sem `revalidatePath` do feed** — reação/comentário
    são estado otimista no cliente (`PostEngagement`). Revalidar
@@ -139,6 +171,55 @@ por hábito.
 |---------|-------|--------|----------------|
 | Curtir / comentar no feed (mesmo tenant ou CN) | Action + `revalidatePath` do feed (RSC completo) | Mutação leve + UI otimista | **~70–95%** menos trabalho no POST (∝ tamanho do feed) |
 
+## Publicar + feed client (2026-07-17)
+
+Incidente: publicar “lento”, tempestade de requests depois, e o post **só
+aparecia após F5**. Causa raiz: o feed vivo é **TanStack Query** — `revalidatePath`
++ `router.refresh()` (SSE perto do topo) forçavam RSC completo **sem** atualizar
+a lista client. Sintoma no Network: `navbar-context`, `conversas`, RSC
+`comunidade`, `feed`, `salas`, Sentry em cascata.
+
+| Técnica | Efeito |
+|---------|--------|
+| Composer emite `comunidade:post-publicado` (+ `PostPublicadoPreview` opcional) | Infinite feed faz **prepend otimista** imediato |
+| Soft hydrate / `invalidateQueries` leve após create | Confirma com servidor sem limpar a lista |
+| Sem `revalidatePath('/portal/comunidade')` no path de publicar | Action não espera RSC do feed |
+| `invalidarLeituraComunidade` / `revalidateTag` mantidos | Cache cross-request fica coerente |
+| `FeedLiveBanner` **não** chama `router.refresh()` perto do topo | Ping SSE → só refetch TanStack do topo |
+| Caminho crítico da action = create + timeline do autor; hashtags/menções/audit/`Perfil` via `after()` | Menos trabalho síncrono na action |
+| Descobrir: ranking **unificado** (rede + sugestões); API/SSR usam `feed.posts` | Post do autor não some quando há `postsSugeridos` |
+
+**Invariante:** se a UI do feed é client (Query/Virtual), mutação bem-sucedida
+**deve** atualizar o cache client (evento / prepend / `setQueryData`). RSC
+sozinho **não** é fonte da lista.
+
+**Medição local (super-admin E2E):** `e2e/publish-latency.measure.ts` →
+`cardMs` ~**520 ms** (Publicar → card). Com isso, **não** otimizar publicar por
+hábito — só com p95 novo ou regressão. Conta de teste: early-return em
+`assertAutorPublicacaoPost` (super-admin); authz de membro **não** era o
+gargalo nessa medição.
+
+## Voltar ao feed (Buscar / Classificação) — 2026-07-17
+
+Navegar para Buscar/Classificação e voltar remountava shell + chat + salas e
+zerava a percepção do TanStack (Suspense skeleton + SSR seed).
+
+| Técnica | Arquivo(s) | Efeito |
+|---------|------------|--------|
+| Fallback Suspense = `ComunidadeFeedBootstrap` | `_components/comunidade-feed-bootstrap.tsx` | Mostra cache quente em vez de skeleton vazio |
+| `gcTime` 20 min no Query provider | `comunidade-query-provider.tsx` | Cache sobrevive à saída do feed |
+| SSR seed só se cache vazio | `use-comunidade-infinite-feed.ts` | Não sobrescreve lista quente |
+| `ComunidadeLayoutChrome` (salas + chat) no layout | `comunidade-layout-chrome.tsx`, `layout.tsx` | `display:none` fora do feed — **sem unmount** |
+| Page fina + Suspense composer/card | `composer-context.ts`, `*-section.tsx` | Layout resolve chrome; page não bloqueia no composer |
+| Prefetch on-hover abas Descobrir/Seguindo | `comunidade-feed-tabs.tsx` | Volta mais rápida |
+| `React.cache` em `listSalasAtivas` + `getActiveTenant` | `salas.ts`, `tenant.ts` | Dedupe layout ↔ page no mesmo RSC |
+
+Medir: `e2e/feed-nav-back.measure.ts` (`firstPostMs`, contagens de
+`conversas/resumo` / feed / RSC).
+
+**Próximos quick wins (só após medir de novo):** uma assinatura SSE; defer do
+rail; cortar soft-refetch ~600 ms em posts só-texto.
+
 ## Pós-deploy (obrigatório em produção)
 
 ```bash
@@ -176,6 +257,8 @@ porém mais lenta em bases grandes).
 | Chat colapsado | Inbox completa no mount | Só `/api/conversas/resumo` | **~80–95%** menos payload/queries de DM no mount |
 | Badge / nova DM | Poll 15s | SSE (+ poll 60s fallback) | **~75–90%** menos polls; latência ~0–15s → **~&lt;1s** |
 | Publicar post (rede grande) | Fan-out sync na action | Autor sync + fila Redis | **~60–90%** menos tempo na action (∝ seguidores) |
+| Publicar → card no feed (client) | `revalidatePath` + refresh RSC; lista TanStack não atualizava | Prepend otimista + sem refresh RSC; action leve (`after`) | Percepção ~**sub-segundo** local (~520 ms medido); sem tempestade RSC |
+| Voltar Buscar/Classificação → Feed | Remount chat/salas + skeleton Suspense | Chrome no layout + bootstrap TanStack + `gcTime` 20 min | Sem “reload” percebido se cache quente |
 | SSE entre réplicas | In-memory só na réplica local | Redis pub/sub (`REDIS_URL`) | De **0%** → **~100%** dos pings cruzam réplicas |
 | Busca | ILIKE / agregação pesada | `pg_trgm` + batch (após `db:enable-pg-trgm`); dropdown `modo=rapida` (sem canais/badges/follow; posts leves) | **~30–70%** em bases grandes; **~40–60%** menos trabalho no typeahead vs página completa |
 | Assets estáticos (CDN) | Sempre origin Railway | Cloudflare Free | **0%** sem domínio próprio; **~40–60%** LCP estático com domínio |
@@ -215,6 +298,10 @@ planejado capturado. Restante ≈ CDN + E/F sob evidência.
 2. Contenção de conexões Postgres → F1.
 3. Domínio próprio comprado → ativar F4 (`docs/ops/cloudflare-cdn.md`).
 4. Várias réplicas / dia de jogo degradando com Redis já on → medir antes de D4+/F.
+5. `cardMs` de publicar (measure) **regredindo** vs ~520 ms baseline local →
+   reabrir hot path de publish (não “otimizar por hábito” abaixo disso).
+6. `firstPostMs` ao voltar de Buscar/Classificação degradado com cache quente →
+   checar remount do chrome / `gcTime` / seed SSR sobrescrevendo Query.
 
 ## Plano futuro — nível profissional
 
@@ -318,11 +405,12 @@ com evidência (p95 / reclamações). Não contratar engine sem medir.
 
 | Agente | Quando acionar |
 |--------|----------------|
-| `performance` | Nova feature em feed/busca/polling; regressão de queries |
-| `data-model` | Novas tabelas materializadas, índices, jobs de backfill |
-| `implementation` | Codificar recorte aprovado (Fable) |
-| `qa-verification` | Vitest + e2e latência antes de merge |
-| `product-strategy` | Priorizar Fase C vs D vs escopo de ranking/busca |
+| `performance` | Nova feature em feed/busca/polling; regressão de queries; typeahead vs `completa` |
+| `data-model` | Novas tabelas materializadas, índices, jobs de backfill; E1 só com p95 |
+| `implementation` | Codificar recorte aprovado (Fable); preservar `modo=rapida` / `GROUP BY` |
+| `qa-verification` | Vitest + e2e; smoke busca (erro ≠ vazio; `vi` → 200) |
+| `ux-review` | Estados loading/erro/vazio do dropdown de busca |
+| `product-strategy` | Priorizar Fase C vs D vs escopo de ranking/busca; não E1 sem métrica |
 
 ## Referências no código
 
@@ -331,16 +419,20 @@ com evidência (p95 / reclamações). Não contratar engine sem medir.
 | Cache tags | `apps/web/src/lib/comunidade-cache.ts` |
 | Infinite hook | `apps/web/src/lib/use-comunidade-infinite-feed.ts` (TanStack Query) |
 | Windowing | `apps/web/src/lib/use-feed-window.ts` (`@tanstack/react-virtual`) |
-| Query provider | `apps/web/src/components/portal/comunidade-query-provider.tsx` |
+| Query provider | `apps/web/src/components/portal/comunidade-query-provider.tsx` (`gcTime` 20 min) |
 | Prefetch hover | `apps/web/src/components/portal/comunidade-prefetch-link.tsx` |
-| Feed + ranking | `apps/web/src/lib/feed.ts` |
+| Feed + ranking | `apps/web/src/lib/feed.ts` (Descobrir unificado → `posts`) |
 | Timeline | `apps/web/src/lib/feed-timeline.ts`, `feed-timeline-queue.ts` |
-| Live refresh | `apps/web/src/lib/feed-live-refresh.ts`, `feed-live-banner.tsx` |
-| Busca | `apps/web/src/lib/comunidade-busca.ts` |
+| Live refresh | `apps/web/src/lib/feed-live-refresh.ts`, `feed-live-banner.tsx` (sem `router.refresh`) |
+| Publish client | `feed-composer.tsx` → evento `comunidade:post-publicado`; prepend no infinite |
+| Layout chrome | `comunidade-layout-chrome.tsx`, `comunidade-feed-bootstrap.tsx`, `composer-context.ts` |
+| Busca | `comunidade-busca.ts`, `postIncludeBusca`/`projetarPostBusca` em `feed.ts`, `comunidade-search-bar.tsx` (`modo=rapida`), `api/comunidade/busca` |
 | Stories | `apps/web/src/lib/stories.ts` |
+| Salas / tenant | `salas.ts` (`listSalasAtivas` + `React.cache`), `tenant.ts` (`getActiveTenant` + `React.cache`) |
 | SSE feed | `apps/web/src/lib/feed-bus.ts`, `realtime-bus.ts`, `use-feed-stream.ts` |
 | SSE notif | `apps/web/src/lib/notificacoes-bus.ts`, `realtime-bus.ts` |
 | SSE mensagens | `apps/web/src/lib/mensageria-bus.ts`, `use-mensagem-stream.ts` |
 | Chat resumo | `apps/web/src/app/api/conversas/resumo/route.ts` |
+| Measure e2e | `e2e/publish-latency.measure.ts`, `e2e/feed-nav-back.measure.ts` (`--project=measure`) |
 | Scripts DB | `packages/db/scripts/enable-pg-trgm.js` |
 | Schema | `packages/db/prisma/schema.prisma` (`FeedTimeline`, índices `Post`) |

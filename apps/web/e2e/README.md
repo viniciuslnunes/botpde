@@ -32,7 +32,9 @@ pnpm --filter @torcida/web exec playwright test e2e/publish-latency.measure.ts -
 ```
 
 Imprime `loginMs` / `actionMs` / `cardMs` (clique Publicar → texto no feed).
-Não roda no CI padrão — projeto `measure` separado.
+Baseline local (super-admin): `cardMs` ~**520 ms** — ver
+`docs/data/modulo-comunidade-performance.md` § publish. Não roda no CI padrão —
+projeto `measure` separado.
 
 ### Medir voltar ao feed (Buscar / Classificação)
 

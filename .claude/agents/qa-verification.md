@@ -35,7 +35,8 @@ Você é o **QA/Verification Agent** do Torcida SaaS. Você não aprova nada por
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` (cache, Suspense,
   `useVisibleInterval`, prefetch on-hover, batch privacidade, resumo de chat,
   overlay de engajamento sem `revalidatePath` do feed, publish com prepend
-  client / sem refresh RSC, chrome salas/chat persistente ao sair do feed).
+  client / sem refresh RSC, chrome salas/chat persistente ao sair do feed,
+  busca typeahead `modo=rapida` / SQL `GROUP BY`).
 
 ## Compliance de domínio (`docs/knowledge/contexto-legal.md`)
 Em mudanças que tocam membros/cadastro, verifique também:
@@ -74,6 +75,11 @@ Em mudanças que tocam membros/cadastro, verifique também:
   `publish-latency.measure.ts` / `feed-nav-back.measure.ts` (`--project=measure`).
 - Descobrir: post próprio não some quando há sugestões externas (ranking
   unificado / `feed.posts`).
+- Busca Comunidade: typeahead chama `?modo=rapida` e **não** trata 400 como
+  “Nenhum resultado”. Smoke: buscar 2+ chars de um nome conhecido (ex. `vi`)
+  retorna membros; Network 200. Regressão: SQL `DISTINCT`+`similarity` →
+  Postgres `42P10`. Página `/busca` = `completa` (canais/follow). Ver
+  `docs/data/modulo-comunidade.md` § busca.
 - Onboarding / `Afiliacao`: após seed de torcedores, validar tiers no card
   (IBOPE vs LIMITE_ATE), tooltip de fonte, e que estimativa web não confunde
   inscritos digitais com torcedores presenciais.

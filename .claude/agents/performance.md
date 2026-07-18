@@ -33,8 +33,9 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
   **Não** reintroduzir `emitFeedPing` síncrono na Server Action de publicar.
 - Imagens: `optimizable-image.ts`, `next.config.ts` `images.remotePatterns`.
 - DB: `packages/db/src/index.js` (`connection_limit`), índices em `schema.prisma`.
-- Medição: `apps/web/e2e/nav-latency.portal.spec.ts`; contador dev em
-  `packages/db/src/query-metrics.js`.
+- Medição: `apps/web/e2e/nav-latency.portal.spec.ts`; Comunidade sob demanda
+  `e2e/publish-latency.measure.ts` e `e2e/feed-nav-back.measure.ts`
+  (`--project=measure`); contador dev em `packages/db/src/query-metrics.js`.
 
 ## Diagnóstico — ordem de investigação
 1. **Quantificar**: quantas queries Prisma por request? (badge dev ou logs).
@@ -59,13 +60,27 @@ na porta do estádio.
   base pública; privacidade sempre em batch (`getAutoresSemAcesso`).
 - Feed live: ping só pós-fan-out; refetch automático **só** perto do scroll top;
   banner “novos posts” quando o usuário está rolando (não saltar a lista).
+  **Não** usar `router.refresh()` no banner perto do topo — a lista é TanStack.
 - **Engajamento (reação/comentário):** nunca `revalidatePath('/portal/comunidade')`
   no hot path — UI é otimista (`PostEngagement`). Authz + post em paralelo;
   `podeEngajarPostVisivel` (CN/sintético); notifs/`AuditLog` de comentário via
   `after()`. Detalhe: `docs/data/modulo-comunidade-performance.md` § engajamento.
   Regressão clássica: POST com digest RSC ao curtir post da Comunidade Nacional.
+- **Publicar post:** nunca `revalidatePath` do feed na action; prepend via evento
+  `comunidade:post-publicado` + soft hydrate. Caminho crítico = create + timeline
+  autor; hashtags/menções/audit em `after()`. Descobrir: página mista em
+  `feed.posts` (não dropar posts da rede quando há sugestões). Medir com
+  `e2e/publish-latency.measure.ts` antes de mais otimização (~520 ms baseline).
+- **Voltar ao feed:** Suspense com `ComunidadeFeedBootstrap`; salas/chat no
+  `ComunidadeLayoutChrome` (`display:none`, sem unmount); `gcTime` 20 min;
+  `listSalasAtivas` + `getActiveTenant` em `React.cache`. Medir
+  `e2e/feed-nav-back.measure.ts`.
+- **Busca typeahead:** `modo=rapida` (sem canais/badges/follow; `postIncludeBusca`).
+  SQL membros: `GROUP BY` — **nunca** `DISTINCT` + `ORDER BY similarity`
+  (Postgres `42P10` → API 400 mascarada como “nenhum resultado”). Erro HTTP ≠
+  empty state. Detalhe: `modulo-comunidade.md` § busca / performance § B6.1.
 - Chat embutido: resumo em `/api/conversas/resumo`; inbox completa só ao expandir.
-- Salas ao vivo: uma leitura na `page.tsx`, distribuída por props.
+- Salas ao vivo: chrome no layout + `React.cache` (não triplicar query layout/page).
 - Prefetch on-hover na navbar — não voltar a `prefetch={true}` em todas as rotas.
 - Polling com `useVisibleInterval`; evitar `setInterval` cru em features novas.
 - Tipos explícitos em queries Prisma novas (§5.2).
@@ -99,10 +114,13 @@ ganho por jornada (%) estão em `modulo-comunidade-performance.md` § “Ganhos
 estimados”. **Não** proponha Meilisearch, pooler, CDN pago ou virtualização
 extra “por hábito”. Reabra só com:
 
-1. Busca lenta **com** `pg_trgm` → E1  
+1. Busca lenta **com** `pg_trgm` → E1 (não reintroduzir DISTINCT+ORDER BY;
+   typeahead já é `modo=rapida` — medir página completa / bases grandes)  
 2. Contenção de conexões → F1  
 3. Domínio próprio → F4 Cloudflare (`docs/ops/cloudflare-cdn.md`)  
 4. Degradação em dia de jogo **com Redis on** → medir antes de mais código  
+5. Publish `cardMs` ou nav-back `firstPostMs` regredindo vs baselines do doc →
+   reabrir só o hot path afetado (não o plano A–D inteiro)
 
 Ao comunicar ganhos a humanos, use as faixas do doc e deixe explícito que são
 **estimativas**, não p95 de produção.

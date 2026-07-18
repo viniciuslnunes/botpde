@@ -69,7 +69,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Performance** (páginas com muitas queries, feed ou polling): siga `ARCHITECTURE.md`
   §5.6–§5.6.1 e `docs/data/modulo-comunidade-performance.md` — `React.cache`/`unstable_cache`,
   Suspense, prefetch on-hover, `useVisibleInterval`, `next/image` quando aplicável.
-  Dúvida de diagnóstico → agente `performance` antes de codar.
+  Comunidade: feed TanStack atualizado no publish (não só RSC); chrome salas/chat
+  no layout ao sair do feed. Dúvida de diagnóstico → agente `performance` antes de
+  codar.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Expandir shell para `portal/layout` antes de

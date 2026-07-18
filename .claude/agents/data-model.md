@@ -77,6 +77,10 @@ nunca são gravados pelo código — capacidade não usada, não bug. Ver `docs/
   `UserRole` com `departamentoId`) e pacote de área só após aprovação —
   `aprovarMembro` / Sem área / Acessos. Pendente e reprovado não herdam área.
   Ver `docs/data/modulo-departamentos.md`.
+- **Busca Comunidade + `pg_trgm`:** índices GIN via `db:enable-pg-trgm`; query
+  de candidatos **não** usa `SELECT DISTINCT … ORDER BY similarity` (Postgres
+  `42P10`). Preferir `GROUP BY`. Sem tabela/índice novo sem evidência — E1
+  (Meilisearch) só com p95. Ver `docs/data/modulo-comunidade.md` § busca.
 - `aliancas.md` — aliança é relação curada torcida↔torcida (tenant raiz ↔
   tenant raiz), opt-in, simétrica na leitura; rivalidade NÃO vira entidade de
   produto — no máximo lista de supressão para recomendações.

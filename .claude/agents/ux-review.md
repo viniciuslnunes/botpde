@@ -59,6 +59,10 @@ comunicar validação real (não placeholder decorativo).
   `comunidade:post-publicado`) — F5 para ver o próprio post é regressão de UX.
 - Voltar de Buscar/Classificação: feed não deve “piscar” skeleton vazio se o
   cache TanStack ainda está quente (`ComunidadeFeedBootstrap` + chrome no layout).
+- Busca no feed (dropdown): loading, **erro** e vazio são estados distintos —
+  falha de API nunca deve parecer “Nenhum resultado para …”. Typeahead usa
+  `modo=rapida` (resultados enxutos); “Ver todos” leva à página completa.
+  Ver `docs/data/modulo-comunidade.md` § busca.
 - Consistência com `@torcida/ui` e tokens; não introduzir estilos soltos.
 - Salas (Meet): lista/lobby, grid de chamada, chat, enquetes, presença e o gesto de
   "levantar a mão" precisam de estados vazio/erro/loading próprios — inclusive o caminho

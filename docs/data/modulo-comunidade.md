@@ -101,6 +101,39 @@ cobrir o mesmo conjunto.
 Helpers e actions: `apps/web/src/app/portal/comunidade/actions.ts`.
 Performance do hot path: `docs/data/modulo-comunidade-performance.md` § engajamento.
 
+### Publicar post — invariantes (2026-07-17)
+
+O feed infinito é **estado client** (TanStack Query). Publicar com sucesso
+**não** depende de `revalidatePath` / `router.refresh` para o card aparecer.
+
+| Regra | Detalhe |
+|-------|---------|
+| UI imediata | Composer dispara `comunidade:post-publicado` (+ preview); o infinite faz prepend otimista. |
+| Action | Sem `revalidatePath('/portal/comunidade')`; caminho crítico = create + timeline do autor; resto em `after()`. Tags via `invalidarLeituraComunidade`. |
+| SSE / live | Banner **não** faz `router.refresh` perto do topo — só refetch Query. |
+| Descobrir | Ranking unificado; resposta usa `feed.posts` (não preferir só `postsSugeridos` e dropar o post do autor). |
+| Medir | `e2e/publish-latency.measure.ts` — baseline local ~520 ms até o card; não micro-otimizar abaixo disso sem regressão. |
+
+Detalhe: `docs/data/modulo-comunidade-performance.md` § “Publicar + feed client”.
+
+### Busca (`buscarComunidade`) — invariantes (2026-07-17)
+
+Typeahead no feed e página `/portal/comunidade/busca` compartilham
+`GET /api/comunidade/busca` + `apps/web/src/lib/comunidade-busca.ts`.
+
+| Regra | Detalhe |
+|-------|---------|
+| Modos | `modo=rapida` (dropdown do feed) vs `modo=completa` (default, página Buscar). Rápida: sem canais/unidades, sem badges, sem follow/contagens; posts via `postIncludeBusca` / `projetarPostBusca`; limites menores. |
+| SQL membros + `pg_trgm` | **Nunca** `SELECT DISTINCT … ORDER BY similarity(...)`. Postgres `42P10` (“ORDER BY expressions must appear in select list”) derruba a API inteira. Usar `GROUP BY m.user_id, u.nome` + `MAX(similarity(bio))`. |
+| Fallback | Sem extensão: `isPgTrgmUnavailableError` → `null` → ILIKE Prisma. Outros erros **não** viram “lista vazia”. |
+| UX dropdown | `comunidade-search-bar.tsx` chama `?modo=rapida`; **erro HTTP ≠ vazio** — mostrar mensagem de erro (a página completa já fazia isso). |
+| Canais (completa) | `buscarCanaisEUnidades`: gate `podeVerCanal` em **paralelo** (`Promise.all`), não em série. |
+| Escopo | `getVisibleTenantIds(tenant, 'comunidade')`; posts de busca só `PUBLICO` + `tipo=MEMBRO` + sem `conversaId`. |
+| Sintoma clássico | Digitar 2+ chars → “Nenhum resultado” para nomes que existem → checar Network: 400 com `42P10` / Prisma raw, ou UI engolindo `!res.ok`. |
+
+Performance / ganhos: `docs/data/modulo-comunidade-performance.md` § busca (B6.1).
+Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
+
 ## Integração torcida (Sprint 4)
 
 - **Repost de comunicados**: botão "Compartilhar" nos comunicados oficiais; embed no feed via `PostComunicadoEmbed`.
@@ -128,7 +161,7 @@ Performance do hot path: `docs/data/modulo-comunidade-performance.md` § engajam
 - **Perfil oficial por unidade** — `/portal/comunidade/unidade/[tenantId]` agrega comunicados, mural institucional, eventos e canal oficial auto-provisionado.
 - **Canal oficial** — um `Conversa` `tipo: CANAL` com `canalOficial: true` por tenant; publicação restrita a admins (`CHANNELS_MANAGE`, `COMMUNITY_MANAGE` ou `ANNOUNCEMENTS_PUBLISH`).
 - **Comunidades temáticas** — admins criam canais com visibilidade `TENANT` / `HIERARQUIA` / `ALIADOS` / `PUBLICO`.
-- **Busca** — `/api/comunidade/busca` inclui canais e unidades da hierarquia visível.
+- **Busca** — `/api/comunidade/busca` (`modo=completa`) inclui canais e unidades da hierarquia visível; typeahead do feed usa `modo=rapida` (sem canais). Invariantes: § busca acima.
 - **Permissão** — `channels:manage` (owner/admin por padrão; rodar `repair-system-role-permissions` em produção).
 
 ## Formato de menções e hashtags
@@ -190,6 +223,9 @@ banner se rolado, resumo leve de mensagens e leitura única de salas ao vivo.
 
 **Padrões a preservar:** batch de privacidade/visibilidade, separar cache público
 de overlay por usuário, inbox completa só ao expandir chat, ping SSE pós-fan-out
-(não na action de publicar), tipos explícitos em queries Prisma. Agente:
-`performance` (ver `docs/agents/README.md`). Teto zero-custo (~85–95%); reabrir
-plano só com gatilho do doc.
+(não na action de publicar), feed client atualizado no publish (evento/prepend —
+não só RSC), chrome salas/chat no layout ao sair do feed, `React.cache` em
+`listSalasAtivas`/`getActiveTenant`, busca typeahead `modo=rapida` + SQL
+`GROUP BY` (nunca `DISTINCT`+`similarity`), tipos explícitos em queries Prisma.
+Agente: `performance` (ver `docs/agents/README.md`). Teto zero-custo (~85–95%);
+reabrir plano só com gatilho do doc.
