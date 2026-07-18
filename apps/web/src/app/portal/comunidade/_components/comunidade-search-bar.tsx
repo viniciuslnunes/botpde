@@ -165,7 +165,7 @@ export function ComunidadeSearchBar() {
               inputRef.current?.blur()
             }
           }}
-          placeholder="Buscar membros, hashtags, posts�"
+          placeholder="Buscar membros, hashtags, posts"
           aria-label="Buscar na comunidade"
           role="combobox"
           aria-haspopup="listbox"
