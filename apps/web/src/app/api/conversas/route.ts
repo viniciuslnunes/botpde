@@ -34,11 +34,19 @@ const criarGrupoSchema = z.object({
 
 const criarSchema = z.discriminatedUnion('tipo', [criarDmSchema, criarGrupoSchema])
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+    if (!tenant) {
+      return NextResponse.json({
+        conversas: [],
+        semVinculo: true,
+      })
     }
 
     const status = await getStatusInboxMensageria(session.user.id, tenant.id)
@@ -54,8 +62,9 @@ export async function GET() {
     const conversas = await listConversas(session.user.id)
     return NextResponse.json({ conversas: serializeConversasInbox(conversas) })
   } catch (error) {
+    console.error('[api/conversas GET]', error)
     const message = error instanceof Error ? error.message : 'Erro ao carregar conversas.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

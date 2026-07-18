@@ -66,7 +66,11 @@ export const getTenantFromHost = cache(async function getTenantFromHost(): Promi
 
   const cookieStore = await cookies()
   const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
-  if (slugFromCookie) return fetchTenantBySlug(slugFromCookie)
+  if (slugFromCookie) {
+    const fromCookie = await fetchTenantBySlug(slugFromCookie)
+    // Cookie inválido/antigo não pode engolir o TENANT_SLUG do deploy.
+    if (fromCookie) return fromCookie
+  }
 
   const fallback = fallbackTenantSlug(host)
   if (fallback) return fetchTenantBySlug(fallback)
@@ -174,7 +178,10 @@ export const getActiveTenant = cache(async function getActiveTenant(
 
   const cookieStore = await cookies()
   const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
-  if (slugFromCookie) return fetchTenantBySlug(slugFromCookie)
+  if (slugFromCookie) {
+    const fromCookie = await fetchTenantBySlug(slugFromCookie)
+    if (fromCookie) return fromCookie
+  }
 
   const fallback = fallbackTenantSlug(host)
   if (fallback) return fetchTenantBySlug(fallback)
