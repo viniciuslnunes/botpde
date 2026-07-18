@@ -47,6 +47,26 @@ export type TenantDesign = {
     warning: string | null
     info: string | null
   }
+  customPalettes?: Array<{
+    id: string
+    nome: string
+    primary: string
+    secondary: string | null
+    actions: {
+      success: string
+      danger: string
+      warning: string
+      info: string
+    }
+    actionsFg?: {
+      success?: string | null
+      danger?: string | null
+      warning?: string | null
+      info?: string | null
+    }
+    swatches: string[]
+    createdAt?: string
+  }>
   light: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
   dark: Partial<Record<(typeof SURFACE_TOKEN_KEYS)[number], string>>
 }

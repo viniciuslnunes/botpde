@@ -63,7 +63,7 @@ export const ACTION_TOKEN_HINTS = /** @type {const} */ ({
   success: 'Botões de aprovar, confirmar positivo e badges de sucesso',
   danger: 'Reprovar, excluir, cancelar inscrição e badges de erro',
   warning: 'Pendências, lista de espera e avisos',
-  info: 'Dicas e status neutro-informativo',
+  info: 'Badge Aviso (Portal), Informativo (Admin) e faixa de dica no evento',
 })
 
 /**
@@ -104,6 +104,20 @@ const ActionsFgSchema = z
   .strict()
   .default({})
 
+/** Paleta salva pela torcida (listada em Paletas sugeridas). */
+export const CustomPaletteSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    nome: z.string().min(1).max(60),
+    primary: hexColor,
+    secondary: hexOrNull.default(null),
+    actions: ActionsTokensSchema,
+    actionsFg: ActionsFgSchema.optional(),
+    swatches: z.array(hexColor).min(1).max(5),
+    createdAt: z.string().max(40).optional(),
+  })
+  .strict()
+
 /** @type {Record<(typeof ACTION_TOKEN_KEYS)[number], string>} */
 export const ACTION_CSS_VARS = {
   success: '--color-success',
@@ -133,6 +147,8 @@ export const TenantDesignSchema = z
     actions: ActionsTokensSchema.default({ ...DEFAULT_ACTIONS }),
     /** Texto em botão sólido / badge soft — null = auto (contraste / legível). */
     actionsFg: ActionsFgSchema,
+    /** Paletas criadas pela torcida (além das sugeridas pelo sistema). */
+    customPalettes: z.array(CustomPaletteSchema).max(20).default([]),
     light: SurfaceTokensSchema.default({}),
     dark: SurfaceTokensSchema.default({}),
   })
@@ -175,6 +191,7 @@ export const DEFAULT_TENANT_DESIGN = /** @type {TenantDesign} */ ({
   },
   actions: { ...DEFAULT_ACTIONS },
   actionsFg: { ...DEFAULT_ACTIONS_FG },
+  customPalettes: [],
   light: {},
   dark: {},
 })
@@ -197,6 +214,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
       brand: { primary, secondary: null },
       actions: { ...DEFAULT_ACTIONS },
       actionsFg: { ...DEFAULT_ACTIONS_FG },
+      customPalettes: [],
     }
   }
 
@@ -211,6 +229,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
         ...DEFAULT_ACTIONS_FG,
         ...(parsed.data.actionsFg ?? {}),
       },
+      customPalettes: parsed.data.customPalettes ?? [],
     }
   }
 
@@ -219,6 +238,7 @@ export function resolveTenantDesign(raw, corPrimaria) {
     brand: { primary, secondary: null },
     actions: { ...DEFAULT_ACTIONS },
     actionsFg: { ...DEFAULT_ACTIONS_FG },
+    customPalettes: [],
   }
 }
 
@@ -648,9 +668,11 @@ export function derivarAcoesDaMarca(primaryHex, opts = {}) {
     .filter(isVerdeIdentidade)
   const marcaEhVerde = verdesNaMarca.length > 0
 
+  // Positivo = cor da marca (legível em botão). Só verde se a identidade for verde.
+  // Nunca injetar azul “genérico” que some da paleta sugerida (ex.: Gaviões P&B+vermelho).
   const success = marcaEhVerde
     ? clampHexLightness(/** @type {string} */ (verdesNaMarca[0]), 0.28, 0.45)
-    : clampHexLightness(mixHex('#1d4ed8', primaryHex, 0.28), 0.28, 0.48)
+    : clampHexLightness(primaryHex, 0.14, 0.42)
 
   const danger = clampHexLightness(
     mixHex('#dc2626', hslToHex((h + 8) % 360, 0.72, 0.42), 0.25),
@@ -662,6 +684,7 @@ export function derivarAcoesDaMarca(primaryHex, opts = {}) {
     0.35,
     0.52,
   )
+  // Info continua azul-neutro (status informativo, não “aprovação”).
   const info = clampHexLightness(mixHex('#2563eb', primaryHex, 0.3), 0.28, 0.55)
 
   return { success, danger, warning, info }
@@ -724,7 +747,8 @@ function destaqueDaPaleta(primary, secondary, clube, fallback) {
  *   secondary: string,
  *   actions: { success: string, danger: string, warning: string, info: string },
  *   swatches: string[],
- *   fonte: 'torcida' | 'harmonia' | 'clube' | 'escudo' | 'preset'
+ *   fonte: 'torcida' | 'harmonia' | 'clube' | 'escudo' | 'preset' | 'custom' | 'atual'
+ *   actionsFg?: { success: string | null, danger: string | null, warning: string | null, info: string | null }
  * }} PaletaSugerida
  */
 
@@ -935,7 +959,108 @@ export function gerarPaletasSugeridas(seedHex, opts = {}) {
 }
 
 /**
- * Aplica uma paleta sugerida sobre um design existente (preserva grade).
+ * Swatches (até 3) a partir do design atual — para cards de paleta.
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ * @returns {string[]}
+ */
+export function swatchesDoDesign(design) {
+  const actions = { ...DEFAULT_ACTIONS, ...(design.actions ?? {}) }
+  const secondary =
+    design.brand?.secondary && /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
+      ? design.brand.secondary
+      : actions.danger
+  return limitarSwatches([
+    design.brand.primary,
+    secondary,
+    actions.success,
+    actions.danger,
+  ])
+}
+
+/**
+ * Converte o design em card de paleta (Paleta atual / snapshot).
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ * @param {{ id: string, nome: string, descricao?: string, fonte?: PaletaSugerida['fonte'] }} meta
+ * @returns {PaletaSugerida}
+ */
+export function designParaPaletaSugerida(design, meta) {
+  const actions = { ...DEFAULT_ACTIONS, ...(design.actions ?? {}) }
+  const secondary =
+    design.brand?.secondary && /^#[0-9a-fA-F]{6}$/.test(design.brand.secondary)
+      ? design.brand.secondary
+      : '#ffffff'
+  return {
+    id: meta.id,
+    nome: meta.nome,
+    descricao: meta.descricao ?? '',
+    primary: design.brand.primary,
+    secondary,
+    actions,
+    actionsFg: design.actionsFg
+      ? { ...DEFAULT_ACTIONS_FG, ...design.actionsFg }
+      : undefined,
+    swatches: swatchesDoDesign(design),
+    fonte: meta.fonte ?? 'atual',
+  }
+}
+
+/**
+ * @param {import('zod').infer<typeof CustomPaletteSchema>} p
+ * @returns {PaletaSugerida}
+ */
+export function customPaletteParaSugerida(p) {
+  const actions = { ...DEFAULT_ACTIONS, ...(p.actions ?? {}) }
+  return {
+    id: `custom:${p.id}`,
+    nome: p.nome,
+    descricao: 'Salva pela torcida',
+    primary: p.primary,
+    secondary: p.secondary ?? '#ffffff',
+    actions,
+    actionsFg: p.actionsFg
+      ? { ...DEFAULT_ACTIONS_FG, ...p.actionsFg }
+      : undefined,
+    swatches:
+      p.swatches?.length > 0
+        ? p.swatches
+        : limitarSwatches([p.primary, p.secondary, actions.danger].filter(Boolean)),
+    fonte: 'custom',
+  }
+}
+
+/**
+ * Captura o rascunho atual como paleta persistível.
+ * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
+ * @param {string} nome
+ * @returns {import('zod').infer<typeof CustomPaletteSchema>}
+ */
+export function capturarPaletaDoDesign(design, nome) {
+  const actions = { ...DEFAULT_ACTIONS, ...(design.actions ?? {}) }
+  const id =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `p-${Date.now().toString(36)}`
+  return {
+    id,
+    nome: String(nome || 'Minha paleta')
+      .trim()
+      .slice(0, 60) || 'Minha paleta',
+    primary: design.brand.primary,
+    secondary: design.brand.secondary ?? null,
+    actions,
+    actionsFg: {
+      success: design.actionsFg?.success ?? null,
+      danger: design.actionsFg?.danger ?? null,
+      warning: design.actionsFg?.warning ?? null,
+      info: design.actionsFg?.info ?? null,
+    },
+    swatches: swatchesDoDesign(design),
+    createdAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * Aplica uma paleta sugerida sobre um design existente (preserva grade e paletas salvas).
  * @param {import('zod').infer<typeof TenantDesignSchema> | object} design
  * @param {PaletaSugerida} paleta
  */
@@ -949,7 +1074,10 @@ export function aplicarPaletaAoDesign(design, paleta) {
       secondary: paleta.secondary,
     },
     actions: { ...DEFAULT_ACTIONS, ...paleta.actions },
-    actionsFg: design.actionsFg ?? { ...DEFAULT_ACTIONS_FG },
+    actionsFg: paleta.actionsFg
+      ? { ...DEFAULT_ACTIONS_FG, ...(design.actionsFg ?? {}), ...paleta.actionsFg }
+      : (design.actionsFg ?? { ...DEFAULT_ACTIONS_FG }),
+    customPalettes: design.customPalettes ?? [],
     light: { ...(design.light ?? {}), ...derived.light },
     dark: { ...(design.dark ?? {}), ...derived.dark },
     grid: design.grid ?? DEFAULT_TENANT_DESIGN.grid,

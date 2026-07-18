@@ -38,6 +38,17 @@ Defaults = valores de `:root` / `.dark` em `apps/web/src/app/globals.css`.
     warning: null,
     info: null,
   },
+  customPalettes: [
+    // até 20 — listadas em “Paletas sugeridas” no estúdio
+    {
+      id: 'uuid',
+      nome: 'Clássico P&B',
+      primary: '#1a1a1a',
+      secondary: '#ffffff',
+      actions: { /* … */ },
+      swatches: ['#1a1a1a', '#ffffff', '#8b0000'],
+    },
+  ],
   grid: { enabled, sizePx, lineOpacity, lineColor, baseColor },
   light: { /* overrides parciais */ },
   dark: { /* overrides parciais */ },
@@ -63,15 +74,17 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 ## Sugestões de cor
 
 1. **Paletas sugeridas** (`gerarPaletasSugeridas` + `resolverMarcaTorcida`) —
-   ordem: **marca da torcida** → **escudo/logo** → **paleta do clube** →
-   **torcida + clube** → monocromática → alto contraste.  
+   ordem na UI: **paleta atual** (rascunho) → **paletas salvas** pela torcida
+   (`customPalettes`, até 20) → sistema (marca → escudo → clube → mono → alto
+   contraste).  
    Se `corPrimaria` ainda for o roxo da plataforma (`#7c3aed`), a marca usa
    `TORCIDA_CORES_PRIMARIAS[slug]` (ex. `pde-gavioes-fiel` → `#1a1a1a`) ou a
    paleta do clube — **nunca** tratar o default do produto como identidade da
-   torcida. Cada card: **3 cores** + hex. Lista gerada do baseline + slug.
-2. **Rivalidade / identidade** — ver knowledge acima. Sucesso default azul;
-   verde só se identidade já for verde; neutros sem saturação artificial;
-   sem análoga/complementar.
+   torcida. Cada card: **3 cores** + hex. Lista gerada do baseline + slug;
+   “Salvar paleta atual” grava no rascunho até `salvarDesignTenant`.
+2. **Rivalidade / identidade** — ver knowledge acima. Sucesso segue a **marca**
+   (não azul genérico nem verde forçado); verde só se identidade já for verde;
+   neutros sem saturação artificial; sem análoga/complementar.
 3. **Paleta do clube** — `CLUBE_PALETAS` / `paletaDoClube`.
 4. **Escudo/logo** — `extrairPaletaDeImagem`; verdes fora de contexto
    filtrados.
@@ -87,9 +100,11 @@ Consumidores: `Badge` (`primary`/`secondary`/`success`/…), diálogos de confir
 - Inspector: scroll com `px-1`/`pr-2`; cards de ação com `p-3` (swatches
   não colados na barra de rolagem).
 - Aba **Ações**: cor de fundo/marca + **cor do texto** (vazio = automático).
+  Informativo aparece na prévia (badge Aviso / faixa no evento / badge Admin).
 - Seletor de cor: swatch abre o **color picker nativo** direto (sem popover
   intermediário).
-- Hotspots na prévia: label **dentro** do contorno (não flutua fora do layout).
+- Prévia **sem** overlay de hotspot/label ao focar token — estado não salvo
+  fica só no rodapé (`StickyPersistBar`).
 - Contraste WCAG no rodapé usa token info (não emerald).
 
 ## Actions

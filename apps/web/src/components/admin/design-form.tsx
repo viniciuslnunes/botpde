@@ -10,6 +10,7 @@ import {
 } from 'react'
 import {
   AlertTriangle,
+  BookmarkPlus,
   CheckCircle2,
   Contrast,
   Grid3x3,
@@ -19,6 +20,7 @@ import {
   Palette,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from 'lucide-react'
 import { applyTenantDesign, type TenantDesign } from '@torcida/ui'
 import {
@@ -33,8 +35,11 @@ import {
   SURFACE_TOKEN_KEYS,
   SURFACE_TOKEN_LABELS,
   aplicarPaletaAoDesign,
+  capturarPaletaDoDesign,
   contrasteRatio,
   contrasteTextoSobre,
+  customPaletteParaSugerida,
+  designParaPaletaSugerida,
   gerarPaletasSugeridas,
   isCorPadraoPlataforma,
   paletaDoClube,
@@ -218,7 +223,7 @@ function ColorField({
         <button
           type="button"
           onClick={() => colorInputRef.current?.click()}
-          className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-sky-400/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] shadow-sm transition hover:border-[rgb(var(--foreground-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--border-strong))]"
           style={{ backgroundColor: display }}
           title="Escolher cor"
           aria-label={`${label}: escolher cor`}
@@ -279,6 +284,87 @@ function SectionFrame({
       </div>
       {children}
     </section>
+  )
+}
+
+function PaletaCard({
+  paleta,
+  badge,
+  onApply,
+  onRemove,
+}: {
+  paleta: {
+    id: string
+    nome: string
+    descricao: string
+    swatches: string[]
+  }
+  badge?: string
+  onApply: () => void
+  onRemove?: () => void
+}) {
+  return (
+    <div className="group relative rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:border-[rgb(var(--border-strong))] hover:bg-[rgb(var(--background-subtle))]">
+      <button type="button" onClick={onApply} className="w-full text-left">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                {paleta.nome}
+              </p>
+              {badge ? (
+                <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
+                  {badge}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+              {paleta.descricao}
+            </p>
+          </div>
+          <span className="shrink-0 rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))] opacity-0 transition-opacity group-hover:opacity-100">
+            Aplicar
+          </span>
+        </div>
+        <div className="mt-2.5 space-y-1.5">
+          <div className="flex overflow-hidden rounded-lg ring-1 ring-[rgb(var(--border))]">
+            {paleta.swatches.map((hex, i) => (
+              <span
+                key={`${paleta.id}-${hex}-${i}`}
+                className="h-9 flex-1 first:rounded-l-lg last:rounded-r-lg"
+                style={{ backgroundColor: hex }}
+                title={hex}
+              />
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {paleta.swatches.map((hex, i) => (
+              <span
+                key={`${paleta.id}-label-${hex}-${i}`}
+                className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-[rgb(var(--foreground-muted))]"
+                title={hex}
+              >
+                {hex.toUpperCase()}
+              </span>
+            ))}
+          </div>
+        </div>
+      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+          className="absolute right-2 top-2 rounded-md p-1 text-[rgb(var(--foreground-muted))] opacity-0 transition-opacity hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))] group-hover:opacity-100"
+          title="Remover paleta salva"
+          aria-label={`Remover ${paleta.nome}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -373,6 +459,8 @@ export function DesignForm({
   const [pending, startTransition] = useTransition()
   const [extracted, setExtracted] = useState<string[]>([])
   const [extracting, setExtracting] = useState(false)
+  const [nomeNovaPaleta, setNomeNovaPaleta] = useState('')
+  const [mostrarSalvarPaleta, setMostrarSalvarPaleta] = useState(false)
   const { resolvedTheme } = useTheme()
 
   const dirty = useMemo(
@@ -452,6 +540,22 @@ export function DesignForm({
     ],
   )
 
+  const paletaAtual = useMemo(
+    () =>
+      designParaPaletaSugerida(design, {
+        id: 'atual',
+        nome: 'Paleta atual',
+        descricao: 'Rascunho que você está editando agora',
+        fonte: 'atual',
+      }),
+    [design],
+  )
+
+  const paletasSalvas = useMemo(
+    () => (design.customPalettes ?? []).map(customPaletteParaSugerida),
+    [design.customPalettes],
+  )
+
   const contrastChecks = useMemo(
     () => buildContrastChecks(design, previewMode),
     [design, previewMode],
@@ -468,9 +572,24 @@ export function DesignForm({
     paleta: ReturnType<typeof gerarPaletasSugeridas>[number],
   ) {
     setDesign(aplicarPaletaAoDesign(design, paleta) as TenantDesign)
-    setFocus('brand.primary')
+    setFocus(null)
     setCompareAtivo(false)
     setSection('identidade')
+  }
+
+  function salvarPaletaAtual() {
+    const lista = design.customPalettes ?? []
+    if (lista.length >= 20) return
+    const nova = capturarPaletaDoDesign(design, nomeNovaPaleta)
+    patch({ customPalettes: [...lista, nova] })
+    setNomeNovaPaleta('')
+    setMostrarSalvarPaleta(false)
+  }
+
+  function removerPaletaSalva(customId: string) {
+    patch({
+      customPalettes: (design.customPalettes ?? []).filter((p) => p.id !== customId),
+    })
   }
 
   function handleCancel() {
@@ -548,13 +667,13 @@ export function DesignForm({
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--foreground))]">
-                    <Sparkles className="h-3.5 w-3.5 text-sky-500" />
+                    <Sparkles className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
                     Paletas sugeridas
                   </div>
                   <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                    Marca da torcida vem do catálogo (ex.: Gaviões = preto), não
-                    do roxo da plataforma. Escudo e clube completam. 3 cores
-                    cada; aplicar muda só a prévia até salvar.
+                    Inclui a paleta atual, as que a torcida salvou e sugestões do
+                    catálogo (marca, escudo, clube). Aplicar muda só a prévia até
+                    salvar o design.
                   </p>
                   {extracting ? (
                     <p className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -562,53 +681,86 @@ export function DesignForm({
                       Extraindo cores do escudo…
                     </p>
                   ) : null}
+
                   <div className="space-y-2">
+                    <PaletaCard
+                      paleta={paletaAtual}
+                      badge="Atual"
+                      onApply={() => applyPaletaCompleta(paletaAtual)}
+                    />
+                    {paletasSalvas.map((p) => {
+                      const customId = p.id.startsWith('custom:')
+                        ? p.id.slice('custom:'.length)
+                        : p.id
+                      return (
+                        <PaletaCard
+                          key={p.id}
+                          paleta={p}
+                          badge="Salva"
+                          onApply={() => applyPaletaCompleta(p)}
+                          onRemove={() => removerPaletaSalva(customId)}
+                        />
+                      )
+                    })}
                     {paletasSugeridas.map((p) => (
-                      <button
+                      <PaletaCard
                         key={p.id}
-                        type="button"
-                        onClick={() => applyPaletaCompleta(p)}
-                        className="group w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 text-left transition-colors hover:border-sky-400 hover:bg-[rgb(var(--background-subtle))]"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                              {p.nome}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
-                              {p.descricao}
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 opacity-0 transition-opacity group-hover:opacity-100 dark:text-sky-300">
-                            Aplicar
-                          </span>
-                        </div>
-                        <div className="mt-2.5 space-y-1.5">
-                          <div className="flex overflow-hidden rounded-lg ring-1 ring-[rgb(var(--border))]">
-                            {p.swatches.map((hex, i) => (
-                              <span
-                                key={`${p.id}-${hex}-${i}`}
-                                className="h-9 flex-1 first:rounded-l-lg last:rounded-r-lg"
-                                style={{ backgroundColor: hex }}
-                                title={hex}
-                              />
-                            ))}
-                          </div>
-                          <div className="flex gap-1">
-                            {p.swatches.map((hex, i) => (
-                              <span
-                                key={`${p.id}-label-${hex}-${i}`}
-                                className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-[rgb(var(--foreground-muted))]"
-                                title={hex}
-                              >
-                                {hex.toUpperCase()}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </button>
+                        paleta={p}
+                        onApply={() => applyPaletaCompleta(p)}
+                      />
                     ))}
                   </div>
+
+                  {mostrarSalvarPaleta ? (
+                    <div className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
+                      <label className="block text-xs font-medium text-[rgb(var(--foreground))]">
+                        Nome da paleta
+                      </label>
+                      <input
+                        type="text"
+                        value={nomeNovaPaleta}
+                        onChange={(e) => setNomeNovaPaleta(e.target.value)}
+                        placeholder="Ex.: Clássico P&B"
+                        maxLength={60}
+                        className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-2.5 py-1.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--border-strong))]"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={salvarPaletaAtual}
+                          disabled={(design.customPalettes ?? []).length >= 20}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+                        >
+                          <BookmarkPlus className="h-3.5 w-3.5" />
+                          Salvar na lista
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMostrarSalvarPaleta(false)
+                            setNomeNovaPaleta('')
+                          }}
+                          className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                        Fica no rascunho até você salvar o design da torcida.
+                        Máximo 20 paletas.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSalvarPaleta(true)}
+                      disabled={(design.customPalettes ?? []).length >= 20}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-2.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--border-strong))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                    >
+                      <BookmarkPlus className="h-3.5 w-3.5" />
+                      Salvar paleta atual na lista
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid gap-4 border-t border-[rgb(var(--border))] pt-4">
@@ -637,7 +789,7 @@ export function DesignForm({
                   />
                   <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                     Aparece no botão Curtir, badge Destaque, faixa do evento e link “Criar conta”
-                    (cena Login). Passe o mouse neste campo para destacar na prévia.
+                    (cena Login).
                   </p>
                   <button
                     type="button"
@@ -656,7 +808,7 @@ export function DesignForm({
             {section === 'acoes' ? (
               <SectionFrame
                 title="Ações e status"
-                description="Olhe a cena Admin na prévia: aprovar, reprovar e pendente."
+                description="Portal: RSVP e aviso informativo. Admin: aprovar, reprovar, pendente e informativo."
               >
                 <div className="grid gap-3">
                   {ACTION_TOKEN_KEYS.map((key) => {
@@ -839,7 +991,7 @@ export function DesignForm({
                           <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
                             {key === 'background'
                               ? 'Canvas atrás de tudo (shell). Ao aplicar uma paleta, recebe tint leve da marca.'
-                              : 'Cartões elevados, popovers e menus. Ao aplicar uma paleta, fica um pouco mais clara/tintada que a superfície.'}
+                              : 'Menu/popover na prévia Portal e painel “Ações rápidas” no Admin. Texto do painel acompanha o contraste da cor escolhida.'}
                           </p>
                         ) : null}
                       </div>

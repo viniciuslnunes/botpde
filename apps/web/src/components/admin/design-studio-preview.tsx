@@ -17,6 +17,8 @@ import {
   DEFAULT_ACTIONS_FG,
   DEFAULT_SURFACE_DARK,
   DEFAULT_SURFACE_LIGHT,
+  contrasteTextoSobre,
+  corMarcaLegivel,
   resolveActionTextColors,
 } from '@torcida/types'
 
@@ -62,35 +64,19 @@ function resolveSurfaces(design: TenantDesign, mode: PreviewMode) {
 
 function Hotspot({
   token,
-  focus,
-  label,
   children,
   className = '',
 }: {
   token: NonNullable<TokenFocus>
-  focus: TokenFocus
-  label: string
+  /** Mantido por compatibilidade — a prévia não destaca mais o token (rodapé já mostra rascunho). */
+  focus?: TokenFocus
+  label?: string
   children: ReactNode
   className?: string
 }) {
-  const active = focus === token
   return (
-    <div
-      data-token={token}
-      className={[
-        'relative transition-[box-shadow,outline] duration-150',
-        className,
-        active
-          ? 'z-10 rounded-lg outline outline-2 outline-offset-2 outline-sky-400 shadow-[0_0_0_4px_rgba(56,189,248,0.25)]'
-          : '',
-      ].join(' ')}
-    >
+    <div data-token={token} className={className || undefined}>
       {children}
-      {active ? (
-        <span className="pointer-events-none absolute left-1 top-1 z-20 max-w-[calc(100%-0.5rem)] truncate rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
-          {label}
-        </span>
-      ) : null}
     </div>
   )
 }
@@ -125,6 +111,19 @@ function PortalScene({
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const surfaces = resolveSurfaces(design, mode)
+  const primaryOnBtn =
+    contrasteTextoSobre(design.brand.primary) === 'light' ? '#ffffff' : '#0a0a0a'
+  const primaryFg = corMarcaLegivel(design.brand.primary, surfaces.surface)
+  const secondaryHex =
+    design.brand.secondary ??
+    (contrasteTextoSobre(design.brand.primary) === 'light' ? '#f4f4f5' : '#27272a')
+  const secondaryFg = corMarcaLegivel(secondaryHex, surfaces.surface)
+  const raisedOn =
+    contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
+  const raisedMuted =
+    contrasteTextoSobre(surfaces.surfaceRaised) === 'light'
+      ? 'rgba(255,255,255,0.72)'
+      : 'rgba(10,10,10,0.58)'
   const actionText = (key: keyof typeof DEFAULT_ACTIONS) =>
     resolveActionTextColors(
       actions[key],
@@ -225,13 +224,36 @@ function PortalScene({
                       Vinicius
                     </span>
                     <Hotspot token="brand.primary" focus={focus} label="Badge primária">
-                      <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))]">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: `${design.brand.primary}24`,
+                          color: primaryFg,
+                        }}
+                      >
                         Sócio
                       </span>
                     </Hotspot>
                     <Hotspot token="brand.secondary" focus={focus} label="Badge secundária">
-                      <span className="rounded-full bg-[rgb(var(--color-secondary)_/_0.14)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-secondary-fg))]">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: `${secondaryHex}24`,
+                          color: secondaryFg,
+                        }}
+                      >
                         Destaque
+                      </span>
+                    </Hotspot>
+                    <Hotspot token="actions.info" focus={focus} label="Informativo">
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: `${actions.info}24`,
+                          color: actionText('info').fg,
+                        }}
+                      >
+                        Aviso
                       </span>
                     </Hotspot>
                     <span className="text-[10px] text-[rgb(var(--foreground-muted))]">agora</span>
@@ -243,8 +265,11 @@ function PortalScene({
                     <Hotspot token="brand.primary" focus={focus} label="Botão primário">
                       <button
                         type="button"
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-                        style={{ backgroundColor: design.brand.primary }}
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        style={{
+                          backgroundColor: design.brand.primary,
+                          color: primaryOnBtn,
+                        }}
                       >
                         Comentar
                       </button>
@@ -252,7 +277,12 @@ function PortalScene({
                     <Hotspot token="brand.secondary" focus={focus} label="Botão secundário">
                       <button
                         type="button"
-                        className="btn-secondary-soft rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        style={{
+                          backgroundColor: `${secondaryHex}22`,
+                          color: secondaryFg,
+                          border: `1px solid ${secondaryHex}55`,
+                        }}
                       >
                         Curtir
                       </button>
@@ -260,7 +290,12 @@ function PortalScene({
                     <Hotspot token="surfaceRaised" focus={focus} label="Superfície elevada">
                       <button
                         type="button"
-                        className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-raised))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))]"
+                        className="rounded-lg border px-3 py-1.5 text-xs font-medium"
+                        style={{
+                          backgroundColor: surfaces.surfaceRaised,
+                          color: raisedOn,
+                          borderColor: surfaces.border,
+                        }}
                       >
                         Compartilhar
                       </button>
@@ -269,6 +304,46 @@ function PortalScene({
                 </div>
               </div>
             </article>
+          </Hotspot>
+
+          <Hotspot token="surfaceRaised" focus={focus} label="Menu elevado (popover)">
+            <div
+              className="overflow-hidden rounded-2xl border shadow-lg"
+              style={{
+                backgroundColor: surfaces.surfaceRaised,
+                borderColor: surfaces.border,
+                color: raisedOn,
+              }}
+            >
+              <div className="border-b px-4 py-2.5" style={{ borderColor: `${surfaces.border}` }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: raisedMuted }}>
+                  Superfície elevada
+                </p>
+                <p className="mt-0.5 text-sm font-semibold">Menu / popover</p>
+              </div>
+              <ul className="p-1.5 text-xs">
+                {['Copiar link do post', 'Compartilhar no WhatsApp', 'Silenciar autor'].map(
+                  (item, i) => (
+                    <li
+                      key={item}
+                      className="rounded-lg px-3 py-2 font-medium"
+                      style={
+                        i === 0
+                          ? {
+                              backgroundColor:
+                                contrasteTextoSobre(surfaces.surfaceRaised) === 'light'
+                                  ? 'rgba(255,255,255,0.12)'
+                                  : 'rgba(0,0,0,0.06)',
+                            }
+                          : undefined
+                      }
+                    >
+                      {item}
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
           </Hotspot>
 
           <Hotspot token="surface" focus={focus} label="Cartão de evento / RSVP">
@@ -324,6 +399,18 @@ function PortalScene({
                   </span>
                 </Hotspot>
               </div>
+              <Hotspot token="actions.info" focus={focus} label="Informativo">
+                <p
+                  className="mt-3 rounded-lg px-3 py-2 text-xs"
+                  style={{
+                    backgroundColor: `${actions.info}1a`,
+                    color: actionText('info').fg,
+                    border: `1px solid ${actions.info}44`,
+                  }}
+                >
+                  Informativo: caravana sai às 14h na sede.
+                </p>
+              </Hotspot>
               </div>
             </div>
           </Hotspot>
@@ -346,6 +433,12 @@ function AdminScene({
 }) {
   const actions = { ...DEFAULT_ACTIONS, ...design.actions }
   const surfaces = resolveSurfaces(design, mode)
+  const raisedOn =
+    contrasteTextoSobre(surfaces.surfaceRaised) === 'light' ? '#ffffff' : '#0a0a0a'
+  const raisedMuted =
+    contrasteTextoSobre(surfaces.surfaceRaised) === 'light'
+      ? 'rgba(255,255,255,0.72)'
+      : 'rgba(10,10,10,0.58)'
   const actionText = (key: keyof typeof DEFAULT_ACTIONS) =>
     resolveActionTextColors(
       actions[key],
@@ -448,9 +541,44 @@ function AdminScene({
                           Pendente
                         </span>
                       </Hotspot>
+                      <Hotspot token="actions.info" focus={focus} label="Badge informativo">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                          style={{
+                            color: actionText('info').fg,
+                            backgroundColor: `${actions.info}24`,
+                          }}
+                        >
+                          Informativo
+                        </span>
+                      </Hotspot>
                     </div>
                   </div>
                 ))}
+              </div>
+            </Hotspot>
+
+            <Hotspot token="surfaceRaised" focus={focus} label="Painel elevado">
+              <div
+                className="overflow-hidden rounded-xl border shadow-md"
+                style={{
+                  backgroundColor: surfaces.surfaceRaised,
+                  borderColor: surfaces.border,
+                  color: raisedOn,
+                }}
+              >
+                <div className="px-4 py-2.5">
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-wide"
+                    style={{ color: raisedMuted }}
+                  >
+                    Superfície elevada
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold">Ações rápidas</p>
+                  <p className="mt-1 text-xs" style={{ color: raisedMuted }}>
+                    Exportar lista · Filtrar por departamento
+                  </p>
+                </div>
               </div>
             </Hotspot>
           </div>
@@ -587,7 +715,7 @@ export function DesignStudioPreview({
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
             {showingBefore
               ? 'Visualização do que está publicado hoje. Desative “Antes/depois” para editar.'
-              : 'Passe o mouse nos controles — a área afetada acende. Só aplica na torcida ao salvar.'}
+              : 'Ajuste as cores à esquerda — a prévia atualiza na hora. Só aplica na torcida ao salvar.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
