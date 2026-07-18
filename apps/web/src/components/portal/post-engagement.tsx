@@ -352,6 +352,7 @@ export function PostEngagement({
           active={comentariosAbertos}
           onClick={abrirComentarios}
           aria-expanded={comentariosAbertos}
+          aria-label={comentariosAbertos ? 'Comentar' : 'Ver comentários'}
           className={[
             btnBase,
             comentariosAbertos
@@ -360,7 +361,7 @@ export function PostEngagement({
           ].join(' ')}
         >
           <MessageCircle className="h-4 w-4" />
-          Comentar
+          {comentariosAbertos ? 'Comentar' : 'Ver comentários'}
         </EngajamentoBtn>
         {!isRepost && (
           <EngajamentoBtn
