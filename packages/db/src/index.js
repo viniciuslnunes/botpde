@@ -24,6 +24,46 @@ function resolveDatabaseUrl() {
   return `${url}${sep}connection_limit=${WEB_CONNECTION_LIMIT}`
 }
 
+// ── Resiliência de conexão ────────────────────────────────────────────────────
+// Postgres/proxy pode fechar conexões ociosas; o pool do Prisma só descobre ao
+// usar o socket morto, lançando P1017 ("Server has closed the connection") no
+// primeiro request após o período ocioso. Como a conexão morta é descartada,
+// uma nova tentativa pega uma conexão fresca e passa. Só reexecutamos LEITURAS
+// (idempotentes) — nunca escritas/transações, para evitar dupla aplicação.
+const CONN_LOST_CODES = new Set(['P1001', 'P1002', 'P1017'])
+const CONN_LOST_MESSAGE =
+  /Server has closed the connection|Can't reach database server|Connection reset|Timed out fetching a new connection/i
+const READ_OPERATIONS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+])
+
+function isConnectionLost(err) {
+  if (!err) return false
+  if (err.code && CONN_LOST_CODES.has(err.code)) return true
+  return typeof err.message === 'string' && CONN_LOST_MESSAGE.test(err.message)
+}
+
+async function runWithRetry(exec, retryable, attempts = 3) {
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await exec()
+    } catch (err) {
+      lastErr = err
+      if (!retryable || i === attempts - 1 || !isConnectionLost(err)) throw err
+      await new Promise((resolve) => setTimeout(resolve, 50 * (i + 1)))
+    }
+  }
+  throw lastErr
+}
+
 // ── Cliente compartilhado (banco principal da plataforma) ─────────────────────
 const globalForPrisma = globalThis
 
@@ -34,18 +74,18 @@ function createPrismaClient() {
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 
-  // Sem métricas (produção sem PERF_METRICS): cliente base, zero overhead.
-  if (!metricsEnabled()) {
-    return base
-  }
-
   return base.$extends({
     query: {
-      async $allOperations({ args, query }) {
+      async $allOperations({ operation, args, query }) {
+        const retryable = READ_OPERATIONS.has(operation)
+        // Sem métricas (produção sem PERF_METRICS): só a camada de resiliência.
+        if (!metricsEnabled()) {
+          return runWithRetry(() => query(args), retryable)
+        }
         incrementPrismaQueryCount()
         const start = performance.now()
         try {
-          return await query(args)
+          return await runWithRetry(() => query(args), retryable)
         } finally {
           addPrismaQueryTime(performance.now() - start)
         }
@@ -89,6 +129,12 @@ export function getDbForTenant(tenant) {
   const client = new PrismaClient({
     datasources: { db: { url: tenant.databaseUrl } },
     log: ['error'],
+  }).$extends({
+    query: {
+      async $allOperations({ operation, args, query }) {
+        return runWithRetry(() => query(args), READ_OPERATIONS.has(operation))
+      },
+    },
   })
 
   tenantClients.set(tenant.id, client)
