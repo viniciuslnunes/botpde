@@ -106,10 +106,15 @@ botpde/ (monorepo pnpm + turborepo)
     mas **não suporta dependências `workspace:*`** (ver item 4: tentativa de
     usar `@torcida/db` quebrou o deploy, revertida em 2026-07-06).
   - `dbo-bot-pde` — Postgres addon. **Confirmado (2026-07-01) que é o
-    mesmo banco usado por `torcida-web`**: `dbo-bot-pde` expõe o host
-    interno (`postgres.railway.internal`), `torcida-web` usa o proxy
-    público (`*.proxy.rlwy.net`) — mesmas credenciais e mesmo database.
-    Não é addon duplicado, sem custo morto aqui.
+    mesmo banco usado por `torcida-web`** — mesmas credenciais e mesmo
+    database, não é addon duplicado, sem custo morto aqui. Desde 2026-07-19
+    tanto `bot-pde` quanto `torcida-web` usam o host **interno**
+    (`postgres.railway.internal`) via private networking; o proxy público
+    (`*.proxy.rlwy.net`) ficou só para acesso externo (scripts/`db:push`
+    locais). A troca resolveu a rajada de `PrismaClientKnownRequestError:
+    Can't reach database server` (P1001) que vinha do proxy público —
+    resiliência adicional (timeouts + `withDbRetry` em leituras) em
+    `packages/db/src/index.js` e `packages/db/src/with-db-retry.js`.
   - `bot-fivem` — produto anterior/paralelo, ainda ativo, sendo migrado
     aos poucos para o web/mobile atual.
 - Hobby Plan: $5/mês incluídos, uso atual ~$2.45/mês estimado — dentro da
