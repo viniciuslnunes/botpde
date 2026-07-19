@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
+import { db, withDbRetry } from '@torcida/db'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import {
@@ -295,12 +295,16 @@ async function AgendaConteudo({
       local: string | null
     }
     const janela = janelaCalendario(vista, dataRef)
-    const calEventos: CalRow[] = await db.evento.findMany({
-      where: { ...baseWhere, data: { gte: janela.gte, lt: janela.lt } },
-      select: { id: true, titulo: true, tipo: true, data: true, fotoUrl: true, local: true },
-      orderBy: { data: 'asc' },
-      take: 120,
-    })
+    // Leitura idempotente com retry (blips do proxy Railway no bootstrap da Agenda).
+    const calEventos: CalRow[] = await withDbRetry(
+      () =>
+        db.evento.findMany({
+          where: { ...baseWhere, data: { gte: janela.gte, lt: janela.lt } },
+          select: { id: true, titulo: true, tipo: true, data: true, fotoUrl: true, local: true },
+          orderBy: { data: 'asc' },
+          take: 120,
+        }) as Promise<CalRow[]>,
+    )
     const calItens: AgendaCalItem[] = calEventos.map((e: CalRow) => ({
       id: e.id,
       titulo: e.titulo,
@@ -321,51 +325,62 @@ async function AgendaConteudo({
     )
   }
 
+  // Leituras idempotentes com retry (blips do proxy Railway no bootstrap da Agenda).
+  const userId = session?.user?.id
   const [proximos, passados, meuRsvp] = await Promise.all([
-    db.evento.findMany({
-      where: { ...baseWhere, data: { gte: agora } },
-      select: {
-        id: true,
-        titulo: true,
-        data: true,
-        local: true,
-        fotoUrl: true,
-        tipo: true,
-        tenantId: true,
-        capacidade: true,
-        _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
-        tenant: { select: { nome: true } },
-        sede: { select: { capacidade: true } },
-      },
-      orderBy: { data: 'asc' },
-      take: 40,
-    }) as Promise<EventoListItem[]>,
-    db.evento.findMany({
-      where: { ...baseWhere, data: { lt: agora } },
-      select: {
-        id: true,
-        titulo: true,
-        data: true,
-        local: true,
-        fotoUrl: true,
-        tipo: true,
-        tenantId: true,
-        capacidade: true,
-        _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
-        tenant: { select: { nome: true } },
-        sede: { select: { capacidade: true } },
-      },
-      orderBy: { data: 'desc' },
-      take: 8,
-    }) as Promise<EventoListItem[]>,
-    session?.user?.id
-      ? db.eventoRsvp.findMany({
-          where: {
-            userId: session.user.id,
-            evento: { tenantId: tenant.id, data: { gte: agora } },
+    withDbRetry(
+      () =>
+        db.evento.findMany({
+          where: { ...baseWhere, data: { gte: agora } },
+          select: {
+            id: true,
+            titulo: true,
+            data: true,
+            local: true,
+            fotoUrl: true,
+            tipo: true,
+            tenantId: true,
+            capacidade: true,
+            _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+            tenant: { select: { nome: true } },
+            sede: { select: { capacidade: true } },
           },
-          select: { eventoId: true, status: true },
-        })
+          orderBy: { data: 'asc' },
+          take: 40,
+        }) as Promise<EventoListItem[]>,
+    ),
+    withDbRetry(
+      () =>
+        db.evento.findMany({
+          where: { ...baseWhere, data: { lt: agora } },
+          select: {
+            id: true,
+            titulo: true,
+            data: true,
+            local: true,
+            fotoUrl: true,
+            tipo: true,
+            tenantId: true,
+            capacidade: true,
+            _count: { select: { rsvps: { where: { status: 'CONFIRMADO' } } } },
+            tenant: { select: { nome: true } },
+            sede: { select: { capacidade: true } },
+          },
+          orderBy: { data: 'desc' },
+          take: 8,
+        }) as Promise<EventoListItem[]>,
+    ),
+    userId
+      ? withDbRetry(
+          () =>
+            db.eventoRsvp.findMany({
+              where: {
+                userId,
+                evento: { tenantId: tenant.id, data: { gte: agora } },
+              },
+              select: { eventoId: true, status: true },
+            }) as Promise<{ eventoId: string; status: string }[]>,
+        )
       : [],
   ])
 

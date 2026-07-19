@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { db, saoMesmoClube, indiceAfiliacaoCanonica } from '@torcida/db'
+import { db, saoMesmoClube, indiceAfiliacaoCanonica, withDbRetry } from '@torcida/db'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
 import {
   calcularStatsClubesOnboarding,
@@ -514,12 +514,14 @@ export type SolicitacaoSocioPendente = {
 /** Sócio ainda em análise (mais recente) — banner de status na Comunidade Nacional. */
 export const getSolicitacaoSocioPendente = cache(
   async (userId: string): Promise<SolicitacaoSocioPendente | null> => {
-    const pendente: { criadoEm: Date; tenant: { nome: string } } | null =
-      await db.saasMembro.findFirst({
+    // Leitura idempotente com retry (blips do proxy Railway na entrada da CN).
+    const pendente: { criadoEm: Date; tenant: { nome: string } } | null = await withDbRetry(() =>
+      db.saasMembro.findFirst({
         where: { userId, tipo: 'SOCIO', status: 'PENDENTE' },
         orderBy: { criadoEm: 'desc' },
         select: { criadoEm: true, tenant: { select: { nome: true } } },
-      })
+      }),
+    )
     if (!pendente) return null
     return { tenantNome: formatNomeTorcida(pendente.tenant.nome), criadoEm: pendente.criadoEm }
   },

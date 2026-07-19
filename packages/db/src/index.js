@@ -16,12 +16,23 @@ export {
 }
 
 const WEB_CONNECTION_LIMIT = 5
+// Timeouts tolerantes a blips do proxy Railway (mesmos parâmetros do
+// seed-departamentos.js). Só entram se a URL ainda não os definir.
+const WEB_URL_PARAMS = {
+  connection_limit: String(WEB_CONNECTION_LIMIT),
+  connect_timeout: '15',
+  pool_timeout: '20',
+}
 
 function resolveDatabaseUrl() {
   const url = process.env.DATABASE_URL ?? ''
-  if (!url || /connection_limit=/i.test(url)) return url
+  if (!url) return url
+  const faltantes = Object.entries(WEB_URL_PARAMS)
+    .filter(([key]) => !new RegExp(`[?&]${key}=`, 'i').test(url))
+    .map(([key, value]) => `${key}=${value}`)
+  if (faltantes.length === 0) return url
   const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}connection_limit=${WEB_CONNECTION_LIMIT}`
+  return `${url}${sep}${faltantes.join('&')}`
 }
 
 // ── Resiliência de conexão ────────────────────────────────────────────────────
@@ -173,3 +184,5 @@ export {
 } from './departamentos-canonicos.js'
 
 export { calcularMenorValorEstimadosConhecido } from './data/torcedores-estimados.js'
+
+export { withDbRetry } from './with-db-retry.js'

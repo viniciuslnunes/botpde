@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withDbRetry } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getInboxNavbar } from '@/lib/notificacoes'
@@ -11,17 +12,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
+  const userId = session.user.id
+
   const tenant = await getTenantFromHost()
   if (!tenant) {
     return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
   }
 
-  const inbox = await getInboxNavbar(
-    tenant.id,
-    session.user.id,
-    TIPOS_NOTIFICACAO_ADMIN,
-    8,
-    { withMenuBadges: true },
+  // Leitura idempotente — resiliente a blips de conexão do proxy Railway.
+  const inbox = await withDbRetry(() =>
+    getInboxNavbar(tenant.id, userId, TIPOS_NOTIFICACAO_ADMIN, 8, {
+      withMenuBadges: true,
+    }),
   )
 
   return NextResponse.json({

@@ -1,7 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, withDbRetry } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
 import { tagSalasAtivas } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
@@ -57,16 +57,21 @@ export const listSalasAtivas = cache(async function listSalasAtivas(
   tenantId: string,
 ): Promise<SalaAtivaListItem[]> {
   const salas = await unstable_cache(
+    // Leitura idempotente com retry: blips do proxy Railway (P1001) na entrada
+    // do feed não devem derrubar o bootstrap da Comunidade.
     async () =>
-      (db.salaReuniao.findMany({
-        where: { tenantId, encerradaEm: null },
-        include: {
-          host: { select: { id: true, nome: true, avatarUrl: true } },
-          evento: { select: { id: true, titulo: true, data: true } },
-          _count: { select: { participantes: true } },
-        },
-        orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
-      }) as Promise<SalaAtivaListItem[]>),
+      withDbRetry(
+        () =>
+          db.salaReuniao.findMany({
+            where: { tenantId, encerradaEm: null },
+            include: {
+              host: { select: { id: true, nome: true, avatarUrl: true } },
+              evento: { select: { id: true, titulo: true, data: true } },
+              _count: { select: { participantes: true } },
+            },
+            orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
+          }) as Promise<SalaAtivaListItem[]>,
+      ),
     ['salas-ativas', tenantId],
     { revalidate: 15, tags: [tagSalasAtivas(tenantId)] },
   )()
