@@ -85,11 +85,12 @@ export const storySlideVariants: Variants = {
   }),
 }
 
+/** Pop de reação (curtir/salvar). Tween — usado com keyframes `scale: [1, x, 1]`,
+ * que spring não suporta (só 2 keyframes). Overshoot fica no próprio keyframe. */
 export const reactionPop: Transition = {
-  type: 'spring',
-  stiffness: 560,
-  damping: 18,
-  mass: 0.6,
+  type: 'tween',
+  duration: 0.34,
+  ease: 'easeOut',
 }
 
 /** Transição entre rotas (admin/portal) — DESLIGADA em `MotionRouteTransition`
