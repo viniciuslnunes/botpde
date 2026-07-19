@@ -9,6 +9,7 @@ import {
   resolveTenantDesign,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
+import { ExpectedError } from '@/lib/expected-error'
 import { invalidateTenantCache } from '@/lib/tenant'
 
 export async function salvarDesignTenant(designRaw: unknown) {
@@ -16,7 +17,7 @@ export async function salvarDesignTenant(designRaw: unknown) {
 
   const parsed = TenantDesignSchema.safeParse(designRaw)
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Design inválido')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Design inválido')
   }
 
   const design = parsed.data

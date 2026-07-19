@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
+import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
@@ -501,7 +502,7 @@ export async function publicarPostComoTorcedorGlobal(
 
   const parsed = postSchema.safeParse({ conteudo, midias, visibilidade: 'PUBLICO' })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Publicação inválida')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Publicação inválida')
   }
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
@@ -771,7 +772,7 @@ export async function atualizarPerfil(bio: string, perfilPrivado: boolean): Prom
   if (!tenant) throw new Error('Tenant não encontrado')
   await assertMembroAtivo(tenant.id, session.user.id)
   const parsed = perfilSchema.safeParse({ bio, perfilPrivado })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Perfil inválido')
   const membro: { tipo: 'SOCIO' | 'TORCEDOR'; status: string } | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { tipo: true, status: true },
@@ -799,7 +800,7 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = editarPostSchema.safeParse({ postId, conteudo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Post inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
@@ -924,7 +925,7 @@ export async function comentarPost(
   conteudo: string,
 ): Promise<ComentarioPostItem> {
   const parsed = comentarioSchema.safeParse({ postId, conteudo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Comentário inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Comentário inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
@@ -1021,7 +1022,7 @@ export async function editarComentario(
   conteudo: string,
 ): Promise<ComentarioPostItem> {
   const parsed = editarComentarioSchema.safeParse({ comentarioId, conteudo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Comentário inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Comentário inválido')
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
@@ -1203,7 +1204,7 @@ export async function votarEnquetePost(enqueteId: string, opcaoId: string): Prom
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = votarEnqueteSchema.safeParse({ enqueteId, opcaoId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Voto inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Voto inválido')
 
   const enquete: { id: string; encerradaEm: Date | null; post: { tenantId: string; oculto: boolean } } | null =
     await db.enquetePost.findFirst({
@@ -1349,7 +1350,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = repostarSchema.safeParse({ postId, comentario })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Repost inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
   const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
   const original: { id: string; autorId: string; oculto: boolean; visibilidade: string } | null =
@@ -1410,7 +1411,7 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = repostarComunicadoSchema.safeParse({ comunicadoId, comentario })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Repost inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
   const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
   const comunicado: { id: string; autorId: string } | null = await db.announcement.findFirst({
@@ -1551,7 +1552,7 @@ export async function criarGrupo(
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = criarGrupoSchema.safeParse({ nome, descricao, publica })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Grupo inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Grupo inválido')
 
   const conversa: { id: string } = await db.conversa.create({
     data: {
@@ -1602,7 +1603,7 @@ export async function atualizarGrupo(input: {
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = atualizarGrupoSchema.safeParse(input)
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   if (parsed.data.avatarUrl != null && !isCloudinaryUrl(parsed.data.avatarUrl)) {
     throw new Error('Foto do grupo inválida.')
@@ -1679,7 +1680,7 @@ export async function alterarPapelGrupo(
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = alterarPapelGrupoSchema.safeParse({ conversaId, userId, papel })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const admin: { id: string } | null = await db.membroConversa.findFirst({
     where: {
@@ -1772,7 +1773,7 @@ export async function removerMembroGrupo(conversaId: string, userId: string): Pr
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = removerMembroGrupoSchema.safeParse({ conversaId, userId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
   if (parsed.data.userId === session.user.id) {
     throw new Error('Use Sair para deixar o grupo.')
   }
@@ -1863,7 +1864,7 @@ export async function gerarCodigoConviteGrupo(conversaId: string): Promise<{ cod
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = conversaGrupoIdSchema.safeParse({ conversaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const admin: { id: string } | null = await db.membroConversa.findFirst({
     where: {
@@ -1927,7 +1928,7 @@ export async function revogarCodigoConviteGrupo(conversaId: string): Promise<voi
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = conversaGrupoIdSchema.safeParse({ conversaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const admin: { id: string } | null = await db.membroConversa.findFirst({
     where: {
@@ -1975,7 +1976,7 @@ export async function entrarPorConviteGrupo(codigo: string): Promise<{ id: strin
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = entrarPorConviteGrupoSchema.safeParse({ codigo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Convite inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Convite inválido')
 
   const conversa: { id: string; nome: string | null } | null = await db.conversa.findFirst({
     where: {
@@ -2042,7 +2043,7 @@ export async function ocultarPostGrupo(postId: string): Promise<void> {
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = ocultarPostGrupoSchema.safeParse({ postId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Post inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Post inválido')
 
   const post: {
     id: string
@@ -2136,7 +2137,7 @@ export async function pedirEntradaGrupo(conversaId: string): Promise<void> {
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = pedirEntradaGrupoSchema.safeParse({ conversaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Pedido inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Pedido inválido')
 
   const conversa: { id: string; nome: string | null; publica: boolean } | null =
     await db.conversa.findFirst({
@@ -2218,7 +2219,7 @@ export async function decidirPedidoGrupo(
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = decidirPedidoGrupoSchema.safeParse({ conversaId, userId, aprovar })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Decisão inválida')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Decisão inválida')
 
   const admin: { id: string } | null = await db.membroConversa.findFirst({
     where: {
@@ -2314,7 +2315,7 @@ export async function sairGrupo(conversaId: string): Promise<void> {
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = sairGrupoSchema.safeParse({ conversaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const conversa: { id: string } | null = await db.conversa.findFirst({
     where: {
@@ -2369,7 +2370,7 @@ export async function alternarSilencioGrupo(conversaId: string): Promise<{ silen
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = alternarSilencioGrupoSchema.safeParse({ conversaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const membro: { id: string; silenciada: boolean } | null = await db.membroConversa.findFirst({
     where: {
@@ -2586,7 +2587,7 @@ export async function criarCanalTematico(
   }
 
   const parsed = criarCanalTematicoSchema.safeParse({ nome, descricao, visibilidadeCanal })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Canal inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
 
   const canal: { id: string } = await db.conversa.create({
     data: {
@@ -2698,7 +2699,7 @@ export async function criarDestaquePerfil(titulo: string, postIds: string[]): Pr
   await assertMembroAtivo(tenant.id, session.user.id)
 
   const parsed = criarDestaqueSchema.safeParse({ titulo, postIds })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Destaque inválido')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Destaque inválido')
 
   const posts: Array<{ id: string }> = await db.post.findMany({
     where: {
@@ -2746,7 +2747,7 @@ export async function reagirPost(
   tipo: 'CURTIR',
 ): Promise<{ minhaReacao: 'CURTIR' | null }> {
   const parsed = reacaoSchema.safeParse({ postId, tipo })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Reação inválida')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Reação inválida')
 
   // Authz + post em paralelo — evita serializar hierarquia antes de saber se o post existe.
   const [ctx, post] = await Promise.all([

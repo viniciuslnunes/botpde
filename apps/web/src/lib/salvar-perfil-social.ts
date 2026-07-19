@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import { atualizarPerfilSocialSchema } from '@torcida/types'
 import { assertMembroAtivo } from '@/lib/authz'
+import { ExpectedError } from './expected-error'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { isCloudinaryUrl } from '@/lib/social-embed'
 
@@ -19,7 +20,7 @@ export async function salvarPerfilSocial(
 ): Promise<PerfilSocialSalvo> {
   const parsed = atualizarPerfilSocialSchema.safeParse(input)
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Perfil inválido')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Perfil inválido')
   }
 
   const tenant: { id: string; ativo: boolean } | null = await db.tenant.findUnique({

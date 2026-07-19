@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo, assertPermission } from '@/lib/authz'
+import { ExpectedError } from '@/lib/expected-error'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isLiveKitConfigured } from '@/lib/env'
 import { deleteLiveKitRoom } from '@/lib/livekit-room'
@@ -118,13 +119,13 @@ export async function criarSala(
 /** Form action sem useActionState (ex.: botão em página de evento). */
 export async function criarSalaDeEvento(formData: FormData): Promise<void> {
   const result = await criarSala({}, formData)
-  if (result.message) throw new Error(result.message)
+  if (result.message) throw new ExpectedError(result.message)
 }
 
 export async function encerrarSala(salaId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEETINGS_HOST)
   const parsed = encerrarSalaSchema.safeParse({ salaId })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Sala inválida')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Sala inválida')
 
   const sala = await db.salaReuniao.findFirst({
     where: { id: parsed.data.salaId, tenantId: tenant.id },
@@ -188,7 +189,7 @@ export async function enviarMensagemSala(formData: FormData) {
     salaId: formData.get('salaId'),
     conteudo: formData.get('conteudo'),
   })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Mensagem inválida')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Mensagem inválida')
 
   await assertMembroAtivo(tenant.id, session.user.id)
 

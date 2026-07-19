@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { canViewRecurso, formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
+import { ExpectedError } from './expected-error'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
 import { getEscopoEventosVisiveis } from './eventos'
@@ -72,7 +73,7 @@ async function resolverOwnerId(tenantId: string): Promise<string> {
     select: { userId: true },
     orderBy: { criadoEm: 'asc' },
   })
-  if (!membro) throw new Error('Tenant sem membros ativos.')
+  if (!membro) throw new ExpectedError('Tenant sem membros ativos.')
   return membro.userId
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import {
   ALL_PERMISSIONS,
@@ -185,7 +186,7 @@ export async function salvarAfiliacao(formData: FormData): Promise<void> {
   const parsed = afiliacaoSchema.safeParse({
     afiliacaoId: String(formData.get('afiliacaoId') ?? ''),
   })
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
   const afiliacaoId = parsed.data.afiliacaoId
   if (afiliacaoId) {

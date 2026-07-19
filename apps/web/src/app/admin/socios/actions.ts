@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { ExpectedError } from '@/lib/expected-error'
 import { novoQrTokenSocio } from '@/lib/pix-gateway'
 import { PERMISSIONS } from '@torcida/types'
 
@@ -47,7 +48,7 @@ export async function emitirCarteirinha(formData: FormData) {
     validade: String(formData.get('validade') ?? ''),
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
   }
 
   const { userId, nome } = parsed.data
@@ -123,7 +124,7 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
 
   const parsed = RenovarCarteirinhaSchema.safeParse({ socioId, novaValidade })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
   }
 
   const validade = new Date(parsed.data.novaValidade)
@@ -158,7 +159,7 @@ export async function revogarCarteirinha(socioId: string) {
 
   const parsed = RevogarCarteirinhaSchema.safeParse({ socioId })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
   }
 
   const socio = await db.saasSocio.findFirst({
