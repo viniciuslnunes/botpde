@@ -53,8 +53,11 @@ export default async function AfiliacoesSuperAdminPage() {
           sedePaiTenant: { select: { nome: true } },
         },
       }),
+      // Candidata = a Sede RAIZ (tipo SEDE) do próprio tenant — representa um
+      // tenant independente afiliável. Subsedes/PDEs intra-tenant (tenantId de
+      // outro tenant) NÃO são unidades independentes e ficariam de fora.
       db.sede.findMany({
-        where: { tenantId: { not: null }, ativa: true },
+        where: { tenantId: { not: null }, ativa: true, tipo: 'SEDE' },
         orderBy: { nome: 'asc' },
         select: { id: true, nome: true, tipo: true, cidade: true, estado: true },
       }),
