@@ -152,11 +152,28 @@ export async function registrarPedidoAfiliacao(
       if (sedePaiTenantId === unidade.tenantId) {
         throw new ExpectedError('A unidade não pode se afiliar a si mesma.')
       }
-      const sedePai: { id: string } | null = await db.tenant.findFirst({
-        where: { id: sedePaiTenantId, ativo: true, sintetico: false },
-        select: { id: true },
-      })
+      const [sedePai, unidadeTenant]: [
+        { id: string; afiliacaoId: string | null } | null,
+        { afiliacaoId: string | null } | null,
+      ] = await Promise.all([
+        db.tenant.findFirst({
+          where: { id: sedePaiTenantId, ativo: true, sintetico: false },
+          select: { id: true, afiliacaoId: true },
+        }),
+        db.tenant.findUnique({
+          where: { id: unidade.tenantId },
+          select: { afiliacaoId: true },
+        }),
+      ])
       if (!sedePai) throw new ExpectedError('Sede-mãe não encontrada.')
+      // Regra de domínio: só se afilia a uma torcida do MESMO clube.
+      if (
+        !sedePai.afiliacaoId ||
+        !unidadeTenant?.afiliacaoId ||
+        sedePai.afiliacaoId !== unidadeTenant.afiliacaoId
+      ) {
+        throw new ExpectedError('A unidade e a Sede-mãe precisam torcer para o mesmo clube.')
+      }
     }
 
     const existente: { id: string; status: StatusAfiliacaoUnidade } | null =

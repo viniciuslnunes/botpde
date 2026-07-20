@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect, useMemo, useState } from 'react'
 import { Check, Handshake, Loader2, Unlink, X } from 'lucide-react'
 import {
   aprovarAfiliacao,
@@ -9,6 +9,7 @@ import {
   registrarPedidoAfiliacao,
   type AfiliacaoActionState,
 } from '@/app/admin/torcida/afiliacao-actions'
+import { SearchableSelect, type ComboOption } from './searchable-select'
 
 export interface AfiliacaoAdminView {
   id: string
@@ -20,14 +21,16 @@ export interface AfiliacaoAdminView {
   motivo: string | null
 }
 
-export interface UnidadeCandidata {
+/** Uma unidade afiliável = tenant independente (via sua Sede raiz) + clube. */
+export interface UnidadeOption {
   sedeId: string
-  label: string
-}
-
-export interface TenantSedePai {
-  id: string
+  tenantId: string
   nome: string
+  local: string | null
+  afiliacaoId: string | null
+  clubeNome: string | null
+  /** Já tem pedido PENDENTE/ATIVA como candidata (não pode abrir outro). */
+  ocupada: boolean
 }
 
 const TIPO_LABEL: Record<AfiliacaoAdminView['unidadeTipo'], string> = {
@@ -55,85 +58,138 @@ function Feedback({ state }: { state: AfiliacaoActionState }) {
   )
 }
 
-function RegistrarForm({
-  candidatas,
-  sedesPai,
-}: {
-  candidatas: UnidadeCandidata[]
-  sedesPai: TenantSedePai[]
-}) {
+function localSub(u: UnidadeOption): string {
+  return [u.clubeNome, u.local].filter(Boolean).join(' · ') || 'sem clube definido'
+}
+
+function RegistrarForm({ unidades }: { unidades: UnidadeOption[] }) {
   const [state, action, pending] = useActionState<AfiliacaoActionState, FormData>(
     registrarPedidoAfiliacao,
     {},
   )
+  const [unidadeSedeId, setUnidadeSedeId] = useState<string | null>(null)
+  const [sedePaiTenantId, setSedePaiTenantId] = useState<string | null>(null)
+  const [mostrarMsg, setMostrarMsg] = useState(false)
+
+  const porSede = useMemo(
+    () => new Map(unidades.map((u) => [u.sedeId, u])),
+    [unidades],
+  )
+  const unidadeSel = unidadeSedeId ? (porSede.get(unidadeSedeId) ?? null) : null
+
+  // Candidatas: só as não-ocupadas.
+  const candidatasOptions: ComboOption[] = useMemo(
+    () =>
+      unidades
+        .filter((u) => !u.ocupada)
+        .map((u) => ({ id: u.sedeId, label: u.nome, sublabel: localSub(u) })),
+    [unidades],
+  )
+
+  // Sede-mãe: só tenants do MESMO clube da candidata, exceto ela própria.
+  const sedesMaeOptions: ComboOption[] = useMemo(() => {
+    if (!unidadeSel) return []
+    return unidades
+      .filter(
+        (u) =>
+          u.afiliacaoId &&
+          u.afiliacaoId === unidadeSel.afiliacaoId &&
+          u.tenantId !== unidadeSel.tenantId,
+      )
+      .map((u) => ({ id: u.tenantId, label: u.nome, sublabel: u.local ?? '' }))
+  }, [unidades, unidadeSel])
+
+  useEffect(() => {
+    if (state.success) {
+      setUnidadeSedeId(null)
+      setSedePaiTenantId(null)
+    }
+  }, [state])
+
+  function trocarUnidade(id: string | null) {
+    setUnidadeSedeId(id)
+    setSedePaiTenantId(null) // clube pode mudar → zera a Sede-mãe
+    setMostrarMsg(false)
+  }
+
+  const semClube = Boolean(unidadeSel && !unidadeSel.afiliacaoId)
 
   return (
     <form
       action={action}
-      className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
+      onSubmit={() => setMostrarMsg(true)}
+      className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
     >
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-        <Handshake className="h-4 w-4" />
-        Registrar pedido de afiliação
-      </h2>
-      <p className="text-xs text-zinc-500">
-        Intake do suporte: escolha a unidade (que já tem portal próprio) e, se houver, a
-        Sede-mãe que vai decidir. Sem Sede-mãe, o super-admin adere direto.
-      </p>
-
-      {candidatas.length === 0 ? (
-        <p className="text-xs text-amber-300">
-          Nenhuma unidade com portal próprio disponível para afiliar.
+      <div>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+          <Handshake className="h-4 w-4" />
+          Registrar pedido de afiliação
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Intake do suporte. Busque a unidade (tenant próprio); a Sede-mãe é filtrada pelo mesmo
+          clube. Sem Sede-mãe, o super-admin adere direto.
         </p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-xs text-zinc-400">
-            Unidade candidata
-            <select
-              name="unidadeSedeId"
-              required
-              defaultValue=""
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500"
-            >
-              <option value="" disabled>
-                Selecione…
-              </option>
-              {candidatas.map((c) => (
-                <option key={c.sedeId} value={c.sedeId}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+      </div>
 
-          <label className="text-xs text-zinc-400">
-            Sede-mãe (opcional)
-            <select
-              name="sedePaiTenantId"
-              defaultValue=""
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500"
-            >
-              <option value="">Sem Sede-mãe (super-admin adere)</option>
-              {sedesPai.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+      <input type="hidden" name="unidadeSedeId" value={unidadeSedeId ?? ''} />
+      <input type="hidden" name="sedePaiTenantId" value={sedePaiTenantId ?? ''} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-400">Unidade candidata</label>
+          {candidatasOptions.length === 0 ? (
+            <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-amber-300">
+              Nenhuma unidade disponível para afiliar.
+            </p>
+          ) : (
+            <SearchableSelect
+              options={candidatasOptions}
+              value={unidadeSedeId}
+              onChange={trocarUnidade}
+              placeholder="Buscar torcida por nome ou cidade…"
+            />
+          )}
+          {unidadeSel && (
+            <p className="text-xs text-zinc-500">
+              Clube: {unidadeSel.clubeNome ?? '—'}
+              {semClube && ' · sem clube: só adesão pelo super-admin (sem Sede-mãe)'}
+            </p>
+          )}
         </div>
-      )}
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-400">Sede-mãe (opcional)</label>
+          <SearchableSelect
+            options={sedesMaeOptions}
+            value={sedePaiTenantId}
+            onChange={(id) => {
+              setSedePaiTenantId(id)
+              setMostrarMsg(false)
+            }}
+            disabled={!unidadeSel || semClube}
+            placeholder={
+              !unidadeSel ? 'Escolha a unidade primeiro' : 'Buscar Sede-mãe do mesmo clube…'
+            }
+            emptyText="Nenhuma outra torcida do mesmo clube na plataforma."
+          />
+          <p className="text-xs text-zinc-500">
+            {sedePaiTenantId
+              ? 'Presidente/Vice da Sede-mãe decidem.'
+              : 'Sem Sede-mãe: o super-admin adere direto.'}
+          </p>
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || candidatas.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          disabled={pending || !unidadeSedeId}
+          className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Registrar pedido
         </button>
-        <Feedback state={state} />
+        {mostrarMsg && <Feedback state={state} />}
       </div>
     </form>
   )
@@ -172,9 +228,7 @@ function AfiliacaoRow({ afiliacao }: { afiliacao: AfiliacaoAdminView }) {
         </span>
       </div>
 
-      {afiliacao.motivo && (
-        <p className="mt-1 text-xs text-zinc-500">Motivo: {afiliacao.motivo}</p>
-      )}
+      {afiliacao.motivo && <p className="mt-1 text-xs text-zinc-500">Motivo: {afiliacao.motivo}</p>}
 
       {afiliacao.status === 'PENDENTE' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -244,23 +298,19 @@ function AfiliacaoRow({ afiliacao }: { afiliacao: AfiliacaoAdminView }) {
 
 export function AfiliacoesConsole({
   afiliacoes,
-  candidatas,
-  sedesPai,
+  unidades,
 }: {
   afiliacoes: AfiliacaoAdminView[]
-  candidatas: UnidadeCandidata[]
-  sedesPai: TenantSedePai[]
+  unidades: UnidadeOption[]
 }) {
   return (
     <div className="space-y-6">
-      <RegistrarForm candidatas={candidatas} sedesPai={sedesPai} />
+      <RegistrarForm unidades={unidades} />
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="text-sm font-semibold text-zinc-200">Pedidos e vínculos</h2>
         {afiliacoes.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            Nenhum pedido de afiliação registrado ainda.
-          </p>
+          <p className="mt-2 text-sm text-zinc-500">Nenhum pedido de afiliação registrado ainda.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {afiliacoes.map((a) => (

@@ -6,8 +6,7 @@ import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   AfiliacoesConsole,
   type AfiliacaoAdminView,
-  type TenantSedePai,
-  type UnidadeCandidata,
+  type UnidadeOption,
 } from './afiliacoes-console'
 
 export const metadata: Metadata = { title: 'Afiliações — Super Admin' }
@@ -21,17 +20,21 @@ interface AfiliacaoRow {
   sedePaiTenant: { nome: string } | null
 }
 
-interface SedeCandidataRow {
+interface SedeRaizRow {
   id: string
-  nome: string
-  tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
   cidade: string | null
   estado: string | null
+  tenant: {
+    id: string
+    nome: string
+    afiliacaoId: string | null
+    afiliacao: { nome: string } | null
+  } | null
 }
 
-interface TenantRow {
-  id: string
-  nome: string
+function formatLocal(cidade: string | null, estado: string | null): string | null {
+  if (cidade && estado) return `${cidade}/${estado}`
+  return cidade ?? estado ?? null
 }
 
 export default async function AfiliacoesSuperAdminPage() {
@@ -40,43 +43,47 @@ export default async function AfiliacoesSuperAdminPage() {
     redirect('/')
   }
 
-  const [afiliacoesRows, sedesComTenant, tenants]: [AfiliacaoRow[], SedeCandidataRow[], TenantRow[]] =
-    await Promise.all([
-      db.afiliacaoUnidade.findMany({
-        orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
-        select: {
-          id: true,
-          status: true,
-          criadoEm: true,
-          motivo: true,
-          unidadeSede: { select: { nome: true, tipo: true } },
-          sedePaiTenant: { select: { nome: true } },
+  const [afiliacoesRows, sedesRaiz, sedeIdsOcupadosRows]: [
+    AfiliacaoRow[],
+    SedeRaizRow[],
+    { unidadeSedeId: string }[],
+  ] = await Promise.all([
+    db.afiliacaoUnidade.findMany({
+      orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
+      select: {
+        id: true,
+        status: true,
+        criadoEm: true,
+        motivo: true,
+        unidadeSede: { select: { nome: true, tipo: true } },
+        sedePaiTenant: { select: { nome: true } },
+      },
+    }),
+    // Sede RAIZ (tipo SEDE) de cada tenant independente, com clube (afiliação).
+    db.sede.findMany({
+      where: { tipo: 'SEDE', ativa: true, tenant: { ativo: true, sintetico: false } },
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true,
+        cidade: true,
+        estado: true,
+        tenant: {
+          select: {
+            id: true,
+            nome: true,
+            afiliacaoId: true,
+            afiliacao: { select: { nome: true } },
+          },
         },
-      }),
-      // Candidata = a Sede RAIZ (tipo SEDE) do próprio tenant — representa um
-      // tenant independente afiliável. Subsedes/PDEs intra-tenant (tenantId de
-      // outro tenant) NÃO são unidades independentes e ficariam de fora.
-      db.sede.findMany({
-        where: { tenantId: { not: null }, ativa: true, tipo: 'SEDE' },
-        orderBy: { nome: 'asc' },
-        select: { id: true, nome: true, tipo: true, cidade: true, estado: true },
-      }),
-      db.tenant.findMany({
-        where: { ativo: true, sintetico: false },
-        orderBy: { nome: 'asc' },
-        select: { id: true, nome: true },
-      }),
-    ])
+      },
+    }),
+    db.afiliacaoUnidade.findMany({
+      where: { status: { in: ['PENDENTE', 'ATIVA'] } },
+      select: { unidadeSedeId: true },
+    }),
+  ])
 
-  // Unidades já com pedido PENDENTE/ATIVA não podem receber novo pedido.
-  const sedeIdsOcupados = new Set(
-    (
-      await db.afiliacaoUnidade.findMany({
-        where: { status: { in: ['PENDENTE', 'ATIVA'] } },
-        select: { unidadeSedeId: true },
-      })
-    ).map((r: { unidadeSedeId: string }) => r.unidadeSedeId),
-  )
+  const sedeIdsOcupados = new Set(sedeIdsOcupadosRows.map((r) => r.unidadeSedeId))
 
   const afiliacoes: AfiliacaoAdminView[] = afiliacoesRows.map((a) => ({
     id: a.id,
@@ -88,14 +95,19 @@ export default async function AfiliacoesSuperAdminPage() {
     motivo: a.motivo,
   }))
 
-  const candidatas: UnidadeCandidata[] = sedesComTenant
-    .filter((s) => !sedeIdsOcupados.has(s.id))
-    .map((s) => {
-      const local = s.cidade && s.estado ? ` (${s.cidade}/${s.estado})` : ''
-      return { sedeId: s.id, label: `${s.nome}${local}` }
-    })
-
-  const sedesPai: TenantSedePai[] = tenants.map((t) => ({ id: t.id, nome: t.nome }))
+  const unidades: UnidadeOption[] = sedesRaiz
+    .filter((s): s is SedeRaizRow & { tenant: NonNullable<SedeRaizRow['tenant']> } =>
+      Boolean(s.tenant),
+    )
+    .map((s) => ({
+      sedeId: s.id,
+      tenantId: s.tenant.id,
+      nome: s.tenant.nome,
+      local: formatLocal(s.cidade, s.estado),
+      afiliacaoId: s.tenant.afiliacaoId,
+      clubeNome: s.tenant.afiliacao?.nome ?? null,
+      ocupada: sedeIdsOcupados.has(s.id),
+    }))
 
   return (
     <div className="space-y-6">
@@ -106,7 +118,7 @@ export default async function AfiliacoesSuperAdminPage() {
           decidem no console da torcida; o super-admin adere quando não há Sede administradora.
         </p>
       </div>
-      <AfiliacoesConsole afiliacoes={afiliacoes} candidatas={candidatas} sedesPai={sedesPai} />
+      <AfiliacoesConsole afiliacoes={afiliacoes} unidades={unidades} />
     </div>
   )
 }
