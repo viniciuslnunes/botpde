@@ -1,12 +1,18 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, Eye, Lock, MapPin, Users, Wallet } from 'lucide-react'
+import { ArrowLeft, Beer, CalendarDays, Lock, MapPin, ShieldCheck, Users, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
-import { formatDataCompetenciaInput } from '@torcida/types'
+import { formatarMoedaBRL, formatDataCompetenciaInput } from '@torcida/types'
 import { assertPresidentePodeLerUnidade } from '@/lib/authz'
 import { listarEventosDaUnidade, type EventoUnidadeItem } from '@/lib/eventos'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
+import {
+  listarMembrosDaUnidade,
+  resumoBarDaUnidade,
+  type BarVendaUnidadeItem,
+  type MembroUnidadeItem,
+} from '@/lib/unidade-oversight'
 import {
   parseFiltroFinanceiro,
   type FinanceiroSearchParams,
@@ -55,10 +61,12 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
 
   const basePath = `/admin/torcida/unidade/${tenantId}`
 
-  const [resumo, lista, eventos] = await Promise.all([
+  const [resumo, lista, eventos, bar, membros] = await Promise.all([
     resumirFinanceiro(tenantId, filtroResumo),
     listarLancamentosFinanceiro(tenantId, { filtro }),
     listarEventosDaUnidade(tenantId),
+    resumoBarDaUnidade(tenantId),
+    listarMembrosDaUnidade(tenantId),
   ])
 
   const itens: LancamentoRow[] = lista.itens.map((l) => ({
@@ -151,10 +159,72 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={3}>
-        <p className="flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
-          <Eye className="h-3.5 w-3.5" />
-          Próximos módulos nesta visão: Bar e Membros (dados sensíveis mascarados).
-        </p>
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Beer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Bar
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Vendido (pago)
+              </p>
+              <p className="mt-1 text-xl font-bold text-[rgb(var(--foreground))]">
+                {formatarMoedaBRL(bar.totalVendido)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Vendas pagas
+              </p>
+              <p className="mt-1 text-xl font-bold text-[rgb(var(--foreground))]">{bar.qtdVendas}</p>
+            </div>
+          </div>
+
+          {bar.recentes.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+              Sem vendas registradas no bar desta unidade.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              {bar.recentes.map((v) => (
+                <BarLinha key={v.id} v={v} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </MotionReveal>
+
+      <MotionReveal index={4}>
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Membros ({membros.total})
+              </h2>
+            </div>
+            <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              RG/CPF e endereço ocultos (LGE)
+            </span>
+          </div>
+
+          {membros.itens.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+              Esta unidade ainda não tem membros.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              {membros.itens.map((m) => (
+                <MembroLinha key={m.id} m={m} />
+              ))}
+            </ul>
+          )}
+        </section>
       </MotionReveal>
     </div>
   )
@@ -191,6 +261,73 @@ function EventoLinha({ ev }: { ev: EventoUnidadeItem }) {
       <span className="inline-flex shrink-0 items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
         <Users className="h-3.5 w-3.5" />
         {ev.rsvps}
+      </span>
+    </li>
+  )
+}
+
+const METODO_BAR_LABEL: Record<string, string> = {
+  PIX: 'PIX',
+  DINHEIRO: 'Dinheiro',
+  CARTAO: 'Cartão',
+  CARTAO_CREDITO: 'Crédito',
+  CARTAO_DEBITO: 'Débito',
+}
+
+function BarLinha({ v }: { v: BarVendaUnidadeItem }) {
+  const paga = v.status === 'PAGA'
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+          {formatarMoedaBRL(v.total)}
+          <span className="ml-1.5 text-xs font-normal text-[rgb(var(--foreground-muted))]">
+            {METODO_BAR_LABEL[v.metodoPagamento] ?? v.metodoPagamento}
+          </span>
+        </p>
+        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          {dtFmt.format(v.criadoEm)}
+          {v.operadorNome ? ` · ${v.operadorNome}` : ''}
+          {` · ${v.unidadeNome}`}
+        </p>
+      </div>
+      <span
+        className={[
+          'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
+          paga
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+        ].join(' ')}
+      >
+        {v.status}
+      </span>
+    </li>
+  )
+}
+
+const TIPO_MEMBRO_LABEL: Record<string, string> = { SOCIO: 'Sócio', TORCEDOR: 'Torcedor' }
+
+function MembroLinha({ m }: { m: MembroUnidadeItem }) {
+  const aprovado = m.status === 'APROVADO'
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">{m.nome}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-[rgb(var(--foreground-muted))]">
+          <span>{TIPO_MEMBRO_LABEL[m.tipo] ?? m.tipo}</span>
+          {m.numeroAssociado && <span>nº {m.numeroAssociado}</span>}
+          {m.cidade && <span>{m.cidade}</span>}
+        </p>
+      </div>
+      <span
+        className={[
+          'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
+          aprovado
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+            : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+        ].join(' ')}
+      >
+        {m.status}
       </span>
     </li>
   )

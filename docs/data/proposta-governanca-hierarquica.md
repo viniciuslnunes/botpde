@@ -1,13 +1,12 @@
 # Proposta — Governança Hierárquica (Sede → Subsede → PDE)
 
 > Status: **em implementação** (branch `feat/governanca-hierarquica-fase1`).
-> Fase 0+1 e Fase 2 (afiliação = **solicitação de subsede/PDE** vinda do
-> onboarding; aprovar cria a Sede — ver §9) concluídas. Fase 3
-> (console R1 read-only por módulo) **iniciada**: scaffold do drill-down
-> `/admin/torcida/unidade/[tenantId]` (gate `assertPresidentePodeLerUnidade`) +
-> módulo **Financeiro** (reuso de loaders + `podeGerir={false}`) + link "Ver
-> administração" na console para unidades Caso B. Faltam **Eventos, Bar e Membros**
-> (este com PII mascarada). Fase 4 (RBAC por sedeId) pendente.
+> Fase 0+1, Fase 2 (afiliação = **solicitação de subsede/PDE** — §9), Fase 2b
+> (promover a portal, A→B + owner — §10) e **Fase 3 concluída**: console R1
+> read-only no drill-down `/admin/torcida/unidade/[tenantId]` (gate
+> `assertPresidentePodeLerUnidade`) com os módulos **Financeiro, Eventos, Bar e
+> Membros** (este com RG/CPF/endereço **omitidos** — LGE), + link "Ver
+> administração" na console para unidades Caso B. Fase 4 (RBAC por sedeId) pendente.
 > Objetivo: transformar subsedes e pontos de encontro em **portais de gestão
 > local** governáveis, dando à Sede visibilidade top-down da administração das
 > afiliadas, sem que a base possa gerir a Sede. Complementa
