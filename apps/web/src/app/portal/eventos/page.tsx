@@ -191,7 +191,7 @@ export default async function EventosPage({ searchParams }: Props) {
         <div className="flex flex-wrap gap-1.5 text-xs">
           <Link
             href={hrefFiltro({ tipo: '' })}
-            prefetch
+            prefetch={false}
             className={[
               'rounded-lg px-2.5 py-1.5 font-medium',
               !tipoFiltro
@@ -205,7 +205,7 @@ export default async function EventosPage({ searchParams }: Props) {
             <Link
               key={t}
               href={hrefFiltro({ tipo: t })}
-              prefetch
+              prefetch={false}
               className={[
                 'rounded-lg px-2.5 py-1.5 font-medium',
                 tipoFiltro === t
@@ -236,7 +236,7 @@ export default async function EventosPage({ searchParams }: Props) {
               <Link
                 key={id}
                 href={hrefFiltro({ vista: id === 'mes' ? '' : id })}
-                prefetch
+                prefetch={false}
                 className={[
                   'rounded-md px-2.5 py-1.5 font-medium transition-colors',
                   vista === id

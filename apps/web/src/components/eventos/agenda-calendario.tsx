@@ -59,7 +59,7 @@ function EventoDiaCard({ e }: { e: AgendaCalItem }) {
   return (
     <Link
       href={e.href}
-      prefetch
+      prefetch={false}
       className={[
         'group flex gap-3 overflow-hidden rounded-2xl border border-[rgb(var(--border))] border-l-4 bg-[rgb(var(--surface))] p-3 shadow-sm transition-all hover:shadow-md',
         TIPO_TINT[tipo],
@@ -107,7 +107,7 @@ function MesChip({ e }: { e: AgendaCalItem }) {
   return (
     <Link
       href={e.href}
-      prefetch
+      prefetch={false}
       title={e.titulo}
       className="flex items-center gap-1 truncate rounded-md bg-[rgb(var(--surface))] px-1 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
     >
@@ -305,6 +305,7 @@ export function AgendaCalendario({
               </p>
               <Link
                 href={hrefComData(diaAtivo)}
+                prefetch={false}
                 className="mt-2 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
               >
                 Ver no filtro de data
@@ -382,6 +383,7 @@ export function AgendaCalendario({
             >
               <Link
                 href={hrefComData(day)}
+                prefetch={false}
                 className={[
                   'mb-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold',
                   isHoje
