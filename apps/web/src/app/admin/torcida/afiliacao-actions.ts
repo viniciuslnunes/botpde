@@ -106,15 +106,15 @@ function mensagemDeErro(error: unknown): AfiliacaoActionState {
 
 // ── Registrar (intake do suporte — super-admin only) ─────────────────────────
 
+// IDs de Sede/Tenant são opacos neste schema (seeds usam ids não-UUID, ex.
+// `sede-principal-<slug>`). Validar só "não-vazio"; a EXISTÊNCIA é conferida
+// no banco (findUnique/findFirst abaixo). Nunca exigir formato UUID aqui.
 const registrarSchema = z.object({
-  unidadeSedeId: z.string().uuid('Unidade inválida'),
+  unidadeSedeId: z.string().trim().min(1, 'Unidade inválida'),
   sedePaiTenantId: z
     .string()
     .optional()
-    .transform((value) => (value && value.trim() ? value.trim() : null))
-    .refine((value) => value === null || z.string().uuid().safeParse(value).success, {
-      message: 'Sede-mãe inválida',
-    }),
+    .transform((value) => (value && value.trim() ? value.trim() : null)),
 })
 
 export async function registrarPedidoAfiliacao(
