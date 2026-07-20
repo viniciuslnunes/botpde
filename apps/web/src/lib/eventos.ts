@@ -94,3 +94,52 @@ export async function getProximoEvento(
   const eventos = await getEventosFuturosVisiveis(tenantId, userId)
   return eventos[0] ?? null
 }
+
+export interface EventoUnidadeItem {
+  id: string
+  titulo: string
+  tipo: string
+  data: Date
+  local: string | null
+  rsvps: number
+}
+
+/**
+ * Eventos da PRÓPRIA unidade (tenant alvo) — read-only, para o drill-down R1 do
+ * Presidente (`/admin/torcida/unidade/[tenantId]`). Não cascateia ancestrais nem
+ * filtra por vínculo de membro: é a agenda daquela unidade, do mais recente ao
+ * mais antigo.
+ */
+export const listarEventosDaUnidade = cache(async function listarEventosDaUnidade(
+  tenantId: string,
+  limite = 20,
+): Promise<EventoUnidadeItem[]> {
+  const rows: Array<{
+    id: string
+    titulo: string
+    tipo: string
+    data: Date
+    local: string | null
+    _count: { rsvps: number }
+  }> = await db.evento.findMany({
+    where: { tenantId },
+    orderBy: { data: 'desc' },
+    take: limite,
+    select: {
+      id: true,
+      titulo: true,
+      tipo: true,
+      data: true,
+      local: true,
+      _count: { select: { rsvps: true } },
+    },
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    titulo: r.titulo,
+    tipo: r.tipo,
+    data: r.data,
+    local: r.local,
+    rsvps: r._count.rsvps,
+  }))
+})

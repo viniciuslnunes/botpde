@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Eye, Lock, Wallet } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Eye, Lock, MapPin, Users, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
 import { formatDataCompetenciaInput } from '@torcida/types'
 import { assertPresidentePodeLerUnidade } from '@/lib/authz'
+import { listarEventosDaUnidade, type EventoUnidadeItem } from '@/lib/eventos'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
 import {
   parseFiltroFinanceiro,
@@ -54,9 +55,10 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
 
   const basePath = `/admin/torcida/unidade/${tenantId}`
 
-  const [resumo, lista] = await Promise.all([
+  const [resumo, lista, eventos] = await Promise.all([
     resumirFinanceiro(tenantId, filtroResumo),
     listarLancamentosFinanceiro(tenantId, { filtro }),
+    listarEventosDaUnidade(tenantId),
   ])
 
   const itens: LancamentoRow[] = lista.itens.map((l) => ({
@@ -126,11 +128,70 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={2}>
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Agenda
+            </h2>
+          </div>
+
+          {eventos.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+              Esta unidade ainda não tem eventos na agenda.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+              {eventos.map((ev) => (
+                <EventoLinha key={ev.id} ev={ev} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </MotionReveal>
+
+      <MotionReveal index={3}>
         <p className="flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
           <Eye className="h-3.5 w-3.5" />
-          Próximos módulos nesta visão: Eventos, Bar e Membros (dados sensíveis mascarados).
+          Próximos módulos nesta visão: Bar e Membros (dados sensíveis mascarados).
         </p>
       </MotionReveal>
     </div>
+  )
+}
+
+const TIPO_EVENTO_LABEL: Record<string, string> = {
+  GERAL: 'Evento',
+  CARAVANA: 'Caravana',
+  ENSAIO: 'Ensaio',
+  REUNIAO: 'Reunião',
+  JOGO: 'Jogo',
+}
+
+const dtFmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+
+function EventoLinha({ ev }: { ev: EventoUnidadeItem }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">{ev.titulo}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-[rgb(var(--foreground-muted))]">
+          <span>{dtFmt.format(ev.data)}</span>
+          <span className="rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-semibold">
+            {TIPO_EVENTO_LABEL[ev.tipo] ?? ev.tipo}
+          </span>
+          {ev.local && (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {ev.local}
+            </span>
+          )}
+        </p>
+      </div>
+      <span className="inline-flex shrink-0 items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
+        <Users className="h-3.5 w-3.5" />
+        {ev.rsvps}
+      </span>
+    </li>
   )
 }
