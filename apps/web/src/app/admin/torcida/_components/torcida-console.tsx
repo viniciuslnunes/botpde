@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@torcida/db'
-import { Users, CreditCard, MapPin, Building2 } from 'lucide-react'
+import { Users, CreditCard, MapPin, Building2, ArrowRight } from 'lucide-react'
 import { getTorcidaWorktree, type TorcidaWorktreeNode } from '@/lib/hierarquia'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
@@ -200,6 +200,9 @@ export async function TorcidaConsole({
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                   Sócios
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  <span className="sr-only">Administração</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgb(var(--border))]">
@@ -247,6 +250,17 @@ export async function TorcidaConsole({
                   </td>
                   <td className="px-4 py-3 text-right text-[rgb(var(--foreground-muted))]">
                     {u.socios}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {u.origem === 'tenant' && u.tenantId !== tenantId ? (
+                      <Link
+                        href={`/admin/torcida/unidade/${u.tenantId}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                      >
+                        Ver administração
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : null}
                   </td>
                 </tr>
               ))}
