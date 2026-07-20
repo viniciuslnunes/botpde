@@ -6,10 +6,11 @@ import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import type { Metadata } from 'next'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
-import { assertPresidenteGlobal } from '@/lib/authz'
+import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { TorcidaConsole } from './_components/torcida-console'
+import { TorcidaEstrutura } from './_components/torcida-estrutura'
 import { AfiliacaoPedidos } from './_components/afiliacao-pedidos'
 
 export const metadata: Metadata = { title: 'Visão da torcida' }
@@ -32,6 +33,26 @@ function PedidosSkeleton() {
 }
 
 /**
+ * Fallback para quem NÃO é Presidente de uma Sede raiz (subsede/PDE com tenant
+ * próprio, ou admin sem TORCIDA_GLOBAL_VIEW): visão da estrutura da torcida,
+ * que respeita o toggle R3 (`getWorktreeParaDescendente`). Sem acesso admin
+ * (`SEDES_MANAGE`) → volta ao /admin.
+ */
+async function TorcidaEstruturaFallback() {
+  let tenant: Tenant
+  try {
+    ;({ tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE))
+  } catch {
+    redirect('/admin')
+  }
+  return (
+    <Suspense fallback={<ConsoleSkeleton />}>
+      <TorcidaEstrutura tenantId={tenant.id} tenantNome={tenant.nome} />
+    </Suspense>
+  )
+}
+
+/**
  * Console global de LEITURA do Presidente/Vice: consolida afiliados e sócios
  * de toda a torcida (Sede + subsedes/PDEs). Nenhuma ação de gestão aqui — a
  * operação de cada unidade continua com a sua Liderança. Exceção deliberada:
@@ -43,7 +64,7 @@ export default async function TorcidaPage() {
   try {
     ;({ session, tenant } = await assertPresidenteGlobal())
   } catch {
-    redirect('/admin')
+    return <TorcidaEstruturaFallback />
   }
 
   const isSuper = isSuperAdminEmail(session.user.email)
