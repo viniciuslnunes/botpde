@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { Check, Handshake, Loader2, MapPin, Pencil, Phone, X } from 'lucide-react'
+import { Check, Handshake, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
 import {
   aprovarSolicitacao,
   criarSolicitacaoManual,
@@ -9,6 +9,7 @@ import {
   recusarSolicitacao,
   type SolicitacaoActionState,
 } from '@/app/admin/torcida/afiliacao-actions'
+import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 
 export interface SolicitacaoView {
@@ -28,6 +29,10 @@ export interface SolicitacaoView {
   provasUrls: string[]
   motivo: string | null
   criadoEm: string
+  /** Sede criada ao aprovar (null enquanto PENDENTE/RECUSADA). */
+  sedeId: string | null
+  /** true = já virou portal próprio (tenant dedicado). */
+  promovida: boolean
 }
 
 export interface TorcidaOption {
@@ -169,6 +174,55 @@ function Campo({
   )
 }
 
+function PromoverForm({ sedeId }: { sedeId: string }) {
+  const [state, action, pending] = useActionState<PromoverState, FormData>(
+    promoverUnidadeAPortal,
+    {},
+  )
+  const [aberto, setAberto] = useState(false)
+
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-violet-800 px-3 py-1.5 text-xs font-semibold text-violet-300 hover:bg-violet-950/40"
+      >
+        <Rocket className="h-3.5 w-3.5" />
+        Promover a portal
+      </button>
+    )
+  }
+
+  return (
+    <form action={action} className="mt-2 flex flex-wrap items-center gap-1.5">
+      <input type="hidden" name="sedeId" value={sedeId} />
+      <input
+        name="ownerEmail"
+        type="email"
+        placeholder="E-mail do owner (opcional)"
+        className="w-56 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500"
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+        Promover
+      </button>
+      <button type="button" onClick={() => setAberto(false)} className="text-xs text-zinc-500 hover:text-zinc-300">
+        Cancelar
+      </button>
+      {state.message && (
+        <span className={state.success ? 'text-xs text-emerald-400' : 'text-xs text-red-400'}>
+          {state.message}
+        </span>
+      )}
+    </form>
+  )
+}
+
 function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
   const [aprovarState, aprovarAction, aprovando] = useActionState<SolicitacaoActionState, FormData>(
     aprovarSolicitacao,
@@ -234,6 +288,16 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
           {s.status}
         </span>
       </div>
+
+      {s.status === 'APROVADA' &&
+        (s.promovida ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-400">
+            <Rocket className="h-3.5 w-3.5" />
+            Portal próprio ativo
+          </p>
+        ) : s.sedeId ? (
+          <PromoverForm sedeId={s.sedeId} />
+        ) : null)}
 
       {pendente && modo === 'ver' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">

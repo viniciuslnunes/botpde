@@ -317,8 +317,50 @@ enum StatusSolicitacaoUnidade { PENDENTE APROVADA RECUSADA }
 - Onboarding `registrarInteresseUnidade` **persiste** a `SolicitacaoUnidade`
   (além do e-mail de conveniência).
 
-### Fora do MVP (adiado)
+### Fora do MVP da Fase 2 (segue na Fase 2b — §10)
 
-Transferência de owner / promoção A→B para dar portal admin à liderança local a
-partir de uma `Sede` já criada. Auto-vínculo de membros ao canal em
-`aprovarMembro` continua valendo (Fase 1).
+Transferência de owner / promoção A→B para dar portal admin à liderança local.
+Auto-vínculo de membros ao canal em `aprovarMembro` continua valendo (Fase 1).
+
+## 10. Fase 2b — Promover unidade a portal (A→B + transferir owner)
+
+**Objetivo:** dar à liderança de uma subsede/PDE (uma `Sede` já existente, Caso A)
+um **portal de gestão próprio**, transferindo a propriedade. É o passo que
+distingue "unidade cadastrada" de "unidade governável". Reusa a lógica já provada
+em `packages/db/scripts/promover-subsede-para-tenant.js` + o padrão de
+`transferirOwnerAction` (`super-admin/torcidas/actions.ts`).
+
+### Ação (super-admin) — `promoverUnidadeAPortal(sedeId, ownerEmail?)`
+1. Carrega a `Sede` (SUBSEDE/PDE; `tenantId` atual = torcida-mãe). Recusa se já for
+   raiz de tenant próprio.
+2. Cria `Tenant` (slug único de nome+cidade; `nome` = unidade; `corPrimaria` herdada
+   da mãe; `plano: FREE`).
+3. Cria cargos de sistema **owner/admin/member — SEM vice** (`SYSTEM_ROLE_PERMISSIONS`)
+   + departamentos/perfis canônicos (`upsert*Canonicos`, `incluirVice: false`).
+4. `Sede.tenantId = novo tenant` (mantém `sedeId` → **preserva a árvore**; a unidade
+   vira Caso B, e o console/drill-down R1 passam a enxergá-la como `origem: 'tenant'`).
+5. Se `ownerEmail` informado e o usuário já existe → atribui owner (padrão
+   `transferirOwnerAction`; usuário precisa ter feito login antes). Senão, promove
+   **sem owner** (atribuível depois).
+6. `AuditLog` (`UNIDADE_PROMOVIDA_A_PORTAL`) + `invalidateHierarchyCache` +
+   `invalidatePermissionsCache`.
+
+### Onde na UI
+Botão **"Promover a portal"** nas solicitações **APROVADAS** em
+`/super-admin/afiliacoes` (a `Sede` já existe) — e a mesma ação reusável para
+unidades que já estão na base. É operação de **super-admin** ("eu transfiro a
+propriedade").
+
+### Decisões (confirmar antes de implementar)
+1. **Membros** — os `SaasMembro` da unidade (via `sedeId`) **migram** para o novo
+   tenant ou **ficam na mãe**? Rec.: **ficam na mãe** no MVP (o script não migra; o
+   portal começa a própria base de membros).
+2. **Owner** — obrigatório na promoção, ou **opcional** (super-admin atribui depois
+   via `transferirOwnerAction`)? Rec.: **opcional**.
+3. **Canal** — o `Conversa` do canal da unidade fica com `tenantId` da mãe (leitura
+   por participação segue funcionando). Re-apontar para o novo tenant fica para
+   depois. Rec.: **deixar como está**.
+
+### Fora do MVP (Fase 2b)
+Migração de membros; re-hospedar o canal no novo tenant; self-service de promoção
+pela própria liderança (fica com super-admin).

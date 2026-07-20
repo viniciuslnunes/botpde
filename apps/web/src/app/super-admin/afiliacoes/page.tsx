@@ -27,7 +27,9 @@ interface SolicitacaoRow {
   provasUrls: string[]
   motivo: string | null
   criadoEm: Date
+  tenantId: string
   tenant: { nome: string }
+  sede: { id: string; tenantId: string | null } | null
 }
 
 interface TorcidaRow {
@@ -61,7 +63,9 @@ export default async function AfiliacoesSuperAdminPage() {
         provasUrls: true,
         motivo: true,
         criadoEm: true,
+        tenantId: true,
         tenant: { select: { nome: true } },
+        sede: { select: { id: true, tenantId: true } },
       },
     }),
     db.tenant.findMany({
@@ -90,6 +94,9 @@ export default async function AfiliacoesSuperAdminPage() {
       provasUrls: s.provasUrls,
       motivo: s.motivo,
       criadoEm: s.criadoEm.toISOString(),
+      sedeId: s.sede?.id ?? null,
+      // Já promovida = a Sede criada tem tenant próprio (≠ tenant da torcida).
+      promovida: Boolean(s.sede && s.sede.tenantId && s.sede.tenantId !== s.tenantId),
     }))
 
   const torcidas: TorcidaOption[] = torcidasRows.map((t) => ({
