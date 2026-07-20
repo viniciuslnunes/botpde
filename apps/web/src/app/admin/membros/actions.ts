@@ -157,6 +157,24 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
 
   invalidatePermissionsCache(membro.userId, tenant.id)
 
+  // Auto-vínculo no canal oficial da unidade (governança hierárquica, Fase 2):
+  // se o tenant tem Sede com canal provisionado, o membro aprovado entra nele.
+  // SEMPRE aqui (aprovação) — nunca em GET/solicitação (anti-padrão write-on-GET).
+  const sedesComCanal: { canalConversaId: string | null }[] = await db.sede.findMany({
+    where: { tenantId: tenant.id, canalConversaId: { not: null } },
+    select: { canalConversaId: true },
+  })
+  for (const sede of sedesComCanal) {
+    if (!sede.canalConversaId) continue
+    await db.membroConversa.upsert({
+      where: {
+        conversaId_userId: { conversaId: sede.canalConversaId, userId: membro.userId },
+      },
+      create: { conversaId: sede.canalConversaId, userId: membro.userId, papel: 'MEMBRO' },
+      update: { saiuEm: null },
+    })
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,

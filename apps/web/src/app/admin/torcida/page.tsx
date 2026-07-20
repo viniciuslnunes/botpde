@@ -1,10 +1,16 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { Eye } from 'lucide-react'
+import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
+import type { Session } from 'next-auth'
 import type { Metadata } from 'next'
+import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 import { assertPresidenteGlobal } from '@/lib/authz'
+import { getUserPermissionsInTenant } from '@/lib/tenant'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { TorcidaConsole } from './_components/torcida-console'
+import { AfiliacaoPedidos } from './_components/afiliacao-pedidos'
 
 export const metadata: Metadata = { title: 'Visão da torcida' }
 
@@ -21,17 +27,48 @@ function ConsoleSkeleton() {
   )
 }
 
+function PedidosSkeleton() {
+  return <div className="h-32 animate-pulse rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+}
+
 /**
  * Console global de LEITURA do Presidente/Vice: consolida afiliados e sócios
  * de toda a torcida (Sede + subsedes/PDEs). Nenhuma ação de gestão aqui — a
- * operação de cada unidade continua com a sua Liderança.
+ * operação de cada unidade continua com a sua Liderança. Exceção deliberada:
+ * a fila de pedidos de afiliação (Fase 2), gate AFFILIATION_MANAGE.
  */
 export default async function TorcidaPage() {
   let tenant: Tenant
+  let session: Session
   try {
-    ;({ tenant } = await assertPresidenteGlobal())
+    ;({ session, tenant } = await assertPresidenteGlobal())
   } catch {
     redirect('/admin')
+  }
+
+  const isSuper = isSuperAdminEmail(session.user.email)
+  let podeGerirAfiliacao = isSuper
+  let podeDecidirAfiliacao = isSuper
+  if (!isSuper) {
+    const {
+      rolePermissions,
+      overrides,
+    }: { rolePermissions: string[]; overrides: { permission: string; granted: boolean }[] } =
+      await getUserPermissionsInTenant(session.user.id, tenant.id)
+    const effective: string[] = calculateEffectivePermissions(rolePermissions, overrides)
+    podeGerirAfiliacao = hasPermission(effective, PERMISSIONS.AFFILIATION_MANAGE)
+    if (podeGerirAfiliacao) {
+      // Peso final do Presidente: só owner aprova/recusa/encerra (proposta §9).
+      const owner: { id: string } | null = await db.userRole.findFirst({
+        where: {
+          userId: session.user.id,
+          tenantId: tenant.id,
+          role: { isSystem: true, nome: 'owner' },
+        },
+        select: { id: true },
+      })
+      podeDecidirAfiliacao = Boolean(owner)
+    }
   }
 
   return (
@@ -56,6 +93,12 @@ export default async function TorcidaPage() {
       <Suspense fallback={<ConsoleSkeleton />}>
         <TorcidaConsole tenantId={tenant.id} tenantNome={tenant.nome} />
       </Suspense>
+
+      {podeGerirAfiliacao && (
+        <Suspense fallback={<PedidosSkeleton />}>
+          <AfiliacaoPedidos tenantId={tenant.id} podeDecidir={podeDecidirAfiliacao} />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -157,6 +157,23 @@ export async function assertPresidentePodeLerUnidade(
   return { session, tenant, targetTenantId, readOnly: true as const }
 }
 
+/**
+ * Garante que o usuário é o owner (Presidente/Liderança) do tenant — cargo de
+ * sistema 'owner'. Usado em decisões que a permissão sozinha não cobre (peso
+ * final do Presidente: configurações sensíveis, afiliação de unidades).
+ */
+export async function assertTenantOwner(userId: string, tenantId: string): Promise<void> {
+  const ownerRole: { id: string } | null = await db.userRole.findFirst({
+    where: {
+      userId,
+      tenantId,
+      role: { isSystem: true, nome: 'owner' },
+    },
+    select: { id: true },
+  })
+  if (!ownerRole) throw new Error('Apenas o owner pode alterar esta configuração')
+}
+
 /** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */
 export async function assertStoreView(): Promise<AuthzResult> {
   const session = await auth()

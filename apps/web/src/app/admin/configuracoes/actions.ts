@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, assertTenantOwner } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -40,18 +40,6 @@ function parseDepartamentoPapel(formData: FormData): {
     throw new Error('Departamento e papel (membro/gestor) devem ser informados juntos.')
   }
   return { departamentoId, papelNoDepartamento }
-}
-
-async function assertTenantOwner(userId: string, tenantId: string): Promise<void> {
-  const ownerRole = await db.userRole.findFirst({
-    where: {
-      userId,
-      tenantId,
-      role: { isSystem: true, nome: 'owner' },
-    },
-    select: { id: true },
-  })
-  if (!ownerRole) throw new Error('Apenas o owner pode alterar esta configuração')
 }
 
 // ── Perfil do tenant ──────────────────────────────────────────────────────────
