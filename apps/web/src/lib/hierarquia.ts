@@ -603,3 +603,54 @@ export async function getTorcidaWorktree(tenantId: string): Promise<TorcidaWorkt
 
   return nodes
 }
+
+/**
+ * R3 — toggle da raiz SEDE: descendentes podem ver a hierarquia completa?
+ * Leitura por PK de `Tenant.hierarquiaVisivelParaFilhos`. Só a raiz SEDE
+ * consome este toggle; alterá-lo exige `invalidateHierarchyCache(rootTenantId)`.
+ */
+async function getHierarquiaVisivelParaFilhosImpl(rootTenantId: string): Promise<boolean> {
+  const tenant: { hierarquiaVisivelParaFilhos: boolean } | null = await db.tenant.findUnique({
+    where: { id: rootTenantId },
+    select: { hierarquiaVisivelParaFilhos: true },
+  })
+  return tenant?.hierarquiaVisivelParaFilhos ?? false
+}
+
+export const getHierarquiaVisivelParaFilhos = cache(
+  async (rootTenantId: string): Promise<boolean> => {
+    return unstable_cache(
+      () => getHierarquiaVisivelParaFilhosImpl(rootTenantId),
+      ['hierarquia-visivel-filhos', rootTenantId],
+      { revalidate: 300, tags: [HIERARCHY_CACHE_TAG, hierarchyCacheTag(rootTenantId)] },
+    )()
+  },
+)
+
+/**
+ * R3 — worktree visível para um tenant DESCENDENTE (subsede/PDE Caso B).
+ * Resolve a raiz pela cadeia de ancestrais (último elemento; se não há
+ * ancestral, o próprio ator é a raiz) e lê o toggle da raiz:
+ * - `false` (padrão) → o descendente vê só a própria worktree
+ *   (`getTorcidaWorktree(actorTenantId)`: a unidade em si + suas sub-unidades
+ *   locais — nunca irmãos nem a árvore da Sede).
+ * - `true` → delega a `getTorcidaWorktree(root)` (árvore inteira da torcida).
+ * O console do Presidente (R1) NÃO passa por aqui — usa `getTorcidaWorktree`
+ * direto, independente do toggle.
+ */
+export async function getWorktreeParaDescendente(
+  actorTenantId: string,
+): Promise<TorcidaWorktreeNode[]> {
+  const ancestrais: string[] = await getAncestorTenantIds(actorTenantId)
+  const rootTenantId = ancestrais.length > 0 ? ancestrais[ancestrais.length - 1] : actorTenantId
+
+  if (rootTenantId === actorTenantId) {
+    return getTorcidaWorktree(actorTenantId)
+  }
+
+  const visivel = await getHierarquiaVisivelParaFilhos(rootTenantId)
+  if (!visivel) {
+    return getTorcidaWorktree(actorTenantId)
+  }
+  return getTorcidaWorktree(rootTenantId)
+}

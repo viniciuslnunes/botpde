@@ -85,6 +85,10 @@ export const PERMISSIONS = /** @type {const} */ ({
   // Console global de leitura do Presidente — visão consolidada da torcida
   // inteira (Sede + subsedes/PDEs). Só Presidente e Vice; admin comum não tem.
   TORCIDA_GLOBAL_VIEW: 'torcida:global_view',
+
+  // Decidir afiliação/promoção de unidades (subsede/PDE → portal próprio).
+  // Só Presidente (owner) e Vice; admin comum não tem.
+  AFFILIATION_MANAGE: 'affiliation:manage',
 })
 
 export const ALL_PERMISSIONS = Object.values(PERMISSIONS)
@@ -182,7 +186,10 @@ export const PERMISSION_GROUPS = /** @type {const} */ ([
   {
     label: 'Presidência',
     base: null,
-    items: [{ key: PERMISSIONS.TORCIDA_GLOBAL_VIEW, label: 'Ver painel global da torcida' }],
+    items: [
+      { key: PERMISSIONS.TORCIDA_GLOBAL_VIEW, label: 'Ver painel global da torcida' },
+      { key: PERMISSIONS.AFFILIATION_MANAGE, label: 'Decidir afiliação de unidades' },
+    ],
   },
   {
     label: 'Outros',
@@ -361,9 +368,13 @@ export const MAX_VICE_PRESIDENTES = 2
  */
 export const SYSTEM_ROLE_PERMISSIONS = {
   [SYSTEM_ROLES.OWNER]: ALL_PERMISSIONS,
-  // Admin comum NÃO tem visão global da torcida — só Presidente (owner) e Vice.
+  // Admin comum NÃO tem visão global da torcida nem decide afiliação —
+  // só Presidente (owner) e Vice.
   [SYSTEM_ROLES.ADMIN]: ALL_PERMISSIONS.filter(
-    (p) => p !== PERMISSIONS.SETTINGS_MANAGE && p !== PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+    (p) =>
+      p !== PERMISSIONS.SETTINGS_MANAGE &&
+      p !== PERMISSIONS.TORCIDA_GLOBAL_VIEW &&
+      p !== PERMISSIONS.AFFILIATION_MANAGE,
   ),
   [SYSTEM_ROLES.VICE]: ALL_PERMISSIONS.filter(
     (p) => p !== PERMISSIONS.SETTINGS_MANAGE,

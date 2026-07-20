@@ -191,6 +191,18 @@ describe('visão global da torcida (TORCIDA_GLOBAL_VIEW)', () => {
   })
 })
 
+describe('afiliação de unidades (AFFILIATION_MANAGE)', () => {
+  it('owner (Presidente) e vice decidem afiliação; admin comum NÃO', () => {
+    const ownerPermissions = SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.OWNER]
+    const vicePermissions = SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.VICE]
+    const adminPermissions = SYSTEM_ROLE_PERMISSIONS[SYSTEM_ROLES.ADMIN]
+
+    expect(ownerPermissions).toContain(PERMISSIONS.AFFILIATION_MANAGE)
+    expect(vicePermissions).toContain(PERMISSIONS.AFFILIATION_MANAGE)
+    expect(adminPermissions).not.toContain(PERMISSIONS.AFFILIATION_MANAGE)
+  })
+})
+
 describe('rótulos de cargos de sistema por tipo de Sede', () => {
   it('cargo máximo: Presidente na Sede, Liderança em subsede/PDE', () => {
     expect(rotuloCargoMaximo('SEDE')).toBe('Presidente')

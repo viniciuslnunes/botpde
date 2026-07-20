@@ -4,6 +4,7 @@ import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { getDescendantTenantIds } from '@/lib/hierarquia'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
 type AuthzResult = {
@@ -126,6 +127,34 @@ export async function assertPresidenteGlobal(): Promise<AuthzResult> {
   if (!sede) throw new Error('Sem permissão')
 
   return { session, tenant }
+}
+
+type PresidenteLeituraUnidadeResult = AuthzResult & {
+  targetTenantId: string
+  readOnly: true
+}
+
+/**
+ * Drill-down read-only do Presidente (R1) sobre uma unidade descendente:
+ * exige `assertPresidenteGlobal` (tipo SEDE + TORCIDA_GLOBAL_VIEW) e que o
+ * tenant alvo esteja na árvore de descendentes da Sede. NUNCA autoriza
+ * mutação — o contrato devolve `readOnly: true` para os loaders da Fase 3.
+ */
+export async function assertPresidentePodeLerUnidade(
+  targetTenantId: string,
+): Promise<PresidenteLeituraUnidadeResult> {
+  const { session, tenant } = await assertPresidenteGlobal()
+
+  if (isSuperAdminEmail(session.user.email)) {
+    return { session, tenant, targetTenantId, readOnly: true as const }
+  }
+
+  const descendentes: string[] = await getDescendantTenantIds(tenant.id)
+  if (!descendentes.includes(targetTenantId)) {
+    throw new Error('Sem permissão')
+  }
+
+  return { session, tenant, targetTenantId, readOnly: true as const }
 }
 
 /** Leitura da loja (pedidos): STORE_VIEW_ORDERS ou STORE_MANAGE. */

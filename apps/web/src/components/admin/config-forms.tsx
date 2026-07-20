@@ -19,6 +19,7 @@ import {
   salvarAfiliacao,
   salvarBalancoFinanceiroVisivel,
   salvarBalancoDetalheNivel,
+  salvarHierarquiaVisivel,
   criarRole,
   atualizarRole,
   excluirRole,
@@ -207,6 +208,62 @@ export function BalancoVisivelForm({ visivel, detalheNivel }: BalancoVisivelForm
           ))}
         </fieldset>
       )}
+    </div>
+  )
+}
+
+// ── Hierarquia visível para as unidades (R3) ─────────────────────────────────
+
+interface HierarquiaVisivelFormProps {
+  visivel: boolean
+}
+
+export function HierarquiaVisivelForm({ visivel }: HierarquiaVisivelFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(visivel)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('hierarquiaVisivelParaFilhos', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarHierarquiaVisivel(fd), {
+        success: next
+          ? 'Subsedes e PDEs agora veem a hierarquia completa da torcida.'
+          : 'Subsedes e PDEs voltam a ver apenas a própria unidade.',
+      })
+      if (!ok) setAtivo(!next)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Por padrão, cada subsede e PDE com portal próprio enxerga apenas a sua
+        unidade (mais o conteúdo público da Sede). Ative para que elas vejam a
+        árvore completa da torcida — todas as unidades irmãs.
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ativo}
+          disabled={pending}
+          onChange={(e) => salvar(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Permitir que subsedes e PDEs vejam a hierarquia completa da torcida
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : ativo
+                ? 'Hierarquia completa visível para as unidades'
+                : 'Cada unidade vê só a si mesma'}
+          </span>
+        </span>
+      </label>
     </div>
   )
 }

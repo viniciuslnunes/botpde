@@ -2,12 +2,13 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, MessageSquare, Flag, Scale } from 'lucide-react'
+import { Settings, MessageSquare, Flag, Scale, Network } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   AfiliacaoForm,
   BalancoVisivelForm,
+  HierarquiaVisivelForm,
 } from '@/components/admin/config-forms'
 import type { Metadata } from 'next'
 
@@ -67,6 +68,13 @@ export default async function ConfiguracoesPage() {
       title: 'Balanço financeiro',
       description: 'Prestação de contas no portal — escolha o nível de detalhe público',
       ownerOnly: false,
+    },
+    {
+      id: 'hierarquia',
+      icon: Network,
+      title: 'Hierarquia da torcida',
+      description: 'Controle o que subsedes e PDEs enxergam da estrutura completa',
+      ownerOnly: true,
     },
   ]
 
@@ -133,6 +141,11 @@ export default async function ConfiguracoesPage() {
                       key={`${tenant.balancoFinanceiroVisivel}-${tenant.balancoDetalheNivel}`}
                       visivel={tenant.balancoFinanceiroVisivel}
                       detalheNivel={tenant.balancoDetalheNivel}
+                    />
+                  ) : section.id === 'hierarquia' ? (
+                    <HierarquiaVisivelForm
+                      key={String(tenant.hierarquiaVisivelParaFilhos)}
+                      visivel={tenant.hierarquiaVisivelParaFilhos}
                     />
                   ) : null}
                 </div>

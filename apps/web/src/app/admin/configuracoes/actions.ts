@@ -5,6 +5,7 @@ import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
+import { invalidateHierarchyCache } from '@/lib/hierarquia'
 import {
   ALL_PERMISSIONS,
   applyPermissionCascade,
@@ -162,6 +163,33 @@ export async function salvarBalancoDetalheNivel(formData: FormData) {
   revalidatePath('/admin/configuracoes')
   revalidatePath('/portal/balanco')
   invalidateTenantCache(tenant.slug)
+}
+
+/** R3 — permite que subsedes/PDEs descendentes vejam a hierarquia completa da torcida. */
+export async function salvarHierarquiaVisivel(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const visivel = formData.get('hierarquiaVisivelParaFilhos') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { hierarquiaVisivelParaFilhos: visivel },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_HIERARQUIA_VISIVEL_ATUALIZADA',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { visivel },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  invalidateHierarchyCache(tenant.id)
 }
 
 const afiliacaoSchema = z.object({

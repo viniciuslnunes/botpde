@@ -438,6 +438,20 @@ Testes: `pnpm --filter @torcida/web test` (suíte da VIN-6) continuam verdes,
 já que não tocam em `packages/types`. Nenhum teste cobre `assertPermission`
 em si (depende de sessão/banco) — cobertura por typecheck + smoke manual.
 
+**Invariante de tenant em mutações (trava R2 da governança hierárquica).** O
+`tenantId` de qualquer Server Action de mutação vem **sempre** do `tenant.id`
+retornado pelo assert (`assertPermission`/`assertAnyPermission`), **nunca** de um
+`tenantId` recebido pelo input (formData/Zod). É o que impede um ator de tenant
+descendente (subsede/PDE) de mutar dados do tenant ancestral (Sede) — a leitura do
+tenant ativo é derivada do vínculo de sócio aprovado do próprio ator
+(`getActiveTenant` em `lib/tenant.ts`), não do request. Exceções conscientes e
+auditadas: fluxos de **super-admin** (cross-tenant por definição, com gate
+`isSuperAdminEmail`) e o **self-service pré-membership** do onboarding
+(`solicitarVinculo`/`registrarInteresseUnidade`, onde o `tenantId` de input é o
+alvo que o próprio usuário escolhe e só cria registro PENDENTE do próprio usuário).
+Auditoria de 2026-07-20 (Fase 0 da governança hierárquica) não achou nenhuma
+mutação que viole o invariante. Ver `docs/data/proposta-governanca-hierarquica.md`.
+
 ### 5.4 Provedor de banco — Railway mantido; Prisma Postgres NÃO adotado (2026-07-07)
 
 Decisão de arquitetura de infra, avaliada com prioridade em custo baixo/zero,

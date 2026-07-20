@@ -208,6 +208,14 @@ model Tenant {
 
 
 
+  /// R3 — hierarquia opt-in: quando true, subsedes/PDEs descendentes enxergam a
+
+  /// worktree completa da torcida. Só a raiz SEDE consome este toggle.
+
+  hierarquiaVisivelParaFilhos Boolean @default(false) @map("hierarquia_visivel_para_filhos")
+
+
+
   // Tenant sintético: container de posts de torcedores globais do clube
 
   // (Comunidade Nacional). Sem Sede/Role/SaasMembro; nunca listado como torcida real.
@@ -1412,6 +1420,14 @@ model Sede {
   sedeReferenciaNome String? @map("sede_referencia_nome")
 
   sedeReferenciaSlug String? @map("sede_referencia_slug")
+
+
+
+  /// Canal (Conversa tipo CANAL) oficial da unidade — existe em Caso A e Caso B.
+
+  canalConversaId String? @unique @map("canal_conversa_id")
+
+  canalConversa   Conversa? @relation("SedeCanal", fields: [canalConversaId], references: [id], onDelete: SetNull)
 
 
 
@@ -3228,6 +3244,8 @@ model Conversa {
   posts     Post[]
 
   departamentoCanal Departamento? @relation("DepartamentoCanal")
+
+  sedeCanal Sede? @relation("SedeCanal")
 
 
 
