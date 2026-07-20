@@ -1,52 +1,53 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
-import { Check, Handshake, Loader2, Unlink, X } from 'lucide-react'
+import { useActionState, useState } from 'react'
+import { Check, Handshake, Loader2, MapPin, Pencil, Phone, X } from 'lucide-react'
 import {
-  aprovarAfiliacao,
-  encerrarAfiliacao,
-  recusarAfiliacao,
-  registrarPedidoAfiliacao,
-  type AfiliacaoActionState,
+  aprovarSolicitacao,
+  criarSolicitacaoManual,
+  editarSolicitacao,
+  recusarSolicitacao,
+  type SolicitacaoActionState,
 } from '@/app/admin/torcida/afiliacao-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 
-export interface AfiliacaoAdminView {
+export interface SolicitacaoView {
   id: string
-  status: 'PENDENTE' | 'ATIVA' | 'RECUSADA' | 'ENCERRADA'
-  unidadeNome: string
-  unidadeTipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
-  sedePaiNome: string | null
-  criadoEm: string
-  motivo: string | null
-}
-
-/** Uma unidade afiliável = tenant independente (via sua Sede raiz) + clube. */
-export interface UnidadeOption {
-  sedeId: string
-  tenantId: string
+  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+  torcidaNome: string
   nome: string
-  local: string | null
-  afiliacaoId: string | null
-  clubeNome: string | null
-  /** Já tem pedido PENDENTE/ATIVA como candidata (não pode abrir outro). */
-  ocupada: boolean
+  tipo: 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade: string
+  estado: string
+  endereco: string | null
+  contatoNome: string
+  contatoEmail: string | null
+  contatoTelefone: string | null
+  vinculo: string | null
+  observacao: string | null
+  provasUrls: string[]
+  motivo: string | null
+  criadoEm: string
 }
 
-const TIPO_LABEL: Record<AfiliacaoAdminView['unidadeTipo'], string> = {
-  SEDE: 'Sede',
+export interface TorcidaOption {
+  id: string
+  nome: string
+  clubeNome: string | null
+}
+
+const TIPO_LABEL: Record<SolicitacaoView['tipo'], string> = {
   SUBSEDE: 'Subsede',
   PONTO_ENCONTRO: 'PDE',
 }
 
-const STATUS_STYLE: Record<AfiliacaoAdminView['status'], string> = {
+const STATUS_STYLE: Record<SolicitacaoView['status'], string> = {
   PENDENTE: 'bg-amber-950/60 text-amber-200 border-amber-800',
-  ATIVA: 'bg-emerald-950/60 text-emerald-200 border-emerald-800',
+  APROVADA: 'bg-emerald-950/60 text-emerald-200 border-emerald-800',
   RECUSADA: 'bg-zinc-800 text-zinc-400 border-zinc-700',
-  ENCERRADA: 'bg-zinc-800 text-zinc-400 border-zinc-700',
 }
 
-function Feedback({ state }: { state: AfiliacaoActionState }) {
+function Feedback({ state }: { state: SolicitacaoActionState }) {
   if (!state.message) return null
   return (
     <p
@@ -58,263 +59,293 @@ function Feedback({ state }: { state: AfiliacaoActionState }) {
   )
 }
 
-function localSub(u: UnidadeOption): string {
-  return [u.clubeNome, u.local].filter(Boolean).join(' · ') || 'sem clube definido'
-}
-
-function RegistrarForm({ unidades }: { unidades: UnidadeOption[] }) {
-  const [state, action, pending] = useActionState<AfiliacaoActionState, FormData>(
-    registrarPedidoAfiliacao,
+function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
+  const [state, action, pending] = useActionState<SolicitacaoActionState, FormData>(
+    criarSolicitacaoManual,
     {},
   )
-  const [unidadeSedeId, setUnidadeSedeId] = useState<string | null>(null)
-  const [sedePaiTenantId, setSedePaiTenantId] = useState<string | null>(null)
-  const [mostrarMsg, setMostrarMsg] = useState(false)
+  const [tenantId, setTenantId] = useState<string | null>(null)
+  const [aberto, setAberto] = useState(false)
 
-  const porSede = useMemo(
-    () => new Map(unidades.map((u) => [u.sedeId, u])),
-    [unidades],
-  )
-  const unidadeSel = unidadeSedeId ? (porSede.get(unidadeSedeId) ?? null) : null
+  const torcidaOptions: ComboOption[] = torcidas.map((t) => ({
+    id: t.id,
+    label: t.nome,
+    sublabel: t.clubeNome ?? undefined,
+  }))
 
-  // Candidatas: só as não-ocupadas.
-  const candidatasOptions: ComboOption[] = useMemo(
-    () =>
-      unidades
-        .filter((u) => !u.ocupada)
-        .map((u) => ({ id: u.sedeId, label: u.nome, sublabel: localSub(u) })),
-    [unidades],
-  )
-
-  // Sede-mãe: só tenants do MESMO clube da candidata, exceto ela própria.
-  const sedesMaeOptions: ComboOption[] = useMemo(() => {
-    if (!unidadeSel) return []
-    return unidades
-      .filter(
-        (u) =>
-          u.afiliacaoId &&
-          u.afiliacaoId === unidadeSel.afiliacaoId &&
-          u.tenantId !== unidadeSel.tenantId,
-      )
-      .map((u) => ({ id: u.tenantId, label: u.nome, sublabel: u.local ?? '' }))
-  }, [unidades, unidadeSel])
-
-  useEffect(() => {
-    if (state.success) {
-      setUnidadeSedeId(null)
-      setSedePaiTenantId(null)
-    }
-  }, [state])
-
-  function trocarUnidade(id: string | null) {
-    setUnidadeSedeId(id)
-    setSedePaiTenantId(null) // clube pode mudar → zera a Sede-mãe
-    setMostrarMsg(false)
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+      >
+        <Handshake className="h-4 w-4" />
+        Registrar solicitação manualmente
+      </button>
+    )
   }
 
-  const semClube = Boolean(unidadeSel && !unidadeSel.afiliacaoId)
-
   return (
-    <form
-      action={action}
-      onSubmit={() => setMostrarMsg(true)}
-      className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
-    >
-      <div>
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-          <Handshake className="h-4 w-4" />
-          Registrar pedido de afiliação
-        </h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Intake do suporte. Busque a unidade (tenant próprio); a Sede-mãe é filtrada pelo mesmo
-          clube. Sem Sede-mãe, o super-admin adere direto.
-        </p>
+    <form action={action} className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-200">Registrar solicitação (intake manual)</h2>
+        <button
+          type="button"
+          onClick={() => setAberto(false)}
+          className="text-xs text-zinc-500 hover:text-zinc-300"
+        >
+          Fechar
+        </button>
       </div>
 
-      <input type="hidden" name="unidadeSedeId" value={unidadeSedeId ?? ''} />
-      <input type="hidden" name="sedePaiTenantId" value={sedePaiTenantId ?? ''} />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-400">Unidade candidata</label>
-          {candidatasOptions.length === 0 ? (
-            <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-amber-300">
-              Nenhuma unidade disponível para afiliar.
-            </p>
-          ) : (
-            <SearchableSelect
-              options={candidatasOptions}
-              value={unidadeSedeId}
-              onChange={trocarUnidade}
-              placeholder="Buscar torcida por nome ou cidade…"
-            />
-          )}
-          {unidadeSel && (
-            <p className="text-xs text-zinc-500">
-              Clube: {unidadeSel.clubeNome ?? '—'}
-              {semClube && ' · sem clube: só adesão pelo super-admin (sem Sede-mãe)'}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-400">Sede-mãe (opcional)</label>
+      <input type="hidden" name="tenantId" value={tenantId ?? ''} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="text-xs font-medium text-zinc-400">Torcida principal (Sede)</label>
           <SearchableSelect
-            options={sedesMaeOptions}
-            value={sedePaiTenantId}
-            onChange={(id) => {
-              setSedePaiTenantId(id)
-              setMostrarMsg(false)
-            }}
-            disabled={!unidadeSel || semClube}
-            placeholder={
-              !unidadeSel ? 'Escolha a unidade primeiro' : 'Buscar Sede-mãe do mesmo clube…'
-            }
-            emptyText="Nenhuma outra torcida do mesmo clube na plataforma."
+            options={torcidaOptions}
+            value={tenantId}
+            onChange={setTenantId}
+            placeholder="Buscar torcida por nome…"
           />
-          <p className="text-xs text-zinc-500">
-            {sedePaiTenantId
-              ? 'Presidente/Vice da Sede-mãe decidem.'
-              : 'Sem Sede-mãe: o super-admin adere direto.'}
-          </p>
         </div>
+        <Campo name="nome" label="Nome da unidade" placeholder="Ex.: Gaviões Praia Grande" />
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-400">Tipo</label>
+          <select
+            name="tipo"
+            defaultValue="PONTO_ENCONTRO"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500"
+          >
+            <option value="PONTO_ENCONTRO">Ponto de encontro / PDE</option>
+            <option value="SUBSEDE">Subsede</option>
+          </select>
+        </div>
+        <Campo name="cidade" label="Cidade" placeholder="Cidade" />
+        <Campo name="estado" label="UF" placeholder="SP" maxLength={2} />
+        <Campo name="endereco" label="Endereço (opcional)" placeholder="Rua, nº, bairro" wide />
+        <Campo name="contatoNome" label="Contato (liderança)" placeholder="Nome do responsável" wide />
       </div>
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || !unidadeSedeId}
+          disabled={pending || !tenantId}
           className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Registrar pedido
+          Registrar
         </button>
-        {mostrarMsg && <Feedback state={state} />}
+        <Feedback state={state} />
       </div>
     </form>
   )
 }
 
-function AfiliacaoRow({ afiliacao }: { afiliacao: AfiliacaoAdminView }) {
-  const [aprovarState, aprovarAction, aprovando] = useActionState<AfiliacaoActionState, FormData>(
-    aprovarAfiliacao,
-    {},
+function Campo({
+  name,
+  label,
+  placeholder,
+  maxLength,
+  wide,
+}: {
+  name: string
+  label: string
+  placeholder: string
+  maxLength?: number
+  wide?: boolean
+}) {
+  return (
+    <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
+      <label className="text-xs font-medium text-zinc-400">{label}</label>
+      <input
+        name={name}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-500"
+      />
+    </div>
   )
-  const [recusarState, recusarAction, recusando] = useActionState<AfiliacaoActionState, FormData>(
-    recusarAfiliacao,
-    {},
-  )
-  const [encerrarState, encerrarAction, encerrando] = useActionState<
-    AfiliacaoActionState,
-    FormData
-  >(encerrarAfiliacao, {})
+}
 
-  const ocupado = aprovando || recusando || encerrando
+function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
+  const [aprovarState, aprovarAction, aprovando] = useActionState<SolicitacaoActionState, FormData>(
+    aprovarSolicitacao,
+    {},
+  )
+  const [recusarState, recusarAction, recusando] = useActionState<SolicitacaoActionState, FormData>(
+    recusarSolicitacao,
+    {},
+  )
+  const [editarState, editarAction, editando] = useActionState<SolicitacaoActionState, FormData>(
+    editarSolicitacao,
+    {},
+  )
+  const [modo, setModo] = useState<'ver' | 'recusar' | 'editar'>('ver')
+
+  const ocupado = aprovando || recusando || editando
+  const pendente = s.status === 'PENDENTE'
 
   return (
     <li className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-zinc-200">{afiliacao.unidadeNome}</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            {TIPO_LABEL[afiliacao.unidadeTipo]}
-            {afiliacao.sedePaiNome ? ` → ${afiliacao.sedePaiNome}` : ' → sem Sede-mãe'}
+          <p className="truncate text-sm font-medium text-zinc-200">
+            {s.nome}
+            <span className="ml-1.5 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400">
+              {TIPO_LABEL[s.tipo]}
+            </span>
           </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+            <span>→ {s.torcidaNome}</span>
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {s.cidade}/{s.estado}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              {s.contatoNome}
+              {s.contatoTelefone ? ` · ${s.contatoTelefone}` : ''}
+              {s.contatoEmail ? ` · ${s.contatoEmail}` : ''}
+            </span>
+          </p>
+          {s.vinculo && <p className="mt-1 text-xs text-zinc-500">Credenciamento: {s.vinculo}</p>}
+          {s.provasUrls.length > 0 && (
+            <p className="mt-1 flex flex-wrap gap-2 text-xs">
+              {s.provasUrls.map((url, i) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-violet-400 hover:underline"
+                >
+                  prova {i + 1}
+                </a>
+              ))}
+            </p>
+          )}
+          {s.motivo && <p className="mt-1 text-xs text-zinc-500">Motivo: {s.motivo}</p>}
         </div>
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[afiliacao.status]}`}
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[s.status]}`}
         >
-          {afiliacao.status}
+          {s.status}
         </span>
       </div>
 
-      {afiliacao.motivo && <p className="mt-1 text-xs text-zinc-500">Motivo: {afiliacao.motivo}</p>}
-
-      {afiliacao.status === 'PENDENTE' && (
+      {pendente && modo === 'ver' && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <form action={aprovarAction}>
-            <input type="hidden" name="afiliacaoId" value={afiliacao.id} />
+            <input type="hidden" name="solicitacaoId" value={s.id} />
             <button
               type="submit"
               disabled={ocupado}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
               {aprovando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Aprovar
+              Aprovar e criar unidade
             </button>
           </form>
-          <form action={recusarAction} className="flex items-center gap-1.5">
-            <input type="hidden" name="afiliacaoId" value={afiliacao.id} />
-            <input
-              name="motivo"
-              required
-              minLength={3}
-              maxLength={500}
-              placeholder="Motivo da recusa"
-              className="w-40 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-red-500"
-            />
-            <button
-              type="submit"
-              disabled={ocupado}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-800 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-            >
-              {recusando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-              Recusar
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => setModo('editar')}
+            disabled={ocupado}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo('recusar')}
+            disabled={ocupado}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-800 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+          >
+            <X className="h-3.5 w-3.5" />
+            Recusar
+          </button>
         </div>
       )}
 
-      {afiliacao.status === 'ATIVA' && (
-        <form action={encerrarAction} className="mt-2 flex items-center gap-1.5">
-          <input type="hidden" name="afiliacaoId" value={afiliacao.id} />
+      {pendente && modo === 'recusar' && (
+        <form action={recusarAction} className="mt-2 flex items-center gap-1.5">
+          <input type="hidden" name="solicitacaoId" value={s.id} />
           <input
             name="motivo"
             required
             minLength={3}
             maxLength={500}
-            placeholder="Motivo do encerramento"
-            className="w-48 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-red-500"
+            placeholder="Motivo da recusa"
+            className="w-52 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-red-500"
           />
           <button
             type="submit"
             disabled={ocupado}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {encerrando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />}
-            Encerrar
+            Confirmar recusa
           </button>
+          <button type="button" onClick={() => setModo('ver')} className="text-xs text-zinc-500 hover:text-zinc-300">
+            Cancelar
+          </button>
+        </form>
+      )}
+
+      {pendente && modo === 'editar' && (
+        <form action={editarAction} className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input type="hidden" name="solicitacaoId" value={s.id} />
+          <input name="nome" defaultValue={s.nome} required minLength={3} maxLength={100} className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500" />
+          <select name="tipo" defaultValue={s.tipo} className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500">
+            <option value="PONTO_ENCONTRO">PDE</option>
+            <option value="SUBSEDE">Subsede</option>
+          </select>
+          <input name="cidade" defaultValue={s.cidade} required className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500" />
+          <input name="estado" defaultValue={s.estado} required maxLength={2} className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500" />
+          <input name="endereco" defaultValue={s.endereco ?? ''} placeholder="Endereço (opcional)" className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500 sm:col-span-2" />
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <button type="submit" disabled={ocupado} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
+              Salvar
+            </button>
+            <button type="button" onClick={() => setModo('ver')} className="text-xs text-zinc-500 hover:text-zinc-300">
+              Cancelar
+            </button>
+          </div>
         </form>
       )}
 
       <div className="mt-1 space-y-0.5">
         <Feedback state={aprovarState} />
         <Feedback state={recusarState} />
-        <Feedback state={encerrarState} />
+        <Feedback state={editarState} />
       </div>
     </li>
   )
 }
 
 export function AfiliacoesConsole({
-  afiliacoes,
-  unidades,
+  solicitacoes,
+  torcidas,
 }: {
-  afiliacoes: AfiliacaoAdminView[]
-  unidades: UnidadeOption[]
+  solicitacoes: SolicitacaoView[]
+  torcidas: TorcidaOption[]
 }) {
   return (
     <div className="space-y-6">
-      <RegistrarForm unidades={unidades} />
+      <CriarManualForm torcidas={torcidas} />
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h2 className="text-sm font-semibold text-zinc-200">Pedidos e vínculos</h2>
-        {afiliacoes.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">Nenhum pedido de afiliação registrado ainda.</p>
+        <h2 className="text-sm font-semibold text-zinc-200">Solicitações de unidade</h2>
+        {solicitacoes.length === 0 ? (
+          <p className="mt-2 text-sm text-zinc-500">
+            Nenhuma solicitação. Elas chegam do onboarding (&quot;Solicitar cadastro de unidade&quot;)
+            ou pelo registro manual acima.
+          </p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {afiliacoes.map((a) => (
-              <AfiliacaoRow key={a.id} afiliacao={a} />
+            {solicitacoes.map((s) => (
+              <SolicitacaoCard key={s.id} s={s} />
             ))}
           </ul>
         )}

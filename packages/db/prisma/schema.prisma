@@ -340,7 +340,7 @@ model Tenant {
 
   barCaixaTurnos          BarCaixaTurno[]
 
-  afiliacoesComoSedePai   AfiliacaoUnidade[]       @relation("AfiliacaoSedePai")
+  solicitacoesUnidade     SolicitacaoUnidade[]     @relation("TenantSolicitacoesUnidade")
 
 
   /// Config: exibir o balanço financeiro consolidado aos associados no portal.
@@ -522,11 +522,9 @@ model User {
   barCaixaTurnosAbertos        BarCaixaTurno[]        @relation("BarCaixaTurnoAbertoPor")
   barCaixaTurnosFechados       BarCaixaTurno[]        @relation("BarCaixaTurnoFechadoPor")
 
-  afiliacoesSolicitadas        AfiliacaoUnidade[]     @relation("AfiliacaoSolicitadaPor")
+  solicitacoesUnidadeFeitas    SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeSolicitante")
 
-  afiliacoesRecomendadas       AfiliacaoUnidade[]     @relation("AfiliacaoRecomendadaPor")
-
-  afiliacoesDecididas          AfiliacaoUnidade[]     @relation("AfiliacaoDecididaPor")
+  solicitacoesUnidadeDecididas SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeDecisor")
 
 
   @@map("saas_users")
@@ -1439,9 +1437,9 @@ model Sede {
 
 
 
-  /// Pedido/vínculo de afiliação desta unidade a uma Sede-mãe (Fase 2 governança).
+  /// Solicitação de unidade que originou esta Sede (quando veio de afiliação).
 
-  afiliacaoUnidade AfiliacaoUnidade? @relation("SedeAfiliacao")
+  solicitacaoUnidade SolicitacaoUnidade? @relation("SolicitacaoUnidadeSede")
 
 
 
@@ -1484,103 +1482,115 @@ enum TipoSede {
 
 
 
-// ─── AFILIAÇÃO DE UNIDADE (governança hierárquica — Fase 2) ──────────────────
-// Workflow R4: suporte registra → Vice recomenda → Presidente (owner) decide,
-// ou super-admin adere quando não há Sede administradora. 1:1 fino com o nó
-// Sede da unidade — NÃO duplica a árvore (Sede.sedeId segue sendo a aresta).
+// ─── SOLICITAÇÃO DE UNIDADE (afiliação de subsede/PDE à torcida) ─────────────
+// Nasce no onboarding ("Solicitar cadastro de unidade") para uma unidade que a
+// base ainda não conhece. Super-admin ou Presidente/Vice da torcida-alvo
+// revisam e, ao APROVAR, cria-se a Sede (SUBSEDE/PDE) sob a torcida = vínculo
+// formal. NÃO confundir com Alianca (torcidas-pares do mesmo clube).
 
 
 
-model AfiliacaoUnidade {
+model SolicitacaoUnidade {
 
   id String @id @default(uuid())
 
 
 
-  /// Nó Sede da unidade candidata (tenant próprio — Caso B).
+  /// Torcida principal (Sede) alvo do vínculo.
 
-  unidadeSedeId String @unique @map("unidade_sede_id")
+  tenantId String @map("tenant_id")
 
-  unidadeSede   Sede   @relation("SedeAfiliacao", fields: [unidadeSedeId], references: [id], onDelete: Cascade)
-
-
-
-  /// Tenant da Sede-mãe que decide. null = sem Sede administradora (super-admin adere).
-
-  sedePaiTenantId String? @map("sede_pai_tenant_id")
-
-  sedePaiTenant   Tenant? @relation("AfiliacaoSedePai", fields: [sedePaiTenantId], references: [id], onDelete: SetNull)
+  tenant   Tenant @relation("TenantSolicitacoesUnidade", fields: [tenantId], references: [id], onDelete: Cascade)
 
 
 
-  status      StatusAfiliacaoUnidade @default(PENDENTE)
+  nome   String
 
-  decididoPor DecisorAfiliacao       @map("decidido_por")
+  /// SUBSEDE | PONTO_ENCONTRO (nunca SEDE — validado na aplicação).
+
+  tipo   TipoSede @default(PONTO_ENCONTRO)
+
+  cidade String
+
+  estado String
+
+  endereco String?
+
+  regiao   String?
+
+
+
+  contatoNome     String  @map("contato_nome")
+
+  contatoEmail    String? @map("contato_email")
+
+  contatoTelefone String? @map("contato_telefone")
+
+
+
+  /// Como comprova o credenciamento (vínculo com a diretoria etc.).
+
+  vinculo    String?
+
+  observacao String?
+
+  provasUrls String[] @default([]) @map("provas_urls")
+
+
+
+  status StatusSolicitacaoUnidade @default(PENDENTE)
 
 
 
   solicitadoPorId String? @map("solicitado_por_id")
 
-  solicitadoPor   User?   @relation("AfiliacaoSolicitadaPor", fields: [solicitadoPorId], references: [id], onDelete: SetNull)
+  solicitadoPor   User?   @relation("SolicitacaoUnidadeSolicitante", fields: [solicitadoPorId], references: [id], onDelete: SetNull)
 
 
 
-  /// Vice recomenda (não finaliza) — o pedido permanece PENDENTE.
+  decididoPorId String?   @map("decidido_por_id")
 
-  recomendadoPorId String?   @map("recomendado_por_id")
+  decididoPor   User?     @relation("SolicitacaoUnidadeDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
 
-  recomendadoPor   User?     @relation("AfiliacaoRecomendadaPor", fields: [recomendadoPorId], references: [id], onDelete: SetNull)
+  decididoEm    DateTime? @map("decidido_em")
 
-  recomendadoEm    DateTime? @map("recomendado_em")
-
-
-
-  /// Presidente (owner) ou super-admin — peso final da decisão.
-
-  decididoPorId   String?   @map("decidido_por_id")
-
-  decididoPorUser User?     @relation("AfiliacaoDecididaPor", fields: [decididoPorId], references: [id], onDelete: SetNull)
-
-  decididoEm      DateTime? @map("decidido_em")
-
-
-
-  /// Justificativa de recusa/encerramento.
+  /// Justificativa da recusa.
 
   motivo String?
 
-  criadoEm DateTime @default(now()) @map("criado_em")
 
+
+  /// Sede criada ao aprovar (vínculo formal materializado).
+
+  sedeId String? @unique @map("sede_id")
+
+  sede   Sede?   @relation("SolicitacaoUnidadeSede", fields: [sedeId], references: [id], onDelete: SetNull)
+
+
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+
+
+  @@index([tenantId, status])
 
   @@index([status])
 
-  @@index([sedePaiTenantId, status])
-
-  @@map("saas_afiliacoes_unidade")
+  @@map("saas_solicitacoes_unidade")
 
 }
 
 
 
-enum StatusAfiliacaoUnidade {
+enum StatusSolicitacaoUnidade {
 
   PENDENTE
 
-  ATIVA
+  APROVADA
 
   RECUSADA
-
-  ENCERRADA
-
-}
-
-
-
-enum DecisorAfiliacao {
-
-  SEDE
-
-  SUPER_ADMIN
 
 }
 

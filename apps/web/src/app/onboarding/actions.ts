@@ -366,6 +366,28 @@ export async function registrarInteresseUnidade(input: {
     return { message: 'Torcida não encontrada.' }
   }
 
+  // Persiste a solicitação como fila gerenciável (super-admin / presidente).
+  // O e-mail abaixo continua como notificação de conveniência.
+  const solicitacao = await db.solicitacaoUnidade.create({
+    data: {
+      tenantId: tenant.id,
+      nome: parsed.data.nomeUnidade,
+      tipo: parsed.data.tipoUnidade,
+      cidade: parsed.data.cidade,
+      estado: parsed.data.estado,
+      endereco: parsed.data.endereco ?? null,
+      regiao: parsed.data.regiao ?? null,
+      contatoNome: parsed.data.contatoNome,
+      contatoEmail: parsed.data.contatoEmail ?? null,
+      contatoTelefone: parsed.data.contatoTelefone ?? null,
+      vinculo: parsed.data.vinculo,
+      observacao: parsed.data.observacao ?? null,
+      provasUrls: parsed.data.provasUrls,
+      solicitadoPorId: session.user.id,
+    },
+    select: { id: true },
+  })
+
   const assunto = `[Onboarding] Unidade não listada — ${parsed.data.nomeUnidade} (${tenant.nome})`
   const tipoLabel = parsed.data.tipoUnidade === 'SUBSEDE' ? 'Subsede' : 'Ponto de encontro'
   const superAdminEmails = getSuperAdminEmails()
@@ -407,7 +429,8 @@ export async function registrarInteresseUnidade(input: {
       tenantId: tenant.id,
       atorId: session.user.id,
       acao: 'UNIDADE_CADASTRO_SOLICITADO',
-      entidade: 'Sede',
+      entidade: 'SolicitacaoUnidade',
+      entidadeId: solicitacao.id,
       detalhes: {
         regiao: parsed.data.regiao ?? null,
         nomeUnidade: parsed.data.nomeUnidade,

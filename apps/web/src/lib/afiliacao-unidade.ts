@@ -1,85 +1,53 @@
 /**
- * Máquina de estados da afiliação de unidade (governança hierárquica — Fase 2).
- * Lógica pura, sem banco: decide quem pode transitar e para qual status.
- * Ver docs/data/proposta-governanca-hierarquica.md §9.
+ * Máquina de estados da SOLICITAÇÃO de unidade (afiliação de subsede/PDE à
+ * torcida). Lógica pura, sem banco. Ver docs/data/proposta-governanca-hierarquica.md.
  *
- * - PENDENTE: Vice pode RECOMENDAR (permanece PENDENTE — não finaliza).
- * - PENDENTE → ATIVA / RECUSADA: só owner (Presidente) ou super-admin —
- *   "peso final do Presidente" é lógica de workflow, não RBAC.
- * - ATIVA → ENCERRADA: owner ou super-admin, com motivo.
+ * Nasce PENDENTE (onboarding "Solicitar cadastro de unidade"). Só o Presidente
+ * (owner) da torcida-alvo ou o super-admin DECIDEM — "peso final do Presidente"
+ * é workflow, não RBAC. Aprovar cria a Sede (SUBSEDE/PDE) sob a torcida.
  */
 
-export type StatusAfiliacaoUnidade = 'PENDENTE' | 'ATIVA' | 'RECUSADA' | 'ENCERRADA'
+export type StatusSolicitacaoUnidade = 'PENDENTE' | 'APROVADA' | 'RECUSADA'
 
-export type AcaoAfiliacao = 'recomendar' | 'aprovar' | 'recusar' | 'encerrar'
+export type AcaoSolicitacao = 'aprovar' | 'recusar'
 
-export interface AtorAfiliacao {
+export interface AtorSolicitacao {
   /** Permissão efetiva AFFILIATION_MANAGE (owner + vice; admin comum não tem). */
   temAffiliationManage: boolean
-  /** Cargo de sistema 'owner' no tenant da Sede-mãe (Presidente). */
+  /** Cargo de sistema 'owner' no tenant da torcida-alvo (Presidente). */
   isOwner: boolean
   /** E-mail na lista de super-admins da plataforma. */
   isSuperAdmin: boolean
 }
 
-export type TransicaoAfiliacao =
-  | { ok: true; status: StatusAfiliacaoUnidade }
+export type TransicaoSolicitacao =
+  | { ok: true; status: StatusSolicitacaoUnidade }
   | { ok: false; erro: string }
 
 /** Peso final: só Presidente (owner com AFFILIATION_MANAGE) ou super-admin decidem. */
-export function podeDecidirAfiliacao(ator: AtorAfiliacao): boolean {
+export function podeDecidirSolicitacao(ator: AtorSolicitacao): boolean {
   return ator.isSuperAdmin || (ator.temAffiliationManage && ator.isOwner)
 }
 
-export function transicionarAfiliacao(
-  status: StatusAfiliacaoUnidade,
-  acao: AcaoAfiliacao,
-  ator: AtorAfiliacao,
-): TransicaoAfiliacao {
-  switch (acao) {
-    case 'recomendar': {
-      if (!ator.isSuperAdmin && !ator.temAffiliationManage) {
-        return { ok: false, erro: 'Sem permissão para recomendar afiliações.' }
-      }
-      if (status !== 'PENDENTE') {
-        return { ok: false, erro: 'Só pedidos pendentes podem ser recomendados.' }
-      }
-      // Recomendação do Vice NÃO finaliza — o pedido permanece PENDENTE.
-      return { ok: true, status: 'PENDENTE' }
-    }
-    case 'aprovar': {
-      if (!podeDecidirAfiliacao(ator)) {
-        return { ok: false, erro: 'Só o Presidente (owner) ou o suporte podem aprovar a afiliação.' }
-      }
-      if (status !== 'PENDENTE') {
-        return { ok: false, erro: 'Só pedidos pendentes podem ser aprovados.' }
-      }
-      return { ok: true, status: 'ATIVA' }
-    }
-    case 'recusar': {
-      if (!podeDecidirAfiliacao(ator)) {
-        return { ok: false, erro: 'Só o Presidente (owner) ou o suporte podem recusar a afiliação.' }
-      }
-      if (status !== 'PENDENTE') {
-        return { ok: false, erro: 'Só pedidos pendentes podem ser recusados.' }
-      }
-      return { ok: true, status: 'RECUSADA' }
-    }
-    case 'encerrar': {
-      if (!podeDecidirAfiliacao(ator)) {
-        return { ok: false, erro: 'Só o Presidente (owner) ou o suporte podem encerrar o vínculo.' }
-      }
-      if (status !== 'ATIVA') {
-        return { ok: false, erro: 'Só vínculos ativos podem ser encerrados.' }
-      }
-      return { ok: true, status: 'ENCERRADA' }
+export function transicionarSolicitacao(
+  status: StatusSolicitacaoUnidade,
+  acao: AcaoSolicitacao,
+  ator: AtorSolicitacao,
+): TransicaoSolicitacao {
+  if (!podeDecidirSolicitacao(ator)) {
+    return {
+      ok: false,
+      erro: 'Só o Presidente (owner) da torcida ou o super-admin podem decidir a solicitação.',
     }
   }
+  if (status !== 'PENDENTE') {
+    return { ok: false, erro: 'Só solicitações pendentes podem ser decididas.' }
+  }
+  return { ok: true, status: acao === 'aprovar' ? 'APROVADA' : 'RECUSADA' }
 }
 
-export const STATUS_AFILIACAO_LABEL: Record<StatusAfiliacaoUnidade, string> = {
+export const STATUS_SOLICITACAO_LABEL: Record<StatusSolicitacaoUnidade, string> = {
   PENDENTE: 'Pendente',
-  ATIVA: 'Ativa',
+  APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
-  ENCERRADA: 'Encerrada',
 }

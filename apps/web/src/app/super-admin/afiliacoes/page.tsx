@@ -5,36 +5,35 @@ import { auth } from '@/lib/auth'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import {
   AfiliacoesConsole,
-  type AfiliacaoAdminView,
-  type UnidadeOption,
+  type SolicitacaoView,
+  type TorcidaOption,
 } from './afiliacoes-console'
 
 export const metadata: Metadata = { title: 'Afiliações — Super Admin' }
 
-interface AfiliacaoRow {
+interface SolicitacaoRow {
   id: string
-  status: 'PENDENTE' | 'ATIVA' | 'RECUSADA' | 'ENCERRADA'
-  criadoEm: Date
+  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+  nome: string
+  tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade: string
+  estado: string
+  endereco: string | null
+  contatoNome: string
+  contatoEmail: string | null
+  contatoTelefone: string | null
+  vinculo: string | null
+  observacao: string | null
+  provasUrls: string[]
   motivo: string | null
-  unidadeSede: { nome: string; tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO' }
-  sedePaiTenant: { nome: string } | null
+  criadoEm: Date
+  tenant: { nome: string }
 }
 
-interface SedeRaizRow {
+interface TorcidaRow {
   id: string
-  cidade: string | null
-  estado: string | null
-  tenant: {
-    id: string
-    nome: string
-    afiliacaoId: string | null
-    afiliacao: { nome: string } | null
-  } | null
-}
-
-function formatLocal(cidade: string | null, estado: string | null): string | null {
-  if (cidade && estado) return `${cidade}/${estado}`
-  return cidade ?? estado ?? null
+  nome: string
+  afiliacao: { nome: string } | null
 }
 
 export default async function AfiliacoesSuperAdminPage() {
@@ -43,82 +42,73 @@ export default async function AfiliacoesSuperAdminPage() {
     redirect('/')
   }
 
-  const [afiliacoesRows, sedesRaiz, sedeIdsOcupadosRows]: [
-    AfiliacaoRow[],
-    SedeRaizRow[],
-    { unidadeSedeId: string }[],
-  ] = await Promise.all([
-    db.afiliacaoUnidade.findMany({
+  const [solicitacoesRows, torcidasRows]: [SolicitacaoRow[], TorcidaRow[]] = await Promise.all([
+    db.solicitacaoUnidade.findMany({
       orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
       select: {
         id: true,
         status: true,
-        criadoEm: true,
-        motivo: true,
-        unidadeSede: { select: { nome: true, tipo: true } },
-        sedePaiTenant: { select: { nome: true } },
-      },
-    }),
-    // Sede RAIZ (tipo SEDE) de cada tenant independente, com clube (afiliação).
-    db.sede.findMany({
-      where: { tipo: 'SEDE', ativa: true, tenant: { ativo: true, sintetico: false } },
-      orderBy: { nome: 'asc' },
-      select: {
-        id: true,
+        nome: true,
+        tipo: true,
         cidade: true,
         estado: true,
-        tenant: {
-          select: {
-            id: true,
-            nome: true,
-            afiliacaoId: true,
-            afiliacao: { select: { nome: true } },
-          },
-        },
+        endereco: true,
+        contatoNome: true,
+        contatoEmail: true,
+        contatoTelefone: true,
+        vinculo: true,
+        observacao: true,
+        provasUrls: true,
+        motivo: true,
+        criadoEm: true,
+        tenant: { select: { nome: true } },
       },
     }),
-    db.afiliacaoUnidade.findMany({
-      where: { status: { in: ['PENDENTE', 'ATIVA'] } },
-      select: { unidadeSedeId: true },
+    db.tenant.findMany({
+      where: { ativo: true, sintetico: false },
+      orderBy: { nome: 'asc' },
+      select: { id: true, nome: true, afiliacao: { select: { nome: true } } },
     }),
   ])
 
-  const sedeIdsOcupados = new Set(sedeIdsOcupadosRows.map((r) => r.unidadeSedeId))
-
-  const afiliacoes: AfiliacaoAdminView[] = afiliacoesRows.map((a) => ({
-    id: a.id,
-    status: a.status,
-    unidadeNome: a.unidadeSede.nome,
-    unidadeTipo: a.unidadeSede.tipo,
-    sedePaiNome: a.sedePaiTenant?.nome ?? null,
-    criadoEm: a.criadoEm.toISOString(),
-    motivo: a.motivo,
-  }))
-
-  const unidades: UnidadeOption[] = sedesRaiz
-    .filter((s): s is SedeRaizRow & { tenant: NonNullable<SedeRaizRow['tenant']> } =>
-      Boolean(s.tenant),
-    )
+  const solicitacoes: SolicitacaoView[] = solicitacoesRows
+    .filter((s): s is SolicitacaoRow & { tipo: 'SUBSEDE' | 'PONTO_ENCONTRO' } => s.tipo !== 'SEDE')
     .map((s) => ({
-      sedeId: s.id,
-      tenantId: s.tenant.id,
-      nome: s.tenant.nome,
-      local: formatLocal(s.cidade, s.estado),
-      afiliacaoId: s.tenant.afiliacaoId,
-      clubeNome: s.tenant.afiliacao?.nome ?? null,
-      ocupada: sedeIdsOcupados.has(s.id),
+      id: s.id,
+      status: s.status,
+      torcidaNome: s.tenant.nome,
+      nome: s.nome,
+      tipo: s.tipo,
+      cidade: s.cidade,
+      estado: s.estado,
+      endereco: s.endereco,
+      contatoNome: s.contatoNome,
+      contatoEmail: s.contatoEmail,
+      contatoTelefone: s.contatoTelefone,
+      vinculo: s.vinculo,
+      observacao: s.observacao,
+      provasUrls: s.provasUrls,
+      motivo: s.motivo,
+      criadoEm: s.criadoEm.toISOString(),
     }))
+
+  const torcidas: TorcidaOption[] = torcidasRows.map((t) => ({
+    id: t.id,
+    nome: t.nome,
+    clubeNome: t.afiliacao?.nome ?? null,
+  }))
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Afiliações de unidades</h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Intake do suporte e adesão do super-admin. Quando há Sede-mãe, o Presidente/Vice também
-          decidem no console da torcida; o super-admin adere quando não há Sede administradora.
+          Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui.
+          Ao aprovar, a unidade é criada sob a torcida. Presidente/Vice também decidem no console da
+          torcida.
         </p>
       </div>
-      <AfiliacoesConsole afiliacoes={afiliacoes} unidades={unidades} />
+      <AfiliacoesConsole solicitacoes={solicitacoes} torcidas={torcidas} />
     </div>
   )
 }

@@ -1,7 +1,8 @@
 # Proposta — Governança Hierárquica (Sede → Subsede → PDE)
 
 > Status: **em implementação** (branch `feat/governanca-hierarquica-fase1`).
-> Fase 0+1 e Fase 2 (afiliação — vincular tenant existente) concluídas. Fase 3
+> Fase 0+1 e Fase 2 (afiliação = **solicitação de subsede/PDE** vinda do
+> onboarding; aprovar cria a Sede — ver §9) concluídas. Fase 3
 > (console R1 read-only por módulo) **iniciada**: scaffold do drill-down
 > `/admin/torcida/unidade/[tenantId]` (gate `assertPresidentePodeLerUnidade`) +
 > módulo **Financeiro** (reuso de loaders + `podeGerir={false}`) + link "Ver
@@ -234,75 +235,90 @@ Riscos que continuam:
 - `ux-review` — jornada do console top-down e do portal da subsede.
 - `qa-verification` — antes de dar por pronto (authz no servidor, estados, Vitest).
 
-## 9. Desenho fechado da Fase 2 (afiliação — vincular tenant existente)
+## 9. Desenho fechado da Fase 2 (afiliação = solicitação de subsede/PDE)
 
-Decisão de materialização (confirmada 2026-07-20): **vincular tenant existente**.
-A unidade candidata já fez seu próprio onboarding (é um tenant com seu nó `Sede`).
-Aprovar a afiliação **não** cria tenant nem migra membros — só estabelece a aresta
-pai-filho na árvore e liga o canal.
+**Correção de abstração (2026-07-20).** A 1ª versão modelava afiliação como
+`AfiliacaoUnidade` ligando **tenant↔tenant** — o que tratava torcidas-pares
+(coirmãs do mesmo clube: Gaviões, Camisa 12, Fiel Macabra…) como se uma fosse
+subsede da outra. **Errado**: coirmãs são organizadas independentes (domínio de
+`Alianca`, não afiliação). Afiliação é o vínculo de uma **subsede/PDE** (unidade
+local) com a **sua torcida principal (Sede)**.
 
-### Modelo (schema.prisma — Fase 2)
+Dois caminhos distintos:
+- **Unidade que já existe na base** → não é afiliação nova; para dar portal com
+  acesso admin à liderança local, **transferir a propriedade** (owner) —
+  `transferirOwnerAction` (super-admin). Promoção A→B.
+- **Unidade nova (base não conhece)** → entra pelo onboarding **"Solicitar
+  cadastro de unidade"** (`registrarInteresseUnidade`) → vira uma
+  **`SolicitacaoUnidade`** persistida → super-admin ou Presidente da torcida-alvo
+  revisa/edita/decide → **aprovar cria a `Sede` (SUBSEDE/PDE)** sob a torcida.
+
+### Modelo (schema.prisma)
 
 ```prisma
-model AfiliacaoUnidade {
-  id               String   @id @default(uuid())
-  unidadeSedeId    String   @unique @map("unidade_sede_id")   // nó Sede da unidade
-  unidadeSede      Sede     @relation("SedeAfiliacao", fields: [unidadeSedeId], references: [id], onDelete: Cascade)
-  sedePaiTenantId  String?  @map("sede_pai_tenant_id")        // null = decidido por super-admin
-  sedePaiTenant    Tenant?  @relation("AfiliacaoSedePai", fields: [sedePaiTenantId], references: [id], onDelete: SetNull)
-  status           StatusAfiliacaoUnidade @default(PENDENTE)
-  decididoPor      DecisorAfiliacao       @map("decidido_por")
-  solicitadoPorId  String?   @map("solicitado_por_id")
-  recomendadoPorId String?   @map("recomendado_por_id")       // Vice (não finaliza)
-  recomendadoEm    DateTime? @map("recomendado_em")
-  decididoPorId    String?   @map("decidido_por_id")          // Presidente/super-admin
-  decididoEm       DateTime? @map("decidido_em")
-  motivo           String?                                    // justificativa recusa/encerramento
-  criadoEm         DateTime  @default(now()) @map("criado_em")
-  // relations User: solicitadoPor, recomendadoPor, decididoPor (todas SetNull)
+model SolicitacaoUnidade {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")           // torcida-alvo (Sede)
+  tenant   Tenant @relation("TenantSolicitacoesUnidade", fields: [tenantId], references: [id], onDelete: Cascade)
+  nome     String
+  tipo     TipoSede @default(PONTO_ENCONTRO)   // SUBSEDE | PONTO_ENCONTRO (nunca SEDE)
+  cidade   String
+  estado   String
+  endereco String?
+  regiao   String?
+  contatoNome     String  @map("contato_nome")
+  contatoEmail    String? @map("contato_email")
+  contatoTelefone String? @map("contato_telefone")
+  vinculo    String?                            // credenciamento
+  observacao String?
+  provasUrls String[] @default([]) @map("provas_urls")
+  status StatusSolicitacaoUnidade @default(PENDENTE)
+  solicitadoPorId String? @map("solicitado_por_id")   // relations User SetNull
+  decididoPorId   String? @map("decidido_por_id")
+  decididoEm      DateTime? @map("decidido_em")
+  motivo          String?                              // justificativa da recusa
+  sedeId String? @unique @map("sede_id")               // Sede criada ao aprovar
+  sede   Sede?   @relation("SolicitacaoUnidadeSede", fields: [sedeId], references: [id], onDelete: SetNull)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+  @@index([tenantId, status])
   @@index([status])
-  @@index([sedePaiTenantId, status])
-  @@map("saas_afiliacoes_unidade")
+  @@map("saas_solicitacoes_unidade")
 }
-enum StatusAfiliacaoUnidade { PENDENTE ATIVA RECUSADA ENCERRADA }
-enum DecisorAfiliacao { SEDE SUPER_ADMIN }
+enum StatusSolicitacaoUnidade { PENDENTE APROVADA RECUSADA }
 ```
 
-### Máquina de estados e quem pode transitar
+### Máquina de estados (`lib/afiliacao-unidade.ts`, pura)
 
-- `PENDENTE` → suporte/super-admin registrou. Vice pode **recomendar** (grava
-  `recomendadoPor*`, **permanece PENDENTE**). Gate: `AFFILIATION_MANAGE`.
-- `PENDENTE → ATIVA` (aprovar) — só **owner** quando `decididoPor = SEDE`;
-  **super-admin** sempre (bypass). "Peso final do Presidente" = lógica do handler,
-  não permissão. Dispara a materialização (abaixo).
-- `PENDENTE → RECUSADA` — owner/super-admin, com `motivo`.
-- `ATIVA → ENCERRADA` — owner/super-admin (desfaz o vínculo; desliga o auto-vínculo
-  do canal setando `saiuEm`, sem hard delete).
+- Nasce `PENDENTE` (onboarding ou intake manual do super-admin).
+- `PENDENTE → APROVADA` / `RECUSADA` — só **owner** da torcida-alvo (peso final,
+  via `assertTenantOwner`) **ou super-admin** (bypass). Vice tem
+  `AFFILIATION_MANAGE` mas **não decide** (peso final é do Presidente). Editar
+  (nome/tipo/cidade/UF/endereço) enquanto PENDENTE: owner ou super-admin.
+- Ator não-super-admin só mexe em solicitações do **próprio** tenant.
 
-### Materialização ao aprovar (ATIVA)
+### Materialização ao aprovar (`lib/afiliacao.ts`, na transação)
 
-1. Encaixar o nó `Sede` da unidade sob a raiz `Sede` da Sede-mãe: setar
-   `unidadeSede.sedeId = <id da Sede raiz do sedePaiTenant>` — **após**
-   `wouldCreateSedeCycle` (hierarquia.ts) retornar false.
-2. Auto-provisionar o canal oficial da unidade (se ainda não houver): `Conversa`
-   `tipo: CANAL`, `canalOficial: true`, `institucional: true`,
-   `visibilidadeCanal: HIERARQUIA`, `somenteAdminPublica: true`, `tenantId` = tenant
-   da unidade; gravar id em `Sede.canalConversaId`.
-3. Auto-vincular membros: backfill dos `SaasMembro` APROVADOS da unidade em
-   `MembroConversa` (upsert idempotente pela `@@unique([conversaId, userId])`), e
-   adicionar o gancho em `aprovarMembro` para novos membros. **Nunca em GET.**
-4. `AuditLog` em toda transição (ator, ação, entidade `AfiliacaoUnidade`, id, detalhes).
+1. Cria a `Sede` `{ tenantId, nome, tipo, cidade, estado, endereco }` ancorada na
+   Sede raiz (tipo SEDE) da torcida (`sedeId = raiz.id`).
+2. Provisiona o canal oficial da unidade (`Conversa` CANAL `canalOficial`
+   `institucional` `HIERARQUIA` `somenteAdminPublica`) no tenant da torcida;
+   grava o id em `Sede.canalConversaId` (fecha o gap Caso A — ponteiro no nó Sede).
+3. `SolicitacaoUnidade.sedeId` = Sede criada; status APROVADA; `AuditLog`.
+   Portal com acesso admin (owner local) = passo à parte (transferência de owner).
 
-### UI mínima
+### UI
 
-- **Super-admin** (`/super-admin/...`): lista de `AfiliacaoUnidade` de todos os
-  tenants + registrar/aprovar/recusar/executar adesão (quando não há Sede).
-- **Sede** (`/admin/torcida`, gate `AFFILIATION_MANAGE`): fila "Pedidos de afiliação"
-  com card do candidato + Recomendar (Vice) / Aprovar·Recusar (Presidente/owner).
-- Estados vazio/erro/loading cobertos (convenção UX).
+- **Super-admin** (`/super-admin/afiliacoes`): fila de `SolicitacaoUnidade` de
+  todas as torcidas + editar/aprovar/recusar + **intake manual** (busca a
+  torcida-alvo com autocomplete e cria a solicitação).
+- **Presidente** (`/admin/torcida`, gate `AFFILIATION_MANAGE`): fila
+  "Solicitações de afiliação" da **sua** torcida; owner aprova/recusa/edita.
+- Onboarding `registrarInteresseUnidade` **persiste** a `SolicitacaoUnidade`
+  (além do e-mail de conveniência).
 
 ### Fora do MVP (adiado)
 
-Promoção completa Caso A→B (criar tenant novo + cargos de sistema + migrar membros
-de uma linha `Sede` intra-tenant) — só quando houver demanda. `Sede.canalConversaId`
-e a árvore já deixam o terreno pronto.
+Transferência de owner / promoção A→B para dar portal admin à liderança local a
+partir de uma `Sede` já criada. Auto-vínculo de membros ao canal em
+`aprovarMembro` continua valendo (Fase 1).

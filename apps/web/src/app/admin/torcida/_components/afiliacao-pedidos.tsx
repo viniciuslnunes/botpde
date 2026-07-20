@@ -1,26 +1,29 @@
 import { db } from '@torcida/db'
 import { Handshake } from 'lucide-react'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { AfiliacaoPedidoCard, type AfiliacaoPedidoView } from './afiliacao-pedido-card'
+import { AfiliacaoPedidoCard, type SolicitacaoView } from './afiliacao-pedido-card'
 
-interface AfiliacaoRow {
+interface SolicitacaoRow {
   id: string
-  status: 'PENDENTE' | 'ATIVA' | 'RECUSADA' | 'ENCERRADA'
+  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+  nome: string
+  tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade: string
+  estado: string
+  endereco: string | null
+  contatoNome: string
+  contatoEmail: string | null
+  contatoTelefone: string | null
+  vinculo: string | null
+  provasUrls: string[]
+  motivo: string | null
   criadoEm: Date
-  recomendadoEm: Date | null
-  recomendadoPor: { nome: string | null } | null
-  unidadeSede: {
-    nome: string
-    tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
-    cidade: string | null
-    estado: string | null
-  }
 }
 
 /**
- * Fila "Pedidos de afiliação" da Sede (Fase 2 — proposta §9). Gate feito na
- * página (AFFILIATION_MANAGE — a seção some para quem não tem). Recomendar é
- * de qualquer AFFILIATION_MANAGE; Aprovar/Recusar/Encerrar só owner/super-admin.
+ * Fila "Solicitações de afiliação" da torcida (proposta §9). Gate na página
+ * (AFFILIATION_MANAGE). Decidir (aprovar/recusar/editar) só owner/super-admin
+ * (`podeDecidir`). Mostra pendentes + as recém-aprovadas.
  */
 export async function AfiliacaoPedidos({
   tenantId,
@@ -29,20 +32,26 @@ export async function AfiliacaoPedidos({
   tenantId: string
   podeDecidir: boolean
 }) {
-  let rows: AfiliacaoRow[]
+  let rows: SolicitacaoRow[]
   try {
-    rows = await db.afiliacaoUnidade.findMany({
-      where: { sedePaiTenantId: tenantId, status: { in: ['PENDENTE', 'ATIVA'] } },
+    rows = await db.solicitacaoUnidade.findMany({
+      where: { tenantId, status: { in: ['PENDENTE', 'APROVADA'] } },
       orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
       select: {
         id: true,
         status: true,
+        nome: true,
+        tipo: true,
+        cidade: true,
+        estado: true,
+        endereco: true,
+        contatoNome: true,
+        contatoEmail: true,
+        contatoTelefone: true,
+        vinculo: true,
+        provasUrls: true,
+        motivo: true,
         criadoEm: true,
-        recomendadoEm: true,
-        recomendadoPor: { select: { nome: true } },
-        unidadeSede: {
-          select: { nome: true, tipo: true, cidade: true, estado: true },
-        },
       },
     })
   } catch {
@@ -50,23 +59,30 @@ export async function AfiliacaoPedidos({
       <section className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <SectionHeader />
         <p className="mt-3 text-sm text-red-600 dark:text-red-400">
-          Não foi possível carregar os pedidos de afiliação. Recarregue a página.
+          Não foi possível carregar as solicitações de afiliação. Recarregue a página.
         </p>
       </section>
     )
   }
 
-  const pedidos: AfiliacaoPedidoView[] = rows.map((row) => ({
-    id: row.id,
-    status: row.status === 'ATIVA' ? 'ATIVA' : 'PENDENTE',
-    unidadeNome: row.unidadeSede.nome,
-    unidadeTipo: row.unidadeSede.tipo,
-    cidade: row.unidadeSede.cidade,
-    estado: row.unidadeSede.estado,
-    criadoEm: row.criadoEm.toISOString(),
-    recomendadoEm: row.recomendadoEm ? row.recomendadoEm.toISOString() : null,
-    recomendadoPorNome: row.recomendadoPor?.nome ?? null,
-  }))
+  const pedidos: SolicitacaoView[] = rows
+    .filter((r): r is SolicitacaoRow & { tipo: 'SUBSEDE' | 'PONTO_ENCONTRO' } => r.tipo !== 'SEDE')
+    .map((r) => ({
+      id: r.id,
+      status: r.status,
+      nome: r.nome,
+      tipo: r.tipo,
+      cidade: r.cidade,
+      estado: r.estado,
+      endereco: r.endereco,
+      contatoNome: r.contatoNome,
+      contatoEmail: r.contatoEmail,
+      contatoTelefone: r.contatoTelefone,
+      vinculo: r.vinculo,
+      provasUrls: r.provasUrls,
+      motivo: r.motivo,
+      criadoEm: r.criadoEm.toISOString(),
+    }))
 
   return (
     <MotionReveal index={4}>
@@ -74,8 +90,8 @@ export async function AfiliacaoPedidos({
         <SectionHeader />
         {pedidos.length === 0 ? (
           <p className="mt-3 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum pedido de afiliação no momento. Pedidos registrados pelo suporte aparecem
-            aqui para recomendação do Vice e decisão do Presidente.
+            Nenhuma solicitação de afiliação no momento. Subsedes e PDEs que pedem cadastro pelo
+            onboarding aparecem aqui para a decisão do Presidente.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -95,11 +111,10 @@ function SectionHeader() {
       <Handshake className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Pedidos de afiliação
+          Solicitações de afiliação
         </h2>
         <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-          Unidades com portal próprio pedindo vínculo à Sede — o Vice recomenda, o
-          Presidente decide.
+          Subsedes e PDEs pedindo vínculo com a torcida — o Presidente aprova e a unidade é criada.
         </p>
       </div>
     </div>
