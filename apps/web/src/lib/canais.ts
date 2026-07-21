@@ -22,6 +22,7 @@ import {
 } from './feed'
 import type {
   CanalItem,
+  CandidatoMembroCanalItem,
   MembroCanalItem,
   PedidoCanalItem,
   UnidadeBuscaItem,
@@ -30,6 +31,7 @@ import type {
 
 export type {
   CanalItem,
+  CandidatoMembroCanalItem,
   MembroCanalItem,
   PedidoCanalItem,
   UnidadeBuscaItem,
@@ -412,7 +414,7 @@ export async function listMembrosCanal(conversaId: string): Promise<MembroCanalI
     papel: 'ADMIN' | 'MEMBRO'
     user: { nome: string | null; avatarUrl: string | null }
   }> = await db.membroConversa.findMany({
-    where: { conversaId, saiuEm: null },
+    where: { conversaId, saiuEm: null, status: 'ATIVO' },
     orderBy: [{ papel: 'asc' }],
     select: {
       userId: true,
@@ -426,6 +428,35 @@ export async function listMembrosCanal(conversaId: string): Promise<MembroCanalI
     avatarUrl: row.user.avatarUrl,
     papel: row.papel,
   }))
+}
+
+/**
+ * Membros aprovados do tenant do canal, elegíveis pra adicionar direto (sem
+ * esperar pedido) num canal fechado. Exclui quem já está ativo no canal.
+ */
+export async function listCandidatosMembroCanal(
+  tenantId: string,
+  conversaId: string,
+): Promise<CandidatoMembroCanalItem[]> {
+  const [membrosAtivosCanal, saasMembros]: [
+    Array<{ userId: string }>,
+    Array<{ userId: string; nome: string; user: { nome: string | null } }>,
+  ] = await Promise.all([
+    db.membroConversa.findMany({
+      where: { conversaId, status: 'ATIVO', saiuEm: null },
+      select: { userId: true },
+    }),
+    db.saasMembro.findMany({
+      where: { tenantId, status: 'APROVADO' },
+      orderBy: { nome: 'asc' },
+      take: 200,
+      select: { userId: true, nome: true, user: { select: { nome: true } } },
+    }),
+  ])
+  const jaAtivos = new Set(membrosAtivosCanal.map((m) => m.userId))
+  return saasMembros
+    .filter((m) => !jaAtivos.has(m.userId))
+    .map((m) => ({ userId: m.userId, nome: m.user.nome ?? m.nome }))
 }
 
 export async function podePublicarNoCanal(
@@ -467,19 +498,25 @@ export async function podeGerenciarPedidosCanal(
 }
 
 /**
- * Lista pedidos de entrada pendentes de um canal fechado. Sem gate de
- * visibilidade próprio — quem chama já deve ter confirmado
- * `podeGerenciarPedidosCanal` antes de exibir a UI (mesmo padrão de
- * `listMembrosCanal`).
+ * Lista pedidos de entrada de um canal fechado — `PENDENTE` (a decidir) ou
+ * `REJEITADO` (histórico de recusados; `saiuEm: null` os distingue de membro
+ * removido depois de aprovado, que também vira `REJEITADO` mas com `saiuEm`
+ * setado). Sem gate de visibilidade próprio — quem chama já deve ter
+ * confirmado `podeGerenciarPedidosCanal` antes de exibir a UI (mesmo padrão
+ * de `listMembrosCanal`).
  */
-export async function listPedidosCanal(conversaId: string): Promise<PedidoCanalItem[]> {
+export async function listPedidosCanal(
+  conversaId: string,
+  status: 'PENDENTE' | 'REJEITADO' = 'PENDENTE',
+): Promise<PedidoCanalItem[]> {
   const rows: Array<{
     userId: string
     entrouEm: Date
     user: { nome: string | null; avatarUrl: string | null }
   }> = await db.membroConversa.findMany({
-    where: { conversaId, status: 'PENDENTE', saiuEm: null },
-    orderBy: { entrouEm: 'asc' },
+    where: { conversaId, status, saiuEm: null },
+    orderBy: { entrouEm: status === 'PENDENTE' ? 'asc' : 'desc' },
+    take: status === 'PENDENTE' ? undefined : 30,
     select: {
       userId: true,
       entrouEm: true,

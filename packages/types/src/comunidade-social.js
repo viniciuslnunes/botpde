@@ -99,6 +99,16 @@ export const decidirPedidoCanalSchema = z.object({
   aprovar: z.boolean(),
 })
 
+export const removerMembroCanalSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+})
+
+export const adicionarMembroCanalSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+})
+
 export const criarGrupoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),

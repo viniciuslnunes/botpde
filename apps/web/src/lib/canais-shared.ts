@@ -34,6 +34,12 @@ export interface PedidoCanalItem {
   pedidoEm: string
 }
 
+/** Membro aprovado do tenant elegível para adicionar direto a um canal fechado. */
+export interface CandidatoMembroCanalItem {
+  userId: string
+  nome: string | null
+}
+
 export interface UnidadeBuscaItem {
   tenantId: string
   nome: string

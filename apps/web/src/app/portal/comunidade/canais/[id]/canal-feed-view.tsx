@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import {
+  listCandidatosMembroCanal,
   listMembrosCanal,
   listPedidosCanal,
   podeGerenciarPedidosCanal,
@@ -55,13 +56,17 @@ export async function CanalFeedView({
   permissoes: string[]
 }) {
   const podeGerenciarAdmins = canal.souAdmin && !canal.canalOficial
-  const podeGerenciarPedidos =
-    !canal.publica && (await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes))
+  const podeGerenciarMembros = await podeGerenciarPedidosCanal(canal, viewerTenantId, permissoes)
+  const podeGerenciarPedidos = podeGerenciarMembros && !canal.publica
 
-  const [tenant, membros, pedidos] = await Promise.all([
+  const [tenant, membros, pedidos, recusados, candidatos] = await Promise.all([
     db.tenant.findUnique({ where: { id: canal.tenantId }, select: { corPrimaria: true } }),
-    podeGerenciarAdmins ? listMembrosCanal(canal.id) : Promise.resolve([]),
-    podeGerenciarPedidos ? listPedidosCanal(canal.id) : Promise.resolve([]),
+    podeGerenciarAdmins || podeGerenciarMembros ? listMembrosCanal(canal.id) : Promise.resolve([]),
+    podeGerenciarPedidos ? listPedidosCanal(canal.id, 'PENDENTE') : Promise.resolve([]),
+    podeGerenciarPedidos ? listPedidosCanal(canal.id, 'REJEITADO') : Promise.resolve([]),
+    podeGerenciarMembros
+      ? listCandidatosMembroCanal(canal.tenantId, canal.id)
+      : Promise.resolve([]),
   ])
 
   return (
@@ -72,8 +77,11 @@ export async function CanalFeedView({
       corPrimaria={tenant?.corPrimaria ?? '#7c3aed'}
       membros={membros}
       podeGerenciarAdmins={podeGerenciarAdmins}
+      podeGerenciarMembros={podeGerenciarMembros}
       pedidos={pedidos}
+      recusados={recusados}
       podeGerenciarPedidos={podeGerenciarPedidos}
+      candidatos={candidatos}
       composer={
         <Suspense fallback={<ComposerFallback />}>
           <CanalComposerSection

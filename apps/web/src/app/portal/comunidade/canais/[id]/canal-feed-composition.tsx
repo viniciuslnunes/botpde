@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Settings,
   Shield,
+  UserMinus,
   UserPlus,
   Users,
   X,
@@ -21,6 +22,8 @@ import {
   alterarAdminCanal,
   atualizarCanalTematico,
   decidirPedidoCanal,
+  removerMembroCanal,
+  adicionarMembroCanal,
 } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { CanalNavbarOverride } from '@/components/canal-navbar-override'
@@ -28,6 +31,7 @@ import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import {
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
+  type CandidatoMembroCanalItem,
   type CanalItem,
   type MembroCanalItem,
   type PedidoCanalItem,
@@ -48,8 +52,12 @@ interface CanalFeedCompositionProps {
   corPrimaria: string
   membros: MembroCanalItem[]
   podeGerenciarAdmins: boolean
+  /** Governança do canal (remover/adicionar membro) — independe de o canal ser aberto ou fechado. */
+  podeGerenciarMembros: boolean
   pedidos: PedidoCanalItem[]
+  recusados: PedidoCanalItem[]
   podeGerenciarPedidos: boolean
+  candidatos: CandidatoMembroCanalItem[]
   /** Composer (mesmo `FeedComposer` do feed principal) — só quando `podePublicar`. */
   composer: ReactNode
   children: ReactNode
@@ -62,8 +70,11 @@ export function CanalFeedComposition({
   corPrimaria,
   membros,
   podeGerenciarAdmins,
+  podeGerenciarMembros,
   pedidos,
+  recusados,
   podeGerenciarPedidos,
+  candidatos,
   composer,
   children,
 }: CanalFeedCompositionProps) {
@@ -217,7 +228,17 @@ export function CanalFeedComposition({
                       Configurações do canal
                     </button>
                   )}
-                  {podeGerenciarAdmins && (
+                  {canal.canalOficial && podeGerenciarMembros && (
+                    <Link
+                      href="/admin/configuracoes#canal-oficial"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                    >
+                      <Settings className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                      Editar canal oficial
+                    </Link>
+                  )}
+                  {(podeGerenciarAdmins || podeGerenciarMembros) && (
                     <button
                       type="button"
                       onClick={() => {
@@ -227,7 +248,7 @@ export function CanalFeedComposition({
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >
                       <Shield className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                      Gerenciar administradores
+                      Gerenciar membros
                     </button>
                   )}
                   {podeGerenciarPedidos && (
@@ -270,10 +291,13 @@ export function CanalFeedComposition({
       )}
 
       {gerenciarOpen && (
-        <GerenciarAdminsModal
+        <GerenciarMembrosModal
           canalId={canal.id}
           membros={membros}
           currentUserId={currentUser.id}
+          podeGerenciarAdmins={podeGerenciarAdmins}
+          podeGerenciarMembros={podeGerenciarMembros}
+          candidatos={candidatos}
           onClose={() => setGerenciarOpen(false)}
         />
       )}
@@ -282,6 +306,7 @@ export function CanalFeedComposition({
         <PedidosCanalModal
           canalId={canal.id}
           pedidos={pedidos}
+          recusados={recusados}
           onClose={() => setPedidosOpen(false)}
         />
       )}
@@ -301,19 +326,30 @@ export function CanalFeedComposition({
   )
 }
 
-function GerenciarAdminsModal({
+function GerenciarMembrosModal({
   canalId,
   membros,
   currentUserId,
+  podeGerenciarAdmins,
+  podeGerenciarMembros,
+  candidatos,
   onClose,
 }: {
   canalId: string
   membros: MembroCanalItem[]
   currentUserId: string
+  /** Delegar/revogar admin — só canal temático. */
+  podeGerenciarAdmins: boolean
+  /** Remover/adicionar membro — oficial e temático. */
+  podeGerenciarMembros: boolean
+  candidatos: CandidatoMembroCanalItem[]
   onClose: () => void
 }) {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [removidos, setRemovidos] = useState<Set<string>>(new Set())
+  const [adicionados, setAdicionados] = useState<CandidatoMembroCanalItem[]>([])
+  const [candidatoSelecionado, setCandidatoSelecionado] = useState('')
 
   function alterar(userId: string, papel: 'ADMIN' | 'MEMBRO') {
     setPendingUserId(userId)
@@ -330,6 +366,44 @@ function GerenciarAdminsModal({
     })
   }
 
+  function remover(userId: string) {
+    setPendingUserId(userId)
+    startTransition(async () => {
+      try {
+        await removerMembroCanal(canalId, userId)
+        toast.success('Membro removido do canal.')
+        setRemovidos((prev) => new Set(prev).add(userId))
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
+      } finally {
+        setPendingUserId(null)
+      }
+    })
+  }
+
+  function adicionar() {
+    if (!candidatoSelecionado) return
+    const candidato = candidatos.find((c) => c.userId === candidatoSelecionado)
+    setPendingUserId(candidatoSelecionado)
+    startTransition(async () => {
+      try {
+        await adicionarMembroCanal(canalId, candidatoSelecionado)
+        toast.success('Membro adicionado.')
+        if (candidato) setAdicionados((prev) => [...prev, candidato])
+        setCandidatoSelecionado('')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível adicionar.')
+      } finally {
+        setPendingUserId(null)
+      }
+    })
+  }
+
+  const membrosVisiveis = membros.filter((m2) => !removidos.has(m2.userId))
+  const candidatosDisponiveis = candidatos.filter(
+    (c) => !adicionados.some((a) => a.userId === c.userId),
+  )
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <m.div
@@ -342,7 +416,7 @@ function GerenciarAdminsModal({
         className="w-full max-w-sm rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-xl"
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[rgb(var(--foreground))]">Administradores do canal</h2>
+          <h2 className="text-sm font-bold text-[rgb(var(--foreground))]">Gerenciar membros</h2>
           <button
             type="button"
             onClick={onClose}
@@ -353,13 +427,42 @@ function GerenciarAdminsModal({
           </button>
         </div>
 
-        {membros.length === 0 ? (
+        {podeGerenciarMembros && candidatosDisponiveis.length > 0 && (
+          <div className="mb-3 flex items-center gap-2">
+            <select
+              value={candidatoSelecionado}
+              onChange={(e) => setCandidatoSelecionado(e.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+            >
+              <option value="">Adicionar membro direto…</option>
+              {candidatosDisponiveis.map((c) => (
+                <option key={c.userId} value={c.userId}>
+                  {c.nome ?? 'Torcedor'}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!candidatoSelecionado || (pending && pendingUserId === candidatoSelecionado)}
+              onClick={adicionar}
+              className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+            >
+              {pending && pendingUserId === candidatoSelecionado ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                'Adicionar'
+              )}
+            </button>
+          </div>
+        )}
+
+        {membrosVisiveis.length === 0 ? (
           <p className="py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
             Nenhum membro encontrado.
           </p>
         ) : (
           <ul className="max-h-80 space-y-1 overflow-y-auto">
-            {membros.map((m2) => (
+            {membrosVisiveis.map((m2) => (
               <li key={m2.userId} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
                 <Avatar nome={m2.nome} avatarUrl={m2.avatarUrl} size="sm" />
                 <div className="min-w-0 flex-1">
@@ -371,20 +474,33 @@ function GerenciarAdminsModal({
                     {m2.papel === 'ADMIN' ? 'Administrador' : 'Membro'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={pending && pendingUserId === m2.userId}
-                  onClick={() => alterar(m2.userId, m2.papel === 'ADMIN' ? 'MEMBRO' : 'ADMIN')}
-                  className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                >
-                  {pending && pendingUserId === m2.userId ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : m2.papel === 'ADMIN' ? (
-                    'Remover admin'
-                  ) : (
-                    'Tornar admin'
-                  )}
-                </button>
+                {podeGerenciarAdmins && (
+                  <button
+                    type="button"
+                    disabled={pending && pendingUserId === m2.userId}
+                    onClick={() => alterar(m2.userId, m2.papel === 'ADMIN' ? 'MEMBRO' : 'ADMIN')}
+                    className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                  >
+                    {pending && pendingUserId === m2.userId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : m2.papel === 'ADMIN' ? (
+                      'Remover admin'
+                    ) : (
+                      'Tornar admin'
+                    )}
+                  </button>
+                )}
+                {podeGerenciarMembros && m2.userId !== currentUserId && (
+                  <button
+                    type="button"
+                    disabled={pending && pendingUserId === m2.userId}
+                    onClick={() => remover(m2.userId)}
+                    aria-label="Remover do canal"
+                    className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+                  >
+                    <UserMinus className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -397,12 +513,15 @@ function GerenciarAdminsModal({
 function PedidosCanalModal({
   canalId,
   pedidos,
+  recusados,
   onClose,
 }: {
   canalId: string
   pedidos: PedidoCanalItem[]
+  recusados: PedidoCanalItem[]
   onClose: () => void
 }) {
+  const [aba, setAba] = useState<'pendentes' | 'recusados'>('pendentes')
   const [decididos, setDecididos] = useState<Set<string>>(new Set())
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -436,7 +555,7 @@ function PedidosCanalModal({
         className="w-full max-w-sm rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-xl"
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[rgb(var(--foreground))]">Pedidos pendentes</h2>
+          <h2 className="text-sm font-bold text-[rgb(var(--foreground))]">Pedidos de entrada</h2>
           <button
             type="button"
             onClick={onClose}
@@ -447,42 +566,87 @@ function PedidosCanalModal({
           </button>
         </div>
 
-        {restantes.length === 0 ? (
+        <div className="mb-3 flex gap-1 rounded-lg bg-[rgb(var(--background-subtle))] p-1">
+          <button
+            type="button"
+            onClick={() => setAba('pendentes')}
+            className={[
+              'flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors',
+              aba === 'pendentes'
+                ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                : 'text-[rgb(var(--foreground-muted))]',
+            ].join(' ')}
+          >
+            Pendentes ({restantes.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setAba('recusados')}
+            className={[
+              'flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors',
+              aba === 'recusados'
+                ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
+                : 'text-[rgb(var(--foreground-muted))]',
+            ].join(' ')}
+          >
+            Recusados ({recusados.length})
+          </button>
+        </div>
+
+        {aba === 'pendentes' ? (
+          restantes.length === 0 ? (
+            <p className="py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+              Nenhum pedido pendente.
+            </p>
+          ) : (
+            <ul className="max-h-80 space-y-1 overflow-y-auto">
+              {restantes.map((p) => (
+                <li key={p.userId} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+                  <Avatar nome={p.nome} avatarUrl={p.avatarUrl} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                      {p.nome ?? 'Torcedor'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending && pendingUserId === p.userId}
+                    onClick={() => decidir(p.userId, true)}
+                    aria-label="Aprovar"
+                    className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                  >
+                    {pending && pendingUserId === p.userId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending && pendingUserId === p.userId}
+                    onClick={() => decidir(p.userId, false)}
+                    aria-label="Recusar"
+                    className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : recusados.length === 0 ? (
           <p className="py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhum pedido pendente.
+            Nenhum pedido recusado.
           </p>
         ) : (
           <ul className="max-h-80 space-y-1 overflow-y-auto">
-            {restantes.map((p) => (
+            {recusados.map((p) => (
               <li key={p.userId} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
                 <Avatar nome={p.nome} avatarUrl={p.avatarUrl} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-                    {p.nome ?? 'Torcedor'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={pending && pendingUserId === p.userId}
-                  onClick={() => decidir(p.userId, true)}
-                  aria-label="Aprovar"
-                  className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
-                >
-                  {pending && pendingUserId === p.userId ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Check className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  disabled={pending && pendingUserId === p.userId}
-                  onClick={() => decidir(p.userId, false)}
-                  aria-label="Recusar"
-                  className="shrink-0 rounded-lg border border-[rgb(var(--border))] p-1.5 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                  {p.nome ?? 'Torcedor'}
+                </p>
+                <span className="shrink-0 text-xs text-[rgb(var(--foreground-muted))]">Recusado</span>
               </li>
             ))}
           </ul>

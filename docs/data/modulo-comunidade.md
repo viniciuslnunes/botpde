@@ -282,6 +282,24 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     `CANAL_APROVADO`/`CANAL_REJEITADO` (enum Prisma — exigiu `db:generate` +
     `db:push`); registradas em `notification-item-visual.tsx` (ícone/título) e
     `notificacoes-routing.ts` (`escopo: 'social'`, mesmo de `GRUPO_*`).
+  - **Publicar no canal exige membership** (`publicarPostCanal`): quem ainda
+    não é membro só auto-entra se `canal.publica`; canal fechado retorna erro
+    ("aguarde aprovação") em vez de inscrever — sem isso, o gate de
+    pedido/aprovação virava decoração (qualquer torcedor com `COMMUNITY_POST`
+    podia publicar direto).
+  - **Gerenciar membros (2026-07-21)**: modal "Gerenciar membros" (renomeado
+    de "Gerenciar administradores" — `GerenciarMembrosModal` em
+    `canal-feed-composition.tsx`) ganha duas abas de autoridade independentes:
+    `podeGerenciarAdmins` (só temático — promover/rebaixar ADMIN, como antes)
+    e `podeGerenciarMembros` (== `podeGerenciarPedidosCanal`, vale pra oficial
+    e temático — remover membro ativo ou adicionar direto sem esperar
+    pedido). Actions: `removerMembroCanal`/`adicionarMembroCanal`
+    (`comunidade/actions.ts`), mesma autoridade de `decidirPedidoCanal`;
+    remover seta `saiuEm` + `status: REJEITADO` (sem bloqueio permanente —
+    pedir entrada de novo passa pelo fluxo normal). Candidatos pra adicionar
+    direto vêm de `listCandidatosMembroCanal` (`SaasMembro` aprovados do
+    tenant, exclui quem já está ativo no canal). `PedidosCanalModal` ganhou
+    aba "Recusados" (`listPedidosCanal(conversaId, 'REJEITADO')`).
 - **Busca** — `/api/comunidade/busca` (`modo=completa`) inclui canais e unidades da hierarquia visível; typeahead do feed usa `modo=rapida` (sem canais). Invariantes: § busca acima.
 - **Permissão** — `channels:manage` (owner/admin por padrão; rodar `repair-system-role-permissions` em produção).
 

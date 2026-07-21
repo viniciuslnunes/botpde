@@ -11,7 +11,7 @@ import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, atualizarCanalTematicoSchema, alterarAdminCanalSchema, pedirEntradaCanalSchema, decidirPedidoCanalSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, atualizarCanalTematicoSchema, alterarAdminCanalSchema, pedirEntradaCanalSchema, decidirPedidoCanalSchema, removerMembroCanalSchema, adicionarMembroCanalSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -2928,8 +2928,8 @@ export async function decidirPedidoCanal(
       tenantId: canal.tenantId,
       tipo: 'CANAL_REJEITADO',
       titulo: 'Entrada no canal recusada',
-      corpo: `Seu pedido para ${canal.nome ?? 'um canal'} foi recusado.`,
-      link: '/portal/comunidade/canais',
+      corpo: `Seu pedido para ${canal.nome ?? 'um canal'} foi recusado. Você pode enviar um novo pedido quando quiser.`,
+      link: linkCanalComunidade(canal.id),
       atorId: session.user.id,
     })
   }
@@ -2943,6 +2943,116 @@ export async function decidirPedidoCanal(
       entidadeId: pedido.id,
       detalhes: { conversaId: canal.id, userId: parsed.data.userId },
     },
+  })
+
+  invalidarLeituraComunidade(canal.tenantId)
+  revalidatePath(linkCanalComunidade(canal.id))
+  revalidatePath('/portal/comunidade/canais')
+}
+
+/**
+ * Remove um membro ativo do canal (kick). Mesma autoridade de
+ * `decidirPedidoCanal` (`podeGerenciarPedidosCanal`) — quem governa pedidos
+ * também governa quem fica. Marca `saiuEm` + `status: REJEITADO`: distingue
+ * de um pedido recusado (`saiuEm: null`) e, se a pessoa pedir entrada de
+ * novo, passa pelo mesmo fluxo de aprovação — não há bloqueio permanente.
+ */
+export async function removerMembroCanal(conversaId: string, userId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = removerMembroCanalSchema.safeParse({ conversaId, userId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  if (parsed.data.userId === session.user.id) {
+    throw new Error('Você não pode remover a si mesmo por aqui.')
+  }
+
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) throw new Error('Canal não encontrado.')
+
+  const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+  const podeRemover = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
+  if (!podeRemover) throw new Error('Sem permissão para remover membros deste canal.')
+
+  const membro: { id: string } | null = await db.membroConversa.findFirst({
+    where: { conversaId: canal.id, userId: parsed.data.userId, status: 'ATIVO', saiuEm: null },
+    select: { id: true },
+  })
+  if (!membro) throw new Error('Membro não encontrado neste canal.')
+
+  await db.membroConversa.update({
+    where: { id: membro.id },
+    data: { saiuEm: new Date(), status: 'REJEITADO' },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: canal.tenantId,
+      atorId: session.user.id,
+      acao: 'CANAL_MEMBRO_REMOVIDO',
+      entidade: 'MembroConversa',
+      entidadeId: membro.id,
+      detalhes: { conversaId: canal.id, userId: parsed.data.userId },
+    },
+  })
+
+  invalidarLeituraComunidade(canal.tenantId)
+  revalidatePath(linkCanalComunidade(canal.id))
+  revalidatePath('/portal/comunidade/canais')
+}
+
+/**
+ * Adiciona um membro direto (sem esperar pedido) — convite ativo da
+ * liderança pra canal fechado. Mesma autoridade de `decidirPedidoCanal`.
+ * Reaproveita o tipo de notificação `CANAL_APROVADO` (mesmo efeito prático:
+ * "você foi aceito no canal").
+ */
+export async function adicionarMembroCanal(conversaId: string, userId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = adicionarMembroCanalSchema.safeParse({ conversaId, userId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) throw new Error('Canal não encontrado.')
+
+  const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+  const podeAdicionar = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
+  if (!podeAdicionar) throw new Error('Sem permissão para adicionar membros a este canal.')
+
+  const alvo: { id: string; status: string } | null = await db.saasMembro.findFirst({
+    where: { tenantId: canal.tenantId, userId: parsed.data.userId, status: 'APROVADO' },
+    select: { id: true, status: true },
+  })
+  if (!alvo) throw new Error('Torcedor não encontrado ou não aprovado nesta torcida.')
+
+  await db.membroConversa.upsert({
+    where: { conversaId_userId: { conversaId: canal.id, userId: parsed.data.userId } },
+    create: { conversaId: canal.id, userId: parsed.data.userId, papel: 'MEMBRO', status: 'ATIVO' },
+    update: { status: 'ATIVO', saiuEm: null },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: canal.tenantId,
+      atorId: session.user.id,
+      acao: 'CANAL_MEMBRO_ADICIONADO',
+      entidade: 'MembroConversa',
+      entidadeId: canal.id,
+      detalhes: { conversaId: canal.id, userId: parsed.data.userId },
+    },
+  })
+
+  await notificarSafe({
+    userId: parsed.data.userId,
+    tenantId: canal.tenantId,
+    tipo: 'CANAL_APROVADO',
+    titulo: 'Você foi adicionado a um canal',
+    corpo: `Você foi adicionado ao canal ${canal.nome ?? 'um canal'}.`,
+    link: linkCanalComunidade(canal.id),
+    atorId: session.user.id,
   })
 
   invalidarLeituraComunidade(canal.tenantId)
@@ -2991,6 +3101,11 @@ export async function publicarPostCanal(
     if (!canal) return { message: 'Canal não encontrado.' }
 
     if (!canal.souMembro) {
+      // Canal fechado: entrada só depois de aprovação via `decidirPedidoCanal`
+      // — não auto-inscreve aqui, senão contorna o pedido/aprovação.
+      if (!canal.publica) {
+        return { message: 'Você precisa ter seu pedido de entrada aprovado para publicar neste canal.' }
+      }
       await inscreverCanal(parsed.data.conversaId, session.user.id)
     }
 
