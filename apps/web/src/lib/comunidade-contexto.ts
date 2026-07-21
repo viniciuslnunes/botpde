@@ -44,13 +44,27 @@ export const resolverContextoComunidade = cache(
           select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
         })
       }
+
+      // Subsede/PDE promovida a tenant próprio: sem logo de marca definido,
+      // usa a foto da Sede (mesmo fallback aplicado ao avatar do canal
+      // oficial em resolveAvatarCanalOficial) — senão a topbar mostra a
+      // inicial da unidade mesmo com foto já cadastrada.
+      let logoUrl = tenant.logoUrl
+      if (!logoUrl) {
+        const sede: { fotoUrl: string | null } | null = await db.sede.findFirst({
+          where: { tenantId: tenant.id },
+          select: { fotoUrl: true },
+        })
+        logoUrl = sede?.fotoUrl ?? null
+      }
+
       return {
         modo: 'torcida',
         tenant: {
           id: tenant.id,
           nome: tenant.nome,
           afiliacaoId: tenant.afiliacaoId,
-          logoUrl: tenant.logoUrl,
+          logoUrl,
           corPrimaria: tenant.corPrimaria,
           balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
         },

@@ -19,7 +19,7 @@ type RoleBadgeLite = {
   departamentoNome: string | null
 }
 
-function chave(autorId: string, tenantId: string): string {
+export function chave(autorId: string, tenantId: string): string {
   return `${autorId}:${tenantId}`
 }
 
@@ -81,6 +81,19 @@ export async function getBadgesPorAutorTenant(
 
   const autorIds = [...new Set(unicos.map((p) => p.autorId))]
   const tenantIds = [...new Set(unicos.map((p) => p.tenantId))]
+
+  // Fallback de `tipoSede` quando o membro não tem `sedeId` (ex.: torcida com
+  // Sede única, sem seleção no cadastro): usa o tipo da Sede raiz do próprio
+  // tenant, em vez de assumir 'SEDE' — senão uma subsede/PDE promovida a
+  // tenant próprio (Caso B) exibe "Presidente" em vez de "Liderança".
+  const sedesRaizPorTenant: Array<{ tenantId: string | null; tipo: TipoSede }> =
+    await db.sede.findMany({
+      where: { tenantId: { in: tenantIds }, sedeId: null },
+      select: { tenantId: true, tipo: true },
+    })
+  const tipoSedeRaizMap = new Map(
+    sedesRaizPorTenant.filter((s) => s.tenantId).map((s) => [s.tenantId!, s.tipo]),
+  )
 
   const [membros, roles, memberships]: [
     Array<{
@@ -152,7 +165,8 @@ export async function getBadgesPorAutorTenant(
         departamentoNome: r.role.departamento?.nome ?? null,
       }))
     const principal = escolherCargoPrincipal(rolesDoAutor)
-    const tipoSede: TipoSede = membro?.sede?.tipo ?? 'SEDE'
+    const tipoSede: TipoSede =
+      membro?.sede?.tipo ?? tipoSedeRaizMap.get(p.tenantId) ?? 'SEDE'
     const deptoNomes = memberships
       .filter((m) => m.userId === p.autorId && m.tenantId === p.tenantId)
       .map((m) => m.departamento.nome)

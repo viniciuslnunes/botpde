@@ -38,6 +38,11 @@ export async function ComunidadeUserCardSection({
             {nome ?? 'Torcedor'}
           </p>
           <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
+          {userCard.cargoNome && (
+            <p className="truncate text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
+              {userCard.cargoNome}
+            </p>
+          )}
           {(numeroExibido || departamentosLabel) && (
             <div className="mt-1.5 space-y-0.5">
               {numeroExibido && (

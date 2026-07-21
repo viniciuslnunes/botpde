@@ -140,7 +140,18 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
 
 - **Repost de comunicados**: botão "Compartilhar" nos comunicados oficiais; embed no feed via `PostComunicadoEmbed`.
 - **Post sobre evento**: composer com modo evento; card com RSVP embutido (`PostEventoEmbed`).
-- **Badges no feed**: sede e cargo do autor nos cards (`autor-badges.ts`).
+- **Badges no feed**: sede e cargo do autor nos cards (`autor-badges.ts`). Rótulo
+  de cargo é contextual por `tipoSede` (`rotuloCargoBadge`/`rotuloCargoSistema` em
+  `packages/types/src/permissions.js`: `OWNER` → "Presidente" na Sede, "Liderança"
+  em subsede/PDE). **Fallback de `tipoSede` (2026-07-21)**: quando o `SaasMembro`
+  não tem `sedeId` (torcida com Sede única no cadastro), `getBadgesPorAutorTenant`
+  usa o tipo da Sede raiz do próprio tenant (`Sede.sedeId: null`) em vez de assumir
+  `'SEDE'` — sem isso, uma subsede/PDE promovida a tenant próprio (Caso B) exibia
+  "Presidente" para o dono. **Card do sócio na Comunidade (2026-07-21)**: o mesmo
+  cargo (via `getBadgesPorAutorTenant`) agora aparece em
+  `ComunidadeUserCardSection` (`_components/comunidade-user-card-section.tsx`),
+  computado por `getComposerContext` — reage ao `tenantId` ativo (troca junto com
+  o tenant, inclusive ao abrir um canal de outra unidade).
 - **Moderação**: link "Ver post" na fila em `/admin/comunidade/moderacao`.
 
 ## Engajamento e lives (Sprint 5)
@@ -217,7 +228,12 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
   `Sede.fotoUrl` → `Tenant.logoUrl` quando `Conversa.avatarUrl` é nulo
   (`resolveAvatarCanalOficial` em `lib/canais.ts`) — não depende de setar
   `Conversa.avatarUrl` manualmente. Governança segue o RBAC do tenant da unidade
-  (sem cascata especial de permissão por `Sede.tipo`).
+  (sem cascata especial de permissão por `Sede.tipo`). **Topbar da subsede/PDE
+  promovida a tenant próprio (2026-07-21)**: `resolverContextoComunidade`
+  (`lib/comunidade-contexto.ts`) aplica o mesmo fallback `Sede.fotoUrl` quando
+  `Tenant.logoUrl` é nulo — sem isso, a foto da unidade cadastrada em
+  `/admin/sedes` aparecia no post/canal mas a `PortalNavbar` continuava
+  mostrando a inicial (ela só lia `Tenant.logoUrl`, sem o fallback).
 - **Comunidades temáticas** — sócios com `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` criam
   canais (`criarCanalTematico`, aceita `avatarUrl` opcional) com visibilidade
   `TENANT`/`HIERARQUIA`/`ALIADOS`/`PUBLICO`; criador vira `MembroConversa` ADMIN.
@@ -287,6 +303,37 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     ("aguarde aprovação") em vez de inscrever — sem isso, o gate de
     pedido/aprovação virava decoração (qualquer torcedor com `COMMUNITY_POST`
     podia publicar direto).
+- **Remover / adicionar membro do canal (2026-07-21):** mesma autoridade de
+  `decidirPedidoCanal` (`podeGerenciarPedidosCanal`) — mas **independe** de o
+  canal ser aberto ou fechado (moderação e convite direto valem pros dois).
+  - **Remover** (`removerMembroCanal`): kick de um membro `ATIVO` — seta
+    `saiuEm: now()` + `status: REJEITADO`. Isso distingue de um pedido
+    recusado (`REJEITADO` com `saiuEm: null`) e **não é um ban permanente**:
+    a pessoa pode pedir entrada de novo e passa pelo mesmo fluxo de
+    aprovação. Bloqueia remover a si mesmo (`ExpectedError`).
+  - **Adicionar direto** (`adicionarMembroCanal`): convite ativo da
+    liderança sem esperar pedido — upsert direto pra `ATIVO`, notifica
+    reaproveitando `CANAL_APROVADO` (mesmo efeito prático de "foi aceito").
+    Candidatos vêm de `listCandidatosMembroCanal(tenantId, conversaId)`
+    (sócios `APROVADO` do tenant, exceto quem já está ativo no canal, capado
+    em 200 — mesmo padrão do seletor de responsável em `admin/sedes`).
+  - **Histórico de recusados**: `listPedidosCanal(conversaId, status)` ganhou
+    o segundo parâmetro (`'PENDENTE' | 'REJEITADO'`, default `PENDENTE`);
+    aba "Recusados" no mesmo `PedidosCanalModal` (só leitura, sem novo
+    fetch/rota).
+  - **UI**: modal "Gerenciar membros" (renomeado de "Gerenciar
+    administradores") no menu "..." — some pro canal oficial que já tinha
+    `souAdmin` do criador original mas nunca teve delegação real; agora abre
+    sempre que há qualquer autoridade de governança (`podeGerenciarAdmins ||
+    podeGerenciarMembros`). Toggle admin continua exclusivo do canal
+    temático. Cross-link novo: item "Editar canal oficial" no menu do canal
+    oficial, apontando pra `/admin/configuracoes#canal-oficial` — antes não
+    havia NENHUM caminho da tela do canal até suas configurações.
+  - **Bug corrigido nesta rodada**: `listMembrosCanal` filtrava só
+    `saiuEm: null`, sem checar `status` — pedidos `PENDENTE` vazavam pra
+    dentro da lista de "membros" no modal de admin. Corrigido pra exigir
+    `status: 'ATIVO'`, mesmo cuidado que `souMembro`/`souAdmin` já tinham em
+    `CanalItem`.
   - **Gerenciar membros (2026-07-21)**: modal "Gerenciar membros" (renomeado
     de "Gerenciar administradores" — `GerenciarMembrosModal` em
     `canal-feed-composition.tsx`) ganha duas abas de autoridade independentes:

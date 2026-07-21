@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { checarPodePublicarNoFeed } from '@/lib/authz'
 import { getPerfilMembroForPortal } from '@/lib/social'
 import { getEventosParaComposer, type EventoComposerItem } from '@/lib/eventos'
+import { chave, getBadgesPorAutorTenant } from '@/lib/autor-badges'
 
 export type ComposerContext = {
   nome: string | null
@@ -15,6 +16,7 @@ export type ComposerContext = {
     numeroAssociado: string | null
     tipo: 'SOCIO' | 'TORCEDOR' | null
     departamentos: string[]
+    cargoNome: string | null
   }
 }
 
@@ -24,7 +26,7 @@ export const getComposerContext = cache(async function getComposerContext(
   userId: string,
   sessionNome: string | null,
 ): Promise<ComposerContext> {
-  const [perfil, eventos, bloqueio, membro, socio, deptos] = await Promise.all([
+  const [perfil, eventos, bloqueio, membro, socio, deptos, badges] = await Promise.all([
     getPerfilMembroForPortal(userId, tenantId),
     getEventosParaComposer(tenantId, userId),
     checarPodePublicarNoFeed(userId, tenantId),
@@ -41,6 +43,7 @@ export const getComposerContext = cache(async function getComposerContext(
       select: { departamento: { select: { nome: true, ordem: true } } },
       orderBy: { departamento: { ordem: 'asc' } },
     }) as Promise<Array<{ departamento: { nome: string; ordem: number } }>>,
+    getBadgesPorAutorTenant([{ autorId: userId, tenantId }]),
   ])
 
   return {
@@ -54,6 +57,7 @@ export const getComposerContext = cache(async function getComposerContext(
       numeroAssociado: membro?.numeroAssociado ?? null,
       tipo: membro?.tipo ?? null,
       departamentos: deptos.map((d) => d.departamento.nome),
+      cargoNome: badges.get(chave(userId, tenantId))?.cargoNome ?? null,
     },
   }
 })
