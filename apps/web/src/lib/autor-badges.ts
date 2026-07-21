@@ -85,15 +85,29 @@ export async function getBadgesPorAutorTenant(
   // Fallback de `tipoSede` quando o membro não tem `sedeId` (ex.: torcida com
   // Sede única, sem seleção no cadastro): usa o tipo da Sede raiz do próprio
   // tenant, em vez de assumir 'SEDE' — senão uma subsede/PDE promovida a
-  // tenant próprio (Caso B) exibe "Presidente" em vez de "Liderança".
-  const sedesRaizPorTenant: Array<{ tenantId: string | null; tipo: TipoSede }> =
+  // tenant próprio (Caso B) exibe "Presidente" em vez de "Liderança". Uma
+  // unidade promovida mantém Sede.sedeId apontando pra Sede-mãe (outro
+  // tenant), então a raiz não é identificável por `sedeId: null` — e se ela
+  // tiver filhos territoriais movidos junto (mesmo tenantId), a raiz é a
+  // única cujo `sedeId` não aponta pra outra Sede do mesmo tenant.
+  const sedesDoTenant: Array<{ id: string; tenantId: string | null; sedeId: string | null; tipo: TipoSede }> =
     await db.sede.findMany({
-      where: { tenantId: { in: tenantIds }, sedeId: null },
-      select: { tenantId: true, tipo: true },
+      where: { tenantId: { in: tenantIds } },
+      select: { id: true, tenantId: true, sedeId: true, tipo: true },
     })
-  const tipoSedeRaizMap = new Map(
-    sedesRaizPorTenant.filter((s) => s.tenantId).map((s) => [s.tenantId!, s.tipo]),
-  )
+  const sedesPorTenant = new Map<string, typeof sedesDoTenant>()
+  for (const s of sedesDoTenant) {
+    if (!s.tenantId) continue
+    const arr = sedesPorTenant.get(s.tenantId) ?? []
+    arr.push(s)
+    sedesPorTenant.set(s.tenantId, arr)
+  }
+  const tipoSedeRaizMap = new Map<string, TipoSede>()
+  for (const [tenantId, sedes] of sedesPorTenant) {
+    const idsDoTenant = new Set(sedes.map((s) => s.id))
+    const raiz = sedes.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
+    if (raiz) tipoSedeRaizMap.set(tenantId, raiz.tipo)
+  }
 
   const [membros, roles, memberships]: [
     Array<{

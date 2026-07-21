@@ -46,16 +46,22 @@ export const resolverContextoComunidade = cache(
       }
 
       // Subsede/PDE promovida a tenant próprio: sem logo de marca definido,
-      // usa a foto da Sede (mesmo fallback aplicado ao avatar do canal
-      // oficial em resolveAvatarCanalOficial) — senão a topbar mostra a
-      // inicial da unidade mesmo com foto já cadastrada.
+      // usa a foto da Sede raiz do tenant — senão a topbar mostra a inicial
+      // da unidade mesmo com foto já cadastrada. A unidade promovida (Caso B)
+      // mantém Sede.sedeId apontando pra Sede-mãe (outro tenant), então não dá
+      // pra achar a raiz por `sedeId: null`; e se ela tiver filhos territoriais
+      // movidos junto (mesmo tenantId), um findFirst sem esse critério pode
+      // pegar a foto de um filho em vez da própria unidade.
       let logoUrl = tenant.logoUrl
       if (!logoUrl) {
-        const sede: { fotoUrl: string | null } | null = await db.sede.findFirst({
-          where: { tenantId: tenant.id },
-          select: { fotoUrl: true },
-        })
-        logoUrl = sede?.fotoUrl ?? null
+        const sedesDoTenant: Array<{ id: string; sedeId: string | null; fotoUrl: string | null }> =
+          await db.sede.findMany({
+            where: { tenantId: tenant.id },
+            select: { id: true, sedeId: true, fotoUrl: true },
+          })
+        const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
+        const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
+        logoUrl = raiz?.fotoUrl ?? null
       }
 
       return {
