@@ -6,7 +6,7 @@ import { db } from '@torcida/db'
 import { canViewRecurso, formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
-import { getTenantRelation } from './hierarquia'
+import { getTenantRelation, getTorcidaLineageTenantIds } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
 import {
   postInclude,
@@ -45,16 +45,41 @@ export {
   linkUnidadeComunidade,
 } from './canais-shared'
 
+/**
+ * Sócio (vínculo `SaasMembro` APROVADO com `tipo: 'SOCIO'`) em qualquer
+ * unidade da mesma torcida (sede/subsedes/PDEs) — não só no `viewerTenantId`
+ * atual, já que o vínculo pode ter sido feito numa subsede e o usuário
+ * navegar pela sede (ou vice-versa). Torcedor (vínculo `TORCEDOR` ou nenhum
+ * vínculo aprovado) não conta.
+ */
+const isSocioDaTorcida = cache(async function isSocioDaTorcida(
+  userId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const lineage = await getTorcidaLineageTenantIds(tenantId)
+  const membro: { id: string } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO', tenantId: { in: lineage } },
+    select: { id: true },
+  })
+  return !!membro
+})
+
 export async function podeVerCanal(
   viewerTenantId: string,
   canalTenantId: string,
   visibilidade: VisibilidadeCanal,
+  userId: string,
 ): Promise<boolean> {
   if (viewerTenantId === canalTenantId) return true
+  if (visibilidade === 'TENANT') return false
+
+  // Canal de outra unidade da torcida (hierarquia/aliados/público): só sócio
+  // enxerga — torcedor vê apenas o canal da própria unidade (relation self,
+  // já resolvido acima).
+  if (!(await isSocioDaTorcida(userId, viewerTenantId))) return false
+
   const relation = await getTenantRelation(viewerTenantId, canalTenantId)
   switch (visibilidade) {
-    case 'TENANT':
-      return false
     case 'HIERARQUIA':
       return relation === 'ancestor' || relation === 'descendant'
     case 'ALIADOS':
@@ -264,7 +289,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
   // React.cache, então pares (viewer, tenant) repetidos não repetem query.
   const [visiveis, fallbackAvatars] = await Promise.all([
-    Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal))),
+    Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId))),
     resolveFallbackAvatarsCanalOficial(
       rows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
     ),
@@ -340,7 +365,7 @@ export async function getCanalPorId(
   })
   if (!row) return null
 
-  const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
+  const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId)
   if (!podeVer) return null
 
   const fallbackAvatars =
@@ -641,7 +666,7 @@ export async function buscarCanaisEUnidades(
   ] = await Promise.all([
     Promise.all(
       canalRows.map(async (row) => {
-        const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
+        const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId)
         return podeVer ? row : null
       }),
     ),

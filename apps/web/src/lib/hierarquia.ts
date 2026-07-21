@@ -357,9 +357,11 @@ export const getTenantRelation = cache(
 
 /**
  * IDs de tenant cujo conteúdo do recurso indicado é visível para o tenant
- * ator: sempre o próprio, mais os ancestrais quando o recurso é PÚBLICO
- * (o ator é descendente deles — só enxerga o público). Centraliza a regra
- * que antes estava implícita e duplicada em eventos, comunidade e loja.
+ * ator: sempre o próprio, sempre os descendentes (ancestor vê TUDO do
+ * descendente, público ou restrito — `resolveVisibility`), e os ancestrais
+ * só quando o recurso é PÚBLICO (o ator é descendente deles — só enxerga o
+ * público). Centraliza a regra que antes estava implícita e duplicada em
+ * eventos, comunidade e loja.
  *
  * Gancho de alianças: tenants com aliança ATIVA (e suas worktrees —
  * PDEs/subsedes herdando a sede) entram via getAlliedTenantIds.
@@ -368,14 +370,18 @@ async function getVisibleTenantIdsImpl(
   tenantId: string,
   recurso: keyof typeof RECURSO_SENSIBILIDADE,
 ): Promise<string[]> {
-  if (!canViewRecurso('descendant', recurso)) return [tenantId]
+  const descendentes = await getDescendantTenantIds(tenantId)
+
+  if (!canViewRecurso('descendant', recurso)) {
+    return Array.from(new Set([tenantId, ...descendentes]))
+  }
 
   const [ancestrais, aliados] = await Promise.all([
     getAncestorTenantIds(tenantId),
     getAlliedTenantIds(tenantId),
   ])
 
-  const ids = new Set([tenantId, ...ancestrais, ...aliados])
+  const ids = new Set([tenantId, ...ancestrais, ...descendentes, ...aliados])
   return Array.from(ids)
 }
 
