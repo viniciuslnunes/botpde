@@ -127,6 +127,19 @@ export default async function AdminEventoDetailPage({
   const espera = evento.rsvps.filter((r: RsvpRow) => r.status === 'LISTA_ESPERA').length
   const labelCheckin = evento.tipo === 'ENSAIO' ? 'Presença' : 'Embarque'
 
+  // `valorVaga` é um Prisma Decimal; ao cruzar a fronteira RSC ele perde o
+  // método `.toNumber()` (vira objeto interno {d,e,s}). Serializa aqui, no
+  // servidor, para o form cliente receber um number puro.
+  const eventoForm = {
+    ...evento,
+    valorVaga:
+      evento.valorVaga == null
+        ? null
+        : typeof evento.valorVaga === 'number'
+          ? evento.valorVaga
+          : evento.valorVaga.toNumber(),
+  }
+
   const itens: EmbarqueRow[] = evento.rsvps.map((r: RsvpRow) => ({
     id: r.id,
     userId: r.user.id,
@@ -205,7 +218,7 @@ export default async function AdminEventoDetailPage({
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-[rgb(var(--foreground))]">Editar</h2>
         <EditarEventoForm
-          evento={evento}
+          evento={eventoForm}
           sedes={sedes}
           partidas={partidas}
           temAfiliacao={Boolean(afiliacaoId)}
