@@ -5,10 +5,20 @@ import { MessagesSquare } from 'lucide-react'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 
 interface ComunidadeFeedEmptyProps {
-  filtro: 'descobrir' | 'seguindo' | 'grupos'
+  filtro: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
 }
 
 export function ComunidadeFeedEmpty({ filtro }: ComunidadeFeedEmptyProps) {
+  if (filtro === 'canal') {
+    return (
+      <MotionEmptyState
+        icon={<MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+        title="Nenhuma publicação ainda"
+        description="Seja o primeiro a publicar neste canal."
+      />
+    )
+  }
+
   return (
     <MotionEmptyState
       icon={<MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}

@@ -27,7 +27,7 @@ interface PageInfo {
   nextCursor: string | null
 }
 
-type Filtro = 'descobrir' | 'seguindo' | 'grupos'
+type Filtro = 'descobrir' | 'seguindo' | 'grupos' | 'canal'
 
 function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
   return {
@@ -70,6 +70,7 @@ export function ComunidadeFeedInfinite({
   tenantId,
   currentUser,
   filtro,
+  conversaId,
   initialPosts,
   initialPageInfo,
   initialCursor,
@@ -79,6 +80,8 @@ export function ComunidadeFeedInfinite({
   tenantId: string
   currentUser: CurrentUser
   filtro: Filtro
+  /** Obrigatório quando `filtro === 'canal'`. */
+  conversaId?: string
   initialPosts: PostSocialItem[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -101,6 +104,7 @@ export function ComunidadeFeedInfinite({
     tenantId,
     viewerId: currentUser.id,
     filtro,
+    conversaId,
     initialPosts,
     initialPageInfo,
     initialCursor,

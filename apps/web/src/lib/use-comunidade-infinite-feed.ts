@@ -21,8 +21,9 @@ export function comunidadeFeedQueryKey(
   tenantId: string,
   viewerId: string,
   filtro?: string,
+  conversaId?: string,
 ) {
-  return ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? ''] as const
+  return ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? '', conversaId ?? ''] as const
 }
 
 async function fetchFeedPage<TPost>(params: {
@@ -30,12 +31,14 @@ async function fetchFeedPage<TPost>(params: {
   cursor: string | null
   take: number
   filtro?: string
+  conversaId?: string
   signal: AbortSignal
 }): Promise<ComunidadeFeedPage<TPost>> {
   const url = new URL(params.endpoint, window.location.origin)
   url.searchParams.set('take', String(params.take))
   if (params.cursor) url.searchParams.set('cursor', params.cursor)
   if (params.filtro) url.searchParams.set('filtro', params.filtro)
+  if (params.conversaId) url.searchParams.set('conversaId', params.conversaId)
 
   const res = await fetch(url.toString(), {
     method: 'GET',
@@ -60,6 +63,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   tenantId: string
   viewerId: string
   filtro?: string
+  /** Escopa a página a um canal específico (`filtro: 'canal'`). */
+  conversaId?: string
   initialPosts: TPost[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -72,6 +77,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     tenantId,
     viewerId,
     filtro,
+    conversaId,
     initialPosts,
     initialPageInfo,
     initialCursor,
@@ -81,8 +87,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
 
   const queryClient = useQueryClient()
   const queryKey = useMemo(
-    () => comunidadeFeedQueryKey(endpoint, tenantId, viewerId, filtro),
-    [endpoint, tenantId, viewerId, filtro],
+    () => comunidadeFeedQueryKey(endpoint, tenantId, viewerId, filtro, conversaId),
+    [endpoint, tenantId, viewerId, filtro, conversaId],
   )
 
   const cached = queryClient.getQueryData<{
@@ -101,6 +107,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         cursor: pageParam,
         take,
         filtro,
+        conversaId,
         signal,
       }),
     initialPageParam: (shouldSeed ? initialCursor : null) as string | null,
@@ -156,6 +163,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
           cursor,
           take,
           filtro,
+          conversaId,
           signal: new AbortController().signal,
         })
 
@@ -204,7 +212,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         // SSE refresh silencioso
       }
     },
-    [endpoint, filtro, initialCursor, queryClient, queryKey, take],
+    [endpoint, filtro, conversaId, initialCursor, queryClient, queryKey, take],
   )
 
   const prependPost = useCallback(

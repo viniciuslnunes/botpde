@@ -6,10 +6,13 @@ import { assertPermission, assertTenantOwner } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidatePermissionsCache, invalidateTenantCache } from '@/lib/tenant'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
+import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
+import { getOrCreateCanalOficial } from '@/lib/canais'
 import {
   ALL_PERMISSIONS,
   applyPermissionCascade,
   DEPARTAMENTO_MODULOS,
+  editarCanalOficialSchema,
   formatNomeTorcida,
   isDepartamentoLegado,
   PERMISSIONS,
@@ -178,6 +181,52 @@ export async function salvarHierarquiaVisivel(formData: FormData) {
 
   revalidatePath('/admin/configuracoes')
   invalidateHierarchyCache(tenant.id)
+}
+
+// ── Canal oficial (mural da unidade na Comunidade) ────────────────────────────
+
+export async function salvarCanalOficial(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+
+  const parsed = editarCanalOficialSchema.safeParse({
+    nome: String(formData.get('nome') ?? ''),
+    descricao: String(formData.get('descricao') ?? '').trim() || undefined,
+    visibilidadeCanal: String(formData.get('visibilidadeCanal') ?? 'HIERARQUIA'),
+    somenteAdminPublica: formData.get('somenteAdminPublica') === 'true',
+    publica: formData.get('publica') === 'true',
+    avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || undefined,
+  })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const { id: canalId } = await getOrCreateCanalOficial(tenant.id)
+
+  await db.conversa.update({
+    where: { id: canalId },
+    data: {
+      nome: parsed.data.nome,
+      descricao: parsed.data.descricao ?? null,
+      visibilidadeCanal: parsed.data.visibilidadeCanal,
+      somenteAdminPublica: parsed.data.somenteAdminPublica,
+      publica: parsed.data.publica,
+      avatarUrl: parsed.data.avatarUrl ?? null,
+    },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'CANAL_OFICIAL_ATUALIZADO',
+      entidade: 'Conversa',
+      entidadeId: canalId,
+      detalhes: parsed.data,
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath(`/portal/comunidade/canais/${canalId}`)
+  revalidatePath('/portal/comunidade/canais')
+  invalidarCachesComunidadeFeed(tenant.id)
 }
 
 const afiliacaoSchema = z.object({

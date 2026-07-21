@@ -1,6 +1,3 @@
-import type { PostSocialItem } from './feed'
-import type { ProximoEventoItem } from './eventos'
-
 export type VisibilidadeCanal = 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'
 
 export interface CanalItem {
@@ -17,7 +14,24 @@ export interface CanalItem {
   membros: number
   souMembro: boolean
   souAdmin: boolean
+  /** Pedido de entrada enviado e ainda não decidido (canal fechado, `publica: false`). */
+  pedidoPendente: boolean
   tenantNome: string
+}
+
+export interface MembroCanalItem {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+  papel: 'ADMIN' | 'MEMBRO'
+}
+
+export interface PedidoCanalItem {
+  userId: string
+  nome: string | null
+  avatarUrl: string | null
+  /** Quando o pedido foi enviado (`MembroConversa.entrouEm` no status PENDENTE). */
+  pedidoEm: string
 }
 
 export interface UnidadeBuscaItem {
@@ -26,31 +40,6 @@ export interface UnidadeBuscaItem {
   logoUrl: string | null
   tipo: string
   cidade: string | null
-}
-
-export interface ComunicadoInstitucionalItem {
-  id: string
-  titulo: string
-  corpo: string
-  prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
-  fixado: boolean
-  publicadoEm: Date
-}
-
-export interface PerfilInstitucional {
-  tenantId: string
-  nome: string
-  logoUrl: string | null
-  corPrimaria: string
-  tipo: string
-  cidade: string | null
-  canalOficialId: string
-  souMembroCanal: boolean
-  podePublicar: boolean
-  comunicados: ComunicadoInstitucionalItem[]
-  postsInstitucionais: PostSocialItem[]
-  postsCanal: PostSocialItem[]
-  proximosEventos: ProximoEventoItem[]
 }
 
 export function isConversaGrupoLike(tipo: string): boolean {

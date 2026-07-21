@@ -55,11 +55,48 @@ export const criarCanalTematicoSchema = z.object({
   nome: z.string().trim().min(3).max(80),
   descricao: z.string().trim().max(280).optional(),
   visibilidadeCanal: z.enum(['TENANT', 'HIERARQUIA', 'ALIADOS', 'PUBLICO']).default('HIERARQUIA'),
+  avatarUrl: z.string().url().max(500).optional(),
+  /** false = canal fechado — entrada mediante pedido/aprovação de um admin. */
+  publica: z.boolean().default(true),
+})
+
+export const alterarAdminCanalSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+  papel: z.enum(['ADMIN', 'MEMBRO']),
 })
 
 export const publicarPostCanalSchema = z.object({
   conversaId: z.string().min(1),
   conteudo: z.string().trim().min(1).max(3000),
+})
+
+/** Campos editáveis de um canal (oficial ou temático) após criado. */
+const canalEditavelBase = z.object({
+  nome: z.string().trim().min(3).max(80),
+  descricao: z.string().trim().max(280).optional(),
+  visibilidadeCanal: z.enum(['TENANT', 'HIERARQUIA', 'ALIADOS', 'PUBLICO']),
+  somenteAdminPublica: z.boolean(),
+  publica: z.boolean(),
+  avatarUrl: z.string().max(500).optional(),
+})
+
+/** Canal oficial da unidade — editado em `/admin/configuracoes` (SETTINGS_MANAGE). */
+export const editarCanalOficialSchema = canalEditavelBase
+
+/** Canal temático — editado no próprio painel do canal (admin do canal ou CHANNELS_MANAGE). */
+export const atualizarCanalTematicoSchema = canalEditavelBase.extend({
+  conversaId: z.string().min(1),
+})
+
+export const pedirEntradaCanalSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
+export const decidirPedidoCanalSchema = z.object({
+  conversaId: z.string().min(1),
+  userId: z.string().min(1),
+  aprovar: z.boolean(),
 })
 
 export const criarGrupoSchema = z.object({

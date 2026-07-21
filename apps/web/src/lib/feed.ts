@@ -35,7 +35,7 @@ export {
   filtroMembroGrupoNoFeed,
 } from './grupos-scope'
 
-interface FeedOpts {
+export interface FeedOpts {
   cursor?: string
   take?: number
   afiliacaoId?: string | null
@@ -409,7 +409,7 @@ export interface FeedPersonalizadoResult {
   }
 }
 
-function decodeCursor(cursor?: string): FeedCursor | null {
+export function decodeCursor(cursor?: string): FeedCursor | null {
   if (!cursor) return null
   try {
     const raw = Buffer.from(cursor, 'base64url').toString('utf8')
@@ -421,7 +421,7 @@ function decodeCursor(cursor?: string): FeedCursor | null {
   }
 }
 
-function encodeCursor(post: { id: string; criadoEm: Date | string }): string {
+export function encodeCursor(post: { id: string; criadoEm: Date | string }): string {
   const criadoEm = post.criadoEm instanceof Date ? post.criadoEm : new Date(post.criadoEm)
   return Buffer.from(
     JSON.stringify({
@@ -432,7 +432,7 @@ function encodeCursor(post: { id: string; criadoEm: Date | string }): string {
   ).toString('base64url')
 }
 
-function buildCursorWhere(cursor: FeedCursor | null) {
+export function buildCursorWhere(cursor: FeedCursor | null) {
   if (!cursor) return undefined
   const data = new Date(cursor.criadoEmIso)
   if (Number.isNaN(data.getTime())) return undefined

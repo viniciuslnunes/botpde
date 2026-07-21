@@ -3285,6 +3285,12 @@ enum TipoNotificacao {
 
   GRUPO_REMOVIDO
 
+  CANAL_PEDIDO
+
+  CANAL_APROVADO
+
+  CANAL_REJEITADO
+
 }
 
 

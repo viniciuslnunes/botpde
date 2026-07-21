@@ -49,6 +49,9 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   GRUPO_REJEITADO: UserX,
   GRUPO_ADMIN: ShieldAlert,
   GRUPO_REMOVIDO: UserMinus,
+  CANAL_PEDIDO: Users,
+  CANAL_APROVADO: UserCheck,
+  CANAL_REJEITADO: UserX,
 }
 
 export interface NotificacaoAtorInfo {
@@ -69,6 +72,9 @@ const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>
   GRUPO_REJEITADO: (nome) => `${nome} recusou sua entrada no grupo`,
   GRUPO_ADMIN: (nome) => `${nome} tornou você admin do grupo`,
   GRUPO_REMOVIDO: (nome) => `${nome} removeu você do grupo`,
+  CANAL_PEDIDO: (nome) => `${nome} pediu para entrar no canal`,
+  CANAL_APROVADO: (nome) => `${nome} aprovou sua entrada no canal`,
+  CANAL_REJEITADO: (nome) => `${nome} recusou sua entrada no canal`,
 }
 
 /**

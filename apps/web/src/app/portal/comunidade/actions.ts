@@ -11,7 +11,7 @@ import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, atualizarCanalTematicoSchema, alterarAdminCanalSchema, pedirEntradaCanalSchema, decidirPedidoCanalSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -31,10 +31,12 @@ import {
   getCanalPorId,
   inscreverCanal,
   podePublicarNoCanal,
+  podeGerenciarPedidosCanal,
   linkCanalComunidade,
   linkUnidadeComunidade,
 } from '@/lib/canais'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
+import { listarDestinatariosPorPermissoes } from '@/lib/notificacoes-routing'
 import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 import {
   backfillTimelineDoAutorParaViewer,
@@ -2574,6 +2576,9 @@ export async function criarCanalTematico(
   nome: string,
   descricao?: string,
   visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO' = 'HIERARQUIA',
+  avatarUrl?: string,
+  /** false = canal fechado — entrada mediante pedido/aprovação. */
+  publica: boolean = true,
 ): Promise<{ id: string }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
   await assertMembroAtivo(tenant.id, session.user.id)
@@ -2586,7 +2591,13 @@ export async function criarCanalTematico(
     throw new Error('Sem permissão para criar canais.')
   }
 
-  const parsed = criarCanalTematicoSchema.safeParse({ nome, descricao, visibilidadeCanal })
+  const parsed = criarCanalTematicoSchema.safeParse({
+    nome,
+    descricao,
+    visibilidadeCanal,
+    avatarUrl,
+    publica,
+  })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
 
   const canal: { id: string } = await db.conversa.create({
@@ -2595,14 +2606,15 @@ export async function criarCanalTematico(
       tenantId: tenant.id,
       nome: parsed.data.nome,
       descricao: parsed.data.descricao?.trim() || null,
+      avatarUrl: parsed.data.avatarUrl ?? null,
       institucional: true,
       canalOficial: false,
       visibilidadeCanal: parsed.data.visibilidadeCanal,
       somenteAdminPublica: true,
-      publica: true,
+      publica: parsed.data.publica,
       criadoPorId: session.user.id,
       membros: {
-        create: { userId: session.user.id, papel: 'ADMIN' },
+        create: { userId: session.user.id, papel: 'ADMIN', status: 'ATIVO' },
       },
     },
     select: { id: true },
@@ -2615,7 +2627,7 @@ export async function criarCanalTematico(
       acao: 'CANAL_TEMATICO_CRIADO',
       entidade: 'Conversa',
       entidadeId: canal.id,
-      detalhes: { visibilidadeCanal: parsed.data.visibilidadeCanal },
+      detalhes: { visibilidadeCanal: parsed.data.visibilidadeCanal, publica: parsed.data.publica },
     },
   })
 
@@ -2623,75 +2635,417 @@ export async function criarCanalTematico(
   return canal
 }
 
-export async function publicarPostCanal(
+/**
+ * Delegação de admin em canal temático (não oficial): quem já é ADMIN do
+ * canal, ou tem CHANNELS_MANAGE/COMMUNITY_MANAGE no tenant, pode promover ou
+ * rebaixar outro membro ativo. Canais oficiais são geridos pelo RBAC do
+ * tenant da unidade — não por esta ação.
+ */
+export async function alterarAdminCanal(
   conversaId: string,
-  conteudo: string,
-): Promise<{ success: boolean; message?: string }> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST)
+  targetUserId: string,
+  papel: 'ADMIN' | 'MEMBRO',
+): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
   await assertMembroAtivo(tenant.id, session.user.id)
 
-  const parsed = publicarPostCanalSchema.safeParse({ conversaId, conteudo })
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  const parsed = alterarAdminCanalSchema.safeParse({ conversaId, userId: targetUserId, papel })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const canal: { id: string; tenantId: string; canalOficial: boolean } | null =
+    await db.conversa.findFirst({
+      where: { id: parsed.data.conversaId, tipo: 'CANAL' },
+      select: { id: true, tenantId: true, canalOficial: true },
+    })
+  if (!canal) throw new ExpectedError('Canal não encontrado.')
+  if (canal.canalOficial) {
+    throw new ExpectedError('Canais oficiais são geridos pelas permissões da torcida.')
   }
 
-  const efetivas = await permissoesEfetivas(session.user.id, tenant.id)
-  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
-  if (!canal) return { success: false, message: 'Canal não encontrado.' }
-
-  if (!canal.souMembro) {
-    await inscreverCanal(parsed.data.conversaId, session.user.id)
-  }
-
-  const podePublicar = await podePublicarNoCanal(canal, tenant.id, efetivas)
-  if (canal.somenteAdminPublica && !podePublicar) {
-    return { success: false, message: 'Somente administradores podem publicar neste canal.' }
-  }
-
-  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
-  if (erroMencoes) return { success: false, message: erroMencoes }
-
-  await getOrCreatePerfilMembro(session.user.id, tenant.id)
-
-  const post = await db.post.create({
-    data: {
-      tenantId: tenant.id,
-      autorId: session.user.id,
-      conteudo: parsed.data.conteudo,
-      tipo: canal.institucional ? 'INSTITUCIONAL' : 'MEMBRO',
-      visibilidade: 'TENANT',
-      conversaId: parsed.data.conversaId,
-    },
+  const souAdminDoCanal: { id: string } | null = await db.membroConversa.findFirst({
+    where: { conversaId: canal.id, userId: session.user.id, papel: 'ADMIN', saiuEm: null },
+    select: { id: true },
   })
 
-  await Promise.all([
-    sincronizarHashtagsDoPost(post.id, tenant.id, parsed.data.conteudo),
-    notificarMencoesDoPost({
-      conteudo: parsed.data.conteudo,
-      autorId: session.user.id,
-      autorNome: session.user.name ?? null,
-      tenantId: tenant.id,
-      postId: post.id,
-      link: linkCanalComunidade(parsed.data.conversaId),
-    }),
-  ])
+  if (!souAdminDoCanal) {
+    const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+    const podeGerenciar =
+      hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
+      hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
+    if (!podeGerenciar) throw new ExpectedError('Sem permissão para gerenciar este canal.')
+  }
+
+  const alvo: { id: string; papel: 'ADMIN' | 'MEMBRO' } | null = await db.membroConversa.findFirst({
+    where: { conversaId: canal.id, userId: parsed.data.userId, saiuEm: null },
+    select: { id: true, papel: true },
+  })
+  if (!alvo) throw new ExpectedError('Membro não encontrado neste canal.')
+  if (alvo.papel === parsed.data.papel) return
+
+  await db.membroConversa.update({
+    where: { id: alvo.id },
+    data: { papel: parsed.data.papel },
+  })
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: canal.tenantId,
       atorId: session.user.id,
-      acao: 'POST_CANAL_PUBLICADO',
-      entidade: 'Post',
-      entidadeId: post.id,
-      detalhes: { conversaId: parsed.data.conversaId, canalOficial: canal.canalOficial },
+      acao: 'canal.alterar_admin',
+      entidade: 'Conversa',
+      entidadeId: canal.id,
+      detalhes: { targetUserId: parsed.data.userId, papel: parsed.data.papel },
     },
   })
 
-  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
-  if (canal.canalOficial) {
-    revalidatePath(linkUnidadeComunidade(tenant.id))
+  invalidarLeituraComunidade(canal.tenantId)
+  revalidatePath(linkCanalComunidade(canal.id))
+  revalidatePath('/portal/comunidade/canais')
+}
+
+/**
+ * Edita nome/descrição/avatar/visibilidade/regras de um canal **temático**
+ * (não oficial — canal oficial é gerido em `/admin/configuracoes`, RBAC da
+ * unidade). Quem chama precisa ser ADMIN do canal ou ter
+ * CHANNELS_MANAGE/COMMUNITY_MANAGE no tenant dono do canal.
+ */
+export async function atualizarCanalTematico(
+  _prevState: { message?: string; success?: boolean },
+  formData: FormData,
+): Promise<{ message?: string; success?: boolean }> {
+  try {
+    const parsed = atualizarCanalTematicoSchema.safeParse({
+      conversaId: formData.get('conversaId'),
+      nome: formData.get('nome'),
+      descricao: String(formData.get('descricao') ?? '').trim() || undefined,
+      visibilidadeCanal: formData.get('visibilidadeCanal'),
+      somenteAdminPublica: formData.get('somenteAdminPublica') === 'true',
+      publica: formData.get('publica') === 'true',
+      avatarUrl: String(formData.get('avatarUrl') ?? '').trim() || undefined,
+    })
+    if (!parsed.success) {
+      return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' }
+    }
+
+    const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+    await assertMembroAtivo(tenant.id, session.user.id)
+
+    const canal: { id: string; tenantId: string; canalOficial: boolean } | null =
+      await db.conversa.findFirst({
+        where: { id: parsed.data.conversaId, tipo: 'CANAL' },
+        select: { id: true, tenantId: true, canalOficial: true },
+      })
+    if (!canal) return { message: 'Canal não encontrado.' }
+    if (canal.tenantId !== tenant.id) return { message: 'Canal não encontrado.' }
+    if (canal.canalOficial) {
+      return { message: 'Canais oficiais são editados em Configurações da torcida.' }
+    }
+
+    const souAdminDoCanal: { id: string } | null = await db.membroConversa.findFirst({
+      where: { conversaId: canal.id, userId: session.user.id, papel: 'ADMIN', saiuEm: null },
+      select: { id: true },
+    })
+    if (!souAdminDoCanal) {
+      const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+      const podeGerenciar =
+        hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
+        hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
+      if (!podeGerenciar) return { message: 'Sem permissão para gerenciar este canal.' }
+    }
+
+    await db.conversa.update({
+      where: { id: canal.id },
+      data: {
+        nome: parsed.data.nome,
+        descricao: parsed.data.descricao ?? null,
+        visibilidadeCanal: parsed.data.visibilidadeCanal,
+        somenteAdminPublica: parsed.data.somenteAdminPublica,
+        publica: parsed.data.publica,
+        avatarUrl: parsed.data.avatarUrl ?? null,
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: canal.tenantId,
+        atorId: session.user.id,
+        acao: 'CANAL_TEMATICO_ATUALIZADO',
+        entidade: 'Conversa',
+        entidadeId: canal.id,
+        detalhes: parsed.data,
+      },
+    })
+
+    invalidarLeituraComunidade(canal.tenantId)
+    revalidatePath(linkCanalComunidade(canal.id))
+    revalidatePath('/portal/comunidade/canais')
+    return { success: true }
+  } catch (error) {
+    console.error('[atualizarCanalTematico]', error)
+    return { message: 'Não foi possível salvar. Tente novamente.' }
   }
-  return { success: true }
+}
+
+/**
+ * Pedido de entrada num canal fechado (`publica: false`) — mesmo modelo de
+ * `pedirEntradaGrupo`: upsert de `MembroConversa` em status `PENDENTE`,
+ * decidido depois por `decidirPedidoCanal`. Notifica admins locais do canal
+ * (temático) + quem tem `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant.
+ */
+export async function pedirEntradaCanal(conversaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Pedido inválido')
+
+  const canal: {
+    id: string
+    tenantId: string
+    nome: string | null
+    publica: boolean
+  } | null = await db.conversa.findFirst({
+    where: { id: parsed.data.conversaId, tenantId: tenant.id, tipo: 'CANAL' },
+    select: { id: true, tenantId: true, nome: true, publica: true },
+  })
+  if (!canal) throw new Error('Canal não encontrado.')
+  if (canal.publica) throw new Error('Este canal é aberto — use Entrar.')
+
+  const existente: { status: string; saiuEm: Date | null } | null =
+    await db.membroConversa.findUnique({
+      where: { conversaId_userId: { conversaId: canal.id, userId: session.user.id } },
+      select: { status: true, saiuEm: true },
+    })
+  if (existente?.status === 'ATIVO' && !existente.saiuEm) {
+    throw new Error('Você já é membro deste canal.')
+  }
+  if (existente?.status === 'PENDENTE' && !existente.saiuEm) {
+    throw new Error('Pedido já enviado — aguarde a aprovação.')
+  }
+
+  await db.membroConversa.upsert({
+    where: { conversaId_userId: { conversaId: canal.id, userId: session.user.id } },
+    create: {
+      conversaId: canal.id,
+      userId: session.user.id,
+      papel: 'MEMBRO',
+      status: 'PENDENTE',
+    },
+    update: { status: 'PENDENTE', saiuEm: null, papel: 'MEMBRO' },
+  })
+
+  const [adminsLocais, adminsPermissao] = await Promise.all([
+    db.membroConversa.findMany({
+      where: { conversaId: canal.id, papel: 'ADMIN', status: 'ATIVO', saiuEm: null },
+      select: { userId: true },
+    }),
+    listarDestinatariosPorPermissoes(canal.tenantId, [
+      PERMISSIONS.CHANNELS_MANAGE,
+      PERMISSIONS.COMMUNITY_MANAGE,
+    ]),
+  ])
+  const destinatarios = new Set<string>([
+    ...adminsLocais.map((a: { userId: string }) => a.userId),
+    ...adminsPermissao,
+  ])
+  destinatarios.delete(session.user.id)
+
+  const nomeCanal = canal.nome ?? 'canal'
+  await Promise.all(
+    [...destinatarios].map((userId) =>
+      notificarSafe({
+        userId,
+        tenantId: canal.tenantId,
+        tipo: 'CANAL_PEDIDO',
+        titulo: 'Pedido para entrar no canal',
+        corpo: `${session.user.name ?? 'Um membro'} pediu para entrar em ${nomeCanal}.`,
+        link: linkCanalComunidade(canal.id),
+        atorId: session.user.id,
+      }),
+    ),
+  )
+
+  revalidatePath('/portal/comunidade/canais')
+  revalidatePath(linkCanalComunidade(canal.id))
+}
+
+/**
+ * Aprova/recusa um pedido de entrada. Autoridade: admin local do canal
+ * (temático) ou `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant — canal
+ * oficial soma `ANNOUNCEMENTS_PUBLISH` (mesmo conjunto de
+ * `podeGerenciarPedidosCanal`, checado aqui via `getCanalPorId`).
+ */
+export async function decidirPedidoCanal(
+  conversaId: string,
+  userId: string,
+  aprovar: boolean,
+): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = decidirPedidoCanalSchema.safeParse({ conversaId, userId, aprovar })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Decisão inválida')
+
+  const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+  if (!canal) throw new Error('Canal não encontrado.')
+
+  const efetivas = await permissoesEfetivas(session.user.id, canal.tenantId)
+  const podeDecidir = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
+  if (!podeDecidir) throw new Error('Sem permissão para decidir pedidos deste canal.')
+
+  const pedido: { id: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: canal.id,
+      userId: parsed.data.userId,
+      status: 'PENDENTE',
+      saiuEm: null,
+    },
+    select: { id: true },
+  })
+  if (!pedido) throw new Error('Pedido não encontrado.')
+
+  if (parsed.data.aprovar) {
+    await db.membroConversa.update({
+      where: { id: pedido.id },
+      data: { status: 'ATIVO', entrouEm: new Date() },
+    })
+    await notificarSafe({
+      userId: parsed.data.userId,
+      tenantId: canal.tenantId,
+      tipo: 'CANAL_APROVADO',
+      titulo: 'Entrada no canal aprovada',
+      corpo: `Você foi aceito em ${canal.nome ?? 'um canal'}.`,
+      link: linkCanalComunidade(canal.id),
+      atorId: session.user.id,
+    })
+  } else {
+    await db.membroConversa.update({
+      where: { id: pedido.id },
+      data: { status: 'REJEITADO' },
+    })
+    await notificarSafe({
+      userId: parsed.data.userId,
+      tenantId: canal.tenantId,
+      tipo: 'CANAL_REJEITADO',
+      titulo: 'Entrada no canal recusada',
+      corpo: `Seu pedido para ${canal.nome ?? 'um canal'} foi recusado.`,
+      link: '/portal/comunidade/canais',
+      atorId: session.user.id,
+    })
+  }
+
+  await db.auditLog.create({
+    data: {
+      tenantId: canal.tenantId,
+      atorId: session.user.id,
+      acao: parsed.data.aprovar ? 'CANAL_PEDIDO_APROVADO' : 'CANAL_PEDIDO_REJEITADO',
+      entidade: 'MembroConversa',
+      entidadeId: pedido.id,
+      detalhes: { conversaId: canal.id, userId: parsed.data.userId },
+    },
+  })
+
+  invalidarLeituraComunidade(canal.tenantId)
+  revalidatePath(linkCanalComunidade(canal.id))
+  revalidatePath('/portal/comunidade/canais')
+}
+
+const publicarPostCanalComMidiaSchema = publicarPostCanalSchema.extend({
+  midias: z.array(midiaUrlSchema).max(MAX_MIDIAS, 'Máximo de 10 anexos').default([]),
+})
+
+/**
+ * Publica no mural de um canal — mesmo `PublicarPostState`/`useActionState` do
+ * composer do feed principal (`FeedComposer`), para que o canal reutilize o
+ * componente de postagem em vez de um form próprio. Visibilidade é sempre
+ * `TENANT` (mural do canal, não escolha do autor); sem enquete/evento.
+ */
+export async function publicarPostCanal(
+  _prevState: PublicarPostState,
+  formData: FormData,
+): Promise<PublicarPostState> {
+  try {
+    const parsed = publicarPostCanalComMidiaSchema.safeParse({
+      conversaId: formData.get('conversaId'),
+      conteudo: formData.get('conteudo'),
+      midias: parseMidias(formData.get('midias')),
+    })
+    if (!parsed.success) {
+      return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos.' }
+    }
+
+    let session: Awaited<ReturnType<typeof assertPermission>>['session']
+    let tenant: Awaited<ReturnType<typeof assertPermission>>['tenant']
+    try {
+      ;({ session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_POST))
+      await assertMembroAtivo(tenant.id, session.user.id)
+    } catch (error) {
+      return { message: error instanceof Error ? error.message : 'Não autorizado.' }
+    }
+
+    const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+    if (erroMencoes) return { message: erroMencoes }
+
+    const efetivas = await permissoesEfetivas(session.user.id, tenant.id)
+    const canal = await getCanalPorId(parsed.data.conversaId, tenant.id, session.user.id)
+    if (!canal) return { message: 'Canal não encontrado.' }
+
+    if (!canal.souMembro) {
+      await inscreverCanal(parsed.data.conversaId, session.user.id)
+    }
+
+    const podePublicar = await podePublicarNoCanal(canal, tenant.id, efetivas)
+    if (canal.somenteAdminPublica && !podePublicar) {
+      return { message: 'Somente administradores podem publicar neste canal.' }
+    }
+
+    await getOrCreatePerfilMembro(session.user.id, tenant.id)
+
+    const post = await db.post.create({
+      data: {
+        tenantId: tenant.id,
+        autorId: session.user.id,
+        conteudo: parsed.data.conteudo,
+        midiaUrls: parsed.data.midias,
+        tipo: canal.institucional ? 'INSTITUCIONAL' : 'MEMBRO',
+        visibilidade: 'TENANT',
+        conversaId: parsed.data.conversaId,
+      },
+    })
+
+    agendarPosPublicacaoFeed({
+      postId: post.id,
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      conteudo: parsed.data.conteudo,
+      audit: {
+        acao: 'POST_CANAL_PUBLICADO',
+        detalhes: { conversaId: parsed.data.conversaId, canalOficial: canal.canalOficial },
+      },
+    })
+
+    invalidarLeituraComunidade(tenant.id)
+    revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+    if (canal.canalOficial) {
+      revalidatePath(linkUnidadeComunidade(tenant.id))
+    }
+
+    return {
+      success: true,
+      token: post.id,
+      preview: previewDoPost({
+        post,
+        autorId: session.user.id,
+        autorNome: session.user.name ?? null,
+        autorAvatar: session.user.image ?? null,
+        tenantNome: tenant.nome,
+      }),
+    }
+  } catch (error) {
+    console.error('[publicarPostCanal]', error)
+    return { message: 'Não foi possível publicar. Tente novamente.' }
+  }
 }
 
 export async function criarDestaquePerfil(titulo: string, postIds: string[]): Promise<void> {

@@ -8,20 +8,30 @@ import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
 import { getTenantRelation } from './hierarquia'
 import { getVisibleTenantIds } from './hierarquia'
-import { getEscopoEventosVisiveis } from './eventos'
-import { postInclude, projetarPost, finalizarPosts, type PostRaw, type PostSocialItem } from './feed'
+import {
+  postInclude,
+  projetarPost,
+  finalizarPosts,
+  buildCursorWhere,
+  decodeCursor,
+  encodeCursor,
+  type FeedOpts,
+  type FeedPersonalizadoResult,
+  type PostRaw,
+  type PostSocialItem,
+} from './feed'
 import type {
   CanalItem,
-  ComunicadoInstitucionalItem,
-  PerfilInstitucional,
+  MembroCanalItem,
+  PedidoCanalItem,
   UnidadeBuscaItem,
   VisibilidadeCanal,
 } from './canais-shared'
 
 export type {
   CanalItem,
-  ComunicadoInstitucionalItem,
-  PerfilInstitucional,
+  MembroCanalItem,
+  PedidoCanalItem,
   UnidadeBuscaItem,
   VisibilidadeCanal,
 } from './canais-shared'
@@ -52,6 +62,50 @@ export async function podeVerCanal(
     default:
       return false
   }
+}
+
+/**
+ * Fallback de avatar dos canais oficiais: quando `Conversa.avatarUrl` é nulo,
+ * usa `Sede.fotoUrl` da unidade dona do canal e, se também nulo,
+ * `Tenant.logoUrl`. Batch por tenantId para evitar N+1 em listagens.
+ */
+async function resolveFallbackAvatarsCanalOficial(
+  tenantIds: string[],
+): Promise<Map<string, string | null>> {
+  const uniqueIds = [...new Set(tenantIds)]
+  if (uniqueIds.length === 0) return new Map()
+
+  const [sedes, tenants]: [
+    Array<{ tenantId: string | null; fotoUrl: string | null }>,
+    Array<{ id: string; logoUrl: string | null }>,
+  ] = await Promise.all([
+    db.sede.findMany({
+      where: { tenantId: { in: uniqueIds } },
+      select: { tenantId: true, fotoUrl: true },
+    }),
+    db.tenant.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, logoUrl: true },
+    }),
+  ])
+  const sedeMap = new Map(sedes.filter((s) => s.tenantId).map((s) => [s.tenantId!, s.fotoUrl]))
+  const tenantMap = new Map(tenants.map((t) => [t.id, t.logoUrl]))
+
+  const result = new Map<string, string | null>()
+  for (const id of uniqueIds) {
+    result.set(id, sedeMap.get(id) ?? tenantMap.get(id) ?? null)
+  }
+  return result
+}
+
+/** Resolve o avatar efetivo de um `CanalItem`, aplicando o fallback só para canais oficiais. */
+function resolveAvatarCanalOficial(
+  row: { tenantId: string; avatarUrl: string | null; canalOficial: boolean },
+  fallbackMap: Map<string, string | null>,
+): string | null {
+  if (row.avatarUrl) return row.avatarUrl
+  if (!row.canalOficial) return null
+  return fallbackMap.get(row.tenantId) ?? null
 }
 
 async function resolverOwnerId(tenantId: string): Promise<string> {
@@ -118,10 +172,12 @@ export async function getOrCreateCanalOficial(
       canalOficial: true,
       visibilidadeCanal: 'HIERARQUIA',
       somenteAdminPublica: true,
-      publica: true,
+      // Fechado por padrão — entrada mediante pedido/aprovação da liderança;
+      // liderança troca em /admin/configuracoes se quiser abrir (ver salvarCanalOficial).
+      publica: false,
       criadoPorId,
       membros: {
-        create: { userId: criadoPorId, papel: 'ADMIN' },
+        create: { userId: criadoPorId, papel: 'ADMIN', status: 'ATIVO' },
       },
     },
     select: { id: true },
@@ -130,14 +186,15 @@ export async function getOrCreateCanalOficial(
   return { id: canal.id, criadoAgora: true }
 }
 
+/** Entrada imediata (canal `publica: true`) — sem pedido, sem aprovação. */
 export async function inscreverCanal(
   conversaId: string,
   userId: string,
 ): Promise<void> {
   await db.membroConversa.upsert({
     where: { conversaId_userId: { conversaId, userId } },
-    create: { conversaId, userId, papel: 'MEMBRO' },
-    update: { saiuEm: null },
+    create: { conversaId, userId, papel: 'MEMBRO', status: 'ATIVO' },
+    update: { saiuEm: null, status: 'ATIVO' },
   })
 }
 
@@ -188,27 +245,28 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     { revalidate: 120, tags: [tagCanaisVisiveis(viewerTenantId)] },
   )()
 
-  const memberships: Array<{ conversaId: string; papel: 'ADMIN' | 'MEMBRO' }> =
-    await db.membroConversa.findMany({
-      where: {
-        userId,
-        saiuEm: null,
-        conversaId: { in: rows.map((row) => row.id) },
-      },
-      select: { conversaId: true, papel: true },
-    })
-  const membershipMap = new Map(
-    memberships.map((item: { conversaId: string; papel: 'ADMIN' | 'MEMBRO' }) => [
-      item.conversaId,
-      item,
-    ]),
-  )
+  const memberships: Array<{
+    conversaId: string
+    papel: 'ADMIN' | 'MEMBRO'
+    status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+  }> = await db.membroConversa.findMany({
+    where: {
+      userId,
+      saiuEm: null,
+      conversaId: { in: rows.map((row) => row.id) },
+    },
+    select: { conversaId: true, papel: true, status: true },
+  })
+  const membershipMap = new Map(memberships.map((item) => [item.conversaId, item]))
 
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
   // React.cache, então pares (viewer, tenant) repetidos não repetem query.
-  const visiveis = await Promise.all(
-    rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)),
-  )
+  const [visiveis, fallbackAvatars] = await Promise.all([
+    Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal))),
+    resolveFallbackAvatarsCanalOficial(
+      rows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
+    ),
+  ])
 
   const result: CanalItem[] = []
   rows.forEach((row, i) => {
@@ -219,15 +277,16 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       tenantId: row.tenantId,
       nome: row.nome,
       descricao: row.descricao,
-      avatarUrl: row.avatarUrl,
+      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
       visibilidadeCanal: row.visibilidadeCanal,
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
       membros: row._count.membros,
-      souMembro: Boolean(membro),
-      souAdmin: membro?.papel === 'ADMIN',
+      souMembro: membro?.status === 'ATIVO',
+      souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+      pedidoPendente: membro?.status === 'PENDENTE',
       tenantNome: formatNomeTorcida(row.tenant.nome),
     })
   })
@@ -253,7 +312,7 @@ export async function getCanalPorId(
     tipo: string
     tenant: { nome: string }
     _count: { membros: number }
-    membros: Array<{ papel: 'ADMIN' | 'MEMBRO' }>
+    membros: Array<{ papel: 'ADMIN' | 'MEMBRO'; status: 'ATIVO' | 'PENDENTE' | 'REJEITADO' }>
   } | null = await db.conversa.findFirst({
     where: { id: conversaId, tipo: 'CANAL' },
     select: {
@@ -272,7 +331,7 @@ export async function getCanalPorId(
       _count: { select: { membros: { where: { saiuEm: null } } } },
       membros: {
         where: { userId, saiuEm: null },
-        select: { papel: true },
+        select: { papel: true, status: true },
         take: 1,
       },
     },
@@ -282,21 +341,27 @@ export async function getCanalPorId(
   const podeVer = await podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal)
   if (!podeVer) return null
 
+  const fallbackAvatars =
+    row.canalOficial && !row.avatarUrl
+      ? await resolveFallbackAvatarsCanalOficial([row.tenantId])
+      : new Map<string, string | null>()
+
   const membro = row.membros[0]
   return {
     id: row.id,
     tenantId: row.tenantId,
     nome: row.nome,
     descricao: row.descricao,
-    avatarUrl: row.avatarUrl,
+    avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
     institucional: row.institucional,
     canalOficial: row.canalOficial,
     visibilidadeCanal: row.visibilidadeCanal,
     somenteAdminPublica: row.somenteAdminPublica,
     publica: row.publica,
     membros: row._count.membros,
-    souMembro: Boolean(membro),
-    souAdmin: membro?.papel === 'ADMIN',
+    souMembro: membro?.status === 'ATIVO',
+    souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+    pedidoPendente: membro?.status === 'PENDENTE',
     tenantNome: formatNomeTorcida(row.tenant.nome),
   }
 }
@@ -305,21 +370,62 @@ export async function getPostsDoCanal(
   conversaId: string,
   tenantId: string,
   userId: string,
-): Promise<PostSocialItem[]> {
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
   const membro: { id: string } | null = await db.membroConversa.findFirst({
-    where: { conversaId, userId, saiuEm: null },
+    where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
     select: { id: true },
   })
-  if (!membro) return []
+  if (!membro) return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const cursorWhere = buildCursorWhere(decodeCursor(opts.cursor))
 
   const postsRaw = (await db.post.findMany({
-    where: { conversaId, tenantId, oculto: false },
-    orderBy: { criadoEm: 'desc' },
-    take: 50,
+    where: { conversaId, tenantId, oculto: false, ...cursorWhere },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
     include: postInclude(userId),
   })) as PostRaw[]
 
-  return finalizarPosts(postsRaw.map(projetarPost))
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+}
+
+/**
+ * Lista membros ativos de um canal (para o modal de delegação de admin —
+ * Tarefa D2). Sem gate de visibilidade próprio: quem chama já deve ter
+ * confirmado `canal.souAdmin` (ou permissão equivalente) antes de exibir a UI.
+ */
+export async function listMembrosCanal(conversaId: string): Promise<MembroCanalItem[]> {
+  const rows: Array<{
+    userId: string
+    papel: 'ADMIN' | 'MEMBRO'
+    user: { nome: string | null; avatarUrl: string | null }
+  }> = await db.membroConversa.findMany({
+    where: { conversaId, saiuEm: null },
+    orderBy: [{ papel: 'asc' }],
+    select: {
+      userId: true,
+      papel: true,
+      user: { select: { nome: true, avatarUrl: true } },
+    },
+  })
+  return rows.map((row) => ({
+    userId: row.userId,
+    nome: row.user.nome,
+    avatarUrl: row.user.avatarUrl,
+    papel: row.papel,
+  }))
 }
 
 export async function podePublicarNoCanal(
@@ -338,91 +444,55 @@ export async function podePublicarNoCanal(
   )
 }
 
-export const getPerfilInstitucional = cache(async function getPerfilInstitucional(
-  targetTenantId: string,
+/**
+ * Quem pode ver/decidir pedidos de entrada de um canal fechado
+ * (`publica: false`): admin local do canal (temático) ou quem tem
+ * `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant — para canal oficial soma
+ * `ANNOUNCEMENTS_PUBLISH` (mesmo conjunto de `podePublicarNoCanal`, já que
+ * canal oficial não delega admin via `MembroConversa`).
+ */
+export async function podeGerenciarPedidosCanal(
+  canal: Pick<CanalItem, 'tenantId' | 'canalOficial' | 'souAdmin'>,
   viewerTenantId: string,
-  userId: string,
   permissoes: string[],
-): Promise<PerfilInstitucional | null> {
-  const podeVer = await podeVerCanal(viewerTenantId, targetTenantId, 'HIERARQUIA')
-  if (!podeVer) {
-    const alliedOk = await podeVerCanal(viewerTenantId, targetTenantId, 'ALIADOS')
-    if (!alliedOk) return null
-  }
+): Promise<boolean> {
+  if (canal.tenantId !== viewerTenantId) return false
+  if (canal.souAdmin) return true
+  const { PERMISSIONS, hasPermission } = await import('@torcida/types')
+  return (
+    hasPermission(permissoes, PERMISSIONS.CHANNELS_MANAGE) ||
+    hasPermission(permissoes, PERMISSIONS.COMMUNITY_MANAGE) ||
+    (canal.canalOficial && hasPermission(permissoes, PERMISSIONS.ANNOUNCEMENTS_PUBLISH))
+  )
+}
 
-  // escopoEventos é independente de tenant/sede/canal → entra no mesmo round-trip.
-  const [tenant, sede, canalOficial, escopoEventos] = await Promise.all([
-    db.tenant.findUnique({
-      where: { id: targetTenantId, ativo: true },
-      select: { id: true, nome: true, logoUrl: true, corPrimaria: true },
-    }),
-    db.sede.findFirst({
-      where: { tenantId: targetTenantId },
-      select: { tipo: true, cidade: true },
-    }),
-    getOrCreateCanalOficial(targetTenantId),
-    getEscopoEventosVisiveis(targetTenantId, userId),
-  ])
-  if (!tenant) return null
-
-  await inscreverCanal(canalOficial.id, userId)
-
-  const canal = await getCanalPorId(canalOficial.id, viewerTenantId, userId)
-  if (!canal) return null
-
-  const [comunicados, postsInstRaw, postsCanalRaw, proximosEventos] = await Promise.all([
-    db.announcement.findMany({
-      where: { tenantId: targetTenantId },
-      orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
-      take: 10,
-      select: {
-        id: true,
-        titulo: true,
-        corpo: true,
-        prioridade: true,
-        fixado: true,
-        publicadoEm: true,
-      },
-    }),
-    db.post.findMany({
-      where: { tenantId: targetTenantId, tipo: 'INSTITUCIONAL', oculto: false, conversaId: null },
-      orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
-      take: 20,
-      include: postInclude(userId),
-    }) as Promise<PostRaw[]>,
-    db.post.findMany({
-      where: { conversaId: canalOficial.id, tenantId: targetTenantId, oculto: false },
-      orderBy: { criadoEm: 'desc' },
-      take: 30,
-      include: postInclude(userId),
-    }) as Promise<PostRaw[]>,
-    db.evento.findMany({
-      where: { ...escopoEventos, data: { gte: new Date() } },
-      orderBy: { data: 'asc' },
-      take: 5,
-      select: { id: true, titulo: true, data: true, local: true },
-    }),
-  ])
-
-  const postsInstitucionais = await finalizarPosts(postsInstRaw.map(projetarPost))
-  const postsCanal = await finalizarPosts(postsCanalRaw.map(projetarPost))
-
-  return {
-    tenantId: tenant.id,
-    nome: formatNomeTorcida(tenant.nome),
-    logoUrl: tenant.logoUrl,
-    corPrimaria: tenant.corPrimaria,
-    tipo: sede?.tipo ?? 'SEDE',
-    cidade: sede?.cidade ?? null,
-    canalOficialId: canalOficial.id,
-    souMembroCanal: canal.souMembro,
-    podePublicar: await podePublicarNoCanal(canal, viewerTenantId, permissoes),
-    comunicados,
-    postsInstitucionais,
-    postsCanal,
-    proximosEventos,
-  }
-})
+/**
+ * Lista pedidos de entrada pendentes de um canal fechado. Sem gate de
+ * visibilidade próprio — quem chama já deve ter confirmado
+ * `podeGerenciarPedidosCanal` antes de exibir a UI (mesmo padrão de
+ * `listMembrosCanal`).
+ */
+export async function listPedidosCanal(conversaId: string): Promise<PedidoCanalItem[]> {
+  const rows: Array<{
+    userId: string
+    entrouEm: Date
+    user: { nome: string | null; avatarUrl: string | null }
+  }> = await db.membroConversa.findMany({
+    where: { conversaId, status: 'PENDENTE', saiuEm: null },
+    orderBy: { entrouEm: 'asc' },
+    select: {
+      userId: true,
+      entrouEm: true,
+      user: { select: { nome: true, avatarUrl: true } },
+    },
+  })
+  return rows.map((row) => ({
+    userId: row.userId,
+    nome: row.user.nome,
+    avatarUrl: row.user.avatarUrl,
+    pedidoEm: row.entrouEm.toISOString(),
+  }))
+}
 
 export async function listUnidadesVisiveis(
   viewerTenantId: string,
@@ -481,7 +551,7 @@ export async function buscarCanaisEUnidades(
       publica: boolean
       tenant: { nome: string }
       _count: { membros: number }
-      membros: Array<{ papel: 'ADMIN' | 'MEMBRO' }>
+      membros: Array<{ papel: 'ADMIN' | 'MEMBRO'; status: 'ATIVO' | 'PENDENTE' | 'REJEITADO' }>
     }>,
     Array<{ id: string; nome: string; logoUrl: string | null }>,
   ] = await Promise.all([
@@ -510,7 +580,7 @@ export async function buscarCanaisEUnidades(
         _count: { select: { membros: { where: { saiuEm: null } } } },
         membros: {
           where: { userId, saiuEm: null },
-          select: { papel: true },
+          select: { papel: true, status: true },
           take: 1,
         },
       },
@@ -527,9 +597,10 @@ export async function buscarCanaisEUnidades(
   ])
 
   // Visibilidade dos canais e busca de sedes das unidades são independentes.
-  const [canaisVisiveis, sedes]: [
+  const [canaisVisiveis, sedes, fallbackAvatars]: [
     Array<(typeof canalRows)[number] | null>,
     Array<{ tenantId: string | null; tipo: string; cidade: string | null }>,
+    Map<string, string | null>,
   ] = await Promise.all([
     Promise.all(
       canalRows.map(async (row) => {
@@ -541,6 +612,9 @@ export async function buscarCanaisEUnidades(
       where: { tenantId: { in: tenantRows.map((t) => t.id) } },
       select: { tenantId: true, tipo: true, cidade: true },
     }),
+    resolveFallbackAvatarsCanalOficial(
+      canalRows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
+    ),
   ])
 
   const canais: CanalItem[] = []
@@ -552,15 +626,16 @@ export async function buscarCanaisEUnidades(
       tenantId: row.tenantId,
       nome: row.nome,
       descricao: row.descricao,
-      avatarUrl: row.avatarUrl,
+      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
       visibilidadeCanal: row.visibilidadeCanal,
       somenteAdminPublica: row.somenteAdminPublica,
       publica: row.publica,
       membros: row._count.membros,
-      souMembro: Boolean(membro),
-      souAdmin: membro?.papel === 'ADMIN',
+      souMembro: membro?.status === 'ATIVO',
+      souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
+      pedidoPendente: membro?.status === 'PENDENTE',
       tenantNome: formatNomeTorcida(row.tenant.nome),
     })
   }

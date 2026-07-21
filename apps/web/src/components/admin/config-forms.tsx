@@ -20,6 +20,7 @@ import {
   salvarBalancoFinanceiroVisivel,
   salvarBalancoDetalheNivel,
   salvarHierarquiaVisivel,
+  salvarCanalOficial,
   criarRole,
   atualizarRole,
   excluirRole,
@@ -378,6 +379,168 @@ export function AfiliacaoForm({ afiliacaoId, afiliacoes }: AfiliacaoFormProps) {
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Salvar afiliação
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Canal oficial (mural desta unidade na Comunidade) ────────────────────────
+
+const VISIBILIDADE_CANAL_OPCOES: Array<{ value: string; label: string; hint: string }> = [
+  { value: 'TENANT', label: 'Só esta torcida', hint: 'Visível apenas para membros desta torcida' },
+  { value: 'HIERARQUIA', label: 'Hierarquia', hint: 'Sede, subsedes e PDEs da mesma árvore' },
+  { value: 'ALIADOS', label: 'Hierarquia + aliados', hint: 'Também visível para torcidas aliadas' },
+  { value: 'PUBLICO', label: 'Comunidade aberta', hint: 'Qualquer torcedor com acesso à Comunidade' },
+]
+
+interface CanalOficialFormProps {
+  nome: string
+  descricao: string | null
+  avatarUrl: string | null
+  visibilidadeCanal: string
+  somenteAdminPublica: boolean
+  publica: boolean
+}
+
+export function CanalOficialForm({
+  nome,
+  descricao,
+  avatarUrl,
+  visibilidadeCanal,
+  somenteAdminPublica,
+  publica,
+}: CanalOficialFormProps) {
+  const [pending, startTransition] = useTransition()
+  const { formRef, markPristine } = useTrackedForm({ title: 'Canal oficial' })
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    fd.set('somenteAdminPublica', fd.has('somenteAdminPublica') ? 'true' : 'false')
+    fd.set('publica', fd.has('publica') ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarCanalOficial(fd), {
+        success: 'Canal oficial atualizado.',
+      })
+      if (ok) markPristine()
+    })
+  }
+
+  return (
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Identidade e regras do mural oficial desta unidade na{' '}
+        <Link
+          href="/portal/comunidade/canais"
+          className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
+        >
+          Comunidade
+        </Link>
+        . Sem foto definida, usa a foto da sede ou o logo da torcida.
+      </p>
+
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+          Nome do canal
+        </label>
+        <input
+          name="nome"
+          defaultValue={nome}
+          required
+          minLength={3}
+          maxLength={80}
+          className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+          Descrição
+        </label>
+        <textarea
+          name="descricao"
+          defaultValue={descricao ?? ''}
+          maxLength={280}
+          rows={2}
+          className="mt-1.5 w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+          Foto do canal (URL)
+        </label>
+        <input
+          name="avatarUrl"
+          defaultValue={avatarUrl ?? ''}
+          placeholder="https://…"
+          className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+          Quem pode ver este canal
+        </label>
+        <select
+          name="visibilidadeCanal"
+          defaultValue={visibilidadeCanal}
+          className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+        >
+          {VISIBILIDADE_CANAL_OPCOES.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+          {VISIBILIDADE_CANAL_OPCOES.find((o) => o.value === visibilidadeCanal)?.hint}
+        </p>
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          name="somenteAdminPublica"
+          defaultChecked={somenteAdminPublica}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Só administradores publicam
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            Desative para deixar qualquer membro publicar no mural
+          </span>
+        </span>
+      </label>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          name="publica"
+          defaultChecked={publica}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Canal aberto
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            Desative para exigir pedido de entrada — a liderança aprova cada torcedor
+          </span>
+        </span>
+      </label>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="flex items-center gap-2 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Salvar canal oficial
         </button>
       </div>
     </form>

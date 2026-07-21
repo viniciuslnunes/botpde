@@ -23,6 +23,7 @@ import {
 import { NotificationBell } from '@/components/portal/notification-bell'
 import { markNavbarNotificationRead, refreshNavbarContext } from '@/lib/use-navbar-context'
 import { useNavbarContext } from '@/lib/use-navbar-context'
+import { useNavbarBrandOverride } from '@/lib/navbar-brand-override'
 import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
@@ -76,6 +77,10 @@ export function PortalNavbar({
   const pathname = usePathname()
   const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
+  const { override: brandOverride } = useNavbarBrandOverride()
+  // Override cosmético (visão de canal): substitui só o slot esquerdo, sem
+  // afetar sessão/tenant ativo/permissões.
+  const brandTenant = brandOverride ?? tenant
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
   const [trocarTorcidaOpen, setTrocarTorcidaOpen] = useState(false)
@@ -136,29 +141,29 @@ export function PortalNavbar({
         <div className="app-container flex h-14 items-center gap-4">
 
           <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
-            {tenant.logoUrl ? (
-              canOptimizeImageUrl(tenant.logoUrl) ? (
+            {brandTenant.logoUrl ? (
+              canOptimizeImageUrl(brandTenant.logoUrl) ? (
                 <Image
-                  src={tenant.logoUrl}
-                  alt={tenant.nome}
+                  src={brandTenant.logoUrl}
+                  alt={brandTenant.nome}
                   width={28}
                   height={28}
                   className="h-7 w-7 shrink-0 rounded-lg object-contain"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={tenant.logoUrl} alt={tenant.nome} className="h-7 w-7 shrink-0 rounded-lg object-contain" />
+                <img src={brandTenant.logoUrl} alt={brandTenant.nome} className="h-7 w-7 shrink-0 rounded-lg object-contain" />
               )
             ) : (
               <div
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
-                style={{ backgroundColor: tenant.corPrimaria }}
+                style={{ backgroundColor: brandTenant.corPrimaria }}
               >
-                {tenant.nome.charAt(0).toUpperCase()}
+                {brandTenant.nome.charAt(0).toUpperCase()}
               </div>
             )}
             <span className="hidden truncate text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground))] sm:block sm:max-w-[10rem] lg:max-w-[14rem]">
-              {tenant.nome}
+              {brandTenant.nome}
             </span>
           </PortalNavLink>
 

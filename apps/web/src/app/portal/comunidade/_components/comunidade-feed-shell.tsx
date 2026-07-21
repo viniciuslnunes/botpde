@@ -5,16 +5,11 @@ import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeFeedBootstrap } from './comunidade-feed-bootstrap'
-import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
+import { ComunidadeAsideRail } from './comunidade-aside-rail'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { FeedLiveBanner } from './feed-live-banner'
-import { ComunidadeFeedNav, ComunidadeFeedNavFallback } from './comunidade-feed-nav'
 import { ComunidadeComposerSection } from './comunidade-composer-section'
-import {
-  ComunidadeUserCardSection,
-  ComunidadeUserCardFallback,
-} from './comunidade-user-card-section'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
 interface CurrentUser {
@@ -46,15 +41,6 @@ function ComunicadosFallback() {
   return <div className="h-16 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
 }
 
-function AsideWidgetsFallback() {
-  return (
-    <>
-      <div className="h-32 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-      <div className="h-40 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
-    </>
-  )
-}
-
 function ComposerFallback() {
   return (
     <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
@@ -73,49 +59,7 @@ export function ComunidadeFeedShell({
 }: ComunidadeFeedShellProps) {
   return (
     <>
-      <aside className="hidden lg:block">
-        <div className="sticky top-20 space-y-4">
-          {currentUser.id ? (
-            <Suspense
-              fallback={
-                <ComunidadeUserCardFallback
-                  tenantNome={tenant.nome}
-                  userName={currentUser.nome}
-                  userAvatar={currentUser.avatarUrl}
-                />
-              }
-            >
-              <ComunidadeUserCardSection
-                tenantId={tenant.id}
-                tenantNome={tenant.nome}
-                userId={currentUser.id}
-                userName={currentUser.nome}
-                userAvatar={currentUser.avatarUrl}
-              />
-            </Suspense>
-          ) : null}
-
-          {currentUser.id ? (
-            <Suspense fallback={<ComunidadeFeedNavFallback />}>
-              <ComunidadeFeedNav
-                tenantId={tenant.id}
-                userId={currentUser.id}
-                currentUserId={currentUser.id}
-                mostrarBalanco={tenant.balancoFinanceiroVisivel === true}
-              />
-            </Suspense>
-          ) : null}
-
-          <Suspense fallback={<AsideWidgetsFallback />}>
-            <ComunidadeAsideWidgets
-              tenantId={tenant.id}
-              afiliacaoId={tenant.afiliacaoId}
-              currentUserId={currentUser.id || undefined}
-              salasAoVivo={salasAtivas}
-            />
-          </Suspense>
-        </div>
-      </aside>
+      <ComunidadeAsideRail tenant={tenant} currentUser={currentUser} salasAtivas={salasAtivas} />
 
       <main className="min-w-0 space-y-4">
         {clubeNacional && somentePublicoHint && (

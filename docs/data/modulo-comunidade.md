@@ -170,9 +170,118 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
 
 ## Canais institucionais (M3 mensageria)
 
-- **Perfil oficial por unidade** — `/portal/comunidade/unidade/[tenantId]` agrega comunicados, mural institucional, eventos e canal oficial auto-provisionado.
-- **Canal oficial** — um `Conversa` `tipo: CANAL` com `canalOficial: true` por tenant; publicação restrita a admins (`CHANNELS_MANAGE`, `COMMUNITY_MANAGE` ou `ANNOUNCEMENTS_PUBLISH`).
-- **Comunidades temáticas** — admins criam canais com visibilidade `TENANT` / `HIERARQUIA` / `ALIADOS` / `PUBLICO`.
+**Redesenho 2026-07-21 — canal como feed, não como tela própria:**
+`/portal/comunidade/canais/[id]` é a única rota de visualização (`canal-feed-view.tsx`
++ `canal-feed-composition.tsx`); `/portal/comunidade/unidade/[tenantId]` virou um
+resolver que checa `podeVerCanal` (hierarquia/aliados), provisiona o canal oficial
+(`getOrCreateCanalOficial`) e redireciona para `/canais/[canalOficialId]` — sem tela
+de "perfil institucional" própria (cabeçalho grande + abas Mural/Comunicados/Eventos
+foi removido; `Announcement`/eventos da unidade não aparecem mais nessa tela — Agenda
+cobre eventos separadamente; comunicados oficiais continuam globais/fora do canal —
+não são `Post`, então nunca entram no mural nichado). O canal reusa os mesmos blocos
+visuais do feed principal: `ComunidadePostsSection`/`ComunidadeFeedInfinite` ganharam
+um modo `filtro: 'canal'` + `conversaId` que chama `getPostsDoCanal` (paginado por
+cursor, mesmo formato de `getPostsParaFeed`/`getPostsDaRede`), renderizado com o
+mesmo `ComunidadePostsAnimated`/`FeedPostCard` de sempre. A página ganhou a mesma
+coluna esquerda do feed (`ComunidadeAsideRail`, extraída de `ComunidadeFeedShell` —
+card do sócio + nav + widgets); cabeçalho do canal continua fino (escudo + nome +
+badge Oficial/Temático + membros).
+
+**Redesenho 2026-07-21 (cont.) — composer único:** o canal publica com o **mesmo**
+`FeedComposer` do feed principal (`canal-composer-section.tsx`), não uma caixa de
+texto própria — mídia, menções, emoji e sticker idênticos. A prop `canal={{
+conversaId, nome }}` troca o alvo da publicação (`publicarPostCanal`, mesmo
+`useActionState`/`PublicarPostState`/preview otimista de `publicarPost`) e some com
+enquete/evento/seletor de alcance (visibilidade do canal é sempre "membros do
+canal", não escolha do autor). `publicarPostCanal` ganhou suporte a `midias` e
+passou a invalidar o cache do feed (`invalidarLeituraComunidade`) — mesmo caminho de
+pós-publicação (`agendarPosPublicacaoFeed`: hashtags, menções, audit) do post normal.
+O contexto do composer (`getComposerContext` — perfil privado, bloqueio de
+publicação) é resolvido pelo **tenant ativo de quem publica**, não por
+`canal.tenantId` — é o que `publicarPostCanal`/`assertPermission` checam de fato
+(publicar num canal só funciona com o tenant ativo igual ao dono do canal).
+
+- **Dois fluxos distintos de identidade ao abrir um canal**:
+  - **Vínculo próprio** (o usuário é sócio aprovado do tenant dono do canal) → troca
+    real de tenant via `TorcidaContextSwitcher`/`trocarTorcidaAction` (torcida/lib
+    de troca já existente) — leva pro portal real daquela torcida, sem overlay.
+  - **Demais casos** (hierarquia sem vínculo próprio, canal temático) → override
+    cosmético: `NavbarBrandOverrideProvider`/`useNavbarBrandOverride`
+    (`apps/web/src/lib/navbar-brand-override.tsx`) + `CanalNavbarOverride`
+    (montado dentro de `canal-feed-composition.tsx`) trocam nome/escudo/cor no
+    canto esquerdo da `PortalNavbar` enquanto a rota está ativa, sem tocar sessão,
+    tenant ativo real ou permissões — reverte ao sair da rota.
+- **Canal oficial** — um `Conversa` `tipo: CANAL` com `canalOficial: true` por tenant
+  (`getOrCreateCanalOficial`); publicação restrita a admins (`CHANNELS_MANAGE`,
+  `COMMUNITY_MANAGE` ou `ANNOUNCEMENTS_PUBLISH`); avatar resolvido com fallback
+  `Sede.fotoUrl` → `Tenant.logoUrl` quando `Conversa.avatarUrl` é nulo
+  (`resolveAvatarCanalOficial` em `lib/canais.ts`) — não depende de setar
+  `Conversa.avatarUrl` manualmente. Governança segue o RBAC do tenant da unidade
+  (sem cascata especial de permissão por `Sede.tipo`).
+- **Comunidades temáticas** — sócios com `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` criam
+  canais (`criarCanalTematico`, aceita `avatarUrl` opcional) com visibilidade
+  `TENANT`/`HIERARQUIA`/`ALIADOS`/`PUBLICO`; criador vira `MembroConversa` ADMIN.
+  **Delegação de admin**: `alterarAdminCanal(conversaId, targetUserId, papel)`
+  (só para canais não-oficiais; quem chama precisa ser ADMIN do canal ou ter
+  `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant; alvo precisa já ser membro ativo)
+  — exposta no menu "..." do cabeçalho do canal, grava `AuditLog`.
+- **Edição de canal (2026-07-21) — duas superfícies, RBAC diferente:**
+  - **Canal oficial** — seção "Canal oficial" em `/admin/configuracoes`
+    (`CanalOficialForm` em `config-forms.tsx` + `salvarCanalOficial` em
+    `admin/configuracoes/actions.ts`, gate `PERMISSIONS.SETTINGS_MANAGE`).
+    Edita `nome`/`descricao`/`avatarUrl`/`visibilidadeCanal`/
+    `somenteAdminPublica`/`publica` do canal do **tenant ativo de quem
+    acessa** (`getOrCreateCanalOficial(tenant.id)` — só resolve/cria quando
+    `isOwner`, pra não materializar o canal como efeito colateral de uma
+    visita sem a permissão real). Para uma subsede/PDE promovida a tenant
+    próprio (Caso B), é a liderança logada no próprio painel admin da unidade
+    que edita o canal dela — não o admin da Sede-mãe mexendo numa linha de
+    `Sede`.
+  - **Canal temático** — modal "Configurações do canal" no menu "..." do
+    próprio canal (`CanalConfigModal` em `canal-feed-composition.tsx` +
+    `atualizarCanalTematico` em `comunidade/actions.ts`), visível pra quem já
+    vê "Gerenciar administradores" (`canal.souAdmin && !canal.canalOficial`);
+    a action rejeita `canal.canalOficial` no servidor como segunda camada.
+    Mesmos campos do canal oficial; formulário nativo (`useActionState` +
+    `<form action={...}>`, sem `preventDefault`/`FormData` manual).
+  - Schemas compartilhados: `editarCanalOficialSchema`/
+    `atualizarCanalTematicoSchema` em `packages/types/src/comunidade-social.js`
+    (`canalEditavelBase` comum; o temático soma `conversaId`).
+- **Canal fechado + pedido de entrada (2026-07-21):** `Conversa.publica: false`
+  agora significa "entrada mediante pedido", mesmo modelo já usado por Grupos
+  — reaproveita o enum `StatusMembroConversa` (`ATIVO`/`PENDENTE`/`REJEITADO`)
+  em vez de uma tabela de solicitação separada. `CanalItem` ganhou
+  `pedidoPendente` (deriva do `status` do `MembroConversa` do viewer;
+  `souMembro`/`souAdmin` agora exigem `status: 'ATIVO'`, não só existência da
+  linha).
+  - **Canal oficial** — `getOrCreateCanalOficial` cria com `publica: false`
+    por padrão (fechado); a liderança abre em `/admin/configuracoes` (mesmo
+    form `CanalOficialForm`/`salvarCanalOficial` da seção anterior).
+  - **Canal temático** — `criarCanalTematico` ganhou parâmetro `publica`
+    (checkbox "Canal privado" no form de criação em `canais-client.tsx`,
+    default aberto).
+  - **Pedir entrada**: `pedirEntradaCanal(conversaId)` — upsert de
+    `MembroConversa` em `PENDENTE`, notifica (`CANAL_PEDIDO`) os admins locais
+    do canal (temático) + quem tem `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no
+    tenant. Botão "Pedir para entrar" no cabeçalho do canal
+    (`canal-feed-composition.tsx`) e na listagem (`canais-client.tsx`);
+    `canal.pedidoPendente` mostra "Pedido enviado" (desabilitado) em vez de
+    duplicar o pedido.
+  - **Decidir pedido**: `decidirPedidoCanal(conversaId, userId, aprovar)` —
+    autoridade via `podeGerenciarPedidosCanal` (`lib/canais.ts`): admin local
+    do canal (temático) OU `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant;
+    canal oficial soma `ANNOUNCEMENTS_PUBLISH` (não delega admin via
+    `MembroConversa` — ver nota em `alterarAdminCanal`). Aprovar seta
+    `status: ATIVO`; recusar seta `REJEITADO` (linha persiste, permite novo
+    pedido depois via upsert). Notifica `CANAL_APROVADO`/`CANAL_REJEITADO`.
+  - **UI de aprovação**: modal "Pedidos pendentes" no menu "..." do canal
+    (`PedidosCanalModal`), com badge de contagem; lista vem de
+    `listPedidosCanal(conversaId)` (sem gate próprio — quem chama já checou
+    `podeGerenciarPedidosCanal`, mesmo padrão de `listMembrosCanal`).
+  - **Notificações**: `TipoNotificacao` ganhou `CANAL_PEDIDO`/
+    `CANAL_APROVADO`/`CANAL_REJEITADO` (enum Prisma — exigiu `db:generate` +
+    `db:push`); registradas em `notification-item-visual.tsx` (ícone/título) e
+    `notificacoes-routing.ts` (`escopo: 'social'`, mesmo de `GRUPO_*`).
 - **Busca** — `/api/comunidade/busca` (`modo=completa`) inclui canais e unidades da hierarquia visível; typeahead do feed usa `modo=rapida` (sem canais). Invariantes: § busca acima.
 - **Permissão** — `channels:manage` (owner/admin por padrão; rodar `repair-system-role-permissions` em produção).
 

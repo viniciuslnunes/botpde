@@ -2,14 +2,16 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, MessageSquare, Flag, Scale, Network } from 'lucide-react'
+import { Settings, MessageSquare, Flag, Scale, Network, Radio } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   AfiliacaoForm,
   BalancoVisivelForm,
   HierarquiaVisivelForm,
+  CanalOficialForm,
 } from '@/components/admin/config-forms'
+import { getOrCreateCanalOficial } from '@/lib/canais'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Configurações — Admin' }
@@ -39,6 +41,33 @@ export default async function ConfiguracoesPage() {
       select: { id: true, nome: true },
     }),
   ])
+
+  // Só resolve/cria o canal oficial para quem de fato vê a seção — evita que
+  // qualquer visita de admin sem SETTINGS_MANAGE (gate real da action) crie o
+  // canal como efeito colateral do carregamento da página.
+  const canalOficial: {
+    nome: string | null
+    descricao: string | null
+    avatarUrl: string | null
+    visibilidadeCanal: string
+    somenteAdminPublica: boolean
+    publica: boolean
+  } | null = isOwner
+    ? await (async () => {
+        const { id: canalOficialId } = await getOrCreateCanalOficial(tenant.id)
+        return db.conversa.findUnique({
+          where: { id: canalOficialId },
+          select: {
+            nome: true,
+            descricao: true,
+            avatarUrl: true,
+            visibilidadeCanal: true,
+            somenteAdminPublica: true,
+            publica: true,
+          },
+        })
+      })()
+    : null
 
   const sections = [
     {
@@ -74,6 +103,13 @@ export default async function ConfiguracoesPage() {
       icon: Network,
       title: 'Hierarquia da torcida',
       description: 'Controle o que subsedes e PDEs enxergam da estrutura completa',
+      ownerOnly: true,
+    },
+    {
+      id: 'canal-oficial',
+      icon: Radio,
+      title: 'Canal oficial',
+      description: 'Nome, foto, visibilidade e regras do mural desta unidade na Comunidade',
       ownerOnly: true,
     },
   ]
@@ -146,6 +182,15 @@ export default async function ConfiguracoesPage() {
                     <HierarquiaVisivelForm
                       key={String(tenant.hierarquiaVisivelParaFilhos)}
                       visivel={tenant.hierarquiaVisivelParaFilhos}
+                    />
+                  ) : section.id === 'canal-oficial' && canalOficial ? (
+                    <CanalOficialForm
+                      nome={canalOficial.nome ?? tenant.nome}
+                      descricao={canalOficial.descricao}
+                      avatarUrl={canalOficial.avatarUrl}
+                      visibilidadeCanal={canalOficial.visibilidadeCanal}
+                      somenteAdminPublica={canalOficial.somenteAdminPublica}
+                      publica={canalOficial.publica}
                     />
                   ) : null}
                 </div>

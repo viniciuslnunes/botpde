@@ -12,6 +12,7 @@ import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { getTenantFromHost } from '@/lib/tenant'
+import { NavbarBrandOverrideProvider } from '@/lib/navbar-brand-override'
 
 export default async function PortalLayout({
   children,
@@ -77,18 +78,20 @@ export default async function PortalLayout({
       {hostTenant ? (
         <TenantDesignBridge corPrimaria={hostTenant.corPrimaria} design={hostTenant.design} />
       ) : null}
-      <PortalNavbar
-        userName={session.user.name ?? null}
-        userAvatar={session.user.image ?? null}
-        tenant={navbarTenant}
-        temDepartamentos={totalDepartamentos > 0}
-        modoNacional={ctx?.modo === 'nacional'}
-        tenantSlugAtual={hostTenant?.slug ?? null}
-        vinculos={vinculos}
-      />
-      <main className="app-container relative py-4 sm:py-8">
-        <PortalMotionShell>{children}</PortalMotionShell>
-      </main>
+      <NavbarBrandOverrideProvider>
+        <PortalNavbar
+          userName={session.user.name ?? null}
+          userAvatar={session.user.image ?? null}
+          tenant={navbarTenant}
+          temDepartamentos={totalDepartamentos > 0}
+          modoNacional={ctx?.modo === 'nacional'}
+          tenantSlugAtual={hostTenant?.slug ?? null}
+          vinculos={vinculos}
+        />
+        <main className="app-container relative py-4 sm:py-8">
+          <PortalMotionShell>{children}</PortalMotionShell>
+        </main>
+      </NavbarBrandOverrideProvider>
     </div>
   )
 }

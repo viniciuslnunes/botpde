@@ -3,20 +3,24 @@ import { ArrowLeft } from 'lucide-react'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { getCanalPorId, getPostsDoCanal, podePublicarNoCanal } from '@/lib/canais'
-import { getPostIdsSalvos } from '@/lib/feed'
+import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
+import { listSalasAtivas } from '@/lib/salas'
+import { ComunidadeAsideRail } from '../../_components/comunidade-aside-rail'
 import { calculateEffectivePermissions } from '@torcida/types'
-import { CanalDetalheClient } from './canal-detalhe-client'
+import { CanalFeedView } from './canal-feed-view'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Canal — Comunidade' }
 
 export default async function CanalDetalhePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ cursor?: string }>
 }) {
   const { id } = await params
+  const { cursor } = await searchParams
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
@@ -30,34 +34,39 @@ export default async function CanalDetalhePage({
   const canal = await getCanalPorId(id, tenant.id, session.user.id)
   if (!canal) notFound()
 
-  const [posts, salvoIds] = await Promise.all([
-    canal.souMembro ? getPostsDoCanal(id, canal.tenantId, session.user.id) : Promise.resolve([]),
-    getPostIdsSalvos(session.user.id, tenant.id),
+  const [podePublicar, salasAtivas] = await Promise.all([
+    podePublicarNoCanal(canal, tenant.id, permissoes),
+    listSalasAtivas(tenant.id),
   ])
 
-  const podePublicar = await podePublicarNoCanal(canal, tenant.id, permissoes)
+  const currentUser = {
+    id: session.user.id,
+    nome: session.user.name ?? null,
+    avatarUrl: session.user.image ?? null,
+  }
 
   return (
-    <div className="space-y-4">
-      <Link
-        href="/portal/comunidade/canais"
-        className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Voltar aos canais
-      </Link>
+    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+      <ComunidadeAsideRail tenant={tenant} currentUser={currentUser} salasAtivas={salasAtivas} />
 
-      <CanalDetalheClient
-        canal={canal}
-        posts={posts}
-        salvoIds={[...salvoIds]}
-        currentUser={{
-          id: session.user.id,
-          nome: session.user.name ?? null,
-          avatarUrl: session.user.image ?? null,
-        }}
-        podePublicar={podePublicar || !canal.somenteAdminPublica}
-      />
+      <div className="min-w-0 space-y-4">
+        <Link
+          href="/portal/comunidade/canais"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1.5 pl-2 pr-3.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar aos canais
+        </Link>
+
+        <CanalFeedView
+          canal={canal}
+          currentUser={currentUser}
+          podePublicar={podePublicar || !canal.somenteAdminPublica}
+          cursor={cursor}
+          viewerTenantId={tenant.id}
+          permissoes={permissoes}
+        />
+      </div>
     </div>
   )
 }

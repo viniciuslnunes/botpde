@@ -16,10 +16,13 @@ const ComunidadeChatPanel = dynamic(
   },
 )
 
+/** Rotas com o mesmo shell de feed (aside esquerdo + rail salas/chat à direita). */
+const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
+
 /**
- * Chrome do layout: children + aside (salas/chat) no feed.
- * Fora do feed o aside fica `display:none` mas montado — evita novo
- * `GET /api/conversas/resumo` ao voltar.
+ * Chrome do layout: children + aside (salas/chat) no feed e no canal (mesmo
+ * shell visual). Fora dessas rotas o aside fica `display:none` mas montado —
+ * evita novo `GET /api/conversas/resumo` ao voltar.
  */
 export function ComunidadeLayoutChrome({
   currentUserId,
@@ -33,7 +36,7 @@ export function ComunidadeLayoutChrome({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const isFeed = pathname === '/portal/comunidade'
+  const isFeed = pathname === '/portal/comunidade' || CANAL_DETALHE_RE.test(pathname)
   const showRail = modoTorcida && isFeed && Boolean(currentUserId)
 
   return (

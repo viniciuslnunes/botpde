@@ -24,7 +24,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { publicarPost, publicarEnquete, publicarPostEvento, type PublicarPostState } from '@/app/portal/comunidade/actions'
+import {
+  publicarPost,
+  publicarEnquete,
+  publicarPostEvento,
+  publicarPostCanal,
+  type PublicarPostState,
+} from '@/app/portal/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
@@ -76,6 +82,12 @@ const VISIBILIDADE_OPCOES: Array<{
   },
 ]
 
+export interface CanalComposerAlvo {
+  conversaId: string
+  /** Nome do canal — usado no placeholder ("Publicar em ..."). */
+  nome: string | null
+}
+
 interface FeedComposerProps {
   userId: string
   userName: string | null
@@ -88,6 +100,12 @@ interface FeedComposerProps {
   bloqueioPublicacao?: string | null
   /** Deep-link da Agenda — abre modo evento com este id pré-selecionado. */
   eventoIdInicial?: string
+  /**
+   * Quando definido, publica no mural de um canal em vez do feed pessoal:
+   * mesmo componente (mídia, menções, emoji), sem alcance/enquete/evento —
+   * visibilidade fica presa aos membros do canal.
+   */
+  canal?: CanalComposerAlvo
 }
 
 export function FeedComposer({
@@ -99,6 +117,7 @@ export function FeedComposer({
   bloqueioPublicacao = null,
   somentePublico = false,
   eventoIdInicial,
+  canal,
 }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
@@ -117,6 +136,7 @@ export function FeedComposer({
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
+      canal={canal}
     />
   )
 }
@@ -129,6 +149,7 @@ function FeedComposerActive({
   eventos = [],
   somentePublico = false,
   eventoIdInicial,
+  canal,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
@@ -142,21 +163,38 @@ function FeedComposerActive({
     publicarPostEvento,
     INITIAL_STATE,
   )
+  const [canalState, canalAction, canalPending] = useActionState<PublicarPostState, FormData>(
+    publicarPostCanal,
+    INITIAL_STATE,
+  )
 
-  const token = postState.token ?? pollState.token ?? eventState.token ?? 'novo'
-  const state = postState.token || postState.success
-    ? postState
-    : pollState.token || pollState.success
-      ? pollState
-      : eventState
+  const token = canal
+    ? (canalState.token ?? 'novo')
+    : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
+  const state = canal
+    ? canalState
+    : postState.token || postState.success
+      ? postState
+      : pollState.token || pollState.success
+        ? pollState
+        : eventState
 
   // Feed infinite: prepend otimista com preview da action (sem esperar refetch).
   useEffect(() => {
-    const preview = postState.preview ?? pollState.preview ?? eventState.preview
-    if (postState.success || pollState.success || eventState.success) {
+    const preview = canal
+      ? canalState.preview
+      : (postState.preview ?? pollState.preview ?? eventState.preview)
+    const success = canal
+      ? canalState.success
+      : postState.success || pollState.success || eventState.success
+    if (success) {
       emitirPostPublicado(preview ? { preview } : undefined)
     }
   }, [
+    canal,
+    canalState.success,
+    canalState.token,
+    canalState.preview,
     postState.success,
     postState.token,
     postState.preview,
@@ -179,12 +217,15 @@ function FeedComposerActive({
       postAction={postAction}
       pollAction={pollAction}
       eventAction={eventAction}
+      canalAction={canalAction}
       postPending={postPending}
       pollPending={pollPending}
       eventPending={eventPending}
+      canalPending={canalPending}
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
+      canal={canal}
       serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
     </div>
@@ -210,13 +251,16 @@ function ComposerBody({
   postAction,
   pollAction,
   eventAction,
+  canalAction,
   postPending,
   pollPending,
   eventPending,
+  canalPending,
   serverError,
   eventos,
   somentePublico = false,
   eventoIdInicial,
+  canal,
 }: {
   userId: string
   userName: string | null
@@ -225,13 +269,16 @@ function ComposerBody({
   postAction: (payload: FormData) => void
   pollAction: (payload: FormData) => void
   eventAction: (payload: FormData) => void
+  canalAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
   eventPending: boolean
+  canalPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
   somentePublico?: boolean
   eventoIdInicial?: string
+  canal?: CanalComposerAlvo
 }) {
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
@@ -278,7 +325,7 @@ function ComposerBody({
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
   const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
   const enviando = medias.some((m) => m.url === null && !m.error)
-  const pending = modoEnquete ? pollPending : modoEvento ? eventPending : postPending
+  const pending = canal ? canalPending : modoEnquete ? pollPending : modoEvento ? eventPending : postPending
   const finalMidias = [
     ...medias.filter((m) => m.url).map((m) => m.url as string),
     ...(embedUrl ? [embedUrl] : []),
@@ -364,7 +411,9 @@ function ComposerBody({
     const fd = new FormData(e.currentTarget)
     fd.set('conteudo', serializarMencoes(texto, mencoes))
     startTransition(() => {
-      if (modoEnquete) {
+      if (canal) {
+        canalAction(fd)
+      } else if (modoEnquete) {
         pollAction(fd)
       } else if (modoEvento) {
         eventAction(fd)
@@ -583,7 +632,11 @@ function ComposerBody({
       className={dragOver ? 'rounded-xl outline-2 outline-dashed outline-[rgb(var(--primary))]' : ''}
     >
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
-      <input type="hidden" name="visibilidade" value={visibilidadeEfetiva} />
+      {canal ? (
+        <input type="hidden" name="conversaId" value={canal.conversaId} />
+      ) : (
+        <input type="hidden" name="visibilidade" value={visibilidadeEfetiva} />
+      )}
       {modoEnquete && (
         <input type="hidden" name="opcoes" value={JSON.stringify(opcoesValidas)} />
       )}
@@ -605,7 +658,7 @@ function ComposerBody({
                 whileTap={{ scale: 0.99 }}
                 className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
               >
-                No que você tá pensando, {firstName}?
+                {canal ? `Publicar em ${canal.nome ?? 'canal'}…` : `No que você tá pensando, ${firstName}?`}
               </m.button>
             ) : (
               <m.textarea
@@ -631,7 +684,11 @@ function ComposerBody({
                     addFiles(files)
                   }
                 }}
-                placeholder={`No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`}
+                placeholder={
+                  canal
+                    ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
+                    : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
+                }
                 className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
               />
             )}
@@ -845,16 +902,18 @@ function ComposerBody({
                       )}
                     </AnimatePresence>
                   </div>
-                  <button
-                    type="button"
-                    onClick={toggleEnquete}
-                    aria-label="Criar enquete"
-                    title="Enquete"
-                    className={modoEnquete ? toolBtnActiveClass : toolBtnClass}
-                  >
-                    <BarChart3 className="h-5 w-5" />
-                  </button>
-                  {eventos.length > 0 && (
+                  {!canal && (
+                    <button
+                      type="button"
+                      onClick={toggleEnquete}
+                      aria-label="Criar enquete"
+                      title="Enquete"
+                      className={modoEnquete ? toolBtnActiveClass : toolBtnClass}
+                    >
+                      <BarChart3 className="h-5 w-5" />
+                    </button>
+                  )}
+                  {!canal && eventos.length > 0 && (
                     <button
                       type="button"
                       onClick={toggleEvento}
@@ -949,22 +1008,24 @@ function ComposerBody({
                           <StickerIcon className="h-4 w-4 shrink-0" />
                           Sticker
                         </m.button>
-                        <m.button
-                          type="button"
-                          custom={2}
-                          variants={menuItemStagger}
-                          initial="hidden"
-                          animate="show"
-                          onClick={toggleEnquete}
-                          className={[
-                            'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
-                            modoEnquete ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
-                          ].join(' ')}
-                        >
-                          <BarChart3 className="h-4 w-4 shrink-0" />
-                          Enquete
-                        </m.button>
-                        {eventos.length > 0 && (
+                        {!canal && (
+                          <m.button
+                            type="button"
+                            custom={2}
+                            variants={menuItemStagger}
+                            initial="hidden"
+                            animate="show"
+                            onClick={toggleEnquete}
+                            className={[
+                              'flex w-full items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                              modoEnquete ? 'font-medium text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground))]',
+                            ].join(' ')}
+                          >
+                            <BarChart3 className="h-4 w-4 shrink-0" />
+                            Enquete
+                          </m.button>
+                        )}
+                        {!canal && eventos.length > 0 && (
                           <m.button
                             type="button"
                             custom={3}
@@ -983,7 +1044,7 @@ function ComposerBody({
                         )}
                         <m.button
                           type="button"
-                          custom={eventos.length > 0 ? 4 : 3}
+                          custom={!canal && eventos.length > 0 ? 4 : 3}
                           variants={menuItemStagger}
                           initial="hidden"
                           animate="show"
@@ -1025,7 +1086,11 @@ function ComposerBody({
               </div>
 
             <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {somentePublico ? (
+              {canal ? (
+                <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
+                  Visível para membros do canal
+                </span>
+              ) : somentePublico ? (
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para torcedores do clube
                 </span>

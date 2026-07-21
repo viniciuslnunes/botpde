@@ -1,0 +1,82 @@
+import { Suspense } from 'react'
+import { ComunidadeAsideWidgets } from './comunidade-aside-widgets'
+import { ComunidadeFeedNav, ComunidadeFeedNavFallback } from './comunidade-feed-nav'
+import {
+  ComunidadeUserCardSection,
+  ComunidadeUserCardFallback,
+} from './comunidade-user-card-section'
+import type { SalaAtivaListItem } from '@/lib/salas'
+
+interface CurrentUser {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+}
+
+function AsideWidgetsFallback() {
+  return (
+    <>
+      <div className="h-32 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
+      <div className="h-40 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
+    </>
+  )
+}
+
+/**
+ * Coluna esquerda do feed (card do sócio + nav + widgets) — extraída de
+ * `ComunidadeFeedShell` para ser reutilizada também na visão de canal
+ * (`/canais/[id]`), que precisa ficar visualmente idêntica ao feed principal.
+ */
+export function ComunidadeAsideRail({
+  tenant,
+  currentUser,
+  salasAtivas = [],
+}: {
+  tenant: { id: string; nome: string; afiliacaoId: string | null; balancoFinanceiroVisivel?: boolean }
+  currentUser: CurrentUser
+  salasAtivas?: SalaAtivaListItem[]
+}) {
+  if (!currentUser.id) return null
+
+  return (
+    <aside className="hidden lg:block">
+      <div className="sticky top-20 space-y-4">
+        <Suspense
+          fallback={
+            <ComunidadeUserCardFallback
+              tenantNome={tenant.nome}
+              userName={currentUser.nome}
+              userAvatar={currentUser.avatarUrl}
+            />
+          }
+        >
+          <ComunidadeUserCardSection
+            tenantId={tenant.id}
+            tenantNome={tenant.nome}
+            userId={currentUser.id}
+            userName={currentUser.nome}
+            userAvatar={currentUser.avatarUrl}
+          />
+        </Suspense>
+
+        <Suspense fallback={<ComunidadeFeedNavFallback />}>
+          <ComunidadeFeedNav
+            tenantId={tenant.id}
+            userId={currentUser.id}
+            currentUserId={currentUser.id}
+            mostrarBalanco={tenant.balancoFinanceiroVisivel === true}
+          />
+        </Suspense>
+
+        <Suspense fallback={<AsideWidgetsFallback />}>
+          <ComunidadeAsideWidgets
+            tenantId={tenant.id}
+            afiliacaoId={tenant.afiliacaoId}
+            currentUserId={currentUser.id}
+            salasAoVivo={salasAtivas}
+          />
+        </Suspense>
+      </div>
+    </aside>
+  )
+}

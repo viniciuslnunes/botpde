@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { Radio } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { listCanaisVisiveis, listUnidadesVisiveis, getOrCreateCanalOficial } from '@/lib/canais'
+import { listCanaisVisiveis, getOrCreateCanalOficial } from '@/lib/canais'
+import { isSuperAdminEmail, listarVinculosAprovadosDoUsuario } from '@/lib/tenant-context'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
@@ -26,9 +27,11 @@ export default async function CanaisPage() {
     hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
     hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
 
-  const [canais, unidades] = await Promise.all([
+  const isSuperAdmin = isSuperAdminEmail(session.user.email)
+
+  const [canais, vinculos] = await Promise.all([
     listCanaisVisiveis(tenant.id, session.user.id),
-    listUnidadesVisiveis(tenant.id),
+    isSuperAdmin ? Promise.resolve([]) : listarVinculosAprovadosDoUsuario(session.user.id),
   ])
 
   return (
@@ -41,7 +44,8 @@ export default async function CanaisPage() {
 
       <CanaisClient
         canais={canais}
-        unidades={unidades}
+        vinculos={vinculos}
+        tenantSlugAtual={tenant.slug}
         podeCriarCanal={podeCriarCanal}
         tenantAtualId={tenant.id}
       />
