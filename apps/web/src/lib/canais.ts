@@ -80,6 +80,20 @@ async function resolverOwnerId(tenantId: string): Promise<string> {
 export async function getOrCreateCanalOficial(
   tenantId: string,
 ): Promise<{ id: string; criadoAgora: boolean }> {
+  // Unidade promovida a portal próprio (Caso B): o Sede.tenantId já aponta pro
+  // tenant novo, mas o canal oficial fica "emprestado" no tenant da Sede-mãe
+  // por decisão de design (docs/data/proposta-governanca-hierarquica.md —
+  // "re-apontar o canal para o novo tenant fica para depois"). Sem checar
+  // Sede.canalConversaId primeiro, a busca abaixo (por Conversa.tenantId) não
+  // acha esse canal e cria um segundo, órfão, duplicando a unidade na tela.
+  const sedeComCanal: { canalConversaId: string | null } | null = await db.sede.findFirst({
+    where: { tenantId, canalConversaId: { not: null } },
+    select: { canalConversaId: true },
+  })
+  if (sedeComCanal?.canalConversaId) {
+    return { id: sedeComCanal.canalConversaId, criadoAgora: false }
+  }
+
   const existente: { id: string } | null = await db.conversa.findFirst({
     where: { tenantId, tipo: 'CANAL', canalOficial: true },
     select: { id: true },
