@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
+  ArrowLeftRight,
   Briefcase,
   CreditCard,
   Calendar,
@@ -20,13 +21,15 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/portal/notification-bell'
-import { markNavbarNotificationRead } from '@/lib/use-navbar-context'
+import { markNavbarNotificationRead, refreshNavbarContext } from '@/lib/use-navbar-context'
 import { useNavbarContext } from '@/lib/use-navbar-context'
 import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
+import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
 /** Barra principal do portal. Áreas (Caravanas, Bateria, Financeiro, Mensalidades…)
  * NÃO entram aqui — ficam no hub `/portal/departamentos` → `/portal/departamentos/[slug]`.
@@ -55,6 +58,10 @@ interface PortalNavbarProps {
   temDepartamentos?: boolean
   /** Comunidade do clube sem vínculo com torcida — sem carteirinha. */
   modoNacional?: boolean
+  /** Slug da torcida ativa — só preenchido no modo torcida. */
+  tenantSlugAtual?: string | null
+  /** Vínculos de sócio APROVADO do usuário em mais de uma torcida. */
+  vinculos?: TorcidaOpcao[]
 }
 
 export function PortalNavbar({
@@ -63,12 +70,34 @@ export function PortalNavbar({
   tenant,
   temDepartamentos = false,
   modoNacional = false,
+  tenantSlugAtual = null,
+  vinculos = [],
 }: PortalNavbarProps) {
   const pathname = usePathname()
   const { unreadMessages, unreadNotifications, hasAdminAreaAccess, notifications } =
     useNavbarContext()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userDropOpen, setUserDropOpen] = useState(false)
+  const [trocarTorcidaOpen, setTrocarTorcidaOpen] = useState(false)
+  const [trocarTorcidaOpenMobile, setTrocarTorcidaOpenMobile] = useState(false)
+  const podeTrocarTorcida = vinculos.length > 1
+
+  // O layout do portal não remonta ao trocar de torcida (redirect client-side
+  // dentro da mesma rota) — o cache de 20s de useNavbarContext (hasAdminAreaAccess
+  // etc.) ficaria com o snapshot da torcida anterior até o próximo poll. Força
+  // um refresh assim que o slug ativo muda.
+  const primeiroTenantSlug = useRef(tenantSlugAtual)
+  useEffect(() => {
+    if (primeiroTenantSlug.current === tenantSlugAtual) return
+    primeiroTenantSlug.current = tenantSlugAtual
+    void refreshNavbarContext(true)
+    // A troca já concluiu (chegamos na nova torcida) — fecha os menus em vez
+    // de deixá-los presos abertos, já que o layout não remonta na navegação.
+    setUserDropOpen(false)
+    setMenuOpen(false)
+    setTrocarTorcidaOpen(false)
+    setTrocarTorcidaOpenMobile(false)
+  }, [tenantSlugAtual])
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
   const baseLinks = modoNacional
@@ -229,6 +258,34 @@ export function PortalNavbar({
                       <UserCircle2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                       Meu Perfil
                     </Link>
+                    {podeTrocarTorcida && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setTrocarTorcidaOpen((v) => !v)}
+                          aria-expanded={trocarTorcidaOpen}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+                        >
+                          <ArrowLeftRight className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                          Trocar Canal
+                          <ChevronDown
+                            className={[
+                              'ml-auto h-3.5 w-3.5 text-[rgb(var(--foreground-muted))] transition-transform',
+                              trocarTorcidaOpen ? 'rotate-180' : '',
+                            ].join(' ')}
+                          />
+                        </button>
+                        {trocarTorcidaOpen && (
+                          <div className="px-2 pb-1">
+                            <TorcidaContextSwitcher
+                              torcidas={vinculos}
+                              atualSlug={tenantSlugAtual}
+                              destino="portal"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {hasAdminAreaAccess && (
                       <Link
                         href="/admin"
@@ -320,6 +377,34 @@ export function PortalNavbar({
                   </PortalNavLink>
                 )
               })}
+              {podeTrocarTorcida && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setTrocarTorcidaOpenMobile((v) => !v)}
+                    aria-expanded={trocarTorcidaOpenMobile}
+                    className={mobileLinkClass(false)}
+                  >
+                    <ArrowLeftRight className="h-4 w-4" />
+                    Trocar Canal
+                    <ChevronDown
+                      className={[
+                        'ml-auto h-3.5 w-3.5 transition-transform',
+                        trocarTorcidaOpenMobile ? 'rotate-180' : '',
+                      ].join(' ')}
+                    />
+                  </button>
+                  {trocarTorcidaOpenMobile && (
+                    <div className="px-2 pb-1">
+                      <TorcidaContextSwitcher
+                        torcidas={vinculos}
+                        atualSlug={tenantSlugAtual}
+                        destino="portal"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               {hasAdminAreaAccess && (
                 <Link
                   href="/admin"

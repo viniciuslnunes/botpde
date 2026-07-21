@@ -13,7 +13,12 @@ import {
   hasPermission,
   PERMISSIONS,
 } from '@torcida/types'
-import { isSuperAdminEmail, listarTorcidasParaSelecao, usuarioPrecisaNickname } from '@/lib/tenant-context'
+import {
+  isSuperAdminEmail,
+  listarTorcidasParaSelecao,
+  listarVinculosAprovadosDoUsuario,
+  usuarioPrecisaNickname,
+} from '@/lib/tenant-context'
 import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 
@@ -73,6 +78,7 @@ export default async function AdminLayout({
     }))
 
   const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
+  const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
   const notifications = await listarNotificacoesRecentes(
     tenant.id,
     session.user.id,
@@ -92,6 +98,7 @@ export default async function AdminLayout({
       items={menuItems}
       isSuperAdmin={isSuperAdmin}
       torcidas={torcidas}
+      vinculos={vinculos}
       notifications={notifications}
       operatorBanner={
         isSuperAdmin ? (

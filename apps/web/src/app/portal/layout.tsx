@@ -3,7 +3,11 @@ import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { getEstadoOnboarding } from '@/lib/onboarding'
-import { isSuperAdminEmail, usuarioPrecisaNickname } from '@/lib/tenant-context'
+import {
+  isSuperAdminEmail,
+  listarVinculosAprovadosDoUsuario,
+  usuarioPrecisaNickname,
+} from '@/lib/tenant-context'
 import { PortalNavbar } from '@/components/portal/navbar'
 import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
@@ -64,6 +68,10 @@ export default async function PortalLayout({
   // Design completo só no modo torcida (tenant real).
   const hostTenant = ctx?.modo === 'torcida' ? await getTenantFromHost() : null
 
+  // Seletor de troca de torcida: só para quem tem vínculo aprovado em mais
+  // de uma (super-admin não usa isso — ele já tem o switcher no admin).
+  const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
+
   return (
     <div className="app-shell-bg min-h-screen">
       {hostTenant ? (
@@ -75,6 +83,8 @@ export default async function PortalLayout({
         tenant={navbarTenant}
         temDepartamentos={totalDepartamentos > 0}
         modoNacional={ctx?.modo === 'nacional'}
+        tenantSlugAtual={hostTenant?.slug ?? null}
+        vinculos={vinculos}
       />
       <main className="app-container relative py-4 sm:py-8">
         <PortalMotionShell>{children}</PortalMotionShell>

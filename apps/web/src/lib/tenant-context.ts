@@ -190,6 +190,28 @@ export function invalidateTorcidasSelecaoCache(): void {
   revalidateTag(TORCIDAS_SELECAO_CACHE_TAG, 'max')
 }
 
+/**
+ * Torcidas onde o usuário tem vínculo de sócio APROVADO — base do seletor de
+ * troca de contexto (não confundir com `listarTorcidasParaSelecao`, que lista
+ * TODAS as torcidas e é exclusiva do switcher de super-admin).
+ */
+export async function listarVinculosAprovadosDoUsuario(userId: string): Promise<TorcidaOpcao[]> {
+  const rows: { tenant: TorcidaRowComAfiliacao }[] = await db.saasMembro.findMany({
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    select: { tenant: { select: TORCIDA_SELECAO_SELECT } },
+    orderBy: { criadoEm: 'desc' },
+  })
+
+  const vistos = new Set<string>()
+  const opcoes: TorcidaOpcao[] = []
+  for (const row of rows) {
+    if (vistos.has(row.tenant.slug)) continue
+    vistos.add(row.tenant.slug)
+    opcoes.push(mapTorcidaOpcao(row.tenant))
+  }
+  return opcoes
+}
+
 /** Torcidas ativas com indicação de owner — para transferência no super-admin. */
 export async function listarTorcidasParaTransferencia(): Promise<TorcidaTransferencia[]> {
   const [tenants, owners]: [

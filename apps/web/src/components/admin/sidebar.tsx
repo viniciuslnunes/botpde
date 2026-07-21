@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { groupAdminMenuBySecao } from '@torcida/types'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
 
@@ -76,6 +77,8 @@ interface AdminSidebarProps {
   badges?: Record<string, number>
   isSuperAdmin?: boolean
   torcidas?: TorcidaOpcao[]
+  /** Vínculos de sócio APROVADO do usuário comum (não super-admin) em mais de uma torcida. */
+  vinculos?: TorcidaOpcao[]
   mobileOpen?: boolean
   onMobileClose?: () => void
 }
@@ -183,6 +186,7 @@ function SidebarBody({
   pathname,
   isSuperAdmin,
   torcidas,
+  vinculos,
   onNavigate,
 }: {
   tenantSlug: string
@@ -191,6 +195,7 @@ function SidebarBody({
   pathname: string
   isSuperAdmin: boolean
   torcidas: TorcidaOpcao[]
+  vinculos: TorcidaOpcao[]
   onNavigate?: () => void
 }) {
   return (
@@ -203,6 +208,15 @@ function SidebarBody({
             destino="admin"
             variant="admin"
           />
+        </div>
+      )}
+
+      {!isSuperAdmin && vinculos.length > 1 && (
+        <div className="border-b border-[rgb(var(--border))] px-4 py-3">
+          <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Torcida ativa
+          </p>
+          <TorcidaContextSwitcher torcidas={vinculos} atualSlug={tenantSlug} destino="admin" />
         </div>
       )}
 
@@ -239,6 +253,7 @@ export function AdminSidebar({
   badges = {},
   isSuperAdmin = false,
   torcidas = [],
+  vinculos = [],
   mobileOpen = false,
   onMobileClose,
 }: AdminSidebarProps) {
@@ -262,6 +277,7 @@ export function AdminSidebar({
               pathname={pathname}
               isSuperAdmin={isSuperAdmin}
               torcidas={torcidas}
+              vinculos={vinculos}
               onNavigate={onMobileClose}
             />
           </aside>
@@ -276,6 +292,7 @@ export function AdminSidebar({
           pathname={pathname}
           isSuperAdmin={isSuperAdmin}
           torcidas={torcidas}
+          vinculos={vinculos}
         />
       </aside>
     </>

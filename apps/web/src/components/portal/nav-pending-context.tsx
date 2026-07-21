@@ -48,3 +48,16 @@ export function NavLinkStatusReporter() {
 
   return null
 }
+
+/** Acopla a barra de progresso do topo a um `pending` arbitrário (ex.: Server
+ * Action de troca de torcida) — mesma UX de carregamento do `next/link`. */
+export function useReportNavPending(pending: boolean) {
+  const id = useId()
+  const report = useContext(NavPendingContext)
+
+  useEffect(() => {
+    if (!report) return
+    report(id, pending)
+    return () => report(id, false)
+  }, [id, pending, report])
+}

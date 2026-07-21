@@ -156,6 +156,28 @@ export const getActiveTenant = cache(async function getActiveTenant(
   const { resolveUserTenantSlugForUser, isSuperAdminEmail } = await import('@/lib/tenant-context')
 
   if (userId && !isSuperAdminEmail(email)) {
+    // Usuário com vínculo aprovado em mais de uma torcida pode trocar de
+    // contexto manualmente (torcida-context-switcher.tsx) — o cookie só
+    // vence quando corresponde a um SaasMembro APROVADO/SOCIO real do
+    // usuário; caso contrário cai no padrão (vínculo mais recente).
+    const cookieStore = await cookies()
+    const slugFromCookie = cookieStore.get(TENANT_CTX_COOKIE)?.value?.trim()
+    if (slugFromCookie) {
+      const vinculoCookie: { id: string } | null = await db.saasMembro.findFirst({
+        where: {
+          userId,
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          tenant: { slug: slugFromCookie },
+        },
+        select: { id: true },
+      })
+      if (vinculoCookie) {
+        const fromCookie = await fetchTenantBySlug(slugFromCookie)
+        if (fromCookie) return fromCookie
+      }
+    }
+
     const userSlug = await resolveUserTenantSlugForUser(userId)
     if (userSlug) return fetchTenantBySlug(userSlug)
 

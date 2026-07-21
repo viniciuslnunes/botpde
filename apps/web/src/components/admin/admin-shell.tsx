@@ -45,6 +45,8 @@ interface AdminShellProps {
   items: AdminMenuItem[]
   isSuperAdmin?: boolean
   torcidas?: TorcidaOpcao[]
+  /** Vínculos de sócio APROVADO do usuário comum (não super-admin) em mais de uma torcida. */
+  vinculos?: TorcidaOpcao[]
   notifications?: NotificationItem[]
   /** Banner do super-admin acima do conteúdo. */
   operatorBanner?: React.ReactNode
@@ -231,6 +233,7 @@ export function AdminShell({
   items,
   isSuperAdmin = false,
   torcidas = [],
+  vinculos = [],
   notifications = [],
   operatorBanner,
   children,
@@ -270,6 +273,7 @@ export function AdminShell({
             badges={menuBadges}
             isSuperAdmin={isSuperAdmin}
             torcidas={torcidas}
+            vinculos={vinculos}
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}
           />
