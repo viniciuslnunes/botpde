@@ -11,8 +11,11 @@ export function hierarchyCacheTag(tenantId: string): string {
 
 /** Invalida cache de hierarquia após mudanças em sede ou aliança. */
 export function invalidateHierarchyCache(tenantId?: string): void {
-  revalidateTag(HIERARCHY_CACHE_TAG, 'max')
-  if (tenantId) revalidateTag(hierarchyCacheTag(tenantId), 'max')
+  if (tenantId) {
+    revalidateTag(hierarchyCacheTag(tenantId), 'max')
+  } else {
+    revalidateTag(HIERARCHY_CACHE_TAG, 'max')
+  }
 }
 
 export type TenantRelation = 'self' | 'ancestor' | 'descendant' | 'unrelated' | 'allied' | 'rival'

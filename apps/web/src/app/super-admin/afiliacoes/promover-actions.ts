@@ -170,6 +170,44 @@ export async function promoverUnidadeAPortal(
           data: { tenantId: novoTenant.id, userId: ownerUserId, roleId: ownerRole.id },
         })
         invalidatePermissionsCache(ownerUserId, novoTenant.id)
+
+        // Sem SaasMembro no tenant novo, o owner não é resolvido como "tenant
+        // casa" no pós-login (resolveUserTenantSlugForUser exige SaasMembro
+        // APROVADO/SOCIO) e o auto-vínculo ao canal oficial (que só roda em
+        // aprovarMembro) nunca dispara. Espelha aprovarMembro aqui.
+        const ownerUser: { nome: string | null } | null = await db.user.findUnique({
+          where: { id: ownerUserId },
+          select: { nome: true },
+        })
+        await db.saasMembro.upsert({
+          where: { tenantId_userId: { tenantId: novoTenant.id, userId: ownerUserId } },
+          create: {
+            tenantId: novoTenant.id,
+            userId: ownerUserId,
+            tipo: 'SOCIO',
+            nome: ownerUser?.nome ?? sede.nome,
+            status: 'APROVADO',
+            aprovadoPorId: session.user.id,
+            aprovadoPorNome: session.user.name ?? 'Super-admin',
+            aprovadoEm: new Date(),
+          },
+          update: {},
+        })
+
+        const sedesComCanal: { canalConversaId: string | null }[] = await db.sede.findMany({
+          where: { tenantId: novoTenant.id, canalConversaId: { not: null } },
+          select: { canalConversaId: true },
+        })
+        for (const s of sedesComCanal) {
+          if (!s.canalConversaId) continue
+          await db.membroConversa.upsert({
+            where: {
+              conversaId_userId: { conversaId: s.canalConversaId, userId: ownerUserId },
+            },
+            create: { conversaId: s.canalConversaId, userId: ownerUserId, papel: 'MEMBRO' },
+            update: { saiuEm: null },
+          })
+        }
       }
     }
 

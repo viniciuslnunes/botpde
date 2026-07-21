@@ -46,7 +46,9 @@ export default async function AfiliacoesSuperAdminPage() {
 
   const [solicitacoesRows, torcidasRows]: [SolicitacaoRow[], TorcidaRow[]] = await Promise.all([
     db.solicitacaoUnidade.findMany({
+      where: { tipo: { not: 'SEDE' } },
       orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
+      take: 200,
       select: {
         id: true,
         status: true,
@@ -75,29 +77,27 @@ export default async function AfiliacoesSuperAdminPage() {
     }),
   ])
 
-  const solicitacoes: SolicitacaoView[] = solicitacoesRows
-    .filter((s): s is SolicitacaoRow & { tipo: 'SUBSEDE' | 'PONTO_ENCONTRO' } => s.tipo !== 'SEDE')
-    .map((s) => ({
-      id: s.id,
-      status: s.status,
-      torcidaNome: s.tenant.nome,
-      nome: s.nome,
-      tipo: s.tipo,
-      cidade: s.cidade,
-      estado: s.estado,
-      endereco: s.endereco,
-      contatoNome: s.contatoNome,
-      contatoEmail: s.contatoEmail,
-      contatoTelefone: s.contatoTelefone,
-      vinculo: s.vinculo,
-      observacao: s.observacao,
-      provasUrls: s.provasUrls,
-      motivo: s.motivo,
-      criadoEm: s.criadoEm.toISOString(),
-      sedeId: s.sede?.id ?? null,
-      // Já promovida = a Sede criada tem tenant próprio (≠ tenant da torcida).
-      promovida: Boolean(s.sede && s.sede.tenantId && s.sede.tenantId !== s.tenantId),
-    }))
+  const solicitacoes: SolicitacaoView[] = solicitacoesRows.map((s) => ({
+    id: s.id,
+    status: s.status,
+    torcidaNome: s.tenant.nome,
+    nome: s.nome,
+    tipo: s.tipo as 'SUBSEDE' | 'PONTO_ENCONTRO',
+    cidade: s.cidade,
+    estado: s.estado,
+    endereco: s.endereco,
+    contatoNome: s.contatoNome,
+    contatoEmail: s.contatoEmail,
+    contatoTelefone: s.contatoTelefone,
+    vinculo: s.vinculo,
+    observacao: s.observacao,
+    provasUrls: s.provasUrls,
+    motivo: s.motivo,
+    criadoEm: s.criadoEm.toISOString(),
+    sedeId: s.sede?.id ?? null,
+    // Já promovida = a Sede criada tem tenant próprio (≠ tenant da torcida).
+    promovida: Boolean(s.sede && s.sede.tenantId && s.sede.tenantId !== s.tenantId),
+  }))
 
   const torcidas: TorcidaOption[] = torcidasRows.map((t) => ({
     id: t.id,
@@ -108,8 +108,8 @@ export default async function AfiliacoesSuperAdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Afiliações de unidades</h1>
-        <p className="mt-2 text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Afiliações de unidades</h1>
+        <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
           Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui.
           Ao aprovar, a unidade é criada sob a torcida. Presidente/Vice também decidem no console da
           torcida.

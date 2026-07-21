@@ -109,7 +109,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={1}>
-        <section className="space-y-4">
+        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
           <div className="flex items-center gap-2">
             <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -136,7 +136,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={2}>
-        <section className="space-y-4">
+        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-sky-600 dark:text-sky-400" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -159,7 +159,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={3}>
-        <section className="space-y-4">
+        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
           <div className="flex items-center gap-2">
             <Beer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -199,7 +199,7 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
       </MotionReveal>
 
       <MotionReveal index={4}>
-        <section className="space-y-4">
+        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />

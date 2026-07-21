@@ -1,12 +1,17 @@
 # Proposta — Governança Hierárquica (Sede → Subsede → PDE)
 
-> Status: **em implementação** (branch `feat/governanca-hierarquica-fase1`).
+> Status: **implementação completa e validada ponta a ponta** (2026-07-20; branch
+> `feat/governanca-hierarquica-fase1`, 11 commits locais, ainda sem push).
 > Fase 0+1, Fase 2 (afiliação = **solicitação de subsede/PDE** — §9), Fase 2b
-> (promover a portal, A→B + owner — §10) e **Fase 3 concluída**: console R1
-> read-only no drill-down `/admin/torcida/unidade/[tenantId]` (gate
-> `assertPresidentePodeLerUnidade`) com os módulos **Financeiro, Eventos, Bar e
-> Membros** (este com RG/CPF/endereço **omitidos** — LGE), + link "Ver
-> administração" na console para unidades Caso B. Fase 4 (RBAC por sedeId) pendente.
+> (promover a portal, A→B + owner — §10), **Fase 3** (console R1 read-only no
+> drill-down `/admin/torcida/unidade/[tenantId]`, gate
+> `assertPresidentePodeLerUnidade`, módulos **Financeiro, Eventos, Bar e
+> Membros** com RG/CPF/endereço **omitidos** — LGE) e **R3** (toggle "Hierarquia
+> da torcida" em `/admin/configuracoes`, "Somente owner") — todos passaram por
+> smoke test manual no navegador (fila de solicitação → aprovar/criar unidade →
+> drill-down "Somente leitura" → toggle). Fase 4 (RBAC por sedeId) fora de
+> escopo. Próximo passo natural: revisão de UI/UX e performance do fluxo (não
+> replanejamento de regra de negócio).
 > Objetivo: transformar subsedes e pontos de encontro em **portais de gestão
 > local** governáveis, dando à Sede visibilidade top-down da administração das
 > afiliadas, sem que a base possa gerir a Sede. Complementa
@@ -363,3 +368,18 @@ propriedade").
 ### Fora do MVP (Fase 2b)
 Migração de membros; re-hospedar o canal no novo tenant; self-service de promoção
 pela própria liderança (fica com super-admin).
+
+### Bug encontrado e corrigido no smoke test (2026-07-20)
+
+Atribuir `ownerEmail` criava só o `UserRole` (owner) no tenant novo — sem
+`SaasMembro` lá, a liderança promovida não conseguia acessar o próprio `/admin`
+(`resolveUserTenantSlugForUser` em `tenant-context.ts:84-91` só resolve o
+"tenant casa" pós-login via `SaasMembro{status:APROVADO, tipo:SOCIO}`, nunca via
+`UserRole`) e não entrava no canal oficial da unidade (auto-vínculo só roda
+dentro de `aprovarMembro`, que nunca era chamado pra ela). Corrigido em
+`promoverUnidadeAPortal` (`promover-actions.ts`): ao atribuir o owner, também
+cria/upserta o `SaasMembro` (APROVADO/SOCIO) e o `MembroConversa` no canal da
+unidade, espelhando exatamente o que `aprovarMembro` faz. Decisão explícita:
+**não** chama `privatizarPerfilAoAprovarSocio` aqui (isso é comportamento de
+aprovação de sócio comum, não confirmado como desejado para o caso do owner —
+revisar se aparecer necessidade).
