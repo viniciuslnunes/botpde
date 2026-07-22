@@ -71,4 +71,16 @@ describe('avaliarAcessoDm', () => {
     const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
     expect(acesso).toBe('direto')
   })
+
+  it('torcedor → torcedor mesmo clube na CN permite DM direta (tenantContexto null)', async () => {
+    vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
+    const acesso = await avaliarAcessoDm(remetente, destinatario, null)
+    expect(acesso).toBe('direto')
+  })
+
+  it('torcedor → torcedor mesmo clube bloqueia se tenant sintético for passado como contexto', async () => {
+    vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
+    const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
+    expect(acesso).toBe('bloqueado')
+  })
 })

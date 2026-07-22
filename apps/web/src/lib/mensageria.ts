@@ -330,16 +330,17 @@ export async function avaliarAcessoDm(
 export async function criarDmComSolicitacao(
   remetenteId: string,
   destinatarioId: string,
-  tenantContextoId: string,
+  tenantId: string,
   conteudo: string,
   midiaUrls: string[] = [],
+  tenantContextoId?: string | null,
 ): Promise<{ id: string; criadaAgora: boolean }> {
   const acesso = await avaliarAcessoDm(remetenteId, destinatarioId, tenantContextoId)
   if (acesso === 'bloqueado') {
     throw new Error('Você não pode enviar mensagem para este usuário.')
   }
   if (acesso === 'direto') {
-    return getOrCreateDmConversa(remetenteId, destinatarioId, tenantContextoId)
+    return getOrCreateDmConversa(remetenteId, destinatarioId, tenantId)
   }
 
   const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
@@ -355,7 +356,7 @@ export async function criarDmComSolicitacao(
   const conversa: { id: string } = await db.conversa.create({
     data: {
       tipo: 'DIRETA',
-      tenantId: tenantContextoId,
+      tenantId,
       criadoPorId: remetenteId,
       membros: {
         create: [

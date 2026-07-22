@@ -83,7 +83,7 @@ async function criarDmOuSolicitacao(opts: {
   const acesso = await avaliarAcessoDm(
     opts.remetenteId,
     opts.destinatarioId,
-    opts.tenantContextoId ?? opts.tenantId,
+    opts.tenantContextoId,
   )
 
   if (acesso === 'bloqueado') {
@@ -128,6 +128,7 @@ async function criarDmOuSolicitacao(opts: {
     opts.tenantId,
     texto,
     opts.midias ?? [],
+    opts.tenantContextoId,
   )
 
   if (criadaAgora) {

@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
         mesmoTenant: boolean,
       ) {
         const acesso = await avaliarAcessoDm(userId, id, null)
+        if (acesso === 'bloqueado') return
         contatos.push({
           id,
           nome,
@@ -162,6 +163,7 @@ export async function GET(request: NextRequest) {
       if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
       vistos.add(r.userId)
       const acesso = await avaliarAcessoDm(uid, r.user.id, tenant.id)
+      if (acesso === 'bloqueado') continue
       contatos.push({
         id: r.user.id,
         nome: r.user.nome,
