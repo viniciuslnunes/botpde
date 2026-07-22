@@ -6,6 +6,7 @@ import { ComunidadeFeedShell } from './_components/comunidade-feed-shell'
 import { ComunidadeNacionalShell } from './_components/comunidade-nacional-shell'
 import { getSolicitacaoSocioPendente } from '@/lib/onboarding'
 import { listSalasAtivas } from '@/lib/salas'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 
 export const metadata: Metadata = { title: 'Comunidade' }
 
@@ -46,7 +47,7 @@ export default async function ComunidadePage({
         currentUser={{
           id: session.user.id,
           nome: session.user.name ?? null,
-          avatarUrl: session.user.image ?? null,
+          avatarUrl: await getAvatarAtualDoUsuario(session.user.id, null),
         }}
         solicitacaoPendente={solicitacaoPendente}
       />
@@ -58,7 +59,7 @@ export default async function ComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   return (

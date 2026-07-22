@@ -10,6 +10,7 @@ import {
   getPedidosPendentesGrupo,
   getMembrosGrupo,
 } from '@/lib/feed'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { GrupoDetalheClient } from './grupo-detalhe-client'
 import type { Metadata } from 'next'
 
@@ -94,7 +95,7 @@ export default async function GrupoDetalhePage({
         currentUser={{
           id: session.user.id,
           nome: session.user.name ?? null,
-          avatarUrl: session.user.image ?? null,
+          avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
         }}
       />
     </div>

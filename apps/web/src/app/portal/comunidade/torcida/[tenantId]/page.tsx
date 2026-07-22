@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostIdsSalvos, getPostsPublicosDoTenant } from '@/lib/feed'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import type { Metadata } from 'next'
@@ -29,7 +30,7 @@ export default async function TorcidaComunidadePublicaPage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   const { logoUrl } = perfil.tenant

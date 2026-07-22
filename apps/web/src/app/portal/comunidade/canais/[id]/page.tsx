@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { listSalasAtivas } from '@/lib/salas'
 import { ComunidadeAsideRail } from '../../_components/comunidade-aside-rail'
 import { calculateEffectivePermissions } from '@torcida/types'
@@ -42,7 +43,7 @@ export default async function CanalDetalhePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   return (

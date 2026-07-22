@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostPorId } from '@/lib/feed'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { resolverAfiliacaoSlugContexto } from '@/lib/sofascore-server'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
@@ -34,7 +35,7 @@ export default async function PostComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   return (

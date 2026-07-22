@@ -7,6 +7,7 @@ import { createRoomToken } from '@/lib/livekit'
 import { getSalaById } from '@/lib/salas'
 import { listParticipantesAtivos } from '@/lib/salas-presenca'
 import { getTenantFromHost } from '@/lib/tenant'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { encerrarSala } from '../actions'
 import { formatDateTimeShort } from '@/lib/format-datetime'
 import { SalaAtivaShell } from '@/components/portal/sala-ativa-shell'
@@ -43,6 +44,7 @@ export default async function SalaDetailPage({
   const livekitUrl = livekitOk ? requireLiveKitConfig().url : null
 
   const encerrarSalaBound = encerrarSala.bind(null, sala.id)
+  const userAvatarUrl = await getAvatarAtualDoUsuario(session.user.id, tenant.id)
 
   return (
     <SalaAtivaShell
@@ -63,14 +65,14 @@ export default async function SalaDetailPage({
       isHost={isHost}
       userId={session.user.id}
       userName={session.user.name ?? 'Torcedor'}
-      userAvatarUrl={session.user.image ?? null}
+      userAvatarUrl={userAvatarUrl}
       livekitOk={livekitOk}
       token={token}
       livekitUrl={livekitUrl}
       initialParticipantes={participantesAtivos.map((p) => ({
         userId: p.userId,
         nome: p.nome,
-        avatarUrl: p.avatarUrl ?? (p.userId === session.user.id ? session.user.image ?? null : null),
+        avatarUrl: p.avatarUrl ?? (p.userId === session.user.id ? userAvatarUrl : null),
         papel: p.papel,
         entrouEm: p.entrouEm.toISOString(),
       }))}

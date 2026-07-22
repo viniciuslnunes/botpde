@@ -3,6 +3,7 @@ import { Heart } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostIdsSalvos, getPostsDaRede } from '@/lib/feed'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { ComunidadeRedeInfinite } from '../_components/comunidade-rede-infinite'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import type { Metadata } from 'next'
@@ -32,7 +33,7 @@ export default async function RedeComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   return (

@@ -7,6 +7,7 @@ import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
 import {
   getAtividadeDoAutor,
+  getAvatarAtualDoUsuario,
   getContagensSeguimento,
   getFotosDoAutor,
   podeVerConteudoSocial,
@@ -171,7 +172,7 @@ export default async function PerfilComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: session.user.image ?? null,
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
   }
 
   const acoes = !isSelf ? (
