@@ -14,6 +14,7 @@ import { ProximoEventoSpotlight } from '@/components/eventos/proximo-evento-spot
 import { Calendar } from 'lucide-react'
 import type { Metadata } from 'next'
 import type { TipoEvento } from '@torcida/db'
+import { diasParaEvento } from '@/lib/eventos'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
@@ -61,6 +62,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     descricao: string | null
     data: Date
     local: string | null
+    fotoUrl: string | null
     tipo: TipoEvento
     capacidade: number | null
     serieId: string | null
@@ -89,6 +91,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             descricao: true,
             data: true,
             local: true,
+            fotoUrl: true,
             tipo: true,
             capacidade: true,
             serieId: true,
@@ -108,6 +111,7 @@ export default async function AdminEventosPage({ searchParams }: Props) {
             descricao: true,
             data: true,
             local: true,
+            fotoUrl: true,
             tipo: true,
             capacidade: true,
             serieId: true,
@@ -167,8 +171,10 @@ export default async function AdminEventosPage({ searchParams }: Props) {
     href: `/admin/eventos/${e.id}`,
   }))
 
-  const destaque = !isCal && proximos[0] ? serializar(proximos[0], false) : null
-  const listaRestante = destaque ? proximos.slice(1) : proximos
+  const destaqueRow = !isCal && proximos[0] ? proximos[0] : null
+  const destaque = destaqueRow ? serializar(destaqueRow, false) : null
+  const listaRestante = destaqueRow ? proximos.slice(1) : proximos
+  const listaProximos = listaRestante.length > 0 ? listaRestante : proximos
 
   function hrefFiltro(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams()
@@ -274,40 +280,46 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           tipoFiltro={tipoFiltro}
         />
       ) : (
-        <>
-          {destaque && (
-            <ProximoEventoSpotlight
-              id={destaque.id}
-              titulo={destaque.titulo}
-              tipo={destaque.tipo}
-              dataLabel={destaque.dataLabel}
-              local={destaque.local}
-              href={`/admin/eventos/${destaque.id}`}
-              lotacaoLabel={destaque.lotacaoLabel}
-            />
-          )}
+        <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
+          <div className="space-y-6 lg:col-span-8 xl:col-span-9">
+            <div>
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                <Calendar className="h-4 w-4" />
+                Próximos ({proximos.length})
+              </h2>
+              <AdminEventosList
+                eventos={listaProximos.map((e) => serializar(e, false))}
+                emptyTitle={emptyHint}
+                emptyDescription="Use Novo evento para abrir o formulário."
+              />
+            </div>
 
-          <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              <Calendar className="h-4 w-4" />
-              Próximos ({proximos.length})
-            </h2>
-            <AdminEventosList
-              eventos={listaRestante.map((e) => serializar(e, false))}
-              emptyTitle={emptyHint}
-              emptyDescription="Use Novo evento para abrir o formulário."
-            />
+            {passados.length > 0 && (
+              <details className="group">
+                <summary className="mb-3 cursor-pointer text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                  Histórico (últimos {passados.length})
+                </summary>
+                <AdminEventosList eventos={passados.map((e) => serializar(e, true))} />
+              </details>
+            )}
           </div>
 
-          {passados.length > 0 && (
-            <details className="group">
-              <summary className="mb-3 cursor-pointer text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Histórico (últimos {passados.length})
-              </summary>
-              <AdminEventosList eventos={passados.map((e) => serializar(e, true))} />
-            </details>
+          {destaque && destaqueRow && (
+            <aside className="order-first lg:sticky lg:top-24 lg:order-last lg:col-span-4 xl:col-span-3">
+              <ProximoEventoSpotlight
+                id={destaque.id}
+                titulo={destaque.titulo}
+                tipo={destaque.tipo}
+                dataLabel={destaque.dataLabel}
+                local={destaque.local}
+                href={`/admin/eventos/${destaque.id}`}
+                lotacaoLabel={destaque.lotacaoLabel}
+                fotoUrl={destaqueRow.fotoUrl}
+                diasLabel={diasParaEvento(destaqueRow.data)}
+              />
+            </aside>
           )}
-        </>
+        </div>
       )}
     </div>
   )

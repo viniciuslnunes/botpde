@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { db, withDbRetry } from '@torcida/db'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { getEscopoEventosVisiveis } from '@/lib/eventos'
+import { getEscopoEventosVisiveis, diasParaEvento } from '@/lib/eventos'
 import {
   EventosListAnimated,
   type EventoCardItem,
@@ -54,13 +54,6 @@ function formatarDataLista(data: Date) {
     minute: '2-digit',
   }).format(d)
   return `${dia.replace('.', '')} · ${hora}`
-}
-
-function diasParaEvento(data: Date) {
-  const diff = Math.ceil((new Date(data).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  if (diff === 0) return 'Hoje'
-  if (diff === 1) return 'Amanhã'
-  return `Em ${diff} dias`
 }
 
 function serializarEvento(

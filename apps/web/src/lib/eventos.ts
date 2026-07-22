@@ -143,3 +143,11 @@ export const listarEventosDaUnidade = cache(async function listarEventosDaUnidad
     rsvps: r._count.rsvps,
   }))
 })
+
+/** Label relativa para o próximo evento (Hoje / Amanhã / Em N dias). */
+export function diasParaEvento(data: Date): string {
+  const diff = Math.ceil((new Date(data).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  if (diff === 0) return 'Hoje'
+  if (diff === 1) return 'Amanhã'
+  return `Em ${diff} dias`
+}
