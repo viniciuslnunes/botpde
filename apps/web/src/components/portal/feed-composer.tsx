@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import {
   publicarPost,
   publicarEnquete,
@@ -318,6 +319,10 @@ function FeedComposerActive({
     eventState.preview,
   ])
 
+  useEffect(() => {
+    if (comunicado && comunicadoState.success) toast.success('Comunicado publicado.')
+  }, [comunicado, comunicadoState.success, comunicadoState.token])
+
   return (
     <div id="feed-composer" className="scroll-mt-24">
     <ComposerBody
@@ -325,21 +330,33 @@ function FeedComposerActive({
       userId={userId}
       userName={userName}
       userAvatar={userAvatar}
+      tenantNome={tenantNome}
       perfilPrivado={perfilPrivado}
       postAction={postAction}
       pollAction={pollAction}
       eventAction={eventAction}
       canalAction={canalAction}
+      comunicadoAction={comunicadoAction}
       postPending={postPending}
       pollPending={pollPending}
       eventPending={eventPending}
       canalPending={canalPending}
+      comunicadoPending={comunicadoPending}
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
+      comunicado={comunicado}
       onPrependOtimista={registrarPrependOtimista}
-      serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
+      serverError={
+        state.message ??
+        state.errors?.conteudo?.[0] ??
+        state.errors?.midias?.[0] ??
+        state.errors?.opcoes?.[0] ??
+        state.errors?.eventoId?.[0] ??
+        state.errors?.titulo?.[0] ??
+        state.errors?.corpo?.[0]
+      }
     />
     </div>
   )
@@ -360,39 +377,47 @@ function ComposerBody({
   userId,
   userName,
   userAvatar,
+  tenantNome,
   perfilPrivado,
   postAction,
   pollAction,
   eventAction,
   canalAction,
+  comunicadoAction,
   postPending,
   pollPending,
   eventPending,
   canalPending,
+  comunicadoPending,
   serverError,
   eventos,
   somentePublico = false,
   eventoIdInicial,
   canal,
+  comunicado = false,
   onPrependOtimista,
 }: {
   userId: string
   userName: string | null
   userAvatar: string | null
+  tenantNome: string
   perfilPrivado: boolean
   postAction: (payload: FormData) => void
   pollAction: (payload: FormData) => void
   eventAction: (payload: FormData) => void
   canalAction: (payload: FormData) => void
+  comunicadoAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
   eventPending: boolean
   canalPending: boolean
+  comunicadoPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
   somentePublico?: boolean
   eventoIdInicial?: string
   canal?: CanalComposerAlvo
+  comunicado?: boolean
   onPrependOtimista: (opts: {
     conteudo: string
     midiaUrls: string[]
@@ -411,6 +436,8 @@ function ComposerBody({
     eventoPreselecionado ?? eventos[0]?.id ?? '',
   )
   const [texto, setTexto] = useState('')
+  const [titulo, setTitulo] = useState('')
+  const [prioridade, setPrioridade] = useState<Prioridade>('NORMAL')
   const [mencoes, setMencoes] = useState<MencaoParsed[]>([])
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
@@ -444,17 +471,27 @@ function ComposerBody({
   const embedUrl = embedDispensado ? null : firstSocialUrlInText(texto)
   const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
   const enviando = medias.some((m) => m.url === null && !m.error)
-  const pending = canal ? canalPending : modoEnquete ? pollPending : modoEvento ? eventPending : postPending
+  const pending = comunicado
+    ? comunicadoPending
+    : canal
+      ? canalPending
+      : modoEnquete
+        ? pollPending
+        : modoEvento
+          ? eventPending
+          : postPending
   const anexos = medias.filter((m) => m.url).map((m) => m.url as string)
   const finalMidias = embedDispensado
     ? anexos
     : ensureSocialEmbedInMidias(texto, [...anexos, ...(embedUrl ? [embedUrl] : [])])
   const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean)
-  const podePublicar = modoEnquete
-    ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending
-    : modoEvento
-      ? texto.trim().length > 0 && eventoId.length > 0 && !pending
-      : texto.trim().length > 0 && !enviando && !pending
+  const podePublicar = comunicado
+    ? titulo.trim().length > 0 && texto.trim().length > 0 && !enviando && !pending
+    : modoEnquete
+      ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending
+      : modoEvento
+        ? texto.trim().length > 0 && eventoId.length > 0 && !pending
+        : texto.trim().length > 0 && !enviando && !pending
 
   // Perfil privado: Público fica listado, mas bloqueado (modal para alterar privacidade).
   const visibilidadeEfetiva: VisibilidadePost =
@@ -464,14 +501,19 @@ function ComposerBody({
     VISIBILIDADE_OPCOES[VISIBILIDADE_OPCOES.length - 1]!
   const AlcanceIcon = opcaoVisibilidadeAtual.Icon
 
+  const opcaoPrioridadeAtual =
+    PRIORIDADE_OPCOES.find((opcao) => opcao.value === prioridade) ?? PRIORIDADE_OPCOES[0]!
+  const PrioridadeIcon = opcaoPrioridadeAtual.Icon
+
   const composerChanges = useMemo(() => {
     const list: string[] = []
+    if (comunicado && titulo.trim()) list.push('Título')
     if (texto.trim()) list.push('Texto')
     if (medias.length > 0) list.push(`Anexos (${medias.length})`)
     if (modoEnquete) list.push('Enquete')
     if (modoEvento) list.push('Evento')
     return list
-  }, [texto, medias.length, modoEnquete, modoEvento])
+  }, [comunicado, titulo, texto, medias.length, modoEnquete, modoEvento])
 
   useUnsavedChanges({
     id: 'feed-composer',
@@ -529,6 +571,16 @@ function ComposerBody({
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.set('conteudo', serializarMencoes(texto, mencoes))
+
+    if (comunicado) {
+      fd.set('titulo', titulo.trim())
+      fd.set('prioridade', prioridade)
+      startTransition(() => {
+        comunicadoAction(fd)
+      })
+      return
+    }
+
     onPrependOtimista({
       conteudo: serializarMencoes(texto, mencoes),
       midiaUrls: finalMidias,
@@ -758,7 +810,7 @@ function ComposerBody({
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
       {canal ? (
         <input type="hidden" name="conversaId" value={canal.conversaId} />
-      ) : (
+      ) : comunicado ? null : (
         <input type="hidden" name="visibilidade" value={visibilidadeEfetiva} />
       )}
       {modoEnquete && (
@@ -768,7 +820,19 @@ function ComposerBody({
 
       <div className="flex items-start gap-3">
         <Avatar nome={userName} avatarUrl={userAvatar} size="md" />
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 space-y-2">
+          {comunicado && expanded && (
+            <input
+              type="text"
+              name="titulo"
+              required
+              maxLength={150}
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Título do comunicado"
+              className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm font-semibold text-[rgb(var(--foreground))] outline-none transition-colors placeholder:font-normal placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+            />
+          )}
           <AnimatePresence mode="wait" initial={false}>
             {!expanded ? (
               <m.button
@@ -782,7 +846,11 @@ function ComposerBody({
                 whileTap={{ scale: 0.99 }}
                 className="h-11 w-full rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 text-left text-sm text-[rgb(var(--foreground-muted))] transition-colors hover:border-[rgb(var(--border-strong))]"
               >
-                {canal ? `Publicar em ${canal.nome ?? 'canal'}…` : `No que você tá pensando, ${firstName}?`}
+                {comunicado
+                  ? 'Novo comunicado oficial…'
+                  : canal
+                    ? `Publicar em ${canal.nome ?? 'canal'}…`
+                    : `No que você tá pensando, ${firstName}?`}
               </m.button>
             ) : (
               <m.textarea
@@ -809,9 +877,11 @@ function ComposerBody({
                   }
                 }}
                 placeholder={
-                  canal
-                    ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
-                    : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
+                  comunicado
+                    ? 'Escreva o comunicado oficial para a torcida…'
+                    : canal
+                      ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
+                      : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
                 }
                 className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
               />
@@ -976,6 +1046,42 @@ function ComposerBody({
             </p>
           )}
 
+          {comunicado && (
+            <div className="mt-3 ml-[52px]">
+              <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Prévia — como vai aparecer no feed
+              </p>
+              {titulo.trim() || texto.trim() ? (
+                <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar nome={userName} avatarUrl={userAvatar} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+                        {userName ?? 'Administração'}
+                      </p>
+                      <p className="text-xs text-[rgb(var(--foreground-muted))]">agora</p>
+                    </div>
+                  </div>
+                  <PostComunicadoEmbed
+                    comunicado={{
+                      id: 'preview',
+                      titulo: titulo.trim() || 'Título do comunicado',
+                      corpo: texto.trim() || 'O texto do comunicado aparece aqui.',
+                      prioridade,
+                      tenantNome,
+                      autorNome: userName,
+                    }}
+                  />
+                  {anexos.length > 0 && <PostMedia urls={anexos} caption="" />}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-4 text-center text-xs text-[rgb(var(--foreground-muted))]">
+                  A prévia aparece aqui conforme você escreve.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 border-t border-[rgb(var(--border))] pt-3">
               <div className="flex min-w-0 items-center gap-1">
                 <button
@@ -1026,7 +1132,7 @@ function ComposerBody({
                       )}
                     </AnimatePresence>
                   </div>
-                  {!canal && (
+                  {!canal && !comunicado && (
                     <button
                       type="button"
                       onClick={toggleEnquete}
@@ -1037,7 +1143,7 @@ function ComposerBody({
                       <BarChart3 className="h-5 w-5" />
                     </button>
                   )}
-                  {!canal && eventos.length > 0 && (
+                  {!canal && !comunicado && eventos.length > 0 && (
                     <button
                       type="button"
                       onClick={toggleEvento}
@@ -1132,7 +1238,7 @@ function ComposerBody({
                           <StickerIcon className="h-4 w-4 shrink-0" />
                           Sticker
                         </m.button>
-                        {!canal && (
+                        {!canal && !comunicado && (
                           <m.button
                             type="button"
                             custom={2}
@@ -1149,7 +1255,7 @@ function ComposerBody({
                             Enquete
                           </m.button>
                         )}
-                        {!canal && eventos.length > 0 && (
+                        {!canal && !comunicado && eventos.length > 0 && (
                           <m.button
                             type="button"
                             custom={3}
@@ -1168,7 +1274,7 @@ function ComposerBody({
                         )}
                         <m.button
                           type="button"
-                          custom={!canal && eventos.length > 0 ? 4 : 3}
+                          custom={!canal && !comunicado && eventos.length > 0 ? 4 : 3}
                           variants={menuItemStagger}
                           initial="hidden"
                           animate="show"
@@ -1210,7 +1316,111 @@ function ComposerBody({
               </div>
 
             <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-              {canal ? (
+              {comunicado ? (
+                <div ref={alcanceRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlcanceOpen((v) => !v)
+                      setExtrasOpen(false)
+                      setEmojiOpen(false)
+                      setStickerOpen(false)
+                    }}
+                    aria-label="Prioridade do comunicado"
+                    aria-expanded={alcanceOpen}
+                    aria-haspopup="listbox"
+                    className={[
+                      'inline-flex h-9 max-w-[13rem] items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-0 pl-2.5 pr-2 text-sm font-medium text-[rgb(var(--foreground))] outline-none transition-[border-color,box-shadow,background-color]',
+                      'hover:border-[rgb(var(--foreground-muted)_/_0.45)] focus:border-[rgb(var(--color-primary))] focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.25)]',
+                      alcanceOpen ? 'border-[rgb(var(--color-primary))] ring-2 ring-[rgb(var(--color-primary)_/_0.25)]' : '',
+                    ].join(' ')}
+                  >
+                    <PrioridadeIcon
+                      aria-hidden
+                      className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]"
+                    />
+                    <span className="min-w-0 truncate">{opcaoPrioridadeAtual.label}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className={[
+                        'h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform',
+                        alcanceOpen ? 'rotate-180' : '',
+                      ].join(' ')}
+                    />
+                  </button>
+                  <AnimatePresence>
+                    {alcanceOpen && (
+                      <m.div
+                        key="prioridade-menu"
+                        role="listbox"
+                        aria-label="Prioridade do comunicado"
+                        variants={popoverPanel}
+                        initial="hidden"
+                        animate="show"
+                        exit="exit"
+                        transition={springGentle}
+                        className="card-soft absolute top-full right-0 z-40 mt-2 min-w-[15.5rem] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-lg"
+                      >
+                        {PRIORIDADE_OPCOES.map((opcao, index) => {
+                          const selecionada = opcao.value === prioridade
+                          const Icon = opcao.Icon
+                          return (
+                            <m.button
+                              key={opcao.value}
+                              type="button"
+                              role="option"
+                              aria-selected={selecionada}
+                              custom={index}
+                              variants={menuItemStagger}
+                              initial="hidden"
+                              animate="show"
+                              onClick={() => {
+                                setPrioridade(opcao.value)
+                                setAlcanceOpen(false)
+                              }}
+                              className={[
+                                'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]',
+                                selecionada ? 'bg-[rgb(var(--color-primary)_/_0.08)]' : '',
+                              ].join(' ')}
+                            >
+                              <Icon
+                                aria-hidden
+                                className={[
+                                  'mt-0.5 h-4 w-4 shrink-0',
+                                  selecionada
+                                    ? 'text-[rgb(var(--color-primary-fg))]'
+                                    : 'text-[rgb(var(--foreground-muted))]',
+                                ].join(' ')}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span
+                                  className={[
+                                    'block text-sm font-medium',
+                                    selecionada
+                                      ? 'text-[rgb(var(--color-primary-fg))]'
+                                      : 'text-[rgb(var(--foreground))]',
+                                  ].join(' ')}
+                                >
+                                  {opcao.label}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                                  {opcao.descricao}
+                                </span>
+                              </span>
+                              {selecionada && (
+                                <Check
+                                  aria-hidden
+                                  className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]"
+                                />
+                              )}
+                            </m.button>
+                          )
+                        })}
+                      </m.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : canal ? (
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para membros do canal
                 </span>
@@ -1348,9 +1558,25 @@ function ComposerBody({
                 disabled={!podePublicar}
                 className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-3 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4"
               >
-                {pending || enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {pending || enviando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : comunicado ? (
+                  <Megaphone className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
                 <span className="max-sm:sr-only">
-                  {enviando ? 'Enviando…' : pending ? 'Publicando…' : modoEnquete ? 'Publicar enquete' : modoEvento ? 'Publicar evento' : 'Publicar'}
+                  {enviando
+                    ? 'Enviando…'
+                    : pending
+                      ? 'Publicando…'
+                      : comunicado
+                        ? 'Publicar comunicado'
+                        : modoEnquete
+                          ? 'Publicar enquete'
+                          : modoEvento
+                            ? 'Publicar evento'
+                            : 'Publicar'}
                 </span>
               </button>
             </div>

@@ -9,6 +9,7 @@ import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
+import { useFeedWindow } from '@/lib/use-feed-window'
 import { deveExibirBadgeTorcidaNoFeed } from '@/lib/feed-live-refresh'
 import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,

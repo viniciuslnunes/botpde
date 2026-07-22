@@ -8,6 +8,7 @@ import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
+import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
 
 const postSchema = z.object({
   titulo: z
@@ -178,6 +179,78 @@ export type ComunicadoState = {
   message?: string
 }
 
+type PrioridadeComunicado = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+
+/**
+ * Cria o Announcement + o Post institucional vinculado (entrada real do
+ * feed — ver `getDescobrirPostsBaseCached`/`scoreDescobrirPost` em
+ * `@/lib/feed`), audita, notifica urgência e invalida os caches. Único
+ * ponto de publicação — `criarComunicado` e `publicarComunicadoComposer`
+ * só coletam/validam o input e chamam isto.
+ */
+async function publicarComunicadoENotificar(opts: {
+  tenantId: string
+  autorId: string
+  titulo: string
+  corpo: string
+  prioridade: PrioridadeComunicado
+  midias?: string[]
+}): Promise<{ id: string }> {
+  const comunicado = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const criado = await tx.announcement.create({
+      data: {
+        tenantId: opts.tenantId,
+        autorId: opts.autorId,
+        titulo: opts.titulo,
+        corpo: opts.corpo,
+        prioridade: opts.prioridade,
+      },
+    })
+    await tx.post.create({
+      data: {
+        tenantId: opts.tenantId,
+        autorId: opts.autorId,
+        titulo: null,
+        conteudo: '',
+        tipo: 'INSTITUCIONAL',
+        visibilidade: 'PUBLICO',
+        fixado: false,
+        midiaUrls: opts.midias ?? [],
+        comunicadoOrigemId: criado.id,
+      },
+    })
+    return criado
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: opts.tenantId,
+      atorId: opts.autorId,
+      acao: 'COMUNICADO_CRIADO',
+      entidade: 'Announcement',
+      entidadeId: comunicado.id,
+    },
+  })
+
+  if (opts.prioridade === 'URGENTE') {
+    await notificarComunicadoUrgente({
+      tenantId: opts.tenantId,
+      tipo: 'COMUNICADO_URGENTE',
+      titulo: `Urgente: ${opts.titulo}`,
+      corpo: opts.corpo.slice(0, 280),
+      link: '/portal/comunidade',
+      excetoUserId: opts.autorId,
+    })
+  }
+
+  invalidateComunicadosCache(opts.tenantId)
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+
+  return comunicado
+}
+
 export async function criarComunicado(
   _prev: ComunicadoState,
   formData: FormData,
@@ -197,51 +270,82 @@ export async function criarComunicado(
 
   const { titulo, corpo, prioridade } = parsed.data
 
-  const comunicado = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const criado = await tx.announcement.create({
-      data: { tenantId: tenant.id, autorId: session.user.id, titulo, corpo, prioridade },
-    })
-    await tx.post.create({
-      data: {
-        tenantId: tenant.id,
-        autorId: session.user.id,
-        titulo: null,
-        conteudo: '',
-        tipo: 'INSTITUCIONAL',
-        visibilidade: 'PUBLICO',
-        fixado: false,
-        comunicadoOrigemId: criado.id,
-      },
-    })
-    return criado
+  await publicarComunicadoENotificar({
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    titulo,
+    corpo,
+    prioridade,
   })
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'COMUNICADO_CRIADO',
-      entidade: 'Announcement',
-      entidadeId: comunicado.id,
-    },
+  return {}
+}
+
+// Mesma forma de validação de anexo usada no composer do feed (member
+// posts) — replicada aqui porque não é exportada de
+// apps/web/src/app/portal/comunidade/actions.ts.
+const midiaUrlSchema = z
+  .string()
+  .max(500)
+  .refine(
+    (url) => isCloudinaryUrl(url) || isSocialUrl(url) || isStickerPath(url),
+    'Tipo de anexo não permitido',
+  )
+
+const comunicadoComposerSchema = z.object({
+  titulo: z.string().min(1, 'Título é obrigatório').max(150),
+  corpo: z.string().min(1, 'Conteúdo é obrigatório').max(4000),
+  prioridade: z.enum(['NORMAL', 'IMPORTANTE', 'URGENTE']),
+  midias: z.array(midiaUrlSchema).max(10, 'Máximo de 10 anexos').default([]),
+})
+
+export type ComunicadoComposerState = {
+  errors?: Record<string, string[]>
+  message?: string
+  success?: boolean
+  /** Muda a cada publicação — usado no cliente para remontar/limpar o composer. */
+  token?: string
+}
+
+function parseMidiasComunicado(raw: FormDataEntryValue | null): unknown {
+  if (typeof raw !== 'string' || raw.trim() === '') return []
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return []
+  }
+}
+
+/** Publica um comunicado a partir do composer rico (`FeedComposer` modo `comunicado`). */
+export async function publicarComunicadoComposer(
+  _prev: ComunicadoComposerState,
+  formData: FormData,
+): Promise<ComunicadoComposerState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const parsed = comunicadoComposerSchema.safeParse({
+    titulo: formData.get('titulo'),
+    corpo: formData.get('conteudo'),
+    prioridade: formData.get('prioridade'),
+    midias: parseMidiasComunicado(formData.get('midias')),
   })
 
-  if (prioridade === 'URGENTE') {
-    await notificarComunicadoUrgente({
-      tenantId: tenant.id,
-      tipo: 'COMUNICADO_URGENTE',
-      titulo: `Urgente: ${titulo}`,
-      corpo: corpo.slice(0, 280),
-      link: '/portal/comunidade',
-      excetoUserId: session.user.id,
-    })
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  invalidateComunicadosCache(tenant.id)
-  revalidatePath('/admin/comunidade')
-  revalidatePath('/portal/comunidade')
-  revalidatePath('/portal')
-  return {}
+  const { titulo, corpo, prioridade, midias } = parsed.data
+
+  const criado = await publicarComunicadoENotificar({
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    titulo,
+    corpo,
+    prioridade,
+    midias,
+  })
+
+  return { success: true, token: criado.id }
 }
 
 export async function atualizarComunicado(
