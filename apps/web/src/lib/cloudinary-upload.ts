@@ -4,8 +4,10 @@
 
 const MAX_WIDTH = 1600
 const BANNER_MAX_WIDTH = 1920
-const AVATAR_MAX_WIDTH = 512
+/** 1024 cobre avatar xl (~96 CSS px) em telas 3x com folga e evita soft de 512. */
+const AVATAR_MAX_WIDTH = 1024
 const JPEG_QUALITY = 0.85
+const AVATAR_JPEG_QUALITY = 0.92
 
 type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro'
 
@@ -17,6 +19,48 @@ interface SignResponse {
   signature: string
 }
 
+/**
+ * Downscale em passos (metade a metade) + smoothing high — um único drawImage
+ * de 4k→512 deixa a foto mole; passos preservam nitidez.
+ */
+function scaleToCanvas(
+  source: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+  destW: number,
+  destH: number,
+): HTMLCanvasElement | null {
+  let cur: CanvasImageSource = source
+  let curW = srcW
+  let curH = srcH
+
+  while (curW / 2 >= destW && curH / 2 >= destH) {
+    const nextW = Math.round(curW / 2)
+    const nextH = Math.round(curH / 2)
+    const step = document.createElement('canvas')
+    step.width = nextW
+    step.height = nextH
+    const ctx = step.getContext('2d')
+    if (!ctx) return null
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(cur, 0, 0, curW, curH, 0, 0, nextW, nextH)
+    cur = step
+    curW = nextW
+    curH = nextH
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = destW
+  canvas.height = destH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(cur, 0, 0, curW, curH, 0, 0, destW, destH)
+  return canvas
+}
+
 /** Redimensiona/comprime no cliente antes de subir (economiza banda e storage). */
 async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
   if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
@@ -26,18 +70,21 @@ async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
       : purpose === 'perfil-banner'
         ? BANNER_MAX_WIDTH
         : MAX_WIDTH
+  const quality = purpose === 'perfil-avatar' ? AVATAR_JPEG_QUALITY : JPEG_QUALITY
   try {
     const bitmap = await createImageBitmap(file)
     const ratio = Math.min(1, maxWidth / bitmap.width)
-    if (ratio === 1) return file
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(bitmap.width * ratio)
-    canvas.height = Math.round(bitmap.height * ratio)
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return file
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    if (ratio === 1) {
+      bitmap.close()
+      return file
+    }
+    const destW = Math.round(bitmap.width * ratio)
+    const destH = Math.round(bitmap.height * ratio)
+    const canvas = scaleToCanvas(bitmap, bitmap.width, bitmap.height, destW, destH)
+    bitmap.close()
+    if (!canvas) return file
     const blob = await new Promise<Blob | null>((res) =>
-      canvas.toBlob(res, 'image/jpeg', JPEG_QUALITY),
+      canvas.toBlob(res, 'image/jpeg', quality),
     )
     return blob ?? file
   } catch {

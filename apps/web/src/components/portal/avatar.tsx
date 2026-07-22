@@ -50,6 +50,7 @@ export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' 
         alt={nome ?? 'Membro'}
         width={px}
         height={px}
+        quality={90}
         className={[base, objectFit, className ?? ''].join(' ')}
       />
     )
