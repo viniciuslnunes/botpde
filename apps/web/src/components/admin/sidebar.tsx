@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -258,31 +260,54 @@ export function AdminSidebar({
   onMobileClose,
 }: AdminSidebarProps) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Trava o scroll do body enquanto o drawer mobile está aberto.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [mobileOpen])
+
+  // Portal no body: o shell admin tem overflow-hidden e clipava o
+  // `position:fixed` do drawer — no mobile o menu “abria” sem aparecer.
+  const mobileDrawer =
+    mounted && mobileOpen
+      ? createPortal(
+          <div className="fixed inset-x-0 bottom-0 top-14 z-[60] lg:hidden">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/35"
+              aria-label="Fechar menu admin"
+              onClick={onMobileClose}
+            />
+            <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
+              <SidebarBody
+                tenantSlug={tenantSlug}
+                items={items}
+                badges={badges}
+                pathname={pathname}
+                isSuperAdmin={isSuperAdmin}
+                torcidas={torcidas}
+                vinculos={vinculos}
+                onNavigate={onMobileClose}
+              />
+            </aside>
+          </div>,
+          document.body,
+        )
+      : null
 
   return (
     <>
-      {mobileOpen && (
-        <div className="fixed inset-x-0 bottom-0 top-14 z-[60] lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/35"
-            aria-label="Fechar menu admin"
-            onClick={onMobileClose}
-          />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
-            <SidebarBody
-              tenantSlug={tenantSlug}
-              items={items}
-              badges={badges}
-              pathname={pathname}
-              isSuperAdmin={isSuperAdmin}
-              torcidas={torcidas}
-              vinculos={vinculos}
-              onNavigate={onMobileClose}
-            />
-          </aside>
-        </div>
-      )}
+      {mobileDrawer}
 
       {/* z-60 > header (z-50) e StickyPersistBar (z-20): backdrops
           `fixed inset-0` dentro do header (sino/dropdown) não podem “matar”
