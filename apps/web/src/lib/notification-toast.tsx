@@ -6,7 +6,15 @@ import { NotificationAvatar } from '@/components/portal/notification-item-visual
 
 /** Tipos cujo efeito muda dados renderizados por Server Components (ex.: painel
  * lateral da comunidade) — exigem `router.refresh()` além do toast. */
-export const TIPOS_QUE_EXIGEM_REFRESH: ReadonlySet<string> = new Set(['MEMBRO_APROVADO'])
+export const TIPOS_QUE_EXIGEM_REFRESH: ReadonlySet<string> = new Set([
+  'MEMBRO_APROVADO',
+  'ALIANCA_ACEITA',
+  'ALIANCA_REJEITADA',
+  'ALIANCA_ENCERRADA',
+  'ALIANCA_CANCELADA',
+  'GRUPO_APROVADO',
+  'CANAL_APROVADO',
+])
 
 const MAX_TOASTS_INDIVIDUAIS = 3
 const TOAST_DURATION_MS = 6000

@@ -158,6 +158,17 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
 
   invalidatePermissionsCache(membro.userId, tenant.id)
 
+  await db.notificacao.updateMany({
+    where: {
+      userId: session.user.id,
+      tenantId: tenant.id,
+      atorId: membro.userId,
+      tipo: 'MEMBRO_SOLICITADO',
+      lida: false,
+    },
+    data: { lida: true },
+  })
+
   // Auto-vínculo no canal oficial da unidade (governança hierárquica, Fase 2):
   // se o tenant tem Sede com canal provisionado, o membro aprovado entra nele.
   // SEMPRE aqui (aprovação) — nunca em GET/solicitação (anti-padrão write-on-GET).
@@ -230,6 +241,17 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
 
     return atualizado
+  })
+
+  await db.notificacao.updateMany({
+    where: {
+      userId: session.user.id,
+      tenantId: tenant.id,
+      atorId: membro.userId,
+      tipo: 'MEMBRO_SOLICITADO',
+      lida: false,
+    },
+    data: { lida: true },
   })
 
   await db.auditLog.create({

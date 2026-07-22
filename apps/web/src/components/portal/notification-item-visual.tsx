@@ -24,6 +24,7 @@ import { Avatar } from '@/components/portal/avatar'
 const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   SEGUIMENTO_PENDENTE: UserPlus,
   SEGUIMENTO_APROVADO: UserCheck,
+  SEGUIMENTO_REJEITADO: UserX,
   NOVO_COMENTARIO: MessageCircle,
   NOVA_REACAO: Heart,
   COMUNICADO_URGENTE: Megaphone,
@@ -63,6 +64,7 @@ export interface NotificacaoAtorInfo {
 const TITULO_COM_ATOR: Partial<Record<TipoNotificacao, (nome: string) => string>> = {
   SEGUIMENTO_PENDENTE: (nome) => `${nome} quer seguir você`,
   SEGUIMENTO_APROVADO: (nome) => `${nome} aceitou você`,
+  SEGUIMENTO_REJEITADO: (nome) => `${nome} não aceitou seu pedido para seguir`,
   NOVO_COMENTARIO: (nome) => `${nome} comentou no seu post`,
   NOVA_REACAO: (nome) => `${nome} curtiu seu post`,
   MENCAO: (nome) => `${nome} mencionou você`,

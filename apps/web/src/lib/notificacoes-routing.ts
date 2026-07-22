@@ -34,6 +34,7 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   NOVA_REACAO: { escopo: 'social' },
   SEGUIMENTO_PENDENTE: { escopo: 'social' },
   SEGUIMENTO_APROVADO: { escopo: 'social' },
+  SEGUIMENTO_REJEITADO: { escopo: 'social' },
   NOVA_MENSAGEM: { escopo: 'social' },
   GRUPO_PEDIDO: { escopo: 'social' },
   GRUPO_APROVADO: { escopo: 'social' },

@@ -754,11 +754,21 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
     data: { status: 'REJEITADO' },
   })
 
+  const tenantNotif = tenant?.id ?? seguimento.tenantContextoId
   await marcarNotificacoesSeguimentoPendentesLidas(
     session.user.id,
-    tenant?.id ?? seguimento.tenantContextoId,
+    tenantNotif,
     seguimento.seguidorId,
   )
+
+  await criarNotificacao({
+    userId: seguimento.seguidorId,
+    tenantId: tenantNotif,
+    tipo: 'SEGUIMENTO_REJEITADO',
+    titulo: 'Pedido para seguir não aceito',
+    corpo: `${session.user.name ?? 'Um membro'} não aceitou seu pedido para seguir.`,
+    atorId: session.user.id,
+  })
 
   revalidatePath('/portal/comunidade/seguindo')
   revalidatePath(`/portal/comunidade/perfil/${seguimento.seguidorId}`)
@@ -2327,6 +2337,17 @@ export async function decidirPedidoGrupo(
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
 
+  await db.notificacao.updateMany({
+    where: {
+      userId: session.user.id,
+      tenantId: tenant.id,
+      atorId: parsed.data.userId,
+      tipo: 'GRUPO_PEDIDO',
+      lida: false,
+    },
+    data: { lida: true },
+  })
+
   if (parsed.data.aprovar) {
     const ativos: number = await db.membroConversa.count({
       where: { conversaId: conversa.id, status: 'ATIVO', saiuEm: null },
@@ -3158,6 +3179,17 @@ export async function decidirPedidoCanal(
     select: { id: true },
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
+
+  await db.notificacao.updateMany({
+    where: {
+      userId: session.user.id,
+      tenantId: canal.tenantId,
+      atorId: parsed.data.userId,
+      tipo: 'CANAL_PEDIDO',
+      lida: false,
+    },
+    data: { lida: true },
+  })
 
   if (parsed.data.aprovar) {
     await db.membroConversa.update({

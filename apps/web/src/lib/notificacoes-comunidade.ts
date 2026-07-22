@@ -25,7 +25,7 @@ const FILTRO_POR_TIPO: Record<Exclude<FiltroNotificacaoSocial, 'todas'>, TipoNot
   mencoes: ['MENCAO'],
   reposts: ['REPOST'],
   reacoes: ['NOVO_COMENTARIO', 'NOVA_REACAO'],
-  seguimento: ['SEGUIMENTO_PENDENTE', 'SEGUIMENTO_APROVADO'],
+  seguimento: ['SEGUIMENTO_PENDENTE', 'SEGUIMENTO_APROVADO', 'SEGUIMENTO_REJEITADO'],
 }
 
 function tiposDoFiltro(filtro: FiltroNotificacaoSocial): TipoNotificacao[] {

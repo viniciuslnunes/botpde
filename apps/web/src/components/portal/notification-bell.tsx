@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { TipoNotificacao } from '@torcida/db'
-import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
+import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
 import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
+import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 
 export interface NotificationItem {
   id: string
@@ -50,10 +51,34 @@ export function NotificationBell({
   const [itemsSignature, setItemsSignature] = useState(initialSignature)
   const [pending, startTransition] = useTransition()
   const pathname = usePathname()
+  const itemsRef = useRef(items)
+  itemsRef.current = items
 
   useEffect(() => {
     setOpen(false)
   }, [pathname])
+
+  // Marca como lidos os itens que já estavam visíveis quando o dropdown
+  // abriu, após um delay — dá tempo do usuário perceber o destaque de
+  // "não lido" antes dele sumir. Fechar antes do delay cancela.
+  useEffect(() => {
+    if (!open) return
+    const idsNaoLidos = itemsRef.current.filter((item) => !item.lida).map((item) => item.id)
+    if (idsNaoLidos.length === 0) return
+
+    const timer = setTimeout(() => {
+      setItems((current) =>
+        current.map((x) => (idsNaoLidos.includes(x.id) ? { ...x, lida: true } : x)),
+      )
+      for (const id of idsNaoLidos) onMarkRead?.(id)
+      startTransition(() => {
+        void marcarNotificacoesLidasPorIds(idsNaoLidos)
+      })
+    }, NOTIFICATION_AUTO_READ_DELAY_MS)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Alinha lista ao SSR/contexto sem effect (React: ajustar state durante render).
   if (itemsSignature !== initialSignature) {

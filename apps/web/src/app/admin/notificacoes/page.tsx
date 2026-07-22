@@ -8,6 +8,7 @@ import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AdminMarcarTodasLidasButton } from '@/app/admin/notificacoes/admin-marcar-todas-lidas-button'
 import { AdminNotificacaoLink } from '@/app/admin/notificacoes/admin-notificacao-link'
+import { AdminNotificacoesAutoRead } from '@/app/admin/notificacoes/admin-notificacoes-auto-read'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { redirect } from 'next/navigation'
@@ -65,6 +66,10 @@ export default async function AdminNotificacoesPage() {
           {notificacoes.some((n) => !n.lida) && <AdminMarcarTodasLidasButton />}
         </div>
       </MotionReveal>
+
+      <AdminNotificacoesAutoRead
+        ids={notificacoes.filter((n) => !n.lida).map((n) => n.id)}
+      />
 
       {notificacoes.length === 0 ? (
         <MotionEmptyState

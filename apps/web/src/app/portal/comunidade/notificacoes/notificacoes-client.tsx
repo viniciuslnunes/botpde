@@ -1,17 +1,18 @@
 'use client'
 
-import { useCallback, useState, useTransition } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { Bell, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { marcarTodasNotificacoesLidas } from '@/app/portal/comunidade/actions'
-import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
+import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
 import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
 import type { NotificacaoSocialItem } from '@/lib/notificacoes-comunidade'
 import type { FiltroNotificacaoSocial } from '@/lib/notificacoes-comunidade'
 import { fadeUp, menuItemStagger, springSnappy } from '@/lib/motion-presets'
+import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 import {
   markNavbarNotificationRead,
   markNavbarNotificationsRead,
@@ -118,6 +119,27 @@ export function NotificacoesComunidadeClient({ inicial }: Props) {
       void marcarNotificacaoLida(item.id)
     })
   }
+
+  // Marca como lidos os itens visíveis após um delay — dá tempo do usuário
+  // perceber o destaque de "não lido" antes dele sumir. Troca de filtro
+  // antes do delay cancela o timer anterior (o novo efeito cuida do resto).
+  useEffect(() => {
+    const idsNaoLidos = itens.filter((n) => !n.lida).map((n) => n.id)
+    if (idsNaoLidos.length === 0) return
+
+    const timer = setTimeout(() => {
+      setItens((prev) =>
+        prev.map((n) => (idsNaoLidos.includes(n.id) ? { ...n, lida: true } : n)),
+      )
+      for (const id of idsNaoLidos) markNavbarNotificationRead(id)
+      startTransition(() => {
+        void marcarNotificacoesLidasPorIds(idsNaoLidos)
+      })
+    }, NOTIFICATION_AUTO_READ_DELAY_MS)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itens])
 
   const naoLidas = itens.filter((n) => !n.lida).length
 

@@ -8,6 +8,33 @@ import { PERMISSIONS } from '@torcida/types'
 
 const denunciaIdSchema = z.object({ denunciaId: z.string().min(1) })
 
+/**
+ * Marca como lida a notificação `DENUNCIA_NOVA` correspondente a esta denúncia
+ * para o admin que está decidindo. A notificação não guarda `denunciaId`
+ * (link genérico para a fila de moderação), então usamos `atorId` (denunciante)
+ * + `corpo` (motivo truncado, igual ao criado no fan-out) para amarrar à
+ * denúncia específica sem afetar notificações de outras denúncias do mesmo
+ * denunciante.
+ */
+async function marcarNotificacaoDenunciaLida(
+  userId: string,
+  tenantId: string,
+  denuncianteId: string,
+  motivo: string,
+): Promise<void> {
+  await db.notificacao.updateMany({
+    where: {
+      userId,
+      tenantId,
+      atorId: denuncianteId,
+      tipo: 'DENUNCIA_NOVA',
+      corpo: motivo.slice(0, 140),
+      lida: false,
+    },
+    data: { lida: true },
+  })
+}
+
 export async function resolverDenuncia(denunciaId: string): Promise<void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.COMMUNITY_MODERATE)
   const parsed = denunciaIdSchema.safeParse({ denunciaId })
@@ -15,9 +42,11 @@ export async function resolverDenuncia(denunciaId: string): Promise<void> {
 
   const denuncia = await db.denuncia.findFirst({
     where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
-    select: { id: true, postId: true },
+    select: { id: true, postId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({
@@ -55,9 +84,11 @@ export async function resolverDenunciaMensagem(denunciaId: string): Promise<void
 
   const denuncia = await db.denunciaMensagem.findFirst({
     where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
-    select: { id: true, mensagemId: true },
+    select: { id: true, mensagemId: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({
@@ -94,9 +125,11 @@ export async function descartarDenunciaMensagem(denunciaId: string): Promise<voi
 
   const denuncia = await db.denunciaMensagem.findFirst({
     where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
-    select: { id: true },
+    select: { id: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denunciaMensagem.update({
@@ -128,9 +161,11 @@ export async function descartarDenuncia(denunciaId: string): Promise<void> {
 
   const denuncia = await db.denuncia.findFirst({
     where: { id: parsed.data.denunciaId, tenantId: tenant.id, status: 'PENDENTE' },
-    select: { id: true },
+    select: { id: true, denuncianteId: true, motivo: true },
   })
   if (!denuncia) throw new Error('Denúncia não encontrada')
+
+  await marcarNotificacaoDenunciaLida(session.user.id, tenant.id, denuncia.denuncianteId, denuncia.motivo)
 
   await db.$transaction([
     db.denuncia.update({
