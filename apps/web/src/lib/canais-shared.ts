@@ -1,4 +1,42 @@
+import { canViewRecurso, type TenantRelation } from '@torcida/types'
+
 export type VisibilidadeCanal = 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'
+
+/**
+ * Gate puro de listagem/detalhe de canal (oficial ou temático).
+ *
+ * - `PUBLICO` — vitrine: qualquer viewer no alcance comunidade (sócio ou torcedor).
+ * - Demais — só sócio; aliados só quando `ALIADOS` (ou via `PUBLICO` acima).
+ */
+export function decidePodeVerCanal(opts: {
+  relation: TenantRelation
+  visibilidade: VisibilidadeCanal
+  isSocio: boolean
+}): boolean {
+  const { relation, visibilidade, isSocio } = opts
+
+  if (visibilidade === 'PUBLICO') {
+    return canViewRecurso(relation, 'comunidade')
+  }
+
+  if (!isSocio) return false
+
+  switch (visibilidade) {
+    case 'TENANT':
+      return relation === 'self'
+    case 'HIERARQUIA':
+      return relation === 'self' || relation === 'ancestor' || relation === 'descendant'
+    case 'ALIADOS':
+      return (
+        relation === 'self' ||
+        relation === 'ancestor' ||
+        relation === 'descendant' ||
+        relation === 'allied'
+      )
+    default:
+      return false
+  }
+}
 
 export interface CanalItem {
   id: string

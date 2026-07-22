@@ -32,6 +32,7 @@ import {
   inscreverCanal,
   podePublicarNoCanal,
   podeGerenciarPedidosCanal,
+  podeVerCanal,
   linkCanalComunidade,
   linkUnidadeComunidade,
 } from '@/lib/canais'
@@ -2575,7 +2576,7 @@ export async function entrarCanal(conversaId: string): Promise<void> {
 export async function criarCanalTematico(
   nome: string,
   descricao?: string,
-  visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO' = 'HIERARQUIA',
+  visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO' = 'ALIADOS',
   avatarUrl?: string,
   /** false = canal fechado — entrada mediante pedido/aprovação. */
   publica: boolean = true,
@@ -2799,16 +2800,33 @@ export async function pedirEntradaCanal(conversaId: string): Promise<void> {
   const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Pedido inválido')
 
-  const canal: {
+  const canalRow: {
     id: string
     tenantId: string
     nome: string | null
     publica: boolean
+    visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'
   } | null = await db.conversa.findFirst({
-    where: { id: parsed.data.conversaId, tenantId: tenant.id, tipo: 'CANAL' },
-    select: { id: true, tenantId: true, nome: true, publica: true },
+    where: { id: parsed.data.conversaId, tipo: 'CANAL' },
+    select: {
+      id: true,
+      tenantId: true,
+      nome: true,
+      publica: true,
+      visibilidadeCanal: true,
+    },
   })
-  if (!canal) throw new Error('Canal não encontrado.')
+  if (!canalRow) throw new Error('Canal não encontrado.')
+
+  const podeVer = await podeVerCanal(
+    tenant.id,
+    canalRow.tenantId,
+    canalRow.visibilidadeCanal,
+    session.user.id,
+  )
+  if (!podeVer) throw new Error('Canal não encontrado ou indisponível.')
+
+  const canal = canalRow
   if (canal.publica) throw new Error('Este canal é aberto — use Entrar.')
 
   const existente: { status: string; saiuEm: Date | null } | null =

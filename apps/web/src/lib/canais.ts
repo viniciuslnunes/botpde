@@ -1,13 +1,17 @@
 import 'server-only'
 
 import { cache } from 'react'
-import { unstable_cache } from 'next/cache'
+import { revalidateTag, unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
-import { canViewRecurso, formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
 import { tagCanaisVisiveis } from './comunidade-cache'
 import { ExpectedError } from './expected-error'
-import { getTenantRelation, getTorcidaLineageTenantIds } from './hierarquia'
-import { getVisibleTenantIds } from './hierarquia'
+import {
+  getDescendantTenantIds,
+  getTenantRelation,
+  getTorcidaLineageTenantIds,
+  getVisibleTenantIds,
+} from './hierarquia'
 import {
   postInclude,
   projetarPost,
@@ -20,14 +24,15 @@ import {
   type PostRaw,
   type PostSocialItem,
 } from './feed'
-import type {
-  CanalItem,
-  CandidatoMembroCanalItem,
-  MembroCanalItem,
-  PedidoCanalItem,
-  SugestaoCanalAside,
-  UnidadeBuscaItem,
-  VisibilidadeCanal,
+import {
+  decidePodeVerCanal,
+  type CanalItem,
+  type CandidatoMembroCanalItem,
+  type MembroCanalItem,
+  type PedidoCanalItem,
+  type SugestaoCanalAside,
+  type UnidadeBuscaItem,
+  type VisibilidadeCanal,
 } from './canais-shared'
 
 export type {
@@ -40,12 +45,16 @@ export type {
   VisibilidadeCanal,
 } from './canais-shared'
 export {
+  decidePodeVerCanal,
   isConversaGrupoLike,
   labelTipoUnidade,
   labelVisibilidadeCanal,
   linkCanalComunidade,
   linkUnidadeComunidade,
 } from './canais-shared'
+
+/** Cap de unidades Caso B materializadas no load de `/canais`. */
+const MAX_CANAIS_OFICIAIS_PROVISION = 50
 
 /**
  * Sócio (vínculo `SaasMembro` APROVADO com `tipo: 'SOCIO'`) em qualquer
@@ -72,25 +81,14 @@ export async function podeVerCanal(
   visibilidade: VisibilidadeCanal,
   userId: string,
 ): Promise<boolean> {
-  if (viewerTenantId === canalTenantId) return true
-  if (visibilidade === 'TENANT') return false
+  const [isSocio, relation] = await Promise.all([
+    isSocioDaTorcida(userId, viewerTenantId),
+    viewerTenantId === canalTenantId
+      ? Promise.resolve('self' as const)
+      : getTenantRelation(viewerTenantId, canalTenantId),
+  ])
 
-  // Canal de outra unidade da torcida (hierarquia/aliados/público): só sócio
-  // enxerga — torcedor vê apenas o canal da própria unidade (relation self,
-  // já resolvido acima).
-  if (!(await isSocioDaTorcida(userId, viewerTenantId))) return false
-
-  const relation = await getTenantRelation(viewerTenantId, canalTenantId)
-  switch (visibilidade) {
-    case 'HIERARQUIA':
-      return relation === 'ancestor' || relation === 'descendant'
-    case 'ALIADOS':
-      return relation === 'ancestor' || relation === 'descendant' || relation === 'allied'
-    case 'PUBLICO':
-      return canViewRecurso(relation, 'comunidade')
-    default:
-      return false
-  }
+  return decidePodeVerCanal({ relation, visibilidade, isSocio })
 }
 
 /**
@@ -199,7 +197,9 @@ export async function getOrCreateCanalOficial(
       descricao: 'Canal oficial da unidade',
       institucional: true,
       canalOficial: true,
-      visibilidadeCanal: 'HIERARQUIA',
+      // Default ALIADOS: hierarquia + torcidas aliadas podem descobrir e pedir
+      // entrada; liderança fecha em HIERARQUIA/TENANT em /admin/configuracoes.
+      visibilidadeCanal: 'ALIADOS',
       somenteAdminPublica: false,
       // Fechado por padrão — entrada mediante pedido/aprovação da liderança;
       // liderança troca em /admin/configuracoes se quiser abrir (ver salvarCanalOficial).
@@ -213,6 +213,86 @@ export async function getOrCreateCanalOficial(
   })
 
   return { id: canal.id, criadoAgora: true }
+}
+
+/**
+ * Garante canais oficiais visíveis na listagem do tenant ativo:
+ * - self + descendentes Caso B (`getOrCreateCanalOficial`)
+ * - unidades Caso A (SUBSEDE/PDE no mesmo tenant sem `Sede.canalConversaId`)
+ *
+ * Não materializa ancestral/aliado (write-on-GET cross-tenant). Cap de
+ * descendentes para não explodir o load de `/canais`.
+ */
+export async function ensureCanaisOficiaisHierarquia(tenantId: string): Promise<void> {
+  const descendentes = await getDescendantTenantIds(tenantId)
+  const tenantIds = [tenantId, ...descendentes].slice(0, MAX_CANAIS_OFICIAIS_PROVISION)
+
+  const criadosCasoB = await Promise.all(tenantIds.map((id) => getOrCreateCanalOficial(id)))
+  let materializou = criadosCasoB.some((c) => c.criadoAgora)
+
+  // Oficiais ainda no default antigo (HIERARQUIA) → ALIADOS, para aliados
+  // descobrirem e pedirem entrada. Temáticos não são tocados.
+  const bumped = await db.conversa.updateMany({
+    where: {
+      tenantId: { in: tenantIds },
+      tipo: 'CANAL',
+      canalOficial: true,
+      visibilidadeCanal: 'HIERARQUIA',
+    },
+    data: { visibilidadeCanal: 'ALIADOS' },
+  })
+  if (bumped.count > 0) materializou = true
+
+  // Caso A: subsede/PDE no mesmo tenant, sem tenant próprio — canal por Sede.
+  const sedesSemCanal: Array<{ id: string; nome: string }> = await db.sede.findMany({
+    where: {
+      tenantId,
+      ativa: true,
+      canalConversaId: null,
+      tipo: { in: ['SUBSEDE', 'PONTO_ENCONTRO'] },
+    },
+    select: { id: true, nome: true },
+    take: MAX_CANAIS_OFICIAIS_PROVISION,
+  })
+
+  if (sedesSemCanal.length > 0) {
+    const criadoPorId = await resolverOwnerId(tenantId)
+    for (const sede of sedesSemCanal) {
+      const canal: { id: string } = await db.conversa.create({
+        data: {
+          tipo: 'CANAL',
+          tenantId,
+          nome: sede.nome,
+          descricao: 'Canal oficial da unidade',
+          institucional: true,
+          canalOficial: true,
+          visibilidadeCanal: 'ALIADOS',
+          somenteAdminPublica: false,
+          publica: false,
+          criadoPorId,
+          membros: {
+            create: { userId: criadoPorId, papel: 'ADMIN', status: 'ATIVO' },
+          },
+        },
+        select: { id: true },
+      })
+      const linked = await db.sede.updateMany({
+        where: { id: sede.id, canalConversaId: null },
+        data: { canalConversaId: canal.id },
+      })
+      if (linked.count === 0) {
+        // Corrida: outro request já ligou o canal — descarta órfão.
+        await db.conversa.delete({ where: { id: canal.id } }).catch(() => undefined)
+        continue
+      }
+      materializou = true
+    }
+  }
+
+  // Listagem usa unstable_cache — sem invalidate, canais novos ficam invisíveis ~120s.
+  if (materializou) {
+    revalidateTag(tagCanaisVisiveis(tenantId), 'max')
+  }
 }
 
 /** Entrada imediata (canal `publica: true`) — sem pedido, sem aprovação. */
@@ -325,8 +405,8 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
 /**
  * Canais visíveis em que o viewer ainda não está inscrito — painel
  * "Canais sugeridos" no rail direito do feed (entre salas e mensagens).
- * Só inclui canais em que dá para agir: abertos (`publica`) ou fechados
- * do próprio tenant (`pedirEntradaCanal` exige `tenantId` ativo).
+ * Abertos → Entrar; fechados → Pedir (inclui cross-tenant quando
+ * `podeVerCanal` — `pedirEntradaCanal` aceita canais visíveis fora do tenant).
  */
 export const getSugestoesCanaisParaAside = cache(async function getSugestoesCanaisParaAside(
   tenantId: string,
@@ -334,12 +414,7 @@ export const getSugestoesCanaisParaAside = cache(async function getSugestoesCana
 ): Promise<SugestaoCanalAside[]> {
   const canais = await listCanaisVisiveis(tenantId, userId)
   return canais
-    .filter(
-      (c) =>
-        !c.souMembro &&
-        !c.pedidoPendente &&
-        (c.publica || c.tenantId === tenantId),
-    )
+    .filter((c) => !c.souMembro && !c.pedidoPendente)
     .sort((a, b) => {
       if (a.tenantId === tenantId && b.tenantId !== tenantId) return -1
       if (b.tenantId === tenantId && a.tenantId !== tenantId) return 1
