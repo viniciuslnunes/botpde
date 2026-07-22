@@ -11,7 +11,7 @@ import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
 import { db } from '@torcida/db'
-import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, atualizarCanalTematicoSchema, alterarAdminCanalSchema, pedirEntradaCanalSchema, decidirPedidoCanalSchema, removerMembroCanalSchema, adicionarMembroCanalSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema, publicarEnqueteSchema, votarEnqueteSchema, repostarSchema, repostarComunicadoSchema, publicarPostEventoSchema, criarGrupoSchema, atualizarGrupoSchema, alterarPapelGrupoSchema, removerMembroGrupoSchema, conversaGrupoIdSchema, entrarPorConviteGrupoSchema, ocultarPostGrupoSchema, criarDestaqueSchema, publicarPostGrupoSchema, publicarMomentoStorySchema, publicarPostCanalSchema, criarCanalTematicoSchema, atualizarCanalTematicoSchema, alterarAdminCanalSchema, pedirEntradaCanalSchema, sairCanalSchema, alternarSilencioCanalSchema, decidirPedidoCanalSchema, removerMembroCanalSchema, adicionarMembroCanalSchema, pedirEntradaGrupoSchema, decidirPedidoGrupoSchema, sairGrupoSchema, alternarSilencioGrupoSchema, MAX_MENCOES_POR_CONTEUDO, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
@@ -2571,6 +2571,117 @@ export async function entrarCanal(conversaId: string): Promise<void> {
   revalidatePath('/portal/comunidade/canais')
   revalidatePath(linkCanalComunidade(conversaId))
   revalidatePath('/portal/mensagens')
+}
+
+/**
+ * Sai do canal (marca `saiuEm`). Cross-tenant: basta ser membro ativo e
+ * ainda poder ver o canal. Em temático, o último ADMIN precisa transferir
+ * antes — oficiais são governados pelo RBAC do tenant, então a saída é livre.
+ */
+export async function sairCanal(conversaId: string): Promise<void> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = sairCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const canalRow: {
+    id: string
+    tenantId: string
+    canalOficial: boolean
+    visibilidadeCanal: 'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'
+  } | null = await db.conversa.findFirst({
+    where: { id: parsed.data.conversaId, tipo: 'CANAL' },
+    select: { id: true, tenantId: true, canalOficial: true, visibilidadeCanal: true },
+  })
+  if (!canalRow) throw new Error('Canal não encontrado.')
+
+  const podeVer = await podeVerCanal(
+    tenant.id,
+    canalRow.tenantId,
+    canalRow.visibilidadeCanal,
+    session.user.id,
+  )
+  if (!podeVer) throw new Error('Canal não encontrado ou indisponível.')
+
+  const membro: { id: string; papel: string } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: canalRow.id,
+      userId: session.user.id,
+      status: 'ATIVO',
+      saiuEm: null,
+    },
+    select: { id: true, papel: true },
+  })
+  if (!membro) throw new Error('Você não é membro deste canal.')
+
+  if (membro.papel === 'ADMIN' && !canalRow.canalOficial) {
+    const outrosAdmins: number = await db.membroConversa.count({
+      where: {
+        conversaId: canalRow.id,
+        papel: 'ADMIN',
+        status: 'ATIVO',
+        saiuEm: null,
+        userId: { not: session.user.id },
+      },
+    })
+    if (outrosAdmins === 0) {
+      throw new Error('Transfira a administração antes de sair do canal.')
+    }
+  }
+
+  await db.membroConversa.update({
+    where: { id: membro.id },
+    data: { saiuEm: new Date() },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: canalRow.tenantId,
+      atorId: session.user.id,
+      acao: 'CANAL_SAIU',
+      entidade: 'Conversa',
+      entidadeId: canalRow.id,
+    },
+  })
+
+  revalidatePath(linkCanalComunidade(canalRow.id))
+  revalidatePath('/portal/comunidade/canais')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/mensagens')
+}
+
+/** Alterna `MembroConversa.silenciada` — canal some do fan-out do feed (igual grupos). */
+export async function alternarSilencioCanal(
+  conversaId: string,
+): Promise<{ silenciada: boolean }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+  await assertMembroAtivo(tenant.id, session.user.id)
+
+  const parsed = alternarSilencioCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
+
+  const membro: { id: string; silenciada: boolean } | null = await db.membroConversa.findFirst({
+    where: {
+      conversaId: parsed.data.conversaId,
+      userId: session.user.id,
+      status: 'ATIVO',
+      saiuEm: null,
+      conversa: { tipo: 'CANAL' },
+    },
+    select: { id: true, silenciada: true },
+  })
+  if (!membro) throw new Error('Você não é membro deste canal.')
+
+  const silenciada = !membro.silenciada
+  await db.membroConversa.update({
+    where: { id: membro.id },
+    data: { silenciada },
+  })
+
+  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
+  revalidatePath('/portal/comunidade')
+  return { silenciada }
 }
 
 export async function criarCanalTematico(

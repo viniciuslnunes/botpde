@@ -1,9 +1,28 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { Radio, Plus, Loader2, Users, ArrowLeftRight, Camera } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  Camera,
+  Crosshair,
+  Loader2,
+  Lock,
+  MapPin,
+  Plus,
+  Radio,
+  Search,
+  Users,
+  X,
+} from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
@@ -11,12 +30,32 @@ import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import {
+  distanciaKm,
+  formatarDistanciaKm,
+  normalizarTexto,
+  type LocalizacaoOnboarding,
+} from '@/lib/onboarding-unidade'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import {
+  agruparCanaisPorSecao,
+  canalCombinaUfCidade,
+  listarCidadesCanais,
+  listarUfsCanais,
+  SECAO_CANAL_LABEL,
+} from '@/lib/canais-listagem'
+import {
+  labelTipoUnidade,
   labelVisibilidadeCanal,
   linkCanalComunidade,
   type CanalItem,
 } from '@/lib/canais-shared'
+
+/** Mesma chave do explorer de sedes — localização persiste entre telas do portal. */
+const GEO_STORAGE_KEY = 'portal:sedes:geo'
+
+type FiltroCanal = 'TODOS' | 'OFICIAIS' | 'TEMATICOS' | 'MINHAS' | 'ENTRAR'
+type OrdenacaoCanal = 'relevancia' | 'proximidade' | 'membros' | 'nome'
 
 interface CanaisClientProps {
   canais: CanalItem[]
@@ -27,13 +66,61 @@ interface CanaisClientProps {
   tenantAtualId: string
 }
 
+function lerGeoSalva(): LocalizacaoOnboarding | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(GEO_STORAGE_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'lat' in parsed &&
+      'lng' in parsed &&
+      typeof (parsed as { lat: unknown }).lat === 'number' &&
+      typeof (parsed as { lng: unknown }).lng === 'number'
+    ) {
+      return { lat: (parsed as { lat: number }).lat, lng: (parsed as { lng: number }).lng }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function salvarGeo(loc: LocalizacaoOnboarding | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (loc) sessionStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(loc))
+    else sessionStorage.removeItem(GEO_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+function localizacaoLabel(canal: CanalItem): string | null {
+  if (canal.cidade && canal.estado) return `${canal.cidade} · ${canal.estado}`
+  if (canal.cidade) return canal.cidade
+  if (canal.estado) return canal.estado
+  return null
+}
+
+function compararRelevancia(a: CanalItem, b: CanalItem, tenantAtualId: string): number {
+  if (a.souMembro !== b.souMembro) return a.souMembro ? -1 : 1
+  if (a.tenantId === tenantAtualId && b.tenantId !== tenantAtualId) return -1
+  if (b.tenantId === tenantAtualId && a.tenantId !== tenantAtualId) return 1
+  if (a.canalOficial !== b.canalOficial) return a.canalOficial ? -1 : 1
+  return b.membros - a.membros
+}
+
 export function CanaisClient({
-  canais,
+  canais: canaisIniciais,
   vinculos,
   tenantSlugAtual,
   podeCriarCanal,
   tenantAtualId,
 }: CanaisClientProps) {
+  const [canais, setCanais] = useState(canaisIniciais)
   const [criando, setCriando] = useState(false)
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
@@ -45,6 +132,180 @@ export function CanaisClient({
   )
   const [privado, setPrivado] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  const [busca, setBusca] = useState('')
+  const buscaDeferred = useDeferredValue(busca)
+  const [filtro, setFiltro] = useState<FiltroCanal>('TODOS')
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoCanal>('relevancia')
+  const [filtroUf, setFiltroUf] = useState<string | null>(null)
+  const [filtroCidade, setFiltroCidade] = useState<string | null>(null)
+  const [localizacao, setLocalizacao] = useState<LocalizacaoOnboarding | null>(null)
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+
+  useEffect(() => {
+    const salva = lerGeoSalva()
+    if (salva) {
+      setLocalizacao(salva)
+      setOrdenacao((prev) => (prev === 'relevancia' ? 'proximidade' : prev))
+    }
+
+    let cancelled = false
+    function aplicarPosicao(pos: GeolocationPosition) {
+      if (cancelled) return
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setLocalizacao(next)
+      salvarGeo(next)
+      setGeoStatus('idle')
+      setOrdenacao((prev) => (prev === 'relevancia' ? 'proximidade' : prev))
+    }
+
+    if (!navigator.geolocation) return
+    const permissions = navigator.permissions
+    if (permissions?.query) {
+      void permissions
+        .query({ name: 'geolocation' })
+        .then((status) => {
+          if (cancelled || status.state !== 'granted') return
+          navigator.geolocation.getCurrentPosition(aplicarPosicao, () => undefined, {
+            enableHighAccuracy: false,
+            timeout: 8_000,
+            maximumAge: 120_000,
+          })
+        })
+        .catch(() => undefined)
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const ufsDisponiveis = useMemo(() => listarUfsCanais(canais), [canais])
+  const cidadesDisponiveis = useMemo(
+    () => listarCidadesCanais(canais, filtroUf),
+    [canais, filtroUf],
+  )
+
+  const contagens = useMemo(() => {
+    const c: Record<FiltroCanal, number> = {
+      TODOS: canais.length,
+      OFICIAIS: 0,
+      TEMATICOS: 0,
+      MINHAS: 0,
+      ENTRAR: 0,
+    }
+    for (const canal of canais) {
+      if (canal.canalOficial) c.OFICIAIS += 1
+      else c.TEMATICOS += 1
+      if (canal.souMembro) c.MINHAS += 1
+      if (!canal.souMembro && !canal.pedidoPendente) c.ENTRAR += 1
+    }
+    return c
+  }, [canais])
+
+  const filtrados = useMemo(() => {
+    const q = normalizarTexto(buscaDeferred)
+    let list = canais.filter((canal) => {
+      if (filtro === 'OFICIAIS' && !canal.canalOficial) return false
+      if (filtro === 'TEMATICOS' && canal.canalOficial) return false
+      if (filtro === 'MINHAS' && !canal.souMembro) return false
+      if (filtro === 'ENTRAR' && (canal.souMembro || canal.pedidoPendente)) return false
+      if (!canalCombinaUfCidade(canal, filtroUf, filtroCidade)) return false
+      if (!q) return true
+      const hay = normalizarTexto(
+        [
+          canal.nome,
+          canal.descricao,
+          canal.tenantNome,
+          canal.cidade,
+          canal.estado,
+          canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
+      return hay.includes(q)
+    })
+
+    const sortKey = ordenacao
+    list = [...list].sort((a, b) => {
+      if (sortKey === 'proximidade' && localizacao) {
+        const da = distanciaKm(localizacao, a)
+        const db = distanciaKm(localizacao, b)
+        if (da != null && db != null && da !== db) return da - db
+        if (da != null && db == null) return -1
+        if (da == null && db != null) return 1
+      }
+      if (sortKey === 'membros') {
+        if (a.membros !== b.membros) return b.membros - a.membros
+      }
+      if (sortKey === 'nome') {
+        return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR')
+      }
+      return compararRelevancia(a, b, tenantAtualId)
+    })
+
+    return list
+  }, [
+    canais,
+    filtro,
+    buscaDeferred,
+    ordenacao,
+    localizacao,
+    tenantAtualId,
+    filtroUf,
+    filtroCidade,
+  ])
+
+  const grupos = useMemo(
+    () => agruparCanaisPorSecao(filtrados, tenantAtualId, localizacao),
+    [filtrados, tenantAtualId, localizacao],
+  )
+
+  const maisProximoId = useMemo(() => {
+    if (!localizacao || filtrados.length === 0) return null
+    let bestId: string | null = null
+    let bestDist = Number.POSITIVE_INFINITY
+    for (const c of filtrados) {
+      const d = distanciaKm(localizacao, c)
+      if (d != null && d < bestDist) {
+        bestDist = d
+        bestId = c.id
+      }
+    }
+    return bestId
+  }, [localizacao, filtrados])
+
+  function pedirLocalizacao() {
+    if (localizacao) {
+      setLocalizacao(null)
+      salvarGeo(null)
+      setGeoStatus('idle')
+      if (ordenacao === 'proximidade') setOrdenacao('relevancia')
+      return
+    }
+    if (!navigator.geolocation) {
+      setGeoStatus('error')
+      toast.error('Geolocalização não disponível neste dispositivo.')
+      return
+    }
+    setGeoStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setLocalizacao(next)
+        salvarGeo(next)
+        setGeoStatus('idle')
+        setOrdenacao('proximidade')
+        toast.success('Ordenando canais por proximidade.')
+      },
+      () => {
+        setGeoStatus('error')
+        toast.error('Não foi possível obter sua localização.')
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+    )
+  }
 
   async function onFotoChange(file: File | null) {
     if (!file) return
@@ -69,8 +330,14 @@ export function CanaisClient({
     startTransition(async () => {
       try {
         await entrarCanal(id)
+        setCanais((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? { ...c, souMembro: true, pedidoPendente: false, membros: c.membros + 1 }
+              : c,
+          ),
+        )
         toast.success('Inscrito no canal!')
-        window.location.reload()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível entrar.')
       }
@@ -81,8 +348,10 @@ export function CanaisClient({
     startTransition(async () => {
       try {
         await pedirEntradaCanal(id)
+        setCanais((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, pedidoPendente: true } : c)),
+        )
         toast.success('Pedido enviado — aguarde a aprovação.')
-        window.location.reload()
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Não foi possível enviar o pedido.')
       }
@@ -109,22 +378,196 @@ export function CanaisClient({
     })
   }
 
+  const filtros: Array<{ id: FiltroCanal; label: string }> = [
+    { id: 'TODOS', label: 'Todos' },
+    { id: 'OFICIAIS', label: 'Oficiais' },
+    { id: 'TEMATICOS', label: 'Temáticos' },
+    { id: 'MINHAS', label: 'Minhas' },
+    { id: 'ENTRAR', label: 'Para entrar' },
+  ]
+
   return (
-    <div className="space-y-6">
-      {podeCriarCanal && (
-        <div className="flex items-center justify-end">
-          <m.button
-            type="button"
-            onClick={() => setCriando((v) => !v)}
-            whileTap={{ scale: 0.96 }}
-            transition={springSnappy}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" />
-            Novo canal
-          </m.button>
-        </div>
+    <div className="space-y-5">
+      {vinculos.length > 1 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+            <ArrowLeftRight className="h-4 w-4" />
+            Suas torcidas
+          </h2>
+          <div className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
+            <TorcidaContextSwitcher torcidas={vinculos} atualSlug={tenantSlugAtual} destino="portal" />
+          </div>
+        </section>
       )}
+
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Buscar canais</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgb(var(--foreground-muted))]" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, cidade ou unidade…"
+              className="h-10 w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-2 pl-9 pr-9 text-sm text-[rgb(var(--foreground))] placeholder:text-[rgb(var(--foreground-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-primary)_/_0.35)]"
+            />
+            {busca ? (
+              <button
+                type="button"
+                onClick={() => setBusca('')}
+                aria-label="Limpar busca"
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </label>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={pedirLocalizacao}
+              disabled={geoStatus === 'loading'}
+              aria-pressed={!!localizacao}
+              title={localizacao ? 'Desativar ordenação por proximidade' : 'Ordenar por proximidade'}
+              className={[
+                'inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors disabled:opacity-50',
+                localizacao
+                  ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]'
+                  : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
+              ].join(' ')}
+            >
+              {geoStatus === 'loading' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Crosshair className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{localizacao ? 'Perto de mim' : 'Proximidade'}</span>
+            </button>
+
+            {podeCriarCanal && (
+              <m.button
+                type="button"
+                onClick={() => setCriando((v) => !v)}
+                whileTap={{ scale: 0.96 }}
+                transition={springSnappy}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3.5 text-sm font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Novo canal</span>
+              </m.button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {filtros.map((f) => {
+            const ativo = filtro === f.id
+            const count = contagens[f.id]
+            if (f.id !== 'TODOS' && count === 0) return null
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFiltro(f.id)}
+                aria-pressed={ativo}
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  ativo
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                    : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                ].join(' ')}
+              >
+                {f.label}
+                <span
+                  className={[
+                    'tabular-nums',
+                    ativo ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
+                  ].join(' ')}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {ufsDisponiveis.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+                <span className="sr-only">Estado</span>
+                <select
+                  value={filtroUf ?? ''}
+                  onChange={(e) => {
+                    const next = e.target.value || null
+                    setFiltroUf(next)
+                    setFiltroCidade(null)
+                  }}
+                  className="h-8 max-w-[5.5rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs font-medium text-[rgb(var(--foreground))]"
+                >
+                  <option value="">UF</option>
+                  {ufsDisponiveis.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {cidadesDisponiveis.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+                <span className="sr-only">Cidade</span>
+                <select
+                  value={filtroCidade ?? ''}
+                  onChange={(e) => setFiltroCidade(e.target.value || null)}
+                  className="h-8 max-w-[9rem] rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs font-medium text-[rgb(var(--foreground))]"
+                >
+                  <option value="">Cidade</option>
+                  {cidadesDisponiveis.map((cidade) => (
+                    <option key={cidade} value={cidade}>
+                      {cidade}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+              <span className="sr-only sm:not-sr-only">Ordenar</span>
+              <select
+                value={ordenacao}
+                onChange={(e) => {
+                  const next = e.target.value as OrdenacaoCanal
+                  if (next === 'proximidade' && !localizacao) {
+                    pedirLocalizacao()
+                    return
+                  }
+                  setOrdenacao(next)
+                }}
+                className="h-8 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2 text-xs font-medium text-[rgb(var(--foreground))]"
+              >
+                <option value="relevancia">Relevância</option>
+                <option value="proximidade">Mais próximos</option>
+                <option value="membros">Mais membros</option>
+                <option value="nome">Nome A–Z</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {geoStatus === 'error' && !localizacao ? (
+          <p className="text-xs text-[rgb(var(--color-danger))]">
+            Permita a localização no navegador para ordenar por proximidade.
+          </p>
+        ) : null}
+
+        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+          {filtrados.length === canais.length
+            ? `${canais.length} ${canais.length === 1 ? 'canal' : 'canais'}`
+            : `${filtrados.length} de ${canais.length} canais`}
+          {localizacao ? ' · agrupados por proximidade' : null}
+          {filtroUf ? ` · ${filtroUf}` : null}
+          {filtroCidade ? ` · ${filtroCidade}` : null}
+        </p>
+      </div>
 
       <AnimatePresence>
         {criando && (
@@ -243,42 +686,50 @@ export function CanaisClient({
         )}
       </AnimatePresence>
 
-      {vinculos.length > 1 && (
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-            <ArrowLeftRight className="h-4 w-4" />
-            Suas torcidas
-          </h2>
-          <div className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
-            <TorcidaContextSwitcher torcidas={vinculos} atualSlug={tenantSlugAtual} destino="portal" />
-          </div>
-        </section>
-      )}
-
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-          <Radio className="h-4 w-4" />
-          Canais
-        </h2>
+      <section className="space-y-4">
         {canais.length === 0 ? (
           <MotionEmptyState
             className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
             title="Nenhum canal visível ainda."
           />
+        ) : filtrados.length === 0 ? (
+          <MotionEmptyState
+            className="rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]"
+            title="Nenhum canal corresponde aos filtros."
+            description="Tente outra busca, limpe UF/cidade ou ative a proximidade."
+          />
         ) : (
-          <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-1.5">
-            {canais.map((c) => (
-              <m.div key={c.id} variants={staggerItem}>
-                <CanalRow
-                  canal={c}
-                  tenantAtualId={tenantAtualId}
-                  onEntrar={entrar}
-                  onPedirEntrada={pedirEntrada}
-                  pending={pending}
-                />
-              </m.div>
-            ))}
-          </m.div>
+          grupos.map((grupo) => (
+            <div key={grupo.secao} className="space-y-2">
+              <h2 className="flex items-center gap-2 px-0.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                {grupo.secao === 'perto' ? <MapPin className="h-3.5 w-3.5" /> : null}
+                {SECAO_CANAL_LABEL[grupo.secao]}
+                <span className="font-medium normal-case tracking-normal tabular-nums">
+                  {grupo.canais.length}
+                </span>
+              </h2>
+              <m.ul
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="divide-y divide-[rgb(var(--border)_/_0.7)] overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+              >
+                {grupo.canais.map((c) => (
+                  <m.li key={c.id} variants={staggerItem}>
+                    <CanalRow
+                      canal={c}
+                      tenantAtualId={tenantAtualId}
+                      distanciaKm={localizacao ? distanciaKm(localizacao, c) : null}
+                      destaqueProximo={c.id === maisProximoId}
+                      onEntrar={entrar}
+                      onPedirEntrada={pedirEntrada}
+                      pending={pending}
+                    />
+                  </m.li>
+                ))}
+              </m.ul>
+            </div>
+          ))
         )}
       </section>
     </div>
@@ -288,12 +739,16 @@ export function CanaisClient({
 function CanalRow({
   canal,
   tenantAtualId,
+  distanciaKm: dist,
+  destaqueProximo,
   onEntrar,
   onPedirEntrada,
   pending,
 }: {
   canal: CanalItem
   tenantAtualId: string
+  distanciaKm: number | null
+  destaqueProximo: boolean
   onEntrar: (id: string) => void
   onPedirEntrada: (id: string) => void
   pending: boolean
@@ -301,69 +756,152 @@ function CanalRow({
   // Sempre pelo id do canal: SUBSEDE/PDE Caso A compartilham tenantId da mãe —
   // linkUnidadeComunidade apontaria todas para o mesmo mural do portal.
   const href = linkCanalComunidade(canal.id)
+  const local = localizacaoLabel(canal)
+  const tipoLabel = canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null
+  const distLabel = dist != null ? formatarDistanciaKm(dist) : null
 
   return (
-    <div className="card-soft flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
-      <Avatar nome={canal.nome ?? canal.tenantNome} avatarUrl={canal.avatarUrl} size="sm" fit="contain" />
+    <div
+      className={[
+        'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 transition-colors sm:grid-cols-[auto_minmax(0,1fr)_minmax(7rem,9rem)_auto_auto] sm:gap-x-4 sm:px-4',
+        'hover:bg-[rgb(var(--background-subtle)_/_0.55)]',
+        destaqueProximo ? 'bg-[rgb(var(--color-primary)_/_0.06)]' : '',
+      ].join(' ')}
+    >
+      <Link href={href} className="shrink-0 self-start sm:self-center">
+        <Avatar nome={canal.nome ?? canal.tenantNome} avatarUrl={canal.avatarUrl} size="md" fit="contain" />
+      </Link>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <Link
+            href={href}
+            className="truncate text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
+          >
             {canal.nome ?? 'Canal'}
-          </p>
-          <span className="inline-flex shrink-0 rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
+          </Link>
+          <span
+            className={[
+              'inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+              canal.canalOficial
+                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+            ].join(' ')}
+          >
             {canal.canalOficial ? 'Oficial' : 'Temático'}
           </span>
           {canal.tenantId === tenantAtualId && (
             <span className="text-[10px] font-medium text-[rgb(var(--foreground-muted))]">você</span>
           )}
+          {destaqueProximo && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))]">
+              <MapPin className="h-3 w-3" />
+              Mais perto
+            </span>
+          )}
         </div>
-        <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+          {tipoLabel ? <span>{tipoLabel}</span> : null}
+          {tipoLabel ? <span aria-hidden>·</span> : null}
           <span className="inline-flex items-center gap-1">
             <Users className="h-3 w-3" />
             {canal.membros}
           </span>
-          {' · '}
-          {canal.tenantNome}
-          {' · '}
-          {labelVisibilidadeCanal(canal.visibilidadeCanal)}
-        </p>
+          {!canal.publica ? (
+            <>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Pedido
+              </span>
+            </>
+          ) : null}
+          {canal.descricao ? (
+            <>
+              <span aria-hidden className="hidden sm:inline">
+                ·
+              </span>
+              <span className="hidden max-w-[28ch] truncate sm:inline">{canal.descricao}</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden className="hidden md:inline">
+                ·
+              </span>
+              <span className="hidden truncate md:inline">
+                {labelVisibilidadeCanal(canal.visibilidadeCanal)}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
-      {canal.souMembro ? (
-        <Link
-          href={href}
-          className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))]"
-        >
-          Abrir
-        </Link>
-      ) : canal.publica ? (
-        <m.button
-          type="button"
-          disabled={pending}
-          onClick={() => onEntrar(canal.id)}
-          whileTap={{ scale: 0.94 }}
-          transition={springSnappy}
-          className="shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
-        >
-          Entrar
-        </m.button>
-      ) : canal.pedidoPendente ? (
-        <span className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Pedido enviado
-        </span>
-      ) : (
-        <m.button
-          type="button"
-          disabled={pending}
-          onClick={() => onPedirEntrada(canal.id)}
-          whileTap={{ scale: 0.94 }}
-          transition={springSnappy}
-          className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-        >
-          Pedir para entrar
-        </m.button>
-      )}
+      <div className="col-start-2 min-w-0 sm:col-start-auto sm:text-right">
+        {local ? (
+          <p className="truncate text-xs font-medium text-[rgb(var(--foreground))]">
+            <span className="inline-flex max-w-full items-center gap-1">
+              <MapPin className="h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]" />
+              <span className="truncate">{local}</span>
+            </span>
+          </p>
+        ) : (
+          <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{canal.tenantNome}</p>
+        )}
+      </div>
+
+      <div className="hidden w-[4.5rem] shrink-0 text-right sm:block">
+        {distLabel ? (
+          <span className="text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
+            {distLabel}
+          </span>
+        ) : (
+          <span className="text-xs text-[rgb(var(--foreground-muted))]">—</span>
+        )}
+      </div>
+
+      <div className="col-start-3 row-start-1 self-center sm:col-start-auto sm:row-start-auto">
+        {canal.souMembro ? (
+          <Link
+            href={href}
+            className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))]"
+          >
+            Abrir
+          </Link>
+        ) : canal.publica ? (
+          <m.button
+            type="button"
+            disabled={pending}
+            onClick={() => onEntrar(canal.id)}
+            whileTap={{ scale: 0.94 }}
+            transition={springSnappy}
+            className="inline-flex shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+          >
+            Entrar
+          </m.button>
+        ) : canal.pedidoPendente ? (
+          <span className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Pedido enviado
+          </span>
+        ) : (
+          <m.button
+            type="button"
+            disabled={pending}
+            onClick={() => onPedirEntrada(canal.id)}
+            whileTap={{ scale: 0.94 }}
+            transition={springSnappy}
+            className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+          >
+            Pedir
+          </m.button>
+        )}
+      </div>
+
+      {distLabel ? (
+        <p className="col-span-2 col-start-2 text-[10px] font-medium text-[rgb(var(--foreground-muted))] sm:hidden">
+          {distLabel} de você
+        </p>
+      ) : null}
     </div>
   )
 }
