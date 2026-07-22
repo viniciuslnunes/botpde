@@ -137,6 +137,8 @@ async function previewDoPost(opts: {
   tenantNome: string
   /** Tenant sintético da CN — badge padrão "Torcedor" quando não há cargo na torcida. */
   tenantSintetico?: boolean
+  /** Tenant ativo do autor — prioriza badge da unidade em que está publicando. */
+  torcidaPreferidaId?: string
 }): Promise<PostPublicadoPreview> {
   let badgeTenantId = opts.post.tenantId
   let tenantNomeExibicao = opts.tenantNome
@@ -148,7 +150,9 @@ async function previewDoPost(opts: {
       select: { afiliacaoId: true },
     })
     if (container?.afiliacaoId) {
-      torcidaReal = await getTorcidaRealDoAutor(opts.autorId, container.afiliacaoId)
+      torcidaReal = await getTorcidaRealDoAutor(opts.autorId, container.afiliacaoId, {
+        tenantPreferidoId: opts.torcidaPreferidaId,
+      })
       if (torcidaReal) {
         badgeTenantId = torcidaReal.tenantId
         tenantNomeExibicao = torcidaReal.tenantNome
@@ -156,10 +160,10 @@ async function previewDoPost(opts: {
     }
   }
 
-  const [badges, perfil] = await Promise.all([
+  const [badges, user] = await Promise.all([
     getBadgesPorAutorTenant([{ autorId: opts.autorId, tenantId: badgeTenantId }]),
-    db.perfilMembro.findUnique({
-      where: { tenantId_userId: { tenantId: badgeTenantId, userId: opts.autorId } },
+    db.user.findUnique({
+      where: { id: opts.autorId },
       select: { nickname: true },
     }),
   ])
@@ -181,7 +185,7 @@ async function previewDoPost(opts: {
       id: opts.autorId,
       nome: opts.autorNome,
       avatarUrl: opts.autorAvatar,
-      nickname: perfil?.nickname ?? null,
+      nickname: user?.nickname ?? null,
       sedeNome: badge?.sedeNome ?? null,
       cargoNome,
       departamentoNome,
@@ -605,6 +609,8 @@ export async function publicarPostComoTorcedorGlobal(
     select: { nome: true, apelido: true },
   })
 
+  const ativo = await getActiveTenant(session.user.id, session.user.email)
+
   return previewDoPost({
     post,
     autorId: session.user.id,
@@ -612,6 +618,7 @@ export async function publicarPostComoTorcedorGlobal(
     autorAvatar: avatarPreviewDaSessao(session),
     tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
     tenantSintetico: true,
+    torcidaPreferidaId: ativo && !ativo.sintetico ? ativo.id : undefined,
   })
 }
 

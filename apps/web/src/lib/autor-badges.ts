@@ -237,16 +237,34 @@ async function carregarBadgesPorAutorTenant(
 export async function getTorcidaRealDoAutor(
   autorId: string,
   afiliacaoId: string,
+  opts?: { tenantPreferidoId?: string },
 ): Promise<TorcidaRealAutor | null> {
+  const filtroBase = {
+    userId: autorId,
+    status: 'APROVADO' as const,
+    tipo: 'SOCIO' as const,
+    tenant: { afiliacaoId, sintetico: false, ativo: true },
+  }
+
+  if (opts?.tenantPreferidoId) {
+    const preferido: {
+      tenant: { id: string; nome: string }
+    } | null = await db.saasMembro.findFirst({
+      where: { ...filtroBase, tenantId: opts.tenantPreferidoId },
+      select: { tenant: { select: { id: true, nome: true } } },
+    })
+    if (preferido) {
+      return {
+        tenantId: preferido.tenant.id,
+        tenantNome: formatNomeTorcida(preferido.tenant.nome),
+      }
+    }
+  }
+
   const membro: {
     tenant: { id: string; nome: string }
   } | null = await db.saasMembro.findFirst({
-    where: {
-      userId: autorId,
-      status: 'APROVADO',
-      tipo: 'SOCIO',
-      tenant: { afiliacaoId, sintetico: false, ativo: true },
-    },
+    where: filtroBase,
     orderBy: { criadoEm: 'desc' },
     select: { tenant: { select: { id: true, nome: true } } },
   })
