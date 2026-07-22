@@ -226,6 +226,10 @@ export async function salvarCanalOficial(formData: FormData) {
   revalidatePath('/admin/configuracoes')
   revalidatePath(`/portal/comunidade/canais/${canalId}`)
   revalidatePath('/portal/comunidade/canais')
+  // Avatar do canal oficial também alimenta o fallback de logo da topbar
+  // (ver resolverContextoComunidade) quando a unidade não tem Tenant.logoUrl
+  // nem Sede.fotoUrl — sem revalidar o layout, a topbar fica com a foto velha.
+  revalidatePath('/portal', 'layout')
   invalidarCachesComunidadeFeed(tenant.id)
 }
 

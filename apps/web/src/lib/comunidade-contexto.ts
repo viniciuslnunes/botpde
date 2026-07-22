@@ -63,6 +63,17 @@ export const resolverContextoComunidade = cache(
         const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
         logoUrl = raiz?.fotoUrl ?? null
       }
+      // Ainda sem foto: cai pro avatar do canal oficial (mural da unidade),
+      // mesma fonte que já alimenta o fallback de avatar em `canais.ts` — sem
+      // isso, uma unidade que só configurou a foto do canal oficial (e não a
+      // Sede.fotoUrl) mostra a inicial na topbar mas o avatar certo nas conversas.
+      if (!logoUrl) {
+        const canalOficial: { avatarUrl: string | null } | null = await db.conversa.findFirst({
+          where: { tenantId: tenant.id, tipo: 'CANAL', canalOficial: true },
+          select: { avatarUrl: true },
+        })
+        logoUrl = canalOficial?.avatarUrl ?? null
+      }
 
       return {
         modo: 'torcida',

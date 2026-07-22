@@ -278,6 +278,10 @@ export async function editarSede(
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
+  // Header do portal (navbar) usa Sede.fotoUrl como fallback do logo do tenant
+  // (ver resolverContextoComunidade) — sem revalidar o layout, a foto nova só
+  // aparece depois que o router cache do cliente expira sozinho.
+  revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
 }
