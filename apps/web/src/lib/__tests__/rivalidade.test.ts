@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { canViewRecurso, ordenarPar, resolveVisibility, saoRivais, SENSIBILIDADE } from '@torcida/types'
 
 const findMany = vi.hoisted(() => vi.fn())
+const userRoleFindMany = vi.hoisted(() => vi.fn())
 const perfilTorcedorFindUnique = vi.hoisted(() => vi.fn())
 const getAlliedTenantIds = vi.hoisted(() => vi.fn())
 const getTenantRelation = vi.hoisted(() => vi.fn())
@@ -11,6 +12,7 @@ const getTenantIdsPorAfiliacao = vi.hoisted(() => vi.fn())
 vi.mock('@torcida/db', () => ({
   db: {
     saasMembro: { findMany },
+    userRole: { findMany: userRoleFindMany },
     seguimento: { findUnique: vi.fn() },
     perfilMembro: { upsert: vi.fn() },
     perfilTorcedor: { findUnique: perfilTorcedorFindUnique },
@@ -70,6 +72,8 @@ type Vinculo = { userId: string; tenantId: string; tipo: 'SOCIO' | 'TORCEDOR' }
 describe('canFollowUser × rivalidade', () => {
   beforeEach(() => {
     findMany.mockReset()
+    userRoleFindMany.mockReset()
+    userRoleFindMany.mockResolvedValue([])
     perfilTorcedorFindUnique.mockReset()
     getAlliedTenantIds.mockReset()
     getTenantRelation.mockReset()
