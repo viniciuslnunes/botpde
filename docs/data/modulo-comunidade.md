@@ -176,9 +176,9 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
   "Mensagens": até 4 canais visíveis em que o viewer ainda não está inscrito
   (`getSugestoesCanaisParaAside` em `lib/canais.ts`, UI em
   `_components/canais-sugeridos-aside.tsx`, montado em `ComunidadeLayoutChrome`).
-  Prioriza canais do tenant ativo, depois oficiais, depois por nº de membros. Só
-  lista canais em que dá para agir (abertos → Entrar; fechados do próprio tenant →
-  Pedir). Botão "Ver canais" no rodapé → `/portal/comunidade/canais`. "Para seguir"
+  Prioriza canais do tenant ativo, depois oficiais, depois por nº de membros.
+  Inclui abertos (Entrar) e fechados (Pedir), inclusive cross-tenant quando
+  `podeVerCanal`. Botão "Ver canais" no rodapé → `/portal/comunidade/canais`. "Para seguir"
   permanece no aside esquerdo (→ `/portal/comunidade/busca`).
 - **Scroll independente dos rails (2026-07-22)** — colunas esquerda e direita usam
   `sticky` + `max-h-[calc(100dvh-5.5rem)]` + `overflow-y-auto`
@@ -256,6 +256,24 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
   `Tenant.logoUrl` é nulo — sem isso, a foto da unidade cadastrada em
   `/admin/sedes` aparecia no post/canal mas a `PortalNavbar` continuava
   mostrando a inicial (ela só lia `Tenant.logoUrl`, sem o fallback).
+- **Listagem e visibilidade (2026-07-22):**
+  - Gate puro em `decidePodeVerCanal` (`canais-shared.ts`): `PUBLICO` = vitrine
+    (sócio **e** torcedor no alcance comunidade); `TENANT`/`HIERARQUIA`/`ALIADOS`
+    = **só sócio** (mesmo no tenant do canal). Aliados só entram com
+    `ALIADOS` ou `PUBLICO`.
+  - Default de canal oficial/temático novo: `visibilidadeCanal: ALIADOS` (antes
+    `HIERARQUIA`, que escondia aliados). `ensureCanaisOficiaisHierarquia` também
+    promove oficiais ainda em `HIERARQUIA` → `ALIADOS` na worktree do viewer
+    (temáticos não são tocados; liderança pode fechar de novo em Configurações).
+  - `/portal/comunidade/canais` chama `ensureCanaisOficiaisHierarquia`: materializa
+    oficial do tenant ativo + descendentes Caso B + unidades Caso A (SUBSEDE/PDE
+    sem `Sede.canalConversaId`). Não cria canal de ancestral/aliado por efeito
+    colateral.
+  - `pedirEntradaCanal` aceita canal fechado de **qualquer** tenant desde que
+    `podeVerCanal` (antes filtrava só `tenantId` ativo — listagem mostrava Pedir
+    e a action falhava).
+  - **Grupos** (`tipo: GRUPO`) criados por torcedores **não** entram nesta
+    listagem — ficam em `/portal/comunidade/grupos` (superfície distinta).
 - **Comunidades temáticas** — sócios com `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` criam
   canais (`criarCanalTematico`, aceita `avatarUrl` opcional) com visibilidade
   `TENANT`/`HIERARQUIA`/`ALIADOS`/`PUBLICO`; criador vira `MembroConversa` ADMIN.

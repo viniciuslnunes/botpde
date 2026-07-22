@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { Radio } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
-import { listCanaisVisiveis, getOrCreateCanalOficial } from '@/lib/canais'
+import { listCanaisVisiveis, ensureCanaisOficiaisHierarquia } from '@/lib/canais'
 import { isSuperAdminEmail, listarVinculosAprovadosDoUsuario } from '@/lib/tenant-context'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
@@ -16,7 +16,7 @@ export default async function CanaisPage() {
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
-  await getOrCreateCanalOficial(tenant.id)
+  await ensureCanaisOficiaisHierarquia(tenant.id)
 
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(
     session.user.id,

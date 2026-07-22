@@ -36,8 +36,9 @@ export default async function UnidadePerfilPage({
   if (!alvo) notFound()
 
   const podeVer =
-    (await podeVerCanal(tenant.id, targetTenantId, 'HIERARQUIA', session.user.id)) ||
-    (await podeVerCanal(tenant.id, targetTenantId, 'ALIADOS', session.user.id))
+    (await podeVerCanal(tenant.id, targetTenantId, 'PUBLICO', session.user.id)) ||
+    (await podeVerCanal(tenant.id, targetTenantId, 'ALIADOS', session.user.id)) ||
+    (await podeVerCanal(tenant.id, targetTenantId, 'HIERARQUIA', session.user.id))
   if (!podeVer) notFound()
 
   const canal = await getOrCreateCanalOficial(targetTenantId)

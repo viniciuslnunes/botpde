@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  decidePodeVerCanal,
   isConversaGrupoLike,
   labelTipoUnidade,
   labelVisibilidadeCanal,
@@ -30,5 +31,58 @@ describe('canais', () => {
     expect(linkUnidadeComunidade('abc')).toBe('/portal/comunidade/unidade/abc')
     expect(linkCanalComunidade('xyz')).toBe('/portal/comunidade/canais/xyz')
     expect(linkTorcidaComunidadePublica('abc')).toBe('/portal/comunidade/torcida/abc')
+  })
+})
+
+describe('decidePodeVerCanal', () => {
+  it('PUBLICO: sócio e torcedor no alcance comunidade', () => {
+    expect(
+      decidePodeVerCanal({ relation: 'self', visibilidade: 'PUBLICO', isSocio: false }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'allied', visibilidade: 'PUBLICO', isSocio: false }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'unrelated', visibilidade: 'PUBLICO', isSocio: true }),
+    ).toBe(false)
+    expect(
+      decidePodeVerCanal({ relation: 'rival', visibilidade: 'PUBLICO', isSocio: true }),
+    ).toBe(false)
+  })
+
+  it('TENANT/HIERARQUIA/ALIADOS: exige sócio mesmo no self', () => {
+    expect(
+      decidePodeVerCanal({ relation: 'self', visibilidade: 'HIERARQUIA', isSocio: false }),
+    ).toBe(false)
+    expect(
+      decidePodeVerCanal({ relation: 'self', visibilidade: 'TENANT', isSocio: true }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'allied', visibilidade: 'TENANT', isSocio: true }),
+    ).toBe(false)
+  })
+
+  it('HIERARQUIA: hierarquia mas não aliados', () => {
+    expect(
+      decidePodeVerCanal({ relation: 'descendant', visibilidade: 'HIERARQUIA', isSocio: true }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'ancestor', visibilidade: 'HIERARQUIA', isSocio: true }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'allied', visibilidade: 'HIERARQUIA', isSocio: true }),
+    ).toBe(false)
+  })
+
+  it('ALIADOS: hierarquia + aliados', () => {
+    expect(
+      decidePodeVerCanal({ relation: 'allied', visibilidade: 'ALIADOS', isSocio: true }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'descendant', visibilidade: 'ALIADOS', isSocio: true }),
+    ).toBe(true)
+    expect(
+      decidePodeVerCanal({ relation: 'allied', visibilidade: 'ALIADOS', isSocio: false }),
+    ).toBe(false)
   })
 })

@@ -39,7 +39,7 @@ export function CanaisClient({
   const [descricao, setDescricao] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [visibilidade, setVisibilidade] = useState<'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'>(
-    'HIERARQUIA',
+    'ALIADOS',
   )
   const [privado, setPrivado] = useState(false)
   const [pending, startTransition] = useTransition()
