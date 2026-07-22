@@ -1405,10 +1405,16 @@ function PainelMembros({
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               autoFocus
-              placeholder="Buscar membro pelo nome"
+              placeholder="Buscar na rede ou na torcida"
               className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-2.5 py-1.5 text-sm text-[rgb(var(--foreground))]"
             />
-            <m.div variants={staggerContainer} initial="hidden" animate="show">
+            {resultados.filter((c) => !jaNoGrupo.has(c.id)).length === 0 && (
+              <p className="px-1 py-1 text-xs text-[rgb(var(--foreground-muted))]">
+                {busca.trim()
+                  ? 'Ninguém na sua rede ou torcida com esse nome.'
+                  : 'Só entram pessoas da sua rede ou associadas à torcida.'}
+              </p>
+            )}            <m.div variants={staggerContainer} initial="hidden" animate="show">
               {resultados
                 .filter((c) => !jaNoGrupo.has(c.id))
                 .slice(0, 6)

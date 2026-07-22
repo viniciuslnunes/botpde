@@ -616,10 +616,20 @@ function NovaConversaModal({
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               autoFocus
-              placeholder="Buscar membro pelo nome"
+              placeholder={
+                tipo === 'grupo'
+                  ? 'Buscar na rede ou na torcida'
+                  : 'Buscar membro pelo nome'
+              }
               className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
             />
           </div>
+          {tipo === 'grupo' && (
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Sócios fora da sua rede ou torcida não entram em grupos — use DM com
+              solicitação.
+            </p>
+          )}
             </>
           )}
         </div>
@@ -632,7 +642,11 @@ function NovaConversaModal({
             </p>
           ) : resultados.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-              Nenhum membro encontrado.
+              {tipo === 'grupo'
+                ? busca.trim()
+                  ? 'Ninguém na sua rede ou torcida com esse nome.'
+                  : 'Só entram pessoas da sua rede de conexão ou associadas à sua torcida.'
+                : 'Nenhum membro encontrado.'}
             </p>
           ) : (
             <m.div variants={staggerContainer} initial="hidden" animate="show">

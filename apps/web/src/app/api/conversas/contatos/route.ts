@@ -16,11 +16,14 @@ type ContatoDto = {
   requerSolicitacao: boolean
 }
 
+type UserLite = { id: string; nome: string | null; avatarUrl: string | null }
+
 /**
  * Contatos elegíveis para conversa.
  * Torcida: membros APROVADOS do tenant/aliadas + sócios do mesmo clube (solicitação).
  * Nacional: usuários com o mesmo clube (`PerfilTorcedor` ou sócio APROVADO).
- * `?para=grupo`: só rede de conexão ou associados da torcida (não basta mesmo clube).
+ * `?para=grupo`: só rede de conexão (+ associados da torcida no escopo TO).
+ *   Não lista sócio/mesmo-clube que exigiria solicitação de DM — evita 403 na criação.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +81,145 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // ── Grupo: candidatos só da rede (+ associados TO). Sem pool “mesmo clube”. ──
+    if (paraGrupo) {
+      const contatos: ContatoDto[] = []
+      const vistos = new Set<string>()
+
+      type SegRow = {
+        seguidorId: string
+        seguidoId: string
+        seguidor: UserLite
+        seguido: UserLite
+      }
+      const conexoes: SegRow[] = await db.seguimento.findMany({
+        where: {
+          status: 'APROVADO',
+          AND: [
+            { OR: [{ seguidorId: userId }, { seguidoId: userId }] },
+            ...(q
+              ? [
+                  {
+                    OR: [
+                      {
+                        seguidorId: userId,
+                        seguido: { nome: { contains: q, mode: 'insensitive' as const } },
+                      },
+                      {
+                        seguidoId: userId,
+                        seguidor: { nome: { contains: q, mode: 'insensitive' as const } },
+                      },
+                    ],
+                  },
+                ]
+              : []),
+          ],
+        },
+        select: {
+          seguidorId: true,
+          seguidoId: true,
+          seguidor: { select: { id: true, nome: true, avatarUrl: true } },
+          seguido: { select: { id: true, nome: true, avatarUrl: true } },
+        },
+        take: 40,
+      })
+
+      for (const s of conexoes) {
+        if (contatos.length >= 20) break
+        const outro = s.seguidorId === userId ? s.seguido : s.seguidor
+        await pushSeElegivel(contatos, vistos, {
+          id: outro.id,
+          nome: outro.nome,
+          avatarUrl: outro.avatarUrl,
+          tenantNome: 'Rede',
+          mesmoTenant: true,
+        })
+      }
+
+      // Escopo torcida: associados da unidade/aliadas (mesmo sem seguimento).
+      if (contexto.via !== 'nacional' && contatos.length < 20) {
+        const { tenant } = await assertUsuarioMensageria()
+        const aliados = await getAlliedTenantIds(tenant.id)
+        const visiveis = [tenant.id, ...aliados]
+
+        type MembroRow = {
+          userId: string
+          tenantId: string
+          user: UserLite
+          tenant: { nome: string }
+        }
+        const membros: MembroRow[] = await db.saasMembro.findMany({
+          where: {
+            status: 'APROVADO',
+            tenantId: { in: visiveis },
+            userId: {
+              not: userId,
+              ...(vistos.size > 0 ? { notIn: [...vistos] } : {}),
+            },
+            ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+          },
+          select: {
+            userId: true,
+            tenantId: true,
+            user: { select: { id: true, nome: true, avatarUrl: true } },
+            tenant: { select: { nome: true } },
+          },
+          orderBy: { user: { nome: 'asc' } },
+          take: 40,
+        })
+
+        for (const r of membros) {
+          if (contatos.length >= 20) break
+          await pushSeElegivel(contatos, vistos, {
+            id: r.user.id,
+            nome: r.user.nome,
+            avatarUrl: r.user.avatarUrl,
+            tenantNome: r.tenant.nome,
+            mesmoTenant: r.tenantId === tenant.id,
+          })
+        }
+
+        if (contatos.length < 20) {
+          type CargoRow = {
+            userId: string
+            tenantId: string
+            user: UserLite
+            tenant: { nome: string }
+          }
+          const cargos: CargoRow[] = await db.userRole.findMany({
+            where: {
+              userId: {
+                not: userId,
+                ...(vistos.size > 0 ? { notIn: [...vistos] } : {}),
+              },
+              tenantId: { in: visiveis },
+              ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+            },
+            select: {
+              userId: true,
+              tenantId: true,
+              user: { select: { id: true, nome: true, avatarUrl: true } },
+              tenant: { select: { nome: true } },
+            },
+            orderBy: { user: { nome: 'asc' } },
+            take: 40,
+          })
+          for (const c of cargos) {
+            if (contatos.length >= 20) break
+            await pushSeElegivel(contatos, vistos, {
+              id: c.user.id,
+              nome: c.user.nome,
+              avatarUrl: c.user.avatarUrl,
+              tenantNome: c.tenant.nome,
+              mesmoTenant: c.tenantId === tenant.id,
+            })
+          }
+        }
+      }
+
+      return NextResponse.json({ contatos })
+    }
+
     if (contexto.via === 'nacional') {
       const afiliacaoId = (
         await db.tenant.findUnique({
@@ -91,7 +233,7 @@ export async function GET(request: NextRequest) {
 
       type PerfilRow = {
         userId: string
-        user: { id: string; nome: string | null; avatarUrl: string | null }
+        user: UserLite
       }
       const perfis: PerfilRow[] = await db.perfilTorcedor.findMany({
         where: {
@@ -110,7 +252,7 @@ export async function GET(request: NextRequest) {
 
       type SocioRow = {
         userId: string
-        user: { id: string; nome: string | null; avatarUrl: string | null }
+        user: UserLite
         tenant: { nome: string }
       }
       const socios: SocioRow[] = await db.saasMembro.findMany({
@@ -158,7 +300,7 @@ export async function GET(request: NextRequest) {
       if (contatos.length < 20) {
         type CargoRow = {
           userId: string
-          user: { id: string; nome: string | null; avatarUrl: string | null }
+          user: UserLite
           tenant: { nome: string }
         }
         const cargos: CargoRow[] = await db.userRole.findMany({
@@ -200,7 +342,7 @@ export async function GET(request: NextRequest) {
     interface ContatoRow {
       userId: string
       tenantId: string
-      user: { id: string; nome: string | null; avatarUrl: string | null }
+      user: UserLite
       tenant: { nome: string }
     }
     const rows: ContatoRow[] = await db.saasMembro.findMany({
@@ -238,7 +380,7 @@ export async function GET(request: NextRequest) {
       type CargoLocalRow = {
         userId: string
         tenantId: string
-        user: { id: string; nome: string | null; avatarUrl: string | null }
+        user: UserLite
         tenant: { nome: string }
       }
       const cargosLocais: CargoLocalRow[] = await db.userRole.findMany({
@@ -275,7 +417,7 @@ export async function GET(request: NextRequest) {
     if (contatos.length < 20 && tenant.afiliacaoId) {
       type SocioClubeRow = {
         userId: string
-        user: { id: string; nome: string | null; avatarUrl: string | null }
+        user: UserLite
         tenant: { nome: string }
       }
       const sociosClube: SocioClubeRow[] = await db.saasMembro.findMany({
