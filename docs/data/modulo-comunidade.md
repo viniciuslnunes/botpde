@@ -9,7 +9,7 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | Entidade | Tabela | Papel |
 |---|---|---|
 | `Post` | `saas_posts` | Publicações (`MEMBRO` ou `INSTITUCIONAL`); `visibilidade`: `PUBLICO`, `TENANT`, `PRIVADO`; `postOrigemId` (repost de post), `comunicadoOrigemId` (repost de comunicado), `eventoId` (post sobre evento) |
-| `PerfilMembro` | `saas_perfis_membro` | Bio, banner, avatar social, privacidade, toggles de exibição (por tenant) |
+| `PerfilMembro` | `saas_perfis_membro` | Bio, banner, privacidade, toggles de exibição (por tenant); `avatarUrl` na tabela é legado — ver nota de avatar abaixo |
 | `PerfilDestaque` / `PerfilDestaqueItem` | — | Destaques estilo stories no perfil |
 | `Seguimento` | `saas_seguimentos` | Grafo social; status `PENDENTE` / `APROVADO` / `REJEITADO` |
 | `Comentario` / `Reacao` | — | Engajamento (`CURTIR`; valores legados `FORCA`/`VAMOS`/`PRESENTE` no banco contam como curtida) |
@@ -21,6 +21,17 @@ membros, enquetes, repost, hashtags, grupos públicos e destaques no perfil.
 | `Conversa` (`comunidade: true`) | `saas_conversas` | Grupos temáticos (público/privado); posts do mural via `Post.conversaId` |
 | `Conversa` (`tipo: CANAL`) | `saas_conversas` | Canais institucionais e comunidades temáticas (M3); mural só-admin opcional |
 | `SaasMembro` | — | Dados operacionais (cidade, sede) exibidos no perfil com opt-in |
+
+## Avatar (2026-07-21)
+
+Identidade única do usuário: avatar sempre lido/gravado em `User.avatarUrl`
+(global), nunca por torcida. `getAvatarAtualDoUsuario(userId)` (sem
+`tenantId`) é o ponto único de leitura (cache `unstable_cache`, invalidado por
+`revalidateTag` no upload/sync OAuth). `PerfilMembro.avatarUrl` existia como
+override por tenant e causava 3 fotos divergentes para o mesmo usuário
+(torcida A, torcida B e feed cada um lendo uma fonte diferente); descontinuado
+como fonte de exibição — a coluna segue no schema, mas a aplicação não lê nem
+escreve nela. Banner (`bannerUrl`/`bannerPos`) e bio continuam por torcida.
 
 ## Privacidade
 
