@@ -318,6 +318,12 @@ async function main() {
   let jaLinkados = 0
   let vinculadosExistentes = 0
   let sedes = 0
+  let canaisOficiais = 0
+
+  const fallbackUser = await db.user.findFirst({
+    select: { id: true },
+    orderBy: { criadoEm: 'asc' },
+  })
 
   for (const tc of conhecidas) {
     const nome = tc.titulo ?? tc.nome
@@ -373,7 +379,7 @@ async function main() {
     await ensureSystemRoles(tenant.id)
 
     const sedeId = `sede-principal-${slug}`
-    await db.sede.upsert({
+    const sede = await db.sede.upsert({
       where: { id: sedeId },
       create: {
         id: sedeId,
@@ -389,8 +395,49 @@ async function main() {
         tenantId: tenant.id,
         ativa: true,
       },
+      select: { id: true, canalConversaId: true },
     })
     sedes += 1
+
+    // Canal oficial privado da torcida (nacional) — sem ADMIN; propriedade
+    // atribuída depois pelo admin da plataforma.
+    if (!sede.canalConversaId && fallbackUser) {
+      const muralExistente = await db.conversa.findFirst({
+        where: {
+          tenantId: tenant.id,
+          tipo: 'CANAL',
+          canalOficial: true,
+          // Evita pegar canal de SUBSEDE/PDE no mesmo tenant.
+          sedeCanal: null,
+        },
+        select: { id: true },
+        orderBy: { criadoEm: 'asc' },
+      })
+      const canalId =
+        muralExistente?.id ??
+        (
+          await db.conversa.create({
+            data: {
+              tipo: 'CANAL',
+              tenantId: tenant.id,
+              nome,
+              descricao: 'Canal oficial da torcida',
+              institucional: true,
+              canalOficial: true,
+              visibilidadeCanal: 'ALIADOS',
+              somenteAdminPublica: false,
+              publica: false,
+              criadoPorId: fallbackUser.id,
+            },
+            select: { id: true },
+          })
+        ).id
+      await db.sede.updateMany({
+        where: { id: sede.id, canalConversaId: null },
+        data: { canalConversaId: canalId },
+      })
+      canaisOficiais += 1
+    }
   }
 
   console.log('\nResumo:')
@@ -398,6 +445,7 @@ async function main() {
   console.log(`  tenants já linkados    : ${jaLinkados}`)
   console.log(`  tenants existentes     : ${vinculadosExistentes} (vinculados ao catálogo)`)
   console.log(`  sedes upsertadas       : ${sedes}`)
+  console.log(`  canais oficiais        : ${canaisOficiais}`)
 }
 
 main()

@@ -16,7 +16,10 @@ export default async function CanaisPage() {
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
-  await ensureCanaisOficiaisHierarquia(tenant.id)
+  // Viewer como fallback de criadoPorId: canal de unidade pode nascer sem
+  // ADMIN (propriedade atribuída depois); só satisfaz a FK se o tenant ainda
+  // não tiver liderança/sócio.
+  await ensureCanaisOficiaisHierarquia(tenant.id, session.user.id)
 
   const { rolePermissions, overrides } = await getUserPermissionsInTenant(
     session.user.id,

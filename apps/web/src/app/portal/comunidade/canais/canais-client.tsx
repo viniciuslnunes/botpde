@@ -15,7 +15,6 @@ import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import {
   labelVisibilidadeCanal,
   linkCanalComunidade,
-  linkUnidadeComunidade,
   type CanalItem,
 } from '@/lib/canais-shared'
 
@@ -299,7 +298,9 @@ function CanalRow({
   onPedirEntrada: (id: string) => void
   pending: boolean
 }) {
-  const href = canal.canalOficial ? linkUnidadeComunidade(canal.tenantId) : linkCanalComunidade(canal.id)
+  // Sempre pelo id do canal: SUBSEDE/PDE Caso A compartilham tenantId da mãe —
+  // linkUnidadeComunidade apontaria todas para o mesmo mural do portal.
+  const href = linkCanalComunidade(canal.id)
 
   return (
     <div className="card-soft flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">

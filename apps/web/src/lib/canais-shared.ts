@@ -38,6 +38,9 @@ export function decidePodeVerCanal(opts: {
   }
 }
 
+/** Tipo da unidade territorial ligada ao canal oficial (`Sede.tipo`). */
+export type TipoUnidadeCanal = 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+
 export interface CanalItem {
   id: string
   tenantId: string
@@ -55,6 +58,15 @@ export interface CanalItem {
   /** Pedido de entrada enviado e ainda não decidido (canal fechado, `publica: false`). */
   pedidoPendente: boolean
   tenantNome: string
+  /**
+   * Localização da unidade (`Sede` via `canalConversaId`).
+   * Null em canais temáticos ou oficiais ainda sem sede ligada.
+   */
+  tipoUnidade: TipoUnidadeCanal | null
+  cidade: string | null
+  estado: string | null
+  lat: number | null
+  lng: number | null
 }
 
 /** Card leve do aside "Canais sugeridos" — espelha `SugestaoAutorAside`. */

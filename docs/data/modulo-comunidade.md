@@ -265,10 +265,23 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     `HIERARQUIA`, que escondia aliados). `ensureCanaisOficiaisHierarquia` também
     promove oficiais ainda em `HIERARQUIA` → `ALIADOS` na worktree do viewer
     (temáticos não são tocados; liderança pode fechar de novo em Configurações).
-  - `/portal/comunidade/canais` chama `ensureCanaisOficiaisHierarquia`: materializa
-    oficial do tenant ativo + descendentes Caso B + unidades Caso A (SUBSEDE/PDE
-    sem `Sede.canalConversaId`). Não cria canal de ancestral/aliado por efeito
-    colateral.
+  - `/portal/comunidade/canais` chama `ensureCanaisOficiaisHierarquia(tenantId, viewerId)`:
+    materializa oficial do tenant ativo + descendentes Caso B + unidades Caso A
+    (SUBSEDE/PDE sem `Sede.canalConversaId`) em toda a worktree. Não cria canal de
+    ancestral/aliado por efeito colateral. **Regra (2026-07-22):** SUBSEDE/PDE
+    nascem com canal oficial **privado** (`publica: false`) e **sem** admin
+    local — `criadoPorId` só preenche FK (liderança do tenant ou viewer); a
+    propriedade é atribuída depois em Configurações / membros. Criação em
+    `/admin/sedes` (`criarSede`) e backfill
+    `pnpm --filter @torcida/db db:ensure-canais-oficiais-unidades` usam o mesmo
+    helper `ensureCanalOficialParaSede`. **Torcidas (nacional, 2026-07-22):**
+    toda `Tenant` ativa da plataforma também tem mural oficial privado
+    (ligado à `Sede` tipo SEDE) via
+    `pnpm --filter @torcida/db db:ensure-canais-oficiais-torcidas` (ou
+    `db:ensure-canais-oficiais` = torcidas + unidades); o seed
+    `seed:torcidas-tenants` já provisiona o canal na criação. Abrir na
+    listagem vai a `/canais/[id]` (não `/unidade/[tenantId]`), para Caso A
+    não colidir no mural do portal-mãe.
   - `pedirEntradaCanal` aceita canal fechado de **qualquer** tenant desde que
     `podeVerCanal` (antes filtrava só `tenantId` ativo — listagem mostrava Pedir
     e a action falhava).

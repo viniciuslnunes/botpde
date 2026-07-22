@@ -10,7 +10,6 @@ import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
 import {
   linkCanalComunidade,
-  linkUnidadeComunidade,
   type SugestaoCanalAside,
 } from '@/lib/canais-shared'
 
@@ -65,9 +64,8 @@ export function CanaisSugeridosAside({
       </h2>
       <div className="mt-3 space-y-3">
         {canais.map((canal) => {
-          const href = canal.canalOficial
-            ? linkUnidadeComunidade(canal.tenantId)
-            : linkCanalComunidade(canal.id)
+          // Sempre pelo id: oficiais Caso A (SUBSEDE/PDE) compartilham tenantId.
+          const href = linkCanalComunidade(canal.id)
           return (
             <div key={canal.id} className="flex items-center gap-2">
               <Link href={href} className="shrink-0">

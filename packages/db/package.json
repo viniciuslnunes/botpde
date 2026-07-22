@@ -41,6 +41,9 @@
     "audit:perfis-torcedores-privados": "node scripts/audit-perfis-torcedores-privados.js",
     "repair:perfis-socios-privados": "node scripts/repair-perfis-socios-privados.js",
     "db:repair-canal-oficial-duplicado": "node scripts/repair-canal-oficial-duplicado.js",
+    "db:ensure-canais-oficiais-unidades": "node scripts/ensure-canais-oficiais-unidades.js",
+    "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
+    "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",
     "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js"
   },
   "dependencies": {

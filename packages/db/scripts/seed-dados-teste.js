@@ -63,13 +63,40 @@ async function main() {
   })
   console.log(`✅ Ponto de encontro: ${pde.nome}`)
 
-  // ── Autor dos comunicados/eventos: o owner do tenant ─────────────────────
+  // Canal oficial privado por unidade (mesmo padrão de ensureCanalOficialParaSede)
   const ownerRole = await db.userRole.findFirst({
     where: { tenantId: tenant.id, role: { isSystem: true, nome: 'owner' } },
     select: { userId: true },
   })
   if (!ownerRole) throw new Error(`Tenant '${slug}' não tem um usuário com cargo 'owner'.`)
   const autorId = ownerRole.userId
+
+  for (const unidade of [subsede, pde]) {
+    if (unidade.canalConversaId) {
+      console.log(`↔  Canal já ligado: ${unidade.nome}`)
+      continue
+    }
+    const canal = await db.conversa.create({
+      data: {
+        tipo: 'CANAL',
+        tenantId: tenant.id,
+        nome: unidade.nome,
+        descricao: 'Canal oficial da unidade',
+        institucional: true,
+        canalOficial: true,
+        visibilidadeCanal: 'ALIADOS',
+        somenteAdminPublica: false,
+        publica: false,
+        criadoPorId: autorId,
+      },
+      select: { id: true },
+    })
+    await db.sede.update({
+      where: { id: unidade.id },
+      data: { canalConversaId: canal.id },
+    })
+    console.log(`✅ Canal oficial (privado): ${unidade.nome} → ${canal.id}`)
+  }
 
   // ── Comunicados oficiais (Announcement) — prioridade e fixação ──────────
   const comunicados = [

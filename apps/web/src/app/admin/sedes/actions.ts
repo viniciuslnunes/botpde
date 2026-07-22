@@ -12,6 +12,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { ensureCanalOficialParaSede } from '@/lib/canais'
 import { PERMISSIONS } from '@torcida/types'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
@@ -178,6 +179,21 @@ export async function criarSede(
     },
   })
 
+  // SUBSEDE/PDE: canal oficial privado já na criação (Caso A), mesmo sem
+  // admin do canal — propriedade/membros vêm depois. SEDE usa o mural do
+  // tenant via getOrCreateCanalOficial na Comunidade.
+  let canalConversaId: string | null = null
+  if (tipo === 'SUBSEDE' || tipo === 'PONTO_ENCONTRO') {
+    const canal = await ensureCanalOficialParaSede({
+      sedeId: sede.id,
+      tenantId: tenant.id,
+      nome,
+      criadoPorId: session.user.id,
+      atorComoAdmin: false,
+    })
+    canalConversaId = canal.id
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -188,12 +204,14 @@ export async function criarSede(
       detalhes: {
         tipo,
         temCoords: rest.lat != null && rest.lng != null,
+        ...(canalConversaId ? { canalConversaId } : {}),
       },
     },
   })
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
+  revalidatePath('/portal/comunidade/canais')
   invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
 }
