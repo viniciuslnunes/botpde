@@ -12,6 +12,8 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EditarSedeForm } from '@/components/admin/sede-forms'
 import { PromoverSedeButton } from '@/components/admin/promover-sede-button'
+import { KpiGrid, StatCard } from '@/components/admin/ui'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ArrowLeft, Calendar, MapPin, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -169,41 +171,32 @@ export default async function EditarSedePage({
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-            <Users className="h-3.5 w-3.5" />
-            Membros aprovados
-          </div>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[rgb(var(--foreground))]">
-            {membrosCount}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-            <MapPin className="h-3.5 w-3.5" />
-            Filhos ativos
-          </div>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[rgb(var(--foreground))]">
-            {filhosAtivos}
-          </p>
-          {filhosAtivos > 0 && (
-            <p className="mt-0.5 text-[11px] text-[rgb(var(--foreground-muted))]">
-              Desativar esta unidade exige desativar/reatribuir os filhos
-            </p>
-          )}
-        </div>
-        <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-[rgb(var(--foreground-muted))]">
-            <Calendar className="h-3.5 w-3.5" />
-            Próximos eventos
-          </div>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-[rgb(var(--foreground))]">
-            {eventos.length}
-            {eventos.length === 5 ? '+' : ''}
-          </p>
-        </div>
-      </div>
+      <KpiGrid cols={3} className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          compact
+          label="Membros aprovados"
+          value={membrosCount}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <StatCard
+          compact
+          label="Filhos ativos"
+          value={filhosAtivos}
+          icon={<MapPin className="h-4 w-4" />}
+          badge={
+            filhosAtivos > 0
+              ? 'Desativar exige desativar/reatribuir os filhos'
+              : undefined
+          }
+          badgeTone="default"
+        />
+        <StatCard
+          compact
+          label="Próximos eventos"
+          value={`${eventos.length}${eventos.length === 5 ? '+' : ''}`}
+          icon={<Calendar className="h-4 w-4" />}
+        />
+      </KpiGrid>
 
       {eventos.length > 0 && (
         <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
@@ -235,6 +228,7 @@ export default async function EditarSedePage({
 
       {podePromoverUi && <PromoverSedeButton sedeId={sede.id} sedeNome={sede.nome} />}
 
+      <MotionReveal index={1}>
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
         <EditarSedeForm
           sede={{
@@ -261,6 +255,7 @@ export default async function EditarSedePage({
           candidatos={candidatos}
         />
       </div>
+      </MotionReveal>
     </div>
   )
 }

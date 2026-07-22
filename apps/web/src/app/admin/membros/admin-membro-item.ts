@@ -7,8 +7,8 @@ export interface AdminMembroItem {
   tipo: string
   cidade: string | null
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
+  /** Label do status para usos em texto puro; o badge visual vem de `StatusBadge`. */
   statusLabel: string
-  statusClass: string
   criadoEmLabel: string
   atualizadoEmLabel?: string | null
   avatarUrl: string | null

@@ -46,6 +46,11 @@ const MAPAS: Record<StatusBadgeDominio, MapaStatus> = {
   patrimonio: PATRIMONIO,
 }
 
+/** Label centralizado de um status — para usos em texto puro (ex.: campo de modal). */
+export function statusBadgeLabel(dominio: StatusBadgeDominio, status: string): string {
+  return MAPAS[dominio][status]?.label ?? status
+}
+
 export interface StatusBadgeProps {
   dominio: StatusBadgeDominio
   status: string

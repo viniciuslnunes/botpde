@@ -489,3 +489,13 @@ não só RSC), chrome salas/chat no layout ao sair do feed, `React.cache` em
 `GROUP BY` (nunca `DISTINCT`+`similarity`), tipos explícitos em queries Prisma.
 Agente: `performance` (ver `docs/agents/README.md`). Teto zero-custo (~85–95%);
 reabrir plano só com gatilho do doc.
+
+## Insights administrativos (2026-07-22)
+
+Nova `lib/comunidade-insights.ts`: `resumirEngajamento` (posts/reações/
+comentários no período vs anterior + interações por dia + denúncias abertas;
+`Reacao`/`Comentario` escopam via `post: { tenantId }`) e
+`resumirLeituraComunicados` (read-rate = leituras de `AnnouncementRead` ÷
+membros aprovados). Superfícies: `InsightSection` no hub `/admin/comunidade`
+(gates `COMMUNITY_MANAGE` / `ANNOUNCEMENTS_PUBLISH` respeitados) e seção
+Comunidade em `/admin/relatorios`. Padrões: `docs/frontend/admin-ui-kit.md`.

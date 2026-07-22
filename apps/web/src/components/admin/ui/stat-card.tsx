@@ -18,6 +18,8 @@ export interface StatCardProps {
   href?: string
   /** Linha auxiliar (ex.: "+3 este mês"). */
   badge?: string
+  /** Cor da linha auxiliar — default `success` (contexto de crescimento). */
+  badgeTone?: StatCardTone
   tone?: StatCardTone
   /** Comparativo vs período anterior — renderiza `TrendDelta`. */
   delta?: { atual: number; anterior: number; invertido?: boolean }
@@ -47,6 +49,7 @@ export function StatCard({
   icon,
   href,
   badge,
+  badgeTone = 'success',
   tone = 'default',
   delta,
   sparkline,
@@ -71,6 +74,17 @@ export function StatCard({
               <TrendDelta atual={delta.atual} anterior={delta.anterior} invertido={delta.invertido} />
             ) : null}
           </div>
+          {badge ? (
+            <p
+              className={`mt-0.5 text-[11px] font-medium ${
+                badgeTone === 'default'
+                  ? 'text-[rgb(var(--foreground-muted))]'
+                  : TONE_VALUE[badgeTone]
+              }`}
+            >
+              {badge}
+            </p>
+          ) : null}
         </div>
       </div>
     </m.div>
@@ -102,8 +116,16 @@ export function StatCard({
             </div>
             <div className="mt-1 min-h-5">
               {badge ? (
-                <p className="flex items-center gap-1 text-xs font-medium text-[rgb(var(--color-success-fg))]">
-                  <TrendingUp className="h-3 w-3 shrink-0" aria-hidden />
+                <p
+                  className={`flex items-center gap-1 text-xs font-medium ${
+                    badgeTone === 'success'
+                      ? 'text-[rgb(var(--color-success-fg))]'
+                      : TONE_VALUE[badgeTone]
+                  }`}
+                >
+                  {badgeTone === 'success' ? (
+                    <TrendingUp className="h-3 w-3 shrink-0" aria-hidden />
+                  ) : null}
                   {badge}
                 </p>
               ) : null}

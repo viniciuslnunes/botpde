@@ -7,6 +7,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { TriangleAlert, Users } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
 import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { MembroDetalheModal } from './membro-detalhe-modal'
@@ -122,9 +123,11 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                         <p className="truncate font-medium text-[rgb(var(--foreground))] group-hover:underline">
                           {membro.nome}
                         </p>
-                        <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium sm:hidden ${membro.statusClass}`}>
-                          {membro.statusLabel}
-                        </span>
+                        <StatusBadge
+                          dominio="membro"
+                          status={membro.status}
+                          className="mt-1 sm:hidden"
+                        />
                         {membro.alertaRivalSocio && (
                           <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                             <TriangleAlert className="h-3 w-3 shrink-0" />
@@ -157,9 +160,7 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.cidade ?? '—'}</span>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${membro.statusClass}`}>
-                      {membro.statusLabel}
-                    </span>
+                    <StatusBadge dominio="membro" status={membro.status} />
                   </td>
                   <td className="px-4 py-3 hidden 2xl:table-cell">
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">{membro.criadoEmLabel}</span>

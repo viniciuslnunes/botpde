@@ -1,16 +1,19 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Receipt } from 'lucide-react'
 import {
   formatarMoedaBRL,
   formatDataCompetenciaInput,
-  STATUS_COBRANCA_LABEL,
   PERMISSIONS,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { listarCobrancasTenant } from '@/lib/cobrancas'
+import { resumirInadimplencia, type InadimplenciaResumo } from '@/lib/cobrancas-insights'
 import { getPixProvider } from '@/lib/pix-gateway'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { InsightSection, StatCard, StatusBadge, TableShell } from '@/components/admin/ui'
+import { MiniBarChart } from '@/components/admin/charts'
 import { db } from '@torcida/db'
 import type { StatusCobrancaAssociacao } from '@torcida/db'
 import { AdminCriarCobrancaForm } from './admin-criar-cobranca-form'
@@ -18,6 +21,61 @@ import { AdminCobrancaAcoes, DispararLembretesButton } from './admin-cobrancas-c
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Cobranças — Admin' }
+
+function formatarTaxaPct(taxa: number | null): string | undefined {
+  if (taxa === null) return undefined
+  return `${(taxa * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do exigível em 90d`
+}
+
+async function CobrancasInsights({ tenantId }: { tenantId: string }) {
+  const resumo: InadimplenciaResumo = await resumirInadimplencia(tenantId)
+
+  const semBase =
+    resumo.quantidadeEmAtraso === 0 && resumo.mrrAtual === 0 && resumo.mrrAnterior === 0
+  if (semBase) return null
+
+  return (
+    <InsightSection
+      title="Saúde da associação"
+      description="Mensalidades pagas no mês vs anterior · aging do valor em atraso."
+    >
+      <StatCard
+        label="Mensalidades no mês (MRR)"
+        value={formatarMoedaBRL(resumo.mrrAtual)}
+        tone="success"
+        delta={{ atual: resumo.mrrAtual, anterior: resumo.mrrAnterior }}
+      />
+      <StatCard
+        label="Valor em atraso"
+        value={formatarMoedaBRL(resumo.valorEmAtraso)}
+        tone={resumo.valorEmAtraso > 0 ? 'danger' : 'success'}
+        badge={formatarTaxaPct(resumo.taxaInadimplencia)}
+        badgeTone="danger"
+      />
+      <StatCard
+        label="Cobranças em atraso"
+        value={resumo.quantidadeEmAtraso}
+        tone={resumo.quantidadeEmAtraso > 0 ? 'warning' : 'default'}
+      />
+
+      {resumo.valorEmAtraso > 0 ? (
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 lg:col-span-3 sm:p-5">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Aging do atraso
+          </h3>
+          <MiniBarChart
+            data={resumo.aging.map((b) => ({
+              rotulo: b.faixa,
+              valor: b.valor,
+              cor: 'rgb(var(--color-danger) / 0.7)',
+            }))}
+            formato="moeda"
+          />
+        </div>
+      ) : null}
+    </InsightSection>
+  )
+}
 
 type Props = { searchParams: Promise<{ status?: string }> }
 
@@ -109,6 +167,18 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
         })}
       </div>
 
+      <Suspense
+        fallback={
+          <div className="grid animate-pulse gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+            ))}
+          </div>
+        }
+      >
+        <CobrancasInsights tenantId={tenant.id} />
+      </Suspense>
+
       <AdminCriarCobrancaForm
         membros={membrosRaw.map((m: (typeof membrosRaw)[number]) => ({ userId: m.userId, label: m.nome }))}
         planos={planosRaw.map((p: (typeof planosRaw)[number]) => ({
@@ -118,13 +188,14 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
         }))}
       />
 
-      <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-        {cobrancas.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma cobrança encontrada.
-          </p>
-        ) : (
-          <table className="w-full min-w-0 text-sm md:min-w-[36rem] xl:min-w-[48rem]">
+      <TableShell
+        isEmpty={cobrancas.length === 0}
+        empty={{
+          icon: <Receipt className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />,
+          title: 'Nenhuma cobrança encontrada',
+          description: 'Ajuste o filtro de status ou crie uma cobrança acima.',
+        }}
+      >
             <thead>
               <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -146,17 +217,6 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
             </thead>
             <tbody className="divide-y divide-[rgb(var(--border))]">
               {cobrancas.map((c) => {
-                const statusLabel =
-                  STATUS_COBRANCA_LABEL[c.status as keyof typeof STATUS_COBRANCA_LABEL] ?? c.status
-                const statusClass =
-                  c.status === 'PAGA'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    : c.status === 'VENCIDA'
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      : c.status === 'CANCELADA'
-                        ? 'bg-gray-100 text-gray-600'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-
                 return (
                   <tr key={c.id} className="hover:bg-[rgb(var(--background-subtle)_/_0.5)]">
                     <td className="px-4 py-3">
@@ -174,9 +234,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
                       {formatDataCompetenciaInput(c.vencimento)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusClass}`}>
-                        {statusLabel}
-                      </span>
+                      <StatusBadge dominio="cobranca" status={c.status} />
                       {c.pixCopiaCola && c.status !== 'PAGA' && (
                         <p className="mt-0.5 text-[10px] text-[rgb(var(--foreground-muted))]">Pix gerado</p>
                       )}
@@ -188,9 +246,7 @@ export default async function CobrancasAdminPage({ searchParams }: Props) {
                 )
               })}
             </tbody>
-          </table>
-        )}
-      </div>
+      </TableShell>
     </div>
   )
 }

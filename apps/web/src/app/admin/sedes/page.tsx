@@ -8,6 +8,7 @@ import {
   AdminSedesManager,
   type AdminSedeListItem,
 } from '@/components/admin/admin-sedes-manager'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Sedes — Admin' }
@@ -103,12 +104,14 @@ export default async function AdminSedesPage() {
 
   return (
     <div className="app-container py-8">
-      <AdminSedesManager
-        sedes={sedes}
-        sedesOption={sedesOption}
-        candidatos={candidatos}
-        membrosSemUnidade={membrosSemUnidade}
-      />
+      <MotionReveal>
+        <AdminSedesManager
+          sedes={sedes}
+          sedesOption={sedesOption}
+          candidatos={candidatos}
+          membrosSemUnidade={membrosSemUnidade}
+        />
+      </MotionReveal>
     </div>
   )
 }

@@ -8,7 +8,9 @@ import { assertPermission } from '@/lib/authz'
 import { AdminPageHeader } from '@/components/admin/ui'
 import { buildAdminHref } from '@/lib/admin-href'
 import { PERIODO_LABEL, PERIODOS, type Periodo } from '@/lib/admin-insights'
+import { AssociacaoSection } from './sections/associacao-section'
 import { BarSection } from './sections/bar-section'
+import { ComunidadeSection } from './sections/comunidade-section'
 import { EventosSection } from './sections/eventos-section'
 import { FinanceiroSection } from './sections/financeiro-section'
 import { LojaSection } from './sections/loja-section'
@@ -17,8 +19,6 @@ import { MembrosSection } from './sections/membros-section'
 export const metadata: Metadata = { title: 'Relatórios — Admin' }
 
 type Props = { searchParams: Promise<{ periodo?: string }> }
-
-const SECOES_EM_BREVE = ['Comunidade', 'Associação']
 
 function SectionSkeleton() {
   return (
@@ -85,6 +85,10 @@ export default async function RelatoriosPage({ searchParams }: Props) {
         </Suspense>
 
         <Suspense fallback={<SectionSkeleton />}>
+          <AssociacaoSection tenantId={tenant.id} />
+        </Suspense>
+
+        <Suspense fallback={<SectionSkeleton />}>
           <BarSection tenantId={tenant.id} periodo={periodo} />
         </Suspense>
 
@@ -96,25 +100,9 @@ export default async function RelatoriosPage({ searchParams }: Props) {
           <EventosSection tenantId={tenant.id} periodo={periodo} />
         </Suspense>
 
-        <section className="space-y-3" aria-label="Seções em breve">
-          <div>
-            <h2 className="font-semibold text-[rgb(var(--foreground))]">Em breve</h2>
-            <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-              Indicadores destes módulos chegam nas próximas ondas.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {SECOES_EM_BREVE.map((nome) => (
-              <div
-                key={nome}
-                className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-3"
-              >
-                <p className="text-sm font-medium text-[rgb(var(--foreground))]">{nome}</p>
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">Em breve</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <Suspense fallback={<SectionSkeleton />}>
+          <ComunidadeSection tenantId={tenant.id} periodo={periodo} />
+        </Suspense>
       </div>
     </div>
   )

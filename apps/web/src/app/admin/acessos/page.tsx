@@ -4,6 +4,7 @@ import { KeyRound } from 'lucide-react'
 import { AccessManager } from '@/components/admin/access-manager'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, permissionsOfRole, PAPEL_DEPARTAMENTO, isDepartamentoLegado } from '@torcida/types'
 import type { Metadata } from 'next'
@@ -235,19 +236,21 @@ export default async function AcessosPage({
 
       <div className="py-6">
         <div className="app-container">
-          {secao === 'cargos' && (
-            <RolesManager roles={rolesComEfetivas} departamentos={departamentos} tipoSede={tipoSede} />
-          )}
-          {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
-          {secao === 'pessoas' && (
-            <AccessManager
-              usuarios={usuariosFormatados}
-              roles={rolesComEfetivas}
-              departamentos={departamentos}
-              tipoSede={tipoSede}
-              initialUserId={initialUserId}
-            />
-          )}
+          <MotionReveal>
+            {secao === 'cargos' && (
+              <RolesManager roles={rolesComEfetivas} departamentos={departamentos} tipoSede={tipoSede} />
+            )}
+            {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
+            {secao === 'pessoas' && (
+              <AccessManager
+                usuarios={usuariosFormatados}
+                roles={rolesComEfetivas}
+                departamentos={departamentos}
+                tipoSede={tipoSede}
+                initialUserId={initialUserId}
+              />
+            )}
+          </MotionReveal>
         </div>
       </div>
     </div>

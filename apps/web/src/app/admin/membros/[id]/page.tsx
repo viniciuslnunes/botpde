@@ -10,6 +10,8 @@ import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminMembroLgeForm } from '../admin-membro-lge-form'
 import { AdminMembroSedeForm } from '../admin-membro-sede-form'
 import { MemberActions } from '@/components/admin/member-actions'
+import { MotionReveal } from '@/components/motion/motion-reveal'
+import { StatusBadge } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membro — Admin' }
@@ -116,38 +118,45 @@ export default async function MembroDetalhePage({ params }: Props) {
         <ArrowLeft className="h-4 w-4" /> Voltar à lista
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
-            <User className="h-5 w-5" />
+      <MotionReveal>
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-lg font-semibold text-[rgb(var(--foreground))]">
+                  {membro.nome}
+                </h1>
+                <StatusBadge dominio="membro" status={membro.status} />
+              </div>
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                {membro.tipo}
+                {membro.departamento ? ` · ${membro.departamento.nome}` : ''}
+                {membro.planoAssociacao ? ` · ${membro.planoAssociacao.nome}` : ''}
+              </p>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                {membro.user.email}
+                {membro.telefone ? ` · ${membro.telefone}` : ''}
+                {membro.cidade ? ` · ${membro.cidade}` : ''}
+              </p>
+              <p className="mt-1 text-xs">
+                {membro.adimplente ? (
+                  <span className="text-[rgb(var(--color-success-fg))]">Adimplente</span>
+                ) : (
+                  <span className="text-[rgb(var(--color-danger-fg))]">Inadimplente</span>
+                )}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-[rgb(var(--foreground))]">{membro.nome}</h1>
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              {membro.tipo} · {membro.status}
-              {membro.departamento ? ` · ${membro.departamento.nome}` : ''}
-              {membro.planoAssociacao ? ` · ${membro.planoAssociacao.nome}` : ''}
-            </p>
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              {membro.user.email}
-              {membro.telefone ? ` · ${membro.telefone}` : ''}
-              {membro.cidade ? ` · ${membro.cidade}` : ''}
-            </p>
-            <p className="mt-1 text-xs">
-              {membro.adimplente ? (
-                <span className="text-green-600 dark:text-green-400">Adimplente</span>
-              ) : (
-                <span className="text-red-600 dark:text-red-400">Inadimplente</span>
-              )}
-            </p>
-          </div>
+          <MemberActions
+            membroId={membro.id}
+            status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
+            departamentoNome={membro.departamento?.nome}
+          />
         </div>
-        <MemberActions
-          membroId={membro.id}
-          status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
-          departamentoNome={membro.departamento?.nome}
-        />
-      </div>
+      </MotionReveal>
 
       {membro.desligadoMotivo && (
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
@@ -155,28 +164,32 @@ export default async function MembroDetalhePage({ params }: Props) {
         </p>
       )}
 
-      <AdminMembroSedeForm
-        membroId={membro.id}
-        sedeIdAtual={membro.sedeId}
-        sedes={sedes}
-        canEdit={podeReatribuirSede}
-      />
+      <MotionReveal index={1}>
+        <AdminMembroSedeForm
+          membroId={membro.id}
+          sedeIdAtual={membro.sedeId}
+          sedes={sedes}
+          canEdit={podeReatribuirSede}
+        />
+      </MotionReveal>
 
-      <AdminMembroLgeForm
-        membroId={membro.id}
-        initial={{
-          rg: membro.rg,
-          cpf: membro.cpf,
-          filiacao: membro.filiacao,
-          escolaridade: membro.escolaridade,
-          profissao: membro.profissao,
-          dataNascimento: membro.dataNascimento,
-          planoAssociacaoId: membro.planoAssociacaoId,
-        }}
-        planos={planos}
-        podeDesligar={podeDesligar}
-        desligadoEm={membro.desligadoEm}
-      />
+      <MotionReveal index={2}>
+        <AdminMembroLgeForm
+          membroId={membro.id}
+          initial={{
+            rg: membro.rg,
+            cpf: membro.cpf,
+            filiacao: membro.filiacao,
+            escolaridade: membro.escolaridade,
+            profissao: membro.profissao,
+            dataNascimento: membro.dataNascimento,
+            planoAssociacaoId: membro.planoAssociacaoId,
+          }}
+          planos={planos}
+          podeDesligar={podeDesligar}
+          desligadoEm={membro.desligadoEm}
+        />
+      </MotionReveal>
     </div>
   )
 }

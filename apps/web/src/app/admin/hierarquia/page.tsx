@@ -3,6 +3,7 @@ import { Network } from 'lucide-react'
 import { assertPermission } from '@/lib/authz'
 import { getOrganizacaoTree } from '@/lib/organizacao-tree'
 import { OrganizacaoMural } from '@/components/admin/organizacao-mural'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { PERMISSIONS } from '@torcida/types'
 import type { Metadata } from 'next'
 
@@ -34,7 +35,9 @@ export default async function HierarquiaPage() {
 
       <div className="py-6">
         <div className="app-container">
-          <OrganizacaoMural tree={tree} />
+          <MotionReveal>
+            <OrganizacaoMural tree={tree} />
+          </MotionReveal>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 Guia do kit de componentes da área admin e da camada de insights/relatórios.
 Decisões fechadas em `ARCHITECTURE.md` §5.12. Plano original: refactor admin
-2026-07-22 (fases 1–3 entregues; ondas 4–5 pendentes — ver § Roadmap).
+2026-07-22 — **todas as fases (1–5) entregues**.
 
 ## Por que existe
 
@@ -68,11 +68,18 @@ Decimal→number antes de retornar):
 | `lib/bar.ts` (estendida) | `resumirVendasBarPorDia`, `listarMaisVendidosBar`, `compararVendasBarPeriodo` (+ `resumirMargemBar` agora aceita `sedeId: undefined` = torcida inteira) | Hub bar + relatórios |
 | `lib/loja-insights.ts` | `resumirVendasLoja`, `listarMaisVendidosLoja`, `resumirUsoCupons` | Hub loja + relatórios |
 | `lib/eventos-insights.ts` | `resumirComparecimento`, `listarPresencaPorEvento` | Hub eventos + relatórios |
+| `lib/membros-insights.ts` | `resumirFunilMembros`, `serieFunilMensal`, `distribuirMembros`, `resumirCarteirinhas` | Hub membros + relatórios |
+| `lib/cobrancas-insights.ts` | `resumirInadimplencia` (aging 0-30/31-60/61-90/90+, taxa, MRR) — 1º consumidor do índice `CobrancaAssociacao (tenantId,status,vencimento)` | Hub cobranças + relatórios (Associação) |
+| `lib/comunidade-insights.ts` | `resumirEngajamento`, `resumirLeituraComunicados` (read-rate = leituras ÷ membros aprovados) | Hub comunidade + relatórios |
 
 Regras de negócio embutidas: receita da loja = pedidos `CONFIRMADO`/`ENTREGUE`
 (`PENDENTE` é aguardando, `CANCELADO` não conta); receita do bar = vendas
 `PAGA`; presença de eventos = `checkedInAt != null` (walk-in conta; taxa pode
-passar de 1), no-show = `CONFIRMADO` sem check-in.
+passar de 1), no-show = `CONFIRMADO` sem check-in; cobrança em atraso =
+`PENDENTE`/`VENCIDA` com vencimento passado; MRR = `PAGA` tipo `MENSALIDADE`
+com `pagoEm` no mês corrente (fuso SP); engajamento de comunidade escopa
+`Reacao`/`Comentario` via relação `post: { tenantId }` (não têm tenantId
+próprio).
 
 ## Página `/admin/relatorios`
 
@@ -101,18 +108,20 @@ pacotes colaborador no seed.
    `SECOES_EM_BREVE`.
 4. Estados vazio/erro/loading sempre cobertos; charts recebem só primitivas.
 
-## Roadmap (ondas pendentes)
+## Estado final (2026-07-22)
 
-- **Onda 4 — Membros/Sócios/Cobranças**: `lib/membros-insights.ts` (funil
-  novos×aprovados×desligados, distribuição por sede/cidade/tipo),
-  `lib/cobrancas-insights.ts` (inadimplência/aging 0-30/31-60/61-90/90+ e MRR —
-  primeiro consumidor do índice `CobrancaAssociacao (tenantId,status,vencimento)`);
-  insights nos hubs membros/cobranças/sócios; migrar tabelas de membros e
-  cobranças para `TableShell` (em `admin-socios-client.tsx`, 1014L, só
-  badges/paginação/empty); `sections/associacao-section.tsx`; Motion em
-  `membros/[id]`.
-- **Onda 5 — Comunidade + Governança**: `lib/comunidade-insights.ts`
-  (engajamento por dia, denúncias, read-rate de comunicados via
-  `Announcement`/`AnnouncementRead`); `sections/comunidade-section.tsx` fecha os
-  relatórios; Motion leveling final em sedes, sedes/[id], hierarquia, aliancas,
-  acessos, configuracoes, design, comunidade/comunicados|mural|noticias.
+Todas as ondas entregues. `/admin/relatorios` cobre Financeiro, Membros,
+Associação, Bar, Loja, Eventos e Comunidade (sem placeholders). Decisões de
+escopo registradas nas ondas 4–5:
+
+- **Tabela de membros** manteve a própria estrutura animada
+  (`AnimatePresence` + stagger, superior ao `TableShell` estático); a
+  unificação foi via `StatusBadge`/`statusBadgeLabel` + `TablePagination`.
+- **Hub de sócios** ficou intacto: o rodapé sticky de paginação com contagem é
+  um padrão próprio (não o duplicado) e o client de 1014L não foi
+  reestruturado; o donut de carteirinhas vive na seção Associação dos
+  relatórios (`resumirCarteirinhas`).
+- **`/admin/design`** ficou fora do Motion leveling: layout de estúdio com
+  `overflow-hidden` sensível; o form já anima via `StickyPersistBar`.
+- `StatCard` ganhou `badgeTone` (linha auxiliar em danger/warning/default —
+  default `success`) e o modo `compact` passou a renderizar `badge`.

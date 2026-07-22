@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { MessagesSquare } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { CriarPostForm, PostsManager } from '@/components/admin/post-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Mural — Comunidade' }
@@ -39,11 +40,15 @@ export default async function AdminMuralPage() {
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
-          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
-            <h3 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Novo post</h3>
-            <CriarPostForm />
-          </div>
-          <PostsManager posts={posts} />
+          <MotionReveal>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
+              <h3 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Novo post</h3>
+              <CriarPostForm />
+            </div>
+          </MotionReveal>
+          <MotionReveal index={1}>
+            <PostsManager posts={posts} />
+          </MotionReveal>
         </div>
       </div>
     </div>

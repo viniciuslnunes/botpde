@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
 import {
   lightboxBackdrop,
@@ -206,11 +207,7 @@ export function MembroDetalheModal({
                     <span className="text-xs text-[rgb(var(--foreground-muted))]">
                       {membro.tipo}
                     </span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${membro.statusClass}`}
-                    >
-                      {membro.statusLabel}
-                    </span>
+                    <StatusBadge dominio="membro" status={membro.status} />
                   </div>
                 </div>
               </div>

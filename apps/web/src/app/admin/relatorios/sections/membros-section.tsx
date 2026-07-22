@@ -1,11 +1,7 @@
 import { db } from '@torcida/db'
-import {
-  PERIODO_LABEL,
-  resolverIntervaloPeriodo,
-  type Periodo,
-  type SerieTemporal,
-} from '@/lib/admin-insights'
+import { PERIODO_LABEL, type Periodo, type SerieTemporal } from '@/lib/admin-insights'
 import { carregarSerieNovosMembros } from '@/lib/admin-dashboard'
+import { resumirFunilMembros, type FunilMembrosResumo } from '@/lib/membros-insights'
 import { InsightSection, StatCard } from '@/components/admin/ui'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 
@@ -16,19 +12,20 @@ export async function MembrosSection({
   tenantId: string
   periodo: Periodo
 }) {
-  const { inicioAnterior, fimAnterior } = resolverIntervaloPeriodo(periodo)
-
-  const [serie, novosAnterior, pendentes, aprovados]: [SerieTemporal, number, number, number] =
-    await Promise.all([
-      carregarSerieNovosMembros(tenantId, periodo),
-      db.saasMembro.count({
-        where: { tenantId, criadoEm: { gte: inicioAnterior, lte: fimAnterior } },
-      }),
-      db.saasMembro.count({ where: { tenantId, status: 'PENDENTE' } }),
-      db.saasMembro.count({ where: { tenantId, status: 'APROVADO' } }),
-    ])
+  const [serie, funil, pendentes, aprovados]: [
+    SerieTemporal,
+    FunilMembrosResumo,
+    number,
+    number,
+  ] = await Promise.all([
+    carregarSerieNovosMembros(tenantId, periodo),
+    resumirFunilMembros(tenantId, periodo),
+    db.saasMembro.count({ where: { tenantId, status: 'PENDENTE' } }),
+    db.saasMembro.count({ where: { tenantId, status: 'APROVADO' } }),
+  ])
 
   const novosNoPeriodo = serie.reduce((acc, ponto) => acc + ponto.valor, 0)
+  const novosAnterior = funil.anterior.novos
   const vazio = novosNoPeriodo === 0 && novosAnterior === 0 && pendentes === 0 && aprovados === 0
 
   return (
@@ -59,6 +56,16 @@ export async function MembrosSection({
             href="/admin/membros"
           />
           <StatCard label="Membros aprovados" value={aprovados} href="/admin/membros" />
+          <StatCard
+            label="Desligamentos no período"
+            value={funil.atual.desligados}
+            tone={funil.atual.desligados > 0 ? 'danger' : 'default'}
+            delta={{
+              atual: funil.atual.desligados,
+              anterior: funil.anterior.desligados,
+              invertido: true,
+            }}
+          />
         </>
       )}
     </InsightSection>

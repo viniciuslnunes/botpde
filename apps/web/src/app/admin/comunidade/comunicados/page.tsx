@@ -7,6 +7,7 @@ import { Megaphone } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { ComunicadosManager } from '@/components/admin/comunicado-forms'
 import { ComunicadoComposerAdmin } from '@/components/admin/comunicado-composer'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Comunicados — Comunidade' }
@@ -80,16 +81,18 @@ export default async function AdminComunicadosPage() {
           >
             <ComunicadoComposerAdmin />
           </Suspense>
-          <ComunicadosManager
-            comunicados={comunicados}
-            currentUser={{
-              id: session.user.id,
-              nome: session.user.name ?? null,
-              avatarUrl: typeof session.user.image === 'string' ? session.user.image : null,
-            }}
-            tenantId={tenant.id}
-            tenantNome={tenant.nome}
-          />
+          <MotionReveal index={1}>
+            <ComunicadosManager
+              comunicados={comunicados}
+              currentUser={{
+                id: session.user.id,
+                nome: session.user.name ?? null,
+                avatarUrl: typeof session.user.image === 'string' ? session.user.image : null,
+              }}
+              tenantId={tenant.id}
+              tenantNome={tenant.nome}
+            />
+          </MotionReveal>
         </div>
       </div>
     </div>

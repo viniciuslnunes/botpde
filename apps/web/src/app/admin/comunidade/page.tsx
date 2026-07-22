@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -6,12 +7,102 @@ import Link from 'next/link'
 import { MessagesSquare, Megaphone, ArrowRight } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import {
+  resumirEngajamento,
+  resumirLeituraComunicados,
+  type EngajamentoResumo,
+  type LeituraComunicadosResumo,
+} from '@/lib/comunidade-insights'
+import { InsightSection, StatCard } from '@/components/admin/ui'
+import { MiniBarChart, Sparkline } from '@/components/admin/charts'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Comunidade — Admin' }
 
 function formatarData(data: Date) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data)
+}
+
+async function ComunidadeInsights({
+  tenantId,
+  mostrarEngajamento,
+  mostrarLeituras,
+}: {
+  tenantId: string
+  mostrarEngajamento: boolean
+  mostrarLeituras: boolean
+}) {
+  const [engajamento, leitura]: [EngajamentoResumo | null, LeituraComunicadosResumo | null] =
+    await Promise.all([
+      mostrarEngajamento ? resumirEngajamento(tenantId, '30d') : Promise.resolve(null),
+      mostrarLeituras ? resumirLeituraComunicados(tenantId) : Promise.resolve(null),
+    ])
+
+  const totalInteracoes = engajamento
+    ? engajamento.atual.posts + engajamento.atual.reacoes + engajamento.atual.comentarios
+    : 0
+  const temLeituras = (leitura?.comunicados.length ?? 0) > 0
+  if (totalInteracoes === 0 && !temLeituras) return null
+
+  return (
+    <InsightSection
+      title="Engajamento (30 dias)"
+      description="Atividade do mural e alcance dos comunicados oficiais."
+    >
+      {engajamento ? (
+        <>
+          <StatCard
+            label="Posts"
+            value={engajamento.atual.posts}
+            delta={{ atual: engajamento.atual.posts, anterior: engajamento.anterior.posts }}
+          />
+          <StatCard
+            label="Reações + comentários"
+            value={engajamento.atual.reacoes + engajamento.atual.comentarios}
+            delta={{
+              atual: engajamento.atual.reacoes + engajamento.atual.comentarios,
+              anterior: engajamento.anterior.reacoes + engajamento.anterior.comentarios,
+            }}
+          />
+          <StatCard
+            label="Denúncias abertas"
+            value={engajamento.denunciasAbertas}
+            tone={engajamento.denunciasAbertas > 0 ? 'warning' : 'default'}
+            href="/admin/comunidade/moderacao"
+          />
+          {totalInteracoes > 0 ? (
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Interações por dia
+              </h3>
+              <Sparkline
+                data={engajamento.interacoesPorDia.map((p) => p.valor)}
+                width={420}
+                height={56}
+                className="h-14 w-full"
+              />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {leitura && temLeituras ? (
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Leituras dos últimos comunicados
+            {leitura.taxaMedia !== null
+              ? ` · média ${(leitura.taxaMedia * 100).toLocaleString('pt-BR', {
+                  maximumFractionDigits: 0,
+                })}%`
+              : ''}
+          </h3>
+          <MiniBarChart
+            data={leitura.comunicados.map((c) => ({ rotulo: c.titulo, valor: c.leituras }))}
+          />
+        </div>
+      ) : null}
+    </InsightSection>
+  )
 }
 
 export default async function AdminComunidadePage() {
@@ -137,6 +228,14 @@ export default async function AdminComunidadePage() {
               </MotionReveal>
             )}
           </div>
+
+          <Suspense fallback={null}>
+            <ComunidadeInsights
+              tenantId={tenant.id}
+              mostrarEngajamento={podeGerenciarPosts}
+              mostrarLeituras={podePublicarComunicado}
+            />
+          </Suspense>
         </div>
       </div>
     </div>

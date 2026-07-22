@@ -788,8 +788,8 @@ Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
 
 ### 5.12 Admin UI Kit + inteligência administrativa (2026-07-22)
 
-Refactor da área admin em fases (1–3 entregues; ondas 4–5 no roadmap). Guia
-completo: `docs/frontend/admin-ui-kit.md`.
+Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
+`docs/frontend/admin-ui-kit.md`.
 
 - **Kit** em `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/
   `KpiGrid`, `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) —

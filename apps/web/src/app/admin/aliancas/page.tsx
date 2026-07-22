@@ -6,6 +6,7 @@ import { assertPermission } from '@/lib/authz'
 import { listAliancasForTenant, listRecomendacoesForTenant } from '@/lib/aliancas'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { PERMISSIONS } from '@torcida/types'
 
 export const metadata: Metadata = { title: 'Alianças — Admin' }
@@ -106,13 +107,15 @@ export default async function AdminAliancasPage() {
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container">
-          <AliancaForms
-            tenantId={authz.tenant.id}
-            afiliacaoId={authz.tenant.afiliacaoId ?? null}
-            aliancas={aliancasSerializadas}
-            recomendacoes={recomendacoesSerializadas}
-            tenants={tenantOptions}
-          />
+          <MotionReveal>
+            <AliancaForms
+              tenantId={authz.tenant.id}
+              afiliacaoId={authz.tenant.afiliacaoId ?? null}
+              aliancas={aliancasSerializadas}
+              recomendacoes={recomendacoesSerializadas}
+              tenants={tenantOptions}
+            />
+          </MotionReveal>
         </div>
       </div>
     </div>

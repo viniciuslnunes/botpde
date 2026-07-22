@@ -6,6 +6,8 @@ import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torc
 import { Newspaper } from 'lucide-react'
 import { aprovarNoticia, rejeitarNoticia } from './actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
+import { MotionReveal } from '@/components/motion/motion-reveal'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Curadoria de Notícias' }
@@ -60,10 +62,13 @@ export default async function AdminNoticiasPage() {
       </div>
 
       {noticias.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          Nenhuma notícia pendente de curadoria.
-        </div>
+        <MotionEmptyState
+          icon={<Newspaper className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />}
+          title="Nenhuma notícia pendente"
+          description="Novas notícias em rascunho da afiliação aparecem aqui para curadoria."
+        />
       ) : (
+        <MotionReveal>
         <div className="space-y-3">
           {noticias.map((noticia) => (
             <div
@@ -132,6 +137,7 @@ export default async function AdminNoticiasPage() {
             </div>
           ))}
         </div>
+        </MotionReveal>
       )}
     </div>
   )

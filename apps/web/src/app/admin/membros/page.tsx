@@ -1,10 +1,25 @@
+import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { tenantsAreRivais } from '@/lib/hierarquia'
+import {
+  distribuirMembros,
+  resumirFunilMembros,
+  serieFunilMensal,
+  type DistribuicaoMembros,
+  type FunilMembrosResumo,
+  type FunilMensalPonto,
+} from '@/lib/membros-insights'
+import {
+  InsightSection,
+  StatCard,
+  statusBadgeLabel,
+  TablePagination,
+} from '@/components/admin/ui'
+import { DonutChart, MiniBarChart } from '@/components/admin/charts'
 import { AdminMembrosTable, AdminMembrosTabs } from './admin-membros-client'
 import { ExportarLgeButton } from './exportar-lge-button'
 import type { Metadata } from 'next'
@@ -13,24 +28,78 @@ export const metadata: Metadata = { title: 'Membros — Admin' }
 
 type StatusFilter = 'PENDENTE' | 'APROVADO' | 'REPROVADO' | 'TODOS'
 
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  PENDENTE: {
-    label: 'Pendente',
-    className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  },
-  APROVADO: {
-    label: 'Aprovado',
-    className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  },
-  REPROVADO: {
-    label: 'Reprovado',
-    className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  },
-}
-
 const TIPO_BADGE: Record<string, string> = {
   SOCIO: 'Sócio',
   TORCEDOR: 'Torcedor',
+}
+
+async function MembrosInsights({ tenantId }: { tenantId: string }) {
+  const [funil, serie, distribuicao]: [
+    FunilMembrosResumo,
+    FunilMensalPonto[],
+    DistribuicaoMembros,
+  ] = await Promise.all([
+    resumirFunilMembros(tenantId, '30d'),
+    serieFunilMensal(tenantId, 12),
+    distribuirMembros(tenantId),
+  ])
+
+  const semBase = distribuicao.socios + distribuicao.torcedores === 0
+  if (semBase && funil.atual.novos === 0 && funil.anterior.novos === 0) return null
+
+  return (
+    <InsightSection
+      title="Movimento da base"
+      description="Últimos 30 dias vs período anterior · funil mensal dos últimos 12 meses."
+    >
+      <StatCard
+        label="Novos cadastros (30d)"
+        value={funil.atual.novos}
+        delta={{ atual: funil.atual.novos, anterior: funil.anterior.novos }}
+      />
+      <StatCard
+        label="Aprovações (30d)"
+        value={funil.atual.aprovados}
+        delta={{ atual: funil.atual.aprovados, anterior: funil.anterior.aprovados }}
+      />
+      <StatCard
+        label="Desligamentos (30d)"
+        value={funil.atual.desligados}
+        tone={funil.atual.desligados > 0 ? 'danger' : 'default'}
+        delta={{
+          atual: funil.atual.desligados,
+          anterior: funil.anterior.desligados,
+          invertido: true,
+        }}
+      />
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Novos × desligados por mês
+        </h3>
+        <MiniBarChart
+          data={serie.map((p) => ({
+            rotulo: p.mes,
+            valor: p.novos,
+            valorSecundario: p.desligados,
+          }))}
+          legenda={{ principal: 'Novos', secundaria: 'Desligados' }}
+        />
+      </div>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Base aprovada por tipo
+        </h3>
+        <DonutChart
+          data={[
+            { rotulo: 'Sócios', valor: distribuicao.socios },
+            { rotulo: 'Torcedores', valor: distribuicao.torcedores },
+          ]}
+          centro={String(distribuicao.socios + distribuicao.torcedores)}
+        />
+      </div>
+    </InsightSection>
+  )
 }
 
 export default async function MembrosPage({
@@ -302,7 +371,6 @@ export default async function MembrosPage({
         <div className="app-container">
         <AdminMembrosTable
           membros={membros.map((membro: (typeof membros)[number]) => {
-            const badge = STATUS_BADGE[membro.status]
             const isSocio = membro.tipo === 'SOCIO'
             const fmtData = (d: Date | null | undefined) =>
               d ? new Date(d).toLocaleDateString('pt-BR') : null
@@ -315,8 +383,7 @@ export default async function MembrosPage({
               tipo: TIPO_BADGE[membro.tipo] ?? membro.tipo,
               cidade: membro.cidade,
               status: membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO',
-              statusLabel: badge.label,
-              statusClass: badge.className,
+              statusLabel: statusBadgeLabel('membro', membro.status),
               criadoEmLabel: new Date(membro.criadoEm).toLocaleDateString('pt-BR'),
               atualizadoEmLabel: fmtData(membro.atualizadoEm),
               avatarUrl: membro.user.avatarUrl,
@@ -348,32 +415,25 @@ export default async function MembrosPage({
           })}
         />
 
-        {/* Paginação */}
-        {totalPaginas > 1 && (
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <p className="text-[rgb(var(--foreground-muted))]">
-              Página {pagina} de {totalPaginas}
-            </p>
-            <div className="flex gap-2">
-              {pagina > 1 && (
-                <Link
-                  href={buildHref({ pagina: String(pagina - 1) })}
-                  className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  ← Anterior
-                </Link>
-              )}
-              {pagina < totalPaginas && (
-                <Link
-                  href={buildHref({ pagina: String(pagina + 1) })}
-                  className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  Próxima →
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        <TablePagination
+          page={pagina}
+          totalPages={totalPaginas}
+          buildHref={(p) => buildHref({ pagina: String(p) })}
+        />
+
+        <div className="mt-8">
+          <Suspense
+            fallback={
+              <div className="grid animate-pulse gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+                ))}
+              </div>
+            }
+          >
+            <MembrosInsights tenantId={tenant.id} />
+          </Suspense>
+        </div>
         </div>
       </div>
     </div>

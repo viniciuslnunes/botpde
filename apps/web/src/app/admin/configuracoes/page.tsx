@@ -12,6 +12,7 @@ import {
   CanalOficialForm,
 } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Configurações — Admin' }
@@ -128,13 +129,13 @@ export default async function ConfiguracoesPage() {
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
-          {sections.map((section) => {
+          {sections.map((section, sectionIndex) => {
             const Icon = section.icon
             const blocked = section.ownerOnly && !isOwner
 
             return (
+              <MotionReveal key={section.id} index={sectionIndex}>
               <div
-                key={section.id}
                 id={section.id}
                 className={[
                   'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))] scroll-mt-6',
@@ -195,6 +196,7 @@ export default async function ConfiguracoesPage() {
                   ) : null}
                 </div>
               </div>
+              </MotionReveal>
             )
           })}
 
