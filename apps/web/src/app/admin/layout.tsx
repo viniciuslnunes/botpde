@@ -21,6 +21,7 @@ import {
 } from '@/lib/tenant-context'
 import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 
 export default async function AdminLayout({
   children,
@@ -85,6 +86,7 @@ export default async function AdminLayout({
     8,
     TIPOS_NOTIFICACAO_ADMIN,
   )
+  const avatarUrl = await getAvatarAtualDoUsuario(session.user.id, tenant.id)
 
   return (
     <AdminShell
@@ -94,7 +96,7 @@ export default async function AdminLayout({
       tenantLogoUrl={tenant.logoUrl}
       tenantDesign={tenant.design}
       userName={session.user.name ?? null}
-      userAvatar={session.user.image ?? null}
+      userAvatar={avatarUrl}
       items={menuItems}
       isSuperAdmin={isSuperAdmin}
       torcidas={torcidas}

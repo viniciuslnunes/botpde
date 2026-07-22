@@ -53,6 +53,26 @@ export function resolverAvatarSocial(
   return perfilAvatar ?? userAvatar ?? null
 }
 
+/**
+ * Avatar do usuário logado, sempre fresco do banco (nunca session.user.image).
+ * A sessão (JWT) só recebe a foto nova no próximo login — usar aqui evitaria
+ * refletir a troca feita em /portal/perfil na topbar/aside na hora.
+ */
+export const getAvatarAtualDoUsuario = cache(
+  async (userId: string, tenantId?: string | null): Promise<string | null> => {
+    const [user, perfil] = await Promise.all([
+      db.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
+      tenantId
+        ? db.perfilMembro.findUnique({
+            where: { userId_tenantId: { userId, tenantId } },
+            select: { avatarUrl: true },
+          })
+        : Promise.resolve(null),
+    ])
+    return resolverAvatarSocial(perfil?.avatarUrl, user?.avatarUrl)
+  },
+)
+
 export type VinculoPrivacidadePerfil = {
   tipo: 'SOCIO' | 'TORCEDOR'
   status: string

@@ -6,6 +6,7 @@ import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-pr
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { listSalasAtivas } from '@/lib/salas'
 import type { SalaAtivaListItem } from '@/lib/salas'
+import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 
 /**
  * Layout da Comunidade: dock mobile, QueryProvider (cache do feed) e
@@ -17,20 +18,25 @@ export default async function ComunidadeLayout({
   children: React.ReactNode
 }) {
   const session = await auth()
-  const currentUser = {
-    id: session?.user?.id ?? '',
-    nome: session?.user?.name ?? null,
-    avatarUrl: session?.user?.image ?? null,
-  }
 
   let modoTorcida = false
   let salas: SalaAtivaListItem[] = []
+  let tenantIdAtual: string | null = null
   if (session?.user?.id) {
     const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
     if (ctx?.modo === 'torcida') {
       modoTorcida = true
+      tenantIdAtual = ctx.tenant.id
       salas = await listSalasAtivas(ctx.tenant.id)
     }
+  }
+
+  const currentUser = {
+    id: session?.user?.id ?? '',
+    nome: session?.user?.name ?? null,
+    avatarUrl: session?.user?.id
+      ? await getAvatarAtualDoUsuario(session.user.id, tenantIdAtual)
+      : null,
   }
 
   return (
