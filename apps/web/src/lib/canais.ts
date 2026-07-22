@@ -463,34 +463,39 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     conversaId: string
     papel: 'ADMIN' | 'MEMBRO'
     status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+    silenciada: boolean
   }> = await db.membroConversa.findMany({
     where: {
       userId,
       saiuEm: null,
       conversaId: { in: rows.map((row) => row.id) },
     },
-    select: { conversaId: true, papel: true, status: true },
+    select: { conversaId: true, papel: true, status: true, silenciada: true },
   })
   const membershipMap = new Map(memberships.map((item) => [item.conversaId, item]))
 
+  type SedeCanalLoc = {
+    canalConversaId: string | null
+    tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
+    cidade: string | null
+    estado: string | null
+    lat: number | null
+    lng: number | null
+  }
+
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
   // React.cache, então pares (viewer, tenant) repetidos não repetem query.
-  const [visiveis, fallbackAvatars, sedesPorCanal] = await Promise.all([
+  const [visiveis, fallbackAvatars, sedesPorCanal]: [
+    boolean[],
+    Map<string, string | null>,
+    SedeCanalLoc[],
+  ] = await Promise.all([
     Promise.all(rows.map((row) => podeVerCanal(viewerTenantId, row.tenantId, row.visibilidadeCanal, userId))),
     resolveFallbackAvatarsCanalOficial(
       rows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
     ),
     rows.length === 0
-      ? Promise.resolve(
-          [] as Array<{
-            canalConversaId: string | null
-            tipo: 'SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO'
-            cidade: string | null
-            estado: string | null
-            lat: number | null
-            lng: number | null
-          }>,
-        )
+      ? Promise.resolve([] as SedeCanalLoc[])
       : db.sede.findMany({
           where: { canalConversaId: { in: rows.map((row) => row.id) } },
           select: {
@@ -506,8 +511,8 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
 
   const sedeMap = new Map(
     sedesPorCanal
-      .filter((s) => s.canalConversaId)
-      .map((s) => [s.canalConversaId!, s]),
+      .filter((s): s is SedeCanalLoc & { canalConversaId: string } => !!s.canalConversaId)
+      .map((s) => [s.canalConversaId, s]),
   )
 
   const result: CanalItem[] = []
@@ -530,6 +535,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       souMembro: membro?.status === 'ATIVO',
       souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
       pedidoPendente: membro?.status === 'PENDENTE',
+      silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
       tipoUnidade: sede?.tipo ?? null,
       cidade: sede?.cidade ?? null,
@@ -623,10 +629,11 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
     conversaId: string
     papel: 'ADMIN' | 'MEMBRO'
     status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+    silenciada: boolean
   }> = userId
     ? await db.membroConversa.findMany({
         where: { userId, saiuEm: null, conversaId: { in: rows.map((row) => row.id) } },
-        select: { conversaId: true, papel: true, status: true },
+        select: { conversaId: true, papel: true, status: true, silenciada: true },
       })
     : []
   const membershipMap = new Map(memberships.map((item) => [item.conversaId, item]))
@@ -678,6 +685,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       souMembro: membro?.status === 'ATIVO',
       souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
       pedidoPendente: membro?.status === 'PENDENTE',
+      silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
       tipoUnidade: sede?.tipo ?? null,
       cidade: sede?.cidade ?? null,
@@ -735,7 +743,11 @@ export async function getCanalPorId(
     tipo: string
     tenant: { nome: string }
     _count: { membros: number }
-    membros: Array<{ papel: 'ADMIN' | 'MEMBRO'; status: 'ATIVO' | 'PENDENTE' | 'REJEITADO' }>
+    membros: Array<{
+      papel: 'ADMIN' | 'MEMBRO'
+      status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+      silenciada: boolean
+    }>
   } | null = await db.conversa.findFirst({
     where: { id: conversaId, tipo: 'CANAL' },
     select: {
@@ -754,7 +766,7 @@ export async function getCanalPorId(
       _count: { select: { membros: { where: { saiuEm: null } } } },
       membros: {
         where: { userId, saiuEm: null },
-        select: { papel: true, status: true },
+        select: { papel: true, status: true, silenciada: true },
         take: 1,
       },
     },
@@ -796,6 +808,7 @@ export async function getCanalPorId(
     souMembro: membro?.status === 'ATIVO',
     souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
     pedidoPendente: membro?.status === 'PENDENTE',
+    silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
     tenantNome: formatNomeTorcida(row.tenant.nome),
     tipoUnidade: sede?.tipo ?? null,
     cidade: sede?.cidade ?? null,
@@ -1025,7 +1038,11 @@ export async function buscarCanaisEUnidades(
       publica: boolean
       tenant: { nome: string }
       _count: { membros: number }
-      membros: Array<{ papel: 'ADMIN' | 'MEMBRO'; status: 'ATIVO' | 'PENDENTE' | 'REJEITADO' }>
+      membros: Array<{
+        papel: 'ADMIN' | 'MEMBRO'
+        status: 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+        silenciada: boolean
+      }>
     }>,
     Array<{ id: string; nome: string; logoUrl: string | null }>,
   ] = await Promise.all([
@@ -1054,7 +1071,7 @@ export async function buscarCanaisEUnidades(
         _count: { select: { membros: { where: { saiuEm: null } } } },
         membros: {
           where: { userId, saiuEm: null },
-          select: { papel: true, status: true },
+          select: { papel: true, status: true, silenciada: true },
           take: 1,
         },
       },
@@ -1110,6 +1127,7 @@ export async function buscarCanaisEUnidades(
       souMembro: membro?.status === 'ATIVO',
       souAdmin: membro?.status === 'ATIVO' && membro.papel === 'ADMIN',
       pedidoPendente: membro?.status === 'PENDENTE',
+      silenciada: membro?.status === 'ATIVO' ? membro.silenciada : false,
       tenantNome: formatNomeTorcida(row.tenant.nome),
       tipoUnidade: null,
       cidade: null,

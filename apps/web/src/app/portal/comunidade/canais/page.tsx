@@ -42,7 +42,7 @@ export default async function CanaisPage() {
       <ComunidadePageHeader
         icon={Radio}
         titulo="Canais"
-        subtitulo="Perfis oficiais das unidades e comunidades temáticas da torcida"
+        subtitulo="Unidades oficiais e comunidades temáticas — busque, filtre e ordene por proximidade"
       />
 
       <CanaisClient

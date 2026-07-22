@@ -4,9 +4,13 @@ import { useActionState, useEffect, useRef, useState, useTransition, type ReactN
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import {
+  Bell,
+  BellOff,
   Camera,
   Check,
   Loader2,
+  LogOut,
+  MapPin,
   MessageCircle,
   MoreVertical,
   Settings,
@@ -20,6 +24,8 @@ import { toast } from '@torcida/ui'
 import {
   entrarCanal,
   pedirEntradaCanal,
+  sairCanal,
+  alternarSilencioCanal,
   alterarAdminCanal,
   atualizarCanalTematico,
   decidirPedidoCanal,
@@ -31,6 +37,7 @@ import { CanalNavbarOverride } from '@/components/canal-navbar-override'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
+  labelTipoUnidade,
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
   type CandidatoMembroCanalItem,
@@ -85,6 +92,8 @@ export function CanalFeedComposition({
   const [configOpen, setConfigOpen] = useState(false)
   const [pedidosOpen, setPedidosOpen] = useState(false)
   const [pending, startTransition] = useTransition()
+  const [silenciada, setSilenciada] = useState(canal.silenciada)
+  const [souMembro, setSouMembro] = useState(canal.souMembro)
 
   function inscrever() {
     startTransition(async () => {
@@ -110,6 +119,39 @@ export function CanalFeedComposition({
     })
   }
 
+  function silenciar() {
+    startTransition(async () => {
+      try {
+        const { silenciada: next } = await alternarSilencioCanal(canal.id)
+        setSilenciada(next)
+        toast.success(next ? 'Canal silenciado no feed.' : 'Canal voltou ao feed.')
+        setMenuOpen(false)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível alterar o silêncio.')
+      }
+    })
+  }
+
+  function sair() {
+    if (!window.confirm('Sair deste canal? Você deixará de ver o mural e o chat.')) return
+    startTransition(async () => {
+      try {
+        await sairCanal(canal.id)
+        toast.success('Você saiu do canal.')
+        setSouMembro(false)
+        window.location.href = '/portal/comunidade/canais'
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível sair.')
+      }
+    })
+  }
+
+  const localLabel =
+    canal.cidade && canal.estado
+      ? `${canal.cidade} · ${canal.estado}`
+      : canal.cidade ?? canal.estado
+  const tipoLabel = canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null
+
   return (
     <div className="space-y-4">
       <CanalNavbarOverride
@@ -131,20 +173,42 @@ export function CanalFeedComposition({
             <span className="inline-flex shrink-0 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
               {canal.canalOficial ? 'Oficial' : 'Temático'}
             </span>
+            {silenciada && souMembro ? (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
+                <BellOff className="h-3 w-3" />
+                Silenciado
+              </span>
+            ) : null}
           </div>
           <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
             <span className="inline-flex items-center gap-1">
               <Users className="h-3 w-3" />
               {canal.membros} inscrito{canal.membros === 1 ? '' : 's'}
             </span>
-            {' · '}
-            {canal.tenantNome}
-            {' · '}
-            {labelVisibilidadeCanal(canal.visibilidadeCanal)}
+            {tipoLabel ? (
+              <>
+                {' · '}
+                {tipoLabel}
+              </>
+            ) : null}
+            {localLabel ? (
+              <>
+                {' · '}
+                <span className="inline-flex items-center gap-0.5">
+                  <MapPin className="h-3 w-3" />
+                  {localLabel}
+                </span>
+              </>
+            ) : (
+              <>
+                {' · '}
+                {canal.tenantNome}
+              </>
+            )}
           </p>
         </div>
 
-        {canal.souMembro && (
+        {souMembro && (
           <Link
             href={`/portal/mensagens?c=${canal.id}`}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))]"
@@ -154,7 +218,7 @@ export function CanalFeedComposition({
           </Link>
         )}
 
-        {!canal.souMembro && canal.publica && (
+        {!souMembro && canal.publica && (
           <m.button
             type="button"
             disabled={pending}
@@ -167,13 +231,13 @@ export function CanalFeedComposition({
           </m.button>
         )}
 
-        {!canal.souMembro && !canal.publica && canal.pedidoPendente && (
+        {!souMembro && !canal.publica && canal.pedidoPendente && (
           <span className="shrink-0 rounded-full border border-[rgb(var(--border))] px-3.5 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Pedido enviado
           </span>
         )}
 
-        {!canal.souMembro && !canal.publica && !canal.pedidoPendente && (
+        {!souMembro && !canal.publica && !canal.pedidoPendente && (
           <m.button
             type="button"
             disabled={pending}
@@ -273,6 +337,37 @@ export function CanalFeedComposition({
                       )}
                     </button>
                   )}
+                  {souMembro && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={silenciar}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                      >
+                        {silenciada ? (
+                          <>
+                            <Bell className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                            Voltar ao feed
+                          </>
+                        ) : (
+                          <>
+                            <BellOff className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+                            Silenciar no feed
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={sair}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--color-danger))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sair do canal
+                      </button>
+                    </>
+                  )}
                   <Link
                     href="/portal/comunidade/canais"
                     onClick={() => setMenuOpen(false)}
@@ -313,9 +408,9 @@ export function CanalFeedComposition({
         />
       )}
 
-      {canal.souMembro && podePublicar && composer}
+      {souMembro && podePublicar && composer}
 
-      {!canal.souMembro ? (
+      {!souMembro ? (
         <MotionEmptyState
           className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-10 text-center text-sm text-[rgb(var(--foreground-muted))]"
           title="Inscreva-se no canal"

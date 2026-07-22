@@ -57,6 +57,8 @@ export interface CanalItem {
   souAdmin: boolean
   /** Pedido de entrada enviado e ainda não decidido (canal fechado, `publica: false`). */
   pedidoPendente: boolean
+  /** Membro silenciou o canal no feed/notificações (`MembroConversa.silenciada`). */
+  silenciada: boolean
   tenantNome: string
   /**
    * Localização da unidade (`Sede` via `canalConversaId`).

@@ -93,6 +93,14 @@ export const pedirEntradaCanalSchema = z.object({
   conversaId: z.string().min(1),
 })
 
+export const sairCanalSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
+export const alternarSilencioCanalSchema = z.object({
+  conversaId: z.string().min(1),
+})
+
 export const decidirPedidoCanalSchema = z.object({
   conversaId: z.string().min(1),
   userId: z.string().min(1),
