@@ -436,7 +436,7 @@ export function PostEngagement({
               onChange={(e) => setComentarioRepost(e.target.value)}
               maxLength={500}
               placeholder="Adicione um comentário (opcional)…"
-              className="h-9 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5 text-base sm:h-9 sm:py-0 sm:text-sm"
             />
             <m.button
               type="submit"

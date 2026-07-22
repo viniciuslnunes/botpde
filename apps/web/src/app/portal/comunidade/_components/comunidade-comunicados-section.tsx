@@ -17,7 +17,6 @@ export async function ComunidadeComunicadosSection({
 
   if (announcements.length === 0) return null
 
-  const temComunicadosNovos = announcements.some((a) => a.lido === false)
   const comunicadosItems = announcements.map((a) => ({
     id: a.id,
     tenantId: a.tenantId,
@@ -31,11 +30,5 @@ export async function ComunidadeComunicadosSection({
     lido: a.lido,
   }))
 
-  return (
-    <ComunicadosSection
-      announcements={comunicadosItems}
-      tenantId={tenantId}
-      defaultExpanded={temComunicadosNovos}
-    />
-  )
+  return <ComunicadosSection announcements={comunicadosItems} tenantId={tenantId} />
 }

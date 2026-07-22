@@ -497,33 +497,22 @@ export async function publicarPost(
 }
 
 /**
- * Publica um post na Comunidade Nacional do clube — torcedor global, sem vínculo
- * com torcida na plataforma. Post vai para o tenant sintético do clube, sempre
- * PUBLICO. Sem AuditLog (decisão registrada: o tenant sintético não tem admin
- * para consultar auditoria; moderação fica no mecanismo de denúncia/oculto).
+ * Publica um post na Comunidade Nacional do clube — torcedor global (sem
+ * vínculo com torcida na plataforma) OU sócio publicando pela aba Nacional
+ * sem a permissão `community:post_nacional` no próprio tenant. Post vai
+ * sempre para o tenant sintético do clube, sempre PUBLICO. Sem AuditLog
+ * (decisão registrada: o tenant sintético não tem admin para consultar
+ * auditoria; moderação fica no mecanismo de denúncia/oculto).
+ *
+ * Autorização via `assertComunidadeNacional` (cobre torcedor global E sócio
+ * aprovado) — usar só `PerfilTorcedor` aqui quebrava a publicação de sócios
+ * sem onboarding de torcedor com um 500 mascarado em produção.
  */
 export async function publicarPostComoTorcedorGlobal(
   conteudo: string,
   midias: string[],
 ): Promise<PostPublicadoPreview> {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Não autenticado')
-
-  const perfil: {
-    onboardingConcluidoEm: Date | null
-    afiliacaoId: string | null
-    afiliacao: { nome: string; apelido: string | null } | null
-  } | null = await db.perfilTorcedor.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      onboardingConcluidoEm: true,
-      afiliacaoId: true,
-      afiliacao: { select: { nome: true, apelido: true } },
-    },
-  })
-  if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) {
-    throw new Error('Conclua o onboarding do torcedor para publicar.')
-  }
+  const { session, afiliacaoId, tenantSintetico: tenant } = await assertComunidadeNacional()
 
   const parsed = postSchema.safeParse({ conteudo, midias, visibilidade: 'PUBLICO' })
   if (!parsed.success) {
@@ -532,8 +521,6 @@ export async function publicarPostComoTorcedorGlobal(
 
   const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
   if (erroMencoes) throw new Error(erroMencoes)
-
-  const tenant = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
 
   const limiterKey = `post:${tenant.id}:${session.user.id}`
   if (excedeuLimiteEngajamento(limiterKey)) {
@@ -570,14 +557,20 @@ export async function publicarPostComoTorcedorGlobal(
   })
 
   after(() => {
-    invalidarLeituraComunidade(tenant.id, perfil.afiliacaoId)
+    invalidarLeituraComunidade(tenant.id, afiliacaoId)
   })
+
+  const afiliacao: { nome: string; apelido: string | null } | null = await db.afiliacao.findUnique({
+    where: { id: afiliacaoId },
+    select: { nome: true, apelido: true },
+  })
+
   return previewDoPost({
     post,
     autorId: session.user.id,
     autorNome: session.user.name ?? null,
     autorAvatar: avatarPreviewDaSessao(session),
-    tenantNome: perfil.afiliacao?.apelido ?? perfil.afiliacao?.nome ?? 'Comunidade',
+    tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
   })
 }
 

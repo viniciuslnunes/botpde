@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, m } from 'motion/react'
-import { ChevronDown, Megaphone, Pin } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { m } from 'motion/react'
+import { Megaphone, Pin } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import { marcarComunicadosLidosAction } from '@/app/portal/comunidade/actions'
 import { ComunicadoShareButton } from '@/components/portal/comunicado-share-button'
-import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { staggerContainer, staggerItem } from '@/lib/motion-presets'
 
 export interface ComunicadoSectionItem {
   id: string
@@ -33,16 +33,9 @@ const PRIORIDADE_VARIANT: Record<string, 'neutral' | 'warning' | 'danger'> = {
   URGENTE: 'danger',
 }
 
-const PESO_PRIORIDADE: Record<ComunicadoSectionItem['prioridade'], number> = {
-  URGENTE: 2,
-  IMPORTANTE: 1,
-  NORMAL: 0,
-}
-
 interface ComunicadosSectionProps {
   announcements: ComunicadoSectionItem[]
   tenantId: string
-  defaultExpanded: boolean
 }
 
 function formatarData(iso: string) {
@@ -51,22 +44,7 @@ function formatarData(iso: string) {
   )
 }
 
-function previewTitulo(announcements: ComunicadoSectionItem[]) {
-  const sorted = [...announcements].sort((a, b) => {
-    const pa = PESO_PRIORIDADE[a.prioridade] - PESO_PRIORIDADE[b.prioridade]
-    if (pa !== 0) return -pa
-    if (a.fixado !== b.fixado) return a.fixado ? -1 : 1
-    return new Date(b.publicadoEm).getTime() - new Date(a.publicadoEm).getTime()
-  })
-  return sorted[0]?.titulo ?? ''
-}
-
-export function ComunicadosSection({
-  announcements,
-  tenantId,
-  defaultExpanded,
-}: ComunicadosSectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
+export function ComunicadosSection({ announcements, tenantId }: ComunicadosSectionProps) {
   const marcouLidosRef = useRef(false)
 
   useEffect(() => {
@@ -80,18 +58,10 @@ export function ComunicadosSection({
   if (announcements.length === 0) return null
 
   const novos = announcements.filter((a) => a.lido === false).length
-  const preview = previewTitulo(announcements)
 
   return (
     <section className="space-y-3">
-      <m.button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        whileTap={{ scale: 0.98 }}
-        transition={springSnappy}
-        className="flex w-full items-center gap-2 rounded-xl px-1 py-0.5 text-left transition-colors hover:bg-[rgb(var(--background-subtle))]"
-        aria-expanded={expanded}
-      >
+      <div className="flex w-full items-center gap-2 px-1 py-0.5">
         <Megaphone className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
         <span className="text-sm font-semibold text-[rgb(var(--foreground))]">
           Comunicados oficiais
@@ -101,32 +71,9 @@ export function ComunicadosSection({
             {novos} {novos === 1 ? 'novo' : 'novos'}
           </span>
         )}
-        {!expanded && preview && (
-          <span className="hidden min-w-0 flex-1 truncate text-xs text-[rgb(var(--foreground-muted))] sm:inline">
-            {preview}
-          </span>
-        )}
-        <m.div
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={springSnappy}
-          className="ml-auto shrink-0"
-        >
-          <ChevronDown className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-        </m.div>
-      </m.button>
+      </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <m.div
-            key="comunicados-lista"
-            variants={collapsePanel}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            transition={springSnappy}
-            className="overflow-hidden"
-          >
-            <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3 pt-1">
+      <m.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-3">
         {announcements.map((a) => {
           const herdado = a.tenantId !== tenantId
           const urgente = a.prioridade === 'URGENTE'
@@ -172,10 +119,7 @@ export function ComunicadosSection({
             </m.article>
           )
         })}
-            </m.div>
-          </m.div>
-        )}
-      </AnimatePresence>
+      </m.div>
     </section>
   )
 }
