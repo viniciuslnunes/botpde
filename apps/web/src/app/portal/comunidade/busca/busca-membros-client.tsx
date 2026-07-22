@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
-import { Search, Loader2, Hash, FileText, Radio, Building2 } from 'lucide-react'
+import { Search, Loader2, Hash, FileText, Radio, Building2, Users } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { PostConteudoRich } from '@/components/portal/post-conteudo-rich'
 import { linkPostComunidade } from '@/lib/comunidade-social'
-import type { MembroBuscaItem } from '@/lib/comunidade-busca'
+import type { MembroBuscaItem, SugestaoMembroBusca } from '@/lib/comunidade-busca'
+import { MembroSugestaoCard } from './membro-sugestao-card'
 import type { CanalItem, UnidadeBuscaItem } from '@/lib/canais-shared'
 import { labelTipoUnidade, linkCanalComunidade, linkUnidadeComunidade } from '@/lib/canais-shared'
 import type { PostSocialItem } from '@/lib/feed'
@@ -23,7 +24,11 @@ interface BuscaResponse {
   unidades: UnidadeBuscaItem[]
 }
 
-export function BuscaMembrosClient() {
+export function BuscaMembrosClient({
+  sugestoesIniciais = [],
+}: {
+  sugestoesIniciais?: SugestaoMembroBusca[]
+}) {
   const searchParams = useSearchParams()
   const inicial = searchParams.get('q') ?? ''
   const [q, setQ] = useState(inicial)
@@ -146,7 +151,7 @@ export function BuscaMembrosClient() {
           </m.p>
         )}
 
-        {!carregando && debounced.length < 2 && (
+        {!carregando && debounced.length < 2 && sugestoesIniciais.length === 0 && (
           <m.p
             key="hint"
             variants={fadeUp}
@@ -160,6 +165,31 @@ export function BuscaMembrosClient() {
           </m.p>
         )}
       </AnimatePresence>
+
+      {!carregando && debounced.length < 2 && sugestoesIniciais.length > 0 && (
+        <m.section
+          key="sugestoes"
+          initial="hidden"
+          animate="show"
+          variants={{ show: { transition: { staggerChildren: 0.04 } } }}
+          className="space-y-4"
+        >
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
+              <Users className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+              Para seguir
+            </h2>
+            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Membros sugeridos da comunidade. Use a busca acima para encontrar alguém específico.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {sugestoesIniciais.map((membro, index) => (
+              <MembroSugestaoCard key={membro.id} membro={membro} index={index} />
+            ))}
+          </div>
+        </m.section>
+      )}
 
       {!carregando && !erro && debounced.length >= 2 && !vazio && (
         <m.div

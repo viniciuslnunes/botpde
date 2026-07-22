@@ -38,7 +38,10 @@ export default async function ComunidadePage({
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
+  const [ctx, avatarUrl] = await Promise.all([
+    resolverContextoComunidade(session.user.id, session.user.email),
+    getAvatarAtualDoUsuario(session.user.id),
+  ])
   if (!ctx) redirect('/')
 
   const escopoDesejado = resolverEscopoComunidade(ctx, params.escopo)
@@ -47,7 +50,7 @@ export default async function ComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
+    avatarUrl,
   }
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {

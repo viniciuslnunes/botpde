@@ -302,6 +302,51 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
   }
 }
 
+/**
+ * Include enxuto para listagem do feed — sem evento/RSVP (card carrega sob demanda).
+ */
+export function postIncludeLista(userId?: string) {
+  return {
+    tenant: { select: { nome: true } },
+    autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+    postOrigem: {
+      select: {
+        id: true,
+        conteudo: true,
+        oculto: true,
+        midiaUrls: true,
+        autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
+      },
+    },
+    comunicadoOrigem: {
+      select: {
+        id: true,
+        titulo: true,
+        corpo: true,
+        prioridade: true,
+        tenant: { select: { nome: true } },
+      },
+    },
+    enquete: {
+      select: {
+        id: true,
+        encerradaEm: true,
+        opcoes: {
+          orderBy: { ordem: 'asc' as const },
+          select: { id: true, texto: true, _count: { select: { votos: true } } },
+        },
+        votos: userId
+          ? { where: { userId }, select: { opcaoId: true }, take: 1 }
+          : ({ where: { id: '' }, select: { opcaoId: true }, take: 1 } as const),
+      },
+    },
+    _count: { select: { reacoes: true, comentarios: true } },
+    reacoes: userId
+      ? { where: { userId }, select: { tipo: true }, take: 1 }
+      : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
+  } as const
+}
+
 export function postInclude(userId?: string) {
   return {
     tenant: { select: { nome: true } },
@@ -1103,17 +1148,17 @@ export const getPostsFeedNacionalSeguindo = cache(async function getPostsFeedNac
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
 
-  const tenantIds = await getTenantIdsPorAfiliacao(afiliacaoId)
-  if (tenantIds.length === 0) {
-    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
-  }
+  const [tenantIds, seguindoAprovados] = await Promise.all([
+    getTenantIdsPorAfiliacao(afiliacaoId),
+    db.seguimento
+      .findMany({
+        where: { seguidorId: userId, status: 'APROVADO' },
+        select: { seguidoId: true },
+      })
+      .then((rows: SeguimentoLite[]) => rows.map((s) => s.seguidoId)),
+  ])
 
-  const aprovados: SeguimentoLite[] = await db.seguimento.findMany({
-    where: { seguidorId: userId, status: 'APROVADO' },
-    select: { seguidoId: true },
-  })
-  const seguindoAprovados = aprovados.map((s) => s.seguidoId)
-  if (seguindoAprovados.length === 0) {
+  if (tenantIds.length === 0 || seguindoAprovados.length === 0) {
     return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
   }
 
@@ -1129,7 +1174,7 @@ export const getPostsFeedNacionalSeguindo = cache(async function getPostsFeedNac
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,
-    include: postInclude(userId),
+    include: postIncludeLista(userId),
   })) as PostRaw[]
 
   const posts = postsRaw.map(projetarPost)
@@ -1145,10 +1190,6 @@ export const getPostsFeedNacionalSeguindo = cache(async function getPostsFeedNac
   }
 })
 
-/**
- * Feed "Meus grupos" da Comunidade Nacional: murais dos grupos do tenant
- * sintético em que o viewer é membro ativo (não silenciado).
- */
 export const getPostsFeedNacionalGrupos = cache(async function getPostsFeedNacionalGrupos(
   afiliacaoId: string,
   userId: string,
@@ -1176,7 +1217,7 @@ export const getPostsFeedNacionalGrupos = cache(async function getPostsFeedNacio
     },
     orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
     take: take + 1,
-    include: postInclude(userId),
+    include: postIncludeGrupo(userId),
   })) as PostRaw[]
 
   const posts = postsRaw.map(projetarPost)
@@ -1244,7 +1285,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: take + 1,
-        include: postInclude(userId),
+        include: postIncludeLista(userId),
       }) as Promise<PostRaw[]>,
     [
       'feed-nacional',

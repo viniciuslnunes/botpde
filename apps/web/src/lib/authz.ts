@@ -11,6 +11,8 @@ import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torc
 type AuthzResult = {
   session: Session
   tenant: Tenant
+  /** Evita 2ª leitura de RBAC no caminho crítico de publicação. */
+  permissoesEfetivas?: ReturnType<typeof calculateEffectivePermissions>
 }
 
 export type AuthzComunidadeNacional = {
@@ -269,7 +271,7 @@ export async function assertAutorPublicacaoPost(
 
   if (membro?.status === 'APROVADO' && temPermissao) {
     await assertMembroAtivo(tenant.id, session.user.id)
-    return { session, tenant }
+    return { session, tenant, permissoesEfetivas: effective }
   }
 
   if (visibilidade !== 'PUBLICO') {
@@ -279,7 +281,7 @@ export async function assertAutorPublicacaoPost(
   }
 
   if (await podePublicarComoTorcedorFeed(session.user.id, tenant.id)) {
-    return { session, tenant }
+    return { session, tenant, permissoesEfetivas: effective }
   }
 
   if (membro?.status === 'PENDENTE') {
@@ -394,15 +396,15 @@ export async function assertComunidadeNacional(): Promise<AuthzComunidadeNaciona
  */
 export async function assertPodeAcessarSalaNacional(salaId: string): Promise<{
   session: Session
-  sala: { id: string; tenantId: string; hostId: string; tipo: string }
+  sala: { id: string; tenantId: string; hostId: string; tipo: string; livekitRoomName: string }
   isHost: boolean
   tenantSinteticoId: string
   afiliacaoId: string
 }> {
-  const sala: { id: string; tenantId: string; hostId: string; tipo: string } | null =
+  const sala: { id: string; tenantId: string; hostId: string; tipo: string; livekitRoomName: string } | null =
     await db.salaReuniao.findFirst({
       where: { id: salaId, encerradaEm: null },
-      select: { id: true, tenantId: true, hostId: true, tipo: true },
+      select: { id: true, tenantId: true, hostId: true, tipo: true, livekitRoomName: true },
     })
   if (!sala) throw new Error('Sala indisponível.')
 

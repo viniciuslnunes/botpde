@@ -2,7 +2,12 @@ import { cache } from 'react'
 import { db, Prisma } from '@torcida/db'
 import { getVisibleTenantIds } from './hierarquia'
 import { canFollowUsers } from './social'
-import { getAutoresSemAcesso, resolverAvatarSocial, resolverPerfilPrivadoEfetivo } from './perfil-social'
+import {
+  getAutoresSemAcesso,
+  getContagensSeguimentoEmLote,
+  resolverAvatarSocial,
+  resolverPerfilPrivadoEfetivo,
+} from './perfil-social'
 import { normalizarHashtag } from './comunidade-social'
 import {
   postIncludeBusca,
@@ -24,6 +29,51 @@ export interface MembroBuscaItem {
   statusSeguimento: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' | null
   seguidores: number
   podeSeguir: boolean
+}
+
+export interface SugestaoMembroBusca extends MembroBuscaItem {
+  bio: string | null
+  publicacoes: number
+  mesmaUnidade: boolean
+  unidadeNome: string | null
+  unidadeTipo: string | null
+  tipoMembro: 'SOCIO' | 'TORCEDOR'
+  cidade: string | null
+}
+
+const SUGESTOES_BUSCA_LIMITE = 12
+const SUGESTOES_BUSCA_CANDIDATOS = 48
+
+type SugestaoMembroBuscaRaw = {
+  userId: string
+  tenantId: string
+  tipo: 'SOCIO' | 'TORCEDOR'
+  cidade: string | null
+  sedeId: string | null
+  user: { id: string; nome: string | null; avatarUrl: string | null }
+  tenant: { nome: string }
+  sede: { nome: string; tipo: string } | null
+}
+
+function pontuarSugestaoMembro(input: {
+  mesmaUnidade: boolean
+  mesmoTenant: boolean
+  ultimaAtividade: Date | null
+  seguidores: number
+  publicacoes: number
+}): number {
+  let score = 0
+  if (input.mesmaUnidade) score += 1_000
+  else if (input.mesmoTenant) score += 500
+
+  if (input.ultimaAtividade) {
+    const dias = (Date.now() - input.ultimaAtividade.getTime()) / (1000 * 60 * 60 * 24)
+    score += Math.max(0, 200 - dias * 5)
+  }
+
+  score += Math.min(input.seguidores, 50) * 2
+  score += Math.min(input.publicacoes, 20)
+  return score
 }
 
 export interface BuscaComunidadeResult {
@@ -172,6 +222,102 @@ const getBloqueadosDoUsuario = cache(async (userId: string): Promise<Set<string>
     bloqueios.map((b) => (b.bloqueadorId === userId ? b.bloqueadoId : b.bloqueadorId)),
   )
 })
+
+/** Membros sugeridos na página `/portal/comunidade/busca` (estado inicial, sem termo). */
+export async function getSugestoesMembrosParaBusca(
+  tenantId: string,
+  userId: string,
+): Promise<SugestaoMembroBusca[]> {
+  const visibleIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  if (visibleIds.length === 0) return []
+
+  const [seguindo, bloqueadosIds] = await Promise.all([
+    db.seguimento.findMany({
+      where: { seguidorId: userId, status: 'APROVADO' },
+      select: { seguidoId: true },
+    }) as Promise<{ seguidoId: string }[]>,
+    getBloqueadosDoUsuario(userId),
+  ])
+
+  const excluirIds = [...new Set([userId, ...seguindo.map((s) => s.seguidoId), ...bloqueadosIds])]
+
+  const rows: MembroBuscaRaw[] = await db.saasMembro.findMany({
+    where: {
+      status: 'APROVADO',
+      tenantId: { in: visibleIds },
+      userId: { notIn: excluirIds },
+    },
+    select: {
+      userId: true,
+      tenantId: true,
+      tipo: true,
+      user: { select: { id: true, nome: true, avatarUrl: true } },
+      tenant: { select: { nome: true } },
+    },
+    take: SUGESTOES_BUSCA_CANDIDATOS,
+    orderBy: { criadoEm: 'desc' },
+  })
+
+  const porUsuario = new Map<string, MembroBuscaRaw>()
+  for (const r of rows) {
+    const existente = porUsuario.get(r.userId)
+    if (!existente || r.tenantId === tenantId) porUsuario.set(r.userId, r)
+  }
+  const candidatos = [...porUsuario.values()]
+  if (candidatos.length === 0) return []
+
+  const candidatoIds = candidatos.map((c) => c.userId)
+
+  const [perfis, seguimentos, contagensMap, podeSeguirLista] = await Promise.all([
+    db.perfilMembro.findMany({
+      where: { tenantId, userId: { in: candidatoIds } },
+      select: { userId: true, perfilPrivado: true, bio: true },
+    }) as Promise<{ userId: string; perfilPrivado: boolean; bio: string | null }[]>,
+    db.seguimento.findMany({
+      where: { seguidorId: userId, seguidoId: { in: candidatoIds } },
+      select: { seguidoId: true, status: true },
+    }) as Promise<
+      { seguidoId: string; status: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' }[]
+    >,
+    getContagensSeguimentoEmLote(candidatoIds, tenantId),
+    canFollowUsers(userId, candidatoIds, tenantId),
+  ])
+
+  const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
+  const statusPorId = new Map(seguimentos.map((s) => [s.seguidoId, s.status]))
+
+  const enriquecidos: SugestaoMembroBusca[] = []
+  for (const r of candidatos) {
+    const perfil = perfilPorId.get(r.userId)
+    const perfilPrivado = resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
+      tipo: r.tipo,
+      status: 'APROVADO',
+    })
+    const podeSeguir = podeSeguirLista.get(r.userId) ?? false
+    if (!podeSeguir) continue
+
+    const contagens = contagensMap.get(r.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+    enriquecidos.push({
+      id: r.user.id,
+      nome: r.user.nome,
+      avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
+      tenantNome: formatNomeTorcida(r.tenant.nome),
+      perfilPrivado,
+      statusSeguimento: statusPorId.get(r.userId) ?? null,
+      seguidores: contagens.seguidores,
+      podeSeguir,
+      bio: perfil?.bio ?? null,
+      publicacoes: contagens.publicacoes,
+    })
+  }
+
+  enriquecidos.sort((a, b) => {
+    if (b.seguidores !== a.seguidores) return b.seguidores - a.seguidores
+    return b.publicacoes - a.publicacoes
+  })
+
+  return enriquecidos.slice(0, SUGESTOES_BUSCA_LIMITE)
+}
 
 export async function buscarMembrosComunidade(
   tenantId: string,

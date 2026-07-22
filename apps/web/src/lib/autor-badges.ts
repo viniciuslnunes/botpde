@@ -1,4 +1,5 @@
 import { db } from '@torcida/db'
+import { unstable_cache } from 'next/cache'
 import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
 import type { PostSocialItem } from './feed'
 
@@ -79,6 +80,26 @@ export async function getBadgesPorAutorTenant(
   })
   if (unicos.length === 0) return new Map()
 
+  const cacheKey = [...unicos]
+    .map((p) => chave(p.autorId, p.tenantId))
+    .sort()
+    .join('|')
+
+  const serializado = await unstable_cache(
+    async (): Promise<Array<[string, AutorBadge]>> => {
+      const map = await carregarBadgesPorAutorTenant(unicos)
+      return [...map.entries()]
+    },
+    ['autor-badges-feed', cacheKey],
+    { revalidate: 120 },
+  )()
+
+  return new Map(serializado)
+}
+
+async function carregarBadgesPorAutorTenant(
+  unicos: Array<{ autorId: string; tenantId: string }>,
+): Promise<Map<string, AutorBadge>> {
   const autorIds = [...new Set(unicos.map((p) => p.autorId))]
   const tenantIds = [...new Set(unicos.map((p) => p.tenantId))]
 

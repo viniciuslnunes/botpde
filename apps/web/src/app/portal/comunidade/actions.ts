@@ -57,6 +57,15 @@ function invalidarLeituraComunidade(tenantId: string, afiliacaoId?: string | nul
   if (afiliacaoId) invalidarFeedNacional(afiliacaoId)
 }
 
+function alcanceNacionalDaPublicacao(
+  visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO',
+  permissoesEfetivas?: ReturnType<typeof calculateEffectivePermissions>,
+): boolean {
+  if (visibilidade !== 'PUBLICO') return false
+  if (!permissoesEfetivas) return true
+  return hasPermission(permissoesEfetivas, PERMISSIONS.COMMUNITY_POST_NACIONAL)
+}
+
 function avatarPreviewDaSessao(session: Session): string | null {
   const img = session.user.image
   return typeof img === 'string' && img.length > 0 ? img : null
@@ -410,8 +419,11 @@ export async function publicarPost(
 
     let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
     let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
+    let permissoesEfetivas: Awaited<
+      ReturnType<typeof assertAutorPublicacaoPost>
+    >['permissoesEfetivas']
     try {
-      ;({ session, tenant } = await assertAutorPublicacaoPost(visibilidade))
+      ;({ session, tenant, permissoesEfetivas } = await assertAutorPublicacaoPost(visibilidade))
     } catch (error) {
       return { message: error instanceof Error ? error.message : 'Não autorizado.' }
     }
@@ -421,7 +433,7 @@ export async function publicarPost(
 
     const [erroPerfil, alcanceNacional] = await Promise.all([
       erroPublicoComPerfilPrivado(session.user.id, tenant.id, visibilidade),
-      resolverAlcanceNacional(session.user.id, tenant.id, visibilidade),
+      Promise.resolve(alcanceNacionalDaPublicacao(visibilidade, permissoesEfetivas)),
     ])
     if (erroPerfil) return { message: erroPerfil }
 
@@ -457,10 +469,12 @@ export async function publicarPost(
       audit: { acao: 'POST_SOCIAL_PUBLICADO', detalhes: { tipo: 'MEMBRO' } },
     })
 
-    invalidarLeituraComunidade(
-      tenant.id,
-      visibilidade === 'PUBLICO' ? tenant.afiliacaoId : null,
-    )
+    after(() => {
+      invalidarLeituraComunidade(
+        tenant.id,
+        visibilidade === 'PUBLICO' ? tenant.afiliacaoId : null,
+      )
+    })
     return {
       success: true,
       token: post.id,
@@ -551,7 +565,9 @@ export async function publicarPostComoTorcedorGlobal(
     conteudo: parsed.data.conteudo,
   })
 
-  invalidarLeituraComunidade(tenant.id, perfil.afiliacaoId)
+  after(() => {
+    invalidarLeituraComunidade(tenant.id, perfil.afiliacaoId)
+  })
   return previewDoPost({
     post,
     autorId: session.user.id,
