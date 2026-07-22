@@ -63,14 +63,30 @@ Arquivo: `apps/web/src/lib/motion-presets.ts` — **fonte única** de timings e 
 | `lightboxBackdrop` | Variants | Overlay fullscreen (stories, fotos, reels) |
 | `lightboxContent` | Variants | Zoom suave do conteúdo do lightbox |
 | `cartItemExit` | Variants | Saída de linha ao remover item da sacola |
+| `heartBurst` | Variants | Burst de anel atrás do ícone ao curtir (expande e desaparece) |
+| `bookmarkDrop` | Transition | "Drop" ao salvar (bookmark) — assinatura própria, distinta do bounce genérico |
+| `shareSpin` | Transition | Giro de 360° do ícone ao confirmar compartilhar/repost |
 
 ### Componentes reutilizáveis (genéricos)
 
 | Componente | Arquivo | Quando usar |
 |------------|---------|-------------|
 | `MotionReveal` | `components/motion/motion-reveal.tsx` | Um item em lista SSR; prop `index` limita delay (máx. 0,28s) |
+| `MotionRevealOnce` | `components/motion/motion-reveal-once.tsx` | Como `MotionReveal`, mas só anima na 1ª aparição de um `id` na sessão — evita replay quando itens remontam (ex.: virtualização) |
+| `OptimisticHighlight` | `components/motion/optimistic-highlight.tsx` | Anel de destaque que se dissipa sozinho (~1,6s) ao redor de um item recém-inserido de forma otimista, sem depender de re-render externo pra sumir |
 | `MotionEmptyState` | `components/motion/motion-empty-state.tsx` | Estados vazios com `icon`, `title`, `description` |
 | `StickyPersistBar` | `components/sticky-persist-bar.tsx` | Rodapé Salvar/Cancelar fixo no viewport (ver padrão abaixo) |
+
+**Padrão "seenIds" para listas virtualizadas:** quando uma lista usa
+`@tanstack/react-virtual` (ou virtualização equivalente), itens fora do overscan
+são desmontados e remontados ao rolar — se o wrapper de entrada (`MotionReveal`)
+rodar a cada mount, o item já visto "reaparece" com fade/slide, gerando jank.
+Solução: manter um `useRef<Set<string>>(new Set())` de ids já vistos no
+componente pai da lista e usar `MotionRevealOnce` no lugar de `MotionReveal`,
+passando esse ref (`seenIds`) e o `id` estável do item. Ver uso em
+`comunidade-feed-infinite.tsx` (`useFeedWindow`). Módulos futuros com
+virtualização (Loja, Eventos) devem reaproveitar `MotionRevealOnce` em vez de
+reimplementar o controle de "já visto".
 
 ### Barra de persistência (`StickyPersistBar`)
 
@@ -290,7 +306,7 @@ Troca visual entre estados de UI (ex.: Seguir → Pendente → Seguindo):
 |------|---------------------|
 | Layout | `MotionShell`, `ComunidadeRouteTransition` |
 | Feed | `MotionReveal`, `ComunidadeFeedEmpty`, tabs com `layoutId` |
-| Composer | expand, pickers, menu `+` mobile |
+| Composer | expand, pickers, menu `+` mobile, prévia de mídia (entrada/saída + barra de progresso real) |
 | Posts | engajamento, enquete, menu, stagger |
 | Stories | rings, viewer, slide, progresso |
 | Busca / notificações | popover, stagger, filtros com `layoutId` |
@@ -302,6 +318,7 @@ Troca visual entre estados de UI (ex.: Seguir → Pendente → Seguindo):
 | Vídeos | reels imersivo (snap, progresso, double-tap, rail), grid→fullscreen, Em alta |
 | Aside | `MotionReveal` nos widgets; salas ao vivo stagger |
 | Comunicados | collapse + stagger nos itens |
+| Painel de conversa (rail) | `collapsePanel` no expand/collapse (shell fica montado), chevron rotativo, badge com pop, skeleton pulsante |
 
 ---
 

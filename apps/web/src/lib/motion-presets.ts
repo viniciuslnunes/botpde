@@ -121,3 +121,24 @@ export const lightboxContent: Variants = {
 export const cartItemExit: Variants = {
   exit: { opacity: 0, x: -24, height: 0, transition: springSnappy },
 }
+
+/** Burst de anel atrás do ícone ao curtir (ping que expande e desaparece). */
+export const heartBurst: Variants = {
+  hidden: { opacity: 0, scale: 0.4 },
+  show: { opacity: [0.55, 0], scale: [0.4, 1.8], transition: { duration: 0.5, ease: 'easeOut' } },
+}
+
+/** Bookmark "cai" e assenta ao salvar — distinto do bounce genérico de reação. */
+export const bookmarkDrop: Transition = {
+  type: 'spring',
+  stiffness: 500,
+  damping: 15,
+  mass: 0.7,
+}
+
+/** Giro rápido do ícone de compartilhar ao confirmar o repost. */
+export const shareSpin: Transition = {
+  type: 'tween',
+  duration: 0.4,
+  ease: 'easeOut',
+}

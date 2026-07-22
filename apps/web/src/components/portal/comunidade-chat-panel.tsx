@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
+import { AnimatePresence, m } from 'motion/react'
 import { ChevronDown, ExternalLink, MessageCircle } from 'lucide-react'
 import type { InboxItemDto } from '@/lib/mensageria-client'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 import { useInboxStream } from '@/lib/use-mensagem-stream'
+import { collapsePanel, springGentle, springSnappy } from '@/lib/motion-presets'
 import { MensagensShell } from './mensagens-shell'
 
 const STORAGE_KEY = 'comunidade-chat-expanded'
@@ -160,17 +162,27 @@ export function ComunidadeChatPanel({
         >
           <MessageCircle className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
           <span className="text-sm font-semibold text-[rgb(var(--foreground))]">Mensagens</span>
-          {naoLidas > 0 && (
-            <span className="rounded-full bg-[rgb(var(--color-primary))] px-1.5 py-0.5 text-[10px] font-bold text-[rgb(var(--color-primary-on))]">
-              {naoLidas > 99 ? '99+' : naoLidas}
-            </span>
-          )}
-          <ChevronDown
-            className={[
-              'ml-auto h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))] transition-transform',
-              expanded ? 'rotate-180' : '',
-            ].join(' ')}
-          />
+          <AnimatePresence initial={false}>
+            {naoLidas > 0 && (
+              <m.span
+                key={naoLidas > 99 ? '99+' : naoLidas}
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={springSnappy}
+                className="rounded-full bg-[rgb(var(--color-primary))] px-1.5 py-0.5 text-[10px] font-bold text-[rgb(var(--color-primary-on))]"
+              >
+                {naoLidas > 99 ? '99+' : naoLidas}
+              </m.span>
+            )}
+          </AnimatePresence>
+          <m.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={springSnappy}
+            className="ml-auto inline-flex shrink-0"
+          >
+            <ChevronDown className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+          </m.span>
         </button>
         <Link
           href="/portal/mensagens"
@@ -184,9 +196,21 @@ export function ComunidadeChatPanel({
       </div>
 
       {/* Mantém o shell montado — evita perder estado e refetch lento ao colapsar/expandir */}
-      <div className={expanded ? 'p-2' : 'hidden'} aria-hidden={!expanded}>
+      <m.div
+        initial={false}
+        animate={expanded ? 'show' : 'hidden'}
+        variants={collapsePanel}
+        transition={springGentle}
+        className="overflow-hidden"
+        aria-hidden={!expanded}
+      >
+        <div className="p-2">
         {!shellPronto ? (
-          <div className="h-40 animate-pulse rounded-xl bg-[rgb(var(--background-subtle))]" />
+          <m.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="h-40 rounded-xl bg-[rgb(var(--background-subtle))]"
+          />
         ) : bloqueioInbox === 'cadastro_pendente' ? (
           <p className="px-3 py-6 text-center text-xs text-[rgb(var(--foreground-muted))]">
             Seu vínculo ainda está em análise. O chat libera quando a torcida aprovar seu cadastro.
@@ -210,7 +234,8 @@ export function ComunidadeChatPanel({
             onInboxChange={onInboxAtualizada}
           />
         )}
-      </div>
+        </div>
+      </m.div>
     </div>
   )
 }

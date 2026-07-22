@@ -1034,46 +1034,63 @@ function ComposerBody({
           {/* Prévia dos anexos */}
           {medias.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 pl-[52px]">
-              {medias.map((m) => (
-                <div
-                  key={m.id}
-                  className="relative h-20 w-20 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
-                >
-                  {m.kind === 'video' ? (
-                    <>
-                      <video src={m.localUrl} muted playsInline className="h-full w-full object-cover" />
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <Play className="h-6 w-6 fill-white text-white drop-shadow" />
-                      </div>
-                    </>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.localUrl}
-                      alt=""
-                      className={m.kind === 'sticker' ? 'h-full w-full object-contain p-1.5' : 'h-full w-full object-cover'}
-                    />
-                  )}
-                  {m.url === null && !m.error && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <Loader2 className="h-5 w-5 animate-spin text-white" />
-                    </div>
-                  )}
-                  {m.error && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-red-600/70 px-1 text-center text-[10px] font-medium text-white">
-                      Falhou
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeMedia(m.id)}
-                    aria-label="Remover anexo"
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+              <AnimatePresence initial={false}>
+                {medias.map((media) => (
+                  <m.div
+                    key={media.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={springSnappy}
+                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+                    {media.kind === 'video' ? (
+                      <>
+                        <video src={media.localUrl} muted playsInline className="h-full w-full object-cover" />
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <Play className="h-6 w-6 fill-white text-white drop-shadow" />
+                        </div>
+                      </>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={media.localUrl}
+                        alt=""
+                        className={media.kind === 'sticker' ? 'h-full w-full object-contain p-1.5' : 'h-full w-full object-cover'}
+                      />
+                    )}
+                    {media.url === null && !media.error && (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                          <Loader2 className="h-5 w-5 animate-spin text-white" />
+                        </div>
+                        <div className="absolute inset-x-0 bottom-0 h-1 bg-black/30">
+                          <m.div
+                            className="h-full bg-white"
+                            initial={false}
+                            animate={{ width: `${media.progress}%` }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                          />
+                        </div>
+                      </>
+                    )}
+                    {media.error && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-600/70 px-1 text-center text-[10px] font-medium text-white">
+                        Falhou
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeMedia(media.id)}
+                      aria-label="Remover anexo"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </m.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
 

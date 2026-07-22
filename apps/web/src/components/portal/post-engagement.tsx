@@ -22,10 +22,14 @@ import {
   type MencaoParsed,
   type TipoReacaoSocial,
 } from '@/lib/comunidade-social'
+import type { TargetAndTransition, Transition } from 'motion/react'
 import {
+  bookmarkDrop,
   collapsePanel,
+  heartBurst,
   menuItemStagger,
   reactionPop,
+  shareSpin,
   springGentle,
   springSnappy,
 } from '@/lib/motion-presets'
@@ -57,6 +61,8 @@ function EngajamentoBtn({
   className,
   onClick,
   disabled,
+  activeTransition = reactionPop,
+  activeAnimate,
   ...rest
 }: {
   children: React.ReactNode
@@ -64,6 +70,10 @@ function EngajamentoBtn({
   className: string
   onClick?: () => void
   disabled?: boolean
+  /** Transição usada ao ativar (default: bounce genérico `reactionPop`). */
+  activeTransition?: Transition
+  /** Keyframes de ativação (default: `scale: [1, 1.08, 1]`). */
+  activeAnimate?: TargetAndTransition
   'aria-label'?: string
   'aria-pressed'?: boolean
   'aria-expanded'?: boolean
@@ -72,8 +82,8 @@ function EngajamentoBtn({
     <m.button
       type="button"
       whileTap={{ scale: 0.9 }}
-      animate={active ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-      transition={active ? reactionPop : springSnappy}
+      animate={active ? (activeAnimate ?? { scale: [1, 1.08, 1] }) : { scale: 1, y: 0 }}
+      transition={active ? activeTransition : springSnappy}
       onClick={onClick}
       disabled={disabled}
       className={className}
@@ -108,6 +118,7 @@ export function PostEngagement({
   const [denunciado, setDenunciado] = useState(false)
   const [repostando, setRepostando] = useState(false)
   const [compartilhado, setCompartilhado] = useState(false)
+  const [justLiked, setJustLiked] = useState(false)
   const [comentarioRepost, setComentarioRepost] = useState('')
   const [motivo, setMotivo] = useState('')
   const [pending, startTransition] = useTransition()
@@ -137,6 +148,7 @@ export function PostEngagement({
     } else {
       setReacao(tipo)
       if (anterior === null) setTotalR((n) => n + 1)
+      if (tipo === 'CURTIR') setJustLiked(true)
     }
     startTransition(async () => {
       try {
@@ -322,12 +334,35 @@ export function PostEngagement({
             {totalR > 0 && (
               <m.span layout className="inline-flex items-center gap-1">
                 <Heart className="h-3.5 w-3.5 fill-[rgb(var(--color-primary-fg))] text-[rgb(var(--color-primary-fg))]" />
-                {totalR}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <m.span
+                    key={totalR}
+                    className="inline-flex"
+                    initial={{ opacity: 0, scale: 0.6, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.6, y: 6 }}
+                    transition={springSnappy}
+                  >
+                    {totalR}
+                  </m.span>
+                </AnimatePresence>
               </m.span>
             )}
             {totalC > 0 && (
-              <m.span layout>
-                {totalC} comentário{totalC === 1 ? '' : 's'}
+              <m.span layout className="inline-flex items-center gap-1">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <m.span
+                    key={totalC}
+                    className="inline-flex"
+                    initial={{ opacity: 0, scale: 0.6, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.6, y: 6 }}
+                    transition={springSnappy}
+                  >
+                    {totalC}
+                  </m.span>
+                </AnimatePresence>
+                comentário{totalC === 1 ? '' : 's'}
               </m.span>
             )}
           </m.div>
@@ -348,7 +383,21 @@ export function PostEngagement({
               : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
           ].join(' ')}
         >
-          <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
+          <span className="relative inline-flex">
+            <AnimatePresence>
+              {justLiked && (
+                <m.span
+                  className="pointer-events-none absolute inset-0 rounded-full bg-[rgb(var(--color-primary-fg)_/_0.35)]"
+                  variants={heartBurst}
+                  initial="hidden"
+                  animate="show"
+                  exit="hidden"
+                  onAnimationComplete={() => setJustLiked(false)}
+                />
+              )}
+            </AnimatePresence>
+            <Heart className={['h-4 w-4', reacao === 'CURTIR' ? 'fill-current' : ''].join(' ')} />
+          </span>
           {reacao === 'CURTIR' ? 'Curtido' : 'Curtir'}
         </EngajamentoBtn>
         <EngajamentoBtn
@@ -379,12 +428,20 @@ export function PostEngagement({
                 : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]',
             ].join(' ')}
           >
-            <Repeat2 className="h-4 w-4" />
+            <m.span
+              className="inline-flex"
+              animate={{ rotate: compartilhado ? 360 : 0 }}
+              transition={shareSpin}
+            >
+              <Repeat2 className="h-4 w-4" />
+            </m.span>
             {compartilhado ? 'Compartilhado' : 'Compartilhar'}
           </EngajamentoBtn>
         )}
         <EngajamentoBtn
           active={salvo}
+          activeTransition={bookmarkDrop}
+          activeAnimate={{ scale: [1, 1.15, 1], y: [0, -3, 0] }}
           onClick={toggleSalvar}
           aria-pressed={salvo}
           aria-label={salvo ? 'Salvo' : 'Salvar'}

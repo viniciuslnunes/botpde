@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
-import { MotionReveal } from '@/components/motion/motion-reveal'
+import { MotionRevealOnce } from '@/components/motion/motion-reveal-once'
+import { OptimisticHighlight } from '@/components/motion/optimistic-highlight'
+import { m } from 'motion/react'
 import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
 import { FeedRefreshIndicator } from './feed-refresh-indicator'
 import { useFeedStream } from '@/lib/use-feed-stream'
@@ -106,6 +108,7 @@ export function ComunidadeFeedInfinite({
 
   const windowing = useFeedWindow(posts.length)
   const refreshDebounceRef = useRef<number | null>(null)
+  const seenIds = useRef<Set<string>>(new Set())
 
   const refreshTopo = useCallback(async () => {
     await refreshCurrentPage(null)
@@ -248,26 +251,23 @@ export function ComunidadeFeedInfinite({
                   className="absolute left-0 top-0 w-full pb-4"
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
-                  <MotionReveal index={item.index}>
-                    <div
-                      className={[
-                        'feed-post-window',
-                        otimista ? 'ring-1 ring-[rgb(var(--color-primary)_/_0.35)]' : '',
-                      ].join(' ')}
-                    >
-                      <FeedPostCard
-                        post={post}
-                        showTenantBadge={deveExibirBadgeTorcidaNoFeed({
-                          postTenantId: post.tenantId,
-                          viewerTenantId: tenantId,
-                          visibilidade: post.visibilidade,
-                          escopoNacional: isNacional,
-                        })}
-                        currentUser={currentUser}
-                        salvo={salvoSet.has(post.id)}
-                      />
-                    </div>
-                  </MotionReveal>
+                  <MotionRevealOnce id={post.id} index={item.index} seenIds={seenIds}>
+                    <OptimisticHighlight active={otimista}>
+                      <div className="feed-post-window">
+                        <FeedPostCard
+                          post={post}
+                          showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                            postTenantId: post.tenantId,
+                            viewerTenantId: tenantId,
+                            visibilidade: post.visibilidade,
+                            escopoNacional: isNacional,
+                          })}
+                          currentUser={currentUser}
+                          salvo={salvoSet.has(post.id)}
+                        />
+                      </div>
+                    </OptimisticHighlight>
+                  </MotionRevealOnce>
                 </div>
               )
             })}
@@ -276,26 +276,23 @@ export function ComunidadeFeedInfinite({
           posts.map((post, index) => {
             const otimista = String(post.id).startsWith('optimistic-')
             return (
-              <MotionReveal key={post.id} index={index}>
-                <div
-                  className={[
-                    'feed-post-window',
-                    otimista ? 'ring-1 ring-[rgb(var(--color-primary)_/_0.35)]' : '',
-                  ].join(' ')}
-                >
-                  <FeedPostCard
-                    post={post}
-                    showTenantBadge={deveExibirBadgeTorcidaNoFeed({
-                      postTenantId: post.tenantId,
-                      viewerTenantId: tenantId,
-                      visibilidade: post.visibilidade,
-                      escopoNacional: isNacional,
-                    })}
-                    currentUser={currentUser}
-                    salvo={salvoSet.has(post.id)}
-                  />
-                </div>
-              </MotionReveal>
+              <MotionRevealOnce key={post.id} id={post.id} index={index} seenIds={seenIds}>
+                <OptimisticHighlight active={otimista}>
+                  <div className="feed-post-window">
+                    <FeedPostCard
+                      post={post}
+                      showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                        postTenantId: post.tenantId,
+                        viewerTenantId: tenantId,
+                        visibilidade: post.visibilidade,
+                        escopoNacional: isNacional,
+                      })}
+                      currentUser={currentUser}
+                      salvo={salvoSet.has(post.id)}
+                    />
+                  </div>
+                </OptimisticHighlight>
+              </MotionRevealOnce>
             )
           })
         )}
@@ -310,7 +307,11 @@ export function ComunidadeFeedInfinite({
       {pageInfo.hasMore ? (
         <div ref={sentinelRef} className="flex justify-center pt-2">
           {loadingMore && (
-            <div className="h-10 w-40 animate-pulse rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+            <m.div
+              className="h-10 w-40 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            />
           )}
         </div>
       ) : null}
