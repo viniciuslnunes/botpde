@@ -5,7 +5,11 @@ import { ImagePlus, Loader2, Send, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { publicarPostComoTorcedorGlobal } from '@/app/portal/comunidade/actions'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { emitirPostPublicado } from '@/lib/feed-live-refresh'
+import {
+  criarPreviewOtimista,
+  emitirPostPublicado,
+  novoIdOtimista,
+} from '@/lib/feed-live-refresh'
 import { Avatar } from '@/components/portal/avatar'
 
 const MAX_CONTEUDO = 3000
@@ -14,6 +18,8 @@ const MAX_IMG_MB = 10
 
 type Props = {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
+  tenantId: string
+  tenantNome: string
 }
 
 /**
@@ -21,12 +27,13 @@ type Props = {
  * plataforma) publicando post público no clube. Só texto + imagens; enquetes,
  * eventos, menções e stickers ficam no composer completo da torcida.
  */
-export function ComunidadeNacionalComposer({ currentUser }: Props) {
+export function ComunidadeNacionalComposer({ currentUser, tenantId, tenantNome }: Props) {
   const [conteudo, setConteudo] = useState('')
   const [midias, setMidias] = useState<string[]>([])
   const [enviandoMidia, setEnviandoMidia] = useState(false)
   const [pending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const optimisticIdRef = useRef<string | null>(null)
 
   const primeiroNome = currentUser.nome?.trim().split(/\s+/)[0] ?? 'torcedor'
   const podePublicar = conteudo.trim().length > 0 && !pending && !enviandoMidia
@@ -60,14 +67,45 @@ export function ComunidadeNacionalComposer({ currentUser }: Props) {
   }
 
   function handlePublicar() {
+    const texto = conteudo.trim()
+    if (!texto) return
+
+    const id = novoIdOtimista()
+    optimisticIdRef.current = id
+    emitirPostPublicado({
+      preview: criarPreviewOtimista({
+        id,
+        tenantId,
+        conteudo: texto,
+        midiaUrls: midias,
+        visibilidade: 'PUBLICO',
+        autor: {
+          id: currentUser.id,
+          nome: currentUser.nome,
+          avatarUrl: currentUser.avatarUrl,
+        },
+        tenantNome,
+      }),
+      filtroAlvo: 'descobrir',
+    })
+
     startTransition(async () => {
       try {
-        const preview = await publicarPostComoTorcedorGlobal(conteudo, midias)
+        const preview = await publicarPostComoTorcedorGlobal(texto, midias)
         setConteudo('')
         setMidias([])
-        emitirPostPublicado({ preview })
+        emitirPostPublicado({
+          preview,
+          substituirId: optimisticIdRef.current ?? undefined,
+          filtroAlvo: 'descobrir',
+        })
+        optimisticIdRef.current = null
         toast.success('Post publicado na comunidade do clube!')
       } catch (error) {
+        if (optimisticIdRef.current) {
+          emitirPostPublicado({ removerId: optimisticIdRef.current })
+          optimisticIdRef.current = null
+        }
         toast.error(error instanceof Error ? error.message : 'Não foi possível publicar.')
       }
     })

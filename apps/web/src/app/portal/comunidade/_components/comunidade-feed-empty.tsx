@@ -22,6 +22,50 @@ export function ComunidadeFeedEmpty({ filtro, nacional = false }: ComunidadeFeed
   }
 
   if (nacional) {
+    if (filtro === 'seguindo') {
+      return (
+        <MotionEmptyState
+          icon={<MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+          title="Nada de quem você segue ainda"
+          description={
+            <>
+              Siga torcedores e sócios do clube para ver publicações públicas deles aqui, ou volte
+              para{' '}
+              <Link
+                href="/portal/comunidade?escopo=nacional"
+                className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              >
+                Descobrir
+              </Link>
+              .
+            </>
+          }
+        />
+      )
+    }
+
+    if (filtro === 'grupos') {
+      return (
+        <MotionEmptyState
+          icon={<MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+          title="Nenhum mural de grupo ainda"
+          description={
+            <>
+              Entre em grupos da comunidade nacional para ver as publicações deles aqui, ou explore
+              em{' '}
+              <Link
+                href="/portal/comunidade/grupos?escopo=nacional"
+                className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+              >
+                Grupos
+              </Link>
+              .
+            </>
+          }
+        />
+      )
+    }
+
     return (
       <MotionEmptyState
         icon={<MessagesSquare className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}

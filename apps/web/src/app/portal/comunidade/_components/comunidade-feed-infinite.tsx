@@ -5,13 +5,17 @@ import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
+import { FeedRefreshIndicator } from './feed-refresh-indicator'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
+import { useFeedPullRefresh } from '@/lib/use-feed-pull-refresh'
 import {
+  COMUNIDADE_FEED_REFRESH_TOPO_EVENT,
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   COMUNIDADE_POST_PUBLICADO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
+  FEED_HYDRATE_AFTER_PUBLISH_MS,
   isComunidadeFeedNearTop,
   type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
@@ -68,6 +72,13 @@ function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
   }
 }
 
+function filtroAceitaPublicacao(
+  filtro: Filtro,
+  filtroAlvo?: PostPublicadoEventDetail['filtroAlvo'],
+): boolean {
+  return filtro === (filtroAlvo ?? 'descobrir')
+}
+
 export function ComunidadeFeedInfinite({
   tenantId,
   currentUser,
@@ -84,7 +95,6 @@ export function ComunidadeFeedInfinite({
   tenantId: string
   currentUser: CurrentUser
   filtro: Filtro
-  /** Obrigatório quando `filtro === 'canal'`. */
   conversaId?: string
   escopo?: 'nacional' | 'torcida'
   afiliacaoId?: string
@@ -92,7 +102,6 @@ export function ComunidadeFeedInfinite({
   initialPageInfo: PageInfo
   initialCursor: string | null
   salvoIds: string[]
-  /** false no bootstrap do Suspense — evita seed vazio e usa cache/API. */
   seedFromSsr?: boolean
 }) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
@@ -102,16 +111,18 @@ export function ComunidadeFeedInfinite({
     posts,
     pageInfo,
     loadingMore,
+    isRefreshing,
     error,
     loadMore,
     refreshCurrentPage,
     prependPost,
+    replacePost,
     removePost,
   } = useComunidadeInfiniteFeed<PostSocialItem>({
     endpoint: '/api/comunidade/feed',
     tenantId,
     viewerId: currentUser.id,
-    filtro: isNacional ? 'descobrir' : filtro,
+    filtro,
     conversaId,
     escopo,
     afiliacaoId,
@@ -122,8 +133,16 @@ export function ComunidadeFeedInfinite({
   })
 
   const windowing = useFeedWindow(posts.length)
-
   const refreshDebounceRef = useRef<number | null>(null)
+  const hydrateTimerRef = useRef<number | null>(null)
+
+  const refreshTopo = useCallback(async () => {
+    await refreshCurrentPage(null)
+  }, [refreshCurrentPage])
+
+  const { pullProgress, isPullRefreshing, triggerRefresh } = useFeedPullRefresh(refreshTopo)
+
+  const showRefreshIndicator = isRefreshing || isPullRefreshing || pullProgress > 0.08
 
   const replaceUrlCursor = useCallback(
     (nextCursor: string) => {
@@ -131,7 +150,13 @@ export function ComunidadeFeedInfinite({
       url.searchParams.set('cursor', nextCursor)
       if (isNacional) {
         url.searchParams.set('escopo', 'nacional')
-        url.searchParams.delete('filtro')
+        if (filtro === 'seguindo') {
+          url.searchParams.set('filtro', 'seguindo')
+        } else if (filtro === 'grupos') {
+          url.searchParams.set('filtro', 'grupos')
+        } else {
+          url.searchParams.delete('filtro')
+        }
       } else if (filtro === 'seguindo') {
         url.searchParams.set('filtro', 'seguindo')
       } else if (filtro === 'grupos') {
@@ -149,8 +174,14 @@ export function ComunidadeFeedInfinite({
     if (typeof cursor === 'string') replaceUrlCursor(cursor)
   }, [loadMore, replaceUrlCursor])
 
+  const agendarHydratePosPublicacao = useCallback(() => {
+    if (hydrateTimerRef.current) window.clearTimeout(hydrateTimerRef.current)
+    hydrateTimerRef.current = window.setTimeout(() => {
+      void refreshCurrentPage(null)
+    }, FEED_HYDRATE_AFTER_PUBLISH_MS)
+  }, [refreshCurrentPage])
+
   useFeedStream(() => {
-    // Longe do topo: banner pede clique — evita saltar a lista no meio da leitura.
     if (!isComunidadeFeedNearTop()) return
     if (refreshDebounceRef.current) window.clearTimeout(refreshDebounceRef.current)
     refreshDebounceRef.current = window.setTimeout(() => {
@@ -158,34 +189,61 @@ export function ComunidadeFeedInfinite({
     }, FEED_SSE_DEBOUNCE_MS)
   })
 
-  // Publicação própria: prepend otimista + hydrate em background (sem bloquear UI).
+  useEffect(() => {
+    function onRefreshTopo() {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      void triggerRefresh()
+    }
+    window.addEventListener(COMUNIDADE_FEED_REFRESH_TOPO_EVENT, onRefreshTopo)
+    return () => window.removeEventListener(COMUNIDADE_FEED_REFRESH_TOPO_EVENT, onRefreshTopo)
+  }, [triggerRefresh])
+
   useEffect(() => {
     function onPostPublicado(ev: Event) {
       const detail = (ev as CustomEvent<PostPublicadoEventDetail>).detail
-      if (detail?.preview) {
-        prependPost(previewParaPostSocial(detail.preview))
+      if (!detail) return
+
+      if (detail.removerId) {
+        removePost(detail.removerId)
+        return
       }
+
+      if (!filtroAceitaPublicacao(filtro, detail.filtroAlvo)) return
+
+      if (detail.preview) {
+        const item = previewParaPostSocial(detail.preview)
+        if (detail.substituirId) {
+          replacePost(detail.substituirId, item)
+        } else {
+          prependPost(item)
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+      }
+
       const url = new URL(window.location.href)
       if (url.searchParams.has('cursor')) {
         url.searchParams.delete('cursor')
         window.history.replaceState({}, '', url.toString())
       }
-      // Hydrate badges/enquete após o cache de tags aquecer — não compete com o prepend.
-      window.setTimeout(() => {
-        void refreshCurrentPage(null)
-      }, 600)
+
+      if (detail.substituirId && detail.preview) {
+        agendarHydratePosPublicacao()
+      }
     }
+
     function onPostExcluido(ev: Event) {
       const detail = (ev as CustomEvent<PostExcluidoEventDetail>).detail
       if (detail?.postId) removePost(detail.postId)
     }
+
     window.addEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
     window.addEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
     return () => {
       window.removeEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
       window.removeEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
+      if (hydrateTimerRef.current) window.clearTimeout(hydrateTimerRef.current)
     }
-  }, [prependPost, refreshCurrentPage, removePost])
+  }, [agendarHydratePosPublicacao, filtro, prependPost, removePost, replacePost])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
@@ -208,14 +266,21 @@ export function ComunidadeFeedInfinite({
 
   return (
     <>
-      <section className="space-y-4">
-        {posts.length === 0 ? (
+      <FeedRefreshIndicator
+        visible={pullProgress > 0.08}
+        refreshing={isRefreshing || isPullRefreshing}
+        pullProgress={pullProgress}
+      />
+
+      <section id="comunidade-feed-posts" className="space-y-4">
+        {posts.length === 0 && !showRefreshIndicator ? (
           <ComunidadeFeedEmpty filtro={filtro} nacional={isNacional} />
         ) : windowing.enabled && windowing.virtualItems ? (
           <div className="relative w-full" style={{ height: windowing.totalSize }}>
             {windowing.virtualItems.map((item) => {
               const post = posts[item.index]
               if (!post) return null
+              const otimista = String(post.id).startsWith('optimistic-')
               return (
                 <div
                   key={post.id}
@@ -225,7 +290,12 @@ export function ComunidadeFeedInfinite({
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
                   <MotionReveal index={item.index}>
-                    <div className="feed-post-window">
+                    <div
+                      className={[
+                        'feed-post-window',
+                        otimista ? 'ring-1 ring-[rgb(var(--color-primary)_/_0.35)]' : '',
+                      ].join(' ')}
+                    >
                       <FeedPostCard
                         post={post}
                         showTenantBadge={post.tenantId !== tenantId}
@@ -239,18 +309,26 @@ export function ComunidadeFeedInfinite({
             })}
           </div>
         ) : (
-          posts.map((post, index) => (
-            <MotionReveal key={post.id} index={index}>
-              <div className="feed-post-window">
-                <FeedPostCard
-                  post={post}
-                  showTenantBadge={post.tenantId !== tenantId}
-                  currentUser={currentUser}
-                  salvo={salvoSet.has(post.id)}
-                />
-              </div>
-            </MotionReveal>
-          ))
+          posts.map((post, index) => {
+            const otimista = String(post.id).startsWith('optimistic-')
+            return (
+              <MotionReveal key={post.id} index={index}>
+                <div
+                  className={[
+                    'feed-post-window',
+                    otimista ? 'ring-1 ring-[rgb(var(--color-primary)_/_0.35)]' : '',
+                  ].join(' ')}
+                >
+                  <FeedPostCard
+                    post={post}
+                    showTenantBadge={post.tenantId !== tenantId}
+                    currentUser={currentUser}
+                    salvo={salvoSet.has(post.id)}
+                  />
+                </div>
+              </MotionReveal>
+            )
+          })
         )}
       </section>
 

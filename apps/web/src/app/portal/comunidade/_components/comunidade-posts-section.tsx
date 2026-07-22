@@ -4,6 +4,8 @@ import {
   getPostsDosMeusGrupos,
   getPostIdsSalvos,
   getPostsFeedNacional,
+  getPostsFeedNacionalSeguindo,
+  getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
 import { getPostsDoCanal } from '@/lib/canais'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
@@ -22,7 +24,7 @@ interface ComunidadePostsSectionProps {
   filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
   /** Obrigatório quando `filtro === 'canal'` — id da Conversa (canal). */
   conversaId?: string
-  /** Feed da Comunidade Nacional do clube — ignora `filtro`/tenant real. */
+  /** Feed da Comunidade Nacional do clube — `tenantId` é o sintético. */
   escopo?: 'nacional' | 'torcida'
   /** Obrigatório quando `escopo === 'nacional'`. */
   afiliacaoId?: string | null
@@ -38,10 +40,13 @@ export async function ComunidadePostsSection({
   afiliacaoId,
 }: ComunidadePostsSectionProps) {
   if (escopo === 'nacional' && afiliacaoId) {
-    const feed = await getPostsFeedNacional(afiliacaoId, currentUser.id || undefined, {
-      cursor,
-      take: 20,
-    })
+    const feedOpts = { cursor, take: 20 }
+    const feed =
+      filtro === 'seguindo'
+        ? await getPostsFeedNacionalSeguindo(afiliacaoId, currentUser.id, feedOpts)
+        : filtro === 'grupos'
+          ? await getPostsFeedNacionalGrupos(afiliacaoId, currentUser.id, feedOpts)
+          : await getPostsFeedNacional(afiliacaoId, currentUser.id || undefined, feedOpts)
     const salvoIds = currentUser.id
       ? await getPostIdsSalvos(currentUser.id, tenantId)
       : new Set<string>()
@@ -50,7 +55,7 @@ export async function ComunidadePostsSection({
       <ComunidadeFeedInfinite
         tenantId={tenantId}
         currentUser={currentUser}
-        filtro="descobrir"
+        filtro={filtro}
         escopo="nacional"
         afiliacaoId={afiliacaoId}
         initialPosts={feed.posts}

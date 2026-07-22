@@ -8,6 +8,7 @@ import { Clock, ListOrdered, Users } from 'lucide-react'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
+import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 
 type Props = {
   afiliacao: AfiliacaoComunidade
@@ -20,9 +21,10 @@ export async function ComunidadeNacionalShell({
   currentUser,
   solicitacaoPendente = null,
 }: Props) {
-  const [noticias, { posts }] = await Promise.all([
+  const [noticias, { posts }, tenantSintetico] = await Promise.all([
     getNoticiasAprovadas(afiliacao.id),
     getPostsFeedNacional(afiliacao.id, currentUser.id || undefined, { take: 20 }),
+    getOrCreateComunidadeNacionalTenant(afiliacao.id),
   ])
   const nomeClube = afiliacao.apelido || afiliacao.nome
 
@@ -93,7 +95,11 @@ export async function ComunidadeNacionalShell({
         </Link>
       )}
 
-      <ComunidadeNacionalComposer currentUser={currentUser} />
+      <ComunidadeNacionalComposer
+        currentUser={currentUser}
+        tenantId={tenantSintetico.id}
+        tenantNome={`${nomeClube} — Comunidade Nacional`}
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">

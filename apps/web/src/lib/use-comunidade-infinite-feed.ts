@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 
 export interface PageInfo {
@@ -106,6 +106,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   } = options
 
   const queryClient = useQueryClient()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const queryKey = useMemo(
     () =>
       comunidadeFeedQueryKey(
@@ -271,6 +272,38 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     [queryClient, queryKey],
   )
 
+  const replacePost = useCallback(
+    (oldId: string, post: TPost) => {
+      queryClient.setQueryData(
+        queryKey,
+        (prev: { pages: ComunidadeFeedPage<TPost>[]; pageParams: Array<string | null> } | undefined) => {
+          if (!prev || prev.pages.length === 0) {
+            return {
+              pages: [{ posts: [post], pageInfo: { hasMore: false, nextCursor: null } }],
+              pageParams: [null],
+            }
+          }
+          let changed = false
+          const pages = prev.pages.map((page, index) => {
+            if (index !== 0) return page
+            const idx = page.posts.findIndex((p) => p.id === oldId)
+            if (idx === -1) {
+              if (page.posts.some((p) => p.id === post.id)) return page
+              changed = true
+              return { ...page, posts: [post, ...page.posts] }
+            }
+            changed = true
+            const nextPosts = [...page.posts]
+            nextPosts[idx] = post
+            return { ...page, posts: nextPosts }
+          })
+          return changed ? { ...prev, pages } : prev
+        },
+      )
+    },
+    [queryClient, queryKey],
+  )
+
   /** Remove de todos os caches `comunidade-feed` (descobrir/seguindo/rede/canal…). */
   const removePost = useCallback(
     (postId: string) => {
@@ -297,10 +330,12 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     pageInfo,
     currentCursor,
     loadingMore: query.isFetchingNextPage,
+    isRefreshing,
     error: query.error instanceof Error ? query.error.message : null,
     loadMore,
     refreshCurrentPage,
     prependPost,
+    replacePost,
     removePost,
   }
 }

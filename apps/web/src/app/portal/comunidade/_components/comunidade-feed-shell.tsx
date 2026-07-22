@@ -169,10 +169,15 @@ export function ComunidadeFeedShell({
         {currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
             {modoNacional ? (
-              <ComunidadeNacionalComposer currentUser={currentUser} />
+              <ComunidadeNacionalComposer
+                currentUser={currentUser}
+                tenantId={tenant.id}
+                tenantNome={tenant.nome}
+              />
             ) : (
               <ComunidadeComposerSection
                 tenantId={tenant.id}
+                tenantNome={tenant.nome}
                 userId={currentUser.id}
                 userName={currentUser.nome}
                 userAvatar={currentUser.avatarUrl}
@@ -188,7 +193,7 @@ export function ComunidadeFeedShell({
           </Suspense>
         )}
 
-        {!modoNacional && <FeedLiveBanner filtro={filtro} />}
+        <FeedLiveBanner filtro={filtro} escopo={escopo} />
 
         <Suspense
           fallback={

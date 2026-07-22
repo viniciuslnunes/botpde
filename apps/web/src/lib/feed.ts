@@ -1090,10 +1090,112 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
 })
 
 /**
- * Feed da comunidade nacional: posts de torcedores (tenant sintético do clube,
- * sempre abertos) + posts de sócios só de quem o torcedor segue e está
- * APROVADO — sócio é sempre "privado" pro torcedor, independente da
- * visibilidade PUBLICO/TENANT/PRIVADO que ele escolheu no post.
+ * Feed "Seguindo" da Comunidade Nacional: só posts PUBLICO de quem o viewer
+ * segue (APROVADO), dentro da mesma afiliação — sem vitrine Descobrir nem
+ * alcanceNacional de não-seguidos.
+ */
+export const getPostsFeedNacionalSeguindo = cache(async function getPostsFeedNacionalSeguindo(
+  afiliacaoId: string,
+  userId: string,
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+
+  const tenantIds = await getTenantIdsPorAfiliacao(afiliacaoId)
+  if (tenantIds.length === 0) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
+
+  const aprovados: SeguimentoLite[] = await db.seguimento.findMany({
+    where: { seguidorId: userId, status: 'APROVADO' },
+    select: { seguidoId: true },
+  })
+  const seguindoAprovados = aprovados.map((s) => s.seguidoId)
+  if (seguindoAprovados.length === 0) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: tenantIds },
+      tipo: 'MEMBRO',
+      visibilidade: 'PUBLICO',
+      oculto: false,
+      ...escopoFeedSemConversa,
+      ...cursorWhere,
+      autorId: { in: seguindoAprovados },
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+})
+
+/**
+ * Feed "Meus grupos" da Comunidade Nacional: murais dos grupos do tenant
+ * sintético em que o viewer é membro ativo (não silenciado).
+ */
+export const getPostsFeedNacionalGrupos = cache(async function getPostsFeedNacionalGrupos(
+  afiliacaoId: string,
+  userId: string,
+  opts: FeedOpts = {},
+): Promise<{ posts: PostSocialItem[]; pageInfo: FeedPersonalizadoResult['pageInfo'] }> {
+  const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
+  const decodedCursor = decodeCursor(opts.cursor)
+  const cursorWhere = buildCursorWhere(decodedCursor)
+
+  const sintetico: { id: string } | null = await db.tenant.findFirst({
+    where: { afiliacaoId, sintetico: true, ativo: true },
+    select: { id: true },
+  })
+  if (!sintetico) {
+    return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
+  }
+
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: sintetico.id,
+      tipo: 'MEMBRO',
+      oculto: false,
+      ...escopoFeedSomenteGrupos(userId),
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    include: postInclude(userId),
+  })) as PostRaw[]
+
+  const posts = postsRaw.map(projetarPost)
+  const hasMore = posts.length > take
+  const pagina = await finalizarPosts(posts.slice(0, take))
+
+  return {
+    posts: pagina,
+    pageInfo: {
+      hasMore,
+      nextCursor: hasMore && pagina.length > 0 ? encodeCursor(pagina[pagina.length - 1]) : null,
+    },
+  }
+})
+
+/**
+ * Feed da comunidade nacional (Descobrir): posts de torcedores (tenant sintético
+ * do clube, sempre abertos) + posts de sócios só de quem o torcedor segue e
+ * está APROVADO + posts com alcanceNacional explícito.
  */
 export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   afiliacaoId: string,

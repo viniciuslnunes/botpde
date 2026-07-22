@@ -7,6 +7,8 @@ import {
   getPostsParaFeed,
   getPostsDosMeusGrupos,
   getPostsFeedNacional,
+  getPostsFeedNacionalSeguindo,
+  getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
 import { getCanalPorId, getPostsDoCanal } from '@/lib/canais'
 import { resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
@@ -56,10 +58,31 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Sem permissão para este feed.' }, { status: 403 })
       }
 
+      const filtroNacional = parsed.data.filtro ?? 'descobrir'
+      const feedOpts = { cursor: parsed.data.cursor, take }
+
+      if (filtroNacional === 'seguindo') {
+        const { posts, pageInfo } = await getPostsFeedNacionalSeguindo(
+          parsed.data.afiliacaoId,
+          session.user.id,
+          feedOpts,
+        )
+        return NextResponse.json({ posts, pageInfo })
+      }
+
+      if (filtroNacional === 'grupos') {
+        const { posts, pageInfo } = await getPostsFeedNacionalGrupos(
+          parsed.data.afiliacaoId,
+          session.user.id,
+          feedOpts,
+        )
+        return NextResponse.json({ posts, pageInfo })
+      }
+
       const { posts, pageInfo } = await getPostsFeedNacional(
         parsed.data.afiliacaoId,
         session.user.id,
-        { cursor: parsed.data.cursor, take },
+        feedOpts,
       )
       return NextResponse.json({ posts, pageInfo })
     }

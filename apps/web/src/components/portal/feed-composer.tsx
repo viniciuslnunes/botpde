@@ -34,7 +34,7 @@ import {
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias } from '@/lib/social-embed'
-import { emitirPostPublicado } from '@/lib/feed-live-refresh'
+import { emitirPostPublicado, criarPreviewOtimista, novoIdOtimista } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
@@ -92,6 +92,8 @@ interface FeedComposerProps {
   userId: string
   userName: string | null
   userAvatar: string | null
+  tenantId: string
+  tenantNome: string
   perfilPrivado?: boolean
   eventos?: EventoComposerItem[]
   /** Quando true, só permite posts PUBLICO (torcedor aguardando aprovação / global). */
@@ -112,6 +114,8 @@ export function FeedComposer({
   userId,
   userName,
   userAvatar,
+  tenantId,
+  tenantNome,
   perfilPrivado = false,
   eventos = [],
   bloqueioPublicacao = null,
@@ -132,6 +136,8 @@ export function FeedComposer({
       userId={userId}
       userName={userName}
       userAvatar={userAvatar}
+      tenantId={tenantId}
+      tenantNome={tenantNome}
       perfilPrivado={perfilPrivado}
       eventos={eventos}
       somentePublico={somentePublico}
@@ -145,12 +151,15 @@ function FeedComposerActive({
   userId,
   userName,
   userAvatar,
+  tenantId,
+  tenantNome,
   perfilPrivado = false,
   eventos = [],
   somentePublico = false,
   eventoIdInicial,
   canal,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
+  const optimisticIdRef = useRef<string | null>(null)
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
     INITIAL_STATE,
@@ -179,7 +188,28 @@ function FeedComposerActive({
         ? pollState
         : eventState
 
-  // Feed infinite: prepend otimista com preview da action (sem esperar refetch).
+  function registrarPrependOtimista(opts: {
+    conteudo: string
+    midiaUrls: string[]
+    visibilidade: VisibilidadePost
+  }) {
+    const id = novoIdOtimista()
+    optimisticIdRef.current = id
+    emitirPostPublicado({
+      preview: criarPreviewOtimista({
+        id,
+        tenantId,
+        conteudo: opts.conteudo,
+        midiaUrls: opts.midiaUrls,
+        visibilidade: opts.visibilidade,
+        autor: { id: userId, nome: userName, avatarUrl: userAvatar },
+        tenantNome,
+      }),
+      filtroAlvo: canal ? 'canal' : 'descobrir',
+    })
+  }
+
+  // Feed infinite: confirma o prepend otimista com id real da action.
   useEffect(() => {
     const preview = canal
       ? canalState.preview
@@ -187,21 +217,44 @@ function FeedComposerActive({
     const success = canal
       ? canalState.success
       : postState.success || pollState.success || eventState.success
-    if (success) {
-      emitirPostPublicado(preview ? { preview } : undefined)
+    const falhou = canal
+      ? Boolean(canalState.message && !canalState.success)
+      : Boolean(
+          (postState.message && !postState.success) ||
+            (pollState.message && !pollState.success) ||
+            (eventState.message && !eventState.success),
+        )
+
+    if (success && preview) {
+      emitirPostPublicado({
+        preview,
+        substituirId: optimisticIdRef.current ?? undefined,
+        filtroAlvo: canal ? 'canal' : 'descobrir',
+      })
+      optimisticIdRef.current = null
+      return
+    }
+
+    if (falhou && optimisticIdRef.current) {
+      emitirPostPublicado({ removerId: optimisticIdRef.current })
+      optimisticIdRef.current = null
     }
   }, [
     canal,
     canalState.success,
+    canalState.message,
     canalState.token,
     canalState.preview,
     postState.success,
+    postState.message,
     postState.token,
     postState.preview,
     pollState.success,
+    pollState.message,
     pollState.token,
     pollState.preview,
     eventState.success,
+    eventState.message,
     eventState.token,
     eventState.preview,
   ])
@@ -226,6 +279,7 @@ function FeedComposerActive({
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
+      onPrependOtimista={registrarPrependOtimista}
       serverError={state.message ?? state.errors?.conteudo?.[0] ?? state.errors?.midias?.[0] ?? state.errors?.opcoes?.[0] ?? state.errors?.eventoId?.[0]}
     />
     </div>
@@ -261,6 +315,7 @@ function ComposerBody({
   somentePublico = false,
   eventoIdInicial,
   canal,
+  onPrependOtimista,
 }: {
   userId: string
   userName: string | null
@@ -279,6 +334,11 @@ function ComposerBody({
   somentePublico?: boolean
   eventoIdInicial?: string
   canal?: CanalComposerAlvo
+  onPrependOtimista: (opts: {
+    conteudo: string
+    midiaUrls: string[]
+    visibilidade: VisibilidadePost
+  }) => void
 }) {
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
@@ -410,6 +470,11 @@ function ComposerBody({
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.set('conteudo', serializarMencoes(texto, mencoes))
+    onPrependOtimista({
+      conteudo: serializarMencoes(texto, mencoes),
+      midiaUrls: finalMidias,
+      visibilidade: visibilidadeEfetiva,
+    })
     startTransition(() => {
       if (canal) {
         canalAction(fd)

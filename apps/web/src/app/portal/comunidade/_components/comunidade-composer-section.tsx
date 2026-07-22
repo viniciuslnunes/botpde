@@ -14,12 +14,14 @@ const FeedComposer = dynamic(
 
 export async function ComunidadeComposerSection({
   tenantId,
+  tenantNome,
   userId,
   userName,
   userAvatar,
   eventoIdInicial,
 }: {
   tenantId: string
+  tenantNome: string
   userId: string
   userName: string | null
   userAvatar: string | null
@@ -50,6 +52,8 @@ export async function ComunidadeComposerSection({
       userId={userId}
       userName={ctx.nome}
       userAvatar={userAvatar}
+      tenantId={tenantId}
+      tenantNome={tenantNome}
       perfilPrivado={ctx.perfilPrivado}
       eventos={eventos}
       bloqueioPublicacao={ctx.bloqueioPublicacao}
