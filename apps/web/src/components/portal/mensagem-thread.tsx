@@ -1013,7 +1013,7 @@ function MensagemBubble({
       className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}
     >
       {!minha && <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />}
-      <div className={['max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
+      <div className={['min-w-0 max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
         <div
           className={[
             'rounded-2xl px-3.5 py-2',
@@ -1023,7 +1023,7 @@ function MensagemBubble({
           ].join(' ')}
         >
           {isConversaGrupoLike(conversaTipo) && !minha && (
-            <p className="mb-0.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
+            <p className="mb-0.5 truncate text-xs font-semibold text-[rgb(var(--color-primary-fg))]">
               {msg.autor.nome ?? 'Membro'}
             </p>
           )}
