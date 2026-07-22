@@ -2601,6 +2601,10 @@ export async function criarCanalTematico(
   })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
 
+  if (parsed.data.avatarUrl != null && !isCloudinaryUrl(parsed.data.avatarUrl)) {
+    throw new ExpectedError('Foto do canal inválida.')
+  }
+
   const canal: { id: string } = await db.conversa.create({
     data: {
       tipo: 'CANAL',
@@ -2731,10 +2735,10 @@ export async function atualizarCanalTematico(
     const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
     await assertMembroAtivo(tenant.id, session.user.id)
 
-    const canal: { id: string; tenantId: string; canalOficial: boolean } | null =
+    const canal: { id: string; tenantId: string; canalOficial: boolean; avatarUrl: string | null } | null =
       await db.conversa.findFirst({
         where: { id: parsed.data.conversaId, tipo: 'CANAL' },
-        select: { id: true, tenantId: true, canalOficial: true },
+        select: { id: true, tenantId: true, canalOficial: true, avatarUrl: true },
       })
     if (!canal) return { message: 'Canal não encontrado.' }
     if (canal.tenantId !== tenant.id) return { message: 'Canal não encontrado.' }
@@ -2754,6 +2758,15 @@ export async function atualizarCanalTematico(
       if (!podeGerenciar) return { message: 'Sem permissão para gerenciar este canal.' }
     }
 
+    const avatarNovo = parsed.data.avatarUrl ?? null
+    if (
+      avatarNovo != null &&
+      avatarNovo !== canal.avatarUrl &&
+      !isCloudinaryUrl(avatarNovo)
+    ) {
+      return { message: 'Foto do canal inválida.' }
+    }
+
     await db.conversa.update({
       where: { id: canal.id },
       data: {
@@ -2762,7 +2775,7 @@ export async function atualizarCanalTematico(
         visibilidadeCanal: parsed.data.visibilidadeCanal,
         somenteAdminPublica: parsed.data.somenteAdminPublica,
         publica: parsed.data.publica,
-        avatarUrl: parsed.data.avatarUrl ?? null,
+        avatarUrl: avatarNovo,
       },
     })
 

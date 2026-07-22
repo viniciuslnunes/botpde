@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { Radio, Plus, Loader2, Users, ArrowLeftRight } from 'lucide-react'
+import { Radio, Plus, Loader2, Users, ArrowLeftRight, Camera } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import {
@@ -38,11 +39,32 @@ export function CanaisClient({
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [uploadingFoto, setUploadingFoto] = useState(false)
+  const fotoRef = useRef<HTMLInputElement>(null)
   const [visibilidade, setVisibilidade] = useState<'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'>(
     'ALIADOS',
   )
   const [privado, setPrivado] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  async function onFotoChange(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem.')
+      return
+    }
+    setUploadingFoto(true)
+    try {
+      const url = await uploadMediaToCloudinary(file, undefined, 'comunidade')
+      setAvatarUrl(url)
+      toast.success('Foto pronta para o canal.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload.')
+    } finally {
+      setUploadingFoto(false)
+      if (fotoRef.current) fotoRef.current.value = ''
+    }
+  }
 
   function entrar(id: string) {
     startTransition(async () => {
@@ -133,26 +155,54 @@ export function CanaisClient({
               placeholder="Descrição (opcional)"
               className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
             />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               {avatarUrl.trim() ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatarUrl.trim()}
                   alt=""
-                  className="h-9 w-9 shrink-0 rounded-lg border border-[rgb(var(--border))] object-cover"
+                  className="h-12 w-12 shrink-0 rounded-lg border border-[rgb(var(--border))] object-cover"
                 />
               ) : (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
-                  <Radio className="h-4 w-4" />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
+                  <Radio className="h-5 w-5" />
                 </div>
               )}
-              <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="URL do escudo/avatar (opcional)"
-                className="h-10 min-w-0 flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 text-sm"
-              />
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-xs text-[rgb(var(--foreground-muted))]">Foto do canal (opcional)</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={uploadingFoto || pending}
+                    onClick={() => fotoRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                  >
+                    {uploadingFoto ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    {avatarUrl.trim() ? 'Trocar foto' : 'Adicionar foto'}
+                  </button>
+                  {avatarUrl.trim() ? (
+                    <button
+                      type="button"
+                      disabled={uploadingFoto || pending}
+                      onClick={() => setAvatarUrl('')}
+                      className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  ) : null}
+                </div>
+                <input
+                  ref={fotoRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => void onFotoChange(e.target.files?.[0] ?? null)}
+                />
+              </div>
             </div>
             <select
               value={visibilidade}
@@ -184,7 +234,7 @@ export function CanaisClient({
             </label>
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || uploadingFoto}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}

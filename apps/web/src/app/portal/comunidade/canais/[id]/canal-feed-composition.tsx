@@ -1,9 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition, type ReactNode } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import {
+  Camera,
   Check,
   Loader2,
   MessageCircle,
@@ -28,6 +29,7 @@ import {
 import { Avatar } from '@/components/portal/avatar'
 import { CanalNavbarOverride } from '@/components/canal-navbar-override'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import {
   labelVisibilidadeCanal,
   linkUnidadeComunidade,
@@ -665,6 +667,9 @@ const VISIBILIDADE_OPCOES: Array<{ value: VisibilidadeCanal; label: string }> = 
 
 function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () => void }) {
   const [state, formAction, pending] = useActionState(atualizarCanalTematico, {})
+  const [avatarUrl, setAvatarUrl] = useState(canal.avatarUrl ?? '')
+  const [uploadingFoto, setUploadingFoto] = useState(false)
+  const fotoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (state.success) {
@@ -674,6 +679,25 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
       toast.error(state.message)
     }
   }, [state])
+
+  async function onFotoChange(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem.')
+      return
+    }
+    setUploadingFoto(true)
+    try {
+      const url = await uploadMediaToCloudinary(file, undefined, 'comunidade')
+      setAvatarUrl(url)
+      toast.success('Foto pronta — salve para aplicar.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha no upload.')
+    } finally {
+      setUploadingFoto(false)
+      if (fotoRef.current) fotoRef.current.value = ''
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -700,6 +724,7 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
 
         <form action={formAction} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           <input type="hidden" name="conversaId" value={canal.id} />
+          <input type="hidden" name="avatarUrl" value={avatarUrl} />
 
           <div>
             <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Nome</label>
@@ -725,13 +750,53 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Foto (URL)</label>
-            <input
-              name="avatarUrl"
-              defaultValue={canal.avatarUrl ?? ''}
-              placeholder="https://…"
-              className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-            />
+            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">Foto</label>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              {avatarUrl.trim() ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl.trim()}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-lg border border-[rgb(var(--border))] object-cover"
+                />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]">
+                  <Camera className="h-5 w-5" />
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={uploadingFoto || pending}
+                  onClick={() => fotoRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                >
+                  {uploadingFoto ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                  {avatarUrl.trim() ? 'Trocar foto' : 'Adicionar foto'}
+                </button>
+                {avatarUrl.trim() ? (
+                  <button
+                    type="button"
+                    disabled={uploadingFoto || pending}
+                    onClick={() => setAvatarUrl('')}
+                    className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+                  >
+                    Remover
+                  </button>
+                ) : null}
+              </div>
+              <input
+                ref={fotoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void onFotoChange(e.target.files?.[0] ?? null)}
+              />
+            </div>
           </div>
 
           <div>
@@ -797,7 +862,7 @@ function CanalConfigModal({ canal, onClose }: { canal: CanalItem; onClose: () =>
             </button>
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || uploadingFoto}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
