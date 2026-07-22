@@ -65,6 +65,8 @@ interface MensagemThreadProps {
   onSaiu: (conversaId: string) => void
   /** Sempre mostra voltar (ex.: painel embutido da comunidade, onde a lista some). */
   showBackButton?: boolean
+  /** Oculta a barra de scroll (scroll por roda/trackpad/toque continua). */
+  hideScrollbar?: boolean
   /** Quando false, pausa SSE/polling da thread. */
   active?: boolean
   /** Atualiza preview da inbox sem esperar SSE/polling. */
@@ -120,6 +122,7 @@ export function MensagemThread({
   onLida,
   onSaiu,
   showBackButton = false,
+  hideScrollbar = false,
   active = true,
   onMensagemEnviada,
   onSolicitacaoResolvida,
@@ -787,7 +790,10 @@ export function MensagemThread({
         <div
           ref={listRef}
           onScroll={atualizarPosicaoScroll}
-          className="h-full space-y-3 overflow-y-auto px-4 py-4"
+          className={[
+            'h-full space-y-3 overflow-y-auto px-4 py-4',
+            hideScrollbar ? 'app-scrollbar-none' : '',
+          ].join(' ')}
         >
           {carregando ? (
             <div className="flex items-center justify-center py-10">

@@ -178,7 +178,12 @@ export function MensagensShell({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          className={[
+            'min-h-0 flex-1 overflow-y-auto',
+            embedded ? 'app-scrollbar-none' : '',
+          ].join(' ')}
+        >
           {carregando ? (
             <div className="animate-pulse space-y-3 p-4">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -295,6 +300,7 @@ export function MensagensShell({
             onLida={zerarNaoLidas}
             onSaiu={removerDaLista}
             showBackButton={embedded}
+            hideScrollbar={embedded}
             active={active}
             onMensagemEnviada={(preview) => {
               setConversas((prev) => {
