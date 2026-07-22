@@ -249,6 +249,7 @@ async function publicarComunicadoENotificar(opts: {
 
   invalidateComunicadosCache(opts.tenantId)
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/comunicados')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
 
@@ -394,6 +395,7 @@ export async function atualizarComunicado(
 
   invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/comunicados')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
   return {}
@@ -437,6 +439,7 @@ async function atualizarComunicadoEPost(opts: {
 
   invalidateComunicadosCache(opts.tenantId)
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/comunicados')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
 }
@@ -509,6 +512,7 @@ export async function alternarFixadoComunicado(comunicadoId: string) {
 
   invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/comunicados')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
 }
@@ -538,6 +542,7 @@ export async function excluirComunicado(comunicadoId: string) {
 
   invalidateComunicadosCache(tenant.id)
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/comunicados')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal')
 }
