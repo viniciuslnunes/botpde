@@ -55,6 +55,7 @@ import { PostMedia } from './post-media'
 import { ensureSocialEmbedInMidias, midiasComEmbedDoTexto, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { isConversaGrupoLike } from '@/lib/canais-shared'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import { ComunidadePrefetchLink } from './comunidade-prefetch-link'
 
 interface MensagemThreadProps {
   conversa: InboxItemDto
@@ -693,11 +694,13 @@ export function MensagemThread({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <Avatar
-          nome={titulo}
-          avatarUrl={conversa.tipo === 'DIRETA' ? conversa.outroMembro?.avatarUrl ?? null : conversa.avatarUrl}
-          size="sm"
-        />
+        {conversa.tipo === 'DIRETA' && conversa.outroMembro ? (
+          <ComunidadePrefetchLink href={`/portal/comunidade/perfil/${conversa.outroMembro.id}`}>
+            <Avatar nome={titulo} avatarUrl={conversa.outroMembro.avatarUrl} size="sm" />
+          </ComunidadePrefetchLink>
+        ) : (
+          <Avatar nome={titulo} avatarUrl={conversa.avatarUrl} size="sm" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</p>
           {isConversaGrupoLike(conversa.tipo) && (
@@ -1167,7 +1170,11 @@ function MensagemBubble({
       {...motionProps}
       className={['group flex gap-2', minha ? 'justify-end' : 'justify-start'].join(' ')}
     >
-      {!minha && <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />}
+      {!minha && (
+        <ComunidadePrefetchLink href={`/portal/comunidade/perfil/${msg.autor.id}`} className="shrink-0">
+          <Avatar nome={msg.autor.nome} avatarUrl={msg.autor.avatarUrl} size="sm" />
+        </ComunidadePrefetchLink>
+      )}
       <div className={['min-w-0 max-w-[80%] sm:max-w-[65%]', minha ? 'items-end' : 'items-start'].join(' ')}>
         <div
           className={[
