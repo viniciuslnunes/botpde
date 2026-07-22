@@ -21,7 +21,11 @@ export function CriarContaForm({ corPrimaria = '#7c3aed' }: { corPrimaria?: stri
         if (!nickDisponivel) e.preventDefault()
       }}
     >
-      <AuthRedirectEffect redirectTo={state.redirectTo} />
+      <AuthRedirectEffect
+        redirectTo={state.redirectTo}
+        message="Preparando seu onboarding..."
+        description="Estamos configurando sua conta e carregando os clubes."
+      />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

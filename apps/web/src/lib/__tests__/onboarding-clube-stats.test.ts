@@ -3,6 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const saasMembroFindMany = vi.hoisted(() => vi.fn())
 const perfilTorcedorFindMany = vi.hoisted(() => vi.fn())
 
+vi.mock('next/cache', () => ({
+  unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+}))
+
 vi.mock('@torcida/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@torcida/db')>()
   return {
@@ -73,5 +77,25 @@ describe('calcularStatsClubesOnboarding', () => {
       torcedoresTotal: 2,
       torcedoresOnline: 2,
     })
+  })
+})
+
+describe('tetoLimiteDeStatsMap', () => {
+  it('usa a menor contagem da plataforma sem novo scan', async () => {
+    const { tetoLimiteDeStatsMap } = await import('@/lib/onboarding-clube-stats')
+    const stats = new Map([
+      [
+        'a',
+        { sociosTotal: 10, sociosOnline: 0, torcedoresTotal: 50, torcedoresOnline: 0 },
+      ],
+      [
+        'b',
+        { sociosTotal: 3, sociosOnline: 0, torcedoresTotal: 0, torcedoresOnline: 0 },
+      ],
+    ])
+    const teto = tetoLimiteDeStatsMap(stats)
+    // menor plataforma = 3 (sócios); teto = min(IBOPE, 3) ≤ 3
+    expect(teto).toBeLessThanOrEqual(3)
+    expect(teto).toBeGreaterThan(0)
   })
 })

@@ -1,9 +1,10 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { db, saoMesmoClube, indiceAfiliacaoCanonica, withDbRetry } from '@torcida/db'
 import { torcidaAcessivelNoHost } from '@/lib/tenant'
 import {
   calcularStatsClubesOnboarding,
-  getTetoLimiteTorcedoresGlobal,
+  tetoLimiteDeStatsMap,
   type StatsClubeOnboarding,
 } from '@/lib/onboarding-clube-stats'
 import {
@@ -71,10 +72,6 @@ function aplicarEstimativaRealNoCard(
   }
 
   return row
-}
-
-async function resolverTetoLimiteGlobal(): Promise<number> {
-  return getTetoLimiteTorcedoresGlobal()
 }
 
 // ─── Tipos de retorno explícitos (a inferência do Prisma quebra silenciosamente
@@ -189,18 +186,25 @@ export type RegiaoOnboarding = {
 
 /**
  * UFs com clubes no catálogo (sugestão por região no passo Clube).
+ * Cache cross-request — a malha de estados muda raramente.
  */
 export const getRegioesOnboarding = cache(async (): Promise<RegiaoOnboarding[]> => {
-  type GrupoUf = { estado: string | null; _count: { _all: number } }
-  const grupos: GrupoUf[] = await db.afiliacao.groupBy({
-    by: ['estado'],
-    where: { estado: { not: null } },
-    _count: { _all: true },
-  })
-  return grupos
-    .filter((g): g is GrupoUf & { estado: string } => g.estado != null && g.estado !== '')
-    .map((g) => ({ uf: g.estado, total: g._count._all }))
-    .sort((a, b) => a.uf.localeCompare(b.uf, 'pt-BR'))
+  return unstable_cache(
+    async (): Promise<RegiaoOnboarding[]> => {
+      type GrupoUf = { estado: string | null; _count: { _all: number } }
+      const grupos: GrupoUf[] = await db.afiliacao.groupBy({
+        by: ['estado'],
+        where: { estado: { not: null } },
+        _count: { _all: true },
+      })
+      return grupos
+        .filter((g): g is GrupoUf & { estado: string } => g.estado != null && g.estado !== '')
+        .map((g) => ({ uf: g.estado, total: g._count._all }))
+        .sort((a, b) => a.uf.localeCompare(b.uf, 'pt-BR'))
+    },
+    ['onboarding-regioes'],
+    { revalidate: 300, tags: ['onboarding-regioes', 'onboarding-afiliacoes'] },
+  )()
 })
 
 /**
@@ -211,143 +215,160 @@ export const getRegioesOnboarding = cache(async (): Promise<RegiaoOnboarding[]> 
  * Quando `busca` é informada, filtra clubes cujo **nome ou apelido começa**
  * com o termo (case-insensitive) — ex.: "co" → Corinthians, Coritiba.
  * `uf` restringe por estado (sugestão regional).
+ *
+ * Cache cross-request (~90s): catálogo + stats de plataforma são dados globais;
+ * `*Online` pode ficar até ~90s stale (aceitável no card de onboarding).
  */
 export const getAfiliacoesParaOnboarding = cache(
   async (busca?: string, uf?: string): Promise<AfiliacaoOnboarding[]> => {
-    const termo = busca?.trim()
-    const estado = uf?.trim().toUpperCase() || undefined
-    type AfiliacaoRow = {
-      id: string
-      nome: string
-      apelido: string | null
-      escudoUrl: string | null
-      cidade: string | null
-      estado: string | null
-      serie: SerieCampeonato | null
-      torcedoresEstimados: number | null
-      torcedoresEstimadosFonte: string | null
-      torcedoresEstimadosTipo: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
-      _count: { tenants: number }
-    }
-    type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
-
-    const filtros = []
-    if (termo) {
-      filtros.push({
-        OR: [
-          { nome: { startsWith: termo, mode: 'insensitive' as const } },
-          { apelido: { startsWith: termo, mode: 'insensitive' as const } },
-        ],
-      })
-    }
-    if (estado) {
-      filtros.push({ estado })
-    }
-
-    const afiliacoes: AfiliacaoRow[] = await db.afiliacao.findMany({
-      where: filtros.length > 0 ? { AND: filtros } : undefined,
-      select: {
-        id: true,
-        nome: true,
-        apelido: true,
-        escudoUrl: true,
-        cidade: true,
-        estado: true,
-        serie: true,
-        torcedoresEstimados: true,
-        torcedoresEstimadosFonte: true,
-        torcedoresEstimadosTipo: true,
-        _count: { select: { tenants: true } },
-      },
-      orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
-    })
-
-    // Duplicatas por nome literal OU pelo mesmo clube (ex.: Corinthians ×
-    // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo;
-    // herda escudoUrl de qualquer duplicata do grupo (Fase E).
-    const unicas: AfiliacaoDedup[] = []
-    for (const afiliacao of afiliacoes) {
-      const idxGrupo = unicas.findIndex((u) => saoMesmoClube(u, afiliacao))
-      if (idxGrupo === -1) {
-        unicas.push({ ...afiliacao, idsGrupo: [afiliacao.id] })
-        continue
-      }
-      const existente = unicas[idxGrupo]!
-      existente.idsGrupo.push(afiliacao.id)
-      const grupo = [existente, afiliacao]
-      const canonIdx = indiceAfiliacaoCanonica(grupo)
-      const canon = grupo[canonIdx]!
-      const escudoUrl = canon.escudoUrl ?? grupo.find((g) => g.escudoUrl)?.escudoUrl ?? null
-      const torcedoresEstimados =
-        canon.torcedoresEstimados ??
-        grupo.find((g) => g.torcedoresEstimados != null)?.torcedoresEstimados ??
-        null
-      const torcedoresEstimadosFonte =
-        canon.torcedoresEstimadosFonte ??
-        grupo.find((g) => g.torcedoresEstimadosFonte)?.torcedoresEstimadosFonte ??
-        null
-      const torcedoresEstimadosTipo =
-        canon.torcedoresEstimadosTipo ??
-        grupo.find((g) => g.torcedoresEstimadosTipo)?.torcedoresEstimadosTipo ??
-        null
-      unicas[idxGrupo] = {
-        ...canon,
-        escudoUrl,
-        torcedoresEstimados,
-        torcedoresEstimadosFonte,
-        torcedoresEstimadosTipo,
-        idsGrupo: existente.idsGrupo,
-      }
-    }
-
-    const statsMap = await calcularStatsClubesOnboarding(
-      unicas.map((u) => ({ canonicalId: u.id, afiliacaoIds: u.idsGrupo })),
-    )
-
-    const tetoLimiteGlobal = await resolverTetoLimiteGlobal()
-
-    const baseRows = unicas.map((afiliacao) => ({
-      id: afiliacao.id,
-      nome: afiliacao.nome,
-      apelido: afiliacao.apelido,
-      escudoUrl: afiliacao.escudoUrl,
-      cidade: afiliacao.cidade,
-      estado: afiliacao.estado,
-      serie: afiliacao.serie,
-      torcedoresEstimados: afiliacao.torcedoresEstimados,
-      torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
-      torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
-      stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
-    }))
-
-    return baseRows
-      .map((afiliacao) => {
-        const estimativa = aplicarEstimativaRealNoCard(
-          {
-            torcedoresEstimados: afiliacao.torcedoresEstimados,
-            torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
-            torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
-          },
-          afiliacao.stats,
-          tetoLimiteGlobal,
-        )
-        return {
-          id: afiliacao.id,
-          nome: afiliacao.nome,
-          apelido: afiliacao.apelido,
-          escudoUrl: afiliacao.escudoUrl,
-          cidade: afiliacao.cidade,
-          estado: afiliacao.estado,
-          serie: afiliacao.serie,
-          torcedoresEstimados: estimativa.torcedoresEstimados,
-          torcedoresEstimadosFonte: estimativa.torcedoresEstimadosFonte,
-          torcedoresEstimadosTipo: estimativa.torcedoresEstimadosTipo,
-          stats: afiliacao.stats,
-        }
-      })
-      .sort(compararClubesOnboarding)
+    const termo = busca?.trim() || ''
+    const estado = uf?.trim().toUpperCase() || ''
+    return unstable_cache(
+      () => carregarAfiliacoesParaOnboarding(termo || undefined, estado || undefined),
+      ['onboarding-afiliacoes', termo || '-', estado || '-'],
+      { revalidate: 90, tags: ['onboarding-afiliacoes'] },
+    )()
   },
 )
+
+async function carregarAfiliacoesParaOnboarding(
+  busca?: string,
+  uf?: string,
+): Promise<AfiliacaoOnboarding[]> {
+  const termo = busca?.trim()
+  const estado = uf?.trim().toUpperCase() || undefined
+  type AfiliacaoRow = {
+    id: string
+    nome: string
+    apelido: string | null
+    escudoUrl: string | null
+    cidade: string | null
+    estado: string | null
+    serie: SerieCampeonato | null
+    torcedoresEstimados: number | null
+    torcedoresEstimadosFonte: string | null
+    torcedoresEstimadosTipo: 'IBOPE_DIGITAL' | 'LIMITE_ATE' | null
+    _count: { tenants: number }
+  }
+  type AfiliacaoDedup = AfiliacaoRow & { idsGrupo: string[] }
+
+  const filtros = []
+  if (termo) {
+    filtros.push({
+      OR: [
+        { nome: { startsWith: termo, mode: 'insensitive' as const } },
+        { apelido: { startsWith: termo, mode: 'insensitive' as const } },
+      ],
+    })
+  }
+  if (estado) {
+    filtros.push({ estado })
+  }
+
+  const afiliacoes: AfiliacaoRow[] = await db.afiliacao.findMany({
+    where: filtros.length > 0 ? { AND: filtros } : undefined,
+    select: {
+      id: true,
+      nome: true,
+      apelido: true,
+      escudoUrl: true,
+      cidade: true,
+      estado: true,
+      serie: true,
+      torcedoresEstimados: true,
+      torcedoresEstimadosFonte: true,
+      torcedoresEstimadosTipo: true,
+      _count: { select: { tenants: true } },
+    },
+    orderBy: [{ escudoUrl: { sort: 'asc', nulls: 'last' } }, { nome: 'asc' }],
+  })
+
+  // Duplicatas por nome literal OU pelo mesmo clube (ex.: Corinthians ×
+  // Sport Club Corinthians Paulista). Prioriza quem tem tenants + escudo;
+  // herda escudoUrl de qualquer duplicata do grupo (Fase E).
+  const unicas: AfiliacaoDedup[] = []
+  for (const afiliacao of afiliacoes) {
+    const idxGrupo = unicas.findIndex((u) => saoMesmoClube(u, afiliacao))
+    if (idxGrupo === -1) {
+      unicas.push({ ...afiliacao, idsGrupo: [afiliacao.id] })
+      continue
+    }
+    const existente = unicas[idxGrupo]!
+    existente.idsGrupo.push(afiliacao.id)
+    const grupo = [existente, afiliacao]
+    const canonIdx = indiceAfiliacaoCanonica(grupo)
+    const canon = grupo[canonIdx]!
+    const escudoUrl = canon.escudoUrl ?? grupo.find((g) => g.escudoUrl)?.escudoUrl ?? null
+    const torcedoresEstimados =
+      canon.torcedoresEstimados ??
+      grupo.find((g) => g.torcedoresEstimados != null)?.torcedoresEstimados ??
+      null
+    const torcedoresEstimadosFonte =
+      canon.torcedoresEstimadosFonte ??
+      grupo.find((g) => g.torcedoresEstimadosFonte)?.torcedoresEstimadosFonte ??
+      null
+    const torcedoresEstimadosTipo =
+      canon.torcedoresEstimadosTipo ??
+      grupo.find((g) => g.torcedoresEstimadosTipo)?.torcedoresEstimadosTipo ??
+      null
+    unicas[idxGrupo] = {
+      ...canon,
+      escudoUrl,
+      torcedoresEstimados,
+      torcedoresEstimadosFonte,
+      torcedoresEstimadosTipo,
+      idsGrupo: existente.idsGrupo,
+    }
+  }
+
+  const statsMap = await calcularStatsClubesOnboarding(
+    unicas.map((u) => ({ canonicalId: u.id, afiliacaoIds: u.idsGrupo })),
+  )
+
+  // Reusa o Map já calculado — evita 2ª passagem em SaasMembro/PerfilTorcedor.
+  const tetoLimiteGlobal = tetoLimiteDeStatsMap(statsMap)
+
+  const baseRows = unicas.map((afiliacao) => ({
+    id: afiliacao.id,
+    nome: afiliacao.nome,
+    apelido: afiliacao.apelido,
+    escudoUrl: afiliacao.escudoUrl,
+    cidade: afiliacao.cidade,
+    estado: afiliacao.estado,
+    serie: afiliacao.serie,
+    torcedoresEstimados: afiliacao.torcedoresEstimados,
+    torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+    torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
+    stats: statsMap.get(afiliacao.id) ?? STATS_VAZIAS,
+  }))
+
+  return baseRows
+    .map((afiliacao) => {
+      const estimativa = aplicarEstimativaRealNoCard(
+        {
+          torcedoresEstimados: afiliacao.torcedoresEstimados,
+          torcedoresEstimadosFonte: afiliacao.torcedoresEstimadosFonte,
+          torcedoresEstimadosTipo: afiliacao.torcedoresEstimadosTipo,
+        },
+        afiliacao.stats,
+        tetoLimiteGlobal,
+      )
+      return {
+        id: afiliacao.id,
+        nome: afiliacao.nome,
+        apelido: afiliacao.apelido,
+        escudoUrl: afiliacao.escudoUrl,
+        cidade: afiliacao.cidade,
+        estado: afiliacao.estado,
+        serie: afiliacao.serie,
+        torcedoresEstimados: estimativa.torcedoresEstimados,
+        torcedoresEstimadosFonte: estimativa.torcedoresEstimadosFonte,
+        torcedoresEstimadosTipo: estimativa.torcedoresEstimadosTipo,
+        stats: afiliacao.stats,
+      }
+    })
+    .sort(compararClubesOnboarding)
+}
 
 /**
  * Torcidas (Tenants ativos) vinculadas a um clube, com contagem de membros aprovados.

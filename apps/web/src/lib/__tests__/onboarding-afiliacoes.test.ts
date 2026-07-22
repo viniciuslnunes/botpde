@@ -5,6 +5,11 @@ const afiliacaoFindMany = vi.hoisted(() => vi.fn())
 const saasMembroFindMany = vi.hoisted(() => vi.fn())
 const perfilTorcedorFindMany = vi.hoisted(() => vi.fn())
 
+// `unstable_cache` não funciona fora do runtime Next.js — passthrough no teste.
+vi.mock('next/cache', () => ({
+  unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+}))
+
 vi.mock('@/lib/tenant', () => ({
   torcidaAcessivelNoHost: () => true,
 }))

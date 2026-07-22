@@ -1,4 +1,5 @@
 import 'server-only'
+import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
 import { db, calcularMenorValorEstimadosConhecido } from '@torcida/db'
 import { JANELA_ONLINE_MS } from '@/lib/presenca'
@@ -146,22 +147,12 @@ export async function calcularStatsClubesOnboarding(
   return result
 }
 
-/**
- * Menor contagem de torcedores/sócios por clube na plataforma (global, cacheada).
- * Usa a mesma agregação do card de onboarding para consistência.
- */
-export const getMenorContagemPlataformaGlobal = cache(async (): Promise<number | null> => {
-  const afiliacoes: { id: string }[] = await db.afiliacao.findMany({
-    select: { id: true },
-  })
-  if (afiliacoes.length === 0) return null
-
-  const stats = await calcularStatsClubesOnboarding(
-    afiliacoes.map((a) => ({ canonicalId: a.id, afiliacaoIds: [a.id] })),
-  )
-
+/** Menor contagem > 0 entre stats já agregadas (evita re-scan de membros). */
+export function menorContagemDeStats(
+  stats: Iterable<StatsClubeOnboarding>,
+): number | null {
   let min: number | null = null
-  for (const s of stats.values()) {
+  for (const s of stats) {
     const n =
       s.torcedoresTotal > 0
         ? s.torcedoresTotal
@@ -171,6 +162,43 @@ export const getMenorContagemPlataformaGlobal = cache(async (): Promise<number |
     if (n > 0 && (min == null || n < min)) min = n
   }
   return min
+}
+
+/**
+ * Teto LIMITE_ATE a partir de um Map de stats já calculado (mesmo request do catálogo).
+ * Evita a 2ª passagem completa em SaasMembro/PerfilTorcedor.
+ */
+export function tetoLimiteDeStatsMap(
+  statsMap: Map<string, StatsClubeOnboarding>,
+): number {
+  const menorIbope = calcularMenorValorEstimadosConhecido()
+  const menorPlataforma = menorContagemDeStats(statsMap.values())
+  if (menorPlataforma != null && menorPlataforma > 0) {
+    return Math.min(menorIbope, menorPlataforma)
+  }
+  return menorIbope
+}
+
+/**
+ * Menor contagem de torcedores/sócios por clube na plataforma (global, cacheada).
+ * Usa a mesma agregação do card de onboarding para consistência.
+ */
+export const getMenorContagemPlataformaGlobal = cache(async (): Promise<number | null> => {
+  return unstable_cache(
+    async (): Promise<number | null> => {
+      const afiliacoes: { id: string }[] = await db.afiliacao.findMany({
+        select: { id: true },
+      })
+      if (afiliacoes.length === 0) return null
+
+      const stats = await calcularStatsClubesOnboarding(
+        afiliacoes.map((a) => ({ canonicalId: a.id, afiliacaoIds: [a.id] })),
+      )
+      return menorContagemDeStats(stats.values())
+    },
+    ['onboarding-menor-contagem-plataforma'],
+    { revalidate: 300, tags: ['onboarding-afiliacoes'] },
+  )()
 })
 
 /** Teto conservador para LIMITE_ATE: menor valor IBOPE curado × menor clube na plataforma. */

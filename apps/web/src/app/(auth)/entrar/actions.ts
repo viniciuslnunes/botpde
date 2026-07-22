@@ -137,8 +137,16 @@ export async function criarContaComSenha(
     throw err
   }
 
-  // Router canônico: com nickname já definido → /onboarding (evita /definir-apelido).
-  const login = await entrarComCredenciais(email, senha, '/auth/contexto')
+  // Conta nova já tem nickname e precisa de onboarding — pula /auth/contexto
+  // (1 RTT + checks) e vai direto; cookie de tenant só importa com SaasMembro.
+  // Em paralelo, aquece o catálogo (unstable_cache) pra /onboarding chegar quente.
+  const [, login] = await Promise.all([
+    import('@/lib/onboarding').then((m) =>
+      Promise.all([m.getAfiliacoesParaOnboarding(), m.getRegioesOnboarding()]),
+    ),
+    entrarComCredenciais(email, senha, '/onboarding'),
+  ])
+
   if (login.message) {
     return {
       message:
