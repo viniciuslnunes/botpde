@@ -412,6 +412,43 @@ export async function avaliarAcessoDm(
   return 'direto'
 }
 
+/**
+ * Rede de conexão social: seguimento APROVADO em qualquer direção.
+ * Usado para incluir em grupo quem exigiria solicitação de DM.
+ */
+export async function saoConectadosNaRede(userA: string, userB: string): Promise<boolean> {
+  if (userA === userB) return false
+  const row: { id: string } | null = await db.seguimento.findFirst({
+    where: {
+      status: 'APROVADO',
+      OR: [
+        { seguidorId: userA, seguidoId: userB },
+        { seguidorId: userB, seguidoId: userA },
+      ],
+    },
+    select: { id: true },
+  })
+  return row !== null
+}
+
+/**
+ * Pode o criador incluir `membroId` num grupo de chat?
+ * - Acesso DM direto (mesma TO/aliados, ou torcedor↔torcedor do clube) → sim
+ * - Quem exigiria solicitação (ex.: sócio de perfil privado) → só se já conectados
+ * - Bloqueado/rival/clube diferente → não
+ */
+export async function podeIncluirEmGrupoMensageria(
+  criadorId: string,
+  membroId: string,
+  tenantContextoId?: string | null,
+): Promise<boolean> {
+  if (criadorId === membroId) return false
+  const acesso = await avaliarAcessoDm(criadorId, membroId, tenantContextoId)
+  if (acesso === 'direto') return true
+  if (acesso === 'bloqueado') return false
+  return saoConectadosNaRede(criadorId, membroId)
+}
+
 /** Cria DM com destinatário PENDENTE e primeira mensagem introdutória. */
 export async function criarDmComSolicitacao(
   remetenteId: string,

@@ -6,14 +6,13 @@ import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import {
   avaliarAcessoDm,
-  canMessageUser,
   criarDmComSolicitacao,
   criarGrupoConversa,
   getOrCreateDmConversa,
   listConversas,
   MAX_CONTEUDO_MENSAGEM,
   MAX_MEMBROS_GRUPO,
-  mesmaAfiliacaoComunidade,
+  podeIncluirEmGrupoMensageria,
   resolveTenantNotificacaoMensageria,
   serializeConversasInbox,
 } from '@/lib/mensageria'
@@ -241,10 +240,13 @@ export async function POST(request: NextRequest) {
 
       const membroIds = [...new Set(parsed.data.membroIds)].filter((id) => id !== userId)
       for (const membroId of membroIds) {
-        const pode = await mesmaAfiliacaoComunidade(userId, membroId)
+        const pode = await podeIncluirEmGrupoMensageria(userId, membroId, null)
         if (!pode) {
           return NextResponse.json(
-            { error: 'Todos os participantes precisam ser torcedores do mesmo clube.' },
+            {
+              error:
+                'Só é possível adicionar quem está na sua rede de conexão ou com quem você já pode conversar na comunidade.',
+            },
             { status: 403 },
           )
         }
@@ -303,10 +305,13 @@ export async function POST(request: NextRequest) {
 
     const membroIds = [...new Set(parsed.data.membroIds)].filter((id) => id !== userId)
     for (const membroId of membroIds) {
-      const pode = await canMessageUser(userId, membroId, tenant.id)
+      const pode = await podeIncluirEmGrupoMensageria(userId, membroId, tenant.id)
       if (!pode) {
         return NextResponse.json(
-          { error: 'Todos os participantes precisam ser da sua torcida ou de torcidas aliadas.' },
+          {
+            error:
+              'Só é possível adicionar quem está na sua rede de conexão, na sua torcida ou em torcidas aliadas.',
+          },
           { status: 403 },
         )
       }

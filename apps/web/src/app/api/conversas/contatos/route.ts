@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@torcida/db'
 import { getAlliedTenantIds } from '@/lib/hierarquia'
-import { avaliarAcessoDm } from '@/lib/mensageria'
+import { avaliarAcessoDm, podeIncluirEmGrupoMensageria } from '@/lib/mensageria'
 import {
   assertContextoMensageria,
   assertUsuarioMensageria,
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const contexto = await assertContextoMensageria()
     const userId = contexto.session.user.id!
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
+    const paraGrupo = request.nextUrl.searchParams.get('para') === 'grupo'
 
     const bloqueios: { bloqueadorId: string; bloqueadoId: string }[] =
       await db.bloqueioUsuario.findMany({
@@ -51,6 +52,19 @@ export async function GET(request: NextRequest) {
     ): Promise<void> {
       if (vistos.has(opts.id) || bloqueadosIds.has(opts.id)) return
       vistos.add(opts.id)
+      if (paraGrupo) {
+        const podeGrupo = await podeIncluirEmGrupoMensageria(userId, opts.id, tenantContextoId)
+        if (!podeGrupo) return
+        contatos.push({
+          id: opts.id,
+          nome: opts.nome,
+          avatarUrl: opts.avatarUrl,
+          tenantNome: opts.tenantNome,
+          mesmoTenant: opts.mesmoTenant,
+          requerSolicitacao: false,
+        })
+        return
+      }
       const acesso = await avaliarAcessoDm(userId, opts.id, tenantContextoId)
       if (acesso === 'bloqueado') return
       contatos.push({

@@ -376,9 +376,11 @@ function NovaConversaModal({
     const id = window.setTimeout(async () => {
       setBuscando(true)
       try {
-        const res = await fetch(`/api/conversas/contatos?q=${encodeURIComponent(busca)}`, {
-          cache: 'no-store',
-        })
+        const para = tipo === 'grupo' ? '&para=grupo' : ''
+        const res = await fetch(
+          `/api/conversas/contatos?q=${encodeURIComponent(busca)}${para}`,
+          { cache: 'no-store' },
+        )
         if (!res.ok) return
         const data = (await res.json()) as { contatos?: ContatoDto[] }
         setResultados(data.contatos ?? [])
@@ -387,7 +389,7 @@ function NovaConversaModal({
       }
     }, 300)
     return () => window.clearTimeout(id)
-  }, [busca])
+  }, [busca, tipo])
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {

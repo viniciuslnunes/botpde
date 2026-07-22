@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
-import { canMessageUser, listMembrosConversa, MAX_MEMBROS_GRUPO } from '@/lib/mensageria'
+import { listMembrosConversa, MAX_MEMBROS_GRUPO, podeIncluirEmGrupoMensageria } from '@/lib/mensageria'
 import { isConversaGrupoLike } from '@/lib/canais'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 
@@ -66,10 +66,18 @@ export async function POST(
       return NextResponse.json({ error: 'Este membro já está no grupo.' }, { status: 400 })
     }
 
-    const pode = await canMessageUser(userId, novoId, tenant.id)
+    const tenantMeta: { sintetico: boolean } | null = await db.tenant.findUnique({
+      where: { id: tenant.id },
+      select: { sintetico: true },
+    })
+    const tenantContextoId = tenantMeta?.sintetico ? null : tenant.id
+    const pode = await podeIncluirEmGrupoMensageria(userId, novoId, tenantContextoId)
     if (!pode) {
       return NextResponse.json(
-        { error: 'O participante precisa ser da sua torcida ou de uma torcida aliada.' },
+        {
+          error:
+            'Só é possível adicionar quem está na sua rede de conexão ou com quem você já pode conversar na comunidade.',
+        },
         { status: 403 },
       )
     }
