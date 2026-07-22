@@ -1059,12 +1059,11 @@ export async function getPostPorId(
   tenantId: string,
   viewerId: string,
 ): Promise<PostSocialItem | null> {
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const visibleTenantIds = await resolveVisibleTenantIdsForFeed(tenantId, viewerId)
   const raw: PostRaw | null = (await db.post.findFirst({
     where: {
       id: postId,
       tenantId: { in: visibleTenantIds },
-      tipo: 'MEMBRO',
       oculto: false,
     },
     include: postInclude(viewerId),
