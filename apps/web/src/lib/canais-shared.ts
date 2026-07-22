@@ -19,6 +19,18 @@ export interface CanalItem {
   tenantNome: string
 }
 
+/** Card leve do aside "Canais sugeridos" — espelha `SugestaoAutorAside`. */
+export interface SugestaoCanalAside {
+  id: string
+  tenantId: string
+  nome: string | null
+  avatarUrl: string | null
+  membros: number
+  canalOficial: boolean
+  publica: boolean
+  tenantNome: string
+}
+
 export interface MembroCanalItem {
   userId: string
   nome: string | null

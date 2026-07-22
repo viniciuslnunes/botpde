@@ -3,12 +3,15 @@ import { Newspaper, Users, Hash, Calendar } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getProximoEvento } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
+import { getSugestoesCanaisParaAside } from '@/lib/canais'
+import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { ComunidadeSalasLiveWidget } from '@/components/portal/comunidade-salas-live-widget'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { CanaisSugeridosAside } from './canais-sugeridos-aside'
 
 interface ComunidadeAsideWidgetsProps {
   tenantId: string
@@ -23,11 +26,14 @@ export async function ComunidadeAsideWidgets({
   currentUserId,
   salasAoVivo = [],
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, sugestoes, hashtags, proximoEvento] = await Promise.all([
+  const [noticias, sugestoes, canaisSugeridos, hashtags, proximoEvento] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
       : Promise.resolve([] as SugestaoAutorAside[]),
+    currentUserId
+      ? getSugestoesCanaisParaAside(tenantId, currentUserId)
+      : Promise.resolve([] as SugestaoCanalAside[]),
     getHashtagsEmAlta(tenantId, 5),
     getProximoEvento(tenantId, currentUserId),
   ])
@@ -115,6 +121,12 @@ export async function ComunidadeAsideWidgets({
         </MotionReveal>
       )}
 
+      {canaisSugeridos.length > 0 && (
+        <MotionReveal index={widgetIndex++}>
+          <CanaisSugeridosAside canais={canaisSugeridos} tenantAtualId={tenantId} />
+        </MotionReveal>
+      )}
+
       {sugestoes.length > 0 && (
         <MotionReveal index={widgetIndex++}>
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
@@ -147,6 +159,12 @@ export async function ComunidadeAsideWidgets({
                 </div>
               ))}
             </div>
+            <Link
+              href="/portal/comunidade/busca"
+              className="mt-3 flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+            >
+              Ver membros
+            </Link>
           </div>
         </MotionReveal>
       )}

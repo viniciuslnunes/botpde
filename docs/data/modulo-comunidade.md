@@ -172,6 +172,13 @@ Pós-deploy: `pnpm --filter @torcida/db db:enable-pg-trgm`.
 - **Recap de sala** — ao encerrar uma live, publica post automático no feed com total de participantes.
 - **Limite de menções** — máximo de 10 menções por post/comentário; rate limit ao notificar.
 - **Ao vivo no aside** — widget de salas ativas no aside desktop (mobile já tinha).
+- **Canais sugeridos no aside (2026-07-22)** — par do "Para seguir": até 4 canais
+  visíveis em que o viewer ainda não está inscrito (`getSugestoesCanaisParaAside` em
+  `lib/canais.ts`, UI em `_components/canais-sugeridos-aside.tsx`). Prioriza canais do
+  tenant ativo, depois oficiais, depois por nº de membros. Só lista canais em que dá
+  para agir (abertos → Entrar; fechados do próprio tenant → Pedir). Botão "Ver canais"
+  no rodapé → `/portal/comunidade/canais` (espelhado por "Ver membros" no "Para seguir"
+  → `/portal/comunidade/busca`).
 
 ## Grupos, stories e vídeos (Sprint 6)
 

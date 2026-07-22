@@ -23,6 +23,7 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | SSE feed + refresh | `feed-live-banner.tsx`, `use-feed-stream.ts`, `feed-live-refresh.ts` | Topo: auto-refetch; rolado: banner |
 | Batch visibilidade | `perfil-social.ts`, `social.ts`, `comunidade-busca.ts` | Fim de N+1 em busca/feed |
 | Batch contagens | `getContagensSeguimentoEmLote` | Aside "Para seguir" |
+| Canais sugeridos | `getSugestoesCanaisParaAside` → `listCanaisVisiveis` | Aside "Canais sugeridos" (filtra membership; cache base 120s) |
 | Hashtags em alta SQL | `feed.ts` `getHashtagsEmAlta` | `groupBy` em vez de agregar em memória |
 | Stories privacidade batch | `stories.ts` | Uma leitura de perfis/seguimentos |
 | Índices compostos | `schema.prisma` (`Post`, `Seguimento`) | Leituras por autor/data e rede |

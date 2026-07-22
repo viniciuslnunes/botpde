@@ -25,6 +25,7 @@ import type {
   CandidatoMembroCanalItem,
   MembroCanalItem,
   PedidoCanalItem,
+  SugestaoCanalAside,
   UnidadeBuscaItem,
   VisibilidadeCanal,
 } from './canais-shared'
@@ -34,6 +35,7 @@ export type {
   CandidatoMembroCanalItem,
   MembroCanalItem,
   PedidoCanalItem,
+  SugestaoCanalAside,
   UnidadeBuscaItem,
   VisibilidadeCanal,
 } from './canais-shared'
@@ -318,6 +320,43 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     })
   })
   return result
+})
+
+/**
+ * Canais visíveis em que o viewer ainda não está inscrito — painel
+ * "Canais sugeridos" no aside do feed (par do "Para seguir").
+ * Só inclui canais em que dá para agir: abertos (`publica`) ou fechados
+ * do próprio tenant (`pedirEntradaCanal` exige `tenantId` ativo).
+ */
+export const getSugestoesCanaisParaAside = cache(async function getSugestoesCanaisParaAside(
+  tenantId: string,
+  userId: string,
+): Promise<SugestaoCanalAside[]> {
+  const canais = await listCanaisVisiveis(tenantId, userId)
+  return canais
+    .filter(
+      (c) =>
+        !c.souMembro &&
+        !c.pedidoPendente &&
+        (c.publica || c.tenantId === tenantId),
+    )
+    .sort((a, b) => {
+      if (a.tenantId === tenantId && b.tenantId !== tenantId) return -1
+      if (b.tenantId === tenantId && a.tenantId !== tenantId) return 1
+      if (a.canalOficial !== b.canalOficial) return a.canalOficial ? -1 : 1
+      return b.membros - a.membros
+    })
+    .slice(0, 4)
+    .map((c) => ({
+      id: c.id,
+      tenantId: c.tenantId,
+      nome: c.nome,
+      avatarUrl: c.avatarUrl,
+      membros: c.membros,
+      canalOficial: c.canalOficial,
+      publica: c.publica,
+      tenantNome: c.tenantNome,
+    }))
 })
 
 export async function getCanalPorId(
