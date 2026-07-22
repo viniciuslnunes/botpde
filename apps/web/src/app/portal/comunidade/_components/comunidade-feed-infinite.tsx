@@ -9,9 +9,11 @@ import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
 import {
+  COMUNIDADE_POST_EXCLUIDO_EVENT,
   COMUNIDADE_POST_PUBLICADO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
   isComunidadeFeedNearTop,
+  type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
   type PostPublicadoPreview,
 } from '@/lib/feed-live-refresh'
@@ -99,6 +101,7 @@ export function ComunidadeFeedInfinite({
     loadMore,
     refreshCurrentPage,
     prependPost,
+    removePost,
   } = useComunidadeInfiniteFeed<PostSocialItem>({
     endpoint: '/api/comunidade/feed',
     tenantId,
@@ -157,9 +160,17 @@ export function ComunidadeFeedInfinite({
         void refreshCurrentPage(null)
       }, 600)
     }
+    function onPostExcluido(ev: Event) {
+      const detail = (ev as CustomEvent<PostExcluidoEventDetail>).detail
+      if (detail?.postId) removePost(detail.postId)
+    }
     window.addEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
-    return () => window.removeEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
-  }, [prependPost, refreshCurrentPage])
+    window.addEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
+    return () => {
+      window.removeEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
+      window.removeEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
+    }
+  }, [prependPost, refreshCurrentPage, removePost])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 

@@ -238,6 +238,27 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     [queryClient, queryKey],
   )
 
+  /** Remove de todos os caches `comunidade-feed` (descobrir/seguindo/rede/canal…). */
+  const removePost = useCallback(
+    (postId: string) => {
+      queryClient.setQueriesData<{
+        pages: ComunidadeFeedPage<TPost>[]
+        pageParams: Array<string | null>
+      }>({ queryKey: ['comunidade-feed'] }, (prev) => {
+        if (!prev) return prev
+        let changed = false
+        const pages = prev.pages.map((page) => {
+          const nextPosts = page.posts.filter((p) => p.id !== postId)
+          if (nextPosts.length === page.posts.length) return page
+          changed = true
+          return { ...page, posts: nextPosts }
+        })
+        return changed ? { ...prev, pages } : prev
+      })
+    },
+    [queryClient],
+  )
+
   return {
     posts,
     pageInfo,
@@ -247,5 +268,6 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     loadMore,
     refreshCurrentPage,
     prependPost,
+    removePost,
   }
 }

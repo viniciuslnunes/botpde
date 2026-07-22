@@ -6,6 +6,7 @@ import { MoreHorizontal, Pencil, Trash2, Pin, PinOff } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { editarPost, excluirPost, fixarPostPerfil, ocultarPostGrupo } from '@/app/portal/comunidade/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { emitirPostExcluido } from '@/lib/feed-live-refresh'
 import {
   paraTextoLegivel,
   podarMencoes,
@@ -89,7 +90,10 @@ export function FeedPostMenu({
                       labelConfirmar: 'Remover',
                       variante: 'destructive',
                       cancelled: false,
-                      run: () => ocultarPostGrupo(postId),
+                      run: async () => {
+                        await ocultarPostGrupo(postId)
+                        emitirPostExcluido({ postId })
+                      },
                       success: 'Post removido do mural.',
                     })
                   }}
@@ -260,7 +264,10 @@ export function FeedPostMenu({
                     labelConfirmar: 'Excluir',
                     variante: 'destructive',
                     cancelled: false,
-                    run: () => excluirPost(postId),
+                    run: async () => {
+                      await excluirPost(postId)
+                      emitirPostExcluido({ postId })
+                    },
                     success: 'Post excluído.',
                   })
                 }}

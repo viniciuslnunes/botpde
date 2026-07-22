@@ -10,7 +10,12 @@ import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
-import { FEED_SSE_DEBOUNCE_MS, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
+import {
+  COMUNIDADE_POST_EXCLUIDO_EVENT,
+  FEED_SSE_DEBOUNCE_MS,
+  isComunidadeFeedNearTop,
+  type PostExcluidoEventDetail,
+} from '@/lib/feed-live-refresh'
 
 interface CurrentUser {
   id: string
@@ -47,6 +52,7 @@ export function ComunidadeRedeInfinite({
     error,
     loadMore,
     refreshCurrentPage,
+    removePost,
   } = useComunidadeInfiniteFeed<PostSocialItem>({
     endpoint: '/api/comunidade/rede',
     tenantId,
@@ -78,6 +84,15 @@ export function ComunidadeRedeInfinite({
       void refreshCurrentPage(initialCursor)
     }, FEED_SSE_DEBOUNCE_MS)
   })
+
+  useEffect(() => {
+    function onPostExcluido(ev: Event) {
+      const detail = (ev as CustomEvent<PostExcluidoEventDetail>).detail
+      if (detail?.postId) removePost(detail.postId)
+    }
+    window.addEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
+    return () => window.removeEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
+  }, [removePost])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
