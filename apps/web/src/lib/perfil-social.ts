@@ -125,6 +125,22 @@ export function torcedorAprovadoPublicoObrigatorio(
   return vinculo?.tipo === 'TORCEDOR'
 }
 
+/**
+ * Subtítulo do cabeçalho do perfil social: sócio exibe a torcida organizada;
+ * torcedor exibe o apelido (ou nome) do clube apoiado — não o nome da TO.
+ */
+export function resolverTituloPerfilSocial(args: {
+  tipoMembro: 'SOCIO' | 'TORCEDOR' | null
+  tenantNome: string
+  afiliacaoApelido: string | null
+  afiliacaoNome: string | null
+}): string {
+  if (args.tipoMembro === 'TORCEDOR') {
+    return args.afiliacaoApelido ?? args.afiliacaoNome ?? args.tenantNome
+  }
+  return args.tenantNome
+}
+
 /** Versão síncrona para testes e uso interno. */
 export function podeVerConteudoSocialSync(
   viewerId: string | undefined,

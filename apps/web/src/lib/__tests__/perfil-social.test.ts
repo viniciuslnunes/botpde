@@ -3,6 +3,7 @@ import {
   podeVerConteudoSocialSync,
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
+  resolverTituloPerfilSocial,
   torcedorAprovadoPublicoObrigatorio,
 } from '@/lib/perfil-social'
 
@@ -52,6 +53,41 @@ describe('resolverPerfilPrivadoEfetivo', () => {
 
   it('sem vínculo assume público', () => {
     expect(resolverPerfilPrivadoEfetivo(undefined, null)).toBe(false)
+  })
+})
+
+describe('resolverTituloPerfilSocial', () => {
+  it('torcedor exibe apelido do clube', () => {
+    expect(
+      resolverTituloPerfilSocial({
+        tipoMembro: 'TORCEDOR',
+        tenantNome: 'GAVIÕES DA FIEL',
+        afiliacaoApelido: 'Timão',
+        afiliacaoNome: 'Corinthians',
+      }),
+    ).toBe('Timão')
+  })
+
+  it('torcedor sem apelido cai no nome do clube', () => {
+    expect(
+      resolverTituloPerfilSocial({
+        tipoMembro: 'TORCEDOR',
+        tenantNome: 'GAVIÕES DA FIEL',
+        afiliacaoApelido: null,
+        afiliacaoNome: 'Corinthians',
+      }),
+    ).toBe('Corinthians')
+  })
+
+  it('sócio exibe nome da torcida organizada', () => {
+    expect(
+      resolverTituloPerfilSocial({
+        tipoMembro: 'SOCIO',
+        tenantNome: 'GAVIÕES DA FIEL',
+        afiliacaoApelido: 'Timão',
+        afiliacaoNome: 'Corinthians',
+      }),
+    ).toBe('GAVIÕES DA FIEL')
   })
 })
 

@@ -13,6 +13,7 @@ import {
   podeVerConteudoSocial,
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
+  resolverTituloPerfilSocial,
   torcedorAprovadoPublicoObrigatorio,
 } from '@/lib/perfil-social'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
@@ -66,7 +67,7 @@ export default async function PerfilComunidadePage({
 
   const aba: PerfilAba = ABAS_VALIDAS.includes(abaRaw as PerfilAba) ? (abaRaw as PerfilAba) : 'publicacoes'
 
-  const [user, membro, socio] = await Promise.all([
+  const [user, membro, socio, afiliacao] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
       select: { id: true, nome: true, nickname: true, avatarUrl: true, email: true, criadoEm: true },
@@ -89,6 +90,12 @@ export default async function PerfilComunidadePage({
       where: { tenantId_userId: { tenantId: tenant.id, userId } },
       select: { numeroSocio: true, validade: true },
     }),
+    tenant.afiliacaoId
+      ? db.afiliacao.findUnique({
+          where: { id: tenant.afiliacaoId },
+          select: { nome: true, apelido: true },
+        })
+      : Promise.resolve(null),
   ])
 
   if (!user) redirect('/portal/comunidade')
@@ -100,6 +107,12 @@ export default async function PerfilComunidadePage({
   })
 
   const vinculo = membro ? { tipo: membro.tipo, status: membro.status } : null
+  const tenantNomeExibicao = resolverTituloPerfilSocial({
+    tipoMembro: membro?.tipo ?? null,
+    tenantNome: tenant.nome,
+    afiliacaoApelido: afiliacao?.apelido ?? null,
+    afiliacaoNome: afiliacao?.nome ?? null,
+  })
   const perfilBase = perfilAtual ?? {
     bio: null,
     perfilPrivado: vinculo?.tipo === 'SOCIO',
@@ -202,7 +215,7 @@ export default async function PerfilComunidadePage({
         bannerUrl={perfil.bannerUrl}
         bannerPos={perfil.bannerPos}
         perfilPrivado={perfil.perfilPrivado}
-        tenantNome={tenant.nome}
+        tenantNome={tenantNomeExibicao}
         segueVoce={segueVoceBadge}
         isSelf={isSelf}
         acoes={acoes}
