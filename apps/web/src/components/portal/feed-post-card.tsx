@@ -13,6 +13,7 @@ import { PostPoll } from './post-poll'
 import { PostRepostEmbed } from './post-repost-embed'
 import { PostComunicadoEmbed } from './post-comunicado-embed'
 import { PostEventoEmbed } from './post-evento-embed'
+import { ComunicadoShareButton } from './comunicado-share-button'
 import type { PostSocialItem } from '@/lib/feed'
 import { formatAutorCargoBadge } from '@/lib/autor-badges-format'
 
@@ -117,7 +118,7 @@ export function FeedPostCard({
         </p>
       )}
 
-      {post.comunicadoOrigemId && !post.postOrigemId && (
+      {post.comunicadoOrigemId && !post.postOrigemId && post.tipo === 'MEMBRO' && (
         <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
           <Megaphone className="h-3.5 w-3.5" />
           Compartilhou um comunicado oficial
@@ -152,6 +153,12 @@ export function FeedPostCard({
         isRepost={!!post.postOrigemId || !!post.comunicadoOrigemId}
         salvoInicial={salvo}
       />
+
+      {post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId && (
+        <div className="mt-1 flex justify-end">
+          <ComunicadoShareButton comunicadoId={post.comunicadoOrigemId} />
+        </div>
+      )}
     </article>
   )
 }

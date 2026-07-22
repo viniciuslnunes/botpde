@@ -2,6 +2,7 @@ import { unstable_cache, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from './hierarquia'
+import { tagFeedDescobrir } from './comunidade-cache'
 
 export const COMUNICADOS_CACHE_TAG = 'comunicados-feed'
 
@@ -9,10 +10,18 @@ export function comunicadosCacheTag(tenantId: string): string {
   return `comunicados-${tenantId}`
 }
 
-/** Invalida cache de comunicados após publicação/edição no admin. */
+/**
+ * Invalida cache de comunicados após publicação/edição no admin. Também
+ * invalida o cache do feed Descobrir — comunicados publicados viram Post
+ * institucional real (ver `criarComunicado`), então mudanças precisam
+ * refletir no feed, não só na lista de comunicados.
+ */
 export function invalidateComunicadosCache(tenantId?: string): void {
   revalidateTag(COMUNICADOS_CACHE_TAG, 'max')
-  if (tenantId) revalidateTag(comunicadosCacheTag(tenantId), 'max')
+  if (tenantId) {
+    revalidateTag(comunicadosCacheTag(tenantId), 'max')
+    revalidateTag(tagFeedDescobrir(tenantId), 'max')
+  }
 }
 
 export interface ComunicadoFeedItem {

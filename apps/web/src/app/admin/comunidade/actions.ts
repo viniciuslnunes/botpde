@@ -197,8 +197,23 @@ export async function criarComunicado(
 
   const { titulo, corpo, prioridade } = parsed.data
 
-  const comunicado = await db.announcement.create({
-    data: { tenantId: tenant.id, autorId: session.user.id, titulo, corpo, prioridade },
+  const comunicado = await db.$transaction(async (tx) => {
+    const criado = await tx.announcement.create({
+      data: { tenantId: tenant.id, autorId: session.user.id, titulo, corpo, prioridade },
+    })
+    await tx.post.create({
+      data: {
+        tenantId: tenant.id,
+        autorId: session.user.id,
+        titulo: null,
+        conteudo: '',
+        tipo: 'INSTITUCIONAL',
+        visibilidade: 'PUBLICO',
+        fixado: false,
+        comunicadoOrigemId: criado.id,
+      },
+    })
+    return criado
   })
 
   await db.auditLog.create({
@@ -284,7 +299,13 @@ export async function alternarFixadoComunicado(comunicadoId: string) {
   })
   if (!comunicado) throw new Error('Comunicado não encontrado')
 
-  await db.announcement.update({ where: { id: comunicadoId }, data: { fixado: !comunicado.fixado } })
+  await db.$transaction([
+    db.announcement.update({ where: { id: comunicadoId }, data: { fixado: !comunicado.fixado } }),
+    db.post.updateMany({
+      where: { comunicadoOrigemId: comunicadoId, tipo: 'INSTITUCIONAL' },
+      data: { fixado: !comunicado.fixado },
+    }),
+  ])
 
   await db.auditLog.create({
     data: {
@@ -310,7 +331,10 @@ export async function excluirComunicado(comunicadoId: string) {
   })
   if (!comunicado) throw new Error('Comunicado não encontrado')
 
-  await db.announcement.delete({ where: { id: comunicadoId } })
+  await db.$transaction([
+    db.post.deleteMany({ where: { comunicadoOrigemId: comunicadoId, tipo: 'INSTITUCIONAL' } }),
+    db.announcement.delete({ where: { id: comunicadoId } }),
+  ])
 
   await db.auditLog.create({
     data: {

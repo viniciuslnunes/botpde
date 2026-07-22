@@ -511,7 +511,9 @@ function scoreDescobrirPost(post: PostSocialItem, tenantId: string): number {
   const localBoost = post.tenantId === tenantId ? 6 : 0
   const mediaBoost = post.midiaUrls.length > 0 || post.imagemUrl ? 1.5 : 0
   const pollBoost = post.enquete ? 2 : 0
-  return freshness + engagement + localBoost + mediaBoost + pollBoost
+  const oficialBoost =
+    post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId ? 100_000 + (post.fixado ? 50 : 0) : 0
+  return freshness + engagement + localBoost + mediaBoost + pollBoost + oficialBoost
 }
 
 function rankDescobrirPosts(posts: PostSocialItem[], tenantId: string): PostSocialItem[] {
@@ -546,11 +548,11 @@ async function getDescobrirPostsBaseCached(
       const postsRaw = (await db.post.findMany({
         where: {
           tenantId: { in: visibleTenantIds },
-          tipo: 'MEMBRO',
           visibilidade: 'PUBLICO',
           oculto: false,
           ...escopoFeedSemConversa,
           ...cursorWhere,
+          OR: [{ tipo: 'MEMBRO' }, { tipo: 'INSTITUCIONAL', comunicadoOrigemId: { not: null } }],
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: fetchLimit,
@@ -701,7 +703,9 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
 
   const seguindoOrdenados = postsRedeRaw.map(projetarPost).sort(sortPostsDesc)
 
-  const discoverExternos = discoverBase.filter((p) => !redeSet.has(p.autorId))
+  const discoverExternos = discoverBase.filter(
+    (p) => !redeSet.has(p.autorId) || (p.tipo === 'INSTITUCIONAL' && p.comunicadoOrigemId),
+  )
   const autorIdsExternos = discoverExternos.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIdsExternos)
   const discoverVisiveis = discoverExternos.filter((p) => !semAcesso.has(p.autorId))

@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered, Scale, Clock } from 'lucide-react'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
-import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
 import { ComunidadeFeedBootstrap } from './comunidade-feed-bootstrap'
 import { ComunidadeAsideRail } from './comunidade-aside-rail'
@@ -45,10 +44,6 @@ interface ComunidadeFeedShellProps {
   afiliacao?: AfiliacaoComunidade | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
-}
-
-function ComunicadosFallback() {
-  return <div className="h-16 animate-pulse rounded-2xl bg-[rgb(var(--border))]" />
 }
 
 function ComposerFallback() {
@@ -184,12 +179,6 @@ export function ComunidadeFeedShell({
                 eventoIdInicial={eventoIdInicial}
               />
             )}
-          </Suspense>
-        )}
-
-        {!modoNacional && (
-          <Suspense fallback={<ComunicadosFallback />}>
-            <ComunidadeComunicadosSection tenantId={tenant.id} currentUserId={currentUser.id} />
           </Suspense>
         )}
 
