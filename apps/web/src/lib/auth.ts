@@ -11,6 +11,8 @@ import { resolveSharedCookieDomain } from '@/lib/session-cookie'
 import { registrarUltimoAcesso } from '@/lib/presenca'
 import { extrairPerfilOAuth } from '@/lib/oauth-perfil'
 import { tentarAtribuirNickname } from '@/lib/nickname-disponivel'
+import { revalidateTag } from 'next/cache'
+import { tagAvatarUsuario } from '@/lib/avatar-cache'
 
 // Cookie compartilhado entre subdomínios só quando o host público = ROOT_DOMAIN.
 const cookieDomain = resolveSharedCookieDomain()
@@ -223,10 +225,12 @@ async function findOrCreateUser(
         ...(googleId && !existingUser.googleId ? { googleId } : {}),
         ...(!existingUser.nome && extraido.nome ? { nome: extraido.nome } : {}),
         ...(!existingUser.email && extraido.email ? { email: extraido.email } : {}),
-        // Avatar vem do provider — sem upload próprio ainda; mantém fresco no login.
-        ...(extraido.avatarUrl ? { avatarUrl: extraido.avatarUrl } : {}),
+        // Avatar do provider — só sobrescreve se o usuário não tiver trocado
+        // por upload próprio depois do último login (ver salvarPerfilSocial).
+        ...(extraido.avatarUrl && !existingUser.avatarUrl ? { avatarUrl: extraido.avatarUrl } : {}),
       },
     })
+    if (extraido.avatarUrl) revalidateTag(tagAvatarUsuario(existingUser.id), 'max')
   } else {
     existingUser = await db.user.create({
       data: {

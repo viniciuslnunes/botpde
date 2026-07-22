@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { db } from '@torcida/db'
 import { atualizarPerfilSocialSchema } from '@torcida/types'
 import { assertMembroAtivo } from '@/lib/authz'
@@ -6,6 +6,7 @@ import { ExpectedError } from './expected-error'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { isCloudinaryUrl } from '@/lib/social-embed'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
+import { tagAvatarUsuario } from '@/lib/avatar-cache'
 
 export interface PerfilSocialSalvo {
   bannerUrl: string | null
@@ -115,6 +116,9 @@ export async function salvarPerfilSocial(
     // (unstable_cache, 60-120s) — sem isso a foto nova só aparece lá depois
     // do TTL expirar.
     invalidarCachesComunidadeFeed(tenant.id)
+    // Topbar/aside (getAvatarAtualDoUsuario) são cache sem TTL — só saem do
+    // ar aqui, no evento real de troca de foto.
+    revalidateTag(tagAvatarUsuario(userId), 'max')
   }
 
   await db.auditLog.create({

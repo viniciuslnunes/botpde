@@ -1,6 +1,8 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getSeguimentoStatus } from './social'
+import { tagAvatarUsuario } from './avatar-cache'
 
 export interface PerfilSocialLite {
   id: string
@@ -54,24 +56,33 @@ export function resolverAvatarSocial(
 }
 
 /**
- * Avatar do usuário logado, sempre fresco do banco (nunca session.user.image).
- * A sessão (JWT) só recebe a foto nova no próximo login — usar aqui evitaria
- * refletir a troca feita em /portal/perfil na topbar/aside na hora.
+ * Avatar do usuário logado, para topbar e aside da Comunidade — nunca
+ * session.user.image (JWT só recebe a foto nova no próximo login). Cacheado
+ * entre requests (sem TTL) e só reconsultado quando salvarPerfilSocial ou o
+ * sync de login OAuth chamam revalidateTag(tagAvatarUsuario(userId)) — não é
+ * uma query por navegação.
  */
-export const getAvatarAtualDoUsuario = cache(
-  async (userId: string, tenantId?: string | null): Promise<string | null> => {
-    const [user, perfil] = await Promise.all([
-      db.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
-      tenantId
-        ? db.perfilMembro.findUnique({
-            where: { userId_tenantId: { userId, tenantId } },
-            select: { avatarUrl: true },
-          })
-        : Promise.resolve(null),
-    ])
-    return resolverAvatarSocial(perfil?.avatarUrl, user?.avatarUrl)
-  },
-)
+export async function getAvatarAtualDoUsuario(
+  userId: string,
+  tenantId?: string | null,
+): Promise<string | null> {
+  return unstable_cache(
+    async () => {
+      const [user, perfil] = await Promise.all([
+        db.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
+        tenantId
+          ? db.perfilMembro.findUnique({
+              where: { userId_tenantId: { userId, tenantId } },
+              select: { avatarUrl: true },
+            })
+          : Promise.resolve(null),
+      ])
+      return resolverAvatarSocial(perfil?.avatarUrl, user?.avatarUrl)
+    },
+    ['avatar-atual-do-usuario', userId, tenantId ?? 'global'],
+    { tags: [tagAvatarUsuario(userId)] },
+  )()
+}
 
 export type VinculoPrivacidadePerfil = {
   tipo: 'SOCIO' | 'TORCEDOR'
