@@ -51,6 +51,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { PostMedia } from './post-media'
+import { ensureSocialEmbedInMidias, midiasComEmbedDoTexto, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { isConversaGrupoLike } from '@/lib/canais-shared'
 import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 
@@ -512,7 +513,8 @@ export function MensagemThread({
     const conteudo = texto.trim()
     const midiasProntas = medias.filter((m) => m.url)
     const midias = midiasProntas.map((m) => m.url as string)
-    if ((!conteudo && midias.length === 0) || enviando || uploadPendente) return
+    const midiasFinais = midiasComEmbedDoTexto(conteudo, midias)
+    if ((!conteudo && midiasFinais.length === 0) || enviando || uploadPendente) return
 
     const tempId = `temp-${Date.now()}`
     const criadoEm = new Date().toISOString()
@@ -520,7 +522,7 @@ export function MensagemThread({
       id: tempId,
       conversaId,
       conteudo,
-      midiaUrls: midias,
+      midiaUrls: midiasFinais,
       respostaAId: null,
       editadaEm: null,
       removida: false,
@@ -543,7 +545,7 @@ export function MensagemThread({
       const res = await fetch(`/api/conversas/${conversaId}/mensagens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo, midias }),
+        body: JSON.stringify({ conteudo, midias: midiasFinais }),
       })
       const data = (await res.json()) as { mensagem?: MensagemDto; error?: string }
       if (!res.ok || !data.mensagem) throw new Error(data.error ?? 'Erro ao enviar.')
@@ -1066,6 +1068,8 @@ function MensagemBubble({
   onDenunciar: () => void
 }) {
   const minha = msg.autor.id === currentUserId
+  const midias = ensureSocialEmbedInMidias(msg.conteudo, msg.midiaUrls)
+  const conteudoVisivel = stripEmbeddedSocialUrls(msg.conteudo, midias)
   const Wrapper = animate ? m.div : 'div'
   const motionProps = animate
     ? {
@@ -1100,10 +1104,10 @@ function MensagemBubble({
             <p className="text-sm italic opacity-70">Mensagem removida</p>
           ) : (
             <>
-              {msg.conteudo ? (
-                <p className="whitespace-pre-wrap break-words text-sm">{msg.conteudo}</p>
+              {conteudoVisivel ? (
+                <p className="whitespace-pre-wrap break-words text-sm">{conteudoVisivel}</p>
               ) : null}
-              {msg.midiaUrls.length > 0 && <PostMedia urls={msg.midiaUrls} />}
+              {midias.length > 0 && <PostMedia urls={midias} />}
             </>
           )}
         </div>

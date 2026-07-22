@@ -12,7 +12,7 @@ import {
 import { assertConversaAccess } from '@/lib/mensageria-api'
 import { emitMensagemNova } from '@/lib/mensageria-bus'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
-import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
+import { isCloudinaryUrl, isSocialUrl, isStickerPath, midiasComEmbedDoTexto } from '@/lib/social-embed'
 
 const midiaSchema = z
   .string()
@@ -102,11 +102,12 @@ export async function POST(
     }
 
     registrarAcaoEngajamento(limiterKey)
+    const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, parsed.data.midias)
     const mensagem = await criarMensagem(
       conversaId,
       userId,
       parsed.data.conteudo,
-      parsed.data.midias,
+      midiasFinais,
       parsed.data.respostaAId,
     )
 

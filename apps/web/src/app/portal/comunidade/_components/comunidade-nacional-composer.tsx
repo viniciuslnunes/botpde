@@ -10,6 +10,7 @@ import {
   emitirPostPublicado,
   novoIdOtimista,
 } from '@/lib/feed-live-refresh'
+import { ensureSocialEmbedInMidias } from '@/lib/social-embed'
 import { Avatar } from '@/components/portal/avatar'
 
 const MAX_CONTEUDO = 3000
@@ -80,6 +81,8 @@ export function ComunidadeNacionalComposer({
     const texto = conteudo.trim()
     if (!texto) return
 
+    const midiasFinais = ensureSocialEmbedInMidias(texto, midias)
+
     const id = novoIdOtimista()
     optimisticIdRef.current = id
     emitirPostPublicado({
@@ -87,7 +90,7 @@ export function ComunidadeNacionalComposer({
         id,
         tenantId,
         conteudo: texto,
-        midiaUrls: midias,
+        midiaUrls: midiasFinais,
         visibilidade: 'PUBLICO',
         autor: {
           id: currentUser.id,
@@ -104,7 +107,7 @@ export function ComunidadeNacionalComposer({
 
     startTransition(async () => {
       try {
-        const preview = await publicarPostComoTorcedorGlobal(texto, midias)
+        const preview = await publicarPostComoTorcedorGlobal(texto, midiasFinais)
         setConteudo('')
         setMidias([])
         emitirPostPublicado({

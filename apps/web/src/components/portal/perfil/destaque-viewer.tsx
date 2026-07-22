@@ -11,7 +11,7 @@ import { PostMedia } from '../post-media'
 import { PostPoll } from '../post-poll'
 import { PostRepostEmbed } from '../post-repost-embed'
 import { linkPostComunidade } from '@/lib/comunidade-social'
-import { stripEmbeddedSocialUrls } from '@/lib/social-embed'
+import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { lightboxBackdrop, springGentle, springSnappy, storySlideVariants } from '@/lib/motion-presets'
 import type { DestaquePerfilItem } from '@/lib/feed'
 
@@ -167,18 +167,23 @@ export function DestaqueViewer({
               className="w-full max-w-lg cursor-grab space-y-4 active:cursor-grabbing"
             >
               {(() => {
-                const texto = stripEmbeddedSocialUrls(post.conteudo, post.midiaUrls)
-                return texto ? (
-                  <PostConteudoRich conteudo={texto} className="text-center text-lg text-white" />
-                ) : null
+                const midias = ensureSocialEmbedInMidias(post.conteudo, post.midiaUrls)
+                const texto = stripEmbeddedSocialUrls(post.conteudo, midias)
+                return (
+                  <>
+                    {texto ? (
+                      <PostConteudoRich conteudo={texto} className="text-center text-lg text-white" />
+                    ) : null}
+                    {midias.length > 0 && (
+                      <div className="overflow-hidden rounded-2xl">
+                        <PostMedia urls={midias} />
+                      </div>
+                    )}
+                  </>
+                )
               })()}
               {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
               {post.enquete && <PostPoll enquete={post.enquete} />}
-              {post.midiaUrls.length > 0 && (
-                <div className="overflow-hidden rounded-2xl">
-                  <PostMedia urls={post.midiaUrls} />
-                </div>
-              )}
               <Link
                 href={linkPostComunidade(post.id)}
                 className="block text-center text-xs text-white/50 hover:text-white/80"

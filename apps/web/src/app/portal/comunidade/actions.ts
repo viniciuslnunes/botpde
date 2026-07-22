@@ -41,7 +41,13 @@ import {
 } from '@/lib/canais'
 import { TIPOS_NOTIFICACAO_SOCIAL } from '@/lib/notificacoes-comunidade'
 import { listarDestinatariosPorPermissoes } from '@/lib/notificacoes-routing'
-import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
+import {
+  isCloudinaryUrl,
+  isSocialUrl,
+  isStickerPath,
+  midiasAposEditarConteudo,
+  midiasComEmbedDoTexto,
+} from '@/lib/social-embed'
 import {
   backfillTimelineDoAutorParaViewer,
   backfillTimelineDoGrupoParaViewer,
@@ -464,6 +470,7 @@ export async function publicarPost(
     }
 
     const { conteudo, midias, visibilidade } = parsed.data
+    const midiasFinais = midiasComEmbedDoTexto(conteudo, midias, MAX_MIDIAS)
 
     let session: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['session']
     let tenant: Awaited<ReturnType<typeof assertAutorPublicacaoPost>>['tenant']
@@ -490,7 +497,7 @@ export async function publicarPost(
         tenantId: tenant.id,
         autorId: session.user.id,
         conteudo,
-        midiaUrls: midias,
+        midiaUrls: midiasFinais,
         tipo: 'MEMBRO',
         visibilidade,
         alcanceNacional,
@@ -572,6 +579,8 @@ export async function publicarPostComoTorcedorGlobal(
   }
   registrarAcaoEngajamento(limiterKey)
 
+  const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, parsed.data.midias, MAX_MIDIAS)
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
@@ -579,7 +588,7 @@ export async function publicarPostComoTorcedorGlobal(
       tipo: 'MEMBRO',
       visibilidade: 'PUBLICO',
       conteudo: parsed.data.conteudo,
-      midiaUrls: parsed.data.midias,
+      midiaUrls: midiasFinais,
     },
   })
 
@@ -888,13 +897,15 @@ export async function editarPost(postId: string, conteudo: string): Promise<void
 
   const post = await db.post.findFirst({
     where: { id: parsed.data.postId, autorId: session.user.id, tenantId: tenant.id, oculto: false },
-    select: { id: true },
+    select: { id: true, midiaUrls: true },
   })
   if (!post) throw new Error('Post não encontrado')
 
+  const midiasFinais = midiasAposEditarConteudo(parsed.data.conteudo, post.midiaUrls)
+
   await db.post.update({
     where: { id: post.id },
-    data: { conteudo: parsed.data.conteudo },
+    data: { conteudo: parsed.data.conteudo, midiaUrls: midiasFinais },
   })
 
   await db.auditLog.create({
@@ -1232,11 +1243,14 @@ export async function publicarEnquete(
     parsed.data.visibilidade,
   )
 
+  const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, [], MAX_MIDIAS)
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
       autorId: session.user.id,
       conteudo: parsed.data.conteudo,
+      midiaUrls: midiasFinais,
       tipo: 'MEMBRO',
       visibilidade: parsed.data.visibilidade,
       alcanceNacional,
@@ -1581,11 +1595,14 @@ export async function publicarPostEvento(
     parsed.data.visibilidade,
   )
 
+  const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, [], MAX_MIDIAS)
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
       autorId: session.user.id,
       conteudo: parsed.data.conteudo,
+      midiaUrls: midiasFinais,
       tipo: 'MEMBRO',
       visibilidade: parsed.data.visibilidade,
       alcanceNacional,
@@ -2563,11 +2580,14 @@ export async function publicarPostGrupo(
 
   await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
+  const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, [], MAX_MIDIAS)
+
   const post = await db.post.create({
     data: {
       tenantId: tenant.id,
       autorId: session.user.id,
       conteudo: parsed.data.conteudo,
+      midiaUrls: midiasFinais,
       tipo: 'MEMBRO',
       visibilidade: 'TENANT',
       conversaId: conversa.id,
@@ -3432,12 +3452,14 @@ export async function publicarPostCanal(
 
     await getOrCreatePerfilMembro(session.user.id, tenant.id)
 
+    const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, parsed.data.midias, MAX_MIDIAS)
+
     const post = await db.post.create({
       data: {
         tenantId: tenant.id,
         autorId: session.user.id,
         conteudo: parsed.data.conteudo,
-        midiaUrls: parsed.data.midias,
+        midiaUrls: midiasFinais,
         tipo: canal.institucional ? 'INSTITUCIONAL' : 'MEMBRO',
         visibilidade: 'TENANT',
         conversaId: parsed.data.conversaId,

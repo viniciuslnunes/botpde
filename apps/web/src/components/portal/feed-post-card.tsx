@@ -1,7 +1,7 @@
 import { Repeat2, Pin, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade } from '@/lib/comunidade-social'
-import { stripEmbeddedSocialUrls } from '@/lib/social-embed'
+import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { Avatar } from './avatar'
 import { PostEngagement } from './post-engagement'
@@ -37,7 +37,8 @@ export function FeedPostCard({
   const author = isAuthor ?? post.autorId === currentUser.id
   const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
   const cargoBadge = formatAutorCargoBadge(post.autor.cargoNome, post.autor.departamentoNome)
-  const conteudoVisivel = stripEmbeddedSocialUrls(post.conteudo, post.midiaUrls)
+  const midias = ensureSocialEmbedInMidias(post.conteudo, post.midiaUrls)
+  const conteudoVisivel = stripEmbeddedSocialUrls(post.conteudo, midias)
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
@@ -137,8 +138,8 @@ export function FeedPostCard({
 
       {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
 
-      {post.midiaUrls.length > 0 ? (
-        <PostMedia urls={post.midiaUrls} caption={post.conteudo} />
+      {midias.length > 0 ? (
+        <PostMedia urls={midias} caption={post.conteudo} />
       ) : (
         post.imagemUrl && <PostLegacyImage src={post.imagemUrl} caption={post.conteudo} />
       )}

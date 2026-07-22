@@ -1130,7 +1130,9 @@ function ComposerBody({
                       autorNome: userName,
                     }}
                   />
-                  {anexos.length > 0 && <PostMedia urls={anexos} caption="" />}
+                  {anexos.length > 0 || (embedUrl && !embedDispensado) ? (
+                    <PostMedia urls={finalMidias} caption="" />
+                  ) : null}
                 </div>
               ) : (
                 <p className="rounded-xl border border-dashed border-[rgb(var(--border))] px-3 py-4 text-center text-xs text-[rgb(var(--foreground-muted))]">

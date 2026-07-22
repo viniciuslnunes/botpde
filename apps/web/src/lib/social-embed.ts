@@ -26,9 +26,13 @@ export function isCloudinaryUrl(url: string): boolean {
   return /^https:\/\/res\.cloudinary\.com\//.test(url)
 }
 
+function normalizeSocialHost(hostname: string): string {
+  return hostname.replace(/^www\./, '').replace(/^m\./, '').replace(/^mobile\./, '')
+}
+
 export function detectEmbedProvider(url: string): EmbedProvider | null {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, '').replace(/^m\./, '')
+    const host = normalizeSocialHost(new URL(url).hostname)
     if (host === 'youtube.com' || host === 'youtu.be') return 'youtube'
     if (host === 'twitter.com' || host === 'x.com') return 'twitter'
     if (host === 'instagram.com') return 'instagram'
@@ -64,8 +68,8 @@ export function cloudinaryVideoPoster(url: string): string {
 export function youTubeId(url: string): string | null {
   try {
     const u = new URL(url)
-    const host = u.hostname.replace(/^www\./, '')
-    if (host === 'youtu.be') return u.pathname.slice(1) || null
+    const host = normalizeSocialHost(u.hostname)
+    if (host === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null
     const v = u.searchParams.get('v')
     if (v) return v
     const m = u.pathname.match(/\/(embed|shorts|live)\/([^/?]+)/)
@@ -363,4 +367,21 @@ export function ensureSocialEmbedInMidias(conteudo: string, midias: string[]): s
   if (midias.some((m) => isSocialUrl(m) && normalizeSocialUrl(m) === norm)) return midias
   if (midias.some(isSocialUrl)) return midias
   return [...midias, fromText]
+}
+
+const MAX_MIDIAS_PADRAO = 10
+
+/** Promove link social do texto para `midiaUrls` (persistência / API). */
+export function midiasComEmbedDoTexto(
+  conteudo: string,
+  midias: string[],
+  max = MAX_MIDIAS_PADRAO,
+): string[] {
+  return ensureSocialEmbedInMidias(conteudo, midias).slice(0, max)
+}
+
+/** Ao editar texto, substitui embed social anterior pelo detectado no conteúdo novo. */
+export function midiasAposEditarConteudo(conteudo: string, midiasAtuais: string[]): string[] {
+  const naoSociais = midiasAtuais.filter((m) => !isSocialUrl(m))
+  return midiasComEmbedDoTexto(conteudo, naoSociais)
 }

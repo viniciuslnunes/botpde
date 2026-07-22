@@ -8,7 +8,7 @@ import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
 import { PERMISSIONS } from '@torcida/types'
 import { z } from 'zod'
 import { isDurableRemoteImageUrl } from '@/lib/optimizable-image'
-import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
+import { isCloudinaryUrl, isSocialUrl, isStickerPath, midiasComEmbedDoTexto } from '@/lib/social-embed'
 
 const postSchema = z.object({
   titulo: z
@@ -219,7 +219,7 @@ async function publicarComunicadoENotificar(opts: {
         tipo: 'INSTITUCIONAL',
         visibilidade: 'PUBLICO',
         fixado: false,
-        midiaUrls: opts.midias ?? [],
+        midiaUrls: midiasComEmbedDoTexto(opts.corpo, opts.midias ?? []),
         comunicadoOrigemId: criado.id,
       },
     })
@@ -423,7 +423,7 @@ async function atualizarComunicadoEPost(opts: {
     }),
     db.post.updateMany({
       where: { comunicadoOrigemId: opts.comunicadoId, tipo: 'INSTITUCIONAL' },
-      data: { midiaUrls: opts.midias },
+      data: { midiaUrls: midiasComEmbedDoTexto(opts.corpo, opts.midias) },
     }),
   ])
 
