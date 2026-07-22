@@ -1,18 +1,28 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useActionState, useState, useTransition } from 'react'
 import {
   criarComunicado,
-  atualizarComunicado,
   alternarFixadoComunicado,
   excluirComunicado,
   type ComunicadoState,
 } from '@/app/admin/comunidade/actions'
-import { Pin, PinOff, Pencil, Trash2, Megaphone, X } from 'lucide-react'
+import { Pin, PinOff, Pencil, Trash2, Megaphone } from 'lucide-react'
 import { FieldError, Input, Select, Textarea, SubmitButton, Badge } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
-import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import { useTrackedForm } from '@/lib/unsaved-changes'
+import { PostMedia } from '@/components/portal/post-media'
+
+const FeedComposer = dynamic(
+  () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
+  {
+    loading: () => (
+      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+    ),
+  },
+)
 
 type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
 
@@ -112,47 +122,46 @@ export interface Comunicado {
   prioridade: Prioridade
   fixado: boolean
   publicadoEm: Date | string
+  midiaUrls: string[]
 }
 
+interface CurrentUser {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+}
+
+/** Mesmo composer rico usado para publicar (com prévia) — pré-preenchido para editar. */
 function EditarComunicadoForm({
   comunicado,
+  currentUser,
+  tenantId,
+  tenantNome,
   onCancel,
 }: {
   comunicado: Comunicado
+  currentUser: CurrentUser
+  tenantId: string
+  tenantNome: string
   onCancel: () => void
 }) {
-  const boundAction = atualizarComunicado.bind(null, comunicado.id)
-  const [state, action, pending] = useActionState<ComunicadoState, FormData>(boundAction, {})
-  const { formRef, markPristine } = useTrackedForm({
-    id: `editar-comunicado-${comunicado.id}`,
-    title: 'Editar comunicado',
-  })
-  const { confirmDiscard } = useUnsavedChangesContext()
-  useActionStateToast(state, pending, 'Comunicado atualizado.', {
-    onSuccess: () => {
-      markPristine()
-      onCancel()
-    },
-  })
-
   return (
-    <form ref={formRef} action={action} className="space-y-4">
-      <ComunicadoFields state={state} initial={comunicado} />
-      <div className="flex gap-2">
-        <SubmitButton label="Salvar" icon={<Megaphone className="h-4 w-4" />} />
-        <button
-          type="button"
-          onClick={() => {
-            void confirmDiscard().then((ok) => {
-              if (ok) onCancel()
-            })
-          }}
-          className="flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <X className="h-3.5 w-3.5" /> Cancelar
-        </button>
-      </div>
-    </form>
+    <FeedComposer
+      userId={currentUser.id}
+      userName={currentUser.nome}
+      userAvatar={currentUser.avatarUrl}
+      tenantId={tenantId}
+      tenantNome={tenantNome}
+      comunicado={{
+        id: comunicado.id,
+        titulo: comunicado.titulo,
+        corpo: comunicado.corpo,
+        prioridade: comunicado.prioridade,
+        midiaUrls: comunicado.midiaUrls,
+        onSalvo: onCancel,
+        onCancelar: onCancel,
+      }}
+    />
   )
 }
 
@@ -163,7 +172,17 @@ function formatarData(data: Date | string) {
   )
 }
 
-export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] }) {
+export function ComunicadosManager({
+  comunicados,
+  currentUser,
+  tenantId,
+  tenantNome,
+}: {
+  comunicados: Comunicado[]
+  currentUser: CurrentUser
+  tenantId: string
+  tenantNome: string
+}) {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const confirmAction = useConfirmAction()
@@ -184,12 +203,14 @@ export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] 
     <div className="space-y-3">
       {ordenados.map((comunicado) =>
         editandoId === comunicado.id ? (
-          <div
+          <EditarComunicadoForm
             key={comunicado.id}
-            className="rounded-xl border border-[rgb(var(--primary)_/_0.4)] bg-[rgb(var(--surface))] p-4"
-          >
-            <EditarComunicadoForm comunicado={comunicado} onCancel={() => setEditandoId(null)} />
-          </div>
+            comunicado={comunicado}
+            currentUser={currentUser}
+            tenantId={tenantId}
+            tenantNome={tenantNome}
+            onCancel={() => setEditandoId(null)}
+          />
         ) : (
           <div
             key={comunicado.id}
@@ -216,6 +237,9 @@ export function ComunicadosManager({ comunicados }: { comunicados: Comunicado[] 
                 <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]">
                   {comunicado.corpo}
                 </p>
+                {comunicado.midiaUrls.length > 0 && (
+                  <PostMedia urls={comunicado.midiaUrls} caption="" />
+                )}
                 <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
                   {formatarData(comunicado.publicadoEm)}
                 </p>

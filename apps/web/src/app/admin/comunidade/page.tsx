@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -6,7 +7,8 @@ import Link from 'next/link'
 import { MessagesSquare, Megaphone } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { CriarPostForm, PostsManager } from '@/components/admin/post-forms'
-import { CriarComunicadoForm, ComunicadosManager } from '@/components/admin/comunicado-forms'
+import { ComunicadosManager } from '@/components/admin/comunicado-forms'
+import { ComunicadoComposerAdmin } from '@/components/admin/comunicado-composer'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -24,14 +26,36 @@ export default async function AdminComunidadePage() {
 
   if (!podePublicarComunicado && !podeGerenciarPosts) redirect('/admin')
 
-  const [comunicados, posts] = await Promise.all([
+  interface ComunicadoRaw {
+    id: string
+    titulo: string
+    corpo: string
+    prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+    fixado: boolean
+    publicadoEm: Date
+    reposts: { midiaUrls: string[] }[]
+  }
+
+  const [comunicadosRaw, posts] = await Promise.all([
     podePublicarComunicado
-      ? db.announcement.findMany({
+      ? (db.announcement.findMany({
           where: { tenantId: tenant.id },
           orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
-          select: { id: true, titulo: true, corpo: true, prioridade: true, fixado: true, publicadoEm: true },
-        })
-      : Promise.resolve([]),
+          select: {
+            id: true,
+            titulo: true,
+            corpo: true,
+            prioridade: true,
+            fixado: true,
+            publicadoEm: true,
+            reposts: {
+              where: { tipo: 'INSTITUCIONAL' },
+              select: { midiaUrls: true },
+              take: 1,
+            },
+          },
+        }) as Promise<ComunicadoRaw[]>)
+      : Promise.resolve([] as ComunicadoRaw[]),
     podeGerenciarPosts
       ? db.post.findMany({
           where: { tenantId: tenant.id },
@@ -40,6 +64,16 @@ export default async function AdminComunidadePage() {
         })
       : Promise.resolve([]),
   ])
+
+  const comunicados = comunicadosRaw.map((c: ComunicadoRaw) => ({
+    id: c.id,
+    titulo: c.titulo,
+    corpo: c.corpo,
+    prioridade: c.prioridade,
+    fixado: c.fixado,
+    publicadoEm: c.publicadoEm,
+    midiaUrls: c.reposts[0]?.midiaUrls ?? [],
+  }))
 
   return (
     <div className="flex flex-col h-full">
@@ -77,11 +111,23 @@ export default async function AdminComunidadePage() {
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 <Megaphone className="h-4 w-4" /> Comunicados oficiais
               </h2>
-              <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
-                <h3 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Novo comunicado</h3>
-                <CriarComunicadoForm />
-              </div>
-              <ComunicadosManager comunicados={comunicados} />
+              <Suspense
+                fallback={
+                  <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+                }
+              >
+                <ComunicadoComposerAdmin />
+              </Suspense>
+              <ComunicadosManager
+                comunicados={comunicados}
+                currentUser={{
+                  id: session.user.id,
+                  nome: session.user.name ?? null,
+                  avatarUrl: typeof session.user.image === 'string' ? session.user.image : null,
+                }}
+                tenantId={tenant.id}
+                tenantNome={tenant.nome}
+              />
             </section>
             </MotionReveal>
           )}

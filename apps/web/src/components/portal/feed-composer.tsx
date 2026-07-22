@@ -38,11 +38,12 @@ import {
 } from '@/app/portal/comunidade/actions'
 import {
   publicarComunicadoComposer,
+  atualizarComunicadoComposer,
   type ComunicadoComposerState,
 } from '@/app/admin/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias } from '@/lib/social-embed'
+import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias, classifyMedia } from '@/lib/social-embed'
 import { emitirPostPublicado, criarPreviewOtimista, novoIdOtimista } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
@@ -57,7 +58,7 @@ import {
   type MencaoParsed,
 } from '@/lib/comunidade-social'
 import { menuItemStagger, popoverPanel, springGentle, springSnappy } from '@/lib/motion-presets'
-import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { useUnsavedChanges, useOptionalUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { useConfirmDialog } from '@/lib/confirm-action'
 
 const INITIAL_STATE: PublicarPostState = {}
@@ -113,6 +114,18 @@ export interface CanalComposerAlvo {
   nome: string | null
 }
 
+export interface ComunicadoEdicaoAlvo {
+  id: string
+  titulo: string
+  corpo: string
+  prioridade: Prioridade
+  midiaUrls: string[]
+  /** Chamado após salvar com sucesso — fecha o modo de edição no chamador. */
+  onSalvo?: () => void
+  /** Chamado ao cancelar (com confirmação de descarte se houver alteração). */
+  onCancelar?: () => void
+}
+
 interface FeedComposerProps {
   userId: string
   userName: string | null
@@ -140,13 +153,15 @@ interface FeedComposerProps {
     sedeNome: string | null
   }
   /**
-   * Quando true, publica um Comunicado oficial (admin) em vez de post de
+   * Quando `true`, publica um Comunicado oficial (admin) em vez de post de
    * membro: mesmo composer (mídia, menções, emoji), com campo de Título e
    * seletor de Prioridade no lugar de Enquete/Evento/Visibilidade, mais uma
-   * prévia fiel de como o comunicado vai aparecer no feed. Mutuamente
-   * exclusivo com `canal`.
+   * prévia fiel de como o comunicado vai aparecer no feed. Passe um
+   * `ComunicadoEdicaoAlvo` para editar um comunicado existente (composer
+   * abre pré-preenchido, já expandido, chamando `atualizarComunicadoComposer`
+   * em vez de publicar um novo). Mutuamente exclusivo com `canal`.
    */
-  comunicado?: boolean
+  comunicado?: boolean | ComunicadoEdicaoAlvo
 }
 
 export function FeedComposer({
@@ -221,10 +236,16 @@ function FeedComposerActive({
     publicarPostCanal,
     INITIAL_STATE,
   )
+  const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
   const [comunicadoState, comunicadoAction, comunicadoPending] = useActionState<
     ComunicadoComposerState,
     FormData
-  >(publicarComunicadoComposer, INITIAL_COMUNICADO_STATE)
+  >(
+    comunicadoEdicao
+      ? atualizarComunicadoComposer.bind(null, comunicadoEdicao.id)
+      : publicarComunicadoComposer,
+    INITIAL_COMUNICADO_STATE,
+  )
 
   const token = comunicado
     ? (comunicadoState.token ?? 'novo')
@@ -320,7 +341,14 @@ function FeedComposerActive({
   ])
 
   useEffect(() => {
-    if (comunicado && comunicadoState.success) toast.success('Comunicado publicado.')
+    if (!comunicado || !comunicadoState.success) return
+    if (comunicadoEdicao) {
+      toast.success('Comunicado atualizado.')
+      comunicadoEdicao.onSalvo?.()
+    } else {
+      toast.success('Comunicado publicado.')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comunicado, comunicadoState.success, comunicadoState.token])
 
   return (
@@ -417,27 +445,30 @@ function ComposerBody({
   somentePublico?: boolean
   eventoIdInicial?: string
   canal?: CanalComposerAlvo
-  comunicado?: boolean
+  comunicado?: boolean | ComunicadoEdicaoAlvo
   onPrependOtimista: (opts: {
     conteudo: string
     midiaUrls: string[]
     visibilidade: VisibilidadePost
   }) => void
 }) {
+  const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
       ? eventoIdInicial
       : undefined
 
-  const [expanded, setExpanded] = useState(Boolean(eventoPreselecionado))
+  const [expanded, setExpanded] = useState(
+    Boolean(eventoPreselecionado) || Boolean(comunicadoEdicao),
+  )
   const [modoEnquete, setModoEnquete] = useState(false)
   const [modoEvento, setModoEvento] = useState(Boolean(eventoPreselecionado))
   const [eventoId, setEventoId] = useState(
     eventoPreselecionado ?? eventos[0]?.id ?? '',
   )
-  const [texto, setTexto] = useState('')
-  const [titulo, setTitulo] = useState('')
-  const [prioridade, setPrioridade] = useState<Prioridade>('NORMAL')
+  const [texto, setTexto] = useState(comunicadoEdicao?.corpo ?? '')
+  const [titulo, setTitulo] = useState(comunicadoEdicao?.titulo ?? '')
+  const [prioridade, setPrioridade] = useState<Prioridade>(comunicadoEdicao?.prioridade ?? 'NORMAL')
   const [mencoes, setMencoes] = useState<MencaoParsed[]>([])
   const [opcoes, setOpcoes] = useState(['', ''])
   const [mencaoQuery, setMencaoQuery] = useState<string | null>(null)
@@ -445,7 +476,17 @@ function ComposerBody({
     somentePublico ? 'PUBLICO' : perfilPrivado ? 'PRIVADO' : 'PUBLICO',
   )
   const [alcanceOpen, setAlcanceOpen] = useState(false)
-  const [medias, setMedias] = useState<MediaItem[]>([])
+  const [medias, setMedias] = useState<MediaItem[]>(() => {
+    if (!comunicadoEdicao) return []
+    return classifyMedia(comunicadoEdicao.midiaUrls).media.map((m) => ({
+      id: m.url,
+      kind: m.type,
+      localUrl: m.url,
+      url: m.url,
+      progress: 100,
+      error: null,
+    }))
+  })
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
   const [embedDispensado, setEmbedDispensado] = useState(false)
@@ -458,6 +499,16 @@ function ComposerBody({
   const [, startTransition] = useTransition()
   const router = useRouter()
   const confirmDialog = useConfirmDialog()
+  const unsavedChangesCtx = useOptionalUnsavedChangesContext()
+
+  async function handleCancelar() {
+    if (comunicadoEdicao) {
+      const ok = unsavedChangesCtx ? await unsavedChangesCtx.confirmDiscard() : true
+      if (ok) comunicadoEdicao.onCancelar?.()
+      return
+    }
+    setExpanded(false)
+  }
 
   useEffect(() => {
     if (!eventoPreselecionado) return
@@ -507,17 +558,24 @@ function ComposerBody({
 
   const composerChanges = useMemo(() => {
     const list: string[] = []
+    if (comunicadoEdicao) {
+      if (titulo.trim() !== comunicadoEdicao.titulo.trim()) list.push('Título')
+      if (texto.trim() !== comunicadoEdicao.corpo.trim()) list.push('Texto')
+      if (prioridade !== comunicadoEdicao.prioridade) list.push('Prioridade')
+      if (anexos.join(',') !== comunicadoEdicao.midiaUrls.join(',')) list.push('Anexos')
+      return list
+    }
     if (comunicado && titulo.trim()) list.push('Título')
     if (texto.trim()) list.push('Texto')
     if (medias.length > 0) list.push(`Anexos (${medias.length})`)
     if (modoEnquete) list.push('Enquete')
     if (modoEvento) list.push('Evento')
     return list
-  }, [comunicado, titulo, texto, medias.length, modoEnquete, modoEvento])
+  }, [comunicado, comunicadoEdicao, titulo, texto, prioridade, anexos, medias.length, modoEnquete, modoEvento])
 
   useUnsavedChanges({
-    id: 'feed-composer',
-    title: 'Nova publicação',
+    id: comunicadoEdicao ? `comunicado-editar-${comunicadoEdicao.id}` : 'feed-composer',
+    title: comunicadoEdicao ? 'Editar comunicado' : 'Nova publicação',
     isDirty: composerChanges.length > 0,
     changes: composerChanges,
   })
@@ -1548,7 +1606,7 @@ function ComposerBody({
               )}
               <button
                 type="button"
-                onClick={() => setExpanded(false)}
+                onClick={() => void handleCancelar()}
                 className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
               >
                 Cancelar
@@ -1569,14 +1627,18 @@ function ComposerBody({
                   {enviando
                     ? 'Enviando…'
                     : pending
-                      ? 'Publicando…'
-                      : comunicado
-                        ? 'Publicar comunicado'
-                        : modoEnquete
-                          ? 'Publicar enquete'
-                          : modoEvento
-                            ? 'Publicar evento'
-                            : 'Publicar'}
+                      ? comunicadoEdicao
+                        ? 'Salvando…'
+                        : 'Publicando…'
+                      : comunicadoEdicao
+                        ? 'Salvar alterações'
+                        : comunicado
+                          ? 'Publicar comunicado'
+                          : modoEnquete
+                            ? 'Publicar enquete'
+                            : modoEvento
+                              ? 'Publicar evento'
+                              : 'Publicar'}
                 </span>
               </button>
             </div>

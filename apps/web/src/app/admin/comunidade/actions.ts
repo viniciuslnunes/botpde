@@ -395,6 +395,88 @@ export async function atualizarComunicado(
   return {}
 }
 
+/**
+ * Atualiza o Announcement e sincroniza `midiaUrls` do Post institucional
+ * vinculado (título/corpo/prioridade já são lidos ao vivo da relação
+ * `comunicadoOrigem` pelo embed — só a mídia mora no Post e precisa de
+ * sync explícito). Único ponto de edição usado pelo composer rico.
+ */
+async function atualizarComunicadoEPost(opts: {
+  tenantId: string
+  autorId: string
+  comunicadoId: string
+  titulo: string
+  corpo: string
+  prioridade: PrioridadeComunicado
+  midias: string[]
+}): Promise<void> {
+  await db.$transaction([
+    db.announcement.update({
+      where: { id: opts.comunicadoId },
+      data: { titulo: opts.titulo, corpo: opts.corpo, prioridade: opts.prioridade },
+    }),
+    db.post.updateMany({
+      where: { comunicadoOrigemId: opts.comunicadoId, tipo: 'INSTITUCIONAL' },
+      data: { midiaUrls: opts.midias },
+    }),
+  ])
+
+  await db.auditLog.create({
+    data: {
+      tenantId: opts.tenantId,
+      atorId: opts.autorId,
+      acao: 'COMUNICADO_ATUALIZADO',
+      entidade: 'Announcement',
+      entidadeId: opts.comunicadoId,
+    },
+  })
+
+  invalidateComunicadosCache(opts.tenantId)
+  revalidatePath('/admin/comunidade')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal')
+}
+
+/** Salva edição de um comunicado a partir do composer rico (`FeedComposer` modo `comunicado`). */
+export async function atualizarComunicadoComposer(
+  comunicadoId: string,
+  _prev: ComunicadoComposerState,
+  formData: FormData,
+): Promise<ComunicadoComposerState> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
+
+  const comunicado = await db.announcement.findFirst({
+    where: { id: comunicadoId, tenantId: tenant.id },
+    select: { id: true },
+  })
+  if (!comunicado) return { message: 'Comunicado não encontrado' }
+
+  const parsed = comunicadoComposerSchema.safeParse({
+    titulo: formData.get('titulo'),
+    corpo: formData.get('conteudo'),
+    prioridade: formData.get('prioridade'),
+    midias: parseMidiasComunicado(formData.get('midias')),
+  })
+
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+  }
+
+  const { titulo, corpo, prioridade, midias } = parsed.data
+
+  await atualizarComunicadoEPost({
+    tenantId: tenant.id,
+    autorId: session.user.id,
+    comunicadoId,
+    titulo,
+    corpo,
+    prioridade,
+    midias,
+  })
+
+  return { success: true, token: comunicadoId }
+}
+
 export async function alternarFixadoComunicado(comunicadoId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ANNOUNCEMENTS_PUBLISH)
 
