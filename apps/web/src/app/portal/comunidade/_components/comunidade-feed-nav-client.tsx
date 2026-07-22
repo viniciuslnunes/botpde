@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   Rss,
@@ -9,16 +8,13 @@ import {
   Video,
   Search,
   Users,
-  Heart,
   Bookmark,
-  Bell,
   Radio,
   ListOrdered,
   Scale,
   type LucideIcon,
 } from 'lucide-react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
-import { subscribeNavbarUnread } from '@/lib/use-navbar-context'
 
 type NavItem = {
   href: string
@@ -28,19 +24,18 @@ type NavItem = {
 }
 
 function isNavActive(pathname: string, href: string): boolean {
-  if (href === '/portal/comunidade') return pathname === '/portal/comunidade'
-  return pathname === href || pathname.startsWith(`${href}/`)
+  const pathOnly = href.split('?')[0] ?? href
+  if (pathOnly === '/portal/comunidade') return pathname === '/portal/comunidade'
+  return pathname === pathOnly || pathname.startsWith(`${pathOnly}/`)
 }
 
 export function ComunidadeFeedNavClient({
   currentUserId,
-  notificacoesNaoLidas = 0,
   solicitacoesPendentes = 0,
   mostrarBalanco = false,
   escopo = 'torcida',
 }: {
   currentUserId: string
-  notificacoesNaoLidas?: number
   solicitacoesPendentes?: number
   /** Prestação de contas pública — só quando o Presidente publicou o balanço. */
   mostrarBalanco?: boolean
@@ -48,12 +43,6 @@ export function ComunidadeFeedNavClient({
   escopo?: 'nacional' | 'torcida'
 }) {
   const pathname = usePathname()
-  /** Contagem ao vivo do cache da navbar; SSR até a primeira atualização. */
-  const [liveUnread, setLiveUnread] = useState<number | null>(null)
-
-  useEffect(() => subscribeNavbarUnread(setLiveUnread), [])
-
-  const notifBadge = liveUnread ?? notificacoesNaoLidas
   const modoNacional = escopo === 'nacional'
   const sufixo = modoNacional ? '?escopo=nacional' : ''
 
@@ -61,11 +50,8 @@ export function ComunidadeFeedNavClient({
     { href: `/portal/comunidade${sufixo}`, label: 'Feed', icon: Rss },
     ...(modoNacional
       ? []
-      : [{ href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart }]),
-    ...(modoNacional
-      ? []
       : [{ href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark }]),
-    { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search },
+    { href: `/portal/comunidade/busca${sufixo}`, label: 'Buscar', icon: Search },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video },
     { href: `/portal/comunidade/grupos${sufixo}`, label: 'Grupos', icon: Users },
     { href: `/portal/comunidade/canais${sufixo}`, label: 'Canais', icon: Radio },
@@ -73,12 +59,6 @@ export function ComunidadeFeedNavClient({
     ...(mostrarBalanco && !modoNacional
       ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
       : []),
-    {
-      href: '/portal/comunidade/notificacoes',
-      label: 'Notificações',
-      icon: Bell,
-      badge: notifBadge,
-    },
     ...(modoNacional
       ? []
       : [

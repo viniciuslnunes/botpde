@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
 import { Search, Loader2, Hash, X, ArrowRight } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -19,6 +19,8 @@ interface BuscaRapidaResponse {
 
 export function ComunidadeSearchBar() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const modoNacional = searchParams.get('escopo') === 'nacional'
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -53,12 +55,11 @@ export function ComunidadeSearchBar() {
     setCarregando(true)
     setErro(null)
     try {
-      const res = await fetch(
-        `/api/comunidade/busca?q=${encodeURIComponent(termo)}&modo=rapida`,
-        {
-          signal: controller.signal,
-        },
-      )
+      const params = new URLSearchParams({ q: termo, modo: 'rapida' })
+      if (modoNacional) params.set('escopo', 'nacional')
+      const res = await fetch(`/api/comunidade/busca?${params}`, {
+        signal: controller.signal,
+      })
       if (!res.ok) {
         const body = (await res.json()) as { error?: string }
         throw new Error(body.error ?? 'Erro na busca')
@@ -76,7 +77,7 @@ export function ComunidadeSearchBar() {
     } finally {
       if (abortRef.current === controller) setCarregando(false)
     }
-  }, [])
+  }, [modoNacional])
 
   useEffect(() => {
     if (!aberto) return
@@ -117,7 +118,8 @@ export function ComunidadeSearchBar() {
     const termo = q.trim()
     if (termo.length < 2) return
     setAberto(false)
-    router.push(`/portal/comunidade/busca?q=${encodeURIComponent(termo)}`)
+    const escopo = modoNacional ? '&escopo=nacional' : ''
+    router.push(`/portal/comunidade/busca?q=${encodeURIComponent(termo)}${escopo}`)
   }
 
   return (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Home, Search, Video, Plus } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -21,10 +21,12 @@ interface ComunidadeDockProps {
  */
 export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const chromeVisible = useScrollChromeVisibility()
   const reduceMotion = useReducedMotion()
+  const sufixoNacional = searchParams.get('escopo') === 'nacional' ? '?escopo=nacional' : ''
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMounted(true), 0)
@@ -34,9 +36,9 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
   const isFeed = pathname === '/portal/comunidade'
 
   const items = [
-    { href: '/portal/comunidade', label: 'Feed', icon: Home, active: isFeed },
+    { href: `/portal/comunidade${sufixoNacional}`, label: 'Feed', icon: Home, active: isFeed },
     {
-      href: '/portal/comunidade/busca',
+      href: `/portal/comunidade/busca${sufixoNacional}`,
       label: 'Buscar',
       icon: Search,
       active: pathname.startsWith('/portal/comunidade/busca'),

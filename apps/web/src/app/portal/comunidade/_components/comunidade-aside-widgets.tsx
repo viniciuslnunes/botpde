@@ -12,13 +12,16 @@ interface ComunidadeAsideWidgetsProps {
   tenantId: string
   afiliacaoId: string | null
   currentUserId?: string
+  escopo?: 'nacional' | 'torcida'
 }
 
 export async function ComunidadeAsideWidgets({
   tenantId,
   afiliacaoId,
   currentUserId,
+  escopo = 'torcida',
 }: ComunidadeAsideWidgetsProps) {
+  const sufixoBusca = escopo === 'nacional' ? '?escopo=nacional' : ''
   const [noticias, sugestoes, hashtags, proximosEventos] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
@@ -127,7 +130,7 @@ export async function ComunidadeAsideWidgets({
               ))}
             </div>
             <Link
-              href="/portal/comunidade/busca"
+              href={`/portal/comunidade/busca${sufixoBusca}`}
               className="mt-3 flex w-full cursor-pointer items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
             >
               Ver membros

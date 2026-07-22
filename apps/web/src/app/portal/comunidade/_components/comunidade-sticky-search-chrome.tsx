@@ -40,7 +40,9 @@ export function ComunidadeStickySearchChrome({ children }: { children?: ReactNod
       }}
     >
       <div className="space-y-3 overflow-x-clip px-4 pb-2 pt-1 lg:px-0">
-        <ComunidadeSearchBar />
+        <Suspense fallback={<div className="h-11 animate-pulse rounded-xl bg-[rgb(var(--border))]" />}>
+          <ComunidadeSearchBar />
+        </Suspense>
         <Suspense fallback={<div className="h-9 border-b border-[rgb(var(--border))]" />}>
           <ComunidadeFeedTabs />
         </Suspense>

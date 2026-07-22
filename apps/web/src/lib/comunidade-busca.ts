@@ -1,6 +1,5 @@
 import { cache } from 'react'
 import { db, Prisma } from '@torcida/db'
-import { getVisibleTenantIds } from './hierarquia'
 import { canFollowUsers } from './social'
 import {
   getAutoresSemAcesso,
@@ -12,11 +11,30 @@ import { normalizarHashtag } from './comunidade-social'
 import {
   postIncludeBusca,
   projetarPostBusca,
+  resolveVisibleTenantIdsForFeed,
   type PostSocialItem,
 } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
 import { formatNomeTorcida } from '@torcida/types'
+
+/**
+ * Escopo de tenants da busca — o mesmo do feed. No tenant sintético da CN
+ * (`getVisibleTenantIds` só devolveria o container vazio de `SaasMembro`),
+ * expande para as TOs do clube + sintético.
+ */
+async function resolveTenantIdsParaBusca(tenantId: string, userId: string): Promise<string[]> {
+  return resolveVisibleTenantIdsForFeed(tenantId, userId)
+}
+
+/** Contexto de follow: na CN o viewer não tem vínculo no sintético — `null` usa afiliação/TO reais. */
+async function resolveFollowContextoId(tenantId: string): Promise<string | null> {
+  const tenant: { sintetico: boolean } | null = await db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { sintetico: true },
+  })
+  return tenant?.sintetico ? null : tenantId
+}
 
 export type BuscaComunidadeModo = 'rapida' | 'completa'
 
@@ -53,6 +71,10 @@ type SugestaoMembroBuscaRaw = {
   user: { id: string; nome: string | null; avatarUrl: string | null }
   tenant: { nome: string }
   sede: { nome: string; tipo: string } | null
+  /** Bio do PerfilTorcedor quando ainda não há PerfilMembro. */
+  bioTorcedor?: string | null
+  /** Veio do PerfilTorcedor da afiliação (comunidade do clube). */
+  viaPerfilTorcedor?: boolean
 }
 
 function pontuarSugestaoMembro(input: {
@@ -61,8 +83,11 @@ function pontuarSugestaoMembro(input: {
   ultimaAtividade: Date | null
   seguidores: number
   publicacoes: number
+  /** Na CN, torcedor do clube (PerfilTorcedor / TORCEDOR) sobe acima de sócio de TO. */
+  torcedorDoClube?: boolean
 }): number {
   let score = 0
+  if (input.torcedorDoClube) score += 2_000
   if (input.mesmaUnidade) score += 1_000
   else if (input.mesmoTenant) score += 500
 
@@ -228,10 +253,10 @@ export async function getSugestoesMembrosParaBusca(
   tenantId: string,
   userId: string,
 ): Promise<SugestaoMembroBusca[]> {
-  const visibleIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const visibleIds = await resolveTenantIdsParaBusca(tenantId, userId)
   if (visibleIds.length === 0) return []
 
-  const [viewerMembro, seguindo, bloqueadosIds] = await Promise.all([
+  const [viewerMembro, seguindo, bloqueadosIds, tenantMeta] = await Promise.all([
     db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
       select: { sedeId: true },
@@ -241,55 +266,142 @@ export async function getSugestoesMembrosParaBusca(
       select: { seguidoId: true },
     }) as Promise<{ seguidoId: string }[]>,
     getBloqueadosDoUsuario(userId),
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        sintetico: true,
+        afiliacaoId: true,
+        afiliacao: { select: { nome: true, apelido: true } },
+      },
+    }) as Promise<{
+      sintetico: boolean
+      afiliacaoId: string | null
+      afiliacao: { nome: string; apelido: string | null } | null
+    } | null>,
   ])
 
+  const modoNacional = Boolean(tenantMeta?.sintetico)
+  const followContextoId = modoNacional ? null : tenantId
   const viewerSedeId = viewerMembro?.sedeId ?? null
   const excluirIds = [...new Set([userId, ...seguindo.map((s) => s.seguidoId), ...bloqueadosIds])]
+  const nomeClube =
+    tenantMeta?.afiliacao?.apelido || tenantMeta?.afiliacao?.nome || 'Comunidade nacional'
 
-  const rows: SugestaoMembroBuscaRaw[] = await db.saasMembro.findMany({
-    where: {
-      status: 'APROVADO',
-      tenantId: { in: visibleIds },
-      userId: { notIn: excluirIds },
-    },
-    select: {
-      userId: true,
-      tenantId: true,
-      tipo: true,
-      cidade: true,
-      sedeId: true,
-      user: { select: { id: true, nome: true, avatarUrl: true } },
-      tenant: { select: { nome: true } },
-      sede: { select: { nome: true, tipo: true } },
-    },
-    take: SUGESTOES_BUSCA_CANDIDATOS,
-    orderBy: { criadoEm: 'desc' },
-  })
+  const [rows, perfisTorcedor]: [
+    SugestaoMembroBuscaRaw[],
+    Array<{
+      userId: string
+      bio: string | null
+      regiao: string | null
+      user: { id: string; nome: string | null; avatarUrl: string | null }
+    }>,
+  ] = await Promise.all([
+    db.saasMembro.findMany({
+      where: {
+        status: 'APROVADO',
+        tenantId: { in: visibleIds },
+        userId: { notIn: excluirIds },
+      },
+      select: {
+        userId: true,
+        tenantId: true,
+        tipo: true,
+        cidade: true,
+        sedeId: true,
+        user: { select: { id: true, nome: true, avatarUrl: true } },
+        tenant: { select: { nome: true } },
+        sede: { select: { nome: true, tipo: true } },
+      },
+      take: SUGESTOES_BUSCA_CANDIDATOS,
+      orderBy: { criadoEm: 'desc' },
+    }) as Promise<SugestaoMembroBuscaRaw[]>,
+    modoNacional && tenantMeta?.afiliacaoId
+      ? (db.perfilTorcedor.findMany({
+          where: {
+            afiliacaoId: tenantMeta.afiliacaoId,
+            onboardingConcluidoEm: { not: null },
+            userId: { notIn: excluirIds },
+          },
+          orderBy: { atualizadoEm: 'desc' },
+          take: SUGESTOES_BUSCA_CANDIDATOS,
+          select: {
+            userId: true,
+            bio: true,
+            regiao: true,
+            user: { select: { id: true, nome: true, avatarUrl: true } },
+          },
+        }) as Promise<
+          Array<{
+            userId: string
+            bio: string | null
+            regiao: string | null
+            user: { id: string; nome: string | null; avatarUrl: string | null }
+          }>
+        >)
+      : Promise.resolve([]),
+  ])
 
   const porUsuario = new Map<string, SugestaoMembroBuscaRaw>()
+
+  function scoreVinculo(r: SugestaoMembroBuscaRaw): number {
+    return (
+      (r.viaPerfilTorcedor ? 4 : 0) +
+      (r.tipo === 'TORCEDOR' ? 2 : 0) +
+      (r.sedeId && r.sedeId === viewerSedeId ? 2 : 0) +
+      (r.tenantId === tenantId ? 1 : 0)
+    )
+  }
+
   for (const r of rows) {
     const existente = porUsuario.get(r.userId)
-    if (!existente) {
+    if (!existente || scoreVinculo(r) > scoreVinculo(existente)) {
       porUsuario.set(r.userId, r)
+    }
+  }
+
+  // CN: torcedores do clube (PerfilTorcedor) entram como candidatos principais.
+  // Sócio de TO já presente permanece sócio; quem só tem perfil global vira TORCEDOR.
+  for (const p of perfisTorcedor) {
+    const existente = porUsuario.get(p.userId)
+    if (existente?.tipo === 'SOCIO') {
+      existente.viaPerfilTorcedor = true
+      if (!existente.bioTorcedor) existente.bioTorcedor = p.bio
       continue
     }
-    const rScore =
-      (r.sedeId && r.sedeId === viewerSedeId ? 2 : 0) + (r.tenantId === tenantId ? 1 : 0)
-    const eScore =
-      (existente.sedeId && existente.sedeId === viewerSedeId ? 2 : 0) +
-      (existente.tenantId === tenantId ? 1 : 0)
-    if (rScore > eScore) porUsuario.set(r.userId, r)
+    const candidato: SugestaoMembroBuscaRaw = {
+      userId: p.userId,
+      tenantId,
+      tipo: 'TORCEDOR',
+      cidade: p.regiao,
+      sedeId: null,
+      user: p.user,
+      tenant: { nome: nomeClube },
+      sede: null,
+      bioTorcedor: p.bio,
+      viaPerfilTorcedor: true,
+    }
+    if (!existente || scoreVinculo(candidato) >= scoreVinculo(existente)) {
+      porUsuario.set(p.userId, candidato)
+    }
   }
+
   const candidatos = [...porUsuario.values()]
   if (candidatos.length === 0) return []
 
   const candidatoIds = candidatos.map((c) => c.userId)
 
+  // Perfil social: no tenant real usa o contexto; na CN tenta o tenant do vínculo do candidato.
+  const perfilTenantIds = followContextoId
+    ? [tenantId]
+    : [...new Set(candidatos.map((c) => c.tenantId))]
+
   const [perfis, seguimentos, contagensMap, podeSeguirLista, postsRecentes] = await Promise.all([
     db.perfilMembro.findMany({
-      where: { tenantId, userId: { in: candidatoIds } },
-      select: { userId: true, perfilPrivado: true, bio: true },
-    }) as Promise<{ userId: string; perfilPrivado: boolean; bio: string | null }[]>,
+      where: { tenantId: { in: perfilTenantIds }, userId: { in: candidatoIds } },
+      select: { userId: true, tenantId: true, perfilPrivado: true, bio: true },
+    }) as Promise<
+      { userId: string; tenantId: string; perfilPrivado: boolean; bio: string | null }[]
+    >,
     db.seguimento.findMany({
       where: { seguidorId: userId, seguidoId: { in: candidatoIds } },
       select: { seguidoId: true, status: true },
@@ -297,7 +409,7 @@ export async function getSugestoesMembrosParaBusca(
       { seguidoId: string; status: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'BLOQUEADO' }[]
     >,
     getContagensSeguimentoEmLote(candidatoIds, tenantId),
-    canFollowUsers(userId, candidatoIds, tenantId),
+    canFollowUsers(userId, candidatoIds, followContextoId),
     db.post.findMany({
       where: {
         autorId: { in: candidatoIds },
@@ -313,13 +425,24 @@ export async function getSugestoesMembrosParaBusca(
     }) as Promise<{ autorId: string; criadoEm: Date }[]>,
   ])
 
-  const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
+  const perfilPorUsuario = new Map<string, { perfilPrivado: boolean; bio: string | null }>()
+  const candidatoPorUser = new Map(candidatos.map((c) => [c.userId, c]))
+  for (const p of perfis) {
+    const cand = candidatoPorUser.get(p.userId)
+    const atual = perfilPorUsuario.get(p.userId)
+    if (!atual) {
+      perfilPorUsuario.set(p.userId, p)
+      continue
+    }
+    if (cand && p.tenantId === cand.tenantId) perfilPorUsuario.set(p.userId, p)
+  }
+
   const statusPorId = new Map(seguimentos.map((s) => [s.seguidoId, s.status]))
   const ultimaAtividadePorId = new Map(postsRecentes.map((p) => [p.autorId, p.criadoEm]))
 
   const enriquecidos: Array<SugestaoMembroBusca & { _score: number }> = []
   for (const r of candidatos) {
-    const perfil = perfilPorId.get(r.userId)
+    const perfil = perfilPorUsuario.get(r.userId)
     const perfilPrivado = resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
       tipo: r.tipo,
       status: 'APROVADO',
@@ -330,6 +453,7 @@ export async function getSugestoesMembrosParaBusca(
     const mesmaUnidade = viewerSedeId != null && r.sedeId === viewerSedeId
     const contagens = contagensMap.get(r.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
     const ultimaAtividade = ultimaAtividadePorId.get(r.userId) ?? null
+    const torcedorDoClube = r.tipo === 'TORCEDOR' || Boolean(r.viaPerfilTorcedor)
 
     enriquecidos.push({
       id: r.user.id,
@@ -340,7 +464,7 @@ export async function getSugestoesMembrosParaBusca(
       statusSeguimento: statusPorId.get(r.userId) ?? null,
       seguidores: contagens.seguidores,
       podeSeguir,
-      bio: perfil?.bio ?? null,
+      bio: perfil?.bio ?? r.bioTorcedor ?? null,
       publicacoes: contagens.publicacoes,
       mesmaUnidade,
       unidadeNome: r.sede?.nome ?? null,
@@ -353,6 +477,7 @@ export async function getSugestoesMembrosParaBusca(
         ultimaAtividade,
         seguidores: contagens.seguidores,
         publicacoes: contagens.publicacoes,
+        torcedorDoClube: modoNacional && torcedorDoClube,
       }),
     })
   }
@@ -372,8 +497,14 @@ export async function buscarMembrosComunidade(
 
   const modo = opts.modo ?? 'completa'
   const limites = LIMITES_POR_MODO[modo]
-  const visibleIds = opts.visibleTenantIds ?? (await getVisibleTenantIds(tenantId, 'comunidade'))
-  const bloqueadosIds = await getBloqueadosDoUsuario(userId)
+  const visibleIds =
+    opts.visibleTenantIds ?? (await resolveTenantIdsParaBusca(tenantId, userId))
+  const [bloqueadosIds, followContextoId] = await Promise.all([
+    getBloqueadosDoUsuario(userId),
+    resolveFollowContextoId(tenantId),
+  ])
+
+  const perfilTenantFilter: string | { in: string[] } = followContextoId ?? { in: visibleIds }
 
   const trigramCandidateIds = await buscarCandidatosMembrosPorTrgm(
     tenantId,
@@ -399,7 +530,10 @@ export async function buscarMembrosComunidade(
                 { nome: { contains: q, mode: 'insensitive' } },
                 {
                   perfisMembro: {
-                    some: { bio: { contains: q, mode: 'insensitive' }, tenantId },
+                    some: {
+                      bio: { contains: q, mode: 'insensitive' },
+                      tenantId: perfilTenantFilter,
+                    },
                   },
                 },
               ],
@@ -432,6 +566,54 @@ export async function buscarMembrosComunidade(
     candidatos.push(r)
     if (candidatos.length >= limites.membrosOut) break
   }
+
+  // CN: inclui torcedores globais (PerfilTorcedor) que não têm SaasMembro nas TOs.
+  if (followContextoId === null && candidatos.length < limites.membrosOut) {
+    const tenantMeta: {
+      afiliacaoId: string | null
+      afiliacao: { nome: string; apelido: string | null } | null
+    } | null = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        afiliacaoId: true,
+        afiliacao: { select: { nome: true, apelido: true } },
+      },
+    })
+    if (tenantMeta?.afiliacaoId) {
+      const nomeClube =
+        tenantMeta.afiliacao?.apelido || tenantMeta.afiliacao?.nome || 'Comunidade nacional'
+      const restantes = limites.membrosOut - candidatos.length
+      const torcedores: Array<{
+        userId: string
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+      }> = await db.perfilTorcedor.findMany({
+        where: {
+          afiliacaoId: tenantMeta.afiliacaoId,
+          onboardingConcluidoEm: { not: null },
+          userId: { notIn: [...vistos, userId, ...bloqueadosIds] },
+          user: { nome: { contains: q, mode: 'insensitive' } },
+        },
+        take: restantes,
+        orderBy: { atualizadoEm: 'desc' },
+        select: {
+          userId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+        },
+      })
+      for (const t of torcedores) {
+        if (vistos.has(t.userId)) continue
+        vistos.add(t.userId)
+        candidatos.push({
+          userId: t.userId,
+          tenantId,
+          tipo: 'TORCEDOR',
+          user: t.user,
+          tenant: { nome: nomeClube },
+        })
+      }
+    }
+  }
+
   if (candidatos.length === 0) return []
 
   const candidatoIds = candidatos.map((c) => c.userId)
@@ -440,7 +622,7 @@ export async function buscarMembrosComunidade(
   if (modo === 'rapida') {
     const perfis: { userId: string; perfilPrivado: boolean }[] =
       await db.perfilMembro.findMany({
-        where: { tenantId, userId: { in: candidatoIds } },
+        where: { tenantId: perfilTenantFilter, userId: { in: candidatoIds } },
         select: { userId: true, perfilPrivado: true },
       })
     const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
@@ -465,7 +647,7 @@ export async function buscarMembrosComunidade(
 
   const [perfis, seguimentos, contagensRows, podeSeguirLista] = await Promise.all([
     db.perfilMembro.findMany({
-      where: { tenantId, userId: { in: candidatoIds } },
+      where: { tenantId: perfilTenantFilter, userId: { in: candidatoIds } },
       select: { userId: true, perfilPrivado: true },
     }) as Promise<{ userId: string; perfilPrivado: boolean }[]>,
     db.seguimento.findMany({
@@ -479,7 +661,7 @@ export async function buscarMembrosComunidade(
       where: { seguidoId: { in: candidatoIds }, status: 'APROVADO' },
       _count: { _all: true },
     }) as Promise<{ seguidoId: string; _count: { _all: number } }[]>,
-    canFollowUsers(userId, candidatoIds, tenantId),
+    canFollowUsers(userId, candidatoIds, followContextoId),
   ])
 
   const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
@@ -517,8 +699,12 @@ export async function buscarComunidade(
 
   const modo = opts.modo ?? 'completa'
   const limites = LIMITES_POR_MODO[modo]
-  const visibleTenantIds = await getVisibleTenantIds(tenantId, 'comunidade')
+  const [visibleTenantIds, followContextoId] = await Promise.all([
+    resolveTenantIdsParaBusca(tenantId, userId),
+    resolveFollowContextoId(tenantId),
+  ])
   const normalizedTag = normalizarHashtag(termo.replace(/^#/, ''))
+  const modoNacional = followContextoId === null
 
   const [membros, hashtagRowsTrgm, postIdsTrgm, canaisUnidades]: [
     MembroBuscaItem[],
@@ -529,9 +715,16 @@ export async function buscarComunidade(
     buscarMembrosComunidade(tenantId, userId, termo, { visibleTenantIds, modo }),
     buscarHashtagsPorTrgm(visibleTenantIds, normalizedTag, limites.hashtags),
     buscarPostIdsPorTrgm(visibleTenantIds, termo, limites.postsCand),
+    // CN: só canais PUBLICO (mesmo critério da vitrine nacional) — nunca TENANT/HIERARQUIA.
     modo === 'rapida'
       ? Promise.resolve({ canais: [] as CanalItem[], unidades: [] as UnidadeBuscaItem[] })
-      : buscarCanaisEUnidades(tenantId, userId, termo, { visibleTenantIds }),
+      : buscarCanaisEUnidades(tenantId, userId, termo, { visibleTenantIds }).then((r) => {
+          if (!modoNacional) return r
+          return {
+            canais: r.canais.filter((c) => c.visibilidadeCanal === 'PUBLICO'),
+            unidades: r.unidades.filter((u) => u.tenantId !== tenantId),
+          }
+        }),
   ])
 
   let hashtagRows: Array<{ tag: string; total: number }>

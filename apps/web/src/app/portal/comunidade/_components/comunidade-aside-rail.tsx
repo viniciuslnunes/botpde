@@ -90,6 +90,7 @@ export function ComunidadeAsideRail({
             tenantId={tenant.id}
             afiliacaoId={tenant.afiliacaoId}
             currentUserId={currentUser.id}
+            escopo={escopo}
           />
         </Suspense>
       </div>

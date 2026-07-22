@@ -141,7 +141,7 @@ Typeahead no feed e página `/portal/comunidade/busca` compartilham
 | Fallback | Sem extensão: `isPgTrgmUnavailableError` → `null` → ILIKE Prisma. Outros erros **não** viram “lista vazia”. |
 | UX dropdown | `comunidade-search-bar.tsx` chama `?modo=rapida`; **erro HTTP ≠ vazio** — mostrar mensagem de erro (a página completa já fazia isso). |
 | Canais (completa) | `buscarCanaisEUnidades`: gate `podeVerCanal` em **paralelo** (`Promise.all`), não em série. |
-| Escopo | `getVisibleTenantIds(tenant, 'comunidade')`; posts de busca só `PUBLICO` + `tipo=MEMBRO` + sem `conversaId`. |
+| Escopo | `resolveVisibleTenantIdsForFeed` (mesmo do feed): na CN (tenant sintético) inclui TOs do clube — `getVisibleTenantIds` sozinho deixa sugestões/membros vazios. **Sugestões CN:** `PerfilTorcedor` da afiliação é a fonte principal (ranking `torcedorDoClube`); sócios de TO entram depois. Posts só `PUBLICO` + `tipo=MEMBRO` + sem `conversaId`. `?escopo=nacional` na página/API. Canais na CN: só `PUBLICO`. |
 | Sintoma clássico | Digitar 2+ chars → “Nenhum resultado” para nomes que existem → checar Network: 400 com `42P10` / Prisma raw, ou UI engolindo `!res.ok`. |
 
 Performance / ganhos: `docs/data/modulo-comunidade-performance.md` § busca (B6.1).

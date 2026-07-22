@@ -26,11 +26,15 @@ interface BuscaResponse {
 
 export function BuscaMembrosClient({
   sugestoesIniciais = [],
+  escopo = 'torcida',
 }: {
   sugestoesIniciais?: SugestaoMembroBusca[]
+  /** Escopo ativo — preserva `?escopo=nacional` nas chamadas à API. */
+  escopo?: 'nacional' | 'torcida'
 }) {
   const searchParams = useSearchParams()
   const inicial = searchParams.get('q') ?? ''
+  const modoNacional = escopo === 'nacional'
   const [q, setQ] = useState(inicial)
   const [debounced, setDebounced] = useState(inicial.trim())
   const [resultado, setResultado] = useState<BuscaResponse>({
@@ -61,7 +65,9 @@ export function BuscaMembrosClient({
     setCarregando(true)
     setErro(null)
     try {
-      const res = await fetch(`/api/comunidade/busca?q=${encodeURIComponent(termo)}`, {
+      const params = new URLSearchParams({ q: termo })
+      if (modoNacional) params.set('escopo', 'nacional')
+      const res = await fetch(`/api/comunidade/busca?${params}`, {
         signal: controller.signal,
       })
       if (!res.ok) {
@@ -77,7 +83,7 @@ export function BuscaMembrosClient({
     } finally {
       if (abortRef.current === controller) setCarregando(false)
     }
-  }, [])
+  }, [modoNacional])
 
   useEffect(() => {
     startTransition(() => void buscar(debounced))
@@ -180,7 +186,9 @@ export function BuscaMembrosClient({
               Para seguir
             </h2>
             <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Priorizamos sua unidade e membros com atividade recente. Use a busca acima para encontrar alguém específico.
+              {modoNacional
+                ? 'Priorizamos torcedores do clube na comunidade. Sócios das torcidas organizadas aparecem em seguida.'
+                : 'Priorizamos sua unidade e membros com atividade recente. Use a busca acima para encontrar alguém específico.'}
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">

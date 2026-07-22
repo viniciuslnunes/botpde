@@ -109,7 +109,11 @@ export default async function ComunidadeLayout({
         >
           <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
         </ComunidadeLayoutChrome>
-        {currentUser.id && <ComunidadeDock currentUser={currentUser} />}
+        {currentUser.id && (
+          <Suspense fallback={null}>
+            <ComunidadeDock currentUser={currentUser} />
+          </Suspense>
+        )}
       </div>
     </ComunidadeQueryProvider>
   )

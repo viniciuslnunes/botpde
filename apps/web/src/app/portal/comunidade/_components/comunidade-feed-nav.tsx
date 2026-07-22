@@ -4,7 +4,7 @@ import { ComunidadeFeedNavClient } from './comunidade-feed-nav-client'
 export function ComunidadeFeedNavFallback() {
   return (
     <nav className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
-      {Array.from({ length: 10 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
           className="flex items-center gap-3 rounded-xl px-3 py-2"
@@ -36,7 +36,6 @@ export async function ComunidadeFeedNav({
   return (
     <ComunidadeFeedNavClient
       currentUserId={currentUserId}
-      notificacoesNaoLidas={badges.notificacoesNaoLidas}
       solicitacoesPendentes={badges.solicitacoesPendentes}
       mostrarBalanco={mostrarBalanco}
       escopo={escopo}
