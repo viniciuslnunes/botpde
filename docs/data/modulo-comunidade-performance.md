@@ -23,7 +23,7 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | SSE feed + refresh | `feed-live-banner.tsx`, `use-feed-stream.ts`, `feed-live-refresh.ts` | Topo: auto-refetch; rolado: banner |
 | Batch visibilidade | `perfil-social.ts`, `social.ts`, `comunidade-busca.ts` | Fim de N+1 em busca/feed |
 | Batch contagens | `getContagensSeguimentoEmLote` | Aside "Para seguir" |
-| Canais sugeridos | `getSugestoesCanaisParaAside` → `listCanaisVisiveis` | Aside "Canais sugeridos" (filtra membership; cache base 120s) |
+| Canais sugeridos | `getSugestoesCanaisParaAside` → `listCanaisVisiveis` | Rail direito (layout; filtra membership; cache base 120s) |
 | Hashtags em alta SQL | `feed.ts` `getHashtagsEmAlta` | `groupBy` em vez de agregar em memória |
 | Stories privacidade batch | `stories.ts` | Uma leitura de perfis/seguimentos |
 | Índices compostos | `schema.prisma` (`Post`, `Seguimento`) | Leituras por autor/data e rede |
@@ -212,7 +212,7 @@ zerava a percepção do TanStack (Suspense skeleton + SSR seed).
 | Fallback Suspense = `ComunidadeFeedBootstrap` | `_components/comunidade-feed-bootstrap.tsx` | Mostra cache quente em vez de skeleton vazio |
 | `gcTime` 20 min no Query provider | `comunidade-query-provider.tsx` | Cache sobrevive à saída do feed |
 | SSR seed só se cache vazio | `use-comunidade-infinite-feed.ts` | Não sobrescreve lista quente |
-| `ComunidadeLayoutChrome` (salas + chat) no layout | `comunidade-layout-chrome.tsx`, `layout.tsx` | `display:none` fora do feed — **sem unmount** |
+| `ComunidadeLayoutChrome` (salas + canais sugeridos + chat) no layout | `comunidade-layout-chrome.tsx`, `layout.tsx` | `display:none` fora do feed — **sem unmount** |
 | Page fina + Suspense composer/card | `composer-context.ts`, `*-section.tsx` | Layout resolve chrome; page não bloqueia no composer |
 | Prefetch on-hover abas Descobrir/Seguindo | `comunidade-feed-tabs.tsx` | Volta mais rápida |
 | `React.cache` em `listSalasAtivas` + `getActiveTenant` | `salas.ts`, `tenant.ts` | Dedupe layout ↔ page no mesmo RSC |

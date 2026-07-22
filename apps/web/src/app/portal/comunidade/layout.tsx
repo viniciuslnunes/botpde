@@ -4,6 +4,8 @@ import { ComunidadeRouteTransition } from './_components/comunidade-route-transi
 import { ComunidadeLayoutChrome } from './_components/comunidade-layout-chrome'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { getSugestoesCanaisParaAside } from '@/lib/canais'
+import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import { listSalasAtivas } from '@/lib/salas'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
@@ -22,12 +24,16 @@ export default async function ComunidadeLayout({
   let modoTorcida = false
   let salas: SalaAtivaListItem[] = []
   let tenantIdAtual: string | null = null
+  let canaisSugeridos: SugestaoCanalAside[] = []
   if (session?.user?.id) {
     const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
     if (ctx?.modo === 'torcida') {
       modoTorcida = true
       tenantIdAtual = ctx.tenant.id
-      salas = await listSalasAtivas(ctx.tenant.id)
+      ;[salas, canaisSugeridos] = await Promise.all([
+        listSalasAtivas(ctx.tenant.id),
+        getSugestoesCanaisParaAside(ctx.tenant.id, session.user.id),
+      ])
     }
   }
 
@@ -44,7 +50,9 @@ export default async function ComunidadeLayout({
       <div className="pb-28 lg:pb-0">
         <ComunidadeLayoutChrome
           currentUserId={currentUser.id}
+          tenantId={tenantIdAtual}
           salas={salas}
+          canaisSugeridos={canaisSugeridos}
           modoTorcida={modoTorcida}
         >
           <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>

@@ -3,6 +3,9 @@
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { ComunidadeSalasAside } from './comunidade-salas-aside'
+import { CanaisSugeridosAside } from './canais-sugeridos-aside'
+import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
+import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
 const ComunidadeChatPanel = dynamic(
@@ -20,18 +23,22 @@ const ComunidadeChatPanel = dynamic(
 const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
 
 /**
- * Chrome do layout: children + aside (salas/chat) no feed e no canal (mesmo
- * shell visual). Fora dessas rotas o aside fica `display:none` mas montado —
- * evita novo `GET /api/conversas/resumo` ao voltar.
+ * Chrome do layout: children + aside (salas / canais sugeridos / chat) no feed
+ * e no canal (mesmo shell visual). Fora dessas rotas o aside fica `display:none`
+ * mas montado — evita novo `GET /api/conversas/resumo` ao voltar.
  */
 export function ComunidadeLayoutChrome({
   currentUserId,
+  tenantId,
   salas,
+  canaisSugeridos = [],
   modoTorcida,
   children,
 }: {
   currentUserId: string
+  tenantId: string | null
   salas: SalaAtivaListItem[]
+  canaisSugeridos?: SugestaoCanalAside[]
   modoTorcida: boolean
   children: React.ReactNode
 }) {
@@ -51,8 +58,11 @@ export function ComunidadeLayoutChrome({
           className={showRail ? 'hidden xl:block' : 'hidden'}
           aria-hidden={!showRail}
         >
-          <div className="sticky top-20 space-y-4">
+          <div className={COMUNIDADE_RAIL_SCROLL}>
             <ComunidadeSalasAside salas={salas} />
+            {tenantId && canaisSugeridos.length > 0 ? (
+              <CanaisSugeridosAside canais={canaisSugeridos} tenantAtualId={tenantId} />
+            ) : null}
             <ComunidadeChatPanel currentUserId={currentUserId} liveUpdates={showRail} />
           </div>
         </aside>

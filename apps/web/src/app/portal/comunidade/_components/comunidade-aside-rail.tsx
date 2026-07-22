@@ -5,6 +5,7 @@ import {
   ComunidadeUserCardSection,
   ComunidadeUserCardFallback,
 } from './comunidade-user-card-section'
+import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
 import type { SalaAtivaListItem } from '@/lib/salas'
 
 interface CurrentUser {
@@ -40,7 +41,7 @@ export function ComunidadeAsideRail({
 
   return (
     <aside className="hidden lg:block">
-      <div className="sticky top-20 space-y-4">
+      <div className={COMUNIDADE_RAIL_SCROLL}>
         <Suspense
           fallback={
             <ComunidadeUserCardFallback
