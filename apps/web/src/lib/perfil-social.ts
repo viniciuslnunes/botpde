@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
 import { getSeguimentoStatus } from './social'
-import { tagAvatarUsuario } from './avatar-cache'
+import { tagAvatarUsuario, tagNomeUsuario } from './avatar-cache'
 
 export interface PerfilSocialLite {
   id: string
@@ -75,6 +75,26 @@ export async function getAvatarAtualDoUsuario(userId: string): Promise<string | 
     },
     ['avatar-atual-do-usuario', userId],
     { revalidate: 60, tags: [tagAvatarUsuario(userId)] },
+  )()
+}
+
+/**
+ * Nome de exibição do usuário logado (topbar) — nunca session.user.name
+ * (JWT congela o valor do login). Invalidado em salvarPerfil via
+ * revalidateTag(tagNomeUsuario(userId)).
+ */
+export async function getNomeAtualDoUsuario(userId: string): Promise<string | null> {
+  return unstable_cache(
+    async () => {
+      const user: { nome: string } | null = await db.user.findUnique({
+        where: { id: userId },
+        select: { nome: true },
+      })
+      const nome = user?.nome?.trim()
+      return nome || null
+    },
+    ['nome-atual-do-usuario', userId],
+    { revalidate: 60, tags: [tagNomeUsuario(userId)] },
   )()
 }
 

@@ -5,7 +5,8 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { nicknameSchema } from '@torcida/types'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+import { tagNomeUsuario } from '@/lib/avatar-cache'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -38,6 +39,8 @@ export type PerfilState = {
   errors?: Record<string, string[]>
   message?: string
   success?: boolean
+  /** Nome gravado — cliente sincroniza JWT / topbar sem re-login. */
+  nome?: string
 }
 
 export async function salvarPerfil(
@@ -102,9 +105,11 @@ export async function salvarPerfil(
     }
   }
 
+  revalidateTag(tagNomeUsuario(session.user.id), 'max')
   revalidatePath('/portal/perfil')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
   revalidatePath('/portal')
   revalidatePath('/portal/comunidade')
-  return { success: true }
+  revalidatePath('/admin')
+  return { success: true, nome }
 }

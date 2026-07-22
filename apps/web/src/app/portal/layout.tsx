@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
-import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
+import { getAvatarAtualDoUsuario, getNomeAtualDoUsuario } from '@/lib/perfil-social'
 import { getEstadoOnboarding } from '@/lib/onboarding'
 import {
   isSuperAdminEmail,
@@ -74,7 +74,10 @@ export default async function PortalLayout({
   // de uma (super-admin não usa isso — ele já tem o switcher no admin).
   const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
 
-  const avatarUrl = await getAvatarAtualDoUsuario(session.user.id)
+  const [avatarUrl, userName] = await Promise.all([
+    getAvatarAtualDoUsuario(session.user.id),
+    getNomeAtualDoUsuario(session.user.id),
+  ])
 
   return (
     <div className="app-shell-bg min-h-screen">
@@ -83,7 +86,7 @@ export default async function PortalLayout({
       ) : null}
       <NavbarBrandOverrideProvider>
         <PortalNavbar
-          userName={session.user.name ?? null}
+          userName={userName ?? session.user.name ?? null}
           userAvatar={avatarUrl}
           tenant={navbarTenant}
           temDepartamentos={totalDepartamentos > 0}

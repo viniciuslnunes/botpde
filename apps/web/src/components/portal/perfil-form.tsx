@@ -1,6 +1,8 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useCallback, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { getCsrfToken } from 'next-auth/react'
 import { salvarPerfil, type PerfilState } from '@/app/portal/perfil/actions'
 import { Save, CheckCircle2 } from 'lucide-react'
 import { FieldError, Input, SubmitButton } from '@torcida/ui'
@@ -27,9 +29,30 @@ export function PerfilForm({
   discordTag,
   temMembro,
 }: Props) {
+  const router = useRouter()
   const [state, action, pending] = useActionState<PerfilState, FormData>(salvarPerfil, {})
   const { formRef, markPristine } = useTrackedForm({ title: 'Dados do perfil' })
-  useActionStateToast(state, pending, 'Perfil atualizado.', { onSuccess: markPristine })
+  const onSuccess = useCallback(() => {
+    markPristine()
+    const nomeSalvo = state.nome
+    if (!nomeSalvo) {
+      router.refresh()
+      return
+    }
+    // Sincroniza o nome no JWT — sem isso session.user.name (posts, notifs)
+    // fica congelado até o próximo login. Topbar já lê do banco via
+    // getNomeAtualDoUsuario; o refresh garante o RSC da layout.
+    void (async () => {
+      const csrfToken = await getCsrfToken()
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrfToken, data: { name: nomeSalvo } }),
+      }).catch(() => {})
+      router.refresh()
+    })()
+  }, [markPristine, router, state.nome])
+  useActionStateToast(state, pending, 'Perfil atualizado.', { onSuccess })
   const [nickDisponivel, setNickDisponivel] = useState(Boolean(nickname))
 
   return (

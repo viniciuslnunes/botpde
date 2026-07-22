@@ -140,10 +140,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
     async jwt({ token, account, user, trigger, session }) {
       // Refresh explícito via fetch('/api/auth/session', { method: 'POST', body }) —
-      // usado pelo formulário de perfil após trocar avatar, já que session.user.image
-      // some do token e não é reconsultado no banco a cada request.
-      if (trigger === 'update' && session && typeof session === 'object' && 'image' in session) {
-        token.picture = (session as { image: string | null }).image
+      // usado pelo formulário de perfil após trocar avatar/nome, já que
+      // session.user.image/name vêm do JWT e não são reconsultados no banco
+      // a cada request (topbar usa getAvatar/getNomeAtualDoUsuario).
+      if (trigger === 'update' && session && typeof session === 'object') {
+        if ('image' in session) {
+          token.picture = (session as { image: string | null }).image
+        }
+        if ('name' in session) {
+          token.name = (session as { name: string | null }).name
+        }
       }
 
       // Somente no login inicial (account presente) buscamos o UUID do banco

@@ -5,7 +5,8 @@ import { db } from '@torcida/db'
 import { nicknameSchema } from '@torcida/types'
 import { checarNicknameDisponivel } from '@/lib/nickname-disponivel'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { revalidatePath } from 'next/cache'
+import { tagNomeUsuario } from '@/lib/avatar-cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 
 export type DefinirApelidoState = {
@@ -85,6 +86,7 @@ export async function definirApelido(
     throw err
   }
 
+  revalidateTag(tagNomeUsuario(session.user.id), 'max')
   revalidatePath('/portal')
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${session.user.id}`)
