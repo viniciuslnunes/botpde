@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { getCsrfToken } from 'next-auth/react'
 import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
@@ -259,11 +260,13 @@ export function PerfilEditarForm({
         setAvatarUrl(url)
         await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true, apenasMidia: true })
         // Sincroniza a foto na sessão (JWT) — sem isso topbar/menu ficam com a
-        // imagem antiga até o usuário deslogar e logar de novo.
+        // imagem antiga até o usuário deslogar e logar de novo. O endpoint de
+        // update do NextAuth exige csrfToken + payload embrulhado em `data`.
+        const csrfToken = await getCsrfToken()
         await fetch('/api/auth/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: url }),
+          body: JSON.stringify({ csrfToken, data: { image: url } }),
         }).catch(() => {})
         router.refresh()
         toast.success('Foto de perfil salva.', { id: toastId })
