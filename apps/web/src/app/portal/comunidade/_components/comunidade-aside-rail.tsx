@@ -6,7 +6,6 @@ import {
   ComunidadeUserCardFallback,
 } from './comunidade-user-card-section'
 import { COMUNIDADE_RAIL_SCROLL } from './comunidade-rail-scroll'
-import type { SalaAtivaListItem } from '@/lib/salas'
 
 interface CurrentUser {
   id: string
@@ -31,13 +30,11 @@ function AsideWidgetsFallback() {
 export function ComunidadeAsideRail({
   tenant,
   currentUser,
-  salasAtivas = [],
   escopo = 'torcida',
   torcidaReal = null,
 }: {
   tenant: { id: string; nome: string; afiliacaoId: string | null; balancoFinanceiroVisivel?: boolean }
   currentUser: CurrentUser
-  salasAtivas?: SalaAtivaListItem[]
   /** Feed dual (Nacional × Minha torcida) — ajusta card do sócio e links da nav. */
   escopo?: 'nacional' | 'torcida'
   /** Torcida real do sócio — na aba Nacional exibe cargo em vez do rótulo da CN. */
@@ -93,7 +90,6 @@ export function ComunidadeAsideRail({
             tenantId={tenant.id}
             afiliacaoId={tenant.afiliacaoId}
             currentUserId={currentUser.id}
-            salasAoVivo={salasAtivas}
           />
         </Suspense>
       </div>

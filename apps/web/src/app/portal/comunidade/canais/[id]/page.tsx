@@ -5,7 +5,6 @@ import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { getCanalPorId, podePublicarNoCanal } from '@/lib/canais'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
-import { listSalasAtivas } from '@/lib/salas'
 import { ComunidadeAsideRail } from '../../_components/comunidade-aside-rail'
 import { calculateEffectivePermissions } from '@torcida/types'
 import { CanalFeedView } from './canal-feed-view'
@@ -35,10 +34,7 @@ export default async function CanalDetalhePage({
   const canal = await getCanalPorId(id, tenant.id, session.user.id)
   if (!canal) notFound()
 
-  const [podePublicar, salasAtivas] = await Promise.all([
-    podePublicarNoCanal(canal, tenant.id, permissoes),
-    listSalasAtivas(tenant.id),
-  ])
+  const podePublicar = await podePublicarNoCanal(canal, tenant.id, permissoes)
 
   const currentUser = {
     id: session.user.id,
@@ -48,7 +44,7 @@ export default async function CanalDetalhePage({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <ComunidadeAsideRail tenant={tenant} currentUser={currentUser} salasAtivas={salasAtivas} />
+      <ComunidadeAsideRail tenant={tenant} currentUser={currentUser} />
 
       <div className="min-w-0 space-y-4">
         <Link

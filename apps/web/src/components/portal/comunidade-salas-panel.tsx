@@ -8,7 +8,7 @@ interface ComunidadeSalasPanelProps {
   limite?: number
   footerHref?: string
   footerLabel?: string
-  /** Quando false, não renderiza se não houver salas (ex.: widget "Ao vivo agora"). */
+  /** Quando false, não renderiza se não houver salas (ex.: bloco mobile do feed). */
   mostrarQuandoVazio?: boolean
 }
 

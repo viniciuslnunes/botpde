@@ -3,10 +3,8 @@ import { Newspaper, Users, Hash } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getProximosEventos } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
-import type { SalaAtivaListItem } from '@/lib/salas'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
-import { ComunidadeSalasLiveWidget } from '@/components/portal/comunidade-salas-live-widget'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ProximosEventosAside } from './proximos-eventos-aside'
 
@@ -14,14 +12,12 @@ interface ComunidadeAsideWidgetsProps {
   tenantId: string
   afiliacaoId: string | null
   currentUserId?: string
-  salasAoVivo?: SalaAtivaListItem[]
 }
 
 export async function ComunidadeAsideWidgets({
   tenantId,
   afiliacaoId,
   currentUserId,
-  salasAoVivo = [],
 }: ComunidadeAsideWidgetsProps) {
   const [noticias, sugestoes, hashtags, proximosEventos] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
@@ -36,11 +32,6 @@ export async function ComunidadeAsideWidgets({
 
   return (
     <>
-      {salasAoVivo.length > 0 && (
-        <MotionReveal index={widgetIndex++}>
-          <ComunidadeSalasLiveWidget salas={salasAoVivo} />
-        </MotionReveal>
-      )}
       {proximosEventos.length > 0 && (
         <MotionReveal index={widgetIndex++}>
           <ProximosEventosAside eventos={proximosEventos} />

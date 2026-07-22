@@ -77,7 +77,6 @@ export function ComunidadeFeedShell({
       <ComunidadeAsideRail
         tenant={tenant}
         currentUser={currentUser}
-        salasAtivas={salasAtivas}
         escopo={escopo}
         torcidaReal={torcidaReal}
       />
