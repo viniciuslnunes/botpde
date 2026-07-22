@@ -13,9 +13,10 @@ export function comunicadosCacheTag(tenantId: string): string {
 
 /**
  * Invalida cache de comunicados após publicação/edição no admin. Também
- * invalida o cache do feed Descobrir — comunicados publicados viram Post
- * institucional real (ver `criarComunicado`), então mudanças precisam
- * refletir no feed, não só na lista de comunicados.
+ * invalida o cache do feed Descobrir — comunicados viram Post institucional
+ * (ver `publicarComunicadoENotificar` / republicação em
+ * `atualizarComunicadoEPost`), então mudanças precisam refletir no feed,
+ * não só na lista de comunicados.
  */
 export function invalidateComunicadosCache(tenantId?: string): void {
   revalidateTag(COMUNICADOS_CACHE_TAG, 'max')

@@ -377,11 +377,20 @@ export async function atualizarComunicado(
   }
 
   const { titulo, corpo, prioridade } = parsed.data
+  const agora = new Date()
 
-  await db.announcement.update({
-    where: { id: comunicadoId },
-    data: { titulo, corpo, prioridade },
-  })
+  // Republica no Descobrir: bump de `publicadoEm`/`criadoEm` recoloca o
+  // post institucional no topo da janela de candidatos (oficialBoost).
+  await db.$transaction([
+    db.announcement.update({
+      where: { id: comunicadoId },
+      data: { titulo, corpo, prioridade, publicadoEm: agora },
+    }),
+    db.post.updateMany({
+      where: { comunicadoOrigemId: comunicadoId, tipo: 'INSTITUCIONAL' },
+      data: { criadoEm: agora },
+    }),
+  ])
 
   await db.auditLog.create({
     data: {
@@ -402,10 +411,12 @@ export async function atualizarComunicado(
 }
 
 /**
- * Atualiza o Announcement e sincroniza `midiaUrls` do Post institucional
- * vinculado (título/corpo/prioridade já são lidos ao vivo da relação
- * `comunicadoOrigem` pelo embed — só a mídia mora no Post e precisa de
- * sync explícito). Único ponto de edição usado pelo composer rico.
+ * Atualiza o Announcement e sincroniza o Post institucional vinculado
+ * (mídia + republicação no feed). Título/corpo/prioridade já são lidos ao
+ * vivo da relação `comunicadoOrigem` pelo embed — a mídia mora no Post.
+ * Bump de `publicadoEm`/`criadoEm` faz o comunicado voltar como sugestão
+ * prioritária no Descobrir (`scoreDescobrirPost` / `oficialBoost`).
+ * Único ponto de edição usado pelo composer rico.
  */
 async function atualizarComunicadoEPost(opts: {
   tenantId: string
@@ -416,14 +427,23 @@ async function atualizarComunicadoEPost(opts: {
   prioridade: PrioridadeComunicado
   midias: string[]
 }): Promise<void> {
+  const agora = new Date()
   await db.$transaction([
     db.announcement.update({
       where: { id: opts.comunicadoId },
-      data: { titulo: opts.titulo, corpo: opts.corpo, prioridade: opts.prioridade },
+      data: {
+        titulo: opts.titulo,
+        corpo: opts.corpo,
+        prioridade: opts.prioridade,
+        publicadoEm: agora,
+      },
     }),
     db.post.updateMany({
       where: { comunicadoOrigemId: opts.comunicadoId, tipo: 'INSTITUCIONAL' },
-      data: { midiaUrls: midiasComEmbedDoTexto(opts.corpo, opts.midias) },
+      data: {
+        midiaUrls: midiasComEmbedDoTexto(opts.corpo, opts.midias),
+        criadoEm: agora,
+      },
     }),
   ])
 
