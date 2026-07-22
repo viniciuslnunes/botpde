@@ -638,6 +638,26 @@ function ensureTileAvatarFallback(
   if (!existing) tile.appendChild(fallback)
 }
 
+function trackTileKey(track: TrackRef): string {
+  return `${track.participant.identity}:${track.source}:${track.publication?.trackSid ?? 'placeholder'}`
+}
+
+function MeetParticipantStrip({
+  tracks,
+  ParticipantTile,
+}: {
+  tracks: TrackRef[]
+  ParticipantTile: (props: { trackRef?: TrackRef }) => ReactNode
+}) {
+  return (
+    <div className="meet-room-bottom-strip" role="list" aria-label="Participantes na chamada">
+      {tracks.map((track) => (
+        <ParticipantTile key={trackTileKey(track)} trackRef={track} />
+      ))}
+    </div>
+  )
+}
+
 function MeetStage({
   lk,
   userId,
@@ -655,7 +675,6 @@ function MeetStage({
     GridLayout,
     ParticipantTile,
     FocusLayout,
-    CarouselLayout,
     useLayoutContext,
     usePinnedTracks,
     useTracks,
@@ -800,9 +819,7 @@ function MeetStage({
                 transition={springSnappy}
                 className="meet-room-bottom-strip-track"
               >
-                <CarouselLayout tracks={carouselTracks} className="meet-room-bottom-strip">
-                  <ParticipantTile />
-                </CarouselLayout>
+                <MeetParticipantStrip tracks={carouselTracks} ParticipantTile={ParticipantTile} />
               </m.div>
             ) : null}
           </AnimatePresence>
@@ -812,7 +829,7 @@ function MeetStage({
   }
 
   return (
-    <div ref={stageRef} className="h-full">
+    <div ref={stageRef} className="meet-room-grid-stage">
       <GridLayout tracks={tracks} className="meet-room-grid">
         <ParticipantTile />
       </GridLayout>

@@ -26,6 +26,7 @@ interface SalaChatProps {
   isHost: boolean
   initialMensagens: SalaMensagem[]
   listClassName?: string
+  className?: string
   /** Painel sobre vídeo: fundos semi-transparentes */
   glass?: boolean
 }
@@ -60,6 +61,7 @@ export function SalaChat({
   isHost,
   initialMensagens,
   listClassName = 'max-h-80 space-y-3 overflow-y-auto pr-1',
+  className,
   glass = false,
 }: SalaChatProps) {
   const confirmAction = useConfirmAction()
@@ -277,8 +279,10 @@ export function SalaChat({
   }
 
   return (
-    <div className={glass ? 'text-white' : undefined}>
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
+    <div
+      className={[glass ? 'text-white' : undefined, className].filter(Boolean).join(' ') || undefined}
+    >
+      <form onSubmit={handleSubmit} className="mb-4 flex shrink-0 gap-2">
         <input
           value={conteudo}
           onChange={(e) => setConteudo(e.target.value)}
@@ -330,7 +334,13 @@ export function SalaChat({
           className={`py-6 text-center ${glass ? 'text-zinc-300' : ''}`}
         />
       ) : (
-        <div ref={listRef} className={listClassName}>
+        <div
+          ref={listRef}
+          className={listClassName}
+          onWheel={(event) => {
+            event.stopPropagation()
+          }}
+        >
           <AnimatePresence mode="popLayout" initial={false}>
             {mensagens.map((mensagem) => {
               const temporaria = isMensagemTemporaria(mensagem.id)

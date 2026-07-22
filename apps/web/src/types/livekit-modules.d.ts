@@ -75,6 +75,7 @@ declare module '@livekit/components-react' {
   export function CarouselLayout(props: {
     tracks: unknown[]
     className?: string
+    orientation?: 'vertical' | 'horizontal'
     children?: ReactNode
   }): ReactNode
   export function useCreateLayoutContext(): unknown

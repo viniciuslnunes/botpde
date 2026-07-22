@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type WheelEvent } from 'react'
 import {
   ArrowLeftToLine,
   Loader2,
@@ -33,7 +33,14 @@ type SalaPopoutClientProps = {
 const CHROME_IDLE_MS = 2000
 
 const panelGlass =
-  'border border-white/20 bg-zinc-950/15 shadow-2xl backdrop-blur-md'
+  'pointer-events-auto border border-white/20 bg-zinc-950/15 shadow-2xl backdrop-blur-md'
+
+const panelScroll =
+  'app-scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+
+function stopWheelBubble(event: WheelEvent<HTMLDivElement>) {
+  event.stopPropagation()
+}
 
 export function SalaPopoutClient({
   salaId,
@@ -286,7 +293,7 @@ export function SalaPopoutClient({
 
       {commentsOpen ? (
         <aside
-          className={`absolute bottom-24 right-16 top-16 z-40 flex w-[min(100%-5rem,20rem)] flex-col overflow-hidden rounded-2xl ${panelGlass}`}
+          className={`absolute bottom-24 right-16 top-16 z-40 flex min-h-0 w-[min(100%-5rem,20rem)] flex-col overflow-hidden rounded-2xl ${panelGlass}`}
           aria-label="Chat da sala"
           onMouseEnter={() => {
             panelHoverRef.current = true
@@ -298,7 +305,7 @@ export function SalaPopoutClient({
             revelarChrome()
           }}
         >
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
             <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-100">
               <MessageSquare className="h-3.5 w-3.5" />
               Chat
@@ -312,14 +319,15 @@ export function SalaPopoutClient({
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
             <SalaChat
               salaId={salaId}
               currentUserId={userId}
               isHost={isHost}
               initialMensagens={initialMensagens}
               glass
-              listClassName="h-[calc(100%-3.25rem)] max-h-none space-y-3 overflow-y-auto pr-1"
+              className="flex min-h-0 flex-1 flex-col"
+              listClassName={`${panelScroll} space-y-3 pr-1`}
             />
           </div>
         </aside>
@@ -327,7 +335,7 @@ export function SalaPopoutClient({
 
       {membersOpen ? (
         <aside
-          className={`absolute bottom-24 top-16 z-40 flex w-[min(100%-5rem,16rem)] flex-col overflow-hidden rounded-2xl ${panelGlass} ${
+          className={`absolute bottom-24 top-16 z-40 flex min-h-0 w-[min(100%-5rem,16rem)] flex-col overflow-hidden rounded-2xl ${panelGlass} ${
             commentsOpen ? 'right-[calc(min(100%-5rem,20rem)+4.5rem)]' : 'right-16'
           }`}
           aria-label="Membros online"
@@ -341,7 +349,7 @@ export function SalaPopoutClient({
             revelarChrome()
           }}
         >
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
             <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-100">
               <Users className="h-3.5 w-3.5" />
               Membros
@@ -355,7 +363,7 @@ export function SalaPopoutClient({
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className={`${panelScroll} p-3`} onWheel={stopWheelBubble}>
             <SalaParticipantes
               salaId={salaId}
               initialParticipantes={initialParticipantes}
