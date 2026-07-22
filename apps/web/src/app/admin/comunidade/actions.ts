@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db } from '@torcida/db'
+import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { invalidateComunicadosCache } from '@/lib/comunidade'
 import { notificarComunicadoUrgente } from '@/lib/notificacoes-routing'
@@ -197,7 +197,7 @@ export async function criarComunicado(
 
   const { titulo, corpo, prioridade } = parsed.data
 
-  const comunicado = await db.$transaction(async (tx) => {
+  const comunicado = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const criado = await tx.announcement.create({
       data: { tenantId: tenant.id, autorId: session.user.id, titulo, corpo, prioridade },
     })
