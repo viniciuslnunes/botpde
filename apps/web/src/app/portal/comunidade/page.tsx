@@ -78,6 +78,7 @@ export default async function ComunidadePage({
           escopo="nacional"
           podeEscopoTorcida={ctx.podeEscopoTorcida}
           afiliacao={afiliacao}
+          torcidaReal={ctx.modo === 'torcida' ? ctx.tenant : null}
           solicitacaoPendente={solicitacaoPendente}
         />
       </div>

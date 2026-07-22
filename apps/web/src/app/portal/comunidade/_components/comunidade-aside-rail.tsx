@@ -33,21 +33,26 @@ export function ComunidadeAsideRail({
   currentUser,
   salasAtivas = [],
   escopo = 'torcida',
+  torcidaReal = null,
 }: {
   tenant: { id: string; nome: string; afiliacaoId: string | null; balancoFinanceiroVisivel?: boolean }
   currentUser: CurrentUser
   salasAtivas?: SalaAtivaListItem[]
   /** Feed dual (Nacional × Minha torcida) — ajusta card do sócio e links da nav. */
   escopo?: 'nacional' | 'torcida'
+  /** Torcida real do sócio — na aba Nacional exibe cargo em vez do rótulo da CN. */
+  torcidaReal?: { id: string; nome: string } | null
 }) {
   if (!currentUser.id) return null
 
   const modoNacional = escopo === 'nacional'
+  const cardTenantId = modoNacional && torcidaReal ? torcidaReal.id : tenant.id
+  const cardTenantNome = modoNacional && torcidaReal ? torcidaReal.nome : tenant.nome
 
   return (
     <aside className="hidden lg:block">
       <div className={COMUNIDADE_RAIL_SCROLL}>
-        {modoNacional ? (
+        {modoNacional && !torcidaReal ? (
           <ComunidadeUserCardFallback
             tenantNome={tenant.nome}
             userName={currentUser.nome}
@@ -57,15 +62,15 @@ export function ComunidadeAsideRail({
           <Suspense
             fallback={
               <ComunidadeUserCardFallback
-                tenantNome={tenant.nome}
+                tenantNome={cardTenantNome}
                 userName={currentUser.nome}
                 userAvatar={currentUser.avatarUrl}
               />
             }
           >
             <ComunidadeUserCardSection
-              tenantId={tenant.id}
-              tenantNome={tenant.nome}
+              tenantId={cardTenantId}
+              tenantNome={cardTenantNome}
               userId={currentUser.id}
               userName={currentUser.nome}
               userAvatar={currentUser.avatarUrl}

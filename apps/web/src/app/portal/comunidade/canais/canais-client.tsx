@@ -11,7 +11,6 @@ import {
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import {
-  ArrowLeftRight,
   Camera,
   Crosshair,
   Loader2,
@@ -26,7 +25,6 @@ import {
 import { toast } from '@torcida/ui'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
-import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
@@ -36,7 +34,6 @@ import {
   normalizarTexto,
   type LocalizacaoOnboarding,
 } from '@/lib/onboarding-unidade'
-import type { TorcidaOpcao } from '@/lib/torcida-labels'
 import {
   agruparCanaisPorSecao,
   canalCombinaUfCidade,
@@ -59,9 +56,6 @@ type OrdenacaoCanal = 'relevancia' | 'proximidade' | 'membros' | 'nome'
 
 interface CanaisClientProps {
   canais: CanalItem[]
-  /** Vínculos de sócio APROVADO do usuário — troca real de tenant (fora de escopo overlay). */
-  vinculos: TorcidaOpcao[]
-  tenantSlugAtual: string
   podeCriarCanal: boolean
   tenantAtualId: string
 }
@@ -115,8 +109,6 @@ function compararRelevancia(a: CanalItem, b: CanalItem, tenantAtualId: string): 
 
 export function CanaisClient({
   canais: canaisIniciais,
-  vinculos,
-  tenantSlugAtual,
   podeCriarCanal,
   tenantAtualId,
 }: CanaisClientProps) {
@@ -388,18 +380,6 @@ export function CanaisClient({
 
   return (
     <div className="space-y-5">
-      {vinculos.length > 1 && (
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-            <ArrowLeftRight className="h-4 w-4" />
-            Suas torcidas
-          </h2>
-          <div className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2">
-            <TorcidaContextSwitcher torcidas={vinculos} atualSlug={tenantSlugAtual} destino="portal" />
-          </div>
-        </section>
-      )}
-
       <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="relative min-w-0 flex-1">

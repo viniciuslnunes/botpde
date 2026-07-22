@@ -10,7 +10,7 @@ import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { ComunidadeEscopoTabs } from './comunidade-escopo-tabs'
 import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeComposerSection } from './comunidade-composer-section'
-import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
+import { ComunidadeNacionalComposerSection } from './comunidade-nacional-composer-section'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
@@ -42,6 +42,8 @@ interface ComunidadeFeedShellProps {
   escopo?: 'nacional' | 'torcida'
   podeEscopoTorcida?: boolean
   afiliacao?: AfiliacaoComunidade | null
+  /** Sócio com torcida real — card/composer na aba Nacional usam cargo da torcida. */
+  torcidaReal?: { id: string; nome: string } | null
   /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
   solicitacaoPendente?: SolicitacaoSocioPendente | null
 }
@@ -64,6 +66,7 @@ export function ComunidadeFeedShell({
   escopo = 'torcida',
   podeEscopoTorcida = false,
   afiliacao = null,
+  torcidaReal = null,
   solicitacaoPendente = null,
 }: ComunidadeFeedShellProps) {
   const modoNacional = escopo === 'nacional'
@@ -76,6 +79,7 @@ export function ComunidadeFeedShell({
         currentUser={currentUser}
         salasAtivas={salasAtivas}
         escopo={escopo}
+        torcidaReal={torcidaReal}
       />
 
       <main className="min-w-0 space-y-4">
@@ -164,10 +168,13 @@ export function ComunidadeFeedShell({
         {currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
             {modoNacional ? (
-              <ComunidadeNacionalComposer
-                currentUser={currentUser}
+              <ComunidadeNacionalComposerSection
                 tenantId={tenant.id}
                 tenantNome={tenant.nome}
+                userId={currentUser.id}
+                userName={currentUser.nome}
+                userAvatar={currentUser.avatarUrl}
+                torcidaReal={torcidaReal}
               />
             ) : (
               <ComunidadeComposerSection

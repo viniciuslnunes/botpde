@@ -8,11 +8,9 @@ import {
   listCanaisPublicosPorAfiliacao,
   ensureCanaisOficiaisHierarquia,
 } from '@/lib/canais'
-import { isSuperAdminEmail, listarVinculosAprovadosDoUsuario } from '@/lib/tenant-context'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
-import { db } from '@torcida/db'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Canais — Comunidade' }
@@ -46,8 +44,6 @@ export default async function CanaisPage({
 
         <CanaisClient
           canais={canais}
-          vinculos={[]}
-          tenantSlugAtual=""
           podeCriarCanal={false}
           tenantAtualId={ctx.tenantSintetico.id}
         />
@@ -73,15 +69,7 @@ export default async function CanaisPage({
     hasPermission(efetivas, PERMISSIONS.CHANNELS_MANAGE) ||
     hasPermission(efetivas, PERMISSIONS.COMMUNITY_MANAGE)
 
-  const isSuperAdmin = isSuperAdminEmail(session.user.email)
-
-  const [canais, vinculos, tenantSlug] = await Promise.all([
-    listCanaisVisiveis(tenant.id, session.user.id),
-    isSuperAdmin ? Promise.resolve([]) : listarVinculosAprovadosDoUsuario(session.user.id),
-    db.tenant.findUnique({ where: { id: tenant.id }, select: { slug: true } }) as Promise<{
-      slug: string
-    } | null>,
-  ])
+  const canais = await listCanaisVisiveis(tenant.id, session.user.id)
 
   return (
     <div className="space-y-5">
@@ -93,8 +81,6 @@ export default async function CanaisPage({
 
       <CanaisClient
         canais={canais}
-        vinculos={vinculos}
-        tenantSlugAtual={tenantSlug?.slug ?? ''}
         podeCriarCanal={podeCriarCanal}
         tenantAtualId={tenant.id}
       />

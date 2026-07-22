@@ -20,6 +20,11 @@ type Props = {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
   tenantId: string
   tenantNome: string
+  autorBadges?: {
+    cargoNome: string | null
+    departamentoNome: string | null
+    sedeNome: string | null
+  }
 }
 
 /**
@@ -27,7 +32,12 @@ type Props = {
  * plataforma) publicando post público no clube. Só texto + imagens; enquetes,
  * eventos, menções e stickers ficam no composer completo da torcida.
  */
-export function ComunidadeNacionalComposer({ currentUser, tenantId, tenantNome }: Props) {
+export function ComunidadeNacionalComposer({
+  currentUser,
+  tenantId,
+  tenantNome,
+  autorBadges,
+}: Props) {
   const [conteudo, setConteudo] = useState('')
   const [midias, setMidias] = useState<string[]>([])
   const [enviandoMidia, setEnviandoMidia] = useState(false)
@@ -83,7 +93,9 @@ export function ComunidadeNacionalComposer({ currentUser, tenantId, tenantNome }
           id: currentUser.id,
           nome: currentUser.nome,
           avatarUrl: currentUser.avatarUrl,
-          cargoNome: 'Torcedor',
+          cargoNome: autorBadges?.cargoNome ?? 'Torcedor',
+          departamentoNome: autorBadges?.departamentoNome ?? null,
+          sedeNome: autorBadges?.sedeNome ?? null,
         },
         tenantNome,
       }),

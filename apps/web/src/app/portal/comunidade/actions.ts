@@ -23,7 +23,7 @@ import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
-import { chave, getBadgesPorAutorTenant } from '@/lib/autor-badges'
+import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
 import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
@@ -138,17 +138,35 @@ async function previewDoPost(opts: {
   /** Tenant sintético da CN — badge padrão "Torcedor" quando não há cargo na torcida. */
   tenantSintetico?: boolean
 }): Promise<PostPublicadoPreview> {
+  let badgeTenantId = opts.post.tenantId
+  let tenantNomeExibicao = opts.tenantNome
+  let torcidaReal: Awaited<ReturnType<typeof getTorcidaRealDoAutor>> = null
+
+  if (opts.tenantSintetico) {
+    const container: { afiliacaoId: string | null } | null = await db.tenant.findUnique({
+      where: { id: opts.post.tenantId },
+      select: { afiliacaoId: true },
+    })
+    if (container?.afiliacaoId) {
+      torcidaReal = await getTorcidaRealDoAutor(opts.autorId, container.afiliacaoId)
+      if (torcidaReal) {
+        badgeTenantId = torcidaReal.tenantId
+        tenantNomeExibicao = torcidaReal.tenantNome
+      }
+    }
+  }
+
   const [badges, perfil] = await Promise.all([
-    getBadgesPorAutorTenant([{ autorId: opts.autorId, tenantId: opts.post.tenantId }]),
+    getBadgesPorAutorTenant([{ autorId: opts.autorId, tenantId: badgeTenantId }]),
     db.perfilMembro.findUnique({
-      where: { tenantId_userId: { tenantId: opts.post.tenantId, userId: opts.autorId } },
+      where: { tenantId_userId: { tenantId: badgeTenantId, userId: opts.autorId } },
       select: { nickname: true },
     }),
   ])
-  const badge = badges.get(chave(opts.autorId, opts.post.tenantId))
+  const badge = badges.get(chave(opts.autorId, badgeTenantId))
   let cargoNome = badge?.cargoNome ?? null
   const departamentoNome = badge?.departamentoNome ?? null
-  if (!cargoNome && opts.tenantSintetico) {
+  if (!cargoNome && opts.tenantSintetico && !torcidaReal) {
     cargoNome = 'Torcedor'
   }
 
@@ -168,7 +186,7 @@ async function previewDoPost(opts: {
       cargoNome,
       departamentoNome,
     },
-    tenantNome: formatNomeTorcida(opts.tenantNome),
+    tenantNome: formatNomeTorcida(tenantNomeExibicao),
   }
 }
 

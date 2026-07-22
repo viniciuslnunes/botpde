@@ -1,8 +1,10 @@
 import { db } from '@torcida/db'
 import { unstable_cache } from 'next/cache'
 import { tagAutorBadgesTenant } from './comunidade-cache'
-import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
+import { SYSTEM_ROLES, formatNomeTorcida, rotuloCargoSistema } from '@torcida/types'
 import type { PostSocialItem } from './feed'
+
+export type TorcidaRealAutor = { tenantId: string; tenantNome: string }
 
 export { formatAutorCargoBadge } from './autor-badges-format'
 
@@ -231,22 +233,127 @@ async function carregarBadgesPorAutorTenant(
   return map
 }
 
+/** Sócio aprovado com torcida real no clube — mesmo critério de `resolveUserTenantSlugForUser`. */
+export async function getTorcidaRealDoAutor(
+  autorId: string,
+  afiliacaoId: string,
+): Promise<TorcidaRealAutor | null> {
+  const membro: {
+    tenant: { id: string; nome: string }
+  } | null = await db.saasMembro.findFirst({
+    where: {
+      userId: autorId,
+      status: 'APROVADO',
+      tipo: 'SOCIO',
+      tenant: { afiliacaoId, sintetico: false, ativo: true },
+    },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenant: { select: { id: true, nome: true } } },
+  })
+  if (!membro) return null
+  return {
+    tenantId: membro.tenant.id,
+    tenantNome: formatNomeTorcida(membro.tenant.nome),
+  }
+}
+
+/** Mapa autor → torcida real (batch) para posts no tenant sintético da CN. */
+export async function resolverTorcidaRealPorAutor(
+  autorIds: string[],
+  afiliacaoId: string,
+): Promise<Map<string, TorcidaRealAutor>> {
+  const unicos = [...new Set(autorIds)]
+  if (unicos.length === 0) return new Map()
+
+  const membros: Array<{
+    userId: string
+    tenant: { id: string; nome: string }
+  }> = await db.saasMembro.findMany({
+    where: {
+      userId: { in: unicos },
+      status: 'APROVADO',
+      tipo: 'SOCIO',
+      tenant: { afiliacaoId, sintetico: false, ativo: true },
+    },
+    orderBy: { criadoEm: 'desc' },
+    select: {
+      userId: true,
+      tenant: { select: { id: true, nome: true } },
+    },
+  })
+
+  const map = new Map<string, TorcidaRealAutor>()
+  for (const m of membros) {
+    if (map.has(m.userId)) continue
+    map.set(m.userId, {
+      tenantId: m.tenant.id,
+      tenantNome: formatNomeTorcida(m.tenant.nome),
+    })
+  }
+  return map
+}
+
 export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise<PostSocialItem[]> {
   if (posts.length === 0) return posts
+
+  const tenantIds = [...new Set(posts.map((p) => p.tenantId))]
+  const tenants: Array<{ id: string; sintetico: boolean; afiliacaoId: string | null }> =
+    await db.tenant.findMany({
+      where: { id: { in: tenantIds } },
+      select: { id: true, sintetico: true, afiliacaoId: true },
+    })
+
+  const sinteticoPorTenant = new Map<string, string>()
+  for (const t of tenants) {
+    if (t.sintetico && t.afiliacaoId) sinteticoPorTenant.set(t.id, t.afiliacaoId)
+  }
+
+  const torcidaRealPorAutor = new Map<string, TorcidaRealAutor>()
+  if (sinteticoPorTenant.size > 0) {
+    const autoresSintetico = [
+      ...new Set(
+        posts.filter((p) => sinteticoPorTenant.has(p.tenantId)).map((p) => p.autorId),
+      ),
+    ]
+    const afiliacaoIds = [...new Set(sinteticoPorTenant.values())]
+    await Promise.all(
+      afiliacaoIds.map(async (afiliacaoId) => {
+        const map = await resolverTorcidaRealPorAutor(autoresSintetico, afiliacaoId)
+        for (const [autorId, torcida] of map) torcidaRealPorAutor.set(autorId, torcida)
+      }),
+    )
+  }
+
   const badges = await getBadgesPorAutorTenant(
-    posts.map((p) => ({ autorId: p.autorId, tenantId: p.tenantId })),
+    posts.map((p) => {
+      const real = torcidaRealPorAutor.get(p.autorId)
+      const tenantBadgeId =
+        sinteticoPorTenant.has(p.tenantId) && real ? real.tenantId : p.tenantId
+      return { autorId: p.autorId, tenantId: tenantBadgeId }
+    }),
   )
+
   return posts.map((p) => {
-    const b = badges.get(chave(p.autorId, p.tenantId))
-    if (!b) return p
-    return {
-      ...p,
-      autor: {
-        ...p.autor,
-        sedeNome: b.sedeNome,
-        cargoNome: b.cargoNome,
-        departamentoNome: b.departamentoNome,
-      },
+    const real = torcidaRealPorAutor.get(p.autorId)
+    const emSintetico = sinteticoPorTenant.has(p.tenantId)
+    const tenantBadgeId = emSintetico && real ? real.tenantId : p.tenantId
+    const b = badges.get(chave(p.autorId, tenantBadgeId))
+
+    const base = b
+      ? {
+          ...p,
+          autor: {
+            ...p.autor,
+            sedeNome: b.sedeNome,
+            cargoNome: b.cargoNome,
+            departamentoNome: b.departamentoNome,
+          },
+        }
+      : p
+
+    if (emSintetico && real) {
+      return { ...base, tenant: { nome: real.tenantNome } }
     }
+    return base
   })
 }
