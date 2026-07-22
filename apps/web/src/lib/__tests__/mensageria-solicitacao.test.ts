@@ -6,6 +6,7 @@ import { avaliarAcessoDm } from '../mensageria'
 vi.mock('@torcida/db', () => ({
   db: {
     saasMembro: { findFirst: vi.fn(), findMany: vi.fn() },
+    userRole: { findFirst: vi.fn(), findMany: vi.fn() },
     bloqueioUsuario: { findFirst: vi.fn() },
     conversa: { findFirst: vi.fn() },
     perfilTorcedor: { findUnique: vi.fn() },
@@ -35,6 +36,8 @@ beforeEach(() => {
   vi.mocked(db.conversa.findFirst).mockResolvedValue(null)
   vi.mocked(canFollowUser).mockResolvedValue(false)
   vi.mocked(db.saasMembro.findMany).mockResolvedValue([])
+  vi.mocked(db.userRole.findMany).mockResolvedValue([])
+  vi.mocked(db.userRole.findFirst).mockResolvedValue(null)
 
   vi.mocked(db.saasMembro.findFirst).mockImplementation(async (args: { where?: { userId?: string } }) => {
     const userId = args?.where?.userId
@@ -100,5 +103,23 @@ describe('avaliarAcessoDm', () => {
     vi.mocked(db.bloqueioUsuario.findFirst).mockResolvedValue(null)
     const acesso = await avaliarAcessoDm(remetente, destinatario, null)
     expect(acesso).toBe('solicitacao')
+  })
+
+  it('presidente só com cargo (sem SaasMembro) exige solicitação do torcedor', async () => {
+    vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
+    vi.mocked(db.userRole.findFirst).mockResolvedValue({
+      id: 'cargo',
+      tenant: { afiliacaoId: clube },
+    })
+    const acesso = await avaliarAcessoDm(remetente, destinatario, null)
+    expect(acesso).toBe('solicitacao')
+  })
+
+  it('presidente com cargo no mesmo tenant conversa direto', async () => {
+    vi.mocked(canFollowUser).mockResolvedValue(true)
+    vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
+    vi.mocked(db.userRole.findFirst).mockResolvedValue({ id: 'cargo' })
+    const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
+    expect(acesso).toBe('direto')
   })
 })

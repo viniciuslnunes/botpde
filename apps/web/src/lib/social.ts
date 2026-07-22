@@ -185,7 +185,7 @@ export async function canFollowUsers(
   }
   if (alvos.length === 0) return result
 
-  const [aliadosContexto, vinculos] = await Promise.all([
+  const [aliadosContexto, vinculosMembro, cargos] = await Promise.all([
     tenantContextoId ? getAlliedTenantIds(tenantContextoId) : Promise.resolve([] as string[]),
     db.saasMembro.findMany({
       where: {
@@ -194,7 +194,24 @@ export async function canFollowUsers(
       },
       select: { userId: true, tenantId: true, tipo: true },
     }) as Promise<VinculoMembro[]>,
+    // Owner/admin legado sem SaasMembro — conta como vínculo SOCIO na TO.
+    db.userRole.findMany({
+      where: {
+        userId: { in: [seguidorId, ...alvos] },
+        tenant: { ativo: true, sintetico: false },
+      },
+      select: { userId: true, tenantId: true },
+    }) as Promise<Array<{ userId: string; tenantId: string }>>,
   ])
+
+  const vistosCargo = new Set(vinculosMembro.map((v) => `${v.userId}:${v.tenantId}`))
+  const vinculos: VinculoMembro[] = [...vinculosMembro]
+  for (const c of cargos) {
+    const key = `${c.userId}:${c.tenantId}`
+    if (vistosCargo.has(key)) continue
+    vistosCargo.add(key)
+    vinculos.push({ userId: c.userId, tenantId: c.tenantId, tipo: 'SOCIO' })
+  }
 
   const tenantsClubeCache = new Map<string, string[]>()
   const relationCache = new Map<string, Awaited<ReturnType<typeof getTenantRelation>>>()

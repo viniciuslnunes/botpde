@@ -139,6 +139,42 @@ export async function GET(request: NextRequest) {
         })
       }
 
+      // Presidentes/admins legado (UserRole sem SaasMembro) do mesmo clube.
+      if (contatos.length < 20) {
+        type CargoRow = {
+          userId: string
+          user: { id: string; nome: string | null; avatarUrl: string | null }
+          tenant: { nome: string }
+        }
+        const cargos: CargoRow[] = await db.userRole.findMany({
+          where: {
+            userId: {
+              not: userId,
+              ...(vistos.size > 0 ? { notIn: [...vistos] } : {}),
+            },
+            tenant: { afiliacaoId, ativo: true, sintetico: false },
+            ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+          },
+          select: {
+            userId: true,
+            user: { select: { id: true, nome: true, avatarUrl: true } },
+            tenant: { select: { nome: true } },
+          },
+          orderBy: { user: { nome: 'asc' } },
+          take: 40,
+        })
+        for (const c of cargos) {
+          if (contatos.length >= 20) break
+          await pushSeElegivel(contatos, vistos, {
+            id: c.user.id,
+            nome: c.user.nome,
+            avatarUrl: c.user.avatarUrl,
+            tenantNome: c.tenant.nome,
+            mesmoTenant: false,
+          })
+        }
+      }
+
       return NextResponse.json({ contatos })
     }
 
@@ -180,6 +216,44 @@ export async function GET(request: NextRequest) {
         tenantNome: r.tenant.nome,
         mesmoTenant: r.tenantId === tenant.id,
       })
+    }
+
+    // Cargos na unidade/aliadas sem SaasMembro (owner legado).
+    if (contatos.length < 20) {
+      type CargoLocalRow = {
+        userId: string
+        tenantId: string
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+        tenant: { nome: string }
+      }
+      const cargosLocais: CargoLocalRow[] = await db.userRole.findMany({
+        where: {
+          userId: {
+            not: uid,
+            ...(vistos.size > 0 ? { notIn: [...vistos] } : {}),
+          },
+          tenantId: { in: visiveis },
+          ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+        },
+        select: {
+          userId: true,
+          tenantId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+          tenant: { select: { nome: true } },
+        },
+        orderBy: { user: { nome: 'asc' } },
+        take: 40,
+      })
+      for (const c of cargosLocais) {
+        if (contatos.length >= 20) break
+        await pushSeElegivel(contatos, vistos, {
+          id: c.user.id,
+          nome: c.user.nome,
+          avatarUrl: c.user.avatarUrl,
+          tenantNome: c.tenant.nome,
+          mesmoTenant: c.tenantId === tenant.id,
+        })
+      }
     }
 
     // Sócios do mesmo clube fora da unidade/aliadas — aparecem com solicitação.

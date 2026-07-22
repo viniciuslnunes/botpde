@@ -193,7 +193,17 @@ async function resolveAfiliacaoParaMensageria(userId: string): Promise<string | 
     orderBy: { criadoEm: 'desc' },
     select: { tenant: { select: { afiliacaoId: true } } },
   })
-  return membro?.tenant.afiliacaoId ?? null
+  if (membro?.tenant.afiliacaoId) return membro.tenant.afiliacaoId
+
+  // Owner/admin legado: tem UserRole na TO sem linha SaasMembro.
+  const cargo: { tenant: { afiliacaoId: string | null } } | null = await db.userRole.findFirst({
+    where: {
+      userId,
+      tenant: { ativo: true, sintetico: false, afiliacaoId: { not: null } },
+    },
+    select: { tenant: { select: { afiliacaoId: true } } },
+  })
+  return cargo?.tenant.afiliacaoId ?? null
 }
 
 /**
@@ -210,13 +220,23 @@ export async function mesmaAfiliacaoComunidade(userA: string, userB: string): Pr
   return Boolean(afiliacaoA && afiliacaoB && afiliacaoA === afiliacaoB)
 }
 
-/** Sócio aprovado em qualquer tenant. */
+/**
+ * Sócio aprovado **ou** cargo em TO real (owner/admin legado sem SaasMembro).
+ * Usado no gate de solicitação de DM — presidente sem linha de membro ainda
+ * exige solicitação de torcedores e aparece como destinatário “sócio”.
+ */
 export async function isSocioAprovado(userId: string): Promise<boolean> {
   const membro: { id: string } | null = await db.saasMembro.findFirst({
     where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
     select: { id: true },
   })
-  return membro !== null
+  if (membro) return true
+
+  const cargo: { id: string } | null = await db.userRole.findFirst({
+    where: { userId, tenant: { ativo: true, sintetico: false } },
+    select: { id: true },
+  })
+  return cargo !== null
 }
 
 async function temBloqueioMutuo(userA: string, userB: string): Promise<boolean> {
@@ -232,12 +252,33 @@ async function temBloqueioMutuo(userA: string, userB: string): Promise<boolean> 
   return bloqueio !== null
 }
 
+async function vinculosSocioOuCargo(userIds: string[]): Promise<Array<{ userId: string; tenantId: string }>> {
+  const [membros, cargos] = await Promise.all([
+    db.saasMembro.findMany({
+      where: { userId: { in: userIds }, status: 'APROVADO', tipo: 'SOCIO' },
+      select: { userId: true, tenantId: true },
+    }) as Promise<Array<{ userId: string; tenantId: string }>>,
+    db.userRole.findMany({
+      where: {
+        userId: { in: userIds },
+        tenant: { ativo: true, sintetico: false },
+      },
+      select: { userId: true, tenantId: true },
+    }) as Promise<Array<{ userId: string; tenantId: string }>>,
+  ])
+  const vistos = new Set<string>()
+  const out: Array<{ userId: string; tenantId: string }> = []
+  for (const v of [...membros, ...cargos]) {
+    const key = `${v.userId}:${v.tenantId}`
+    if (vistos.has(key)) continue
+    vistos.add(key)
+    out.push(v)
+  }
+  return out
+}
+
 async function isParRivalSocio(userA: string, userB: string): Promise<boolean> {
-  type VinculoSocio = { userId: string; tenantId: string }
-  const vinculos: VinculoSocio[] = await db.saasMembro.findMany({
-    where: { userId: { in: [userA, userB] }, status: 'APROVADO', tipo: 'SOCIO' },
-    select: { userId: true, tenantId: true },
-  })
+  const vinculos = await vinculosSocioOuCargo([userA, userB])
   const aV = vinculos.filter((v) => v.userId === userA)
   const bV = vinculos.filter((v) => v.userId === userB)
   if (aV.length === 0 || bV.length === 0) return false
@@ -274,6 +315,12 @@ export async function resolveTenantNotificacaoMensageria(
     select: { tenantId: true },
   })
   if (socio) return socio.tenantId
+
+  const cargo: { tenantId: string } | null = await db.userRole.findFirst({
+    where: { userId, tenant: { ativo: true, sintetico: false } },
+    select: { tenantId: true },
+  })
+  if (cargo) return cargo.tenantId
 
   const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
     where: { userId },
