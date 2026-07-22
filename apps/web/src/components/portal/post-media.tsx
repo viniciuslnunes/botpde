@@ -422,7 +422,7 @@ function SocialEmbed({ url }: { url: string }) {
             src={`https://www.youtube-nocookie.com/embed/${id}`}
             title="YouTube"
             loading="lazy"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; compute-pressure"
             allowFullScreen
             className="h-full w-full border-0"
             referrerPolicy="strict-origin-when-cross-origin"
