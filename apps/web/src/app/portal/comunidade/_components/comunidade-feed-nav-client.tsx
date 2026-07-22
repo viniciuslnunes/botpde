@@ -37,12 +37,15 @@ export function ComunidadeFeedNavClient({
   notificacoesNaoLidas = 0,
   solicitacoesPendentes = 0,
   mostrarBalanco = false,
+  escopo = 'torcida',
 }: {
   currentUserId: string
   notificacoesNaoLidas?: number
   solicitacoesPendentes?: number
   /** Prestação de contas pública — só quando o Presidente publicou o balanço. */
   mostrarBalanco?: boolean
+  /** Feed dual (Nacional × Minha torcida) — preserva `?escopo=` nos links. */
+  escopo?: 'nacional' | 'torcida'
 }) {
   const pathname = usePathname()
   /** Contagem ao vivo do cache da navbar; SSR até a primeira atualização. */
@@ -51,17 +54,23 @@ export function ComunidadeFeedNavClient({
   useEffect(() => subscribeNavbarUnread(setLiveUnread), [])
 
   const notifBadge = liveUnread ?? notificacoesNaoLidas
+  const modoNacional = escopo === 'nacional'
+  const sufixo = modoNacional ? '?escopo=nacional' : ''
 
   const navItems: NavItem[] = [
-    { href: '/portal/comunidade', label: 'Feed', icon: Rss },
-    { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart },
-    { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
+    { href: `/portal/comunidade${sufixo}`, label: 'Feed', icon: Rss },
+    ...(modoNacional
+      ? []
+      : [{ href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart }]),
+    ...(modoNacional
+      ? []
+      : [{ href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark }]),
     { href: '/portal/comunidade/busca', label: 'Buscar', icon: Search },
     { href: '/portal/comunidade/videos', label: 'Vídeos', icon: Video },
-    { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users },
-    { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio },
+    { href: `/portal/comunidade/grupos${sufixo}`, label: 'Grupos', icon: Users },
+    { href: `/portal/comunidade/canais${sufixo}`, label: 'Canais', icon: Radio },
     { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
-    ...(mostrarBalanco
+    ...(mostrarBalanco && !modoNacional
       ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
       : []),
     {
@@ -70,12 +79,16 @@ export function ComunidadeFeedNavClient({
       icon: Bell,
       badge: notifBadge,
     },
-    {
-      href: '/portal/comunidade/seguindo',
-      label: 'Solicitações',
-      icon: UserPlus,
-      badge: solicitacoesPendentes,
-    },
+    ...(modoNacional
+      ? []
+      : [
+          {
+            href: '/portal/comunidade/seguindo',
+            label: 'Solicitações',
+            icon: UserPlus,
+            badge: solicitacoesPendentes,
+          },
+        ]),
     ...(currentUserId
       ? [
           {

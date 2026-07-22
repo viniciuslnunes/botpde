@@ -10,6 +10,9 @@ export type AfiliacaoComunidade = {
   escudoUrl: string | null
 }
 
+/** Escopo de leitura/publicação escolhido dentro da Comunidade (query `?escopo=`). */
+export type EscopoComunidade = 'nacional' | 'torcida'
+
 export type ContextoComunidadePortal =
   | {
       modo: 'torcida'
@@ -22,12 +25,31 @@ export type ContextoComunidadePortal =
         balancoFinanceiroVisivel: boolean
       }
       afiliacao: AfiliacaoComunidade | null
+      /** Container operacional da Comunidade Nacional do clube (get-or-create). */
+      tenantSintetico?: { id: string } | null
+      /** Sócio com tenant real — pode alternar para a aba "Minha torcida". */
+      podeEscopoTorcida: boolean
     }
   | {
       modo: 'nacional'
       tenant: null
       afiliacao: AfiliacaoComunidade
+      tenantSintetico?: { id: string } | null
+      podeEscopoTorcida: boolean
     }
+
+/**
+ * Resolve o escopo efetivo a partir do parâmetro de query e do contexto do
+ * usuário. Torcedor (sem tenant real) é sempre forçado a `nacional`; sócio
+ * aprovado tem as duas abas e cai em `torcida` por padrão.
+ */
+export function resolverEscopoComunidade(
+  ctx: ContextoComunidadePortal,
+  escopoParam: string | undefined,
+): EscopoComunidade {
+  if (!ctx.podeEscopoTorcida) return 'nacional'
+  return escopoParam === 'nacional' ? 'nacional' : 'torcida'
+}
 
 /**
  * Resolve tenant ativo ou modo comunidade nacional (torcedor global sem torcida
@@ -75,6 +97,10 @@ export const resolverContextoComunidade = cache(
         logoUrl = canalOficial?.avatarUrl ?? null
       }
 
+      const tenantSintetico = tenant.afiliacaoId
+        ? await getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
+        : null
+
       return {
         modo: 'torcida',
         tenant: {
@@ -86,6 +112,8 @@ export const resolverContextoComunidade = cache(
           balancoFinanceiroVisivel: tenant.balancoFinanceiroVisivel,
         },
         afiliacao,
+        tenantSintetico,
+        podeEscopoTorcida: true,
       }
     }
 
@@ -104,7 +132,9 @@ export const resolverContextoComunidade = cache(
     })
     if (!afiliacao) return null
 
-    return { modo: 'nacional', tenant: null, afiliacao }
+    const tenantSintetico = await getOrCreateComunidadeNacionalTenant(afiliacao.id)
+
+    return { modo: 'nacional', tenant: null, afiliacao, tenantSintetico, podeEscopoTorcida: false }
   },
 )
 

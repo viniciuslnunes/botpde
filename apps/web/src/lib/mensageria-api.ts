@@ -1,7 +1,9 @@
+import type { Session } from 'next-auth'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
+import { assertComunidadeNacional, assertMembroAtivo } from '@/lib/authz'
 import { db } from '@torcida/db'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { assertMembroConversa } from './mensageria'
 
@@ -75,9 +77,94 @@ export async function assertPodeEnviarMensagens() {
   return { ...ctx, efetivas }
 }
 
-/** Usuário autenticado + participante ativo da conversa. */
+/**
+ * Participante ativo da conversa. Leitura/escrita na thread é por
+ * `MembroConversa` (não por tenant) — torcedor na CN e sócio usam o mesmo
+ * gate depois de já estarem na conversa.
+ */
 export async function assertConversaAccess(conversaId: string) {
-  const ctx = await assertUsuarioMensageria()
-  const membro = await assertMembroConversa(conversaId, ctx.userId)
-  return { ...ctx, membro, conversa: membro.conversa }
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado.')
+
+  const membro = await assertMembroConversa(conversaId, session.user.id)
+  const tenant = { id: membro.conversa.tenantId }
+  return {
+    session,
+    tenant,
+    userId: session.user.id,
+    membro,
+    conversa: membro.conversa,
+  }
+}
+
+/**
+ * Elegível para mensageria no caminho da Comunidade Nacional (torcedor global
+ * ou sócio via o clube). Não checa `SaasMembro`/cargo — a CN não tem um; a
+ * listagem do inbox (`listConversas`) já é chaveada por participação.
+ */
+export async function assertUsuarioMensageriaNacional(): Promise<{
+  session: Session
+  tenantSintetico: { id: string }
+  afiliacaoId: string
+  userId: string
+}> {
+  const { session, tenantSintetico, afiliacaoId } = await assertComunidadeNacional()
+  return { session, tenantSintetico, afiliacaoId, userId: session.user.id }
+}
+
+/**
+ * Igual a `assertUsuarioMensageriaNacional` — elegibilidade de envio na CN
+ * não depende de permissão de cargo (não há `UserRole` no tenant sintético);
+ * o gate por destinatário é `mesmaAfiliacaoComunidade` (ver `mensageria.ts`).
+ */
+export async function assertPodeEnviarMensagensNacional(): Promise<{
+  session: Session
+  tenantSintetico: { id: string }
+  afiliacaoId: string
+  userId: string
+}> {
+  return assertUsuarioMensageriaNacional()
+}
+
+export type ContextoMensageria =
+  | { via: 'torcida'; session: Session; tenant: { id: string } }
+  | { via: 'nacional'; session: Session; tenant: { id: string } }
+
+/**
+ * Split preferido para rotas de mensageria dual: resolve o tenant real
+ * (torcida ativa) ou, na ausência dele, o tenant sintético da Comunidade
+ * Nacional do clube do usuário — sempre devolve um `tenant.id` utilizável
+ * como contexto/auditoria (`Conversa.tenantId`).
+ */
+export async function assertContextoMensageria(): Promise<ContextoMensageria> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado.')
+
+  const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
+  if (ctx?.modo === 'torcida') {
+    return { via: 'torcida', session, tenant: { id: ctx.tenant.id } }
+  }
+  if (ctx?.tenantSintetico) {
+    return { via: 'nacional', session, tenant: { id: ctx.tenantSintetico.id } }
+  }
+
+  throw new Error('Você precisa de um clube vinculado para acessar as mensagens.')
+}
+
+/**
+ * Tenta o caminho torcida (membro ativo no tenant do host) e cai para o
+ * caminho nacional quando o usuário não tem vínculo ali mas tem clube
+ * (torcedor global ou sócio noutra unidade).
+ */
+export async function assertUsuarioMensageriaFlexivel(): Promise<
+  | ({ via: 'torcida' } & Awaited<ReturnType<typeof assertUsuarioMensageria>>)
+  | ({ via: 'nacional' } & Awaited<ReturnType<typeof assertUsuarioMensageriaNacional>>)
+> {
+  try {
+    const ctx = await assertUsuarioMensageria()
+    return { ...ctx, via: 'torcida' as const }
+  } catch {
+    const ctx = await assertUsuarioMensageriaNacional()
+    return { ...ctx, via: 'nacional' as const }
+  }
 }

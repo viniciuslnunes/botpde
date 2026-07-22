@@ -172,6 +172,36 @@ export async function canMessageUser(
   return canFollowUser(remetenteId, destinatarioId, tenantContextoId)
 }
 
+/** Afiliação (clube) do usuário para fins de mensageria na Comunidade Nacional. */
+async function resolveAfiliacaoParaMensageria(userId: string): Promise<string | null> {
+  const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
+    where: { userId },
+    select: { afiliacaoId: true },
+  })
+  if (perfil?.afiliacaoId) return perfil.afiliacaoId
+
+  const membro: { tenant: { afiliacaoId: string | null } } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenant: { select: { afiliacaoId: true } } },
+  })
+  return membro?.tenant.afiliacaoId ?? null
+}
+
+/**
+ * Ambos os usuários têm o mesmo clube vinculado (torcedor global ou sócio) —
+ * gate de DM/grupo no caminho Comunidade Nacional, onde não há hierarquia de
+ * tenant para `canFollowUser`/`canMessageUser`.
+ */
+export async function mesmaAfiliacaoComunidade(userA: string, userB: string): Promise<boolean> {
+  if (userA === userB) return false
+  const [afiliacaoA, afiliacaoB] = await Promise.all([
+    resolveAfiliacaoParaMensageria(userA),
+    resolveAfiliacaoParaMensageria(userB),
+  ])
+  return Boolean(afiliacaoA && afiliacaoB && afiliacaoA === afiliacaoB)
+}
+
 /** Participação ativa na conversa (não saiu). Lança erro se não participa. */
 export async function assertMembroConversa(
   conversaId: string,

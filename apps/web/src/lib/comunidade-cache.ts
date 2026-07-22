@@ -27,6 +27,11 @@ export function tagSalasAtivas(tenantId: string): string {
   return `${COMUNIDADE_FEED_CACHE_TAG}:salas:${tenantId}`
 }
 
+/** Salas visíveis na Comunidade Nacional (sintético + ABERTA das unidades do clube). */
+export function tagSalasNacionais(afiliacaoId: string): string {
+  return `${COMUNIDADE_FEED_CACHE_TAG}:salas-nacionais:${afiliacaoId}`
+}
+
 /** Invalida caches cross-request após mutação de feed, stories ou social. */
 export function invalidarCachesComunidadeFeed(tenantId: string): void {
   revalidateTag(tagFeedDescobrir(tenantId), 'max')

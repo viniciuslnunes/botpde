@@ -11,24 +11,30 @@ interface CurrentUser {
 /**
  * Fallback do Suspense dos posts: monta o infinite feed na hora.
  * Se o QueryClient (layout) ainda tem cache da visita anterior, a lista
- * aparece sem esperar o RSC `getPostsParaFeed`. Cache frio → fetch da API.
+ * aparece sem esperar o RSC. Cache frio → fetch da API.
  */
 export function ComunidadeFeedBootstrap({
   tenantId,
   currentUser,
   filtro = 'descobrir',
   cursor = null,
+  escopo,
+  afiliacaoId,
 }: {
   tenantId: string
   currentUser: CurrentUser
   filtro?: 'descobrir' | 'seguindo' | 'grupos'
   cursor?: string | null
+  escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
 }) {
   return (
     <ComunidadeFeedInfinite
       tenantId={tenantId}
       currentUser={currentUser}
       filtro={filtro}
+      escopo={escopo}
+      afiliacaoId={afiliacaoId}
       initialPosts={[]}
       initialPageInfo={{ hasMore: true, nextCursor: null }}
       initialCursor={cursor}

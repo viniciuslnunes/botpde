@@ -5,11 +5,18 @@ import type { Session } from 'next-auth'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { getDescendantTenantIds } from '@/lib/hierarquia'
+import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
 type AuthzResult = {
   session: Session
   tenant: Tenant
+}
+
+export type AuthzComunidadeNacional = {
+  session: Session
+  afiliacaoId: string
+  tenantSintetico: { id: string }
 }
 
 type VisibilidadePost = 'PUBLICO' | 'TENANT' | 'PRIVADO'
@@ -323,4 +330,100 @@ export async function checarPodePublicarNoFeed(
     return 'Você não tem permissão para publicar.'
   }
   return 'Conclua o onboarding do torcedor para publicar no feed.'
+}
+
+/**
+ * Resolve a afiliação (clube) do usuário para fins de Comunidade Nacional:
+ * torcedor global com onboarding concluído, ou sócio com vínculo `APROVADO`
+ * cujo tenant ativo pertence a um clube. `null` quando o usuário não tem
+ * nenhum clube vinculado.
+ */
+export async function resolveAfiliacaoComunidadeDoUsuario(
+  userId: string,
+  email?: string | null,
+): Promise<string | null> {
+  const perfil: { onboardingConcluidoEm: Date | null; afiliacaoId: string | null } | null =
+    await db.perfilTorcedor.findUnique({
+      where: { userId },
+      select: { onboardingConcluidoEm: true, afiliacaoId: true },
+    })
+  if (perfil?.onboardingConcluidoEm && perfil.afiliacaoId) return perfil.afiliacaoId
+
+  const tenant = await getActiveTenant(userId, email)
+  if (!tenant?.afiliacaoId) return null
+
+  const membro: { status: string } | null = await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId } },
+    select: { status: true },
+  })
+  if (membro?.status === 'APROVADO') return tenant.afiliacaoId
+
+  return null
+}
+
+/**
+ * Sessão + afiliação + tenant sintético (container operacional) da
+ * Comunidade Nacional do clube do usuário. Único critério de acesso: ter um
+ * clube resolvível via `resolveAfiliacaoComunidadeDoUsuario` — a CN não tem
+ * `SaasMembro`/cargos próprios.
+ */
+export async function assertComunidadeNacional(): Promise<AuthzComunidadeNacional> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autorizado')
+
+  let afiliacaoId = await resolveAfiliacaoComunidadeDoUsuario(session.user.id, session.user.email)
+
+  if (!afiliacaoId && isSuperAdminEmail(session.user.email)) {
+    const tenant = await resolvePortalTenant(session)
+    afiliacaoId = tenant?.afiliacaoId ?? null
+  }
+
+  if (!afiliacaoId) {
+    throw new Error('Você precisa de um clube vinculado para acessar a Comunidade Nacional.')
+  }
+
+  const tenantSintetico = await getOrCreateComunidadeNacionalTenant(afiliacaoId)
+  return { session, afiliacaoId, tenantSintetico }
+}
+
+/**
+ * Pode entrar numa sala visível na Comunidade Nacional: qualquer sala do
+ * tenant sintético (container da CN) ou sala `ABERTA` de uma unidade real do
+ * mesmo clube. `EVENTO`/`DM_GRUPO` fora do sintético permanecem restritas ao
+ * tenant de origem — nunca acessíveis pelo caminho nacional.
+ */
+export async function assertPodeAcessarSalaNacional(salaId: string): Promise<{
+  session: Session
+  sala: { id: string; tenantId: string; hostId: string; tipo: string }
+  isHost: boolean
+  tenantSinteticoId: string
+  afiliacaoId: string
+}> {
+  const sala: { id: string; tenantId: string; hostId: string; tipo: string } | null =
+    await db.salaReuniao.findFirst({
+      where: { id: salaId, encerradaEm: null },
+      select: { id: true, tenantId: true, hostId: true, tipo: true },
+    })
+  if (!sala) throw new Error('Sala indisponível.')
+
+  const tenantDaSala: { afiliacaoId: string | null; sintetico: boolean } | null =
+    await db.tenant.findUnique({
+      where: { id: sala.tenantId },
+      select: { afiliacaoId: true, sintetico: true },
+    })
+  if (!tenantDaSala?.afiliacaoId) throw new Error('Sala indisponível.')
+
+  const { session, afiliacaoId, tenantSintetico } = await assertComunidadeNacional()
+  if (afiliacaoId !== tenantDaSala.afiliacaoId) throw new Error('Sala indisponível.')
+
+  const podeAcessar = tenantDaSala.sintetico || sala.tipo === 'ABERTA'
+  if (!podeAcessar) throw new Error('Sala indisponível.')
+
+  return {
+    session,
+    sala,
+    isHost: sala.hostId === session.user.id,
+    tenantSinteticoId: tenantSintetico.id,
+    afiliacaoId,
+  }
 }

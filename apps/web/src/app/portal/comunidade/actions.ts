@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
-import { assertAutorPublicacaoPost, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
+import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { marcarComunicadosLidos } from '@/lib/comunidade'
@@ -1546,21 +1546,38 @@ export async function publicarPostEvento(
   }
 }
 
+/**
+ * Sócio com tenant real usa `GROUPS_CREATE` no tenant ativo. Sem tenant (ou
+ * sem permissão) — fallback para a Comunidade Nacional do clube
+ * (`tenantId = tenantSintetico.id`), mesmo critério de acesso de
+ * `assertComunidadeNacional`.
+ */
 export async function criarGrupo(
   nome: string,
   descricao?: string,
   publica = true,
 ): Promise<{ id: string }> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.GROUPS_CREATE)
-  await assertMembroAtivo(tenant.id, session.user.id)
-
   const parsed = criarGrupoSchema.safeParse({ nome, descricao, publica })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Grupo inválido')
+
+  let session: Session
+  let tenantId: string
+
+  try {
+    const ctx = await assertPermission(PERMISSIONS.GROUPS_CREATE)
+    await assertMembroAtivo(ctx.tenant.id, ctx.session.user.id)
+    session = ctx.session
+    tenantId = ctx.tenant.id
+  } catch {
+    const nacional = await assertComunidadeNacional()
+    session = nacional.session
+    tenantId = nacional.tenantSintetico.id
+  }
 
   const conversa: { id: string } = await db.conversa.create({
     data: {
       tipo: 'GRUPO',
-      tenantId: tenant.id,
+      tenantId,
       nome: parsed.data.nome,
       descricao: parsed.data.descricao?.trim() || null,
       publica: parsed.data.publica,
@@ -1576,7 +1593,7 @@ export async function criarGrupo(
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
+      tenantId,
       atorId: session.user.id,
       acao: 'GRUPO_CRIADO',
       entidade: 'Conversa',
@@ -2094,13 +2111,24 @@ export async function ocultarPostGrupo(postId: string): Promise<void> {
 }
 
 export async function entrarGrupoPublico(conversaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  let session: Session
+  let tenantId: string
+
+  try {
+    const ctx = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+    await assertMembroAtivo(ctx.tenant.id, ctx.session.user.id)
+    session = ctx.session
+    tenantId = ctx.tenant.id
+  } catch {
+    const nacional = await assertComunidadeNacional()
+    session = nacional.session
+    tenantId = nacional.tenantSintetico.id
+  }
 
   const conversa: { id: string } | null = await db.conversa.findFirst({
     where: {
       id: conversaId,
-      tenantId: tenant.id,
+      tenantId,
       tipo: 'GRUPO',
       publica: true,
       comunidade: true,
@@ -2558,19 +2586,63 @@ async function permissoesEfetivas(userId: string, tenantId: string): Promise<str
   return calculateEffectivePermissions(rolePermissions, overrides)
 }
 
+/**
+ * Sócio/torcedor com tenant real: caminho normal (visibilidade cross-tenant
+ * via `podeVerCanal`). Cai para a Comunidade Nacional quando o usuário não
+ * tem tenant ativo, ou quando o canal é `PUBLICO` de uma unidade do mesmo
+ * clube fora da relação de hierarquia/aliança do tenant do viewer (ex.: duas
+ * torcidas do mesmo time sem vínculo entre si).
+ */
 export async function entrarCanal(conversaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
-  await assertMembroAtivo(tenant.id, session.user.id)
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
+    await assertMembroAtivo(tenant.id, session.user.id)
 
-  const canal = await getCanalPorId(conversaId, tenant.id, session.user.id)
-  if (!canal) throw new Error('Canal não encontrado ou indisponível.')
-  if (!canal.publica) throw new Error('Este canal não aceita novos inscritos.')
+    const canal = await getCanalPorId(conversaId, tenant.id, session.user.id)
+    if (canal) {
+      if (!canal.publica) throw new Error('Este canal não aceita novos inscritos.')
+      await inscreverCanal(conversaId, session.user.id)
+      revalidatePath('/portal/comunidade/canais')
+      revalidatePath(linkCanalComunidade(conversaId))
+      revalidatePath('/portal/mensagens')
+      return
+    }
+  } catch {
+    // Sem tenant ativo, sem membro ativo, ou canal fora da relação do tenant
+    // — tenta o caminho da Comunidade Nacional abaixo.
+  }
+
+  const { session, afiliacaoId } = await assertComunidadeNacional()
+
+  const canalNacional: {
+    id: string
+    visibilidadeCanal: string
+    publica: boolean
+    tenant: { afiliacaoId: string | null; sintetico: boolean }
+  } | null = await db.conversa.findFirst({
+    where: { id: conversaId, tipo: 'CANAL' },
+    select: {
+      id: true,
+      visibilidadeCanal: true,
+      publica: true,
+      tenant: { select: { afiliacaoId: true, sintetico: true } },
+    },
+  })
+
+  if (
+    !canalNacional ||
+    canalNacional.visibilidadeCanal !== 'PUBLICO' ||
+    canalNacional.tenant.sintetico ||
+    canalNacional.tenant.afiliacaoId !== afiliacaoId
+  ) {
+    throw new Error('Canal não encontrado ou indisponível.')
+  }
+  if (!canalNacional.publica) throw new Error('Este canal não aceita novos inscritos.')
 
   await inscreverCanal(conversaId, session.user.id)
 
   revalidatePath('/portal/comunidade/canais')
   revalidatePath(linkCanalComunidade(conversaId))
-  revalidatePath('/portal/mensagens')
 }
 
 /**

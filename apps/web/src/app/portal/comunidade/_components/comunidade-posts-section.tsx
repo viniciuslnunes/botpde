@@ -1,4 +1,10 @@
-import { getPostsDaRede, getPostsParaFeed, getPostsDosMeusGrupos, getPostIdsSalvos } from '@/lib/feed'
+import {
+  getPostsDaRede,
+  getPostsParaFeed,
+  getPostsDosMeusGrupos,
+  getPostIdsSalvos,
+  getPostsFeedNacional,
+} from '@/lib/feed'
 import { getPostsDoCanal } from '@/lib/canais'
 import { ComunidadeFeedInfinite } from './comunidade-feed-infinite'
 
@@ -16,6 +22,10 @@ interface ComunidadePostsSectionProps {
   filtro?: 'descobrir' | 'seguindo' | 'grupos' | 'canal'
   /** Obrigatório quando `filtro === 'canal'` — id da Conversa (canal). */
   conversaId?: string
+  /** Feed da Comunidade Nacional do clube — ignora `filtro`/tenant real. */
+  escopo?: 'nacional' | 'torcida'
+  /** Obrigatório quando `escopo === 'nacional'`. */
+  afiliacaoId?: string | null
 }
 
 export async function ComunidadePostsSection({
@@ -24,7 +34,33 @@ export async function ComunidadePostsSection({
   cursor,
   filtro = 'descobrir',
   conversaId,
+  escopo = 'torcida',
+  afiliacaoId,
 }: ComunidadePostsSectionProps) {
+  if (escopo === 'nacional' && afiliacaoId) {
+    const feed = await getPostsFeedNacional(afiliacaoId, currentUser.id || undefined, {
+      cursor,
+      take: 20,
+    })
+    const salvoIds = currentUser.id
+      ? await getPostIdsSalvos(currentUser.id, tenantId)
+      : new Set<string>()
+
+    return (
+      <ComunidadeFeedInfinite
+        tenantId={tenantId}
+        currentUser={currentUser}
+        filtro="descobrir"
+        escopo="nacional"
+        afiliacaoId={afiliacaoId}
+        initialPosts={feed.posts}
+        initialPageInfo={feed.pageInfo}
+        initialCursor={cursor ?? null}
+        salvoIds={[...salvoIds]}
+      />
+    )
+  }
+
   const salvoIds = currentUser.id
     ? await getPostIdsSalvos(currentUser.id, tenantId)
     : new Set<string>()

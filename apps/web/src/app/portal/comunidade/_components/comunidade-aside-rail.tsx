@@ -32,33 +32,46 @@ export function ComunidadeAsideRail({
   tenant,
   currentUser,
   salasAtivas = [],
+  escopo = 'torcida',
 }: {
   tenant: { id: string; nome: string; afiliacaoId: string | null; balancoFinanceiroVisivel?: boolean }
   currentUser: CurrentUser
   salasAtivas?: SalaAtivaListItem[]
+  /** Feed dual (Nacional × Minha torcida) — ajusta card do sócio e links da nav. */
+  escopo?: 'nacional' | 'torcida'
 }) {
   if (!currentUser.id) return null
+
+  const modoNacional = escopo === 'nacional'
 
   return (
     <aside className="hidden lg:block">
       <div className={COMUNIDADE_RAIL_SCROLL}>
-        <Suspense
-          fallback={
-            <ComunidadeUserCardFallback
-              tenantNome={tenant.nome}
-              userName={currentUser.nome}
-              userAvatar={currentUser.avatarUrl}
-            />
-          }
-        >
-          <ComunidadeUserCardSection
-            tenantId={tenant.id}
+        {modoNacional ? (
+          <ComunidadeUserCardFallback
             tenantNome={tenant.nome}
-            userId={currentUser.id}
             userName={currentUser.nome}
             userAvatar={currentUser.avatarUrl}
           />
-        </Suspense>
+        ) : (
+          <Suspense
+            fallback={
+              <ComunidadeUserCardFallback
+                tenantNome={tenant.nome}
+                userName={currentUser.nome}
+                userAvatar={currentUser.avatarUrl}
+              />
+            }
+          >
+            <ComunidadeUserCardSection
+              tenantId={tenant.id}
+              tenantNome={tenant.nome}
+              userId={currentUser.id}
+              userName={currentUser.nome}
+              userAvatar={currentUser.avatarUrl}
+            />
+          </Suspense>
+        )}
 
         <Suspense fallback={<ComunidadeFeedNavFallback />}>
           <ComunidadeFeedNav
@@ -66,6 +79,7 @@ export function ComunidadeAsideRail({
             userId={currentUser.id}
             currentUserId={currentUser.id}
             mostrarBalanco={tenant.balancoFinanceiroVisivel === true}
+            escopo={escopo}
           />
         </Suspense>
 

@@ -73,6 +73,8 @@ export function ComunidadeFeedInfinite({
   currentUser,
   filtro,
   conversaId,
+  escopo,
+  afiliacaoId,
   initialPosts,
   initialPageInfo,
   initialCursor,
@@ -84,6 +86,8 @@ export function ComunidadeFeedInfinite({
   filtro: Filtro
   /** Obrigatório quando `filtro === 'canal'`. */
   conversaId?: string
+  escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
   initialPosts: PostSocialItem[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -92,6 +96,7 @@ export function ComunidadeFeedInfinite({
   seedFromSsr?: boolean
 }) {
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
+  const isNacional = escopo === 'nacional'
 
   const {
     posts,
@@ -106,8 +111,10 @@ export function ComunidadeFeedInfinite({
     endpoint: '/api/comunidade/feed',
     tenantId,
     viewerId: currentUser.id,
-    filtro,
+    filtro: isNacional ? 'descobrir' : filtro,
     conversaId,
+    escopo,
+    afiliacaoId,
     initialPosts,
     initialPageInfo,
     initialCursor,
@@ -122,11 +129,19 @@ export function ComunidadeFeedInfinite({
     (nextCursor: string) => {
       const url = new URL(window.location.href)
       url.searchParams.set('cursor', nextCursor)
-      if (filtro === 'seguindo') url.searchParams.set('filtro', 'seguindo')
-      else url.searchParams.delete('filtro')
+      if (isNacional) {
+        url.searchParams.set('escopo', 'nacional')
+        url.searchParams.delete('filtro')
+      } else if (filtro === 'seguindo') {
+        url.searchParams.set('filtro', 'seguindo')
+      } else if (filtro === 'grupos') {
+        url.searchParams.set('filtro', 'grupos')
+      } else {
+        url.searchParams.delete('filtro')
+      }
       window.history.replaceState({}, '', url.toString())
     },
-    [filtro],
+    [filtro, isNacional],
   )
 
   const loadMoreWithDeeplink = useCallback(async () => {
@@ -195,7 +210,7 @@ export function ComunidadeFeedInfinite({
     <>
       <section className="space-y-4">
         {posts.length === 0 ? (
-          <ComunidadeFeedEmpty filtro={filtro} />
+          <ComunidadeFeedEmpty filtro={filtro} nacional={isNacional} />
         ) : windowing.enabled && windowing.virtualItems ? (
           <div className="relative w-full" style={{ height: windowing.totalSize }}>
             {windowing.virtualItems.map((item) => {

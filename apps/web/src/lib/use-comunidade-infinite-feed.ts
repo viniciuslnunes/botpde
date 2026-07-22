@@ -22,8 +22,19 @@ export function comunidadeFeedQueryKey(
   viewerId: string,
   filtro?: string,
   conversaId?: string,
+  escopo?: string,
+  afiliacaoId?: string,
 ) {
-  return ['comunidade-feed', endpoint, tenantId, viewerId, filtro ?? '', conversaId ?? ''] as const
+  return [
+    'comunidade-feed',
+    endpoint,
+    tenantId,
+    viewerId,
+    filtro ?? '',
+    conversaId ?? '',
+    escopo ?? '',
+    afiliacaoId ?? '',
+  ] as const
 }
 
 async function fetchFeedPage<TPost>(params: {
@@ -32,6 +43,8 @@ async function fetchFeedPage<TPost>(params: {
   take: number
   filtro?: string
   conversaId?: string
+  escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
   signal: AbortSignal
 }): Promise<ComunidadeFeedPage<TPost>> {
   const url = new URL(params.endpoint, window.location.origin)
@@ -39,6 +52,8 @@ async function fetchFeedPage<TPost>(params: {
   if (params.cursor) url.searchParams.set('cursor', params.cursor)
   if (params.filtro) url.searchParams.set('filtro', params.filtro)
   if (params.conversaId) url.searchParams.set('conversaId', params.conversaId)
+  if (params.escopo) url.searchParams.set('escopo', params.escopo)
+  if (params.afiliacaoId) url.searchParams.set('afiliacaoId', params.afiliacaoId)
 
   const res = await fetch(url.toString(), {
     method: 'GET',
@@ -65,6 +80,9 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
   filtro?: string
   /** Escopa a página a um canal específico (`filtro: 'canal'`). */
   conversaId?: string
+  /** Feed da Comunidade Nacional — passa `afiliacaoId` junto. */
+  escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
   initialPosts: TPost[]
   initialPageInfo: PageInfo
   initialCursor: string | null
@@ -78,6 +96,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     viewerId,
     filtro,
     conversaId,
+    escopo,
+    afiliacaoId,
     initialPosts,
     initialPageInfo,
     initialCursor,
@@ -87,8 +107,17 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
 
   const queryClient = useQueryClient()
   const queryKey = useMemo(
-    () => comunidadeFeedQueryKey(endpoint, tenantId, viewerId, filtro, conversaId),
-    [endpoint, tenantId, viewerId, filtro, conversaId],
+    () =>
+      comunidadeFeedQueryKey(
+        endpoint,
+        tenantId,
+        viewerId,
+        filtro,
+        conversaId,
+        escopo,
+        afiliacaoId,
+      ),
+    [endpoint, tenantId, viewerId, filtro, conversaId, escopo, afiliacaoId],
   )
 
   const cached = queryClient.getQueryData<{
@@ -108,6 +137,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         take,
         filtro,
         conversaId,
+        escopo,
+        afiliacaoId,
         signal,
       }),
     initialPageParam: (shouldSeed ? initialCursor : null) as string | null,
@@ -164,6 +195,8 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
           take,
           filtro,
           conversaId,
+          escopo,
+          afiliacaoId,
           signal: new AbortController().signal,
         })
 
@@ -212,7 +245,7 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
         // SSE refresh silencioso
       }
     },
-    [endpoint, filtro, conversaId, initialCursor, queryClient, queryKey, take],
+    [endpoint, filtro, conversaId, escopo, afiliacaoId, initialCursor, queryClient, queryKey, take],
   )
 
   const prependPost = useCallback(

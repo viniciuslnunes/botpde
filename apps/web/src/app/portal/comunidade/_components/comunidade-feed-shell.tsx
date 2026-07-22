@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered, Scale } from 'lucide-react'
+import { Video, Users, Heart, Bookmark, UserPlus, Radio, ListOrdered, Scale, Clock } from 'lucide-react'
 import { ComunidadeSalasMobile } from './comunidade-salas-mobile'
 import { ComunidadeComunicadosSection } from './comunidade-comunicados-section'
 import { ComunidadePostsSection } from './comunidade-posts-section'
@@ -8,9 +8,13 @@ import { ComunidadeFeedBootstrap } from './comunidade-feed-bootstrap'
 import { ComunidadeAsideRail } from './comunidade-aside-rail'
 import { ComunidadeStoriesSection } from './comunidade-stories-section'
 import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
+import { ComunidadeEscopoTabs } from './comunidade-escopo-tabs'
 import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeComposerSection } from './comunidade-composer-section'
+import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
 import type { SalaAtivaListItem } from '@/lib/salas'
+import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
+import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 
 interface CurrentUser {
   id: string
@@ -35,6 +39,12 @@ interface ComunidadeFeedShellProps {
   salasAtivas?: SalaAtivaListItem[]
   /** Deep-link `?eventoId=` — abre o composer no modo evento. */
   eventoIdInicial?: string
+  /** Escopo ativo do feed dual (Nacional × Minha torcida). */
+  escopo?: 'nacional' | 'torcida'
+  podeEscopoTorcida?: boolean
+  afiliacao?: AfiliacaoComunidade | null
+  /** Sócio com pedido de vínculo em análise — mostrado no escopo Nacional. */
+  solicitacaoPendente?: SolicitacaoSocioPendente | null
 }
 
 function ComunicadosFallback() {
@@ -56,13 +66,52 @@ export function ComunidadeFeedShell({
   somentePublicoHint = false,
   salasAtivas = [],
   eventoIdInicial,
+  escopo = 'torcida',
+  podeEscopoTorcida = false,
+  afiliacao = null,
+  solicitacaoPendente = null,
 }: ComunidadeFeedShellProps) {
+  const modoNacional = escopo === 'nacional'
+  const sufixoEscopo = modoNacional ? '?escopo=nacional' : ''
+
   return (
     <>
-      <ComunidadeAsideRail tenant={tenant} currentUser={currentUser} salasAtivas={salasAtivas} />
+      <ComunidadeAsideRail
+        tenant={tenant}
+        currentUser={currentUser}
+        salasAtivas={salasAtivas}
+        escopo={escopo}
+      />
 
       <main className="min-w-0 space-y-4">
-        {clubeNacional && somentePublicoHint && (
+        <ComunidadeEscopoTabs
+          afiliacao={afiliacao}
+          podeEscopoTorcida={podeEscopoTorcida}
+          escopoAtivo={escopo}
+        />
+
+        {modoNacional && (
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+            Feed da comunidade nacional de{' '}
+            <strong className="text-[rgb(var(--foreground))]">
+              {clubeNacional?.apelido || clubeNacional?.nome}
+            </strong>
+            . Publicações públicas das torcidas do clube na plataforma.
+          </div>
+        )}
+
+        {modoNacional && solicitacaoPendente && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm">
+              Sua solicitação de sócio na <strong>{solicitacaoPendente.tenantNome}</strong> está
+              em análise pela diretoria. Você continua aqui, na Comunidade Nacional, até ser
+              aprovado ou reprovado — a gente te avisa assim que houver uma decisão.
+            </p>
+          </div>
+        )}
+
+        {clubeNacional && !modoNacional && somentePublicoHint && (
           <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
             Feed da comunidade nacional de{' '}
             <strong className="text-[rgb(var(--foreground))]">
@@ -76,16 +125,22 @@ export function ComunidadeFeedShell({
 
         <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
           {[
-            { href: '/portal/comunidade/salas', label: 'Salas', icon: Video },
-            { href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart },
-            { href: '/portal/comunidade/grupos', label: 'Grupos', icon: Users },
-            { href: '/portal/comunidade/canais', label: 'Canais', icon: Radio },
+            { href: `/portal/comunidade/salas${sufixoEscopo}`, label: 'Salas', icon: Video },
+            ...(modoNacional
+              ? []
+              : [{ href: '/portal/comunidade/rede', label: 'Minha rede', icon: Heart }]),
+            { href: `/portal/comunidade/grupos${sufixoEscopo}`, label: 'Grupos', icon: Users },
+            { href: `/portal/comunidade/canais${sufixoEscopo}`, label: 'Canais', icon: Radio },
             { href: '/portal/comunidade/classificacao', label: 'Classificação', icon: ListOrdered },
-            ...(tenant.balancoFinanceiroVisivel
+            ...(tenant.balancoFinanceiroVisivel && !modoNacional
               ? [{ href: '/portal/balanco', label: 'Balanço', icon: Scale }]
               : []),
-            { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
-            { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
+            ...(modoNacional
+              ? []
+              : [
+                  { href: '/portal/comunidade/salvos', label: 'Salvos', icon: Bookmark },
+                  { href: '/portal/comunidade/seguindo', label: 'Solicitações', icon: UserPlus },
+                ]),
           ].map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
@@ -101,7 +156,7 @@ export function ComunidadeFeedShell({
           <ComunidadeSalasMobile salas={salasAtivas} />
         </Suspense>
 
-        {currentUser.id && (
+        {!modoNacional && currentUser.id && (
           <Suspense
             fallback={
               <div className="h-20 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
@@ -113,21 +168,27 @@ export function ComunidadeFeedShell({
 
         {currentUser.id && (
           <Suspense fallback={<ComposerFallback />}>
-            <ComunidadeComposerSection
-              tenantId={tenant.id}
-              userId={currentUser.id}
-              userName={currentUser.nome}
-              userAvatar={currentUser.avatarUrl}
-              eventoIdInicial={eventoIdInicial}
-            />
+            {modoNacional ? (
+              <ComunidadeNacionalComposer currentUser={currentUser} />
+            ) : (
+              <ComunidadeComposerSection
+                tenantId={tenant.id}
+                userId={currentUser.id}
+                userName={currentUser.nome}
+                userAvatar={currentUser.avatarUrl}
+                eventoIdInicial={eventoIdInicial}
+              />
+            )}
           </Suspense>
         )}
 
-        <Suspense fallback={<ComunicadosFallback />}>
-          <ComunidadeComunicadosSection tenantId={tenant.id} currentUserId={currentUser.id} />
-        </Suspense>
+        {!modoNacional && (
+          <Suspense fallback={<ComunicadosFallback />}>
+            <ComunidadeComunicadosSection tenantId={tenant.id} currentUserId={currentUser.id} />
+          </Suspense>
+        )}
 
-        <FeedLiveBanner filtro={filtro} />
+        {!modoNacional && <FeedLiveBanner filtro={filtro} />}
 
         <Suspense
           fallback={
@@ -136,6 +197,8 @@ export function ComunidadeFeedShell({
               currentUser={currentUser}
               filtro={filtro}
               cursor={cursor ?? null}
+              escopo={escopo}
+              afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
             />
           }
         >
@@ -144,6 +207,8 @@ export function ComunidadeFeedShell({
             currentUser={currentUser}
             cursor={cursor}
             filtro={filtro}
+            escopo={escopo}
+            afiliacaoId={modoNacional ? tenant.afiliacaoId : undefined}
           />
         </Suspense>
       </main>

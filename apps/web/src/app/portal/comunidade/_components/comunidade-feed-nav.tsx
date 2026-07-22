@@ -23,11 +23,13 @@ export async function ComunidadeFeedNav({
   userId,
   currentUserId,
   mostrarBalanco = false,
+  escopo = 'torcida',
 }: {
   tenantId: string
   userId: string
   currentUserId: string
   mostrarBalanco?: boolean
+  escopo?: 'nacional' | 'torcida'
 }) {
   const badges = await getResumoBadgesComunidade(tenantId, userId)
 
@@ -37,6 +39,7 @@ export async function ComunidadeFeedNav({
       notificacoesNaoLidas={badges.notificacoesNaoLidas}
       solicitacoesPendentes={badges.solicitacoesPendentes}
       mostrarBalanco={mostrarBalanco}
+      escopo={escopo}
     />
   )
 }

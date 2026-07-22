@@ -88,7 +88,7 @@ G. Convergência bot ↔ web · **H. Alianças** ✅ entregue (incl. grafo nacio
 rivalidade e recomendações) · **I. Informação do nicho** 🆕 ·
 **J. Importação de base** 🆕 · **K. Salas de vídeo (Meet)** ✅ entregue ·
 **L. Escudos de clubes** 🔄 fase A entregue (`docs/data/escudos-afiliacoes.md`) ·
-**M. Comunidade Nacional / torcedor global** ✅ entregue — falta racional de
-produto próprio, ver `dominio.md` · **N. Controle de acesso por Departamentos**
+**M. Comunidade Nacional / torcedor global** ✅ entregue — shell dual Nacional ×
+Torcida (2026-07-22); ver `dominio.md` e `docs/data/modulo-comunidade.md` · **N. Controle de acesso por Departamentos**
 ✅ entregue, ver `docs/data/modulo-departamentos.md` · **O. Performance Comunidade**
 ✅ ondas A–B (`0dca679`); manutenção e Fases C–F em `docs/data/modulo-comunidade-performance.md`.

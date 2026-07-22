@@ -424,6 +424,18 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   `Post.alcanceNacional` e **bypassam o gate de seguir** — qualquer torcedor da
   mesma afiliação vê no feed nacional, mesmo sem seguir o autor. No composer,
   “Público” e o antigo “Torcida e torcedores” são a mesma opção.
+- **Shell dual Nacional × Torcida (2026-07-22)**: query `?escopo=nacional|torcida`.
+  Torcedor (sem sócio `APROVADO`) só vê a aba Nacional; sócio aprovado alterna
+  as duas. Chrome (menu, salas, chat, canais sugeridos) monta nos dois escopos.
+  No Nacional: feed `getPostsFeedNacional` com infinite scroll via
+  `/api/comunidade/feed?escopo=nacional&afiliacaoId=…`; salas = sintético CN ∪ `ABERTA` das
+  TOs do clube (`listSalasNacionais`); canais sugeridos = só `PUBLICO`
+  (`listCanaisPublicosPorAfiliacao`); DMs/grupos stampam `tenantId` sintético
+  com gate `mesmaAfiliacaoComunidade` / `assertComunidadeNacional`. **Nunca**
+  vazam canais `TENANT`/`HIERARQUIA`/`ALIADOS`, salas `EVENTO`/`DM_GRUPO` nem
+  posts `TENANT`/`PRIVADO` para o escopo Nacional. Authz CN:
+  `apps/web/src/lib/authz.ts` (`assertComunidadeNacional`,
+  `assertPodeAcessarSalaNacional`).
 - **Torcedor global pode publicar mesmo PENDENTE**: `assertAutorPublicacaoPost`
   (`apps/web/src/lib/authz.ts`) diferencia sócio de torcedor — um torcedor com
   onboarding concluído na mesma afiliação publica posts com visibilidade

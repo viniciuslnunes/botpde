@@ -2,22 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
-import { getPostsDaRede, getPostsParaFeed, getPostsDosMeusGrupos } from '@/lib/feed'
+import {
+  getPostsDaRede,
+  getPostsParaFeed,
+  getPostsDosMeusGrupos,
+  getPostsFeedNacional,
+} from '@/lib/feed'
 import { getCanalPorId, getPostsDoCanal } from '@/lib/canais'
+import { resolveAfiliacaoComunidadeDoUsuario } from '@/lib/authz'
 
 const querySchema = z.object({
   cursor: z.string().optional(),
   take: z.coerce.number().int().min(5).max(50).optional(),
   filtro: z.enum(['descobrir', 'seguindo', 'grupos', 'canal']).optional(),
   conversaId: z.string().optional(),
+  escopo: z.enum(['nacional', 'torcida']).optional(),
+  afiliacaoId: z.string().uuid().optional(),
 })
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
+    const session = await auth()
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
@@ -26,10 +34,39 @@ export async function GET(request: NextRequest) {
       take: request.nextUrl.searchParams.get('take') ?? undefined,
       filtro: request.nextUrl.searchParams.get('filtro') ?? undefined,
       conversaId: request.nextUrl.searchParams.get('conversaId') ?? undefined,
+      escopo: request.nextUrl.searchParams.get('escopo') ?? undefined,
+      afiliacaoId: request.nextUrl.searchParams.get('afiliacaoId') ?? undefined,
     })
 
     if (!parsed.success) {
       return NextResponse.json({ error: 'Parâmetros inválidos.' }, { status: 400 })
+    }
+
+    const take = parsed.data.take ?? 20
+
+    if (parsed.data.escopo === 'nacional') {
+      if (!parsed.data.afiliacaoId) {
+        return NextResponse.json({ error: 'afiliacaoId obrigatório.' }, { status: 400 })
+      }
+      const afiliacaoViewer = await resolveAfiliacaoComunidadeDoUsuario(
+        session.user.id,
+        session.user.email,
+      )
+      if (!afiliacaoViewer || afiliacaoViewer !== parsed.data.afiliacaoId) {
+        return NextResponse.json({ error: 'Sem permissão para este feed.' }, { status: 403 })
+      }
+
+      const { posts, pageInfo } = await getPostsFeedNacional(
+        parsed.data.afiliacaoId,
+        session.user.id,
+        { cursor: parsed.data.cursor, take },
+      )
+      return NextResponse.json({ posts, pageInfo })
+    }
+
+    const tenant = await getTenantFromHost()
+    if (!tenant) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
 
     const filtro = parsed.data.filtro ?? 'descobrir'
@@ -37,9 +74,17 @@ export async function GET(request: NextRequest) {
     if (filtro === 'seguindo') {
       const { posts, pageInfo } = await getPostsDaRede(tenant.id, session.user.id, {
         cursor: parsed.data.cursor,
-        take: parsed.data.take ?? 20,
+        take,
       })
 
+      return NextResponse.json({ posts, pageInfo })
+    }
+
+    if (filtro === 'grupos') {
+      const { posts, pageInfo } = await getPostsDosMeusGrupos(tenant.id, session.user.id, {
+        cursor: parsed.data.cursor,
+        take,
+      })
       return NextResponse.json({ posts, pageInfo })
     }
 
@@ -53,23 +98,18 @@ export async function GET(request: NextRequest) {
       }
       const { posts, pageInfo } = await getPostsDoCanal(canal.id, canal.tenantId, session.user.id, {
         cursor: parsed.data.cursor,
-        take: parsed.data.take ?? 20,
+        take,
       })
 
       return NextResponse.json({ posts, pageInfo })
     }
 
-    const [{ posts, pageInfo }] = await Promise.all([
-      getPostsParaFeed(tenant.id, session.user.id, {
-        cursor: parsed.data.cursor,
-        take: parsed.data.take ?? 20,
-      }),
-    ])
-
-    return NextResponse.json({
-      posts,
-      pageInfo,
+    const { posts, pageInfo } = await getPostsParaFeed(tenant.id, session.user.id, {
+      cursor: parsed.data.cursor,
+      take,
     })
+
+    return NextResponse.json({ posts, pageInfo })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro na rota do feed.'
     return NextResponse.json({ error: message }, { status: 400 })

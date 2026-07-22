@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@torcida/db'
 import { getAlliedTenantIds } from '@/lib/hierarquia'
-import { assertUsuarioMensageria } from '@/lib/mensageria-api'
+import {
+  assertContextoMensageria,
+  assertUsuarioMensageria,
+} from '@/lib/mensageria-api'
 
 /**
- * Contatos elegíveis para conversa: membros APROVADOS do tenant atual e de
- * torcidas aliadas (mesma regra do canMessageUser), exceto o próprio usuário
- * e quem tem bloqueio em qualquer direção.
+ * Contatos elegíveis para conversa.
+ * Torcida: membros APROVADOS do tenant e aliadas.
+ * Nacional: usuários com o mesmo clube (`PerfilTorcedor` ou sócio APROVADO).
  */
 export async function GET(request: NextRequest) {
   try {
-    const { userId, tenant } = await assertUsuarioMensageria()
+    const contexto = await assertContextoMensageria()
+    const userId = contexto.session.user.id!
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
-
-    const aliados = await getAlliedTenantIds(tenant.id)
-    const visiveis = [tenant.id, ...aliados]
 
     const bloqueios: { bloqueadorId: string; bloqueadoId: string }[] =
       await db.bloqueioUsuario.findMany({
@@ -24,6 +25,99 @@ export async function GET(request: NextRequest) {
     const bloqueadosIds = new Set(
       bloqueios.map((b) => (b.bloqueadorId === userId ? b.bloqueadoId : b.bloqueadorId)),
     )
+
+    if (contexto.via === 'nacional') {
+      const afiliacaoId = (
+        await db.tenant.findUnique({
+          where: { id: contexto.tenant.id },
+          select: { afiliacaoId: true },
+        })
+      )?.afiliacaoId
+      if (!afiliacaoId) {
+        return NextResponse.json({ contatos: [] })
+      }
+
+      type PerfilRow = {
+        userId: string
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+      }
+      const perfis: PerfilRow[] = await db.perfilTorcedor.findMany({
+        where: {
+          afiliacaoId,
+          userId: { not: userId },
+          onboardingConcluidoEm: { not: null },
+          ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+        },
+        select: {
+          userId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+        },
+        orderBy: { user: { nome: 'asc' } },
+        take: 40,
+      })
+
+      type SocioRow = {
+        userId: string
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+        tenant: { nome: string }
+      }
+      const socios: SocioRow[] = await db.saasMembro.findMany({
+        where: {
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          userId: { not: userId },
+          tenant: { afiliacaoId, ativo: true, sintetico: false },
+          ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+        },
+        select: {
+          userId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+          tenant: { select: { nome: true } },
+        },
+        orderBy: { user: { nome: 'asc' } },
+        take: 40,
+      })
+
+      const vistos = new Set<string>()
+      const contatos: Array<{
+        id: string
+        nome: string | null
+        avatarUrl: string | null
+        tenantNome: string
+        mesmoTenant: boolean
+      }> = []
+
+      for (const p of perfis) {
+        if (vistos.has(p.userId) || bloqueadosIds.has(p.userId)) continue
+        vistos.add(p.userId)
+        contatos.push({
+          id: p.user.id,
+          nome: p.user.nome,
+          avatarUrl: p.user.avatarUrl,
+          tenantNome: 'Comunidade Nacional',
+          mesmoTenant: true,
+        })
+        if (contatos.length >= 20) break
+      }
+      for (const s of socios) {
+        if (contatos.length >= 20) break
+        if (vistos.has(s.userId) || bloqueadosIds.has(s.userId)) continue
+        vistos.add(s.userId)
+        contatos.push({
+          id: s.user.id,
+          nome: s.user.nome,
+          avatarUrl: s.user.avatarUrl,
+          tenantNome: s.tenant.nome,
+          mesmoTenant: false,
+        })
+      }
+
+      return NextResponse.json({ contatos })
+    }
+
+    const { userId: uid, tenant } = await assertUsuarioMensageria()
+    const aliados = await getAlliedTenantIds(tenant.id)
+    const visiveis = [tenant.id, ...aliados]
 
     interface ContatoRow {
       userId: string
@@ -35,7 +129,7 @@ export async function GET(request: NextRequest) {
       where: {
         status: 'APROVADO',
         tenantId: { in: visiveis },
-        userId: { not: userId },
+        userId: { not: uid },
         ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
       },
       select: {
@@ -48,7 +142,6 @@ export async function GET(request: NextRequest) {
       take: 40,
     })
 
-    // Um usuário pode ser membro de mais de um tenant visível — dedup por userId
     const vistos = new Set<string>()
     const contatos = rows
       .filter((r) => {

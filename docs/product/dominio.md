@@ -35,16 +35,18 @@ A hierarquia Sede → Subsede → PDE é **afiliação territorial** (subsedes/P
 
 | Perfil | Superfície | Papel |
 |---|---|---|
-| Torcedor 🆕 | Portal (Comunidade Nacional, onboarding) | Simpatizante da afiliação sem organizada própria; topo do funil de aquisição; `PerfilTorcedor` global; pode publicar posts públicos mesmo antes de virar sócio de uma torcida (`SaasMembro.tipo = TORCEDOR`) |
-| Associado (sócio) | Portal | Status, eventos, comunicados, unidade local, feed do time; `SaasMembro.tipo = SOCIO` |
+| Torcedor | Portal (Comunidade Nacional dual-shell, onboarding) | Simpatizante da afiliação sem organizada própria; topo do funil de aquisição; `PerfilTorcedor` global; feed/chat/salas CN + vitrine pública das TOs do clube; pode publicar posts públicos antes de virar sócio (`SaasMembro.tipo = TORCEDOR`) |
+| Associado (sócio) | Portal | Status, eventos, comunicados, unidade local; Comunidade com abas **Nacional** + **Minha torcida**; `SaasMembro.tipo = SOCIO` |
 | Admin de núcleo | Admin local | Opera sede/subsede/PDE, membros, eventos |
 | Diretoria | Admin ampliado | Comunicados e ações de maior alcance |
 | Presidente (owner) | Admin + Config | Define alianças, afiliação (time) da torcida, governança |
 | Super-admin | Painel global | Governança técnica da plataforma |
 
-> **Torcedor** ainda não tem racional de produto registrado (por que existe,
-> que dor de aquisição resolve, como converte a sócio) — pendência levantada
-> na auditoria de 2026-07-16, ver `roadmap.md`.
+> **Torcedor / Comunidade Nacional**: shell dual com sócio (abas Nacional ×
+> Minha torcida). Torcedor só acessa o escopo Nacional — posts públicos por
+> afiliação, DMs/grupos no tenant sintético, salas CN + salas `ABERTA` das TOs
+> do clube, canais `PUBLICO`. Conteúdo interno da TO permanece exclusivo do
+> sócio aprovado. Detalhe: `docs/data/modulo-comunidade.md` § Visibilidade.
 
 ## Jornadas centrais
 

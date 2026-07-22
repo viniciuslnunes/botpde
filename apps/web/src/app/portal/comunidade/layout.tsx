@@ -4,15 +4,18 @@ import { ComunidadeRouteTransition } from './_components/comunidade-route-transi
 import { ComunidadeLayoutChrome } from './_components/comunidade-layout-chrome'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
-import { getSugestoesCanaisParaAside } from '@/lib/canais'
+import { getSugestoesCanaisParaAside, getSugestoesCanaisPublicosParaAside } from '@/lib/canais'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
-import { listSalasAtivas } from '@/lib/salas'
+import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 
 /**
  * Layout da Comunidade: dock mobile, QueryProvider (cache do feed) e
  * aside de chat/salas persistente no feed (sem remount ao ir/voltar).
+ * O layout não lê `?escopo=` (server component fora do client tree) — por
+ * isso carrega os dois datasets (torcida/nacional) quando aplicável e deixa
+ * o chrome (client) decidir qual mostrar a partir da query string.
  */
 export default async function ComunidadeLayout({
   children,
@@ -21,19 +24,54 @@ export default async function ComunidadeLayout({
 }) {
   const session = await auth()
 
-  let modoTorcida = false
-  let salas: SalaAtivaListItem[] = []
-  let tenantIdAtual: string | null = null
-  let canaisSugeridos: SugestaoCanalAside[] = []
+  let modoComunidade = false
+  let podeEscopoTorcida = false
+  let salasTorcida: SalaAtivaListItem[] = []
+  let canaisTorcida: SugestaoCanalAside[] = []
+  let salasNacional: SalaAtivaListItem[] = []
+  let canaisNacional: SugestaoCanalAside[] = []
+  let tenantId: string | null = null
+  let tenantSinteticoId: string | null = null
+  let afiliacaoId: string | null = null
+
   if (session?.user?.id) {
     const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
-    if (ctx?.modo === 'torcida') {
-      modoTorcida = true
-      tenantIdAtual = ctx.tenant.id
-      ;[salas, canaisSugeridos] = await Promise.all([
-        listSalasAtivas(ctx.tenant.id),
-        getSugestoesCanaisParaAside(ctx.tenant.id, session.user.id),
-      ])
+    if (ctx) {
+      afiliacaoId = ctx.afiliacao?.id ?? null
+      podeEscopoTorcida = ctx.podeEscopoTorcida
+      tenantSinteticoId = ctx.tenantSintetico?.id ?? null
+      // Chrome (salas/chat) sempre que há contexto de comunidade — sócio sem
+      // afiliação ainda vê o rail da torcida; torcedor exige clube.
+      modoComunidade = ctx.modo === 'torcida' || Boolean(ctx.afiliacao)
+
+      const tarefas: Promise<void>[] = []
+
+      if (ctx.modo === 'torcida') {
+        tenantId = ctx.tenant.id
+        tarefas.push(
+          Promise.all([
+            listSalasAtivas(ctx.tenant.id),
+            getSugestoesCanaisParaAside(ctx.tenant.id, session.user.id),
+          ]).then(([salas, canais]) => {
+            salasTorcida = salas
+            canaisTorcida = canais
+          }),
+        )
+      }
+
+      if (afiliacaoId) {
+        tarefas.push(
+          Promise.all([
+            listSalasNacionais(afiliacaoId),
+            getSugestoesCanaisPublicosParaAside(afiliacaoId, session.user.id),
+          ]).then(([salas, canais]) => {
+            salasNacional = salas
+            canaisNacional = canais
+          }),
+        )
+      }
+
+      await Promise.all(tarefas)
     }
   }
 
@@ -50,10 +88,14 @@ export default async function ComunidadeLayout({
       <div className="pb-28 lg:pb-0">
         <ComunidadeLayoutChrome
           currentUserId={currentUser.id}
-          tenantId={tenantIdAtual}
-          salas={salas}
-          canaisSugeridos={canaisSugeridos}
-          modoTorcida={modoTorcida}
+          tenantId={tenantId}
+          tenantSinteticoId={tenantSinteticoId}
+          podeEscopoTorcida={podeEscopoTorcida}
+          salasTorcida={salasTorcida}
+          canaisTorcida={canaisTorcida}
+          salasNacional={salasNacional}
+          canaisNacional={canaisNacional}
+          modoComunidade={modoComunidade}
         >
           <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
         </ComunidadeLayoutChrome>

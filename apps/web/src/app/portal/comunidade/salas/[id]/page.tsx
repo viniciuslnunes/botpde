@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
+import { assertSalaMembro } from '@/lib/salas-api'
 import { isLiveKitConfigured, requireLiveKitConfig } from '@/lib/env'
 import { createRoomToken } from '@/lib/livekit'
 import { getSalaById } from '@/lib/salas'
 import { listParticipantesAtivos } from '@/lib/salas-presenca'
-import { getTenantFromHost } from '@/lib/tenant'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { encerrarSala } from '../actions'
 import { formatDateTimeShort } from '@/lib/format-datetime'
@@ -21,16 +20,18 @@ export default async function SalaDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
 
-  await assertMembroAtivo(tenant.id, session.user.id)
+  // `assertSalaMembro` cobre o caminho torcida (membro ativo do tenant) e o
+  // fallback Comunidade Nacional (sala do sintético ou `ABERTA` do clube) —
+  // sempre usa o `tenantId` real da sala (não o sintético) para `getSalaById`.
+  const { sala: salaCtx } = await assertSalaMembro(id)
 
-  const sala = await getSalaById(tenant.id, id)
+  const sala = await getSalaById(salaCtx.tenantId, id)
   if (!sala) notFound()
 
-  const participantesAtivos = await listParticipantesAtivos(tenant.id, sala.id)
+  const participantesAtivos = await listParticipantesAtivos(salaCtx.tenantId, sala.id)
   const isHost = session.user.id === sala.hostId
   const livekitOk = isLiveKitConfigured()
   const token = livekitOk

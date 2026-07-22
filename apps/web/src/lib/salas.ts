@@ -3,7 +3,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db, withDbRetry } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
-import { tagSalasAtivas } from './comunidade-cache'
+import { tagSalasAtivas, tagSalasNacionais } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
 
 export type SalaAtivaListItem = {
@@ -76,7 +76,11 @@ export const listSalasAtivas = cache(async function listSalasAtivas(
     { revalidate: 15, tags: [tagSalasAtivas(tenantId)] },
   )()
 
-  return salas.map((sala) => ({
+  return salas.map(normalizarDatasSala)
+})
+
+function normalizarDatasSala(sala: SalaAtivaListItem): SalaAtivaListItem {
+  return {
     ...sala,
     criadoEm: sala.criadoEm instanceof Date ? sala.criadoEm : new Date(sala.criadoEm),
     evento: sala.evento
@@ -85,7 +89,49 @@ export const listSalasAtivas = cache(async function listSalasAtivas(
           data: sala.evento.data instanceof Date ? sala.evento.data : new Date(sala.evento.data),
         }
       : null,
-  }))
+  }
+}
+
+/**
+ * Salas visíveis na Comunidade Nacional do clube: qualquer sala do tenant
+ * sintético (container operacional da CN) + salas `ABERTA` das unidades
+ * reais do clube (EVENTO/DM_GRUPO permanecem restritas ao tenant de origem).
+ */
+export const listSalasNacionais = cache(async function listSalasNacionais(
+  afiliacaoId: string,
+): Promise<SalaAtivaListItem[]> {
+  const tenants: Array<{ id: string; sintetico: boolean }> = await db.tenant.findMany({
+    where: { afiliacaoId, ativo: true },
+    select: { id: true, sintetico: true },
+  })
+  const tenantIdsSinteticos = tenants.filter((t) => t.sintetico).map((t) => t.id)
+  const tenantIdsOficiais = tenants.filter((t) => !t.sintetico).map((t) => t.id)
+
+  const salas = await unstable_cache(
+    async () =>
+      withDbRetry(
+        () =>
+          db.salaReuniao.findMany({
+            where: {
+              encerradaEm: null,
+              OR: [
+                { tenantId: { in: tenantIdsSinteticos } },
+                { tenantId: { in: tenantIdsOficiais }, tipo: 'ABERTA' },
+              ],
+            },
+            include: {
+              host: { select: { id: true, nome: true, avatarUrl: true } },
+              evento: { select: { id: true, titulo: true, data: true } },
+              _count: { select: { participantes: true } },
+            },
+            orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
+          }) as Promise<SalaAtivaListItem[]>,
+      ),
+    ['salas-nacionais', afiliacaoId],
+    { revalidate: 15, tags: [tagSalasNacionais(afiliacaoId)] },
+  )()
+
+  return salas.map(normalizarDatasSala)
 })
 
 export async function getSalaById(tenantId: string, salaId: string): Promise<SalaDetalhe | null> {
