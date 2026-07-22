@@ -97,18 +97,38 @@ export function tiktokVideoId(url: string): string | null {
   }
 }
 
-/** Src do iframe oficial do Instagram (`/p|reel|tv/{id}/embed`). */
-export function instagramEmbedSrc(url: string, widthPx?: number): string | null {
+export type InstagramMediaKind = 'p' | 'reel' | 'tv'
+
+/**
+ * Extrai kind+id de permalinks oficiais e variantes comuns (share, username no path).
+ * URLs com `/username/p/...` quebram o embed.js (iframe da home → X-Frame-Options deny).
+ */
+export function parseInstagramPost(url: string): { kind: InstagramMediaKind; id: string } | null {
   try {
-    const u = new URL(url)
-    const m = u.pathname.match(/\/(p|reel|reels|tv)\/([^/?]+)/)
+    const host = normalizeSocialHost(new URL(url).hostname)
+    if (host !== 'instagram.com') return null
+    const m = new URL(url).pathname.match(/\/(?:share\/)?(p|reel|reels|tv)\/([^/?]+)/)
     if (!m) return null
-    const kind = m[1] === 'reels' ? 'reel' : m[1]
-    const wp = widthPx ? resolveEmbedFrameWidth('instagram', widthPx) : EMBED_FRAME_MAX_WIDTH.instagram
-    return `https://www.instagram.com/${kind}/${m[2]}/embed/?cr=1&v=14&wp=${wp}`
+    const kind: InstagramMediaKind = m[1] === 'reels' ? 'reel' : (m[1] as InstagramMediaKind)
+    return { kind, id: m[2] }
   } catch {
     return null
   }
+}
+
+/** Permalink canônico com trailing slash — o que o player /embed espera. */
+export function instagramPermalink(url: string): string | null {
+  const parsed = parseInstagramPost(url)
+  if (!parsed) return null
+  return `https://www.instagram.com/${parsed.kind}/${parsed.id}/`
+}
+
+/** Src do iframe oficial do Instagram (`/p|reel|tv/{id}/embed`) — permite framing. */
+export function instagramEmbedSrc(url: string, widthPx?: number): string | null {
+  const parsed = parseInstagramPost(url)
+  if (!parsed) return null
+  const wp = widthPx ? resolveEmbedFrameWidth('instagram', widthPx) : EMBED_FRAME_MAX_WIDTH.instagram
+  return `https://www.instagram.com/${parsed.kind}/${parsed.id}/embed/?cr=1&v=14&wp=${wp}`
 }
 
 export function twitterEmbedSrc(url: string, widthPx?: number): string | null {

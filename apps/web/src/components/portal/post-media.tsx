@@ -6,10 +6,15 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
+  applyEmbedHeightReport,
   classifyMedia,
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
+  EMBED_RESIZE_ORIGINS,
+  estimateEmbedHeight,
+  instagramEmbedSrc,
+  parseEmbedHeightMessage,
   resolveEmbedFrameWidth,
   tiktokVideoId,
   youTubeId,
@@ -19,7 +24,7 @@ import {
 
 const EMBED_SCRIPTS: Partial<Record<EmbedProvider, string>> = {
   twitter: 'https://platform.twitter.com/widgets.js',
-  instagram: 'https://www.instagram.com/embed.js',
+  // Instagram: iframe /embed/ direto — embed.js acaba iframeando a home (XFO deny).
   tiktok: 'https://www.tiktok.com/embed.js',
 }
 
@@ -65,10 +70,8 @@ function loadEmbedScript(provider: EmbedProvider): Promise<void> {
 function processOfficialEmbed(provider: EmbedProvider, host: HTMLElement) {
   const w = window as unknown as {
     twttr?: { widgets?: { load: (el?: HTMLElement | null) => void } }
-    instgrm?: { Embeds?: { process: () => void } }
   }
   if (provider === 'twitter') w.twttr?.widgets?.load(host)
-  if (provider === 'instagram') w.instgrm?.Embeds?.process()
 }
 
 interface PostMediaProps {
@@ -321,11 +324,13 @@ function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
   const shellRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const processedRef = useRef(false)
   const [cardWidth, setCardWidth] = useState(0)
   const [visible, setVisible] = useState(false)
   const [activated, setActivated] = useState(false)
   const [hasFrame, setHasFrame] = useState(false)
+  const [igHeight, setIgHeight] = useState<number | null>(null)
 
   useEffect(() => {
     const el = shellRef.current
@@ -362,10 +367,11 @@ function SocialEmbed({ url }: { url: string }) {
     setActivated(false)
     setHasFrame(false)
     setVisible(false)
+    setIgHeight(null)
   }, [url])
 
   useEffect(() => {
-    if (!provider || provider === 'youtube') return
+    if (!provider || provider === 'youtube' || provider === 'instagram') return
     if (!visible || cardWidth <= 0 || processedRef.current) return
     const host = hostRef.current
     if (!host) return
@@ -389,6 +395,21 @@ function SocialEmbed({ url }: { url: string }) {
     return () => mo.disconnect()
   }, [activated, url])
 
+  useEffect(() => {
+    if (provider !== 'instagram') return
+    const origins = EMBED_RESIZE_ORIGINS.instagram
+    const onMessage = (event: MessageEvent) => {
+      if (!origins.includes(event.origin)) return
+      const win = iframeRef.current?.contentWindow
+      if (win && event.source && event.source !== win) return
+      const report = parseEmbedHeightMessage('instagram', event.data)
+      if (!report) return
+      setIgHeight(applyEmbedHeightReport(report))
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [provider, url])
+
   if (!provider) return null
 
   if (provider === 'youtube') {
@@ -406,6 +427,46 @@ function SocialEmbed({ url }: { url: string }) {
             className="h-full w-full border-0"
             referrerPolicy="strict-origin-when-cross-origin"
           />
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir no {EMBED_HOSTS[provider]}
+        </a>
+      </div>
+    )
+  }
+
+  // Instagram: iframe /embed/ (permite framing). embed.js iframeia a home → XFO deny.
+  if (provider === 'instagram') {
+    const frameWidth = resolveEmbedFrameWidth('instagram', cardWidth || 360)
+    const src = instagramEmbedSrc(url, frameWidth)
+    if (!src) return <EmbedFallback url={url} provider={provider} />
+    const height = igHeight ?? estimateEmbedHeight('instagram', url, frameWidth)
+    return (
+      <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
+        <div
+          className="mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white"
+          style={{ width: frameWidth, maxWidth: '100%', height: cardWidth > 0 ? height : undefined, minHeight: cardWidth > 0 ? undefined : height }}
+        >
+          {cardWidth > 0 && (
+            <iframe
+              ref={iframeRef}
+              src={src}
+              title="Instagram"
+              width={frameWidth}
+              height={height}
+              loading="lazy"
+              allow="clipboard-write; encrypted-media; picture-in-picture; web-share"
+              allowFullScreen
+              className="h-full w-full border-0"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          )}
         </div>
         <a
           href={url}
@@ -441,23 +502,6 @@ function SocialEmbed({ url }: { url: string }) {
           <>
             {provider === 'twitter' && (
               <blockquote className="twitter-tweet" data-dnt="true" data-width={String(frameWidth)}>
-                <a href={url}>{url}</a>
-              </blockquote>
-            )}
-            {provider === 'instagram' && (
-              <blockquote
-                className="instagram-media"
-                data-instgrm-permalink={url.split('?')[0]}
-                data-instgrm-version="14"
-                data-width={String(frameWidth)}
-                style={{
-                  width: '100%',
-                  maxWidth: '100%',
-                  minWidth: '100%',
-                  margin: 0,
-                  background: '#fff',
-                }}
-              >
                 <a href={url}>{url}</a>
               </blockquote>
             )}

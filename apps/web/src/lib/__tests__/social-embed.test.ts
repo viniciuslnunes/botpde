@@ -164,6 +164,19 @@ describe('instagramEmbedSrc', () => {
       'https://www.instagram.com/p/ABC123xyz/embed/?cr=1&v=14&wp=540',
     )
   })
+
+  it('aceita username no path e share/', () => {
+    expect(instagramEmbedSrc('https://www.instagram.com/baixada/p/ABC123xyz/?igsh=1')).toBe(
+      'https://www.instagram.com/p/ABC123xyz/embed/?cr=1&v=14&wp=540',
+    )
+    expect(instagramEmbedSrc('https://www.instagram.com/share/reel/DSf2dEMDhNa/')).toBe(
+      'https://www.instagram.com/reel/DSf2dEMDhNa/embed/?cr=1&v=14&wp=540',
+    )
+  })
+
+  it('rejeita perfil sem post', () => {
+    expect(instagramEmbedSrc('https://www.instagram.com/baixada/')).toBeNull()
+  })
 })
 
 describe('resolveEmbedFrameWidth', () => {
