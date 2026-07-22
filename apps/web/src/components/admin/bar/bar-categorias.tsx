@@ -10,6 +10,8 @@ import { useTrackedForm } from '@/lib/unsaved-changes'
 
 const initialState: BarActionState = {}
 
+const CATEGORIA_LABELS = { nome: 'Nome', ordem: 'Ordem' } as const
+
 export type BarCategoriaItem = {
   id: string
   nome: string
@@ -49,7 +51,7 @@ export function BarCategoriasSection({ categorias }: { categorias: BarCategoriaI
   const { formRef, markPristine } = useTrackedForm({
     id: 'criar-categoria-bar',
     title: 'Nova categoria do bar',
-    labels: { nome: 'Nome', ordem: 'Ordem' },
+    labels: CATEGORIA_LABELS,
   })
   useActionStateToast(state, pending, 'Categoria criada.', {
     onSuccess: () => {

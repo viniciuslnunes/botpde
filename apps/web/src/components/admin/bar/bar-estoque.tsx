@@ -15,6 +15,14 @@ import { StickyPersistBar } from '@/components/sticky-persist-bar'
 
 const initialState: BarActionState = {}
 
+/** Estável — evita loop de re-render em `useTrackedForm` com form fechado. */
+const COMPRA_LABELS = {
+  produtoId: 'Produto',
+  quantidade: 'Quantidade',
+  custoTotal: 'Custo total',
+  motivo: 'Motivo',
+} as const
+
 function formatarPreco(valor: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
@@ -33,12 +41,7 @@ export function RegistrarCompraBarForm({ produtos }: { produtos: BarProdutoSeria
     id: 'bar-registrar-compra',
     title: 'Registrar compra',
     enabled: open,
-    labels: {
-      produtoId: 'Produto',
-      quantidade: 'Quantidade',
-      custoTotal: 'Custo total',
-      motivo: 'Motivo',
-    },
+    labels: COMPRA_LABELS,
   })
   const { confirmDiscard } = useUnsavedChangesContext()
   useActionStateToast(state, pending, 'Compra registrada.', {

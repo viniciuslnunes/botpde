@@ -21,6 +21,15 @@ type TrackedFormApi = {
   changes: string[]
 }
 
+function sameChangeList(a: string[], b: string[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 /**
  * Observa um `<form>` nativo e registra alterações vs. snapshot inicial.
  */
@@ -37,26 +46,36 @@ export function useTrackedForm({
   const [changes, setChanges] = useState<string[]>([])
   const { remove } = useUnsavedChangesContext()
 
+  // Inline `labels={{…}}` nos call sites cria objeto novo a cada render.
+  // Se entrar nas deps do effect, com `enabled:false` vira loop:
+  // effect → setChanges([]) → re-render → labels novo → effect… (menu admin morto).
+  const labelsRef = useRef(labels)
+  labelsRef.current = labels
+
+  const setChangesIfChanged = useCallback((next: string[]) => {
+    setChanges((prev) => (sameChangeList(prev, next) ? prev : next))
+  }, [])
+
   const captureBaseline = useCallback(() => {
     const form = formRef.current
     if (!form) return
     baselineRef.current = serializeFormValues(form)
-    setChanges([])
-  }, [])
+    setChangesIfChanged([])
+  }, [setChangesIfChanged])
 
   const recompute = useCallback(() => {
     const form = formRef.current
     if (!form || !enabled) {
-      setChanges([])
+      setChangesIfChanged([])
       return
     }
     if (!baselineRef.current) {
       baselineRef.current = serializeFormValues(form)
-      setChanges([])
+      setChangesIfChanged([])
       return
     }
-    setChanges(diffFormChanges(form, baselineRef.current, labels))
-  }, [enabled, labels])
+    setChangesIfChanged(diffFormChanges(form, baselineRef.current, labelsRef.current))
+  }, [enabled, setChangesIfChanged])
 
   const markPristine = useCallback(() => {
     captureBaseline()
@@ -67,7 +86,7 @@ export function useTrackedForm({
     const form = formRef.current
     if (!form || !enabled) {
       remove(id)
-      setChanges([])
+      setChangesIfChanged([])
       return
     }
 
@@ -86,7 +105,7 @@ export function useTrackedForm({
       form.removeEventListener('input', onAny)
       form.removeEventListener('change', onAny)
     }
-  }, [enabled, id, remove, captureBaseline, recompute])
+  }, [enabled, id, remove, captureBaseline, recompute, setChangesIfChanged])
 
   useUnsavedChanges({
     id,
