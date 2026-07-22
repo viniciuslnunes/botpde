@@ -8,7 +8,7 @@ import {
   editarSolicitacao,
   recusarSolicitacao,
   type SolicitacaoActionState,
-} from '@/app/admin/torcida/afiliacao-actions'
+} from '@/app/admin/afiliacoes/afiliacao-actions'
 import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 

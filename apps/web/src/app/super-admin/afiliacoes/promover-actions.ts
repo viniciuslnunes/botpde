@@ -229,8 +229,9 @@ export async function promoverUnidadeAPortal(
 
     invalidateHierarchyCache(tenantMaeId)
     invalidateHierarchyCache(novoTenant.id)
-    revalidatePath('/super-admin/afiliacoes')
-    revalidatePath('/admin/torcida')
+revalidatePath('/super-admin/afiliacoes')
+  revalidatePath('/admin/afiliacoes')
+  revalidatePath('/admin/torcida')
 
     return {
       success: true,

@@ -100,6 +100,7 @@ function assertMesmoTenant(ator: AtorResolvido, solicitacao: SolicitacaoLite): v
 }
 
 function revalidar(): void {
+  revalidatePath('/admin/afiliacoes')
   revalidatePath('/admin/torcida')
   revalidatePath('/super-admin/afiliacoes')
 }

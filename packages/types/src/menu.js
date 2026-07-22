@@ -166,6 +166,13 @@ export const ADMIN_MENU = /** @type {const} */ ([
     secao: 'patrimonio',
   },
   {
+    id: 'afiliacoes',
+    label: 'Solicitações de afiliação',
+    href: '/admin/afiliacoes',
+    permissao: PERMISSIONS.AFFILIATION_MANAGE,
+    secao: 'governanca',
+  },
+  {
     id: 'aliancas',
     label: 'Alianças',
     href: '/admin/aliancas',
