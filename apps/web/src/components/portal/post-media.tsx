@@ -274,7 +274,7 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 transition-colors hover:border-[rgb(var(--border-strong))]"
+      className="flex w-full items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3 transition-colors hover:border-[rgb(var(--border-strong))]"
     >
       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[rgb(var(--color-primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
         <ExternalLink className="h-4 w-4" />
@@ -293,9 +293,25 @@ function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
   const containerRef = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const measured = containerWidth > 0
 
   useEffect(() => {
-    if (!provider || provider === 'youtube') return
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      const w = Math.round(el.getBoundingClientRect().width)
+      if (w > 0) setContainerWidth(w)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Só processa após medir a largura do card — senão IG/X/TikTok fixam ~326px.
+  useEffect(() => {
+    if (!provider || provider === 'youtube' || !measured) return
     const src = SCRIPTS[provider]
     if (!src) return
     let cancelled = false
@@ -312,7 +328,7 @@ function SocialEmbed({ url }: { url: string }) {
     return () => {
       cancelled = true
     }
-  }, [provider, url])
+  }, [provider, url, measured])
 
   if (!provider) return null
 
@@ -332,10 +348,12 @@ function SocialEmbed({ url }: { url: string }) {
     )
   }
 
+  const embedWidth = measured ? String(containerWidth) : undefined
+
   return (
-    <div ref={containerRef} className="overflow-hidden">
+    <div ref={containerRef} className="social-embed w-full min-w-0 overflow-hidden">
       {provider === 'twitter' && (
-        <blockquote className="twitter-tweet" data-dnt="true">
+        <blockquote className="twitter-tweet" data-dnt="true" data-width={embedWidth}>
           <a href={url}>{url}</a>
         </blockquote>
       )}
@@ -344,12 +362,23 @@ function SocialEmbed({ url }: { url: string }) {
           className="instagram-media"
           data-instgrm-permalink={url}
           data-instgrm-version="14"
+          data-width={embedWidth}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: '100%',
+            margin: 0,
+          }}
         >
           <a href={url}>{url}</a>
         </blockquote>
       )}
       {provider === 'tiktok' && (
-        <blockquote className="tiktok-embed" cite={url}>
+        <blockquote
+          className="tiktok-embed"
+          cite={url}
+          style={{ maxWidth: '100%', minWidth: '100%', width: '100%', margin: 0 }}
+        >
           <a href={url}>{url}</a>
         </blockquote>
       )}
