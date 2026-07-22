@@ -5,10 +5,13 @@ import { PERMISSIONS, hasPermission } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import {
+  avaliarAcessoDm,
   canMessageUser,
+  criarDmComSolicitacao,
   criarGrupoConversa,
   getOrCreateDmConversa,
   listConversas,
+  MAX_CONTEUDO_MENSAGEM,
   MAX_MEMBROS_GRUPO,
   mesmaAfiliacaoComunidade,
   serializeConversasInbox,
@@ -21,10 +24,22 @@ import {
 } from '@/lib/mensageria-api'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { criarNotificacao } from '@/lib/notificacoes'
+import { isCloudinaryUrl, isSocialUrl, isStickerPath } from '@/lib/social-embed'
+
+const midiaSchema = z
+  .string()
+  .max(500)
+  .refine(
+    (url) => isCloudinaryUrl(url) || isSocialUrl(url) || isStickerPath(url),
+    'Tipo de anexo não permitido',
+  )
 
 const criarDmSchema = z.object({
   tipo: z.literal('DIRETA'),
   destinatarioId: z.string().uuid(),
+  conteudo: z.string().trim().max(MAX_CONTEUDO_MENSAGEM).optional(),
+  midias: z.array(midiaSchema).max(10).optional(),
 })
 
 const criarGrupoSchema = z.object({
@@ -37,6 +52,97 @@ const criarGrupoSchema = z.object({
 })
 
 const criarSchema = z.discriminatedUnion('tipo', [criarDmSchema, criarGrupoSchema])
+
+async function notificarSolicitacaoMensagem(opts: {
+  destinatarioId: string
+  remetenteId: string
+  remetenteNome: string | null | undefined
+  tenantId: string
+  conversaId: string
+}): Promise<void> {
+  await criarNotificacao({
+    userId: opts.destinatarioId,
+    tenantId: opts.tenantId,
+    tipo: 'MENSAGEM_SOLICITACAO_PENDENTE',
+    titulo: 'Nova solicitação de mensagem',
+    corpo: `${opts.remetenteNome ?? 'Um torcedor'} quer conversar com você.`,
+    link: `/portal/mensagens?c=${opts.conversaId}`,
+    atorId: opts.remetenteId,
+  })
+}
+
+async function criarDmOuSolicitacao(opts: {
+  remetenteId: string
+  destinatarioId: string
+  tenantId: string
+  tenantContextoId?: string | null
+  conteudo?: string
+  midias?: string[]
+  remetenteNome?: string | null
+}): Promise<NextResponse> {
+  const acesso = await avaliarAcessoDm(
+    opts.remetenteId,
+    opts.destinatarioId,
+    opts.tenantContextoId ?? opts.tenantId,
+  )
+
+  if (acesso === 'bloqueado') {
+    return NextResponse.json(
+      { error: 'Você não pode conversar com este usuário.' },
+      { status: 403 },
+    )
+  }
+
+  if (acesso === 'direto') {
+    const { id, criadaAgora } = await getOrCreateDmConversa(
+      opts.remetenteId,
+      opts.destinatarioId,
+      opts.tenantId,
+    )
+    return NextResponse.json({ conversaId: id, criadaAgora, solicitacao: false })
+  }
+
+  const texto = opts.conteudo?.trim() ?? ''
+  if (!texto && (opts.midias?.length ?? 0) === 0) {
+    return NextResponse.json(
+      {
+        error: 'Envie uma mensagem para solicitar a conversa.',
+        precisaMensagem: true,
+        requerSolicitacao: true,
+      },
+      { status: 400 },
+    )
+  }
+
+  const limiterKey = `dm-solic:${opts.tenantId}:${opts.remetenteId}`
+  if (excedeuLimiteEngajamento(limiterKey)) {
+    return NextResponse.json(
+      { error: 'Você está enviando solicitações rápido demais. Aguarde um pouco.' },
+      { status: 429 },
+    )
+  }
+
+  const { id, criadaAgora } = await criarDmComSolicitacao(
+    opts.remetenteId,
+    opts.destinatarioId,
+    opts.tenantId,
+    texto,
+    opts.midias ?? [],
+  )
+
+  if (criadaAgora) {
+    registrarAcaoEngajamento(limiterKey)
+    await notificarSolicitacaoMensagem({
+      destinatarioId: opts.destinatarioId,
+      remetenteId: opts.remetenteId,
+      remetenteNome: opts.remetenteNome,
+      tenantId: opts.tenantId,
+      conversaId: id,
+    })
+  }
+
+  return NextResponse.json({ conversaId: id, criadaAgora, solicitacao: true })
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -106,16 +212,16 @@ export async function POST(request: NextRequest) {
       const tenantId = tenantSintetico.id
 
       if (parsed.data.tipo === 'DIRETA') {
-        const { destinatarioId } = parsed.data
-        const pode = await mesmaAfiliacaoComunidade(userId, destinatarioId)
-        if (!pode) {
-          return NextResponse.json(
-            { error: 'Você só pode conversar com torcedores do mesmo clube.' },
-            { status: 403 },
-          )
-        }
-        const { id, criadaAgora } = await getOrCreateDmConversa(userId, destinatarioId, tenantId)
-        return NextResponse.json({ conversaId: id, criadaAgora })
+        const { destinatarioId, conteudo, midias } = parsed.data
+        return criarDmOuSolicitacao({
+          remetenteId: userId,
+          destinatarioId,
+          tenantId,
+          tenantContextoId: null,
+          conteudo,
+          midias,
+          remetenteNome: contexto.session.user.name,
+        })
       }
 
       const limiterKey = `grupo-cn:${tenantId}:${userId}`
@@ -161,16 +267,16 @@ export async function POST(request: NextRequest) {
     const { userId, tenant, efetivas } = await assertPodeEnviarMensagens()
 
     if (parsed.data.tipo === 'DIRETA') {
-      const { destinatarioId } = parsed.data
-      const pode = await canMessageUser(userId, destinatarioId, tenant.id)
-      if (!pode) {
-        return NextResponse.json(
-          { error: 'Você só pode conversar com membros da sua torcida ou de torcidas aliadas.' },
-          { status: 403 },
-        )
-      }
-      const { id, criadaAgora } = await getOrCreateDmConversa(userId, destinatarioId, tenant.id)
-      return NextResponse.json({ conversaId: id, criadaAgora })
+      const { destinatarioId, conteudo, midias } = parsed.data
+      return criarDmOuSolicitacao({
+        remetenteId: userId,
+        destinatarioId,
+        tenantId: tenant.id,
+        tenantContextoId: tenant.id,
+        conteudo,
+        midias,
+        remetenteNome: contexto.session.user.name,
+      })
     }
 
     if (!hasPermission(efetivas, PERMISSIONS.GROUPS_CREATE)) {

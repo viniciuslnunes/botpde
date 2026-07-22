@@ -66,6 +66,8 @@ interface MensagemThreadProps {
   active?: boolean
   /** Atualiza preview da inbox sem esperar SSE/polling. */
   onMensagemEnviada?: (preview: { conteudo: string; criadoEm: string }) => void
+  /** Após aprovar/recusar solicitação de mensagem. */
+  onSolicitacaoResolvida?: () => void
 }
 
 function isTemp(id: string): boolean {
@@ -106,6 +108,7 @@ export function MensagemThread({
   showBackButton = false,
   active = true,
   onMensagemEnviada,
+  onSolicitacaoResolvida,
 }: MensagemThreadProps) {
   const confirmAction = useConfirmAction()
   const [mensagens, setMensagens] = useState<MensagemDto[]>([])
@@ -116,6 +119,7 @@ export function MensagemThread({
   const [texto, setTexto] = useState(() => getMensagemDraft(conversa.id))
   const [medias, setMedias] = useState<MediaItem[]>([])
   const [enviando, setEnviando] = useState(false)
+  const [processandoSolicitacao, setProcessandoSolicitacao] = useState(false)
   const [anexoMenuOpen, setAnexoMenuOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -475,6 +479,34 @@ export function MensagemThread({
     }
   }
 
+  const conversaBloqueada =
+    conversa.solicitacaoRecebida || conversa.aguardandoAprovacao
+
+  async function responderSolicitacao(acao: 'aprovar' | 'rejeitar') {
+    setProcessandoSolicitacao(true)
+    try {
+      const res = await fetch(`/api/conversas/${conversaId}/solicitacao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao }),
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Erro ao processar solicitação.')
+      if (acao === 'aprovar') {
+        toast.success('Solicitação aprovada. A conversa está liberada.')
+      } else {
+        toast.success('Solicitação recusada.')
+        onSaiu(conversaId)
+        onBack()
+      }
+      onSolicitacaoResolvida?.()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao processar solicitação.')
+    } finally {
+      setProcessandoSolicitacao(false)
+    }
+  }
+
   async function enviar(event: React.FormEvent) {
     event.preventDefault()
     const conteudo = texto.trim()
@@ -653,6 +685,41 @@ export function MensagemThread({
         </AnimatePresence>
       )}
 
+      {conversa.solicitacaoRecebida && (
+        <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3">
+          <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+            {tituloConversa(conversa)} quer conversar com você
+          </p>
+          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+            Aprove para liberar o canal de mensagens. Ao recusar, esta pessoa não poderá enviar nova solicitação.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={processandoSolicitacao}
+              onClick={() => void responderSolicitacao('aprovar')}
+              className="inline-flex flex-1 items-center justify-center rounded-lg bg-[rgb(var(--primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {processandoSolicitacao ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aprovar'}
+            </button>
+            <button
+              type="button"
+              disabled={processandoSolicitacao}
+              onClick={() => void responderSolicitacao('rejeitar')}
+              className="inline-flex flex-1 items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] disabled:opacity-60"
+            >
+              Recusar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {conversa.aguardandoAprovacao && (
+        <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 text-xs text-[rgb(var(--foreground-muted))]">
+          Sua solicitação foi enviada. Aguarde {tituloConversa(conversa)} aprovar para continuar a conversa.
+        </div>
+      )}
+
       {/* Mensagens */}
       <div className="relative min-h-0 flex-1">
         <div
@@ -762,6 +829,7 @@ export function MensagemThread({
       </div>
 
       {/* Composer */}
+      {!conversaBloqueada && (
       <form onSubmit={enviar} className="border-t border-[rgb(var(--border))] p-3">
         <AnimatePresence mode="popLayout">
           {medias.length > 0 && (
@@ -969,6 +1037,7 @@ export function MensagemThread({
           </m.button>
         </div>
       </form>
+      )}
     </m.div>
   )
 }

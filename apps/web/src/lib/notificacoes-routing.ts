@@ -36,6 +36,9 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   SEGUIMENTO_APROVADO: { escopo: 'social' },
   SEGUIMENTO_REJEITADO: { escopo: 'social' },
   NOVA_MENSAGEM: { escopo: 'social' },
+  MENSAGEM_SOLICITACAO_PENDENTE: { escopo: 'social' },
+  MENSAGEM_SOLICITACAO_APROVADA: { escopo: 'social' },
+  MENSAGEM_SOLICITACAO_REJEITADA: { escopo: 'social' },
   GRUPO_PEDIDO: { escopo: 'social' },
   GRUPO_APROVADO: { escopo: 'social' },
   GRUPO_REJEITADO: { escopo: 'social' },
@@ -74,6 +77,7 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
     menuId: 'comunidade-moderacao',
   },
+  DENUNCIA_RESOLVIDA: { escopo: 'social' },
   ALIANCA_PROPOSTA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,

@@ -72,6 +72,7 @@ export async function criarPost(_prev: PostState, formData: FormData): Promise<P
   })
 
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/mural')
   revalidatePath('/portal/comunidade')
   return {}
 }
@@ -115,6 +116,7 @@ export async function atualizarPost(
   })
 
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/mural')
   revalidatePath('/portal/comunidade')
   return {}
 }
@@ -138,6 +140,7 @@ export async function alternarFixado(postId: string) {
   })
 
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/mural')
   revalidatePath('/portal/comunidade')
 }
 
@@ -160,6 +163,7 @@ export async function excluirPost(postId: string) {
   })
 
   revalidatePath('/admin/comunidade')
+  revalidatePath('/admin/comunidade/mural')
   revalidatePath('/portal/comunidade')
 }
 

@@ -2,6 +2,8 @@ import { Prisma } from '@torcida/db'
 import { db } from '@torcida/db'
 import type { InboxItemDto } from './mensageria-client'
 import { canFollowUser } from './social'
+import { criarNotificacao } from '@/lib/notificacoes'
+import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 
 /**
  * Mensageria (DM 1×1 e grupos) — ver ARCHITECTURE.md §6 item 27.
@@ -16,6 +18,8 @@ export const MAX_CONTEUDO_MENSAGEM = 2000
 
 export type TipoConversa = 'DIRETA' | 'GRUPO' | 'CANAL'
 export type PapelConversa = 'ADMIN' | 'MEMBRO'
+export type StatusParticipacaoConversa = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+export type AcessoDm = 'direto' | 'solicitacao' | 'bloqueado'
 
 export interface AutorLite {
   id: string
@@ -42,6 +46,9 @@ export interface ConversaInboxItem {
   avatarUrl: string | null
   atualizadoEm: Date
   meuPapel: PapelConversa
+  meuStatus: StatusParticipacaoConversa
+  solicitacaoRecebida: boolean
+  aguardandoAprovacao: boolean
   silenciada: boolean
   totalMembros: number
   /** No caso de DM, o outro participante (para nome/avatar da linha). */
@@ -58,6 +65,7 @@ export interface ConversaInboxItem {
 interface MembroAtivoRow {
   id: string
   papel: PapelConversa
+  status: StatusParticipacaoConversa
   ultimaLeituraEm: Date | null
   silenciada: boolean
   conversa: {
@@ -202,16 +210,278 @@ export async function mesmaAfiliacaoComunidade(userA: string, userB: string): Pr
   return Boolean(afiliacaoA && afiliacaoB && afiliacaoA === afiliacaoB)
 }
 
+/** Sócio aprovado em qualquer tenant. */
+export async function isSocioAprovado(userId: string): Promise<boolean> {
+  const membro: { id: string } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    select: { id: true },
+  })
+  return membro !== null
+}
+
+async function temBloqueioMutuo(userA: string, userB: string): Promise<boolean> {
+  const bloqueio: { id: string } | null = await db.bloqueioUsuario.findFirst({
+    where: {
+      OR: [
+        { bloqueadorId: userA, bloqueadoId: userB },
+        { bloqueadorId: userB, bloqueadoId: userA },
+      ],
+    },
+    select: { id: true },
+  })
+  return bloqueio !== null
+}
+
+async function isParRivalSocio(userA: string, userB: string): Promise<boolean> {
+  type VinculoSocio = { userId: string; tenantId: string }
+  const vinculos: VinculoSocio[] = await db.saasMembro.findMany({
+    where: { userId: { in: [userA, userB] }, status: 'APROVADO', tipo: 'SOCIO' },
+    select: { userId: true, tenantId: true },
+  })
+  const aV = vinculos.filter((v) => v.userId === userA)
+  const bV = vinculos.filter((v) => v.userId === userB)
+  if (aV.length === 0 || bV.length === 0) return false
+
+  const { getTenantRelation } = await import('./hierarquia')
+  const { saoRivais } = await import('@torcida/types')
+  for (const va of aV) {
+    for (const vb of bV) {
+      if (va.tenantId === vb.tenantId) continue
+      const rel = await getTenantRelation(va.tenantId, vb.tenantId)
+      if (saoRivais(rel)) return true
+    }
+  }
+  return false
+}
+
+interface DmExistenteRow {
+  id: string
+  membros: Array<{ userId: string; status: StatusParticipacaoConversa }>
+}
+
+/** DM existente entre dois usuários, com status de cada participante. */
+export async function findDmEntreUsuarios(
+  userA: string,
+  userB: string,
+): Promise<DmExistenteRow | null> {
+  const conversa: DmExistenteRow | null = await db.conversa.findFirst({
+    where: {
+      tipo: 'DIRETA',
+      AND: [
+        { membros: { some: { userId: userA, saiuEm: null } } },
+        { membros: { some: { userId: userB, saiuEm: null } } },
+      ],
+    },
+    select: {
+      id: true,
+      membros: {
+        where: { saiuEm: null },
+        select: { userId: true, status: true },
+      },
+    },
+  })
+  return conversa
+}
+
+/**
+ * Avalia se a DM é direta, exige solicitação com aprovação ou está bloqueada.
+ * Torcedor → sócio (mesmo clube) e sócio×sócio cross-unidade sem aliança usam solicitação.
+ */
+export async function avaliarAcessoDm(
+  remetenteId: string,
+  destinatarioId: string,
+  tenantContextoId?: string | null,
+): Promise<AcessoDm> {
+  if (remetenteId === destinatarioId) return 'bloqueado'
+  if (await temBloqueioMutuo(remetenteId, destinatarioId)) return 'bloqueado'
+  if (await isParRivalSocio(remetenteId, destinatarioId)) return 'bloqueado'
+
+  const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
+  if (existente) {
+    const meu = existente.membros.find((m) => m.userId === remetenteId)
+    const outro = existente.membros.find((m) => m.userId === destinatarioId)
+    if (meu?.status === 'REJEITADO' || outro?.status === 'REJEITADO') return 'bloqueado'
+    if (meu?.status === 'ATIVO' && outro?.status === 'ATIVO') return 'direto'
+    if (outro?.status === 'PENDENTE') return 'solicitacao'
+    if (meu?.status === 'PENDENTE') return 'solicitacao'
+  }
+
+  const [remSocio, destSocio, mesmoClube] = await Promise.all([
+    isSocioAprovado(remetenteId),
+    isSocioAprovado(destinatarioId),
+    mesmaAfiliacaoComunidade(remetenteId, destinatarioId),
+  ])
+
+  if (tenantContextoId) {
+    const podeDireto = await canMessageUser(remetenteId, destinatarioId, tenantContextoId)
+    if (podeDireto) return 'direto'
+    if (mesmoClube && remSocio && destSocio) return 'solicitacao'
+    if (mesmoClube && !remSocio && destSocio) return 'solicitacao'
+    return 'bloqueado'
+  }
+
+  if (!mesmoClube) return 'bloqueado'
+  if (!remSocio && destSocio) return 'solicitacao'
+  if (remSocio && destSocio) return 'solicitacao'
+  return 'direto'
+}
+
+/** Cria DM com destinatário PENDENTE e primeira mensagem introdutória. */
+export async function criarDmComSolicitacao(
+  remetenteId: string,
+  destinatarioId: string,
+  tenantContextoId: string,
+  conteudo: string,
+  midiaUrls: string[] = [],
+): Promise<{ id: string; criadaAgora: boolean }> {
+  const acesso = await avaliarAcessoDm(remetenteId, destinatarioId, tenantContextoId)
+  if (acesso === 'bloqueado') {
+    throw new Error('Você não pode enviar mensagem para este usuário.')
+  }
+  if (acesso === 'direto') {
+    return getOrCreateDmConversa(remetenteId, destinatarioId, tenantContextoId)
+  }
+
+  const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
+  if (existente) {
+    const outro = existente.membros.find((m) => m.userId === destinatarioId)
+    if (outro?.status === 'PENDENTE') return { id: existente.id, criadaAgora: false }
+    if (outro?.status === 'REJEITADO') {
+      throw new Error('Sua solicitação anterior foi recusada. Você não pode enviar nova mensagem.')
+    }
+    return { id: existente.id, criadaAgora: false }
+  }
+
+  const conversa: { id: string } = await db.conversa.create({
+    data: {
+      tipo: 'DIRETA',
+      tenantId: tenantContextoId,
+      criadoPorId: remetenteId,
+      membros: {
+        create: [
+          { userId: remetenteId, papel: 'MEMBRO', status: 'ATIVO' },
+          { userId: destinatarioId, papel: 'MEMBRO', status: 'PENDENTE' },
+        ],
+      },
+    },
+    select: { id: true },
+  })
+
+  await criarMensagem(conversa.id, remetenteId, conteudo, midiaUrls)
+  return { id: conversa.id, criadaAgora: true }
+}
+
+/** Destinatário aprova solicitação — ambos passam a ATIVO. */
+export async function aprovarSolicitacaoMensagem(
+  conversaId: string,
+  userId: string,
+): Promise<void> {
+  const membro: { status: StatusParticipacaoConversa; conversa: { tipo: TipoConversa } } | null =
+    await db.membroConversa.findFirst({
+      where: { conversaId, userId, saiuEm: null },
+      select: { status: true, conversa: { select: { tipo: true } } },
+    })
+  if (!membro || membro.conversa.tipo !== 'DIRETA') {
+    throw new Error('Conversa não encontrada.')
+  }
+  if (membro.status !== 'PENDENTE') {
+    throw new Error('Não há solicitação pendente nesta conversa.')
+  }
+
+  await db.membroConversa.updateMany({
+    where: { conversaId, saiuEm: null, status: { in: ['PENDENTE', 'ATIVO'] } },
+    data: { status: 'ATIVO' },
+  })
+}
+
+/** Destinatário recusa — bloqueia novas solicitações do remetente. */
+export async function rejeitarSolicitacaoMensagem(
+  conversaId: string,
+  userId: string,
+): Promise<{ remetenteId: string }> {
+  const membro: {
+    status: StatusParticipacaoConversa
+    conversa: { tipo: TipoConversa; criadoPorId: string }
+  } | null = await db.membroConversa.findFirst({
+    where: { conversaId, userId, saiuEm: null },
+    select: {
+      status: true,
+      conversa: { select: { tipo: true, criadoPorId: true } },
+    },
+  })
+  if (!membro || membro.conversa.tipo !== 'DIRETA') {
+    throw new Error('Conversa não encontrada.')
+  }
+  if (membro.status !== 'PENDENTE') {
+    throw new Error('Não há solicitação pendente nesta conversa.')
+  }
+
+  const remetenteId = membro.conversa.criadoPorId
+
+  await db.$transaction([
+    db.membroConversa.update({
+      where: { conversaId_userId: { conversaId, userId } },
+      data: { status: 'REJEITADO' },
+    }),
+    db.membroConversa.updateMany({
+      where: { conversaId, userId: remetenteId, saiuEm: null },
+      data: { status: 'REJEITADO' },
+    }),
+    db.bloqueioUsuario.upsert({
+      where: {
+        bloqueadorId_bloqueadoId: { bloqueadorId: userId, bloqueadoId: remetenteId },
+      },
+      create: { bloqueadorId: userId, bloqueadoId: remetenteId },
+      update: {},
+    }),
+  ])
+
+  return { remetenteId }
+}
+
+/** Verifica se o usuário pode enviar mensagens nesta conversa. */
+export async function assertPodeEnviarNaConversa(
+  conversaId: string,
+  userId: string,
+): Promise<{ membro: MembroAtivoRow; conversaTipo: TipoConversa }> {
+  const membro = await assertMembroConversa(conversaId, userId)
+  if (membro.status === 'REJEITADO') {
+    throw new Error('Esta conversa foi encerrada.')
+  }
+
+  if (membro.conversa.tipo === 'DIRETA' && membro.status === 'ATIVO') {
+    const outro: { status: StatusParticipacaoConversa } | null = await db.membroConversa.findFirst({
+      where: { conversaId, userId: { not: userId }, saiuEm: null },
+      select: { status: true },
+    })
+    if (outro?.status === 'PENDENTE') {
+      throw new Error('Aguarde a aprovação da sua solicitação antes de enviar mais mensagens.')
+    }
+  }
+
+  if (membro.status === 'PENDENTE') {
+    throw new Error('Aprove ou recuse a solicitação antes de responder.')
+  }
+
+  return { membro, conversaTipo: membro.conversa.tipo }
+}
+
 /** Participação ativa na conversa (não saiu). Lança erro se não participa. */
 export async function assertMembroConversa(
   conversaId: string,
   userId: string,
 ): Promise<MembroAtivoRow> {
   const membro: MembroAtivoRow | null = await db.membroConversa.findFirst({
-    where: { conversaId, userId, saiuEm: null, status: 'ATIVO' },
+    where: {
+      conversaId,
+      userId,
+      saiuEm: null,
+      status: { in: ['ATIVO', 'PENDENTE'] },
+    },
     select: {
       id: true,
       papel: true,
+      status: true,
       ultimaLeituraEm: true,
       silenciada: true,
       conversa: {
@@ -310,10 +580,11 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
 
   // Sem nested `membros[]` completo — grupos grandes inflavam a payload (N membros × 50 conversas).
   const rows: InboxRow[] = await db.membroConversa.findMany({
-    where: { userId, saiuEm: null },
+    where: { userId, saiuEm: null, status: { in: ['ATIVO', 'PENDENTE'] } },
     select: {
       id: true,
       papel: true,
+      status: true,
       ultimaLeituraEm: true,
       silenciada: true,
       conversa: {
@@ -353,7 +624,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
     contarNaoLidasPorConversa(userId, { conversaIds }),
     dmIds.length === 0
       ? Promise.resolve(
-          [] as Array<{ conversaId: string; user: AutorLite }>,
+          [] as Array<{ conversaId: string; user: AutorLite; status: StatusParticipacaoConversa }>,
         )
       : db.membroConversa.findMany({
           where: {
@@ -363,18 +634,28 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
           },
           select: {
             conversaId: true,
+            status: true,
             user: { select: { id: true, nome: true, avatarUrl: true } },
           },
         }),
   ])
 
   const outroPorConversa = new Map<string, AutorLite>()
+  const outroStatusPorConversa = new Map<string, StatusParticipacaoConversa>()
   for (const row of outrosDm) {
     outroPorConversa.set(row.conversaId, row.user)
+    outroStatusPorConversa.set(row.conversaId, row.status)
   }
 
   return rows.map((row) => {
     const ultima = row.conversa.mensagens[0] ?? null
+    const outroStatus =
+      row.conversa.tipo === 'DIRETA'
+        ? (outroStatusPorConversa.get(row.conversa.id) ?? 'ATIVO')
+        : 'ATIVO'
+    const solicitacaoRecebida = row.conversa.tipo === 'DIRETA' && row.status === 'PENDENTE'
+    const aguardandoAprovacao =
+      row.conversa.tipo === 'DIRETA' && row.status === 'ATIVO' && outroStatus === 'PENDENTE'
     return {
       id: row.conversa.id,
       tipo: row.conversa.tipo,
@@ -382,6 +663,9 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       avatarUrl: row.conversa.avatarUrl,
       atualizadoEm: row.conversa.atualizadoEm,
       meuPapel: row.papel,
+      meuStatus: row.status,
+      solicitacaoRecebida,
+      aguardandoAprovacao,
       silenciada: row.silenciada,
       totalMembros: row.conversa._count.membros,
       outroMembro:
@@ -465,6 +749,59 @@ export async function criarMensagem(
     }),
   ])
   return mensagem as MensagemItem
+}
+
+/**
+ * Notificação persistente de mensagem nova — uma por conversa não lida (não
+ * uma por mensagem, evita spam numa conversa ativa). Se o destinatário já
+ * tem uma `NOVA_MENSAGEM` não lida dessa conversa, só atualiza o preview e
+ * bumpa pro topo; senão cria. Best-effort — nunca deve quebrar o envio.
+ */
+export async function notificarNovaMensagem(params: {
+  conversaId: string
+  tenantId: string
+  autorId: string
+  autorNome: string
+  conversaTipo: TipoConversa
+  conversaNome: string | null
+  preview: string
+  destinatarios: string[]
+}): Promise<void> {
+  const { conversaId, tenantId, autorId, autorNome, conversaTipo, conversaNome, preview, destinatarios } =
+    params
+  const link = `/portal/mensagens?c=${conversaId}`
+  const titulo =
+    conversaTipo === 'DIRETA'
+      ? `Nova mensagem de ${autorNome}`
+      : `Nova mensagem em ${conversaNome ?? 'grupo'}`
+
+  for (const userId of destinatarios) {
+    try {
+      const existente: { id: string } | null = await db.notificacao.findFirst({
+        where: { userId, tenantId, tipo: 'NOVA_MENSAGEM', lida: false, link },
+        select: { id: true },
+      })
+      if (existente) {
+        await db.notificacao.update({
+          where: { id: existente.id },
+          data: { corpo: preview, criadoEm: new Date(), atorId: autorId, titulo },
+        })
+        emitNotificacaoPing(tenantId, userId)
+      } else {
+        await criarNotificacao({
+          userId,
+          tenantId,
+          tipo: 'NOVA_MENSAGEM',
+          titulo,
+          corpo: preview,
+          link,
+          atorId: autorId,
+        })
+      }
+    } catch {
+      // best-effort — falha ao notificar não pode quebrar o envio da mensagem
+    }
+  }
 }
 
 /** Marca a conversa como lida até agora. */

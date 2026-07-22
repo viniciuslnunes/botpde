@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@torcida/db'
 import { getAlliedTenantIds } from '@/lib/hierarquia'
+import { avaliarAcessoDm } from '@/lib/mensageria'
 import {
   assertContextoMensageria,
   assertUsuarioMensageria,
@@ -85,31 +86,44 @@ export async function GET(request: NextRequest) {
         avatarUrl: string | null
         tenantNome: string
         mesmoTenant: boolean
+        requerSolicitacao: boolean
       }> = []
+
+      async function pushContato(
+        id: string,
+        nome: string | null,
+        avatarUrl: string | null,
+        tenantNome: string,
+        mesmoTenant: boolean,
+      ) {
+        const acesso = await avaliarAcessoDm(userId, id, null)
+        contatos.push({
+          id,
+          nome,
+          avatarUrl,
+          tenantNome,
+          mesmoTenant,
+          requerSolicitacao: acesso === 'solicitacao',
+        })
+      }
 
       for (const p of perfis) {
         if (vistos.has(p.userId) || bloqueadosIds.has(p.userId)) continue
         vistos.add(p.userId)
-        contatos.push({
-          id: p.user.id,
-          nome: p.user.nome,
-          avatarUrl: p.user.avatarUrl,
-          tenantNome: 'Comunidade Nacional',
-          mesmoTenant: true,
-        })
+        await pushContato(
+          p.user.id,
+          p.user.nome,
+          p.user.avatarUrl,
+          'Comunidade Nacional',
+          true,
+        )
         if (contatos.length >= 20) break
       }
       for (const s of socios) {
         if (contatos.length >= 20) break
         if (vistos.has(s.userId) || bloqueadosIds.has(s.userId)) continue
         vistos.add(s.userId)
-        contatos.push({
-          id: s.user.id,
-          nome: s.user.nome,
-          avatarUrl: s.user.avatarUrl,
-          tenantNome: s.tenant.nome,
-          mesmoTenant: false,
-        })
+        await pushContato(s.user.id, s.user.nome, s.user.avatarUrl, s.tenant.nome, false)
       }
 
       return NextResponse.json({ contatos })
@@ -143,20 +157,21 @@ export async function GET(request: NextRequest) {
     })
 
     const vistos = new Set<string>()
-    const contatos = rows
-      .filter((r) => {
-        if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) return false
-        vistos.add(r.userId)
-        return true
-      })
-      .slice(0, 20)
-      .map((r) => ({
+    const contatos = []
+    for (const r of rows) {
+      if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
+      vistos.add(r.userId)
+      const acesso = await avaliarAcessoDm(uid, r.user.id, tenant.id)
+      contatos.push({
         id: r.user.id,
         nome: r.user.nome,
         avatarUrl: r.user.avatarUrl,
         tenantNome: r.tenant.nome,
         mesmoTenant: r.tenantId === tenant.id,
-      }))
+        requerSolicitacao: acesso === 'solicitacao',
+      })
+      if (contatos.length >= 20) break
+    }
 
     return NextResponse.json({ contatos })
   } catch (error) {

@@ -5,6 +5,7 @@ import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { notificarSafe } from '@/lib/notificacoes'
+import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
 import {
@@ -158,7 +159,7 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
 
   invalidatePermissionsCache(membro.userId, tenant.id)
 
-  await db.notificacao.updateMany({
+  const { count: solicitacoesLidas } = await db.notificacao.updateMany({
     where: {
       userId: session.user.id,
       tenantId: tenant.id,
@@ -168,6 +169,7 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
     },
     data: { lida: true },
   })
+  if (solicitacoesLidas > 0) emitNotificacaoPing(tenant.id, session.user.id)
 
   // Auto-vínculo no canal oficial da unidade (governança hierárquica, Fase 2):
   // se o tenant tem Sede com canal provisionado, o membro aprovado entra nele.
@@ -243,7 +245,7 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     return atualizado
   })
 
-  await db.notificacao.updateMany({
+  const { count: solicitacoesLidas } = await db.notificacao.updateMany({
     where: {
       userId: session.user.id,
       tenantId: tenant.id,
@@ -253,6 +255,7 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     },
     data: { lida: true },
   })
+  if (solicitacoesLidas > 0) emitNotificacaoPing(tenant.id, session.user.id)
 
   await db.auditLog.create({
     data: {

@@ -1,18 +1,18 @@
-import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { MessagesSquare, Megaphone } from 'lucide-react'
+import { MessagesSquare, Megaphone, ArrowRight } from 'lucide-react'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
-import { CriarPostForm, PostsManager } from '@/components/admin/post-forms'
-import { ComunicadosManager } from '@/components/admin/comunicado-forms'
-import { ComunicadoComposerAdmin } from '@/components/admin/comunicado-composer'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Comunidade — Admin' }
+
+function formatarData(data: Date) {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data)
+}
 
 export default async function AdminComunidadePage() {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
@@ -26,54 +26,24 @@ export default async function AdminComunidadePage() {
 
   if (!podePublicarComunicado && !podeGerenciarPosts) redirect('/admin')
 
-  interface ComunicadoRaw {
-    id: string
-    titulo: string
-    corpo: string
-    prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
-    fixado: boolean
-    publicadoEm: Date
-    reposts: { midiaUrls: string[] }[]
-  }
-
-  const [comunicadosRaw, posts] = await Promise.all([
+  const [comunicadosCount, ultimoComunicado, postsCount, ultimoPost] = await Promise.all([
+    podePublicarComunicado ? db.announcement.count({ where: { tenantId: tenant.id } }) : Promise.resolve(0),
     podePublicarComunicado
-      ? (db.announcement.findMany({
+      ? db.announcement.findFirst({
           where: { tenantId: tenant.id },
-          orderBy: [{ fixado: 'desc' }, { publicadoEm: 'desc' }],
-          select: {
-            id: true,
-            titulo: true,
-            corpo: true,
-            prioridade: true,
-            fixado: true,
-            publicadoEm: true,
-            reposts: {
-              where: { tipo: 'INSTITUCIONAL' },
-              select: { midiaUrls: true },
-              take: 1,
-            },
-          },
-        }) as Promise<ComunicadoRaw[]>)
-      : Promise.resolve([] as ComunicadoRaw[]),
-    podeGerenciarPosts
-      ? db.post.findMany({
-          where: { tenantId: tenant.id },
-          orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
-          select: { id: true, titulo: true, conteudo: true, imagemUrl: true, fixado: true, criadoEm: true },
+          orderBy: { publicadoEm: 'desc' },
+          select: { titulo: true, publicadoEm: true },
         })
-      : Promise.resolve([]),
+      : Promise.resolve(null),
+    podeGerenciarPosts ? db.post.count({ where: { tenantId: tenant.id } }) : Promise.resolve(0),
+    podeGerenciarPosts
+      ? db.post.findFirst({
+          where: { tenantId: tenant.id },
+          orderBy: { criadoEm: 'desc' },
+          select: { titulo: true, conteudo: true, criadoEm: true },
+        })
+      : Promise.resolve(null),
   ])
-
-  const comunicados = comunicadosRaw.map((c: ComunicadoRaw) => ({
-    id: c.id,
-    titulo: c.titulo,
-    corpo: c.corpo,
-    prioridade: c.prioridade,
-    fixado: c.fixado,
-    publicadoEm: c.publicadoEm,
-    midiaUrls: c.reposts[0]?.midiaUrls ?? [],
-  }))
 
   return (
     <div className="flex flex-col h-full">
@@ -90,62 +60,83 @@ export default async function AdminComunidadePage() {
       </div>
 
       <div className="flex-1 overflow-auto py-6">
-        <div className="app-container space-y-8">
+        <div className="app-container space-y-6">
           {podeGerenciarPosts && (
             <MotionReveal index={0}>
-            <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                Gerencie canais oficiais e comunidades temáticas em{' '}
-                <Link href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
-                  Portal → Comunidade → Canais
+              <section className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+                <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                  Gerencie canais oficiais e comunidades temáticas em{' '}
+                  <Link href="/portal/comunidade/canais" className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline">
+                    Portal → Comunidade → Canais
+                  </Link>
+                  .
+                </p>
+              </section>
+            </MotionReveal>
+          )}
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            {podePublicarComunicado && (
+              <MotionReveal index={1}>
+                <Link
+                  href="/admin/comunidade/comunicados"
+                  className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 transition-colors hover:border-[rgb(var(--color-primary-fg))]/40"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    <Megaphone className="h-4 w-4" /> Comunicados oficiais
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-[rgb(var(--foreground))]">{comunicadosCount}</p>
+                  <p className="text-sm text-[rgb(var(--foreground-muted))]">publicados</p>
+                  <div className="mt-4 flex-1 text-sm text-[rgb(var(--foreground-muted))]">
+                    {ultimoComunicado ? (
+                      <p>
+                        Último: <span className="text-[rgb(var(--foreground))]">{ultimoComunicado.titulo}</span>{' '}
+                        · {formatarData(ultimoComunicado.publicadoEm)}
+                      </p>
+                    ) : (
+                      <p>Nenhum comunicado publicado ainda.</p>
+                    )}
+                  </div>
+                  <span className="mt-4 flex items-center gap-1 text-sm font-medium text-[rgb(var(--color-primary-fg))]">
+                    Abrir comunicados
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
                 </Link>
-                .
-              </p>
-            </section>
-            </MotionReveal>
-          )}
+              </MotionReveal>
+            )}
 
-          {podePublicarComunicado && (
-            <MotionReveal index={1}>
-            <section className="space-y-6">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                <Megaphone className="h-4 w-4" /> Comunicados oficiais
-              </h2>
-              <Suspense
-                fallback={
-                  <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-                }
-              >
-                <ComunicadoComposerAdmin />
-              </Suspense>
-              <ComunicadosManager
-                comunicados={comunicados}
-                currentUser={{
-                  id: session.user.id,
-                  nome: session.user.name ?? null,
-                  avatarUrl: typeof session.user.image === 'string' ? session.user.image : null,
-                }}
-                tenantId={tenant.id}
-                tenantNome={tenant.nome}
-              />
-            </section>
-            </MotionReveal>
-          )}
-
-          {podeGerenciarPosts && (
-            <MotionReveal index={2}>
-            <section className="space-y-6">
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                <MessagesSquare className="h-4 w-4" /> Mural da comunidade
-              </h2>
-              <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
-                <h3 className="mb-4 font-semibold text-[rgb(var(--foreground))]">Novo post</h3>
-                <CriarPostForm />
-              </div>
-              <PostsManager posts={posts} />
-            </section>
-            </MotionReveal>
-          )}
+            {podeGerenciarPosts && (
+              <MotionReveal index={2}>
+                <Link
+                  href="/admin/comunidade/mural"
+                  className="group flex h-full flex-col rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 transition-colors hover:border-[rgb(var(--color-primary-fg))]/40"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    <MessagesSquare className="h-4 w-4" /> Mural da comunidade
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-[rgb(var(--foreground))]">{postsCount}</p>
+                  <p className="text-sm text-[rgb(var(--foreground-muted))]">posts</p>
+                  <div className="mt-4 flex-1 text-sm text-[rgb(var(--foreground-muted))]">
+                    {ultimoPost ? (
+                      <p>
+                        Último:{' '}
+                        <span className="text-[rgb(var(--foreground))]">
+                          {ultimoPost.titulo || ultimoPost.conteudo.slice(0, 60)}
+                        </span>{' '}
+                        · {formatarData(ultimoPost.criadoEm)}
+                      </p>
+                    ) : (
+                      <p>Nenhum post publicado ainda.</p>
+                    )}
+                  </div>
+                  <span className="mt-4 flex items-center gap-1 text-sm font-medium text-[rgb(var(--color-primary-fg))]">
+                    Abrir mural
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              </MotionReveal>
+            )}
+          </div>
         </div>
       </div>
     </div>

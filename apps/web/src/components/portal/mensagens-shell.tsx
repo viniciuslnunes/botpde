@@ -251,7 +251,11 @@ export function MensagensShell({
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                        {c.ultimaMensagem
+                        {c.solicitacaoRecebida
+                          ? 'Solicitação de mensagem'
+                          : c.aguardandoAprovacao
+                            ? 'Aguardando aprovação'
+                            : c.ultimaMensagem
                           ? c.ultimaMensagem.removida
                             ? 'Mensagem removida'
                             : c.ultimaMensagem.conteudo || '📎 Anexo'
@@ -259,9 +263,9 @@ export function MensagensShell({
                             ? `${c.totalMembros} participantes`
                             : 'Conversa iniciada'}
                       </p>
-                      {c.naoLidas > 0 && (
+                      {(c.naoLidas > 0 || c.solicitacaoRecebida) && (
                         <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))] px-1.5 text-[11px] font-bold text-[rgb(var(--color-primary-on))] ring-1 ring-inset ring-[rgb(var(--color-primary-fg)_/_0.35)]">
-                          {c.naoLidas > 99 ? '99+' : c.naoLidas}
+                          {c.solicitacaoRecebida ? '!' : c.naoLidas > 99 ? '99+' : c.naoLidas}
                         </span>
                       )}
                     </div>
@@ -315,6 +319,7 @@ export function MensagensShell({
                 )
               })
             }}
+            onSolicitacaoResolvida={() => void atualizarInbox()}
           />
         ) : (
           !embedded && (
@@ -356,6 +361,8 @@ function NovaConversaModal({
   const [buscando, setBuscando] = useState(false)
   const [nome, setNome] = useState('')
   const [selecionados, setSelecionados] = useState<ContatoDto[]>([])
+  const [contatoDm, setContatoDm] = useState<ContatoDto | null>(null)
+  const [mensagemInicial, setMensagemInicial] = useState('')
   const [criando, setCriando] = useState(false)
   const [mounted, setMounted] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -395,16 +402,35 @@ function NovaConversaModal({
     }
   }, [onClose])
 
-  async function criar(payload: unknown) {
+  async function criarDm(payload: {
+    destinatarioId: string
+    conteudo?: string
+  }) {
     setCriando(true)
     try {
       const res = await fetch('/api/conversas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ tipo: 'DIRETA', ...payload }),
       })
-      const data = (await res.json()) as { conversaId?: string; error?: string }
-      if (!res.ok || !data.conversaId) throw new Error(data.error ?? 'Erro ao criar conversa.')
+      const data = (await res.json()) as {
+        conversaId?: string
+        error?: string
+        precisaMensagem?: boolean
+        solicitacao?: boolean
+      }
+      if (!res.ok || !data.conversaId) {
+        if (data.precisaMensagem) {
+          setContatoDm(
+            resultados.find((c) => c.id === payload.destinatarioId) ?? contatoDm ?? null,
+          )
+          return
+        }
+        throw new Error(data.error ?? 'Erro ao criar conversa.')
+      }
+      if (data.solicitacao) {
+        toast.success('Solicitação enviada. Aguarde a aprovação do membro.')
+      }
       onCriada(data.conversaId)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao criar conversa.')
@@ -413,9 +439,36 @@ function NovaConversaModal({
     }
   }
 
+  async function criarGrupo() {
+    setCriando(true)
+    try {
+      const res = await fetch('/api/conversas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'GRUPO',
+          nome: nome.trim(),
+          membroIds: selecionados.map((c) => c.id),
+        }),
+      })
+      const data = (await res.json()) as { conversaId?: string; error?: string }
+      if (!res.ok || !data.conversaId) throw new Error(data.error ?? 'Erro ao criar grupo.')
+      onCriada(data.conversaId)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao criar grupo.')
+    } finally {
+      setCriando(false)
+    }
+  }
+
   function escolher(contato: ContatoDto) {
     if (tipo === 'dm') {
-      void criar({ tipo: 'DIRETA', destinatarioId: contato.id })
+      if (contato.requerSolicitacao) {
+        setContatoDm(contato)
+        setMensagemInicial('')
+        return
+      }
+      void criarDm({ destinatarioId: contato.id })
       return
     }
     setSelecionados((prev) =>
@@ -455,11 +508,18 @@ function NovaConversaModal({
       >
         <div className="flex items-center justify-between border-b border-[rgb(var(--border))] px-4 py-3">
           <h3 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            {tipo === 'dm' ? 'Nova conversa' : 'Novo grupo'}
+            {tipo === 'dm' && contatoDm ? 'Solicitar conversa' : tipo === 'dm' ? 'Nova conversa' : 'Novo grupo'}
           </h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              if (contatoDm) {
+                setContatoDm(null)
+                setMensagemInicial('')
+                return
+              }
+              onClose()
+            }}
             aria-label="Fechar"
             className="flex h-7 w-7 items-center justify-center rounded-lg text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
           >
@@ -468,6 +528,47 @@ function NovaConversaModal({
         </div>
 
         <div className="space-y-3 p-4">
+          {tipo === 'dm' && contatoDm ? (
+            <>
+              <div className="flex items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2.5">
+                <Avatar nome={contatoDm.nome} avatarUrl={contatoDm.avatarUrl} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                    {contatoDm.nome ?? 'Membro'}
+                  </p>
+                  <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                    {contatoDm.tenantNome}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                Envie uma mensagem inicial. O membro precisa aprovar antes da conversa continuar.
+              </p>
+              <textarea
+                value={mensagemInicial}
+                onChange={(e) => setMensagemInicial(e.target.value)}
+                autoFocus
+                maxLength={2000}
+                rows={4}
+                placeholder="Olá! Gostaria de conversar com você…"
+                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
+              />
+              <button
+                type="button"
+                disabled={criando || mensagemInicial.trim().length === 0}
+                onClick={() =>
+                  void criarDm({
+                    destinatarioId: contatoDm.id,
+                    conteudo: mensagemInicial.trim(),
+                  })
+                }
+                className="w-full rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {criando ? 'Enviando…' : 'Enviar solicitação'}
+              </button>
+            </>
+          ) : (
+            <>
           {tipo === 'grupo' && (
             <>
               <input
@@ -518,8 +619,11 @@ function NovaConversaModal({
               className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] py-2 pl-9 pr-3 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
             />
           </div>
+            </>
+          )}
         </div>
 
+        {!(tipo === 'dm' && contatoDm) && (
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
           {buscando && resultados.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -557,6 +661,7 @@ function NovaConversaModal({
             </m.div>
           )}
         </div>
+        )}
 
         {tipo === 'grupo' && (
           <div className="border-t border-[rgb(var(--border))] p-4">
@@ -565,13 +670,7 @@ function NovaConversaModal({
               disabled={criando || nome.trim().length < 3 || selecionados.length === 0}
               whileTap={{ scale: 0.98 }}
               transition={springSnappy}
-              onClick={() =>
-                void criar({
-                  tipo: 'GRUPO',
-                  nome: nome.trim(),
-                  membroIds: selecionados.map((c) => c.id),
-                })
-              }
+              onClick={() => void criarGrupo()}
               className="w-full rounded-xl bg-[rgb(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {criando ? 'Criando…' : `Criar grupo (${selecionados.length + 1} participantes)`}

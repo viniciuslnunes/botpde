@@ -6,6 +6,7 @@ import type { TipoNotificacao } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
+import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 
 /**
  * Marca lida(s) só invalida as rotas do lado afetado: admin quando `tipos`
@@ -20,7 +21,7 @@ async function marcarLidasDoUsuario(tipos?: TipoNotificacao[]): Promise<void> {
   const tenant = await getTenantFromHost()
   if (!tenant) throw new Error('Tenant não encontrado')
 
-  await db.notificacao.updateMany({
+  const { count } = await db.notificacao.updateMany({
     where: {
       tenantId: tenant.id,
       userId: session.user.id,
@@ -29,6 +30,10 @@ async function marcarLidasDoUsuario(tipos?: TipoNotificacao[]): Promise<void> {
     },
     data: { lida: true },
   })
+
+  if (count === 0) return
+
+  emitNotificacaoPing(tenant.id, session.user.id)
 
   const apenasAdmin = tipos === TIPOS_NOTIFICACAO_ADMIN
   if (apenasAdmin) {
@@ -68,6 +73,8 @@ export async function marcarNotificacaoLida(notificacaoId: string): Promise<void
     data: { lida: true },
   })
 
+  emitNotificacaoPing(tenant.id, session.user.id)
+
   revalidatePath('/portal/comunidade/notificacoes')
   if (TIPOS_NOTIFICACAO_ADMIN.includes(notificacao.tipo)) {
     revalidatePath('/admin')
@@ -102,6 +109,8 @@ export async function marcarNotificacoesLidasPorIds(ids: string[]): Promise<void
     where: { id: { in: ids }, tenantId: tenant.id, userId: session.user.id },
     data: { lida: true },
   })
+
+  emitNotificacaoPing(tenant.id, session.user.id)
 
   revalidatePath('/portal/comunidade/notificacoes')
   const tipos = notificacoes.map((n) => n.tipo)

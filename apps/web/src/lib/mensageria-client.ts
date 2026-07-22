@@ -18,6 +18,8 @@ export interface MensagemDto {
   autor: AutorDto
 }
 
+export type StatusParticipacaoConversa = 'ATIVO' | 'PENDENTE' | 'REJEITADO'
+
 export interface InboxItemDto {
   id: string
   tipo: 'DIRETA' | 'GRUPO' | 'CANAL'
@@ -25,6 +27,11 @@ export interface InboxItemDto {
   avatarUrl: string | null
   atualizadoEm: string
   meuPapel: 'ADMIN' | 'MEMBRO'
+  meuStatus: StatusParticipacaoConversa
+  /** Destinatário com solicitação pendente — exibe aprovar/recusar. */
+  solicitacaoRecebida: boolean
+  /** Remetente aguardando aprovação do destinatário. */
+  aguardandoAprovacao: boolean
   silenciada: boolean
   totalMembros: number
   outroMembro: AutorDto | null
@@ -43,6 +50,8 @@ export interface ContatoDto {
   avatarUrl: string | null
   tenantNome: string
   mesmoTenant: boolean
+  /** Precisa enviar solicitação com mensagem inicial em vez de DM direta. */
+  requerSolicitacao: boolean
 }
 
 export interface MembroConversaDto {

@@ -19,6 +19,7 @@ import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getPerfilMembroForPortal, getSeguimentoStatus } from '@/lib/social'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
+import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
@@ -680,7 +681,7 @@ async function marcarNotificacoesSeguimentoPendentesLidas(
   tenantId: string,
   atorId: string,
 ): Promise<void> {
-  await db.notificacao.updateMany({
+  const { count } = await db.notificacao.updateMany({
     where: {
       userId,
       tenantId,
@@ -690,6 +691,7 @@ async function marcarNotificacoesSeguimentoPendentesLidas(
     },
     data: { lida: true },
   })
+  if (count > 0) emitNotificacaoPing(tenantId, userId)
 }
 
 export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
@@ -2337,7 +2339,7 @@ export async function decidirPedidoGrupo(
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
 
-  await db.notificacao.updateMany({
+  const { count: pedidosLidos } = await db.notificacao.updateMany({
     where: {
       userId: session.user.id,
       tenantId: tenant.id,
@@ -2347,6 +2349,7 @@ export async function decidirPedidoGrupo(
     },
     data: { lida: true },
   })
+  if (pedidosLidos > 0) emitNotificacaoPing(tenant.id, session.user.id)
 
   if (parsed.data.aprovar) {
     const ativos: number = await db.membroConversa.count({
@@ -3180,7 +3183,7 @@ export async function decidirPedidoCanal(
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
 
-  await db.notificacao.updateMany({
+  const { count: pedidosLidos } = await db.notificacao.updateMany({
     where: {
       userId: session.user.id,
       tenantId: canal.tenantId,
@@ -3190,6 +3193,7 @@ export async function decidirPedidoCanal(
     },
     data: { lida: true },
   })
+  if (pedidosLidos > 0) emitNotificacaoPing(canal.tenantId, session.user.id)
 
   if (parsed.data.aprovar) {
     await db.membroConversa.update({

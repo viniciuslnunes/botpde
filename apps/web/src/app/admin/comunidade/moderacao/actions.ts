@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { assertPermission } from '@/lib/authz'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
+import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
+import { notificarSafe } from '@/lib/notificacoes'
 
 const denunciaIdSchema = z.object({ denunciaId: z.string().min(1) })
 
@@ -22,7 +24,7 @@ async function marcarNotificacaoDenunciaLida(
   denuncianteId: string,
   motivo: string,
 ): Promise<void> {
-  await db.notificacao.updateMany({
+  const { count } = await db.notificacao.updateMany({
     where: {
       userId,
       tenantId,
@@ -33,6 +35,7 @@ async function marcarNotificacaoDenunciaLida(
     },
     data: { lida: true },
   })
+  if (count > 0) emitNotificacaoPing(tenantId, userId)
 }
 
 export async function resolverDenuncia(denunciaId: string): Promise<void> {
@@ -72,6 +75,14 @@ export async function resolverDenuncia(denunciaId: string): Promise<void> {
       },
     }),
   ])
+
+  await notificarSafe({
+    userId: denuncia.denuncianteId,
+    tenantId: tenant.id,
+    tipo: 'DENUNCIA_RESOLVIDA',
+    titulo: 'Sua denúncia foi analisada — conteúdo removido',
+    link: '/portal/comunidade',
+  })
 
   revalidatePath('/admin/comunidade/moderacao')
   revalidatePath('/portal/comunidade')
@@ -115,6 +126,14 @@ export async function resolverDenunciaMensagem(denunciaId: string): Promise<void
     }),
   ])
 
+  await notificarSafe({
+    userId: denuncia.denuncianteId,
+    tenantId: tenant.id,
+    tipo: 'DENUNCIA_RESOLVIDA',
+    titulo: 'Sua denúncia foi analisada — mensagem removida',
+    link: '/portal/mensagens',
+  })
+
   revalidatePath('/admin/comunidade/moderacao')
 }
 
@@ -151,6 +170,14 @@ export async function descartarDenunciaMensagem(denunciaId: string): Promise<voi
     }),
   ])
 
+  await notificarSafe({
+    userId: denuncia.denuncianteId,
+    tenantId: tenant.id,
+    tipo: 'DENUNCIA_RESOLVIDA',
+    titulo: 'Sua denúncia foi analisada — sem violação encontrada',
+    link: '/portal/mensagens',
+  })
+
   revalidatePath('/admin/comunidade/moderacao')
 }
 
@@ -186,6 +213,14 @@ export async function descartarDenuncia(denunciaId: string): Promise<void> {
       },
     }),
   ])
+
+  await notificarSafe({
+    userId: denuncia.denuncianteId,
+    tenantId: tenant.id,
+    tipo: 'DENUNCIA_RESOLVIDA',
+    titulo: 'Sua denúncia foi analisada — sem violação encontrada',
+    link: '/portal/comunidade',
+  })
 
   revalidatePath('/admin/comunidade/moderacao')
 }

@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
+import { avaliarAcessoDm } from '@/lib/mensageria'
 import {
   getAtividadeDoAutor,
   getAvatarAtualDoUsuario,
@@ -126,15 +127,19 @@ export default async function PerfilComunidadePage({
   const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(vinculo)
   const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
-  const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge] = isSelf
-    ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false]
+  const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge, acessoDm] = isSelf
+    ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false, 'bloqueado' as const]
     : await Promise.all([
         canFollowUser(session.user.id, userId, tenant.id),
         getSeguimentoStatus(session.user.id, userId),
         podeVerConteudoSocial(session.user.id, userId, tenant.id),
         getContagensSeguimento(userId, tenant.id),
         usuarioSegueVoce(session.user.id, userId),
+        avaliarAcessoDm(session.user.id, userId, tenant.id),
       ])
+
+  const podeConversarDireto = acessoDm === 'direto'
+  const podeSolicitarMensagem = acessoDm === 'solicitacao'
 
   let bloqueadoPorMim = false
   let mensageriaDisponivel = true
@@ -189,10 +194,11 @@ export default async function PerfilComunidadePage({
   const acoes = !isSelf ? (
     <>
       {podeSeguir && <SeguimentoButtons userId={userId} status={statusSeguimento} />}
-      {mensageriaDisponivel && (
+      {mensageriaDisponivel && (podeConversarDireto || podeSolicitarMensagem) && (
         <PerfilMensagemActions
           userId={userId}
-          podeConversar={podeSeguir}
+          podeConversar={podeConversarDireto}
+          podeSolicitarMensagem={podeSolicitarMensagem}
           bloqueadoPorMim={bloqueadoPorMim}
         />
       )}

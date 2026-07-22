@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import {
+  assertPodeEnviarNaConversa,
   criarMensagem,
   listMensagens,
+  notificarNovaMensagem,
   serializeMensagem,
   MAX_CONTEUDO_MENSAGEM,
 } from '@/lib/mensageria'
@@ -68,7 +70,8 @@ export async function POST(
 ) {
   try {
     const { id: conversaId } = await context.params
-    const { userId, tenant } = await assertConversaAccess(conversaId)
+    const { userId, tenant, session, conversa } = await assertConversaAccess(conversaId)
+    await assertPodeEnviarNaConversa(conversaId, userId)
 
     const body: unknown = await request.json()
     const parsed = enviarSchema.safeParse(body)
@@ -115,6 +118,20 @@ export async function POST(
       conversaId,
       membros.map((m) => m.userId),
     )
+
+    const destinatarios = membros.map((m) => m.userId).filter((id) => id !== userId)
+    if (destinatarios.length > 0) {
+      await notificarNovaMensagem({
+        conversaId,
+        tenantId: tenant.id,
+        autorId: userId,
+        autorNome: session.user.name ?? 'Alguém',
+        conversaTipo: conversa.tipo,
+        conversaNome: conversa.nome,
+        preview: parsed.data.conteudo || 'Enviou um anexo',
+        destinatarios,
+      })
+    }
 
     return NextResponse.json({ mensagem: serializeMensagem(mensagem) })
   } catch (error) {
