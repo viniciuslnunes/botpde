@@ -95,7 +95,9 @@ export function FeedPostCard({
             href={linkPostComunidade(post.id)}
             className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
           >
-            {formatRelative(post.criadoEm)}
+            <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
+              {formatRelative(post.criadoEm)}
+            </time>
           </ComunidadePrefetchLink>
         </div>
         {mostrarMenu && (

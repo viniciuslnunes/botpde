@@ -47,9 +47,13 @@ export function PerfilAtividadeList({ itens }: PerfilAtividadeListProps) {
                 em: {item.postSnippet}
                 {item.postSnippet.length >= 120 ? '…' : ''}
               </p>
-              <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+              <time
+                dateTime={new Date(item.criadoEm).toISOString()}
+                className="mt-1 block text-[11px] text-[rgb(var(--foreground-muted))]"
+                suppressHydrationWarning
+              >
                 {formatRelative(item.criadoEm)}
-              </p>
+              </time>
             </div>
           </div>
         </m.div>

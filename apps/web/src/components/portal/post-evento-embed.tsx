@@ -21,7 +21,9 @@ export function PostEventoEmbed({ evento }: PostEventoEmbedProps) {
           </Link>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-            {formatRelative(evento.data)}
+            <time dateTime={new Date(evento.data).toISOString()} suppressHydrationWarning>
+              {formatRelative(evento.data)}
+            </time>
           </p>
           {evento.local && (
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))]">
