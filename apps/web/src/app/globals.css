@@ -106,7 +106,10 @@ body {
 /* ── Cursor de ação (pointer) ───────────────────────────────────
    Tailwind v4 não define pointer em button (fica auto → I-beam no texto).
    Unlayered + !important para vencer utilitários em @layer e UA.
-   Descendentes herdam para o I-beam não aparecer em span/ícone/texto. */
+   Descendentes também recebem pointer (não inherit) para o I-beam
+   não aparecer em <p>/<span> dentro de links/botões.
+   NÃO usar pointer-events:none nos filhos: em <a> transparente o hit
+   atravessa o link e o cursor volta ao padrão. */
 :is(
   a[href],
   area[href],
@@ -196,7 +199,8 @@ body {
       [contenteditable='true']
     )
   ) {
-  cursor: inherit !important;
+  /* pointer explícito (não inherit): evita I-beam se o hit-test cair no filho */
+  cursor: pointer !important;
 }
 
 :is(button, input, select, textarea, .app-action):disabled,
@@ -266,23 +270,6 @@ button,
 .app-action {
   -webkit-user-select: none;
   user-select: none;
-}
-
-/* Hit-test no próprio controle — elimina I-beam sobre texto/ícone.
-   Controles aninhados (link/botão/input) recuperam os eventos. */
-:is(a[href], button, [role='button'], .app-action)
-  :where(*):not(
-    :is(a[href], button, input, select, textarea, label, summary, [role='button'])
-  ) {
-  pointer-events: none;
-}
-
-:is(a[href], button, [role='button'], .app-action)
-  :is(a[href], button, input, select, textarea, label, summary, [role='button']),
-:is(a[href], button, [role='button'], .app-action)
-  :is(a[href], button, input, select, textarea, label, summary, [role='button'])
-  * {
-  pointer-events: auto;
 }
 
 /* ── Utilitários com cor primária do tenant ──────────────────── */

@@ -110,12 +110,15 @@ export async function ComunidadeAsideWidgets({
             <div className="mt-3 space-y-3">
               {sugestoes.map((autor) => (
                 <div key={autor.id} className="flex items-center gap-2">
-                  <Link href={`/portal/comunidade/perfil/${autor.id}`}>
+                  <Link
+                    href={`/portal/comunidade/perfil/${autor.id}`}
+                    className="shrink-0 cursor-pointer"
+                  >
                     <Avatar nome={autor.nome} avatarUrl={autor.avatarUrl} size="sm" />
                   </Link>
                   <Link
                     href={`/portal/comunidade/perfil/${autor.id}`}
-                    className="min-w-0 flex-1 truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline"
+                    className="min-w-0 flex-1 cursor-pointer truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline"
                   >
                     {autor.nome ?? 'Membro'}
                   </Link>
@@ -134,7 +137,7 @@ export async function ComunidadeAsideWidgets({
             </div>
             <Link
               href="/portal/comunidade/busca"
-              className="mt-3 flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
+              className="mt-3 flex w-full cursor-pointer items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
             >
               Ver membros
             </Link>
