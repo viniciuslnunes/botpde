@@ -19,6 +19,35 @@ interface SignResponse {
   signature: string
 }
 
+/** Assinatura Cloudinary válida por ~1h — reutiliza entre anexos da mesma sessão. */
+const signCache = new Map<string, { sign: SignResponse; expiresAt: number }>()
+const SIGN_CACHE_MS = 4 * 60 * 1000
+
+async function obterAssinaturaUpload(
+  purpose: UploadPurpose,
+  tenantId?: string,
+): Promise<SignResponse> {
+  const cacheKey = `${purpose}:${tenantId ?? ''}`
+  const hit = signCache.get(cacheKey)
+  if (hit && hit.expiresAt > Date.now()) return hit.sign
+
+  const signRes = await fetch('/api/upload/sign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ purpose, tenantId }),
+  })
+  if (signRes.status === 501) {
+    throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')
+  }
+  if (!signRes.ok) {
+    const body = (await signRes.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Falha ao autorizar o upload.')
+  }
+  const sign = (await signRes.json()) as SignResponse
+  signCache.set(cacheKey, { sign, expiresAt: Date.now() + SIGN_CACHE_MS })
+  return sign
+}
+
 /**
  * Downscale em passos (metade a metade) + smoothing high — um único drawImage
  * de 4k→512 deixa a foto mole; passos preservam nitidez.
@@ -106,19 +135,7 @@ export async function uploadMediaToCloudinary(
     throw new Error('Torcida inválida para upload.')
   }
 
-  const signRes = await fetch('/api/upload/sign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ purpose, tenantId }),
-  })
-  if (signRes.status === 501) {
-    throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')
-  }
-  if (!signRes.ok) {
-    const body = (await signRes.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error ?? 'Falha ao autorizar o upload.')
-  }
-  const sign = (await signRes.json()) as SignResponse
+  const sign = await obterAssinaturaUpload(purpose, tenantId)
 
   // Vídeo sobe sem compressão no cliente; imagem é redimensionada antes.
   const blob = isVideo ? file : await compress(file, purpose)

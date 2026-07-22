@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db, Prisma } from '@torcida/db'
 import { getFeedComunidade, type ComunicadoFeedItem } from './comunidade'
-import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes } from './comunidade-cache'
+import { tagFeedDescobrir, tagFeedHashtags, tagFeedSugestoes, tagFeedNacional } from './comunidade-cache'
 import { getTenantIdsPorAfiliacao } from './comunidade-contexto'
 import { getVisibleTenantIds } from './hierarquia'
 import {
@@ -1205,39 +1205,58 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   const take = Math.min(Math.max(opts.take ?? 20, 5), 50)
   const decodedCursor = decodeCursor(opts.cursor)
   const cursorWhere = buildCursorWhere(decodedCursor)
+  const cursorKey = decodedCursor ? `${decodedCursor.criadoEmIso}:${decodedCursor.id}` : 'start'
 
-  const tenantIds = await getTenantIdsPorAfiliacao(afiliacaoId)
+  const [tenantIds, seguindoAprovados] = await Promise.all([
+    getTenantIdsPorAfiliacao(afiliacaoId),
+    userId
+      ? db.seguimento
+          .findMany({
+            where: { seguidorId: userId, status: 'APROVADO' },
+            select: { seguidoId: true },
+          })
+          .then((rows: SeguimentoLite[]) => rows.map((s) => s.seguidoId))
+      : Promise.resolve([] as string[]),
+  ])
+
   if (tenantIds.length === 0) {
     return { posts: [], pageInfo: { hasMore: false, nextCursor: null } }
   }
 
-  let seguindoAprovados: string[] = []
-  if (userId) {
-    const aprovados: SeguimentoLite[] = await db.seguimento.findMany({
-      where: { seguidorId: userId, status: 'APROVADO' },
-      select: { seguidoId: true },
-    })
-    seguindoAprovados = aprovados.map((s) => s.seguidoId)
-  }
+  const seguindoKey = [...seguindoAprovados].sort().join(',') || 'none'
+  const tenantIdsKey = [...tenantIds].sort().join(',')
 
-  const postsRaw = (await db.post.findMany({
-    where: {
-      tenantId: { in: tenantIds },
-      tipo: 'MEMBRO',
-      visibilidade: 'PUBLICO',
-      oculto: false,
-      ...escopoFeedSemConversa,
-      ...cursorWhere,
-      OR: [
-        { tenant: { sintetico: true } },
-        { autorId: { in: seguindoAprovados } },
-        { alcanceNacional: true },
-      ],
-    },
-    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
-    take: take + 1,
-    include: postInclude(userId),
-  })) as PostRaw[]
+  const postsRaw = (await unstable_cache(
+    async () =>
+      db.post.findMany({
+        where: {
+          tenantId: { in: tenantIds },
+          tipo: 'MEMBRO',
+          visibilidade: 'PUBLICO',
+          oculto: false,
+          ...escopoFeedSemConversa,
+          ...cursorWhere,
+          OR: [
+            { tenant: { sintetico: true } },
+            { autorId: { in: seguindoAprovados } },
+            { alcanceNacional: true },
+          ],
+        },
+        orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        include: postInclude(userId),
+      }) as Promise<PostRaw[]>,
+    [
+      'feed-nacional',
+      afiliacaoId,
+      userId ?? 'anon',
+      seguindoKey,
+      tenantIdsKey,
+      cursorKey,
+      String(take),
+    ],
+    { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
+  )()) as PostRaw[]
 
   const posts = postsRaw.map(projetarPost)
   const hasMore = posts.length > take

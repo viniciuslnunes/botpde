@@ -15,7 +15,6 @@ import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   COMUNIDADE_POST_PUBLICADO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
-  FEED_HYDRATE_AFTER_PUBLISH_MS,
   isComunidadeFeedNearTop,
   type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
@@ -134,7 +133,6 @@ export function ComunidadeFeedInfinite({
 
   const windowing = useFeedWindow(posts.length)
   const refreshDebounceRef = useRef<number | null>(null)
-  const hydrateTimerRef = useRef<number | null>(null)
 
   const refreshTopo = useCallback(async () => {
     await refreshCurrentPage(null)
@@ -173,13 +171,6 @@ export function ComunidadeFeedInfinite({
     const cursor = await loadMore()
     if (typeof cursor === 'string') replaceUrlCursor(cursor)
   }, [loadMore, replaceUrlCursor])
-
-  const agendarHydratePosPublicacao = useCallback(() => {
-    if (hydrateTimerRef.current) window.clearTimeout(hydrateTimerRef.current)
-    hydrateTimerRef.current = window.setTimeout(() => {
-      void refreshCurrentPage(null)
-    }, FEED_HYDRATE_AFTER_PUBLISH_MS)
-  }, [refreshCurrentPage])
 
   useFeedStream(() => {
     if (!isComunidadeFeedNearTop()) return
@@ -225,10 +216,6 @@ export function ComunidadeFeedInfinite({
         url.searchParams.delete('cursor')
         window.history.replaceState({}, '', url.toString())
       }
-
-      if (detail.substituirId && detail.preview) {
-        agendarHydratePosPublicacao()
-      }
     }
 
     function onPostExcluido(ev: Event) {
@@ -241,9 +228,8 @@ export function ComunidadeFeedInfinite({
     return () => {
       window.removeEventListener(COMUNIDADE_POST_PUBLICADO_EVENT, onPostPublicado)
       window.removeEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
-      if (hydrateTimerRef.current) window.clearTimeout(hydrateTimerRef.current)
     }
-  }, [agendarHydratePosPublicacao, filtro, prependPost, removePost, replacePost])
+  }, [filtro, prependPost, removePost, replacePost])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 

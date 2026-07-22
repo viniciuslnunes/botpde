@@ -1,9 +1,6 @@
 /** Debounce do refetch após ping SSE do feed (ms). */
 export const FEED_SSE_DEBOUNCE_MS = 250
 
-/** Hydrate leve (badges/enquete) após publicação confirmada — não bloqueia o prepend. */
-export const FEED_HYDRATE_AFTER_PUBLISH_MS = 180
-
 /** Considera "topo" para auto-refresh sem bagunçar a rolagem. */
 export const FEED_NEAR_TOP_PX = 280
 

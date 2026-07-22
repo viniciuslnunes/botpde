@@ -5,7 +5,7 @@ import { after } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
-import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
+import { invalidarCachesComunidadeFeed, invalidarFeedNacional } from '@/lib/comunidade-cache'
 import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -52,8 +52,14 @@ import { generateInviteSlug } from '@/lib/invite-slug'
 
 const MAX_MIDIAS = 10
 
-function invalidarLeituraComunidade(tenantId: string): void {
+function invalidarLeituraComunidade(tenantId: string, afiliacaoId?: string | null): void {
   invalidarCachesComunidadeFeed(tenantId)
+  if (afiliacaoId) invalidarFeedNacional(afiliacaoId)
+}
+
+function avatarPreviewDaSessao(session: Session): string | null {
+  const img = session.user.image
+  return typeof img === 'string' && img.length > 0 ? img : null
 }
 
 /**
@@ -413,18 +419,11 @@ export async function publicarPost(
     const erroMencoes = erroMencoesExcessivas(conteudo)
     if (erroMencoes) return { message: erroMencoes }
 
-    const erroPerfil = await erroPublicoComPerfilPrivado(
-      session.user.id,
-      tenant.id,
-      visibilidade,
-    )
+    const [erroPerfil, alcanceNacional] = await Promise.all([
+      erroPublicoComPerfilPrivado(session.user.id, tenant.id, visibilidade),
+      resolverAlcanceNacional(session.user.id, tenant.id, visibilidade),
+    ])
     if (erroPerfil) return { message: erroPerfil }
-
-    const alcanceNacional = await resolverAlcanceNacional(
-      session.user.id,
-      tenant.id,
-      visibilidade,
-    )
 
     const post = await db.post.create({
       data: {
@@ -438,12 +437,14 @@ export async function publicarPost(
       },
     })
 
-    // Caminho crítico: autor na timeline. Hashtags/menções/audit/perfil → after().
-    await publicarNaTimelineRede({
-      postId: post.id,
-      autorId: session.user.id,
-      tenantId: tenant.id,
-      criadoEm: post.criadoEm,
+    // Timeline do autor + fan-out de seguidores fora do caminho crítico da resposta.
+    after(() => {
+      void publicarNaTimelineRede({
+        postId: post.id,
+        autorId: session.user.id,
+        tenantId: tenant.id,
+        criadoEm: post.criadoEm,
+      })
     })
 
     agendarPosPublicacaoFeed({
@@ -456,7 +457,10 @@ export async function publicarPost(
       audit: { acao: 'POST_SOCIAL_PUBLICADO', detalhes: { tipo: 'MEMBRO' } },
     })
 
-    invalidarLeituraComunidade(tenant.id)
+    invalidarLeituraComunidade(
+      tenant.id,
+      visibilidade === 'PUBLICO' ? tenant.afiliacaoId : null,
+    )
     return {
       success: true,
       token: post.id,
@@ -464,7 +468,7 @@ export async function publicarPost(
         post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
-        autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
+        autorAvatar: avatarPreviewDaSessao(session),
         tenantNome: tenant.nome,
       }),
     }
@@ -530,11 +534,13 @@ export async function publicarPostComoTorcedorGlobal(
     },
   })
 
-  await publicarNaTimelineRede({
-    postId: post.id,
-    autorId: session.user.id,
-    tenantId: tenant.id,
-    criadoEm: post.criadoEm,
+  after(() => {
+    void publicarNaTimelineRede({
+      postId: post.id,
+      autorId: session.user.id,
+      tenantId: tenant.id,
+      criadoEm: post.criadoEm,
+    })
   })
 
   agendarPosPublicacaoFeed({
@@ -545,12 +551,12 @@ export async function publicarPostComoTorcedorGlobal(
     conteudo: parsed.data.conteudo,
   })
 
-  invalidarLeituraComunidade(tenant.id)
+  invalidarLeituraComunidade(tenant.id, perfil.afiliacaoId)
   return previewDoPost({
     post,
     autorId: session.user.id,
     autorNome: session.user.name ?? null,
-    autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
+    autorAvatar: avatarPreviewDaSessao(session),
     tenantNome: perfil.afiliacao?.apelido ?? perfil.afiliacao?.nome ?? 'Comunidade',
   })
 }
