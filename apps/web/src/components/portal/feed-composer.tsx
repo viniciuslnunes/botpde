@@ -219,6 +219,7 @@ function FeedComposerActive({
   autorBadges,
   comunicado = false,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
+  const router = useRouter()
   const optimisticIdRef = useRef<string | null>(null)
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
     publicarPost,
@@ -345,8 +346,10 @@ function FeedComposerActive({
     if (comunicadoEdicao) {
       toast.success('Comunicado atualizado.')
       comunicadoEdicao.onSalvo?.()
+      router.refresh()
     } else {
       toast.success('Comunicado publicado.')
+      router.refresh()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comunicado, comunicadoState.success, comunicadoState.token])
@@ -629,6 +632,8 @@ function ComposerBody({
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.set('conteudo', serializarMencoes(texto, mencoes))
+    // Estado React (não só o hidden) — evita midias vazias se o DOM estiver stale.
+    fd.set('midias', JSON.stringify(finalMidias))
 
     if (comunicado) {
       fd.set('titulo', titulo.trim())

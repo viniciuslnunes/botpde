@@ -416,6 +416,7 @@ export async function atualizarComunicado(
  * vivo da relação `comunicadoOrigem` pelo embed — a mídia mora no Post.
  * Bump de `publicadoEm`/`criadoEm` faz o comunicado voltar como sugestão
  * prioritária no Descobrir (`scoreDescobrirPost` / `oficialBoost`).
+ * Se o Post institucional não existir (comunicados legados/seed), cria um.
  * Único ponto de edição usado pelo composer rico.
  */
 async function atualizarComunicadoEPost(opts: {
@@ -428,8 +429,10 @@ async function atualizarComunicadoEPost(opts: {
   midias: string[]
 }): Promise<void> {
   const agora = new Date()
-  await db.$transaction([
-    db.announcement.update({
+  const midiaUrls = midiasComEmbedDoTexto(opts.corpo, opts.midias)
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const atualizado = await tx.announcement.update({
       where: { id: opts.comunicadoId },
       data: {
         titulo: opts.titulo,
@@ -437,15 +440,37 @@ async function atualizarComunicadoEPost(opts: {
         prioridade: opts.prioridade,
         publicadoEm: agora,
       },
-    }),
-    db.post.updateMany({
+      select: { fixado: true },
+    })
+
+    const postExistente: { id: string } | null = await tx.post.findFirst({
       where: { comunicadoOrigemId: opts.comunicadoId, tipo: 'INSTITUCIONAL' },
-      data: {
-        midiaUrls: midiasComEmbedDoTexto(opts.corpo, opts.midias),
-        criadoEm: agora,
-      },
-    }),
-  ])
+      select: { id: true },
+    })
+
+    if (postExistente) {
+      await tx.post.update({
+        where: { id: postExistente.id },
+        data: { midiaUrls, criadoEm: agora },
+      })
+    } else {
+      // Comunicados antigos / seed sem Post institucional — a mídia só vive no Post.
+      await tx.post.create({
+        data: {
+          tenantId: opts.tenantId,
+          autorId: opts.autorId,
+          titulo: null,
+          conteudo: '',
+          tipo: 'INSTITUCIONAL',
+          visibilidade: 'PUBLICO',
+          fixado: atualizado.fixado,
+          midiaUrls,
+          comunicadoOrigemId: opts.comunicadoId,
+          criadoEm: agora,
+        },
+      })
+    }
+  })
 
   await db.auditLog.create({
     data: {

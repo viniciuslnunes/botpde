@@ -43,6 +43,7 @@ export default async function AdminComunicadosPage() {
       reposts: {
         where: { tipo: 'INSTITUCIONAL' },
         select: { midiaUrls: true },
+        orderBy: { criadoEm: 'desc' },
         take: 1,
       },
     },
