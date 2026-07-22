@@ -466,9 +466,11 @@ html[data-grid='off'] .app-shell-bg {
   contain-intrinsic-size: auto 420px;
 }
 
-/* Embeds sociais (iframe) — largura total do card */
+/* Embeds sociais (iframe) — largura total; altura vem do JS (estimate + postMessage) */
 .social-embed iframe {
   display: block;
   width: 100%;
   max-width: 100%;
+  border: 0;
+  overflow: hidden;
 }

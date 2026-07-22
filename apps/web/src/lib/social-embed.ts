@@ -118,6 +118,150 @@ export function tiktokEmbedSrc(url: string): string | null {
   return `https://www.tiktok.com/embed/v2/${id}`
 }
 
+/** Origens que enviam `postMessage` de resize dos iframes oficiais. */
+export const EMBED_RESIZE_ORIGINS: Record<Exclude<EmbedProvider, 'youtube'>, readonly string[]> = {
+  twitter: ['https://platform.twitter.com', 'https://twitter.com', 'https://x.com'],
+  instagram: ['https://www.instagram.com'],
+  tiktok: ['https://www.tiktok.com'],
+}
+
+let tiktokFrameSeq = 0
+
+/**
+ * Nome do iframe exigido pelo player TikTok para emitir altura via postMessage
+ * (`__tt_embed__v` + id com 17 dígitos — documentado indiretamente via amp-tiktok).
+ */
+export function nextTikTokEmbedFrameName(): string {
+  tiktokFrameSeq += 1
+  return `__tt_embed__v${String(tiktokFrameSeq).padStart(17, '0')}`
+}
+
+/**
+ * Altura inicial do iframe a partir da largura do card. Embeds verticais (TikTok /
+ * Reel) escalam com a largura — altura fixa (~740) causa scroll interno no feed.
+ */
+export function estimateEmbedHeight(provider: EmbedProvider, url: string, widthPx: number): number {
+  const w = Math.min(Math.max(Math.round(widthPx) || 360, 280), 720)
+  switch (provider) {
+    case 'youtube':
+      return Math.round((w * 9) / 16)
+    case 'tiktok':
+      // 9:16 + chrome (CTA, handle, áudio)
+      return Math.round((w * 16) / 9) + 180
+    case 'instagram':
+      if (/\/(reel|reels)\//i.test(url)) return Math.round((w * 16) / 9) + 160
+      return Math.round(w * 1.2) + 220
+    case 'twitter':
+      // Texto + mídia; postMessage refina depois
+      return Math.round(w * 0.95) + 260
+    default:
+      return 560
+  }
+}
+
+function asRecord(data: unknown): Record<string, unknown> | null {
+  if (data == null) return null
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>
+  }
+  if (typeof data === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(data)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function positiveHeight(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
+  if (!Number.isFinite(n) || n < 80) return null
+  return Math.min(Math.ceil(n), 2400)
+}
+
+function positiveWidth(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
+  if (!Number.isFinite(n) || n < 120) return null
+  return Math.round(n)
+}
+
+export interface EmbedHeightReport {
+  height: number
+  /** Largura reportada pelo player (TikTok); usada para escalar no card. */
+  width?: number
+}
+
+/**
+ * Extrai altura útil das mensagens oficiais de resize (X / Instagram / TikTok).
+ * Retorna null se a mensagem não for de medição.
+ */
+export function parseEmbedHeightMessage(
+  provider: EmbedProvider,
+  data: unknown,
+): EmbedHeightReport | null {
+  const msg = asRecord(data)
+  if (!msg) return null
+
+  if (provider === 'twitter') {
+    if (msg.method === 'twttr.private.resize') {
+      const params = msg.params
+      if (Array.isArray(params) && params[0] && typeof params[0] === 'object') {
+        const p = params[0] as Record<string, unknown>
+        const height = positiveHeight(p.height)
+        if (!height) return null
+        const width = positiveWidth(p.width)
+        return width ? { height, width } : { height }
+      }
+    }
+    const embed = asRecord(msg['twttr.embed'])
+    if (embed?.method === 'resize') {
+      const params = embed.params
+      if (Array.isArray(params) && params[0] && typeof params[0] === 'object') {
+        const p = params[0] as Record<string, unknown>
+        const height = positiveHeight(p.height)
+        if (!height) return null
+        return { height }
+      }
+    }
+    const height = positiveHeight(msg.height)
+    return height ? { height } : null
+  }
+
+  if (provider === 'instagram') {
+    if (msg.type === 'MEASURE') {
+      const details = asRecord(msg.details)
+      const height = positiveHeight(details?.height)
+      return height ? { height } : null
+    }
+    const height = positiveHeight(msg.height)
+    return height ? { height } : null
+  }
+
+  if (provider === 'tiktok') {
+    const height = positiveHeight(msg.height)
+    if (!height) return null
+    const width = positiveWidth(msg.width)
+    return width ? { height, width } : { height }
+  }
+
+  return null
+}
+
+/** Ajusta altura reportada quando o player mediu numa largura menor que o card. */
+export function scaleEmbedHeightToWidth(
+  report: EmbedHeightReport,
+  containerWidth: number,
+): number {
+  if (!report.width || containerWidth <= 0 || report.width >= containerWidth * 0.92) {
+    return report.height
+  }
+  return Math.min(Math.ceil(report.height * (containerWidth / report.width)), 2400)
+}
+
 /**
  * Separa os anexos em mídia (imagem/vídeo/sticker) e embeds sociais,
  * preservando a ordem.

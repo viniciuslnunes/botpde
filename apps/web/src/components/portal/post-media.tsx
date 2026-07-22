@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
@@ -10,7 +10,12 @@ import {
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
+  EMBED_RESIZE_ORIGINS,
+  estimateEmbedHeight,
   instagramEmbedSrc,
+  nextTikTokEmbedFrameName,
+  parseEmbedHeightMessage,
+  scaleEmbedHeightToWidth,
   tiktokEmbedSrc,
   twitterEmbedSrc,
   youTubeId,
@@ -275,27 +280,69 @@ function embedIframeSrc(provider: EmbedProvider, url: string): string | null {
   return null
 }
 
-function embedFrameHeight(provider: EmbedProvider, url: string): number {
-  if (provider === 'youtube') return 0 // aspect-video
-  if (provider === 'instagram') return /\/(reel|reels)\//i.test(url) ? 760 : 640
-  if (provider === 'tiktok') return 740
-  if (provider === 'twitter') return 520
-  return 560
-}
-
 function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [width, setWidth] = useState(0)
+  const [reportedHeight, setReportedHeight] = useState<number | null>(null)
+  const widthBucketRef = useRef(0)
+  const [tiktokFrameName] = useState(() =>
+    detectEmbedProvider(url) === 'tiktok' ? nextTikTokEmbedFrameName() : undefined,
+  )
+
+  useEffect(() => {
+    const el = frameRef.current
+    if (!el) return
+    const update = () => {
+      const w = Math.round(el.getBoundingClientRect().width)
+      if (w <= 0) return
+      setWidth(w)
+      const bucket = Math.round(w / 48)
+      if (bucket !== widthBucketRef.current) {
+        widthBucketRef.current = bucket
+        setReportedHeight(null)
+      }
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [url])
+
+  useEffect(() => {
+    setReportedHeight(null)
+  }, [url])
+
+  useEffect(() => {
+    if (!provider || provider === 'youtube') return
+    const origins = EMBED_RESIZE_ORIGINS[provider]
+    const onMessage = (event: MessageEvent) => {
+      if (!origins.includes(event.origin)) return
+      const win = iframeRef.current?.contentWindow
+      if (win && event.source !== win) return
+      const report = parseEmbedHeightMessage(provider, event.data)
+      if (!report) return
+      const containerW = frameRef.current?.getBoundingClientRect().width ?? 0
+      setReportedHeight(scaleEmbedHeightToWidth(report, containerW || report.width || 0))
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [provider, url])
+
   if (!provider) return null
 
   const src = embedIframeSrc(provider, url)
   if (!src) return <EmbedFallback url={url} provider={provider} />
 
-  const height = embedFrameHeight(provider, url)
   const isVideoAspect = provider === 'youtube'
+  const height =
+    reportedHeight ?? (isVideoAspect ? 0 : estimateEmbedHeight(provider, url, width || 360))
 
   return (
     <div className="social-embed w-full min-w-0 space-y-2">
       <div
+        ref={frameRef}
         className={[
           'w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white',
           isVideoAspect ? 'aspect-video' : '',
@@ -305,8 +352,10 @@ function SocialEmbed({ url }: { url: string }) {
         style={isVideoAspect ? undefined : { height }}
       >
         <iframe
+          ref={iframeRef}
           src={src}
           title={EMBED_HOSTS[provider]}
+          name={provider === 'tiktok' ? tiktokFrameName : undefined}
           loading="lazy"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen

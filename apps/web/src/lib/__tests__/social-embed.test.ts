@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   ensureSocialEmbedInMidias,
+  estimateEmbedHeight,
   firstSocialUrlInText,
   instagramEmbedSrc,
+  nextTikTokEmbedFrameName,
+  parseEmbedHeightMessage,
+  scaleEmbedHeightToWidth,
   stripEmbeddedSocialUrls,
 } from '../social-embed'
 
 const IG = 'https://www.instagram.com/reel/DSf2dEMDhNa/'
+const TT = 'https://www.tiktok.com/@user/video/1234567890123456789'
+const TW = 'https://x.com/user/status/1234567890123456789'
 
 describe('firstSocialUrlInText', () => {
   it('encontra URL com texto acima', () => {
@@ -65,5 +71,69 @@ describe('instagramEmbedSrc', () => {
     expect(instagramEmbedSrc('https://www.instagram.com/p/AbCdEf/')).toBe(
       'https://www.instagram.com/p/AbCdEf/embed',
     )
+  })
+})
+
+describe('estimateEmbedHeight', () => {
+  it('escala TikTok/Reel com a largura do card (não usa teto fixo baixo)', () => {
+    const narrow = estimateEmbedHeight('tiktok', TT, 325)
+    const wide = estimateEmbedHeight('tiktok', TT, 520)
+    expect(wide).toBeGreaterThan(narrow)
+    expect(wide).toBeGreaterThan(900)
+    expect(estimateEmbedHeight('instagram', IG, 520)).toBeGreaterThan(900)
+  })
+
+  it('Twitter começa com altura generosa para mídia', () => {
+    expect(estimateEmbedHeight('twitter', TW, 520)).toBeGreaterThan(700)
+  })
+})
+
+describe('parseEmbedHeightMessage', () => {
+  it('lê resize do X/Twitter', () => {
+    expect(
+      parseEmbedHeightMessage('twitter', {
+        method: 'twttr.private.resize',
+        params: [{ width: 550, height: 812 }],
+      }),
+    ).toEqual({ height: 812, width: 550 })
+  })
+
+  it('lê MEASURE do Instagram (string JSON)', () => {
+    expect(
+      parseEmbedHeightMessage(
+        'instagram',
+        JSON.stringify({ type: 'MEASURE', details: { height: 1040 } }),
+      ),
+    ).toEqual({ height: 1040 })
+  })
+
+  it('lê height do TikTok', () => {
+    expect(parseEmbedHeightMessage('tiktok', { height: 978, width: 325 })).toEqual({
+      height: 978,
+      width: 325,
+    })
+  })
+
+  it('ignora mensagens sem altura útil', () => {
+    expect(parseEmbedHeightMessage('tiktok', { type: 'ping' })).toBeNull()
+    expect(parseEmbedHeightMessage('instagram', { type: 'MEASURE', details: {} })).toBeNull()
+  })
+})
+
+describe('scaleEmbedHeightToWidth', () => {
+  it('escala quando o card é mais largo que o player reportado', () => {
+    expect(scaleEmbedHeightToWidth({ height: 740, width: 325 }, 520)).toBe(
+      Math.ceil(740 * (520 / 325)),
+    )
+  })
+
+  it('não escala quando a largura já é compatível', () => {
+    expect(scaleEmbedHeightToWidth({ height: 900, width: 500 }, 520)).toBe(900)
+  })
+})
+
+describe('nextTikTokEmbedFrameName', () => {
+  it('gera nome com prefixo e 17 dígitos', () => {
+    expect(nextTikTokEmbedFrameName()).toMatch(/^__tt_embed__v\d{17}$/)
   })
 })
