@@ -75,6 +75,17 @@ function isTemp(id: string): boolean {
   return id.startsWith('temp-')
 }
 
+/** Temp otimista já ecoado pelo servidor (SSE/poll) — evita duplicar até o POST confirmar. */
+function tempEcoado(temp: MensagemDto, servidor: MensagemDto[]): boolean {
+  const t0 = new Date(temp.criadoEm).getTime()
+  return servidor.some(
+    (n) =>
+      n.autor.id === temp.autor.id &&
+      n.conteudo === temp.conteudo &&
+      Math.abs(new Date(n.criadoEm).getTime() - t0) < 60_000,
+  )
+}
+
 function ordenar(lista: MensagemDto[]): MensagemDto[] {
   return [...lista].sort(
     (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime(),
@@ -286,11 +297,14 @@ export function MensagemThread({
           ? novas.filter((m) => m.autor.id !== currentUserId).length
           : 0
         setMensagens((prev) => {
-          const pendentes = prev.filter((m) => isTemp(m.id))
           const base = full ? novas : [...prev.filter((m) => !isTemp(m.id)), ...novas]
           const dedup = new Map<string, MensagemDto>()
           for (const m of base) dedup.set(m.id, m)
-          const merged = ordenar([...dedup.values(), ...pendentes])
+          const servidor = [...dedup.values()]
+          const pendentes = prev
+            .filter((m) => isTemp(m.id))
+            .filter((temp) => !tempEcoado(temp, servidor))
+          const merged = ordenar([...servidor, ...pendentes])
           const last = ultimaDoServidor(merged)
           const first = primeiraDoServidor(merged)
           if (last) lastCriadoEmRef.current = last
@@ -553,7 +567,12 @@ export function MensagemThread({
         if (m.localUrl.startsWith('blob:')) URL.revokeObjectURL(m.localUrl)
       }
       setMensagens((prev) => {
-        const next = ordenar(prev.filter((m) => m.id !== tempId).concat(data.mensagem!))
+        const dedup = new Map<string, MensagemDto>()
+        for (const m of prev) {
+          if (m.id !== tempId) dedup.set(m.id, m)
+        }
+        dedup.set(data.mensagem!.id, data.mensagem!)
+        const next = ordenar([...dedup.values()])
         const last = ultimaDoServidor(next)
         if (last) lastCriadoEmRef.current = last
         return next

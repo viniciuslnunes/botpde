@@ -42,8 +42,20 @@ function ordenarMensagens(lista: SalaMensagem[]): SalaMensagem[] {
   })
 }
 
+function tempEcoado(temp: SalaMensagem, servidor: SalaMensagem[]): boolean {
+  const t0 = new Date(temp.criadoEm).getTime()
+  return servidor.some(
+    (n) =>
+      n.autor.id === temp.autor.id &&
+      n.conteudo === temp.conteudo &&
+      Math.abs(new Date(n.criadoEm).getTime() - t0) < 60_000,
+  )
+}
+
 function mesclarComServidor(prev: SalaMensagem[], server: SalaMensagem[]): SalaMensagem[] {
-  const pendentes = prev.filter((msg) => isMensagemTemporaria(msg.id))
+  const pendentes = prev
+    .filter((msg) => isMensagemTemporaria(msg.id))
+    .filter((temp) => !tempEcoado(temp, server))
   return ordenarMensagens([...server, ...pendentes])
 }
 
@@ -206,12 +218,16 @@ export function SalaChat({
       }
 
       setMensagens((prev) => {
-        const next = ordenarMensagens(
-          prev.filter((msg) => msg.id !== tempId).concat({
-            ...data.mensagem!,
-            criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
-          }),
-        )
+        const confirmada: SalaMensagem = {
+          ...data.mensagem!,
+          criadoEmFormatado: formatDateTimeShort(data.mensagem!.criadoEm),
+        }
+        const dedup = new Map<string, SalaMensagem>()
+        for (const msg of prev) {
+          if (msg.id !== tempId) dedup.set(msg.id, msg)
+        }
+        dedup.set(confirmada.id, confirmada)
+        const next = ordenarMensagens([...dedup.values()])
         const last = ultimaMensagemServidor(next)
         if (last) lastCriadoEmRef.current = last
         return next
