@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { ComunidadeDock } from './_components/comunidade-dock'
 import { ComunidadeRouteTransition } from './_components/comunidade-route-transition'
 import { ComunidadeLayoutChrome } from './_components/comunidade-layout-chrome'
+import { ComunidadeEscopoNavbarOverride } from './_components/comunidade-escopo-navbar-override'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
-import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
+import { resolverContextoComunidade, type AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import { getSugestoesCanaisParaAside, getSugestoesCanaisPublicosParaAside } from '@/lib/canais'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
 import { listSalasAtivas, listSalasNacionais } from '@/lib/salas'
@@ -33,10 +35,12 @@ export default async function ComunidadeLayout({
   let tenantId: string | null = null
   let tenantSinteticoId: string | null = null
   let afiliacaoId: string | null = null
+  let afiliacao: AfiliacaoComunidade | null = null
 
   if (session?.user?.id) {
     const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
     if (ctx) {
+      afiliacao = ctx.afiliacao
       afiliacaoId = ctx.afiliacao?.id ?? null
       podeEscopoTorcida = ctx.podeEscopoTorcida
       tenantSinteticoId = ctx.tenantSintetico?.id ?? null
@@ -85,6 +89,12 @@ export default async function ComunidadeLayout({
 
   return (
     <ComunidadeQueryProvider>
+      <Suspense fallback={null}>
+        <ComunidadeEscopoNavbarOverride
+          afiliacao={afiliacao}
+          podeEscopoTorcida={podeEscopoTorcida}
+        />
+      </Suspense>
       <div className="pb-28 lg:pb-0">
         <ComunidadeLayoutChrome
           currentUserId={currentUser.id}
