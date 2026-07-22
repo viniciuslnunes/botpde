@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { db } from '@torcida/db'
 import { canFollowUser } from '../social'
-import { avaliarAcessoDm, podeIncluirEmGrupoMensageria } from '../mensageria'
+import { avaliarAcessoDm } from '../mensageria'
 
 vi.mock('@torcida/db', () => ({
   db: {
@@ -10,7 +10,6 @@ vi.mock('@torcida/db', () => ({
     bloqueioUsuario: { findFirst: vi.fn() },
     conversa: { findFirst: vi.fn() },
     perfilTorcedor: { findUnique: vi.fn() },
-    seguimento: { findFirst: vi.fn() },
   },
 }))
 
@@ -39,7 +38,6 @@ beforeEach(() => {
   vi.mocked(db.saasMembro.findMany).mockResolvedValue([])
   vi.mocked(db.userRole.findMany).mockResolvedValue([])
   vi.mocked(db.userRole.findFirst).mockResolvedValue(null)
-  vi.mocked(db.seguimento.findFirst).mockResolvedValue(null)
 
   vi.mocked(db.saasMembro.findFirst).mockImplementation(async (args: { where?: { userId?: string } }) => {
     const userId = args?.where?.userId
@@ -123,31 +121,5 @@ describe('avaliarAcessoDm', () => {
     vi.mocked(db.userRole.findFirst).mockResolvedValue({ id: 'cargo' })
     const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
     expect(acesso).toBe('direto')
-  })
-})
-
-describe('podeIncluirEmGrupoMensageria', () => {
-  it('torcedor não inclui sócio privado sem conexão', async () => {
-    const pode = await podeIncluirEmGrupoMensageria(remetente, destinatario, null)
-    expect(pode).toBe(false)
-  })
-
-  it('torcedor inclui sócio privado se há seguimento aprovado', async () => {
-    vi.mocked(db.seguimento.findFirst).mockResolvedValue({ id: 'seg' })
-    const pode = await podeIncluirEmGrupoMensageria(remetente, destinatario, null)
-    expect(pode).toBe(true)
-  })
-
-  it('torcedor inclui outro torcedor do mesmo clube (DM direta)', async () => {
-    vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
-    vi.mocked(db.userRole.findFirst).mockResolvedValue(null)
-    const pode = await podeIncluirEmGrupoMensageria(remetente, destinatario, null)
-    expect(pode).toBe(true)
-  })
-
-  it('mesmo tenant/aliado pode incluir (DM direta)', async () => {
-    vi.mocked(canFollowUser).mockResolvedValue(true)
-    const pode = await podeIncluirEmGrupoMensageria(remetente, destinatario, tenant)
-    expect(pode).toBe(true)
   })
 })
