@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
+import { assertComunidadeNacional } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
-import { subscribeFeedPing } from '@/lib/feed-bus'
+import { subscribeFeedNacionalPing, subscribeFeedPing } from '@/lib/feed-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
 
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,9 @@ export const dynamic = 'force-dynamic'
  * SSE de pings do feed da Comunidade. O client (useFeedStream) só recebe
  * "tem post novo" e mostra o banner de novos posts — a lista em si continua
  * SSR, atualizada quando o membro clica para voltar ao topo do feed.
+ *
+ * Torcida: canal por tenant (host).
+ * Nacional: `?escopo=nacional&afiliacaoId=` — torcedor global sem subdomínio de torcida.
  */
 export async function GET(request: Request) {
   try {
@@ -16,14 +20,29 @@ export async function GET(request: Request) {
     if (!session?.user?.id) {
       return new Response('Não autenticado', { status: 401 })
     }
+
+    const url = new URL(request.url)
+    const escopo = url.searchParams.get('escopo')
+    const afiliacaoParam = url.searchParams.get('afiliacaoId')
+
+    if (escopo === 'nacional') {
+      const { afiliacaoId } = await assertComunidadeNacional()
+      if (afiliacaoParam && afiliacaoParam !== afiliacaoId) {
+        return new Response('Afiliação inválida', { status: 403 })
+      }
+      return createSsePingResponse(
+        (onPing) => subscribeFeedNacionalPing(afiliacaoId, onPing),
+        request.signal,
+      )
+    }
+
     const tenant = await getTenantFromHost()
     if (!tenant) {
       return new Response('Tenant não encontrado', { status: 404 })
     }
-    const tenantId = tenant.id
 
     return createSsePingResponse(
-      (onPing) => subscribeFeedPing(tenantId, onPing),
+      (onPing) => subscribeFeedPing(tenant.id, onPing),
       request.signal,
     )
   } catch (err) {

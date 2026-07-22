@@ -1,4 +1,9 @@
-import { feedBusKey, publishRealtime, subscribeRealtime } from '@/lib/realtime-bus'
+import {
+  feedBusKey,
+  feedNacionalBusKey,
+  publishRealtime,
+  subscribeRealtime,
+} from '@/lib/realtime-bus'
 
 /**
  * Bus de push do feed da Comunidade.
@@ -13,4 +18,12 @@ export function emitFeedPing(tenantId: string): void {
 
 export function subscribeFeedPing(tenantId: string, onPing: () => void): () => void {
   return subscribeRealtime(feedBusKey(tenantId), onPing)
+}
+
+export function emitFeedNacionalPing(afiliacaoId: string): void {
+  publishRealtime(feedNacionalBusKey(afiliacaoId))
+}
+
+export function subscribeFeedNacionalPing(afiliacaoId: string, onPing: () => void): () => void {
+  return subscribeRealtime(feedNacionalBusKey(afiliacaoId), onPing)
 }

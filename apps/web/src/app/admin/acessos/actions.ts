@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import {
@@ -170,6 +171,7 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   })
 
   invalidatePermissionsCache(userId, tenant.id)
+  invalidarBadgesAutorTenant(tenant.id)
   revalidatePath('/admin/acessos')
   revalidatePath('/admin/hierarquia')
   revalidatePath('/portal/departamentos')
@@ -268,6 +270,7 @@ export async function salvarPerfilComposto(formData: FormData) {
   })
 
   if (userId) invalidatePermissionsCache(userId, tenant.id)
+  invalidarBadgesAutorTenant(tenant.id)
   revalidatePath('/admin/acessos')
   revalidatePath('/admin/configuracoes')
   revalidatePath('/admin/hierarquia')
@@ -372,6 +375,7 @@ export async function adicionarMembroDepartamento(departamentoId: string, target
   })
 
   invalidatePermissionsCache(targetUserId, tenant.id)
+  invalidarBadgesAutorTenant(tenant.id)
   revalidatePath('/admin/acessos')
   revalidatePath('/portal/departamentos', 'layout')
 }
@@ -407,6 +411,7 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
   })
 
   invalidatePermissionsCache(targetUserId, tenant.id)
+  invalidarBadgesAutorTenant(tenant.id)
   revalidatePath('/admin/acessos')
   revalidatePath('/portal/departamentos', 'layout')
 }

@@ -44,6 +44,21 @@ export type PostExcluidoEventDetail = {
   postId: string
 }
 
+/** Endpoint SSE do feed — Nacional usa canal por afiliação. */
+export function feedStreamEndpoint(opts?: {
+  escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
+}): string {
+  if (opts?.escopo === 'nacional' && opts.afiliacaoId) {
+    const q = new URLSearchParams({
+      escopo: 'nacional',
+      afiliacaoId: opts.afiliacaoId,
+    })
+    return `/api/comunidade/feed/stream?${q.toString()}`
+  }
+  return '/api/comunidade/feed/stream'
+}
+
 /** Preview imediato no client — antes da Server Action concluir. */
 export function criarPreviewOtimista(opts: {
   id: string

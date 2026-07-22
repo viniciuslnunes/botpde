@@ -193,7 +193,11 @@ export function ComunidadeFeedShell({
           </Suspense>
         )}
 
-        <FeedLiveBanner filtro={filtro} escopo={escopo} />
+        <FeedLiveBanner
+          filtro={filtro}
+          escopo={escopo}
+          afiliacaoId={modoNacional ? tenant.afiliacaoId ?? undefined : undefined}
+        />
 
         <Suspense
           fallback={

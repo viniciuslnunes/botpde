@@ -145,6 +145,11 @@ export function feedBusKey(tenantId: string): string {
   return `feed:${tenantId}`
 }
 
+/** Ping SSE do feed Descobrir/Seguindo da Comunidade Nacional (por afiliação). */
+export function feedNacionalBusKey(afiliacaoId: string): string {
+  return `feed-nacional:${afiliacaoId}`
+}
+
 export function notificacaoBusKey(tenantId: string, userId: string): string {
   return `notif:${tenantId}:${userId}`
 }

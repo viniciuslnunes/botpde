@@ -20,8 +20,9 @@ describe('comunidade-cache', () => {
 
   it('invalida todos os blocos de leitura do feed', () => {
     invalidarCachesComunidadeFeed('tenant-x')
-    expect(revalidateTag).toHaveBeenCalledTimes(6)
+    expect(revalidateTag).toHaveBeenCalledTimes(7)
     expect(revalidateTag).toHaveBeenCalledWith(`${COMUNIDADE_FEED_CACHE_TAG}:descobrir:tenant-x`, 'max')
     expect(revalidateTag).toHaveBeenCalledWith(`${COMUNIDADE_FEED_CACHE_TAG}:hashtags:tenant-x`, 'max')
+    expect(revalidateTag).toHaveBeenCalledWith(`${COMUNIDADE_FEED_CACHE_TAG}:autor-badges:tenant-x`, 'max')
   })
 })

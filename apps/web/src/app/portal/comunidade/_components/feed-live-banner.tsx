@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowUp } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
-import { emitirFeedRefreshTopo, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
+import { emitirFeedRefreshTopo, feedStreamEndpoint, isComunidadeFeedNearTop } from '@/lib/feed-live-refresh'
 
 /**
  * Banner "N novos posts" quando o usuário está longe do topo.
@@ -11,11 +11,21 @@ import { emitirFeedRefreshTopo, isComunidadeFeedNearTop } from '@/lib/feed-live-
  */
 export function FeedLiveBanner({
   escopo,
+  afiliacaoId,
 }: {
   filtro?: 'descobrir' | 'seguindo' | 'grupos'
   escopo?: 'nacional' | 'torcida'
+  afiliacaoId?: string
 }) {
   const [novos, setNovos] = useState(0)
+
+  const streamEndpoint = useMemo(
+    () =>
+      feedStreamEndpoint(
+        escopo === 'nacional' && afiliacaoId ? { escopo: 'nacional', afiliacaoId } : undefined,
+      ),
+    [afiliacaoId, escopo],
+  )
 
   useFeedStream(() => {
     if (isComunidadeFeedNearTop()) {
@@ -23,7 +33,7 @@ export function FeedLiveBanner({
       return
     }
     setNovos((n) => n + 1)
-  })
+  }, streamEndpoint)
 
   if (novos === 0) return null
 

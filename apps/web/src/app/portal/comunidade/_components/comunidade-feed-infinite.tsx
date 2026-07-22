@@ -15,6 +15,7 @@ import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   COMUNIDADE_POST_PUBLICADO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
+  feedStreamEndpoint,
   isComunidadeFeedNearTop,
   type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
@@ -106,6 +107,14 @@ export function ComunidadeFeedInfinite({
   const salvoSet = useMemo(() => new Set<string>(salvoIds), [salvoIds])
   const isNacional = escopo === 'nacional'
 
+  const streamEndpoint = useMemo(
+    () =>
+      feedStreamEndpoint(
+        isNacional && afiliacaoId ? { escopo: 'nacional', afiliacaoId } : undefined,
+      ),
+    [afiliacaoId, isNacional],
+  )
+
   const {
     posts,
     pageInfo,
@@ -178,7 +187,7 @@ export function ComunidadeFeedInfinite({
     refreshDebounceRef.current = window.setTimeout(() => {
       void refreshCurrentPage(null)
     }, FEED_SSE_DEBOUNCE_MS)
-  })
+  }, streamEndpoint)
 
   useEffect(() => {
     function onRefreshTopo() {

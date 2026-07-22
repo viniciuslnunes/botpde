@@ -554,7 +554,7 @@ async function getDescobrirPostsBaseCached(
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: fetchLimit,
-        include: postInclude(),
+        include: postIncludeLista(),
       })) as PostRaw[]
       return postsRaw.map(projetarPost)
     },
@@ -1248,7 +1248,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
   const cursorWhere = buildCursorWhere(decodedCursor)
   const cursorKey = decodedCursor ? `${decodedCursor.criadoEmIso}:${decodedCursor.id}` : 'start'
 
-  const [tenantIds, seguindoAprovados] = await Promise.all([
+  const [tenantIds, seguindoAprovados, sintetico] = await Promise.all([
     getTenantIdsPorAfiliacao(afiliacaoId),
     userId
       ? db.seguimento
@@ -1258,6 +1258,10 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
           })
           .then((rows: SeguimentoLite[]) => rows.map((s) => s.seguidoId))
       : Promise.resolve([] as string[]),
+    db.tenant.findFirst({
+      where: { afiliacaoId, sintetico: true },
+      select: { id: true },
+    }),
   ])
 
   if (tenantIds.length === 0) {
@@ -1299,7 +1303,10 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
     { revalidate: 45, tags: [tagFeedNacional(afiliacaoId)] },
   )()) as PostRaw[]
 
-  const posts = postsRaw.map(projetarPost)
+  let posts = postsRaw.map(projetarPost)
+  if (!decodedCursor && sintetico) {
+    posts = rankDescobrirPosts(posts, sintetico.id)
+  }
   const hasMore = posts.length > take
   const pagina = await finalizarPosts(posts.slice(0, take))
 

@@ -37,6 +37,15 @@ export function tagFeedNacional(afiliacaoId: string): string {
   return `${COMUNIDADE_FEED_CACHE_TAG}:nacional:${afiliacaoId}`
 }
 
+/** Badges de autor (cargo/sede/depto) no feed — por tenant. */
+export function tagAutorBadgesTenant(tenantId: string): string {
+  return `${COMUNIDADE_FEED_CACHE_TAG}:autor-badges:${tenantId}`
+}
+
+export function invalidarBadgesAutorTenant(tenantId: string): void {
+  revalidateTag(tagAutorBadgesTenant(tenantId), 'max')
+}
+
 /** Invalida caches cross-request após mutação de feed, stories ou social. */
 export function invalidarCachesComunidadeFeed(tenantId: string): void {
   revalidateTag(tagFeedDescobrir(tenantId), 'max')
@@ -45,6 +54,7 @@ export function invalidarCachesComunidadeFeed(tenantId: string): void {
   revalidateTag(tagStoriesRings(tenantId), 'max')
   revalidateTag(tagCanaisVisiveis(tenantId), 'max')
   revalidateTag(tagSalasAtivas(tenantId), 'max')
+  invalidarBadgesAutorTenant(tenantId)
 }
 
 export function invalidarFeedNacional(afiliacaoId: string): void {

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import type { Session } from 'next-auth'
 import { invalidarCachesComunidadeFeed, invalidarFeedNacional } from '@/lib/comunidade-cache'
+import { emitFeedNacionalPing } from '@/lib/feed-bus'
 import { assertAutorPublicacaoPost, assertComunidadeNacional, assertMembroAtivo, assertPermission, assertPodePublicarNoFeed } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
@@ -54,7 +55,10 @@ const MAX_MIDIAS = 10
 
 function invalidarLeituraComunidade(tenantId: string, afiliacaoId?: string | null): void {
   invalidarCachesComunidadeFeed(tenantId)
-  if (afiliacaoId) invalidarFeedNacional(afiliacaoId)
+  if (afiliacaoId) {
+    invalidarFeedNacional(afiliacaoId)
+    emitFeedNacionalPing(afiliacaoId)
+  }
 }
 
 function alcanceNacionalDaPublicacao(

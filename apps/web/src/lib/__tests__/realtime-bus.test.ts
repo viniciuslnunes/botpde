@@ -35,9 +35,20 @@ describe('realtime-bus (in-memory)', () => {
     expect(onPing).toHaveBeenCalledTimes(1)
   })
 
+  it('emite e entrega ping local no feed nacional', async () => {
+    const { emitFeedNacionalPing, subscribeFeedNacionalPing } = await import('@/lib/feed-bus')
+    const onPing = vi.fn()
+    const unsub = subscribeFeedNacionalPing('aff-1', onPing)
+    emitFeedNacionalPing('aff-1')
+    emitFeedNacionalPing('aff-2')
+    expect(onPing).toHaveBeenCalledTimes(1)
+    unsub()
+  })
+
   it('gera chaves de canal estáveis', async () => {
-    const { feedBusKey, notificacaoBusKey } = await import('@/lib/realtime-bus')
+    const { feedBusKey, feedNacionalBusKey, notificacaoBusKey } = await import('@/lib/realtime-bus')
     expect(feedBusKey('abc')).toBe('feed:abc')
+    expect(feedNacionalBusKey('aff')).toBe('feed-nacional:aff')
     expect(notificacaoBusKey('t', 'u')).toBe('notif:t:u')
   })
 })

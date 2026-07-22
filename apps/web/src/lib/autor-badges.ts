@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
 import { unstable_cache } from 'next/cache'
+import { tagAutorBadgesTenant } from './comunidade-cache'
 import { SYSTEM_ROLES, rotuloCargoSistema } from '@torcida/types'
 import type { PostSocialItem } from './feed'
 
@@ -91,7 +92,10 @@ export async function getBadgesPorAutorTenant(
       return [...map.entries()]
     },
     ['autor-badges-feed', cacheKey],
-    { revalidate: 120 },
+    {
+      revalidate: 120,
+      tags: [...new Set(unicos.map((p) => tagAutorBadgesTenant(p.tenantId)))],
+    },
   )()
 
   return new Map(serializado)

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { notificarSafe } from '@/lib/notificacoes'
@@ -201,6 +202,7 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
     link: '/portal/carteirinha',
   })
 
+  invalidarBadgesAutorTenant(tenant.id)
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
