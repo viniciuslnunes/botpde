@@ -7,9 +7,18 @@ import {
   assertUsuarioMensageria,
 } from '@/lib/mensageria-api'
 
+type ContatoDto = {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+  tenantNome: string
+  mesmoTenant: boolean
+  requerSolicitacao: boolean
+}
+
 /**
  * Contatos elegíveis para conversa.
- * Torcida: membros APROVADOS do tenant e aliadas.
+ * Torcida: membros APROVADOS do tenant/aliadas + sócios do mesmo clube (solicitação).
  * Nacional: usuários com o mesmo clube (`PerfilTorcedor` ou sócio APROVADO).
  */
 export async function GET(request: NextRequest) {
@@ -26,6 +35,33 @@ export async function GET(request: NextRequest) {
     const bloqueadosIds = new Set(
       bloqueios.map((b) => (b.bloqueadorId === userId ? b.bloqueadoId : b.bloqueadorId)),
     )
+
+    const tenantContextoId = contexto.via === 'nacional' ? null : contexto.tenant.id
+
+    async function pushSeElegivel(
+      contatos: ContatoDto[],
+      vistos: Set<string>,
+      opts: {
+        id: string
+        nome: string | null
+        avatarUrl: string | null
+        tenantNome: string
+        mesmoTenant: boolean
+      },
+    ): Promise<void> {
+      if (vistos.has(opts.id) || bloqueadosIds.has(opts.id)) return
+      vistos.add(opts.id)
+      const acesso = await avaliarAcessoDm(userId, opts.id, tenantContextoId)
+      if (acesso === 'bloqueado') return
+      contatos.push({
+        id: opts.id,
+        nome: opts.nome,
+        avatarUrl: opts.avatarUrl,
+        tenantNome: opts.tenantNome,
+        mesmoTenant: opts.mesmoTenant,
+        requerSolicitacao: acesso === 'solicitacao',
+      })
+    }
 
     if (contexto.via === 'nacional') {
       const afiliacaoId = (
@@ -80,51 +116,27 @@ export async function GET(request: NextRequest) {
       })
 
       const vistos = new Set<string>()
-      const contatos: Array<{
-        id: string
-        nome: string | null
-        avatarUrl: string | null
-        tenantNome: string
-        mesmoTenant: boolean
-        requerSolicitacao: boolean
-      }> = []
-
-      async function pushContato(
-        id: string,
-        nome: string | null,
-        avatarUrl: string | null,
-        tenantNome: string,
-        mesmoTenant: boolean,
-      ) {
-        const acesso = await avaliarAcessoDm(userId, id, null)
-        if (acesso === 'bloqueado') return
-        contatos.push({
-          id,
-          nome,
-          avatarUrl,
-          tenantNome,
-          mesmoTenant,
-          requerSolicitacao: acesso === 'solicitacao',
-        })
-      }
+      const contatos: ContatoDto[] = []
 
       for (const p of perfis) {
-        if (vistos.has(p.userId) || bloqueadosIds.has(p.userId)) continue
-        vistos.add(p.userId)
-        await pushContato(
-          p.user.id,
-          p.user.nome,
-          p.user.avatarUrl,
-          'Comunidade Nacional',
-          true,
-        )
         if (contatos.length >= 20) break
+        await pushSeElegivel(contatos, vistos, {
+          id: p.user.id,
+          nome: p.user.nome,
+          avatarUrl: p.user.avatarUrl,
+          tenantNome: 'Comunidade Nacional',
+          mesmoTenant: true,
+        })
       }
       for (const s of socios) {
         if (contatos.length >= 20) break
-        if (vistos.has(s.userId) || bloqueadosIds.has(s.userId)) continue
-        vistos.add(s.userId)
-        await pushContato(s.user.id, s.user.nome, s.user.avatarUrl, s.tenant.nome, false)
+        await pushSeElegivel(contatos, vistos, {
+          id: s.user.id,
+          nome: s.user.nome,
+          avatarUrl: s.user.avatarUrl,
+          tenantNome: s.tenant.nome,
+          mesmoTenant: false,
+        })
       }
 
       return NextResponse.json({ contatos })
@@ -158,21 +170,60 @@ export async function GET(request: NextRequest) {
     })
 
     const vistos = new Set<string>()
-    const contatos = []
+    const contatos: ContatoDto[] = []
     for (const r of rows) {
-      if (vistos.has(r.userId) || bloqueadosIds.has(r.userId)) continue
-      vistos.add(r.userId)
-      const acesso = await avaliarAcessoDm(uid, r.user.id, tenant.id)
-      if (acesso === 'bloqueado') continue
-      contatos.push({
+      if (contatos.length >= 20) break
+      await pushSeElegivel(contatos, vistos, {
         id: r.user.id,
         nome: r.user.nome,
         avatarUrl: r.user.avatarUrl,
         tenantNome: r.tenant.nome,
         mesmoTenant: r.tenantId === tenant.id,
-        requerSolicitacao: acesso === 'solicitacao',
       })
-      if (contatos.length >= 20) break
+    }
+
+    // Sócios do mesmo clube fora da unidade/aliadas — aparecem com solicitação.
+    if (contatos.length < 20 && tenant.afiliacaoId) {
+      type SocioClubeRow = {
+        userId: string
+        user: { id: string; nome: string | null; avatarUrl: string | null }
+        tenant: { nome: string }
+      }
+      const sociosClube: SocioClubeRow[] = await db.saasMembro.findMany({
+        where: {
+          status: 'APROVADO',
+          tipo: 'SOCIO',
+          userId: {
+            not: uid,
+            ...(vistos.size > 0 ? { notIn: [...vistos] } : {}),
+          },
+          tenant: {
+            afiliacaoId: tenant.afiliacaoId,
+            ativo: true,
+            sintetico: false,
+            id: { notIn: visiveis },
+          },
+          ...(q ? { user: { nome: { contains: q, mode: 'insensitive' } } } : {}),
+        },
+        select: {
+          userId: true,
+          user: { select: { id: true, nome: true, avatarUrl: true } },
+          tenant: { select: { nome: true } },
+        },
+        orderBy: { user: { nome: 'asc' } },
+        take: 40,
+      })
+
+      for (const s of sociosClube) {
+        if (contatos.length >= 20) break
+        await pushSeElegivel(contatos, vistos, {
+          id: s.user.id,
+          nome: s.user.nome,
+          avatarUrl: s.user.avatarUrl,
+          tenantNome: s.tenant.nome,
+          mesmoTenant: false,
+        })
+      }
     }
 
     return NextResponse.json({ contatos })

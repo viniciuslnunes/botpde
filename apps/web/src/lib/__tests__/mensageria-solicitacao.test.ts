@@ -59,6 +59,11 @@ describe('avaliarAcessoDm', () => {
     expect(acesso).toBe('solicitacao')
   })
 
+  it('torcedor → sócio mesmo clube exige solicitação com tenant (sem aliança)', async () => {
+    const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
+    expect(acesso).toBe('solicitacao')
+  })
+
   it('bloqueio mútuo impede qualquer acesso', async () => {
     vi.mocked(db.bloqueioUsuario.findFirst).mockResolvedValue({ id: 'blk' })
     const acesso = await avaliarAcessoDm(remetente, destinatario, null)
@@ -72,15 +77,21 @@ describe('avaliarAcessoDm', () => {
     expect(acesso).toBe('direto')
   })
 
-  it('torcedor → torcedor mesmo clube na CN permite DM direta (tenantContexto null)', async () => {
+  it('torcedor → torcedor mesmo clube na CN permite DM direta', async () => {
     vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
     const acesso = await avaliarAcessoDm(remetente, destinatario, null)
     expect(acesso).toBe('direto')
   })
 
-  it('torcedor → torcedor mesmo clube bloqueia se tenant sintético for passado como contexto', async () => {
+  it('torcedor → torcedor mesmo clube permanece direto mesmo com tenant de contexto', async () => {
     vi.mocked(db.saasMembro.findFirst).mockResolvedValue(null)
     const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
-    expect(acesso).toBe('bloqueado')
+    expect(acesso).toBe('direto')
+  })
+
+  it('sócio → sócio mesmo clube sem aliança exige solicitação', async () => {
+    vi.mocked(db.saasMembro.findFirst).mockResolvedValue({ id: 'socio' })
+    const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
+    expect(acesso).toBe('solicitacao')
   })
 })

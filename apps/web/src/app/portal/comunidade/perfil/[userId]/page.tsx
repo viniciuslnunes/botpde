@@ -6,6 +6,7 @@ import { resolvePerfilTenantForUser } from '@/lib/resolve-perfil-tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { canFollowUser, getSeguimentoStatus, segueVoce as usuarioSegueVoce } from '@/lib/social'
 import { avaliarAcessoDm } from '@/lib/mensageria'
+import { resolveTenantContextoDm } from '@/lib/mensageria-api'
 import {
   getAtividadeDoAutor,
   getAvatarAtualDoUsuario,
@@ -127,6 +128,8 @@ export default async function PerfilComunidadePage({
   const privacidadeBloqueada = torcedorAprovadoPublicoObrigatorio(vinculo)
   const perfil = { ...perfilBase, perfilPrivado: perfilPrivadoEfetivo }
 
+  const dmTenantContexto = await resolveTenantContextoDm(session.user.id, session.user.email)
+
   const [podeSeguir, statusSeguimento, podeVer, contagens, segueVoceBadge, acessoDm] = isSelf
     ? [false, null, true, await getContagensSeguimento(userId, tenant.id), false, 'bloqueado' as const]
     : await Promise.all([
@@ -135,7 +138,8 @@ export default async function PerfilComunidadePage({
         podeVerConteudoSocial(session.user.id, userId, tenant.id),
         getContagensSeguimento(userId, tenant.id),
         usuarioSegueVoce(session.user.id, userId),
-        avaliarAcessoDm(session.user.id, userId, tenant.id),
+        // Mesmo critério do POST /api/conversas (contexto do viewer, não do perfil).
+        avaliarAcessoDm(session.user.id, userId, dmTenantContexto),
       ])
 
   const podeConversarDireto = acessoDm === 'direto'

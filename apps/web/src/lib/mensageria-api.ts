@@ -131,6 +131,22 @@ export type ContextoMensageria =
   | { via: 'nacional'; session: Session; tenant: { id: string } }
 
 /**
+ * Tenant de regras para `avaliarAcessoDm`: id da torcida se o usuário pode
+ * usar mensageria ali; `null` na Comunidade Nacional (ou cookie/host sem vínculo).
+ */
+export async function resolveTenantContextoDm(
+  userId: string,
+  email?: string | null,
+): Promise<string | null> {
+  const ctx = await resolverContextoComunidade(userId, email)
+  if (ctx?.modo === 'torcida') {
+    const status = await getStatusInboxMensageria(userId, ctx.tenant.id)
+    if (status.podeListar) return ctx.tenant.id
+  }
+  return null
+}
+
+/**
  * Split preferido para rotas de mensageria dual: resolve o tenant real
  * (torcida ativa) ou, na ausência dele, o tenant sintético da Comunidade
  * Nacional do clube do usuário — sempre devolve um `tenant.id` utilizável
@@ -142,7 +158,15 @@ export async function assertContextoMensageria(): Promise<ContextoMensageria> {
 
   const ctx = await resolverContextoComunidade(session.user.id, session.user.email)
   if (ctx?.modo === 'torcida') {
-    return { via: 'torcida', session, tenant: { id: ctx.tenant.id } }
+    // Cookie/host pode apontar uma torcida do clube sem o usuário ser sócio
+    // elegível ali — nesse caso a mensageria cai na CN (senão POST 403 / busca vazia).
+    const status = await getStatusInboxMensageria(session.user.id, ctx.tenant.id)
+    if (status.podeListar) {
+      return { via: 'torcida', session, tenant: { id: ctx.tenant.id } }
+    }
+    if (ctx.tenantSintetico) {
+      return { via: 'nacional', session, tenant: { id: ctx.tenantSintetico.id } }
+    }
   }
   if (ctx?.tenantSintetico) {
     return { via: 'nacional', session, tenant: { id: ctx.tenantSintetico.id } }

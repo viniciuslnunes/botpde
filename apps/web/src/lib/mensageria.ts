@@ -285,7 +285,16 @@ export async function findDmEntreUsuarios(
 
 /**
  * Avalia se a DM é direta, exige solicitação com aprovação ou está bloqueada.
- * Torcedor → sócio (mesmo clube) e sócio×sócio cross-unidade sem aliança usam solicitação.
+ *
+ * Regras (após bloqueio/rival/rejeição):
+ * - mesmo tenant ou aliados (`canMessageUser`) → direto
+ * - mesmo clube e destinatário é sócio → solicitação (torcedor→sócio ou sócio×sócio sem aliança)
+ * - mesmo clube entre torcedores → direto
+ * - clubes diferentes → bloqueado
+ *
+ * `tenantContextoId` null = Comunidade Nacional (sem hierarquia de tenant).
+ * Com tenant setado, `canMessageUser` só amplia para direto — nunca transforma
+ * par do mesmo clube em bloqueado (bug que gerava 403 na busca de contatos).
  */
 export async function avaliarAcessoDm(
   remetenteId: string,
@@ -306,23 +315,18 @@ export async function avaliarAcessoDm(
     if (meu?.status === 'PENDENTE') return 'solicitacao'
   }
 
-  const [remSocio, destSocio, mesmoClube] = await Promise.all([
-    isSocioAprovado(remetenteId),
+  if (tenantContextoId) {
+    const podeDireto = await canMessageUser(remetenteId, destinatarioId, tenantContextoId)
+    if (podeDireto) return 'direto'
+  }
+
+  const [destSocio, mesmoClube] = await Promise.all([
     isSocioAprovado(destinatarioId),
     mesmaAfiliacaoComunidade(remetenteId, destinatarioId),
   ])
 
-  if (tenantContextoId) {
-    const podeDireto = await canMessageUser(remetenteId, destinatarioId, tenantContextoId)
-    if (podeDireto) return 'direto'
-    if (mesmoClube && remSocio && destSocio) return 'solicitacao'
-    if (mesmoClube && !remSocio && destSocio) return 'solicitacao'
-    return 'bloqueado'
-  }
-
   if (!mesmoClube) return 'bloqueado'
-  if (!remSocio && destSocio) return 'solicitacao'
-  if (remSocio && destSocio) return 'solicitacao'
+  if (destSocio) return 'solicitacao'
   return 'direto'
 }
 
