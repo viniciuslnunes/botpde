@@ -12,7 +12,17 @@ const serverActionOrigins = [
   ...(rootDomain ? [rootDomain, `*.${rootDomain}`] : []),
 ]
 
+// Skew protection: após deploy no Railway, cliente com tab antiga força hard
+// reload em vez de pedir chunk/hash que já não existe (ChunkLoadError 404).
+// RAILWAY_GIT_COMMIT_SHA vem no build e no runtime do mesmo deploy.
+const deploymentId =
+  process.env.NEXT_DEPLOYMENT_ID?.trim() ||
+  process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
+  process.env.RAILWAY_DEPLOYMENT_ID?.trim() ||
+  undefined
+
 const nextConfig: NextConfig = {
+  ...(deploymentId ? { deploymentId } : {}),
   experimental: {
     // Sem @torcida/ui: optimizePackageImports no barrel quebra o singleton do Sonner
     // (toast() e <Toaster /> em grafos distintos → toasts silenciosos).
