@@ -262,7 +262,7 @@ export function AdminSidebar({
   return (
     <>
       {mobileOpen && (
-        <div className="fixed inset-x-0 bottom-0 top-14 z-40 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 top-14 z-[60] lg:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-black/35"
@@ -284,7 +284,10 @@ export function AdminSidebar({
         </div>
       )}
 
-      <aside className="relative z-30 hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
+      {/* z-60 > header (z-50) e StickyPersistBar (z-20): backdrops
+          `fixed inset-0` dentro do header (sino/dropdown) não podem “matar”
+          o menu — sintoma clássico pós-Estoque até dar F5. */}
+      <aside className="relative z-[60] hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
         <SidebarBody
           tenantSlug={tenantSlug}
           items={items}

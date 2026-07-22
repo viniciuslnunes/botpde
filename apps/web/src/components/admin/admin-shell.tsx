@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -78,6 +78,13 @@ function AdminTopbar({
 }) {
   const [userDropOpen, setUserDropOpen] = useState(false)
   const firstName = userName?.split(' ')[0] ?? 'Admin'
+  const pathname = usePathname()
+
+  // Soft-nav não remonta o shell: fecha dropdowns para não deixar
+  // `fixed inset-0` invisível do header (z-50) cobrindo o sidebar.
+  useEffect(() => {
+    setUserDropOpen(false)
+  }, [pathname])
 
   return (
     <header className="sticky top-0 z-50 shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] backdrop-blur-sm">
@@ -246,6 +253,10 @@ export function AdminShell({
     unreadNotifications,
     menuBadges,
   } = useAdminNavbarContext(notifications)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">

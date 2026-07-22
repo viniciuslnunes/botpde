@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida } from '@/app/actions/notificacoes'
 import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
@@ -48,6 +49,11 @@ export function NotificationBell({
   const [items, setItems] = useState<NotificationItem[]>(initialItems)
   const [itemsSignature, setItemsSignature] = useState(initialSignature)
   const [pending, startTransition] = useTransition()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
 
   // Alinha lista ao SSR/contexto sem effect (React: ajustar state durante render).
   if (itemsSignature !== initialSignature) {

@@ -110,7 +110,9 @@ export function StickyPersistBar({
 
       {mounted
         ? createPortal(
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
+            // z-20 < sidebar admin (z-60): barra nunca cobre o menu.
+            // pointer-events no enter/exit evita ghost em opacity:0.
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4">
               <AnimatePresence>
                 {visible ? (
                   <m.div
@@ -123,9 +125,16 @@ export function StickyPersistBar({
                         ? 'Ações de persistência — alterações pendentes'
                         : 'Ações de persistência'
                     }
+                    // Só desliga hits no *exit* (opacity→0). NÃO animar
+                    // pointerEvents no enter — spring + valor discreto pode
+                    // deixar a barra em pointer-events:none (regressão bccc34a).
                     initial={reduceMotion ? false : { opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={reduceMotion ? undefined : { opacity: 0, y: 16 }}
+                    exit={
+                      reduceMotion
+                        ? undefined
+                        : { opacity: 0, y: 16, pointerEvents: 'none' }
+                    }
                     transition={reduceMotion ? { duration: 0 } : springSnappy}
                     className={[
                       'dock-shadow pointer-events-auto flex w-full max-w-3xl flex-col gap-2 rounded-2xl border px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-3',
