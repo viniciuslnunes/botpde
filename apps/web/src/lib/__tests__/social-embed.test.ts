@@ -4,9 +4,9 @@ import {
   classifyMedia,
   detectEmbedProvider,
   ensureSocialEmbedInMidias,
-  estimateEmbedHeight,
   firstSocialUrlInText,
   instagramEmbedSrc,
+  instagramPermalink,
   midiasAposEditarConteudo,
   midiasComEmbedDoTexto,
   parseEmbedHeightMessage,
@@ -223,19 +223,15 @@ describe('applyEmbedHeightReport', () => {
   it('aplica buffer sem upscale', () => {
     expect(applyEmbedHeightReport({ height: 740, width: 325 })).toBe(744)
   })
-
-  it('usa buffer maior no Instagram', () => {
-    expect(applyEmbedHeightReport({ height: 1104 }, 'instagram')).toBe(1132)
-  })
 })
 
-describe('estimateEmbedHeight — Instagram', () => {
-  it('estima reel e post com chrome generoso', () => {
-    expect(estimateEmbedHeight('instagram', SOCIAL_URLS.instagram, 540)).toBe(
-      Math.round((540 * 16) / 9) + 420,
+describe('instagramPermalink', () => {
+  it('normaliza username/share para permalink canônico', () => {
+    expect(instagramPermalink('https://www.instagram.com/baixada/p/ABC123xyz/?igsh=1')).toBe(
+      'https://www.instagram.com/p/ABC123xyz/',
     )
-    expect(estimateEmbedHeight('instagram', SOCIAL_URLS.instagramPost, 540)).toBe(
-      Math.round((540 * 5) / 4) + 340,
+    expect(instagramPermalink(SOCIAL_URLS.instagram)).toBe(
+      'https://www.instagram.com/reel/DSf2dEMDhNa/',
     )
   })
 })
