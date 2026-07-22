@@ -1,14 +1,14 @@
 import Link from 'next/link'
-import { Newspaper, Users, Hash, Calendar } from 'lucide-react'
+import { Newspaper, Users, Hash } from 'lucide-react'
 import { getNoticiasAprovadas } from '@/lib/noticias'
-import { getProximoEvento } from '@/lib/eventos'
+import { getProximosEventos } from '@/lib/eventos'
 import { getSugestoesAutoresParaAside, getHashtagsEmAlta, type SugestaoAutorAside } from '@/lib/feed'
 import type { SalaAtivaListItem } from '@/lib/salas'
-import { formatRelative } from '@/lib/format-datetime'
 import { Avatar } from '@/components/portal/avatar'
 import { SeguimentoButtons } from '@/components/portal/seguimento-buttons'
 import { ComunidadeSalasLiveWidget } from '@/components/portal/comunidade-salas-live-widget'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { ProximosEventosAside } from './proximos-eventos-aside'
 
 interface ComunidadeAsideWidgetsProps {
   tenantId: string
@@ -23,13 +23,13 @@ export async function ComunidadeAsideWidgets({
   currentUserId,
   salasAoVivo = [],
 }: ComunidadeAsideWidgetsProps) {
-  const [noticias, sugestoes, hashtags, proximoEvento] = await Promise.all([
+  const [noticias, sugestoes, hashtags, proximosEventos] = await Promise.all([
     afiliacaoId ? getNoticiasAprovadas(afiliacaoId) : Promise.resolve([]),
     currentUserId
       ? getSugestoesAutoresParaAside(tenantId, currentUserId)
       : Promise.resolve([] as SugestaoAutorAside[]),
     getHashtagsEmAlta(tenantId, 5),
-    getProximoEvento(tenantId, currentUserId),
+    getProximosEventos(tenantId, currentUserId, 4),
   ])
 
   let widgetIndex = 0
@@ -41,24 +41,9 @@ export async function ComunidadeAsideWidgets({
           <ComunidadeSalasLiveWidget salas={salasAoVivo} />
         </MotionReveal>
       )}
-      {proximoEvento && (
+      {proximosEventos.length > 0 && (
         <MotionReveal index={widgetIndex++}>
-          <Link
-            href={`/portal/eventos/${proximoEvento.id}`}
-            className="block rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 transition-colors hover:border-[rgb(var(--color-primary)_/_0.5)]"
-          >
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
-              <Calendar className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
-              Próximo evento
-            </h2>
-            <p className="mt-2 text-sm font-medium text-[rgb(var(--foreground))]">
-              {proximoEvento.titulo}
-            </p>
-            <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              {formatRelative(proximoEvento.data)}
-              {proximoEvento.local && ` · ${proximoEvento.local}`}
-            </p>
-          </Link>
+          <ProximosEventosAside eventos={proximosEventos} />
         </MotionReveal>
       )}
 

@@ -95,6 +95,16 @@ export async function getProximoEvento(
   return eventos[0] ?? null
 }
 
+/** Próximos eventos futuros visíveis — card "Próximos eventos" no aside da Comunidade. */
+export async function getProximosEventos(
+  tenantId: string,
+  userId?: string,
+  limite = 4,
+): Promise<ProximoEventoItem[]> {
+  const eventos = await getEventosFuturosVisiveis(tenantId, userId)
+  return eventos.slice(0, limite)
+}
+
 export interface EventoUnidadeItem {
   id: string
   titulo: string
