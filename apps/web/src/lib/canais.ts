@@ -550,7 +550,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
 /**
  * Canais visíveis em que o viewer ainda não está inscrito — painel
  * "Canais sugeridos" no rail direito do feed (entre salas e mensagens).
- * Abertos → Entrar; fechados → Pedir (inclui cross-tenant quando
+ * Abertos → Entrar; fechados → Solicitar (inclui cross-tenant quando
  * `podeVerCanal` — `pedirEntradaCanal` aceita canais visíveis fora do tenant).
  */
 export const getSugestoesCanaisParaAside = cache(async function getSugestoesCanaisParaAside(

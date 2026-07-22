@@ -872,7 +872,7 @@ function CanalRow({
             transition={springSnappy}
             className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
           >
-            Pedir
+            Solicitar
           </m.button>
         )}
       </div>

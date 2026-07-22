@@ -246,7 +246,7 @@ export function CanalFeedComposition({
             transition={springSnappy}
             className="shrink-0 rounded-full bg-[rgb(var(--color-primary))] px-3.5 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            Pedir para entrar
+            Solicitar para entrar
           </m.button>
         )}
 

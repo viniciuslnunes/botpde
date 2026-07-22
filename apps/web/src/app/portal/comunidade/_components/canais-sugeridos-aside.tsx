@@ -114,7 +114,7 @@ export function CanaisSugeridosAside({
                   transition={springSnappy}
                   className="shrink-0 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1 text-[10px] font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
                 >
-                  Pedir
+                  Solicitar
                 </m.button>
               )}
             </div>
