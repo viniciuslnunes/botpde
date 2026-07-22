@@ -5,6 +5,7 @@ import { db, withDbRetry } from '@torcida/db'
 import type { TipoSalaReuniao } from '@torcida/db'
 import { tagSalasAtivas, tagSalasNacionais } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
+import { compactOr, orTenantIdsIn } from '@/lib/prisma-filters'
 
 /** Contagem de participantes online (presença ativa), alinhada a `salas-presenca`. */
 export const participantesOnlineCountSelect = {
@@ -112,6 +113,14 @@ export const listSalasNacionais = cache(async function listSalasNacionais(
   const tenantIdsSinteticos = tenants.filter((t) => t.sintetico).map((t) => t.id)
   const tenantIdsOficiais = tenants.filter((t) => !t.sintetico).map((t) => t.id)
 
+  const orSalas = compactOr([
+    orTenantIdsIn(tenantIdsSinteticos),
+    tenantIdsOficiais.length > 0
+      ? { tenantId: { in: tenantIdsOficiais }, tipo: 'ABERTA' as const }
+      : null,
+  ])
+  if (orSalas.length === 0) return []
+
   const salas = await unstable_cache(
     async () =>
       withDbRetry(
@@ -119,10 +128,7 @@ export const listSalasNacionais = cache(async function listSalasNacionais(
           db.salaReuniao.findMany({
             where: {
               encerradaEm: null,
-              OR: [
-                { tenantId: { in: tenantIdsSinteticos } },
-                { tenantId: { in: tenantIdsOficiais }, tipo: 'ABERTA' },
-              ],
+              OR: orSalas,
             },
             include: {
               host: { select: { id: true, nome: true, avatarUrl: true } },

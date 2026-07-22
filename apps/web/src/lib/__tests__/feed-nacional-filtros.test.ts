@@ -32,6 +32,7 @@ vi.mock('@/lib/feed-timeline', () => ({ garantirTimelineDaRedeDoViewer: vi.fn() 
 vi.mock('next/cache', () => ({ unstable_cache: (fn: () => unknown) => fn }))
 
 import {
+  getPostsFeedNacional,
   getPostsFeedNacionalSeguindo,
   getPostsFeedNacionalGrupos,
 } from '@/lib/feed'
@@ -65,6 +66,32 @@ const postRaw = {
   comentarios: [],
   _count: { reacoes: 0, comentarios: 0 },
 }
+
+describe('getPostsFeedNacional', () => {
+  beforeEach(() => {
+    findManySeguimento.mockReset()
+    findManyPost.mockReset()
+    findFirstTenant.mockReset()
+    getTenantIdsPorAfiliacao.mockReset()
+    getTenantIdsPorAfiliacao.mockResolvedValue(['syn-1', 't1'])
+    findFirstTenant.mockResolvedValue({ id: 'syn-1' })
+  })
+
+  it('não usa autorId in:[] quando o viewer não segue ninguém', async () => {
+    findManySeguimento.mockResolvedValue([])
+    findManyPost.mockResolvedValue([])
+
+    await getPostsFeedNacional('af-1', 'u1')
+
+    expect(findManyPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ tenant: { sintetico: true } }, { alcanceNacional: true }],
+        }),
+      }),
+    )
+  })
+})
 
 describe('getPostsFeedNacionalSeguindo', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { subscribeNotificacaoPing } from '@/lib/notificacoes-bus'
 import { createSsePingResponse } from '@/lib/sse-stream'
 
@@ -16,12 +16,13 @@ export async function GET(request: Request) {
     if (!session?.user?.id) {
       return new Response('Não autenticado', { status: 401 })
     }
-    const tenant = await getTenantFromHost()
-    if (!tenant) {
+
+    const tenantId = await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+    if (!tenantId) {
       return new Response('Tenant não encontrado', { status: 404 })
     }
+
     const userId = session.user.id
-    const tenantId = tenant.id
 
     return createSsePingResponse(
       (onPing) => subscribeNotificacaoPing(tenantId, userId, onPing),

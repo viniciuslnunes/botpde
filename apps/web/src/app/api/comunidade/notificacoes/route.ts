@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import {
   listarNotificacoesSociais,
   type FiltroNotificacaoSocial,
@@ -17,22 +18,27 @@ const FILTROS_VALIDOS = new Set<FiltroNotificacaoSocial>([
 
 export async function GET(request: NextRequest) {
   try {
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
+    const session = await auth()
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
-    await assertMembroAtivo(tenant.id, session.user.id)
+
+    const tenantId = await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+
+    const tenantAtivo = await getActiveTenant(session.user.id, session.user.email)
+    if (tenantAtivo?.id === tenantId) {
+      await assertMembroAtivo(tenantId, session.user.id)
+    }
 
     const raw = request.nextUrl.searchParams.get('filtro') ?? 'todas'
     const filtro = FILTROS_VALIDOS.has(raw as FiltroNotificacaoSocial)
       ? (raw as FiltroNotificacaoSocial)
       : 'todas'
 
-    const notificacoes = await listarNotificacoesSociais(
-      tenant.id,
-      session.user.id,
-      filtro,
-    )
+    const notificacoes = await listarNotificacoesSociais(tenantId, session.user.id, filtro)
 
     return NextResponse.json({
       notificacoes: notificacoes.map((n) => ({

@@ -3,6 +3,7 @@ import { db } from '@torcida/db'
 import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from './hierarquia'
 import { tagFeedDescobrir } from './comunidade-cache'
+import { compactOr } from '@/lib/prisma-filters'
 
 export const COMUNICADOS_CACHE_TAG = 'comunicados-feed'
 
@@ -125,10 +126,12 @@ export async function getFeedComunidade(
       ? (db.post.findMany({
           where: {
             oculto: false,
-            OR: [
+            OR: compactOr([
               { tenantId },
-              { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' },
-            ],
+              tenantsExternos.length > 0
+                ? { tenantId: { in: tenantsExternos }, visibilidade: 'PUBLICO' }
+                : null,
+            ]),
           },
           orderBy: [{ fixado: 'desc' }, { criadoEm: 'desc' }],
           take: opts.takePosts,

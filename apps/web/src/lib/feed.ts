@@ -19,6 +19,7 @@ import { enriquecerPostsComBadges } from './autor-badges'
 import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
 import { formatNomeTorcida } from '@torcida/types'
 import { durableImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
+import { compactOr } from '@/lib/prisma-filters'
 
 import { getNoticiasAprovadas, type NoticiaAprovadaItem } from './noticias'
 import {
@@ -194,8 +195,10 @@ export function projetarPost(post: PostRaw): PostSocialItem {
     midiaUrls: filterDurableImageUrls(rest.midiaUrls),
     tenant: { nome: formatNomeTorcida(tenant.nome) },
     autor: {
-      ...autor,
-      avatarUrl: durableImageUrl(autor.avatarUrl),
+      id: autor?.id ?? rest.autorId,
+      nome: autor?.nome ?? null,
+      nickname: autor?.nickname ?? null,
+      avatarUrl: durableImageUrl(autor?.avatarUrl ?? null),
       sedeNome: null,
       cargoNome: null,
       departamentoNome: null,
@@ -210,8 +213,10 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           oculto: postOrigem.oculto,
           midiaUrls: filterDurableImageUrls(postOrigem.midiaUrls),
           autor: {
-            ...postOrigem.autor,
-            avatarUrl: durableImageUrl(postOrigem.autor.avatarUrl),
+            id: postOrigem.autor?.id ?? '',
+            nome: postOrigem.autor?.nome ?? null,
+            nickname: postOrigem.autor?.nickname ?? null,
+            avatarUrl: durableImageUrl(postOrigem.autor?.avatarUrl ?? null),
           },
         }
       : null,
@@ -222,7 +227,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           corpo: comunicadoOrigem.corpo,
           prioridade: comunicadoOrigem.prioridade,
           tenantNome: formatNomeTorcida(comunicadoOrigem.tenant.nome),
-          autorNome: comunicadoOrigem.autor.nome,
+          autorNome: comunicadoOrigem.autor?.nome ?? null,
         }
       : null,
     evento: evento
@@ -325,6 +330,7 @@ export function postIncludeLista(userId?: string) {
         corpo: true,
         prioridade: true,
         tenant: { select: { nome: true } },
+        autor: { select: { nome: true } },
       },
     },
     enquete: {
@@ -345,6 +351,15 @@ export function postIncludeLista(userId?: string) {
       ? { where: { userId }, select: { tipo: true }, take: 1 }
       : ({ where: { id: '' }, select: { tipo: true }, take: 1 } as const),
   } as const
+}
+
+/** OR do feed nacional — Prisma rejeita `in: []`; omitir o ramo de seguidos vazio. */
+function orFeedNacionalDescobrir(seguindoAprovados: string[]): Prisma.PostWhereInput[] {
+  return compactOr([
+    { tenant: { sintetico: true } },
+    seguindoAprovados.length > 0 ? { autorId: { in: seguindoAprovados } } : null,
+    { alcanceNacional: true },
+  ])
 }
 
 export function postInclude(userId?: string) {
@@ -1285,11 +1300,7 @@ export const getPostsFeedNacional = cache(async function getPostsFeedNacional(
           oculto: false,
           ...escopoFeedSemConversa,
           ...cursorWhere,
-          OR: [
-            { tenant: { sintetico: true } },
-            { autorId: { in: seguindoAprovados } },
-            { alcanceNacional: true },
-          ],
+          OR: orFeedNacionalDescobrir(seguindoAprovados),
         },
         orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
         take: take + 1,

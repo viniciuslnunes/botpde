@@ -200,3 +200,25 @@ export const getTenantIdsPorAfiliacao = cache(async (afiliacaoId: string): Promi
   })
   return tenants.map((t) => t.id)
 })
+
+/**
+ * Tenant operacional do portal na Comunidade: torcida ativa do sócio ou container
+ * sintético da CN para torcedor global (sem `SaasMembro`). Usado por navbar,
+ * notificações, busca e APIs que antes dependiam só de `getTenantFromHost()`.
+ */
+export const resolveTenantIdPortalComunidade = cache(
+  async (userId: string, email?: string | null): Promise<string | null> => {
+    const ativo = await getActiveTenant(userId, email)
+    if (ativo) return ativo.id
+
+    const perfil: { onboardingConcluidoEm: Date | null; afiliacaoId: string | null } | null =
+      await db.perfilTorcedor.findUnique({
+        where: { userId },
+        select: { onboardingConcluidoEm: true, afiliacaoId: true },
+      })
+    if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) return null
+
+    const sintetico = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
+    return sintetico.id
+  },
+)

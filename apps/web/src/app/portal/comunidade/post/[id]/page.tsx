@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getTenantFromHost } from '@/lib/tenant'
+import { resolveTenantIdPortalComunidade, resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { getPostPorId } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
 import { resolverAfiliacaoSlugContexto } from '@/lib/sofascore-server'
@@ -19,18 +19,20 @@ export default async function PostComunidadePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const [{ id }, session, tenant] = await Promise.all([
-    params,
-    auth(),
-    getTenantFromHost(),
-  ])
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
-  if (!tenant) redirect('/portal')
 
-  const post = await getPostPorId(id, tenant.id, session.user.id)
+  const [{ id }, tenantId, ctx] = await Promise.all([
+    params,
+    resolveTenantIdPortalComunidade(session.user.id, session.user.email),
+    resolverContextoComunidade(session.user.id, session.user.email),
+  ])
+  if (!tenantId) redirect('/portal')
+
+  const post = await getPostPorId(id, tenantId, session.user.id)
   if (!post) notFound()
 
-  const afiliacaoSlug = await resolverAfiliacaoSlugContexto(tenant.afiliacaoId)
+  const afiliacaoSlug = await resolverAfiliacaoSlugContexto(ctx?.afiliacao?.id ?? null)
 
   const currentUser = {
     id: session.user.id,
@@ -50,7 +52,7 @@ export default async function PostComunidadePage({
       <MotionReveal>
         <FeedPostCard
           post={post}
-          showTenantBadge={post.tenantId !== tenant.id}
+          showTenantBadge={post.tenantId !== tenantId}
           currentUser={currentUser}
           isAuthor={post.autorId === session.user.id}
         />

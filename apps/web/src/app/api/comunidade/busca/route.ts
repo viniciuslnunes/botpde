@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { assertMembroAtivo } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { buscarComunidade, type BuscaComunidadeModo } from '@/lib/comunidade-busca'
 
 function resolverModoBusca(raw: string | null): BuscaComunidadeModo {
@@ -10,15 +11,24 @@ function resolverModoBusca(raw: string | null): BuscaComunidadeModo {
 
 export async function GET(request: NextRequest) {
   try {
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
+    const session = await auth()
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     }
-    await assertMembroAtivo(tenant.id, session.user.id)
+
+    const tenantId = await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
+    }
+
+    const tenantAtivo = await getActiveTenant(session.user.id, session.user.email)
+    if (tenantAtivo?.id === tenantId) {
+      await assertMembroAtivo(tenantId, session.user.id)
+    }
 
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
     const modo = resolverModoBusca(request.nextUrl.searchParams.get('modo'))
-    const resultado = await buscarComunidade(tenant.id, session.user.id, q, { modo })
+    const resultado = await buscarComunidade(tenantId, session.user.id, q, { modo })
 
     return NextResponse.json(resultado)
   } catch (error) {
