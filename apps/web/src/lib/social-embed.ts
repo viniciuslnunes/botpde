@@ -166,7 +166,7 @@ export function resolveEmbedFrameWidth(
 /** Origens que enviam `postMessage` de resize dos iframes oficiais. */
 export const EMBED_RESIZE_ORIGINS: Record<Exclude<EmbedProvider, 'youtube'>, readonly string[]> = {
   twitter: ['https://platform.twitter.com', 'https://twitter.com', 'https://x.com'],
-  instagram: ['https://www.instagram.com'],
+  instagram: ['https://www.instagram.com', 'https://instagram.com'],
   tiktok: ['https://www.tiktok.com'],
 }
 
@@ -194,13 +194,38 @@ export function estimateEmbedHeight(provider: EmbedProvider, url: string, widthP
       // player 9:16 + perfil/CTA/caption do embed/v2
       return Math.round((w * 16) / 9) + 400
     case 'instagram':
-      if (/\/(reel|reels)\//i.test(url)) return Math.round((w * 16) / 9) + 260
-      return Math.round(w * 1.15) + 260
+      // Chrome do /embed/ (header + CTA + likes + comentar) é alto; subestimar
+      // deixa scrollbar dentro do iframe até o MEASURE chegar (se chegar).
+      if (/\/(reel|reels)\//i.test(url)) return Math.round((w * 16) / 9) + 420
+      return Math.round((w * 5) / 4) + 340
     case 'twitter':
       return Math.round(w * 0.9) + 360
     default:
       return 560
   }
+}
+
+/**
+ * True se `source` é o contentWindow do iframe ou um frame aninhado dele
+ * (Instagram MEASURE às vezes vem de iframe filho same-origin).
+ */
+export function isEmbedMessageSource(
+  source: MessageEventSource | null,
+  iframe: HTMLIFrameElement | null,
+): boolean {
+  if (!source || !iframe?.contentWindow) return false
+  if (typeof Window === 'undefined' || !(source instanceof Window)) return false
+  let w: Window | null = source
+  for (let i = 0; i < 6 && w; i++) {
+    if (w === iframe.contentWindow) return true
+    if (w.parent === w) break
+    try {
+      w = w.parent
+    } catch {
+      break
+    }
+  }
+  return false
 }
 
 function asRecord(data: unknown): Record<string, unknown> | null {
@@ -298,10 +323,14 @@ export function parseEmbedHeightMessage(
 /**
  * Usa a altura reportada pelo player. Não amplia com a largura do card — o
  * conteúdo social não estica; upscale só criava faixas e scroll interno.
- * Buffer de 4px evita scrollbar fantasma por arredondamento.
+ * Buffer evita scrollbar fantasma (IG costuma reportar ~1 linha a menos).
  */
-export function applyEmbedHeightReport(report: EmbedHeightReport): number {
-  return Math.min(report.height + 4, 2400)
+export function applyEmbedHeightReport(
+  report: EmbedHeightReport,
+  provider?: EmbedProvider,
+): number {
+  const pad = provider === 'instagram' ? 28 : 4
+  return Math.min(report.height + pad, 2400)
 }
 
 /**

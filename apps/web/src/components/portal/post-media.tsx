@@ -14,6 +14,7 @@ import {
   EMBED_RESIZE_ORIGINS,
   estimateEmbedHeight,
   instagramEmbedSrc,
+  isEmbedMessageSource,
   parseEmbedHeightMessage,
   resolveEmbedFrameWidth,
   tiktokVideoId,
@@ -400,11 +401,13 @@ function SocialEmbed({ url }: { url: string }) {
     const origins = EMBED_RESIZE_ORIGINS.instagram
     const onMessage = (event: MessageEvent) => {
       if (!origins.includes(event.origin)) return
-      const win = iframeRef.current?.contentWindow
-      if (win && event.source && event.source !== win) return
+      // Só aplica se vier deste iframe (ou frame aninhado dele) — evita
+      // um MEASURE de outro post IG no feed sobrescrever a altura.
+      if (!isEmbedMessageSource(event.source, iframeRef.current)) return
       const report = parseEmbedHeightMessage('instagram', event.data)
       if (!report) return
-      setIgHeight(applyEmbedHeightReport(report))
+      const next = applyEmbedHeightReport(report, 'instagram')
+      setIgHeight((prev) => (prev == null ? next : Math.max(prev, next)))
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)

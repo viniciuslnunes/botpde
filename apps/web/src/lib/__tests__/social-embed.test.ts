@@ -4,6 +4,7 @@ import {
   classifyMedia,
   detectEmbedProvider,
   ensureSocialEmbedInMidias,
+  estimateEmbedHeight,
   firstSocialUrlInText,
   instagramEmbedSrc,
   midiasAposEditarConteudo,
@@ -204,10 +205,37 @@ describe('parseEmbedHeightMessage', () => {
       width: 325,
     })
   })
+
+  it('lê MEASURE do Instagram (objeto e JSON string)', () => {
+    expect(
+      parseEmbedHeightMessage('instagram', { type: 'MEASURE', details: { height: 1104 } }),
+    ).toEqual({ height: 1104 })
+    expect(
+      parseEmbedHeightMessage(
+        'instagram',
+        JSON.stringify({ type: 'MEASURE', details: { height: '988' } }),
+      ),
+    ).toEqual({ height: 988 })
+  })
 })
 
 describe('applyEmbedHeightReport', () => {
   it('aplica buffer sem upscale', () => {
     expect(applyEmbedHeightReport({ height: 740, width: 325 })).toBe(744)
+  })
+
+  it('usa buffer maior no Instagram', () => {
+    expect(applyEmbedHeightReport({ height: 1104 }, 'instagram')).toBe(1132)
+  })
+})
+
+describe('estimateEmbedHeight — Instagram', () => {
+  it('estima reel e post com chrome generoso', () => {
+    expect(estimateEmbedHeight('instagram', SOCIAL_URLS.instagram, 540)).toBe(
+      Math.round((540 * 16) / 9) + 420,
+    )
+    expect(estimateEmbedHeight('instagram', SOCIAL_URLS.instagramPost, 540)).toBe(
+      Math.round((540 * 5) / 4) + 340,
+    )
   })
 })
