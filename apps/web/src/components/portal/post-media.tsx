@@ -511,14 +511,12 @@ function SocialEmbed({ url }: { url: string }) {
     return <EmbedFallback url={url} provider={provider} />
   }
 
-  // Host acompanha o tema só quando o iframe também muda (senão vira faixa contrastante).
-  const hostBg = themeAware && colorScheme === 'dark' ? 'bg-black' : 'bg-white'
-
+  // Sem bg/borda no host: o widget (X) já pinta o card; chrome nosso vira filete.
   return (
     <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
       <div
         ref={hostRef}
-        className={`social-embed-host relative mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] ${hostBg}`}
+        className="social-embed-host relative mx-auto overflow-hidden rounded-xl"
         style={{
           width: frameWidth,
           maxWidth: '100%',

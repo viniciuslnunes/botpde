@@ -636,15 +636,19 @@ html[data-grid='off'] .app-shell-bg {
 }
 
 /* Embeds sociais — widgets oficiais; largura nativa centralizada, altura automática */
-.social-embed-host > blockquote {
+.social-embed-host blockquote {
   margin: 0 !important;
 }
 .social-embed-host iframe {
   display: block !important;
   max-width: 100% !important;
+  border: 0 !important;
+  /* Evita filete claro nas bordas arredondadas do widget do X */
+  background: transparent !important;
 }
 .social-embed-host .instagram-media,
 .social-embed-host .twitter-tweet,
 .social-embed-host .tiktok-embed {
   max-width: 100% !important;
+  margin: 0 !important;
 }
