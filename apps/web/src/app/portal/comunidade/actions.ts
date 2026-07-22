@@ -17,6 +17,7 @@ import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunid
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
 import { canFollowUser, getOrCreatePerfilMembro, getPerfilMembroForPortal, getSeguimentoStatus } from '@/lib/social'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
@@ -25,7 +26,6 @@ import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engage
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
 import { formatNomeTorcida } from '@torcida/types'
-import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
@@ -647,9 +647,14 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
   const statusAtual = await getSeguimentoStatus(session.user.id, userId)
   if (statusAtual === 'APROVADO' || statusAtual === 'PENDENTE') return statusAtual
 
-  // Seguimento.tenantContextoId é FK obrigatória: sem tenant do ator (torcedor
-  // global), usa o tenant do alvo. Dois torcedores globais entre si ficam de fora.
+  // Seguimento.tenantContextoId é FK obrigatória: sem tenant real do ator
+  // (torcedor global), tenta a Comunidade Nacional dele (afiliação com
+  // onboarding concluído); depois o tenant do alvo; por fim a CN do alvo.
+  // Cobre também torcedor global seguindo torcedor global.
   let tenantContextoId = tenant?.id ?? null
+  if (!tenantContextoId) {
+    tenantContextoId = await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+  }
   if (!tenantContextoId) {
     const vinculoAlvo: { tenant: { id: string } } | null = await db.saasMembro.findFirst({
       where: { userId, status: 'APROVADO' },
@@ -659,20 +664,20 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
     tenantContextoId = vinculoAlvo?.tenant.id ?? null
   }
   if (!tenantContextoId) {
+    tenantContextoId = await resolveTenantIdPortalComunidade(userId, undefined)
+  }
+  if (!tenantContextoId) {
     throw new Error(
       'Não é possível seguir outro torcedor sem torcida ainda — funcionalidade em desenvolvimento.',
     )
   }
 
-  // Sócio é sempre "privado" pra torcedor: sem tenant (ator é torcedor global),
-  // nunca auto-aprova, mesmo que o alvo tenha perfilPrivado=false — só o próprio
-  // sócio aprovando manualmente libera as publicações dele pro torcedor.
-  const perfilSeguido = await db.perfilMembro.findUnique({
-    where: { userId_tenantId: { userId, tenantId: tenantContextoId } },
-    select: { perfilPrivado: true },
-  })
-  const statusInicial =
-    tenant && perfilSeguido?.perfilPrivado === false ? 'APROVADO' : 'PENDENTE'
+  // Decisão depende só da privacidade efetiva do ALVO (mesma regra usada no
+  // resto da Comunidade — sócio sem registro explícito é privado por padrão,
+  // torcedor é público por padrão): perfil não-privado segue instantâneo,
+  // independente do ator ter tenant ativo ou ser torcedor global.
+  const { perfilPrivado } = await getPerfilMembroForPortal(userId, tenantContextoId)
+  const statusInicial = perfilPrivado ? 'PENDENTE' : 'APROVADO'
 
   await db.seguimento.upsert({
     where: { seguidorId_seguidoId: { seguidorId: session.user.id, seguidoId: userId } },
@@ -1314,7 +1319,7 @@ export async function votarEnquetePost(enqueteId: string, opcaoId: string): Prom
     throw new Error('Enquete indisponível')
   }
 
-  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const visibleIds = await resolveVisibleTenantIdsForFeed(tenant.id, session.user.id)
   if (!visibleIds.includes(enquete.post.tenantId)) throw new Error('Enquete não encontrada')
 
   const opcao: { id: string } | null = await db.opcaoEnquetePost.findFirst({
@@ -1447,7 +1452,7 @@ export async function repostarPost(postId: string, comentario?: string): Promise
   const parsed = repostarSchema.safeParse({ postId, comentario })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
-  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const visibleIds = await resolveVisibleTenantIdsForFeed(tenant.id, session.user.id)
   const original: { id: string; autorId: string; oculto: boolean; visibilidade: string } | null =
     await db.post.findFirst({
       where: { id: parsed.data.postId, tenantId: { in: visibleIds }, oculto: false },
@@ -1508,7 +1513,7 @@ export async function repostarComunicado(comunicadoId: string, comentario?: stri
   const parsed = repostarComunicadoSchema.safeParse({ comunicadoId, comentario })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Repost inválido')
 
-  const visibleIds = await getVisibleTenantIds(tenant.id, 'comunidade')
+  const visibleIds = await resolveVisibleTenantIdsForFeed(tenant.id, session.user.id)
   const comunicado: { id: string; autorId: string } | null = await db.announcement.findFirst({
     where: { id: parsed.data.comunicadoId, tenantId: { in: visibleIds } },
     select: { id: true, autorId: true },
