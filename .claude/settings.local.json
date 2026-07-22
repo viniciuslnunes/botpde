@@ -41,7 +41,9 @@
       "Bash(grep -n \"Aplicar \\\\`resolveVisibility\\\\` em mais telas\" ARCHITECTURE.md)",
       "Bash(git add *)",
       "Bash(git restore *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(node -e \"require\\('acorn'\\)\")",
+      "Bash(rm -rf \"node_modules/.pnpm/acorn@8.17.0\")"
     ]
   },
   "hooks": {
