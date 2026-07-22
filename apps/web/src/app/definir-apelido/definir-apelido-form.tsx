@@ -35,7 +35,11 @@ export function DefinirApelidoForm({
         if (!nickDisponivel) e.preventDefault()
       }}
     >
-      <AuthRedirectEffect redirectTo={state.redirectTo} />
+      <AuthRedirectEffect
+        redirectTo={state.redirectTo}
+        message="Preparando seu onboarding..."
+        description="Estamos configurando seu perfil e carregando os clubes."
+      />
       {state.message && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
           {state.message}

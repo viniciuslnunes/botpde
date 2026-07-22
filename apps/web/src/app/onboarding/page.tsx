@@ -1,27 +1,33 @@
+import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding, UFS_BRASIL } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
 import { usuarioPrecisaNickname } from '@/lib/tenant-context'
+import { OnboardingSkeleton } from './onboarding-skeleton'
 import { OnboardingWizard } from './wizard'
 
 export default async function OnboardingPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  if (await usuarioPrecisaNickname(session.user.id)) {
-    redirect('/definir-apelido')
-  }
+  const userId = session.user.id
 
-  const [estado, hostTenant] = await Promise.all([
-    getEstadoOnboarding(session.user.id),
+  // Gates em paralelo — evita waterfall de 3 RTTs antes do catálogo.
+  const [precisaNickname, estado, hostTenant] = await Promise.all([
+    usuarioPrecisaNickname(userId),
+    getEstadoOnboarding(userId),
     getTenantFromHost(),
   ])
 
+  if (precisaNickname) {
+    redirect('/definir-apelido')
+  }
+
   if (hostTenant) {
     const membroHost = await db.saasMembro.findUnique({
-      where: { tenantId_userId: { tenantId: hostTenant.id, userId: session.user.id } },
+      where: { tenantId_userId: { tenantId: hostTenant.id, userId } },
       select: { status: true },
     })
     if (membroHost?.status === 'APROVADO') {
@@ -31,6 +37,15 @@ export default async function OnboardingPage() {
     redirect('/auth/contexto')
   }
 
+  return (
+    <Suspense fallback={<OnboardingSkeleton />}>
+      <OnboardingWizardLoader nomeInicial={session.user.name ?? ''} />
+    </Suspense>
+  )
+}
+
+/** Catálogo pesado em Suspense — shell/gates resolvem antes; skeleton cobre o fetch. */
+async function OnboardingWizardLoader({ nomeInicial }: { nomeInicial: string }) {
   const [afiliacoesIniciais, regioes] = await Promise.all([
     getAfiliacoesParaOnboarding(),
     getRegioesOnboarding(),
@@ -41,7 +56,7 @@ export default async function OnboardingPage() {
       afiliacoesIniciais={afiliacoesIniciais}
       regioes={regioes}
       ufs={UFS_BRASIL}
-      nomeInicial={session.user.name ?? ''}
+      nomeInicial={nomeInicial}
     />
   )
 }
