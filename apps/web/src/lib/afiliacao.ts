@@ -62,7 +62,7 @@ export async function criarUnidadeDaSolicitacao(
       institucional: true,
       canalOficial: true,
       visibilidadeCanal: 'HIERARQUIA',
-      somenteAdminPublica: true,
+      somenteAdminPublica: false,
       publica: true,
       criadoPorId: atorId,
       membros: { create: { userId: atorId, papel: 'ADMIN' } },

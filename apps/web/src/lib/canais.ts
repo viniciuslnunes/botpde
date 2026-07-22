@@ -198,7 +198,7 @@ export async function getOrCreateCanalOficial(
       institucional: true,
       canalOficial: true,
       visibilidadeCanal: 'HIERARQUIA',
-      somenteAdminPublica: true,
+      somenteAdminPublica: false,
       // Fechado por padrão — entrada mediante pedido/aprovação da liderança;
       // liderança troca em /admin/configuracoes se quiser abrir (ver salvarCanalOficial).
       publica: false,

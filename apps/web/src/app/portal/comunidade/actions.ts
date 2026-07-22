@@ -2610,7 +2610,7 @@ export async function criarCanalTematico(
       institucional: true,
       canalOficial: false,
       visibilidadeCanal: parsed.data.visibilidadeCanal,
-      somenteAdminPublica: true,
+      somenteAdminPublica: false,
       publica: parsed.data.publica,
       criadoPorId: session.user.id,
       membros: {
