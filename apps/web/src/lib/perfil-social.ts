@@ -58,9 +58,11 @@ export function resolverAvatarSocial(
 /**
  * Avatar do usuário logado, para topbar e aside da Comunidade — nunca
  * session.user.image (JWT só recebe a foto nova no próximo login). Cacheado
- * entre requests (sem TTL) e só reconsultado quando salvarPerfilSocial ou o
- * sync de login OAuth chamam revalidateTag(tagAvatarUsuario(userId)) — não é
- * uma query por navegação.
+ * entre requests — não é uma query por navegação. Invalidado na hora pelo
+ * evento real (salvarPerfilSocial / sync de login OAuth chamam
+ * revalidateTag(tagAvatarUsuario(userId))); o `revalidate` é só rede de
+ * segurança contra um cache poluído por uma corrida rara (ex.: leitura antes
+ * da foto existir), não o mecanismo principal de atualização.
  */
 export async function getAvatarAtualDoUsuario(
   userId: string,
@@ -80,7 +82,7 @@ export async function getAvatarAtualDoUsuario(
       return resolverAvatarSocial(perfil?.avatarUrl, user?.avatarUrl)
     },
     ['avatar-atual-do-usuario', userId, tenantId ?? 'global'],
-    { tags: [tagAvatarUsuario(userId)] },
+    { revalidate: 60, tags: [tagAvatarUsuario(userId)] },
   )()
 }
 
