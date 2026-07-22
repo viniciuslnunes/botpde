@@ -104,28 +104,48 @@ body {
 }
 
 /* Ações clicáveis (navegação / mutação) — pointer por padrão.
-   Em @layer base para utilitários Tailwind (cursor-default, etc.) sobrescreverem. */
-@layer base {
-  a[href],
-  button:not(:disabled),
-  [role='button']:not([aria-disabled='true']),
-  summary,
-  label[for],
-  input[type='button']:not(:disabled),
-  input[type='submit']:not(:disabled),
-  input[type='reset']:not(:disabled),
-  input[type='file']:not(:disabled),
-  input[type='image']:not(:disabled),
-  select:not(:disabled) {
-    cursor: pointer;
-  }
+   Fora de @layer para vencer o preflight. Inclui descendentes (*)
+   para o I-beam não aparecer sobre texto/ícones dentro do alvo. */
+a[href],
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+summary,
+label[for],
+input[type='button']:not(:disabled),
+input[type='submit']:not(:disabled),
+input[type='reset']:not(:disabled),
+input[type='file']:not(:disabled),
+input[type='image']:not(:disabled),
+select:not(:disabled),
+a[href] *,
+button:not(:disabled) *,
+[role='button']:not([aria-disabled='true']) *,
+summary *,
+label[for] * {
+  cursor: pointer;
+}
 
-  button:disabled,
-  [role='button'][aria-disabled='true'],
-  input:is([type='button'], [type='submit'], [type='reset'], [type='file'], [type='image']):disabled,
-  select:disabled {
-    cursor: not-allowed;
-  }
+button:disabled,
+button:disabled *,
+[role='button'][aria-disabled='true'],
+[role='button'][aria-disabled='true'] *,
+input:is([type='button'], [type='submit'], [type='reset'], [type='file'], [type='image']):disabled,
+select:disabled {
+  cursor: not-allowed;
+}
+
+/* Utilitários Tailwind precisam vencer a regra acima (mesma cascata unlayered). */
+.cursor-default,
+.cursor-default * {
+  cursor: default;
+}
+.cursor-text,
+.cursor-text * {
+  cursor: text;
+}
+.cursor-not-allowed,
+.cursor-not-allowed * {
+  cursor: not-allowed;
 }
 
 /* ── Utilitários com cor primária do tenant ──────────────────── */
