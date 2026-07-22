@@ -64,7 +64,7 @@ export function PerfilHeader({
           <Avatar nome={nome} avatarUrl={avatarUrl} size="xl" />
         </div>
 
-        <h1 className="mt-3 text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">
+        <h1 className="mt-3 w-full max-w-full break-words px-2 text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">
           {nome ?? 'Membro'}
         </h1>
         {nickname && (

@@ -244,8 +244,10 @@ export function PortalNavbar({
                     {firstName.charAt(0).toUpperCase()}
                   </div>
                 )}
-                {firstName}
-                <ChevronDown className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
+                <span className="block truncate" style={{ maxWidth: '9rem' }}>
+                  {firstName}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]" />
               </button>
 
               {userDropOpen && (

@@ -136,7 +136,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
 
-    async jwt({ token, account, user }) {
+    async jwt({ token, account, user, trigger, session }) {
+      // Refresh explícito via fetch('/api/auth/session', { method: 'POST', body }) —
+      // usado pelo formulário de perfil após trocar avatar, já que session.user.image
+      // some do token e não é reconsultado no banco a cada request.
+      if (trigger === 'update' && session && typeof session === 'object' && 'image' in session) {
+        token.picture = (session as { image: string | null }).image
+      }
+
       // Somente no login inicial (account presente) buscamos o UUID do banco
       // e sobrescrevemos token.sub para que session.user.id seja sempre o UUID,
       // nunca o ID numérico do OAuth provider (Discord snowflake / Google ID).

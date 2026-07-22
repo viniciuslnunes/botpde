@@ -171,8 +171,8 @@ function AdminTopbar({
                   {firstName.charAt(0).toUpperCase()}
                 </div>
               )}
-              {firstName}
-              <ChevronDown className="h-3.5 w-3.5 text-[rgb(var(--foreground-muted))]" />
+              <span className="inline-block max-w-[110px] truncate lg:max-w-[160px]">{firstName}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[rgb(var(--foreground-muted))]" />
             </button>
 
             {userDropOpen && (

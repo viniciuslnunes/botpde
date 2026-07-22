@@ -5,6 +5,7 @@ import { assertMembroAtivo } from '@/lib/authz'
 import { ExpectedError } from './expected-error'
 import { resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { isCloudinaryUrl } from '@/lib/social-embed'
+import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 
 export interface PerfilSocialSalvo {
   bannerUrl: string | null
@@ -36,6 +37,11 @@ export async function salvarPerfilSocial(
       where: { tenantId_userId: { tenantId: tenant.id, userId } },
       select: { tipo: true, status: true },
     })
+
+  const perfilAnterior = await db.perfilMembro.findUnique({
+    where: { userId_tenantId: { userId, tenantId: tenant.id } },
+    select: { avatarUrl: true },
+  })
 
   const bannerUrl = parsed.data.bannerUrl ?? null
   const bannerPos = parsed.data.bannerPos ?? null
@@ -98,6 +104,17 @@ export async function salvarPerfilSocial(
 
   if (bannerUrl && saved.bannerUrl !== bannerUrl) {
     throw new Error('Falha ao gravar a capa no banco. Confira se o schema está atualizado (db:push).')
+  }
+
+  // Avatar do perfil social é por torcida (PerfilMembro), mas mensagens, menções e
+  // a sessão (login) exibem User.avatarUrl (global) — sem isso a foto trocada aqui
+  // nunca aparece fora do próprio card de perfil.
+  if (avatarUrl && avatarUrl !== perfilAnterior?.avatarUrl) {
+    await db.user.update({ where: { id: userId }, data: { avatarUrl } })
+    // Feed "descobrir"/sugestões e stories rings embutem avatarUrl no cache
+    // (unstable_cache, 60-120s) — sem isso a foto nova só aparece lá depois
+    // do TTL expirar.
+    invalidarCachesComunidadeFeed(tenant.id)
   }
 
   await db.auditLog.create({

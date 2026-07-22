@@ -258,6 +258,14 @@ export function PerfilEditarForm({
       } else {
         setAvatarUrl(url)
         await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true, apenasMidia: true })
+        // Sincroniza a foto na sessão (JWT) — sem isso topbar/menu ficam com a
+        // imagem antiga até o usuário deslogar e logar de novo.
+        await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: url }),
+        }).catch(() => {})
+        router.refresh()
         toast.success('Foto de perfil salva.', { id: toastId })
       }
     } catch {
