@@ -1,11 +1,15 @@
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
+import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { getTenantFromHost } from '@/lib/tenant'
 
 /**
- * Tenant do perfil social na tela. Em produção (Railway/apex) o host pode não
- * trazer subdomínio; o cookie pode faltar ou apontar para outra torcida.
- * Para o próprio perfil, faz fallback ao vínculo APROVADO do usuário.
+ * Tenant do perfil social na tela.
+ *
+ * - Sócio / torcedor com vínculo APROVADO no host → tenant da TO (PerfilMembro vive lá).
+ * - Torcedor global (só `PerfilTorcedor`, sem SaasMembro) → tenant sintético da
+ *   Comunidade Nacional do clube — nunca o `TENANT_SLUG`/cookie de uma TO alheia.
+ * - Fallback: vínculo SOCIO APROVADO do perfil visitado, depois host.
  */
 export async function resolvePerfilTenantForUser(
   profileUserId: string,
@@ -14,35 +18,37 @@ export async function resolvePerfilTenantForUser(
   const fromHost = await getTenantFromHost()
 
   if (fromHost) {
-    if (profileUserId !== viewerId) return fromHost
-
-    const membro: { status: string } | null = await db.saasMembro.findUnique({
+    const membroHost: { status: string; tipo: string } | null = await db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: fromHost.id, userId: profileUserId } },
-      select: { status: true },
+      select: { status: true, tipo: true },
     })
-    if (membro?.status === 'APROVADO') return fromHost
+    // SOCIO e TORCEDOR da TO guardam PerfilMembro nesse tenant.
+    if (membroHost?.status === 'APROVADO') return fromHost
   }
 
-  if (profileUserId === viewerId) {
-    const vinculo: { tenant: Tenant } | null = await db.saasMembro.findFirst({
-      where: { userId: profileUserId, status: 'APROVADO' },
-      orderBy: { criadoEm: 'desc' },
-      select: { tenant: true },
-    })
-    if (vinculo?.tenant.ativo) return vinculo.tenant
+  const socio: { tenant: Tenant } | null = await db.saasMembro.findFirst({
+    where: { userId: profileUserId, status: 'APROVADO', tipo: 'SOCIO' },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenant: true },
+  })
+  if (socio?.tenant.ativo) return socio.tenant
+
+  // Torcedor global: CN do clube do onboarding (não herdar Gaviões do deploy).
+  const perfil: {
+    onboardingConcluidoEm: Date | null
+    afiliacaoId: string | null
+  } | null = await db.perfilTorcedor.findUnique({
+    where: { userId: profileUserId },
+    select: { onboardingConcluidoEm: true, afiliacaoId: true },
+  })
+  if (perfil?.onboardingConcluidoEm && perfil.afiliacaoId) {
+    const { id } = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
+    const sintetico: Tenant | null = await db.tenant.findUnique({ where: { id } })
+    if (sintetico?.ativo) return sintetico
   }
 
-  // Torcedor global (sem tenant pelo host) abrindo o perfil de outra pessoa:
-  // usa o tenant do perfil visitado. Perfil de outro torcedor global (nenhum
-  // vínculo aprovado) segue fora de escopo — retorna null.
-  if (!fromHost && profileUserId !== viewerId) {
-    const vinculoPerfil: { tenant: Tenant } | null = await db.saasMembro.findFirst({
-      where: { userId: profileUserId, status: 'APROVADO' },
-      orderBy: { criadoEm: 'desc' },
-      select: { tenant: true },
-    })
-    if (vinculoPerfil?.tenant.ativo) return vinculoPerfil.tenant
-  }
+  // Visitante sem onboarding do perfil: mantém host se houver; senão null.
+  if (profileUserId !== viewerId && fromHost) return fromHost
 
   return fromHost
 }

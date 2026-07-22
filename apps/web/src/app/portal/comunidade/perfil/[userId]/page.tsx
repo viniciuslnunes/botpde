@@ -108,9 +108,15 @@ export default async function PerfilComunidadePage({
     select: perfilSelect,
   })
 
-  const vinculo = membro ? { tipo: membro.tipo, status: membro.status } : null
+  // Torcedor global vive no tenant sintético da CN sem SaasMembro — trata como
+  // TORCEDOR para título (apelido do clube) e privacidade pública obrigatória.
+  const vinculo = membro
+    ? { tipo: membro.tipo, status: membro.status }
+    : tenant.sintetico
+      ? { tipo: 'TORCEDOR' as const, status: 'APROVADO' as const }
+      : null
   const tenantNomeExibicao = resolverTituloPerfilSocial({
-    tipoMembro: membro?.tipo ?? null,
+    tipoMembro: vinculo?.tipo ?? null,
     tenantNome: tenant.nome,
     afiliacaoApelido: afiliacao?.apelido ?? null,
     afiliacaoNome: afiliacao?.nome ?? null,
@@ -284,7 +290,7 @@ export default async function PerfilComunidadePage({
                 sedeNome={membro?.sede?.nome ?? null}
                 membroDesde={membro?.criadoEm ?? user.criadoEm}
                 email={isSelf ? user.email : null}
-                tipoMembro={membro?.tipo ?? null}
+                tipoMembro={vinculo?.tipo ?? null}
                 numeroSocio={isSelf ? (socio?.numeroSocio ?? null) : null}
                 validadeSocio={isSelf ? (socio?.validade ?? null) : null}
                 membroForm={{

@@ -89,6 +89,17 @@ describe('resolverTituloPerfilSocial', () => {
       }),
     ).toBe('GAVIÕES DA FIEL')
   })
+
+  it('torcedor global (tipo inferido) exibe apelido do clube', () => {
+    expect(
+      resolverTituloPerfilSocial({
+        tipoMembro: 'TORCEDOR',
+        tenantNome: 'Timão — Comunidade Nacional',
+        afiliacaoApelido: 'Timão',
+        afiliacaoNome: 'Corinthians',
+      }),
+    ).toBe('Timão')
+  })
 })
 
 describe('torcedorAprovadoPublicoObrigatorio', () => {
