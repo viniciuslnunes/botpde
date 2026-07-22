@@ -86,7 +86,7 @@ export default async function AdminLayout({
     8,
     TIPOS_NOTIFICACAO_ADMIN,
   )
-  const avatarUrl = await getAvatarAtualDoUsuario(session.user.id, tenant.id)
+  const avatarUrl = await getAvatarAtualDoUsuario(session.user.id)
 
   return (
     <AdminShell

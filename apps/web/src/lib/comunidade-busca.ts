@@ -249,10 +249,10 @@ export async function buscarMembrosComunidade(
 
   // Dropdown só mostra avatar/nome/torcida — pula follow + contagens.
   if (modo === 'rapida') {
-    const perfis: { userId: string; perfilPrivado: boolean; avatarUrl: string | null }[] =
+    const perfis: { userId: string; perfilPrivado: boolean }[] =
       await db.perfilMembro.findMany({
         where: { tenantId, userId: { in: candidatoIds } },
-        select: { userId: true, perfilPrivado: true, avatarUrl: true },
+        select: { userId: true, perfilPrivado: true },
       })
     const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
 
@@ -261,7 +261,7 @@ export async function buscarMembrosComunidade(
       return {
         id: r.user.id,
         nome: r.user.nome,
-        avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
+        avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
         tenantNome: formatNomeTorcida(r.tenant.nome),
         perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
           tipo: r.tipo,
@@ -277,8 +277,8 @@ export async function buscarMembrosComunidade(
   const [perfis, seguimentos, contagensRows, podeSeguirLista] = await Promise.all([
     db.perfilMembro.findMany({
       where: { tenantId, userId: { in: candidatoIds } },
-      select: { userId: true, perfilPrivado: true, avatarUrl: true },
-    }) as Promise<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }[]>,
+      select: { userId: true, perfilPrivado: true },
+    }) as Promise<{ userId: string; perfilPrivado: boolean }[]>,
     db.seguimento.findMany({
       where: { seguidorId: userId, seguidoId: { in: candidatoIds } },
       select: { seguidoId: true, status: true },
@@ -302,7 +302,7 @@ export async function buscarMembrosComunidade(
     return {
       id: r.user.id,
       nome: r.user.nome,
-      avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, r.user.avatarUrl),
+      avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
       tenantNome: formatNomeTorcida(r.tenant.nome),
       perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
         tipo: r.tipo,

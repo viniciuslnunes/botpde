@@ -7,14 +7,12 @@ import {
 } from '@/lib/perfil-social'
 
 describe('resolverAvatarSocial', () => {
-  it('prioriza avatar do perfil social', () => {
-    expect(resolverAvatarSocial('https://perfil.jpg', 'https://oauth.jpg')).toBe(
-      'https://perfil.jpg',
-    )
+  it('retorna o avatar do usuário', () => {
+    expect(resolverAvatarSocial('https://oauth.jpg')).toBe('https://oauth.jpg')
   })
 
-  it('usa fallback OAuth quando perfil não tem avatar', () => {
-    expect(resolverAvatarSocial(null, 'https://oauth.jpg')).toBe('https://oauth.jpg')
+  it('retorna null quando o usuário não tem avatar', () => {
+    expect(resolverAvatarSocial(null)).toBe(null)
   })
 })
 

@@ -39,8 +39,8 @@ export async function salvarPerfilSocial(
       select: { tipo: true, status: true },
     })
 
-  const perfilAnterior = await db.perfilMembro.findUnique({
-    where: { userId_tenantId: { userId, tenantId: tenant.id } },
+  const usuarioAnterior = await db.user.findUnique({
+    where: { id: userId },
     select: { avatarUrl: true },
   })
 
@@ -64,7 +64,7 @@ export async function salvarPerfilSocial(
         membro,
       )
 
-  const saved: PerfilSocialSalvo = await db.perfilMembro.upsert({
+  const saved: Omit<PerfilSocialSalvo, 'avatarUrl'> = await db.perfilMembro.upsert({
     where: { userId_tenantId: { userId, tenantId: tenant.id } },
     create: {
       userId,
@@ -76,13 +76,11 @@ export async function salvarPerfilSocial(
       exibirDesde: apenasMidia ? true : (parsed.data.exibirDesde ?? true),
       bannerUrl,
       bannerPos,
-      avatarUrl,
     },
     update: apenasMidia
       ? {
           bannerUrl,
           bannerPos,
-          avatarUrl,
         }
       : {
           bio: parsed.data.bio?.trim() || null,
@@ -92,12 +90,10 @@ export async function salvarPerfilSocial(
           exibirDesde: parsed.data.exibirDesde ?? true,
           bannerUrl,
           bannerPos,
-          avatarUrl,
         },
     select: {
       bannerUrl: true,
       bannerPos: true,
-      avatarUrl: true,
       bio: true,
       perfilPrivado: true,
     },
@@ -107,11 +103,11 @@ export async function salvarPerfilSocial(
     throw new Error('Falha ao gravar a capa no banco. Confira se o schema está atualizado (db:push).')
   }
 
-  // Avatar do perfil social é por torcida (PerfilMembro), mas mensagens, menções e
-  // a sessão (login) exibem User.avatarUrl (global) — sem isso a foto trocada aqui
-  // nunca aparece fora do próprio card de perfil.
-  if (avatarUrl && avatarUrl !== perfilAnterior?.avatarUrl) {
+  // Avatar é identidade única do usuário (User.avatarUrl) — nunca por torcida.
+  let avatarSalvo = usuarioAnterior?.avatarUrl ?? null
+  if (avatarUrl && avatarUrl !== usuarioAnterior?.avatarUrl) {
     await db.user.update({ where: { id: userId }, data: { avatarUrl } })
+    avatarSalvo = avatarUrl
     // Feed "descobrir"/sugestões e stories rings embutem avatarUrl no cache
     // (unstable_cache, 60-120s) — sem isso a foto nova só aparece lá depois
     // do TTL expirar.
@@ -135,5 +131,5 @@ export async function salvarPerfilSocial(
   revalidatePath('/portal/comunidade')
   revalidatePath(`/portal/comunidade/perfil/${userId}`)
 
-  return saved
+  return { ...saved, avatarUrl: avatarSalvo }
 }

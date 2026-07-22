@@ -759,7 +759,6 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
 
   const perfisPublicos: Array<{
     userId: string
-    avatarUrl: string | null
     user: { id: string; nome: string | null; avatarUrl: string | null }
   }> = await db.perfilMembro.findMany({
     where: {
@@ -771,7 +770,6 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
     orderBy: { atualizadoEm: 'desc' },
     select: {
       userId: true,
-      avatarUrl: true,
       user: { select: { id: true, nome: true, avatarUrl: true } },
     },
   })
@@ -805,7 +803,7 @@ export const getSugestoesAutoresParaAside = cache(async function getSugestoesAut
       sugestoes.push({
         id: p.user.id,
         nome: p.user.nome,
-        avatarUrl: resolverAvatarSocial(p.avatarUrl, p.user.avatarUrl),
+        avatarUrl: resolverAvatarSocial(p.user.avatarUrl),
         seguidores: contagens.seguidores,
       })
     }

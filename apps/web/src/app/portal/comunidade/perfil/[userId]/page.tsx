@@ -39,7 +39,6 @@ const ABAS_VALIDAS: PerfilAba[] = ['sobre', 'publicacoes', 'fotos', 'atividade']
 const perfilSelect = {
   bio: true,
   perfilPrivado: true,
-  avatarUrl: true,
   bannerUrl: true,
   bannerPos: true,
   exibirCidade: true,
@@ -104,7 +103,6 @@ export default async function PerfilComunidadePage({
   const perfilBase = perfilAtual ?? {
     bio: null,
     perfilPrivado: vinculo?.tipo === 'SOCIO',
-    avatarUrl: null,
     bannerUrl: null,
     bannerPos: null,
     exibirCidade: false,
@@ -145,7 +143,7 @@ export default async function PerfilComunidadePage({
   }
 
   const visibleTenantIds = await getVisibleTenantIds(tenant.id, 'comunidade')
-  const avatarUrl = resolverAvatarSocial(perfil.avatarUrl, user.avatarUrl)
+  const avatarUrl = resolverAvatarSocial(user.avatarUrl)
 
   const posts: PostSocialItem[] = podeVer
     ? ((await db.post.findMany({
@@ -172,7 +170,7 @@ export default async function PerfilComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
   }
 
   const acoes = !isSelf ? (
@@ -249,7 +247,7 @@ export default async function PerfilComunidadePage({
                   exibirDesde={perfil.exibirDesde}
                   bannerUrl={perfil.bannerUrl}
                   bannerPos={perfil.bannerPos}
-                  avatarUrl={perfil.avatarUrl}
+                  avatarUrl={null}
                   avatarFallback={user.avatarUrl}
                 />
               )}

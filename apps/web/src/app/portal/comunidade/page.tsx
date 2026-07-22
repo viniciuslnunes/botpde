@@ -47,7 +47,7 @@ export default async function ComunidadePage({
         currentUser={{
           id: session.user.id,
           nome: session.user.name ?? null,
-          avatarUrl: await getAvatarAtualDoUsuario(session.user.id, null),
+          avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
         }}
         solicitacaoPendente={solicitacaoPendente}
       />
@@ -59,7 +59,7 @@ export default async function ComunidadePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
   }
 
   return (

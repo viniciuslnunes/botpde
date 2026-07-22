@@ -463,7 +463,7 @@ export async function publicarPost(
         post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
-        autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+        autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
         tenantNome: tenant.nome,
       }),
     }
@@ -549,7 +549,7 @@ export async function publicarPostComoTorcedorGlobal(
     post,
     autorId: session.user.id,
     autorNome: session.user.name ?? null,
-    autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+    autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
     tenantNome: perfil.afiliacao?.apelido ?? perfil.afiliacao?.nome ?? 'Comunidade',
   })
 }
@@ -1014,7 +1014,7 @@ export async function comentarPost(
     autor: {
       id: viewerId,
       nome: session.user.name ?? null,
-      avatarUrl: await getAvatarAtualDoUsuario(viewerId, tenantId),
+      avatarUrl: await getAvatarAtualDoUsuario(viewerId),
     },
   }
 }
@@ -1072,7 +1072,7 @@ export async function editarComentario(
     autor: {
       id: viewerId,
       nome: session.user.name ?? null,
-      avatarUrl: await getAvatarAtualDoUsuario(viewerId, tenantId),
+      avatarUrl: await getAvatarAtualDoUsuario(viewerId),
     },
   }
 }
@@ -1195,7 +1195,7 @@ export async function publicarEnquete(
       post,
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
-      autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+      autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
       tenantNome: tenant.nome,
     }),
   }
@@ -1539,7 +1539,7 @@ export async function publicarPostEvento(
       post,
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
-      autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+      autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
       tenantNome: tenant.nome,
     }),
   }
@@ -2504,7 +2504,7 @@ export async function publicarPostGrupo(
       },
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
-      autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+      autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
       tenantNome: tenant.nome,
     }),
   }
@@ -3153,7 +3153,7 @@ export async function publicarPostCanal(
         post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
-        autorAvatar: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+        autorAvatar: await getAvatarAtualDoUsuario(session.user.id),
         tenantNome: tenant.nome,
       }),
     }

@@ -31,7 +31,7 @@ export default async function VideosPage() {
         currentUser={{
           id: session.user.id,
           nome: session.user.name ?? null,
-          avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+          avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
         }}
       />
     </div>

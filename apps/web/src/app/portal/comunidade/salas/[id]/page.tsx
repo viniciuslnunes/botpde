@@ -44,7 +44,7 @@ export default async function SalaDetailPage({
   const livekitUrl = livekitOk ? requireLiveKitConfig().url : null
 
   const encerrarSalaBound = encerrarSala.bind(null, sala.id)
-  const userAvatarUrl = await getAvatarAtualDoUsuario(session.user.id, tenant.id)
+  const userAvatarUrl = await getAvatarAtualDoUsuario(session.user.id)
 
   return (
     <SalaAtivaShell

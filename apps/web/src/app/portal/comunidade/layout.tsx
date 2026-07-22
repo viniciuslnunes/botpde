@@ -35,7 +35,7 @@ export default async function ComunidadeLayout({
     id: session?.user?.id ?? '',
     nome: session?.user?.name ?? null,
     avatarUrl: session?.user?.id
-      ? await getAvatarAtualDoUsuario(session.user.id, tenantIdAtual)
+      ? await getAvatarAtualDoUsuario(session.user.id)
       : null,
   }
 

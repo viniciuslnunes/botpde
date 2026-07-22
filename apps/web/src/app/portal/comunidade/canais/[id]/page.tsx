@@ -43,7 +43,7 @@ export default async function CanalDetalhePage({
   const currentUser = {
     id: session.user.id,
     nome: session.user.name ?? null,
-    avatarUrl: await getAvatarAtualDoUsuario(session.user.id, tenant.id),
+    avatarUrl: await getAvatarAtualDoUsuario(session.user.id),
   }
 
   return (

@@ -74,10 +74,7 @@ export default async function PortalLayout({
   // de uma (super-admin não usa isso — ele já tem o switcher no admin).
   const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
 
-  const avatarUrl = await getAvatarAtualDoUsuario(
-    session.user.id,
-    ctx?.modo === 'torcida' ? ctx.tenant.id : null,
-  )
+  const avatarUrl = await getAvatarAtualDoUsuario(session.user.id)
 
   return (
     <div className="app-shell-bg min-h-screen">

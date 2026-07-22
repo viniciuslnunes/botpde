@@ -121,22 +121,9 @@ export const getStoryRings = cache(async function getStoryRings(
   const autorIds = [...new Set(rows.map((r) => r.userId))].filter((id) => id !== viewerId)
   const semAcesso = await getAutoresSemAcesso(viewerId, tenantId, autorIds)
 
-  const perfis: Array<{ userId: string; avatarUrl: string | null }> =
-    [...new Set(rows.map((r) => r.userId))].length > 0
-      ? await db.perfilMembro.findMany({
-          where: {
-            userId: { in: [...new Set(rows.map((r) => r.userId))] },
-            tenantId,
-          },
-          select: { userId: true, avatarUrl: true },
-        })
-      : []
-  const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
-
   for (const row of rows) {
     if (row.userId !== viewerId && semAcesso.has(row.userId)) continue
 
-    const perfil = perfilPorId.get(row.userId)
     const momento: MomentoStoryItem = {
       id: row.id,
       userId: row.userId,
@@ -156,7 +143,7 @@ export const getStoryRings = cache(async function getStoryRings(
       porAutor.set(row.userId, {
         userId: row.userId,
         nome: row.user.nome,
-        avatarUrl: resolverAvatarSocial(perfil?.avatarUrl ?? null, row.user.avatarUrl),
+        avatarUrl: resolverAvatarSocial(row.user.avatarUrl),
         momentos: [momento],
         temNovo: row.userId !== viewerId,
       })

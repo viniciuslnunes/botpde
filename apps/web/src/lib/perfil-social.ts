@@ -48,11 +48,14 @@ const perfilSelect = {
   criadoEm: true,
 } as const
 
-export function resolverAvatarSocial(
-  perfilAvatar: string | null | undefined,
-  userAvatar: string | null | undefined,
-): string | null {
-  return perfilAvatar ?? userAvatar ?? null
+/**
+ * Avatar é identidade única do usuário (User.avatarUrl) — nunca por torcida.
+ * PerfilMembro.avatarUrl existia como override por tenant e causava 3 fontes
+ * divergentes (topbar/perfil por torcida, feed sempre global); descontinuado
+ * como fonte de exibição.
+ */
+export function resolverAvatarSocial(userAvatar: string | null | undefined): string | null {
+  return userAvatar ?? null
 }
 
 /**
@@ -64,24 +67,13 @@ export function resolverAvatarSocial(
  * segurança contra um cache poluído por uma corrida rara (ex.: leitura antes
  * da foto existir), não o mecanismo principal de atualização.
  */
-export async function getAvatarAtualDoUsuario(
-  userId: string,
-  tenantId?: string | null,
-): Promise<string | null> {
+export async function getAvatarAtualDoUsuario(userId: string): Promise<string | null> {
   return unstable_cache(
     async () => {
-      const [user, perfil] = await Promise.all([
-        db.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
-        tenantId
-          ? db.perfilMembro.findUnique({
-              where: { userId_tenantId: { userId, tenantId } },
-              select: { avatarUrl: true },
-            })
-          : Promise.resolve(null),
-      ])
-      return resolverAvatarSocial(perfil?.avatarUrl, user?.avatarUrl)
+      const user = await db.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } })
+      return resolverAvatarSocial(user?.avatarUrl)
     },
-    ['avatar-atual-do-usuario', userId, tenantId ?? 'global'],
+    ['avatar-atual-do-usuario', userId],
     { revalidate: 60, tags: [tagAvatarUsuario(userId)] },
   )()
 }
@@ -333,12 +325,12 @@ export async function listarRedeSocial(
   const userIds = slice.map((r) => (tipo === 'seguidores' ? r.seguidorId : r.seguidoId))
 
   const [perfis, vinculosSaas]: [
-    Array<{ userId: string; perfilPrivado: boolean; avatarUrl: string | null }>,
+    Array<{ userId: string; perfilPrivado: boolean }>,
     Array<{ userId: string; tipo: 'SOCIO' | 'TORCEDOR'; status: string }>,
   ] = await Promise.all([
     db.perfilMembro.findMany({
       where: { userId: { in: userIds }, tenantId },
-      select: { userId: true, perfilPrivado: true, avatarUrl: true },
+      select: { userId: true, perfilPrivado: true },
     }),
     db.saasMembro.findMany({
       where: { userId: { in: userIds }, tenantId },
@@ -363,7 +355,7 @@ export async function listarRedeSocial(
     return {
       userId: user.id,
       nome: user.nome,
-      avatarUrl: resolverAvatarSocial(perfil?.avatarUrl, user.avatarUrl),
+      avatarUrl: resolverAvatarSocial(user.avatarUrl),
       perfilPrivado: resolverPerfilPrivadoEfetivo(
         perfil?.perfilPrivado,
         membroMap.get(user.id) ?? null,
