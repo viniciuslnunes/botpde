@@ -22,6 +22,15 @@ export const EMBED_HOSTS: Record<EmbedProvider, string> = {
   tiktok: 'TikTok',
 }
 
+/**
+ * Só o widget oficial do X aceita `data-theme` / `theme=`.
+ * Instagram e TikTok entregam iframe cross-origin sem parâmetro de tema;
+ * YouTube usa player próprio (sem chrome light/dark no embed).
+ */
+export function embedSupportsColorScheme(provider: EmbedProvider): boolean {
+  return provider === 'twitter'
+}
+
 export function isCloudinaryUrl(url: string): boolean {
   return /^https:\/\/res\.cloudinary\.com\//.test(url)
 }
@@ -131,11 +140,15 @@ export function instagramEmbedSrc(url: string, widthPx?: number): string | null 
   return `https://www.instagram.com/${parsed.kind}/${parsed.id}/embed/?cr=1&v=14&wp=${wp}`
 }
 
-export function twitterEmbedSrc(url: string, widthPx?: number): string | null {
+export function twitterEmbedSrc(
+  url: string,
+  widthPx?: number,
+  theme: 'light' | 'dark' = 'light',
+): string | null {
   const id = twitterStatusId(url)
   if (!id) return null
   const w = widthPx ? resolveEmbedFrameWidth('twitter', widthPx) : EMBED_FRAME_MAX_WIDTH.twitter
-  return `https://platform.twitter.com/embed/Tweet.html?id=${id}&dnt=true&width=${w}`
+  return `https://platform.twitter.com/embed/Tweet.html?id=${id}&dnt=true&width=${w}&theme=${theme}`
 }
 
 export function tiktokEmbedSrc(url: string): string | null {

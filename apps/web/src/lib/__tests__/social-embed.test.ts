@@ -16,6 +16,7 @@ import {
   twitterEmbedSrc,
   twitterStatusId,
   youTubeId,
+  embedSupportsColorScheme,
 } from '../social-embed'
 
 const SOCIAL_URLS = {
@@ -146,10 +147,21 @@ describe('youTubeId', () => {
   })
 })
 
+describe('embedSupportsColorScheme', () => {
+  it('só o X/Twitter aceita tema light/dark no widget oficial', () => {
+    expect(embedSupportsColorScheme('twitter')).toBe(true)
+    expect(embedSupportsColorScheme('instagram')).toBe(false)
+    expect(embedSupportsColorScheme('tiktok')).toBe(false)
+    expect(embedSupportsColorScheme('youtube')).toBe(false)
+  })
+})
+
 describe('twitterStatusId e twitterEmbedSrc', () => {
   it.each([SOCIAL_URLS.twitter, SOCIAL_URLS.x, SOCIAL_URLS.xMobile])('extrai status de %s', (url) => {
     expect(twitterStatusId(url)).toBe('1234567890123456789')
     expect(twitterEmbedSrc(url)).toContain('id=1234567890123456789')
+    expect(twitterEmbedSrc(url)).toContain('theme=light')
+    expect(twitterEmbedSrc(url, undefined, 'dark')).toContain('theme=dark')
   })
 })
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
@@ -10,6 +11,7 @@ import {
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
+  embedSupportsColorScheme,
   estimateEmbedHeight,
   instagramPermalink,
   resolveEmbedFrameWidth,
@@ -408,6 +410,10 @@ function YouTubeEmbed({ url, videoId }: { url: string; videoId: string }) {
 
 function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
+  const { resolvedTheme } = useTheme()
+  /** Preferência do portal; undefined (SSR) → dark, alinhado ao restante da UI. */
+  const colorScheme = resolvedTheme === 'light' ? 'light' : 'dark'
+  const themeAware = provider != null && embedSupportsColorScheme(provider)
   const shellRef = useRef<HTMLDivElement>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const processedRef = useRef(false)
@@ -453,6 +459,14 @@ function SocialEmbed({ url }: { url: string }) {
     setVisible(false)
   }, [url])
 
+  // Remonta widgets que só leem o tema na criação (hoje: X)
+  useEffect(() => {
+    if (!themeAware) return
+    processedRef.current = false
+    setActivated(false)
+    setHasFrame(false)
+  }, [themeAware, colorScheme])
+
   useEffect(() => {
     if (!provider || provider === 'youtube') return
     if (!visible || cardWidth <= 0 || processedRef.current) return
@@ -464,7 +478,7 @@ function SocialEmbed({ url }: { url: string }) {
       processOfficialEmbed(provider, host)
       setActivated(true)
     })
-  }, [provider, url, visible, cardWidth])
+  }, [provider, url, visible, cardWidth, colorScheme])
 
   useEffect(() => {
     const host = hostRef.current
@@ -497,59 +511,69 @@ function SocialEmbed({ url }: { url: string }) {
     return <EmbedFallback url={url} provider={provider} />
   }
 
+  // Host acompanha o tema só quando o iframe também muda (senão vira faixa contrastante).
+  const hostBg = themeAware && colorScheme === 'dark' ? 'bg-black' : 'bg-white'
+
   return (
     <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
       <div
         ref={hostRef}
-        className="social-embed-host relative mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white"
+        className={`social-embed-host relative mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] ${hostBg}`}
         style={{
           width: frameWidth,
           maxWidth: '100%',
           minHeight: hasFrame ? undefined : skeletonHeight,
         }}
       >
-        {!hasFrame && <EmbedSkeleton provider={provider} height={skeletonHeight} />}
-        {cardWidth > 0 && (
-          <>
-            {provider === 'twitter' && (
-              <blockquote className="twitter-tweet" data-dnt="true" data-width={String(frameWidth)}>
-                <a href={url}>{url}</a>
-              </blockquote>
-            )}
-            {provider === 'instagram' && igPermalink && (
-              <blockquote
-                className="instagram-media"
-                data-instgrm-permalink={igPermalink}
-                data-instgrm-version="14"
-                data-width={String(frameWidth)}
-                style={{
-                  width: '100%',
-                  maxWidth: '100%',
-                  minWidth: '100%',
-                  margin: 0,
-                  background: '#fff',
-                }}
-              >
-                <a href={igPermalink}>{igPermalink}</a>
-              </blockquote>
-            )}
-            {provider === 'tiktok' && videoId && (
-              <blockquote
-                className="tiktok-embed"
-                cite={url}
-                data-video-id={videoId}
-                style={{
-                  width: '100%',
-                  maxWidth: frameWidth,
-                  minWidth: 0,
-                  margin: 0,
-                }}
-              >
-                <a href={url}>{url}</a>
-              </blockquote>
-            )}
-          </>
-        )}
+        <div key={themeAware ? `embed-${colorScheme}` : 'embed'}>
+          {!hasFrame && <EmbedSkeleton provider={provider} height={skeletonHeight} />}
+          {cardWidth > 0 && (
+            <>
+              {provider === 'twitter' && (
+                <blockquote
+                  className="twitter-tweet"
+                  data-dnt="true"
+                  data-theme={colorScheme}
+                  data-width={String(frameWidth)}
+                >
+                  <a href={url}>{url}</a>
+                </blockquote>
+              )}
+              {provider === 'instagram' && igPermalink && (
+                <blockquote
+                  className="instagram-media"
+                  data-instgrm-permalink={igPermalink}
+                  data-instgrm-version="14"
+                  data-width={String(frameWidth)}
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    minWidth: '100%',
+                    margin: 0,
+                    background: '#fff',
+                  }}
+                >
+                  <a href={igPermalink}>{igPermalink}</a>
+                </blockquote>
+              )}
+              {provider === 'tiktok' && videoId && (
+                <blockquote
+                  className="tiktok-embed"
+                  cite={url}
+                  data-video-id={videoId}
+                  style={{
+                    width: '100%',
+                    maxWidth: frameWidth,
+                    minWidth: 0,
+                    margin: 0,
+                  }}
+                >
+                  <a href={url}>{url}</a>
+                </blockquote>
+              )}
+            </>
+          )}
+        </div>
       </div>
       <a
         href={url}
