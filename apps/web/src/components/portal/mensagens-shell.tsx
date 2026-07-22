@@ -377,10 +377,9 @@ function NovaConversaModal({
       setBuscando(true)
       try {
         const para = tipo === 'grupo' ? '&para=grupo' : ''
-        const res = await fetch(
-          `/api/conversas/contatos?q=${encodeURIComponent(busca)}${para}`,
-          { cache: 'no-store' },
-        )
+        const res = await fetch(`/api/conversas/contatos?q=${encodeURIComponent(busca)}${para}`, {
+          cache: 'no-store',
+        })
         if (!res.ok) return
         const data = (await res.json()) as { contatos?: ContatoDto[] }
         setResultados(data.contatos ?? [])

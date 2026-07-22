@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@torcida/db'
 import { getAlliedTenantIds } from '@/lib/hierarquia'
-import { avaliarAcessoDm, podeIncluirEmGrupoMensageria } from '@/lib/mensageria'
+import { avaliarAcessoDm, podeConvidarParaGrupoChat } from '@/lib/mensageria'
 import {
   assertContextoMensageria,
   assertUsuarioMensageria,
@@ -20,6 +20,7 @@ type ContatoDto = {
  * Contatos elegíveis para conversa.
  * Torcida: membros APROVADOS do tenant/aliadas + sócios do mesmo clube (solicitação).
  * Nacional: usuários com o mesmo clube (`PerfilTorcedor` ou sócio APROVADO).
+ * `?para=grupo`: só rede de conexão ou associados da torcida (não basta mesmo clube).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -53,8 +54,8 @@ export async function GET(request: NextRequest) {
       if (vistos.has(opts.id) || bloqueadosIds.has(opts.id)) return
       vistos.add(opts.id)
       if (paraGrupo) {
-        const podeGrupo = await podeIncluirEmGrupoMensageria(userId, opts.id, tenantContextoId)
-        if (!podeGrupo) return
+        const pode = await podeConvidarParaGrupoChat(userId, opts.id, tenantContextoId)
+        if (!pode) return
         contatos.push({
           id: opts.id,
           nome: opts.nome,

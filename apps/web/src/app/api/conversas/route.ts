@@ -12,7 +12,7 @@ import {
   listConversas,
   MAX_CONTEUDO_MENSAGEM,
   MAX_MEMBROS_GRUPO,
-  podeIncluirEmGrupoMensageria,
+  podeConvidarParaGrupoChat,
   resolveTenantNotificacaoMensageria,
   serializeConversasInbox,
 } from '@/lib/mensageria'
@@ -240,12 +240,12 @@ export async function POST(request: NextRequest) {
 
       const membroIds = [...new Set(parsed.data.membroIds)].filter((id) => id !== userId)
       for (const membroId of membroIds) {
-        const pode = await podeIncluirEmGrupoMensageria(userId, membroId, null)
+        const pode = await podeConvidarParaGrupoChat(userId, membroId, null)
         if (!pode) {
           return NextResponse.json(
             {
               error:
-                'Só é possível adicionar quem está na sua rede de conexão ou com quem você já pode conversar na comunidade.',
+                'Só é possível adicionar quem está na sua rede de conexão ou associado à sua torcida.',
             },
             { status: 403 },
           )
@@ -305,12 +305,12 @@ export async function POST(request: NextRequest) {
 
     const membroIds = [...new Set(parsed.data.membroIds)].filter((id) => id !== userId)
     for (const membroId of membroIds) {
-      const pode = await podeIncluirEmGrupoMensageria(userId, membroId, tenant.id)
+      const pode = await podeConvidarParaGrupoChat(userId, membroId, tenant.id)
       if (!pode) {
         return NextResponse.json(
           {
             error:
-              'Só é possível adicionar quem está na sua rede de conexão, na sua torcida ou em torcidas aliadas.',
+              'Só é possível adicionar quem está na sua rede de conexão ou associado à sua torcida.',
           },
           { status: 403 },
         )

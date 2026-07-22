@@ -180,6 +180,51 @@ export async function canMessageUser(
   return canFollowUser(remetenteId, destinatarioId, tenantContextoId)
 }
 
+/**
+ * Pode convidar `alvoId` para um grupo de chat?
+ * - Rede de conexão: seguimento APROVADO em qualquer direção
+ * - Associados da comunidade: mesmo tenant / torcida aliada (`canMessageUser`)
+ *
+ * Na Comunidade Nacional (`tenantContextoId` null) **não** basta o mesmo clube —
+ * perfil privado de sócio fora da rede não entra no grupo.
+ */
+export async function podeConvidarParaGrupoChat(
+  convidanteId: string,
+  alvoId: string,
+  tenantContextoId?: string | null,
+): Promise<boolean> {
+  if (convidanteId === alvoId) return false
+
+  const bloqueio: { id: string } | null = await db.bloqueioUsuario.findFirst({
+    where: {
+      OR: [
+        { bloqueadorId: convidanteId, bloqueadoId: alvoId },
+        { bloqueadorId: alvoId, bloqueadoId: convidanteId },
+      ],
+    },
+    select: { id: true },
+  })
+  if (bloqueio) return false
+
+  const conexao: { id: string } | null = await db.seguimento.findFirst({
+    where: {
+      status: 'APROVADO',
+      OR: [
+        { seguidorId: convidanteId, seguidoId: alvoId },
+        { seguidorId: alvoId, seguidoId: convidanteId },
+      ],
+    },
+    select: { id: true },
+  })
+  if (conexao) return true
+
+  if (tenantContextoId) {
+    return canMessageUser(convidanteId, alvoId, tenantContextoId)
+  }
+
+  return false
+}
+
 /** Afiliação (clube) do usuário para fins de mensageria na Comunidade Nacional. */
 async function resolveAfiliacaoParaMensageria(userId: string): Promise<string | null> {
   const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
@@ -410,43 +455,6 @@ export async function avaliarAcessoDm(
   if (!mesmoClube) return 'bloqueado'
   if (destSocio) return 'solicitacao'
   return 'direto'
-}
-
-/**
- * Rede de conexão social: seguimento APROVADO em qualquer direção.
- * Usado para incluir em grupo quem exigiria solicitação de DM.
- */
-export async function saoConectadosNaRede(userA: string, userB: string): Promise<boolean> {
-  if (userA === userB) return false
-  const row: { id: string } | null = await db.seguimento.findFirst({
-    where: {
-      status: 'APROVADO',
-      OR: [
-        { seguidorId: userA, seguidoId: userB },
-        { seguidorId: userB, seguidoId: userA },
-      ],
-    },
-    select: { id: true },
-  })
-  return row !== null
-}
-
-/**
- * Pode o criador incluir `membroId` num grupo de chat?
- * - Acesso DM direto (mesma TO/aliados, ou torcedor↔torcedor do clube) → sim
- * - Quem exigiria solicitação (ex.: sócio de perfil privado) → só se já conectados
- * - Bloqueado/rival/clube diferente → não
- */
-export async function podeIncluirEmGrupoMensageria(
-  criadorId: string,
-  membroId: string,
-  tenantContextoId?: string | null,
-): Promise<boolean> {
-  if (criadorId === membroId) return false
-  const acesso = await avaliarAcessoDm(criadorId, membroId, tenantContextoId)
-  if (acesso === 'direto') return true
-  if (acesso === 'bloqueado') return false
-  return saoConectadosNaRede(criadorId, membroId)
 }
 
 /** Cria DM com destinatário PENDENTE e primeira mensagem introdutória. */

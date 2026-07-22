@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
-import { listMembrosConversa, MAX_MEMBROS_GRUPO, podeIncluirEmGrupoMensageria } from '@/lib/mensageria'
+import { listMembrosConversa, MAX_MEMBROS_GRUPO, podeConvidarParaGrupoChat } from '@/lib/mensageria'
 import { isConversaGrupoLike } from '@/lib/canais'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 
@@ -66,17 +66,22 @@ export async function POST(
       return NextResponse.json({ error: 'Este membro já está no grupo.' }, { status: 400 })
     }
 
-    const tenantMeta: { sintetico: boolean } | null = await db.tenant.findUnique({
-      where: { id: tenant.id },
-      select: { sintetico: true },
-    })
-    const tenantContextoId = tenantMeta?.sintetico ? null : tenant.id
-    const pode = await podeIncluirEmGrupoMensageria(userId, novoId, tenantContextoId)
+    const pode = await podeConvidarParaGrupoChat(
+      userId,
+      novoId,
+      // Tenant sintético da CN não tem hierarquia de associados — só rede.
+      (await db.tenant.findUnique({
+        where: { id: tenant.id },
+        select: { sintetico: true },
+      }))?.sintetico
+        ? null
+        : tenant.id,
+    )
     if (!pode) {
       return NextResponse.json(
         {
           error:
-            'Só é possível adicionar quem está na sua rede de conexão ou com quem você já pode conversar na comunidade.',
+            'Só é possível adicionar quem está na sua rede de conexão ou associado à sua torcida.',
         },
         { status: 403 },
       )

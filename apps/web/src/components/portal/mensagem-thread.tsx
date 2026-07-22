@@ -1221,7 +1221,9 @@ function PainelMembros({
     const id = window.setTimeout(async () => {
       const res = await fetch(
         `/api/conversas/contatos?q=${encodeURIComponent(busca)}&para=grupo`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+        },
       )
       if (!res.ok) return
       const data = (await res.json()) as { contatos?: ContatoDto[] }
