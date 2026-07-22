@@ -180,10 +180,10 @@ export function BuscaMembrosClient({
               Para seguir
             </h2>
             <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-              Membros sugeridos da comunidade. Use a busca acima para encontrar alguém específico.
+              Priorizamos sua unidade e membros com atividade recente. Use a busca acima para encontrar alguém específico.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             {sugestoesIniciais.map((membro, index) => (
               <MembroSugestaoCard key={membro.id} membro={membro} index={index} />
             ))}

@@ -231,7 +231,11 @@ export async function getSugestoesMembrosParaBusca(
   const visibleIds = await getVisibleTenantIds(tenantId, 'comunidade')
   if (visibleIds.length === 0) return []
 
-  const [seguindo, bloqueadosIds] = await Promise.all([
+  const [viewerMembro, seguindo, bloqueadosIds] = await Promise.all([
+    db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { sedeId: true },
+    }) as Promise<{ sedeId: string | null } | null>,
     db.seguimento.findMany({
       where: { seguidorId: userId, status: 'APROVADO' },
       select: { seguidoId: true },
@@ -239,9 +243,10 @@ export async function getSugestoesMembrosParaBusca(
     getBloqueadosDoUsuario(userId),
   ])
 
+  const viewerSedeId = viewerMembro?.sedeId ?? null
   const excluirIds = [...new Set([userId, ...seguindo.map((s) => s.seguidoId), ...bloqueadosIds])]
 
-  const rows: MembroBuscaRaw[] = await db.saasMembro.findMany({
+  const rows: SugestaoMembroBuscaRaw[] = await db.saasMembro.findMany({
     where: {
       status: 'APROVADO',
       tenantId: { in: visibleIds },
@@ -251,24 +256,36 @@ export async function getSugestoesMembrosParaBusca(
       userId: true,
       tenantId: true,
       tipo: true,
+      cidade: true,
+      sedeId: true,
       user: { select: { id: true, nome: true, avatarUrl: true } },
       tenant: { select: { nome: true } },
+      sede: { select: { nome: true, tipo: true } },
     },
     take: SUGESTOES_BUSCA_CANDIDATOS,
     orderBy: { criadoEm: 'desc' },
   })
 
-  const porUsuario = new Map<string, MembroBuscaRaw>()
+  const porUsuario = new Map<string, SugestaoMembroBuscaRaw>()
   for (const r of rows) {
     const existente = porUsuario.get(r.userId)
-    if (!existente || r.tenantId === tenantId) porUsuario.set(r.userId, r)
+    if (!existente) {
+      porUsuario.set(r.userId, r)
+      continue
+    }
+    const rScore =
+      (r.sedeId && r.sedeId === viewerSedeId ? 2 : 0) + (r.tenantId === tenantId ? 1 : 0)
+    const eScore =
+      (existente.sedeId && existente.sedeId === viewerSedeId ? 2 : 0) +
+      (existente.tenantId === tenantId ? 1 : 0)
+    if (rScore > eScore) porUsuario.set(r.userId, r)
   }
   const candidatos = [...porUsuario.values()]
   if (candidatos.length === 0) return []
 
   const candidatoIds = candidatos.map((c) => c.userId)
 
-  const [perfis, seguimentos, contagensMap, podeSeguirLista] = await Promise.all([
+  const [perfis, seguimentos, contagensMap, podeSeguirLista, postsRecentes] = await Promise.all([
     db.perfilMembro.findMany({
       where: { tenantId, userId: { in: candidatoIds } },
       select: { userId: true, perfilPrivado: true, bio: true },
@@ -281,12 +298,26 @@ export async function getSugestoesMembrosParaBusca(
     >,
     getContagensSeguimentoEmLote(candidatoIds, tenantId),
     canFollowUsers(userId, candidatoIds, tenantId),
+    db.post.findMany({
+      where: {
+        autorId: { in: candidatoIds },
+        tenantId: { in: visibleIds },
+        tipo: 'MEMBRO',
+        oculto: false,
+        visibilidade: 'PUBLICO',
+        conversaId: null,
+      },
+      orderBy: { criadoEm: 'desc' },
+      distinct: ['autorId'],
+      select: { autorId: true, criadoEm: true },
+    }) as Promise<{ autorId: string; criadoEm: Date }[]>,
   ])
 
   const perfilPorId = new Map(perfis.map((p) => [p.userId, p]))
   const statusPorId = new Map(seguimentos.map((s) => [s.seguidoId, s.status]))
+  const ultimaAtividadePorId = new Map(postsRecentes.map((p) => [p.autorId, p.criadoEm]))
 
-  const enriquecidos: SugestaoMembroBusca[] = []
+  const enriquecidos: Array<SugestaoMembroBusca & { _score: number }> = []
   for (const r of candidatos) {
     const perfil = perfilPorId.get(r.userId)
     const perfilPrivado = resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
@@ -296,7 +327,10 @@ export async function getSugestoesMembrosParaBusca(
     const podeSeguir = podeSeguirLista.get(r.userId) ?? false
     if (!podeSeguir) continue
 
+    const mesmaUnidade = viewerSedeId != null && r.sedeId === viewerSedeId
     const contagens = contagensMap.get(r.userId) ?? { seguidores: 0, seguindo: 0, publicacoes: 0 }
+    const ultimaAtividade = ultimaAtividadePorId.get(r.userId) ?? null
+
     enriquecidos.push({
       id: r.user.id,
       nome: r.user.nome,
@@ -308,15 +342,24 @@ export async function getSugestoesMembrosParaBusca(
       podeSeguir,
       bio: perfil?.bio ?? null,
       publicacoes: contagens.publicacoes,
+      mesmaUnidade,
+      unidadeNome: r.sede?.nome ?? null,
+      unidadeTipo: r.sede?.tipo ?? null,
+      tipoMembro: r.tipo,
+      cidade: r.cidade,
+      _score: pontuarSugestaoMembro({
+        mesmaUnidade,
+        mesmoTenant: r.tenantId === tenantId,
+        ultimaAtividade,
+        seguidores: contagens.seguidores,
+        publicacoes: contagens.publicacoes,
+      }),
     })
   }
 
-  enriquecidos.sort((a, b) => {
-    if (b.seguidores !== a.seguidores) return b.seguidores - a.seguidores
-    return b.publicacoes - a.publicacoes
-  })
+  enriquecidos.sort((a, b) => b._score - a._score)
 
-  return enriquecidos.slice(0, SUGESTOES_BUSCA_LIMITE)
+  return enriquecidos.slice(0, SUGESTOES_BUSCA_LIMITE).map(({ _score: _, ...item }) => item)
 }
 
 export async function buscarMembrosComunidade(
