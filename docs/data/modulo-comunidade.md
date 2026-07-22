@@ -427,8 +427,10 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
 - **Shell dual Nacional × Torcida (2026-07-22)**: query `?escopo=nacional|torcida`.
   Torcedor (sem sócio `APROVADO`) só vê a aba Nacional; sócio aprovado alterna
   as duas. Chrome (menu, salas, chat, canais sugeridos) monta nos dois escopos.
-  No Nacional: feed `getPostsFeedNacional` com infinite scroll via
-  `/api/comunidade/feed?escopo=nacional&afiliacaoId=…`; salas = sintético CN ∪ `ABERTA` das
+  No Nacional: feed `getPostsFeedNacional` / `getPostsFeedNacionalSeguindo` /
+  `getPostsFeedNacionalGrupos` com infinite scroll via
+  `/api/comunidade/feed?escopo=nacional&afiliacaoId=…&filtro=`; SSE em
+  `/api/comunidade/feed/stream?escopo=nacional&afiliacaoId=…`; salas = sintético CN ∪ `ABERTA` das
   TOs do clube (`listSalasNacionais`); canais sugeridos = só `PUBLICO`
   (`listCanaisPublicosPorAfiliacao`); DMs/grupos stampam `tenantId` sintético
   com gate `mesmaAfiliacaoComunidade` / `assertComunidadeNacional`. **Nunca**
@@ -470,8 +472,14 @@ materializada (`FeedTimeline`), ranking heurístico do Descobrir, busca `pg_trgm
 caches por escopo, SSE de feed (ping **após** fan-out), auto-refetch no topo /
 banner se rolado, resumo leve de mensagens e leitura única de salas ao vivo.
 
+**2026-07-22 (dual Nacional × Torcida):** filtros reais Seguindo/Grupos no
+Nacional, prepend otimista + pull-to-refresh, cache Nacional 45s, SSE por
+afiliação, ranking Descobrir Nacional (1ª página), badges com tag de
+invalidação, sugestões de busca com ranking por unidade/atividade.
+
 **Documentação completa, pós-deploy, ganhos estimados (%) e plano futuro:**
-[`docs/data/modulo-comunidade-performance.md`](modulo-comunidade-performance.md).
+[`docs/data/modulo-comunidade-performance.md`](modulo-comunidade-performance.md)
+(§ ondas dual 2026-07-22).
 
 **Padrões a preservar:** batch de privacidade/visibilidade, separar cache público
 de overlay por usuário, inbox completa só ao expandir chat, ping SSE pós-fan-out

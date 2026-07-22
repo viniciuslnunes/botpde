@@ -3,9 +3,10 @@
 > Plano de otimização da Comunidade entregue em **2026-07-16** (`0dca679` na
 > `main`). Live UX zero-custo (`f6690cb`): ping SSE pós-fan-out + auto-refetch no
 > topo. **2026-07-17:** engajamento overlay; publish + prepend client; nav-back
-> sem remount; busca typeahead (`modo=rapida`). Complementa `ARCHITECTURE.md`
-> §5.6 e `docs/data/modulo-comunidade.md`. Agente responsável por novas
-> auditorias: `performance`.
+> sem remount; busca typeahead (`modo=rapida`). **2026-07-22:** shell dual
+> Nacional × Torcida + ondas 1–3 de perf/filtros (commits `7dbc82a`…`f5462a4`).
+> Complementa `ARCHITECTURE.md` §5.6 e `docs/data/modulo-comunidade.md`. Agente
+> responsável por novas auditorias: `performance`.
 
 ## Objetivo
 
@@ -42,6 +43,47 @@ sem trocar de stack — zero Redis/WebSocket obrigatório nesta fase.
 | **B6** Busca `pg_trgm` | `comunidade-busca.ts`, `enable-pg-trgm.js` | Similaridade + índices GIN; fallback ILIKE |
 | **B6.1** Busca typeahead (2026-07-17) | `modo=rapida`, `postIncludeBusca`, fix `GROUP BY` | Dropdown leve; SQL DISTINCT+ORDER BY quebrava API (`42P10`) |
 
+### Ondas dual Nacional × Torcida (2026-07-22)
+
+Auditoria pós-`6b4df74` (shell dual). **Três ondas** de perf + filtros reais no
+escopo Nacional; busca de sugestões em commit separado. Não substituem ondas
+A/B — estendem o mesmo padrão (cache público + overlay viewer, TanStack no
+client, ping SSE pós-fan-out).
+
+| Onda | Commit(s) | Escopo | Entregas |
+|------|-----------|--------|----------|
+| **1** | `7dbc82a`, `7823d25` | Filtros + UX publicação | `getPostsFeedNacionalSeguindo` / `Grupos` com queries duras; roteamento `filtro` na API e `comunidade-posts-section`; empty states; prepend otimista + pull-to-refresh; `FeedLiveBanner` no Nacional; timeline/fan-out em `after()`; `unstable_cache` 45s em `getPostsFeedNacional` + `tagFeedNacional`; assinatura Cloudinary cacheada 4 min |
+| **2** | `3439e56` | Hot path leitura/publicação | `assertAutorPublicacaoPost` retorna `permissoesEfetivas` (sem 2ª leitura RBAC); invalidação via `after()`; cache badges 120s (`autor-badges-feed`); `postIncludeLista` no Nacional; queries paralelas no SSR (`page.tsx`); includes enxutos Seguindo/Grupos |
+| **3** | `f5462a4` | Realtime + ranking + badges | Canal SSE `feed-nacional:{afiliacaoId}`; stream `?escopo=nacional&afiliacaoId=`; `emitFeedNacionalPing` na invalidação pós-publicação; ranking Descobrir Nacional (1ª página); Descobrir torcida com `postIncludeLista` no cache base; tag `autor-badges:{tenantId}` + `revalidateTag` em RBAC/aprovação |
+| **Busca** | `0b8f1dd` | Sugestões `/busca` | Ranking por mesma unidade + atividade recente; cards com sede/cidade/badges (`comunidade-busca.ts`, `membro-sugestao-card.tsx`) |
+
+**Segregação Nacional (filtros duros — não relaxar sem revisão de produto):**
+
+| Aba | Regra |
+|-----|-------|
+| Descobrir | `PUBLICO`, `conversaId: null`, tenants da afiliação; OR sintético ∪ seguidos `APROVADO` ∪ `alcanceNacional` |
+| Seguindo | Só autores seguidos `APROVADO`, `PUBLICO`, mesma afiliação |
+| Meus grupos | Só tenant sintético + murais dos grupos do viewer (`escopoFeedSomenteGrupos`) |
+
+**Invariantes dual (preservar em features novas):**
+
+1. Nacional **não** vê `TENANT`/`PRIVADO`, canais fechados nem salas `EVENTO`/`DM_GRUPO`.
+2. Ping SSE torcida = `feed:{tenantId}` (host); Nacional =
+   `feed-nacional:{afiliacaoId}` — client monta endpoint em
+   `feedStreamEndpoint()` (`feed-live-refresh.ts`).
+3. Publicação: prepend otimista no client; invalidação de cache em `after()`;
+   ping nacional só quando `afiliacaoId` entra em `invalidarLeituraComunidade`.
+4. Ranking Descobrir Nacional só na **primeira página** (`cursor` ausente);
+   paginação seguinte permanece cronológica (cursor keyset estável).
+5. Testes de filtro: `apps/web/src/lib/__tests__/feed-nacional-filtros.test.ts`.
+
+**Gaps conhecidos (não bloqueiam produção; reabrir só com métrica):**
+
+- Ping nacional no **fan-out** (`feed-timeline-queue`) — hoje cobre Descobrir
+  na invalidação; Seguindo Nacional depende do fan-out + ping tenant do autor.
+- Invalidação de badges em toda mutação de sede (ex.: `reatribuirSedeMembro`).
+- E2E do stream Nacional e regressão de segregação entre escopos.
+
 ### Busca — hot path e armadilhas (2026-07-17)
 
 Commit de referência: `e4a30ee` (fix SQL + `modo=rapida`).
@@ -74,6 +116,8 @@ candidatos de membros usam `GROUP BY m.user_id, u.nome` +
 | Bloco | Padrão | TTL / escopo |
 |-------|--------|----------------|
 | Discover base | `unstable_cache` em `feed.ts` | 60s por tenant + escopo visível |
+| Feed Nacional Descobrir | `unstable_cache` + `tagFeedNacional(afiliacaoId)` | 45s; key inclui `userId`, seguindo, tenants, cursor |
+| Badges autor (feed) | `unstable_cache` + `tagAutorBadgesTenant(tenantId)` | 120s por lote autor:tenant |
 | Sugestões aside | `unstable_cache` + filtro por usuário | 120s base pública |
 | Canais visíveis | `unstable_cache` + membership por request | 120s base + query leve |
 | Hashtags em alta | `unstable_cache` | 120s |
@@ -112,8 +156,10 @@ Tabela `saas_feed_timeline` (`FeedTimeline` no Prisma): fan-out on write.
 | Método | Rota | Uso |
 |--------|------|-----|
 | GET | `/api/comunidade/feed?cursor=&take=&filtro=` | Paginação feed Descobrir/Seguindo |
+| GET | `/api/comunidade/feed?escopo=nacional&afiliacaoId=&filtro=` | Paginação feed Nacional (Descobrir / Seguindo / Grupos) |
 | GET | `/api/comunidade/rede?cursor=&take=` | Paginação Minha rede |
-| GET | `/api/comunidade/feed/stream` | Long-poll ping (sem payload; ≤~25s) |
+| GET | `/api/comunidade/feed/stream` | Long-poll ping por tenant (host) |
+| GET | `/api/comunidade/feed/stream?escopo=nacional&afiliacaoId=` | Long-poll ping feed Nacional (por afiliação) |
 | GET | `/api/conversas/resumo` | `naoLidas` + flags de bloqueio |
 
 ## Padrões obrigatórios (features novas na Comunidade)
