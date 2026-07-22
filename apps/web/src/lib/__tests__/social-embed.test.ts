@@ -51,11 +51,42 @@ describe('firstSocialUrlInText — todas as redes', () => {
   it.each(Object.entries(SOCIAL_URLS))('encontra URL de %s no texto', (_name, url) => {
     expect(firstSocialUrlInText(`olha isso\n${url}`)).toBe(url)
   })
+
+  it('normaliza YouTube sem protocolo (cola típica)', () => {
+    expect(firstSocialUrlInText('youtube.com/watch?v=O_rzxRdKgkU')).toBe(
+      'https://youtube.com/watch?v=O_rzxRdKgkU',
+    )
+  })
+
+  it('normaliza www.youtube sem protocolo', () => {
+    expect(firstSocialUrlInText('www.youtube.com/watch?v=O_rzxRdKgkU')).toBe(
+      'https://www.youtube.com/watch?v=O_rzxRdKgkU',
+    )
+  })
+
+  it('normaliza youtu.be sem protocolo', () => {
+    expect(firstSocialUrlInText('youtu.be/O_rzxRdKgkU')).toBe('https://youtu.be/O_rzxRdKgkU')
+  })
+
+  it('normaliza Instagram e X sem protocolo', () => {
+    expect(firstSocialUrlInText('instagram.com/reel/DSf2dEMDhNa/')).toBe(
+      'https://instagram.com/reel/DSf2dEMDhNa/',
+    )
+    expect(firstSocialUrlInText('x.com/user/status/1234567890123456789')).toBe(
+      'https://x.com/user/status/1234567890123456789',
+    )
+  })
 })
 
 describe('ensureSocialEmbedInMidias — todas as redes', () => {
   it.each(Object.values(SOCIAL_URLS))('promove %s do texto para midias', (url) => {
     expect(ensureSocialEmbedInMidias(`texto\n${url}`, [])).toEqual([url])
+  })
+
+  it('promove YouTube sem protocolo para midias com https', () => {
+    expect(ensureSocialEmbedInMidias('youtube.com/watch?v=O_rzxRdKgkU', [])).toEqual([
+      'https://youtube.com/watch?v=O_rzxRdKgkU',
+    ])
   })
 
   it('mantém só um embed social quando já existe outro', () => {
@@ -68,6 +99,14 @@ describe('ensureSocialEmbedInMidias — todas as redes', () => {
 describe('stripEmbeddedSocialUrls — todas as redes', () => {
   it.each(Object.values(SOCIAL_URLS))('remove %s duplicado do texto', (url) => {
     expect(stripEmbeddedSocialUrls(`legenda\n${url}`, [url])).toBe('legenda')
+  })
+
+  it('remove URL sem protocolo quando midia tem https', () => {
+    expect(
+      stripEmbeddedSocialUrls('youtube.com/watch?v=O_rzxRdKgkU', [
+        'https://youtube.com/watch?v=O_rzxRdKgkU',
+      ]),
+    ).toBe('')
   })
 })
 

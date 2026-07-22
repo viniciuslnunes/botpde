@@ -301,6 +301,16 @@ export function classifyMedia(urls: string[]): { media: MediaAttachment[]; embed
   return { media, embeds }
 }
 
+/** Hosts sociais (com prefixos www/m/mobile) — protocolo opcional no texto. */
+const SOCIAL_HOST_IN_TEXT =
+  '(?:www\\.|m\\.|mobile\\.)?(?:youtube\\.com|youtu\\.be|twitter\\.com|x\\.com|instagram\\.com|(?:[\\w-]+\\.)?tiktok\\.com)'
+
+/** Captura URL social com ou sem `https://` (cola de WhatsApp / digitação). */
+const SOCIAL_URL_IN_TEXT_RE = new RegExp(
+  `(?:https?:\\/\\/)?${SOCIAL_HOST_IN_TEXT}\\/[^\\s<>"']+`,
+  'gi',
+)
+
 /** Normaliza URL social para comparação (sem barra final / query irrelevante). */
 function normalizeSocialUrl(url: string): string {
   try {
@@ -313,6 +323,36 @@ function normalizeSocialUrl(url: string): string {
   }
 }
 
+/** Converte match cru (com ou sem protocolo) em URL absoluta válida para embed. */
+export function toAbsoluteSocialUrl(raw: string): string | null {
+  const cleaned = raw.replace(/[.,);!?]+$/u, '').trim()
+  if (!cleaned) return null
+  const withProtocol = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`
+  return isSocialUrl(withProtocol) ? withProtocol : null
+}
+
+/** Variantes textuais da mesma URL (com/sem protocolo, com/sem www). */
+function socialUrlTextVariants(url: string): string[] {
+  try {
+    const u = new URL(url)
+    const host = u.hostname
+    const rest = `${u.pathname}${u.search}`
+    const hosts = new Set<string>([host])
+    if (host.startsWith('www.')) hosts.add(host.slice(4))
+    else hosts.add(`www.${host}`)
+    if (host.startsWith('m.')) hosts.add(host.slice(2))
+    const out = new Set<string>()
+    for (const h of hosts) {
+      out.add(`https://${h}${rest}`)
+      out.add(`http://${h}${rest}`)
+      out.add(`${h}${rest}`)
+    }
+    return [...out]
+  } catch {
+    return [url]
+  }
+}
+
 /**
  * Remove do texto as URLs que já serão embutidas via `midiaUrls`, para não
  * duplicar o link acima do preview. Texto acima/abaixo/no meio do link permanece.
@@ -322,19 +362,21 @@ export function stripEmbeddedSocialUrls(conteudo: string, midiaUrls: string[]): 
   if (socials.length === 0 || !conteudo) return conteudo
 
   const norms = new Set(socials.map(normalizeSocialUrl))
+  const variants = socials.flatMap(socialUrlTextVariants)
   const lines = conteudo.split('\n')
   const kept = lines
     .map((line) => {
       const trimmed = line.trim()
       if (!trimmed) return line
-      // Linha só com a URL (e pontuação residual)
+      // Linha só com a URL (e pontuação residual) — com ou sem https://
       const onlyUrl = trimmed.replace(/[.,);!?]+$/u, '')
-      if (/^https?:\/\//i.test(onlyUrl) && norms.has(normalizeSocialUrl(onlyUrl))) {
+      const absolute = toAbsoluteSocialUrl(onlyUrl)
+      if (absolute && norms.has(normalizeSocialUrl(absolute))) {
         return null
       }
       // URL no meio/fim da linha — remove a ocorrência, mantém o resto
       let out = line
-      for (const url of socials) {
+      for (const url of variants) {
         const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         out = out.replace(new RegExp(`${escaped}/?`, 'gi'), '')
       }
@@ -350,11 +392,11 @@ export function stripEmbeddedSocialUrls(conteudo: string, midiaUrls: string[]): 
 
 /** Primeira URL de rede social encontrada num texto — usada pelo composer. */
 export function firstSocialUrlInText(text: string): string | null {
-  const matches = text.match(/https?:\/\/[^\s<>"']+/g)
+  const matches = text.match(SOCIAL_URL_IN_TEXT_RE)
   if (!matches) return null
   for (const raw of matches) {
-    const url = raw.replace(/[.,);!?]+$/u, '')
-    if (isSocialUrl(url)) return url
+    const url = toAbsoluteSocialUrl(raw)
+    if (url) return url
   }
   return null
 }

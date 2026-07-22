@@ -1,18 +1,31 @@
 import type { ReactNode } from 'react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { MENCAO_REGEX, HASHTAG_REGEX } from '@torcida/types'
+import { toAbsoluteSocialUrl } from '@/lib/social-embed'
 
 interface PostConteudoRichProps {
   conteudo: string
   className?: string
 }
 
-/** http(s) até whitespace; pontuação final comum fica fora do href. */
-const URL_REGEX = /https?:\/\/[^\s<>"']+/gi
+/** http(s) ou host social sem protocolo (youtube.com/..., x.com/...). */
+const URL_REGEX =
+  /(?:https?:\/\/[^\s<>"']+|(?:www\.|m\.|mobile\.)?(?:youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|(?:[\w-]+\.)?tiktok\.com)\/[^\s<>"']+)/gi
 
 function splitUrlMatch(raw: string): { href: string; trailing: string } {
-  const href = raw.replace(/[.,);!?]+$/u, '')
-  return { href, trailing: raw.slice(href.length) }
+  const cleaned = raw.replace(/[.,);!?]+$/u, '')
+  const absolute = toAbsoluteSocialUrl(cleaned)
+  const href = absolute ?? (/^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`)
+  return { href, trailing: raw.slice(cleaned.length) }
+}
+
+function isUrlMatch(raw: string): boolean {
+  return (
+    /^https?:\/\//i.test(raw) ||
+    /^(?:www\.|m\.|mobile\.)?(?:youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|(?:[\w-]+\.)?tiktok\.com)\//i.test(
+      raw,
+    )
+  )
 }
 
 function renderSegment(text: string, keyPrefix: string): ReactNode[] {
@@ -27,7 +40,7 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
   let i = 0
   while ((m = combined.exec(text)) !== null) {
     if (m.index > last) nodes.push(text.slice(last, m.index))
-    if (/^https?:\/\//i.test(m[0])) {
+    if (isUrlMatch(m[0])) {
       const { href, trailing } = splitUrlMatch(m[0])
       nodes.push(
         <a
