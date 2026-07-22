@@ -1,6 +1,7 @@
 import { Repeat2, Pin, Megaphone } from 'lucide-react'
 import { formatRelative } from '@/lib/format-datetime'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { ensureSocialEmbedInMidias, stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { Avatar } from './avatar'
@@ -36,29 +37,47 @@ export function FeedPostCard({
 }: FeedPostCardProps) {
   const author = isAuthor ?? post.autorId === currentUser.id
   const mostrarMenu = author || (podeModerarGrupo && !!post.grupo)
-  const cargoBadge = formatAutorCargoBadge(post.autor.cargoNome, post.autor.departamentoNome)
+  const isComunicadoOficial = post.tipo === 'INSTITUCIONAL' && Boolean(post.comunicadoOrigemId)
+  const cargoBadge = isComunicadoOficial
+    ? null
+    : formatAutorCargoBadge(post.autor.cargoNome, post.autor.departamentoNome)
+  const headerHref = isComunicadoOficial
+    ? linkTorcidaComunidadePublica(post.tenantId)
+    : `/portal/comunidade/perfil/${post.autor.id}`
+  const headerNome = isComunicadoOficial ? post.tenant.nome : (post.autor.nome ?? 'Membro')
+  const headerAvatar = isComunicadoOficial ? post.tenant.logoUrl : post.autor.avatarUrl
   const midias = ensureSocialEmbedInMidias(post.conteudo, post.midiaUrls)
   const conteudoVisivel = stripEmbeddedSocialUrls(post.conteudo, midias)
+  const mediaCaption = isComunicadoOficial
+    ? (post.comunicadoOrigem?.corpo ?? post.conteudo)
+    : post.conteudo
+  const mediaBlock =
+    midias.length > 0 ? (
+      <PostMedia urls={midias} caption={mediaCaption} />
+    ) : (
+      post.imagemUrl && <PostLegacyImage src={post.imagemUrl} caption={mediaCaption} />
+    )
+
   return (
     <article className="card-soft rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <header className="flex items-center gap-3">
-        <ComunidadePrefetchLink href={`/portal/comunidade/perfil/${post.autor.id}`}>
-          <Avatar nome={post.autor.nome} avatarUrl={post.autor.avatarUrl} size="md" />
+        <ComunidadePrefetchLink href={headerHref}>
+          <Avatar nome={headerNome} avatarUrl={headerAvatar} size="md" />
         </ComunidadePrefetchLink>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2">
             <ComunidadePrefetchLink
-              href={`/portal/comunidade/perfil/${post.autor.id}`}
+              href={headerHref}
               className="text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
             >
-              {post.autor.nome ?? 'Membro'}
+              {headerNome}
             </ComunidadePrefetchLink>
-            {showTenantBadge && (
+            {showTenantBadge && !isComunicadoOficial && (
               <span className="rounded-full bg-[rgb(var(--color-primary)_/_0.14)] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
                 {post.tenant.nome}
               </span>
             )}
-            {post.autor.sedeNome && (
+            {!isComunicadoOficial && post.autor.sedeNome && (
               <span className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
                 {post.autor.sedeNome}
               </span>
@@ -83,7 +102,7 @@ export function FeedPostCard({
               </ComunidadePrefetchLink>
             )}
           </div>
-          {post.autor.nickname && (
+          {!isComunicadoOficial && post.autor.nickname && (
             <ComunidadePrefetchLink
               href={`/portal/comunidade/perfil/${post.autor.id}`}
               className="block truncate text-xs text-[rgb(var(--foreground-muted))] hover:underline"
@@ -128,26 +147,45 @@ export function FeedPostCard({
         </p>
       )}
 
-      {conteudoVisivel ? (
-        <ExpandableText
-          conteudo={conteudoVisivel}
-          lines={8}
-          className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
-        />
-      ) : null}
-
-      {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
-
-      {post.comunicadoOrigem && <PostComunicadoEmbed comunicado={post.comunicadoOrigem} />}
-
-      {post.evento && <PostEventoEmbed evento={post.evento} />}
-
-      {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
-
-      {midias.length > 0 ? (
-        <PostMedia urls={midias} caption={post.conteudo} />
+      {isComunicadoOficial && post.comunicadoOrigem ? (
+        <>
+          {mediaBlock}
+          {post.comunicadoOrigem.titulo ? (
+            <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">
+              {post.comunicadoOrigem.titulo}
+            </h3>
+          ) : null}
+          <ExpandableText
+            text={post.comunicadoOrigem.corpo}
+            lines={8}
+            className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+          />
+          {post.comunicadoOrigem.autorNome ? (
+            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+              {post.comunicadoOrigem.autorNome}
+            </p>
+          ) : null}
+        </>
       ) : (
-        post.imagemUrl && <PostLegacyImage src={post.imagemUrl} caption={post.conteudo} />
+        <>
+          {conteudoVisivel ? (
+            <ExpandableText
+              conteudo={conteudoVisivel}
+              lines={8}
+              className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+            />
+          ) : null}
+
+          {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
+
+          {post.comunicadoOrigem && <PostComunicadoEmbed comunicado={post.comunicadoOrigem} />}
+
+          {post.evento && <PostEventoEmbed evento={post.evento} />}
+
+          {post.enquete && <PostPoll enquete={post.enquete} isAuthor={author} />}
+
+          {mediaBlock}
+        </>
       )}
 
       <PostEngagement

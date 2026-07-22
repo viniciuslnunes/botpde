@@ -222,27 +222,15 @@ export function ComunicadosManager({
             ].join(' ')}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  {comunicado.fixado && (
-                    <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
-                      <Pin className="h-3 w-3" /> Fixado
-                    </span>
-                  )}
-                  <Badge variant={PRIORIDADE_VARIANT[comunicado.prioridade]}>
-                    {PRIORIDADE_LABEL[comunicado.prioridade]}
-                  </Badge>
-                  <h3 className="font-semibold text-[rgb(var(--foreground))]">{comunicado.titulo}</h3>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]">
-                  {comunicado.corpo}
-                </p>
-                {comunicado.midiaUrls.length > 0 && (
-                  <PostMedia urls={comunicado.midiaUrls} caption="" />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                {comunicado.fixado && (
+                  <span className="flex items-center gap-1 rounded-full bg-[rgb(var(--primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
+                    <Pin className="h-3 w-3" /> Fixado
+                  </span>
                 )}
-                <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-                  {formatarData(comunicado.publicadoEm)}
-                </p>
+                <Badge variant={PRIORIDADE_VARIANT[comunicado.prioridade]}>
+                  {PRIORIDADE_LABEL[comunicado.prioridade]}
+                </Badge>
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
@@ -288,6 +276,17 @@ export function ComunicadosManager({
                 </button>
               </div>
             </div>
+
+            {comunicado.midiaUrls.length > 0 && (
+              <PostMedia urls={comunicado.midiaUrls} caption={comunicado.corpo} />
+            )}
+            <h3 className="mt-3 font-semibold text-[rgb(var(--foreground))]">{comunicado.titulo}</h3>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]">
+              {comunicado.corpo}
+            </p>
+            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+              {formatarData(comunicado.publicadoEm)}
+            </p>
           </div>
         ),
       )}

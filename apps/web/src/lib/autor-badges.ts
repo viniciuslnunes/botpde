@@ -342,14 +342,19 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     )
   }
 
-  const badges = await getBadgesPorAutorTenant(
-    posts.map((p) => {
+  const badges = await getBadgesPorAutorTenant([
+    ...posts.map((p) => {
       const real = torcidaRealPorAutor.get(p.autorId)
       const tenantBadgeId =
         sinteticoPorTenant.has(p.tenantId) && real ? real.tenantId : p.tenantId
       return { autorId: p.autorId, tenantId: tenantBadgeId }
     }),
-  )
+    ...posts.flatMap((p) => {
+      const c = p.comunicadoOrigem
+      if (!c?.autorId) return []
+      return [{ autorId: c.autorId, tenantId: c.tenantId }]
+    }),
+  ])
 
   return posts.map((p) => {
     const real = torcidaRealPorAutor.get(p.autorId)
@@ -357,20 +362,34 @@ export async function enriquecerPostsComBadges(posts: PostSocialItem[]): Promise
     const tenantBadgeId = emSintetico && real ? real.tenantId : p.tenantId
     const b = badges.get(chave(p.autorId, tenantBadgeId))
 
-    const base = b
-      ? {
-          ...p,
-          autor: {
+    const comunicado = p.comunicadoOrigem
+    const badgeComunicado =
+      comunicado?.autorId != null
+        ? badges.get(chave(comunicado.autorId, comunicado.tenantId))
+        : undefined
+
+    const base = {
+      ...p,
+      autor: b
+        ? {
             ...p.autor,
             sedeNome: b.sedeNome,
             cargoNome: b.cargoNome,
             departamentoNome: b.departamentoNome,
-          },
-        }
-      : p
+          }
+        : p.autor,
+      comunicadoOrigem:
+        comunicado && badgeComunicado
+          ? {
+              ...comunicado,
+              autorCargoNome: badgeComunicado.cargoNome,
+              autorDepartamentoNome: badgeComunicado.departamentoNome,
+            }
+          : comunicado,
+    }
 
     if (emSintetico && real) {
-      return { ...base, tenant: { nome: real.tenantNome } }
+      return { ...base, tenant: { nome: real.tenantNome, logoUrl: base.tenant.logoUrl } }
     }
     return base
   })

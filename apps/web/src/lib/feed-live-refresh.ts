@@ -115,7 +115,7 @@ export function previewParaPostSocial(preview: PostPublicadoPreview): PostSocial
     postOrigemId: null,
     comunicadoOrigemId: null,
     eventoId: null,
-    tenant: { nome: preview.tenantNome },
+    tenant: { nome: preview.tenantNome, logoUrl: null },
     autor: {
       id: preview.autor.id,
       nome: preview.autor.nome,

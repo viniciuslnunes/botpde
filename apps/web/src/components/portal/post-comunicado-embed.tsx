@@ -1,6 +1,7 @@
 import { Megaphone } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import type { ComunicadoOrigemEmbed } from '@/lib/feed'
+import { formatAutorCargoBadge } from '@/lib/autor-badges-format'
 import { ExpandableText } from './expandable-text'
 
 const PRIORIDADE_VARIANT: Record<string, 'neutral' | 'warning' | 'danger'> = {
@@ -14,6 +15,11 @@ interface PostComunicadoEmbedProps {
 }
 
 export function PostComunicadoEmbed({ comunicado }: PostComunicadoEmbedProps) {
+  const cargoBadge = formatAutorCargoBadge(
+    comunicado.autorCargoNome,
+    comunicado.autorDepartamentoNome,
+  )
+
   return (
     <div className="mt-3 rounded-xl border border-[rgb(var(--primary)_/_0.3)] bg-[rgb(var(--primary)_/_0.05)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -35,7 +41,10 @@ export function PostComunicadoEmbed({ comunicado }: PostComunicadoEmbedProps) {
         className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]"
       />
       {comunicado.autorNome && (
-        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{comunicado.autorNome}</p>
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+          Por {comunicado.autorNome}
+          {cargoBadge ? ` · ${cargoBadge}` : ''}
+        </p>
       )}
     </div>
   )

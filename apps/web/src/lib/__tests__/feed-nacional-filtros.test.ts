@@ -55,7 +55,7 @@ const postRaw = {
   conversaId: null,
   oculto: false,
   alcanceNacional: false,
-  tenant: { nome: 'CN' },
+  tenant: { nome: 'CN', logoUrl: null },
   autor: { id: 'u2', nome: 'Autor', nickname: null, avatarUrl: null },
   postOrigem: null,
   comunicadoOrigem: null,

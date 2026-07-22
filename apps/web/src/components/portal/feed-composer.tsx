@@ -49,7 +49,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
-import { PostComunicadoEmbed } from './post-comunicado-embed'
+import { ExpandableText } from './expandable-text'
 import { PostMedia } from './post-media'
 import {
   paraTextoLegivel,
@@ -1131,29 +1131,34 @@ function ComposerBody({
               <p className="mb-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
                 Prévia — como vai aparecer no feed
               </p>
-              {titulo.trim() || texto.trim() ? (
+              {titulo.trim() || texto.trim() || anexos.length > 0 || (embedUrl && !embedDispensado) ? (
                 <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
                   <div className="flex items-center gap-2.5">
-                    <Avatar nome={userName} avatarUrl={userAvatar} size="sm" />
+                    <Avatar nome={tenantNome} avatarUrl={null} size="sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-[rgb(var(--foreground))]">
-                        {userName ?? 'Administração'}
+                        {formatNomeTorcida(tenantNome)}
                       </p>
                       <p className="text-xs text-[rgb(var(--foreground-muted))]">agora</p>
                     </div>
                   </div>
-                  <PostComunicadoEmbed
-                    comunicado={{
-                      id: 'preview',
-                      titulo: titulo.trim() || 'Título do comunicado',
-                      corpo: texto.trim() || 'O texto do comunicado aparece aqui.',
-                      prioridade,
-                      tenantNome,
-                      autorNome: userName,
-                    }}
-                  />
                   {anexos.length > 0 || (embedUrl && !embedDispensado) ? (
-                    <PostMedia urls={finalMidias} caption="" />
+                    <PostMedia urls={finalMidias} caption={texto} />
+                  ) : null}
+                  {titulo.trim() ? (
+                    <h3 className="mt-3 text-sm font-semibold text-[rgb(var(--foreground))]">
+                      {titulo.trim()}
+                    </h3>
+                  ) : null}
+                  {(texto.trim() || (!titulo.trim() && anexos.length === 0)) && (
+                    <ExpandableText
+                      text={texto.trim() || 'O texto do comunicado aparece aqui.'}
+                      lines={8}
+                      className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+                    />
+                  )}
+                  {userName ? (
+                    <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{userName}</p>
                   ) : null}
                 </div>
               ) : (

@@ -65,8 +65,12 @@ export interface ComunicadoOrigemEmbed {
   titulo: string
   corpo: string
   prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+  tenantId: string
   tenantNome: string
+  autorId: string | null
   autorNome: string | null
+  autorCargoNome: string | null
+  autorDepartamentoNome: string | null
 }
 
 export interface EventoPostEmbed {
@@ -75,6 +79,28 @@ export interface EventoPostEmbed {
   data: Date
   local: string | null
   meuRsvp: 'CONFIRMADO' | 'RECUSADO' | null
+}
+
+/** Tenant no card do feed — nome + logo (comunicados oficiais usam no header). */
+export type PostTenantLite = { nome: string; logoUrl: string | null }
+
+const tenantSelectPost = {
+  nome: true,
+  logoUrl: true,
+  torcidaConhecida: { select: { logoUrl: true } },
+} as const
+
+type TenantPostRaw = {
+  nome: string
+  logoUrl: string | null
+  torcidaConhecida: { logoUrl: string | null } | null
+}
+
+function projetarTenantPost(tenant: TenantPostRaw): PostTenantLite {
+  return {
+    nome: formatNomeTorcida(tenant.nome),
+    logoUrl: durableImageUrl(tenant.torcidaConhecida?.logoUrl ?? tenant.logoUrl),
+  }
 }
 
 export interface PostSocialItem {
@@ -92,7 +118,7 @@ export interface PostSocialItem {
   postOrigemId: string | null
   comunicadoOrigemId: string | null
   eventoId: string | null
-  tenant: { nome: string }
+  tenant: PostTenantLite
   autor: {
     id: string
     nome: string | null
@@ -124,7 +150,9 @@ export type PostRaw = Omit<
   | 'evento'
   | 'enquete'
   | 'grupo'
+  | 'tenant'
 > & {
+  tenant: TenantPostRaw
   _count: { reacoes: number; comentarios: number }
   reacoes: { tipo: string }[]
   conversa?: { id: string; nome: string | null; tipo: string } | null
@@ -140,8 +168,9 @@ export type PostRaw = Omit<
     titulo: string
     corpo: string
     prioridade: 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+    tenantId: string
     tenant: { nome: string }
-    autor: { nome: string | null }
+    autor: { id: string; nome: string | null } | null
   } | null
   evento?: {
     id: string
@@ -193,7 +222,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
     ...rest,
     imagemUrl: durableImageUrl(rest.imagemUrl),
     midiaUrls: filterDurableImageUrls(rest.midiaUrls),
-    tenant: { nome: formatNomeTorcida(tenant.nome) },
+    tenant: projetarTenantPost(tenant),
     autor: {
       id: autor?.id ?? rest.autorId,
       nome: autor?.nome ?? null,
@@ -226,8 +255,12 @@ export function projetarPost(post: PostRaw): PostSocialItem {
           titulo: comunicadoOrigem.titulo,
           corpo: comunicadoOrigem.corpo,
           prioridade: comunicadoOrigem.prioridade,
+          tenantId: comunicadoOrigem.tenantId,
           tenantNome: formatNomeTorcida(comunicadoOrigem.tenant.nome),
+          autorId: comunicadoOrigem.autor?.id ?? null,
           autorNome: comunicadoOrigem.autor?.nome ?? null,
+          autorCargoNome: null,
+          autorDepartamentoNome: null,
         }
       : null,
     evento: evento
@@ -247,7 +280,7 @@ export function projetarPost(post: PostRaw): PostSocialItem {
 /** Include mínimo para cards de busca (sem engajamento/embeds). */
 export function postIncludeBusca() {
   return {
-    tenant: { select: { nome: true } },
+    tenant: { select: tenantSelectPost },
     autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
   } as const
 }
@@ -267,7 +300,7 @@ type PostBuscaRaw = {
   postOrigemId: string | null
   comunicadoOrigemId: string | null
   eventoId: string | null
-  tenant: { nome: string }
+  tenant: TenantPostRaw
   autor: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
 }
 
@@ -288,7 +321,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
     postOrigemId: post.postOrigemId,
     comunicadoOrigemId: post.comunicadoOrigemId,
     eventoId: post.eventoId,
-    tenant: { nome: formatNomeTorcida(post.tenant.nome) },
+    tenant: projetarTenantPost(post.tenant),
     autor: {
       ...post.autor,
       avatarUrl: durableImageUrl(post.autor.avatarUrl),
@@ -312,7 +345,7 @@ export function projetarPostBusca(post: PostBuscaRaw): PostSocialItem {
  */
 export function postIncludeLista(userId?: string) {
   return {
-    tenant: { select: { nome: true } },
+    tenant: { select: tenantSelectPost },
     autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
     postOrigem: {
       select: {
@@ -329,8 +362,9 @@ export function postIncludeLista(userId?: string) {
         titulo: true,
         corpo: true,
         prioridade: true,
+        tenantId: true,
         tenant: { select: { nome: true } },
-        autor: { select: { nome: true } },
+        autor: { select: { id: true, nome: true } },
       },
     },
     enquete: {
@@ -364,7 +398,7 @@ function orFeedNacionalDescobrir(seguindoAprovados: string[]): Prisma.PostWhereI
 
 export function postInclude(userId?: string) {
   return {
-    tenant: { select: { nome: true } },
+    tenant: { select: tenantSelectPost },
     autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
     postOrigem: {
       select: {
@@ -381,8 +415,9 @@ export function postInclude(userId?: string) {
         titulo: true,
         corpo: true,
         prioridade: true,
+        tenantId: true,
         tenant: { select: { nome: true } },
-        autor: { select: { nome: true } },
+        autor: { select: { id: true, nome: true } },
       },
     },
     evento: {
@@ -422,7 +457,7 @@ export function postInclude(userId?: string) {
  */
 export function postIncludeGrupo(userId?: string) {
   return {
-    tenant: { select: { nome: true } },
+    tenant: { select: tenantSelectPost },
     autor: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
     postOrigem: {
       select: {
