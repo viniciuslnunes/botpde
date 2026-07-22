@@ -94,28 +94,49 @@ export function tiktokVideoId(url: string): string | null {
 }
 
 /** Src do iframe oficial do Instagram (`/p|reel|tv/{id}/embed`). */
-export function instagramEmbedSrc(url: string): string | null {
+export function instagramEmbedSrc(url: string, widthPx?: number): string | null {
   try {
     const u = new URL(url)
     const m = u.pathname.match(/\/(p|reel|reels|tv)\/([^/?]+)/)
     if (!m) return null
     const kind = m[1] === 'reels' ? 'reel' : m[1]
-    return `https://www.instagram.com/${kind}/${m[2]}/embed`
+    const wp = widthPx ? resolveEmbedFrameWidth('instagram', widthPx) : EMBED_FRAME_MAX_WIDTH.instagram
+    return `https://www.instagram.com/${kind}/${m[2]}/embed/?cr=1&v=14&wp=${wp}`
   } catch {
     return null
   }
 }
 
-export function twitterEmbedSrc(url: string): string | null {
+export function twitterEmbedSrc(url: string, widthPx?: number): string | null {
   const id = twitterStatusId(url)
   if (!id) return null
-  return `https://platform.twitter.com/embed/Tweet.html?id=${id}&dnt=true`
+  const w = widthPx ? resolveEmbedFrameWidth('twitter', widthPx) : EMBED_FRAME_MAX_WIDTH.twitter
+  return `https://platform.twitter.com/embed/Tweet.html?id=${id}&dnt=true&width=${w}`
 }
 
 export function tiktokEmbedSrc(url: string): string | null {
   const id = tiktokVideoId(url)
   if (!id) return null
   return `https://www.tiktok.com/embed/v2/${id}`
+}
+
+/** Largura nativa do player — esticar além disso só cria faixas laterais. */
+export const EMBED_FRAME_MAX_WIDTH: Record<Exclude<EmbedProvider, 'youtube'>, number> = {
+  tiktok: 325,
+  instagram: 400,
+  twitter: 550,
+}
+
+export function resolveEmbedFrameWidth(
+  provider: EmbedProvider,
+  cardWidthPx: number,
+): number {
+  if (provider === 'youtube') {
+    return Math.max(Math.round(cardWidthPx) || 360, 280)
+  }
+  const cap = EMBED_FRAME_MAX_WIDTH[provider]
+  const card = Math.round(cardWidthPx) || cap
+  return Math.min(Math.max(card, 280), cap)
 }
 
 /** Origens que enviam `postMessage` de resize dos iframes oficiais. */
@@ -137,23 +158,22 @@ export function nextTikTokEmbedFrameName(): string {
 }
 
 /**
- * Altura inicial do iframe a partir da largura do card. Embeds verticais (TikTok /
- * Reel) escalam com a largura — altura fixa (~740) causa scroll interno no feed.
+ * Altura inicial na largura nativa do player (não na largura do card).
+ * Buffer generoso no chrome — postMessage refina depois.
  */
 export function estimateEmbedHeight(provider: EmbedProvider, url: string, widthPx: number): number {
-  const w = Math.min(Math.max(Math.round(widthPx) || 360, 280), 720)
+  const w = resolveEmbedFrameWidth(provider, widthPx)
   switch (provider) {
     case 'youtube':
       return Math.round((w * 9) / 16)
     case 'tiktok':
-      // 9:16 + chrome (CTA, handle, áudio)
-      return Math.round((w * 16) / 9) + 180
+      // player 9:16 + perfil/CTA/caption do embed/v2
+      return Math.round((w * 16) / 9) + 400
     case 'instagram':
-      if (/\/(reel|reels)\//i.test(url)) return Math.round((w * 16) / 9) + 160
-      return Math.round(w * 1.2) + 220
+      if (/\/(reel|reels)\//i.test(url)) return Math.round((w * 16) / 9) + 260
+      return Math.round(w * 1.15) + 260
     case 'twitter':
-      // Texto + mídia; postMessage refina depois
-      return Math.round(w * 0.95) + 260
+      return Math.round(w * 0.9) + 360
     default:
       return 560
   }
@@ -191,7 +211,7 @@ function positiveWidth(value: unknown): number | null {
 
 export interface EmbedHeightReport {
   height: number
-  /** Largura reportada pelo player (TikTok); usada para escalar no card. */
+  /** Largura reportada pelo player (TikTok / X). */
   width?: number
 }
 
@@ -251,15 +271,13 @@ export function parseEmbedHeightMessage(
   return null
 }
 
-/** Ajusta altura reportada quando o player mediu numa largura menor que o card. */
-export function scaleEmbedHeightToWidth(
-  report: EmbedHeightReport,
-  containerWidth: number,
-): number {
-  if (!report.width || containerWidth <= 0 || report.width >= containerWidth * 0.92) {
-    return report.height
-  }
-  return Math.min(Math.ceil(report.height * (containerWidth / report.width)), 2400)
+/**
+ * Usa a altura reportada pelo player. Não amplia com a largura do card — o
+ * conteúdo social não estica; upscale só criava faixas e scroll interno.
+ * Buffer de 4px evita scrollbar fantasma por arredondamento.
+ */
+export function applyEmbedHeightReport(report: EmbedHeightReport): number {
+  return Math.min(report.height + 4, 2400)
 }
 
 /**

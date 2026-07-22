@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
+  applyEmbedHeightReport,
   classifyMedia,
   cloudinaryVideoPoster,
   detectEmbedProvider,
@@ -15,7 +16,7 @@ import {
   instagramEmbedSrc,
   nextTikTokEmbedFrameName,
   parseEmbedHeightMessage,
-  scaleEmbedHeightToWidth,
+  resolveEmbedFrameWidth,
   tiktokEmbedSrc,
   twitterEmbedSrc,
   youTubeId,
@@ -269,40 +270,33 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
   )
 }
 
-function embedIframeSrc(provider: EmbedProvider, url: string): string | null {
+function embedIframeSrc(provider: EmbedProvider, url: string, widthPx: number): string | null {
   if (provider === 'youtube') {
     const id = youTubeId(url)
     return id ? `https://www.youtube-nocookie.com/embed/${id}` : null
   }
-  if (provider === 'instagram') return instagramEmbedSrc(url)
-  if (provider === 'twitter') return twitterEmbedSrc(url)
+  if (provider === 'instagram') return instagramEmbedSrc(url, widthPx)
+  if (provider === 'twitter') return twitterEmbedSrc(url, widthPx)
   if (provider === 'tiktok') return tiktokEmbedSrc(url)
   return null
 }
 
 function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
-  const frameRef = useRef<HTMLDivElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [width, setWidth] = useState(0)
+  const [cardWidth, setCardWidth] = useState(0)
   const [reportedHeight, setReportedHeight] = useState<number | null>(null)
-  const widthBucketRef = useRef(0)
   const [tiktokFrameName] = useState(() =>
     detectEmbedProvider(url) === 'tiktok' ? nextTikTokEmbedFrameName() : undefined,
   )
 
   useEffect(() => {
-    const el = frameRef.current
+    const el = shellRef.current
     if (!el) return
     const update = () => {
       const w = Math.round(el.getBoundingClientRect().width)
-      if (w <= 0) return
-      setWidth(w)
-      const bucket = Math.round(w / 48)
-      if (bucket !== widthBucketRef.current) {
-        widthBucketRef.current = bucket
-        setReportedHeight(null)
-      }
+      if (w > 0) setCardWidth(w)
     }
     update()
     const ro = new ResizeObserver(update)
@@ -320,11 +314,11 @@ function SocialEmbed({ url }: { url: string }) {
     const onMessage = (event: MessageEvent) => {
       if (!origins.includes(event.origin)) return
       const win = iframeRef.current?.contentWindow
-      if (win && event.source !== win) return
+      // Só filtra por source quando o contentWindow já está disponível
+      if (win && event.source && event.source !== win) return
       const report = parseEmbedHeightMessage(provider, event.data)
       if (!report) return
-      const containerW = frameRef.current?.getBoundingClientRect().width ?? 0
-      setReportedHeight(scaleEmbedHeightToWidth(report, containerW || report.width || 0))
+      setReportedHeight(applyEmbedHeightReport(report))
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
@@ -332,36 +326,46 @@ function SocialEmbed({ url }: { url: string }) {
 
   if (!provider) return null
 
-  const src = embedIframeSrc(provider, url)
+  const widthForFrame = resolveEmbedFrameWidth(provider, cardWidth || 360)
+  const src = embedIframeSrc(provider, url, widthForFrame)
   if (!src) return <EmbedFallback url={url} provider={provider} />
 
   const isVideoAspect = provider === 'youtube'
   const height =
-    reportedHeight ?? (isVideoAspect ? 0 : estimateEmbedHeight(provider, url, width || 360))
+    reportedHeight ?? (isVideoAspect ? 0 : estimateEmbedHeight(provider, url, widthForFrame))
+  // Evita montar o iframe com largura errada (duplo load + scroll fantasma)
+  const frameReady = isVideoAspect || cardWidth > 0
 
   return (
-    <div className="social-embed w-full min-w-0 space-y-2">
+    <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
       <div
-        ref={frameRef}
         className={[
-          'w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white',
-          isVideoAspect ? 'aspect-video' : '',
+          'mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))]',
+          isVideoAspect ? 'aspect-video w-full bg-black' : 'bg-white',
         ]
           .filter(Boolean)
           .join(' ')}
-        style={isVideoAspect ? undefined : { height }}
+        style={
+          isVideoAspect
+            ? undefined
+            : { width: widthForFrame, maxWidth: '100%', height: frameReady ? height : undefined, minHeight: frameReady ? undefined : height }
+        }
       >
-        <iframe
-          ref={iframeRef}
-          src={src}
-          title={EMBED_HOSTS[provider]}
-          name={provider === 'tiktok' ? tiktokFrameName : undefined}
-          loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          className="h-full w-full border-0"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        {frameReady && (
+          <iframe
+            ref={iframeRef}
+            src={src}
+            title={EMBED_HOSTS[provider]}
+            name={provider === 'tiktok' ? tiktokFrameName : undefined}
+            width={isVideoAspect ? undefined : widthForFrame}
+            height={isVideoAspect ? undefined : height}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="h-full w-full border-0"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        )}
       </div>
       <a
         href={url}

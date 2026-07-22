@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyEmbedHeightReport,
   ensureSocialEmbedInMidias,
   estimateEmbedHeight,
   firstSocialUrlInText,
   instagramEmbedSrc,
   nextTikTokEmbedFrameName,
   parseEmbedHeightMessage,
-  scaleEmbedHeightToWidth,
+  resolveEmbedFrameWidth,
   stripEmbeddedSocialUrls,
 } from '../social-embed'
 
@@ -61,30 +62,39 @@ describe('ensureSocialEmbedInMidias', () => {
 })
 
 describe('instagramEmbedSrc', () => {
-  it('monta src de reel', () => {
+  it('monta src de reel com wp nativo', () => {
     expect(instagramEmbedSrc(IG)).toBe(
-      'https://www.instagram.com/reel/DSf2dEMDhNa/embed',
+      'https://www.instagram.com/reel/DSf2dEMDhNa/embed/?cr=1&v=14&wp=400',
     )
   })
 
   it('monta src de post /p/', () => {
-    expect(instagramEmbedSrc('https://www.instagram.com/p/AbCdEf/')).toBe(
-      'https://www.instagram.com/p/AbCdEf/embed',
+    expect(instagramEmbedSrc('https://www.instagram.com/p/AbCdEf/', 320)).toBe(
+      'https://www.instagram.com/p/AbCdEf/embed/?cr=1&v=14&wp=320',
     )
   })
 })
 
-describe('estimateEmbedHeight', () => {
-  it('escala TikTok/Reel com a largura do card (não usa teto fixo baixo)', () => {
-    const narrow = estimateEmbedHeight('tiktok', TT, 325)
-    const wide = estimateEmbedHeight('tiktok', TT, 520)
-    expect(wide).toBeGreaterThan(narrow)
-    expect(wide).toBeGreaterThan(900)
-    expect(estimateEmbedHeight('instagram', IG, 520)).toBeGreaterThan(900)
+describe('resolveEmbedFrameWidth', () => {
+  it('limita TikTok/IG/X à largura nativa do player', () => {
+    expect(resolveEmbedFrameWidth('tiktok', 520)).toBe(325)
+    expect(resolveEmbedFrameWidth('instagram', 520)).toBe(400)
+    expect(resolveEmbedFrameWidth('twitter', 700)).toBe(550)
   })
 
-  it('Twitter começa com altura generosa para mídia', () => {
-    expect(estimateEmbedHeight('twitter', TW, 520)).toBeGreaterThan(700)
+  it('não ultrapassa a largura do card no mobile', () => {
+    expect(resolveEmbedFrameWidth('twitter', 320)).toBe(320)
+  })
+})
+
+describe('estimateEmbedHeight', () => {
+  it('usa largura nativa — card largo não infla o TikTok', () => {
+    expect(estimateEmbedHeight('tiktok', TT, 520)).toBe(estimateEmbedHeight('tiktok', TT, 325))
+    expect(estimateEmbedHeight('tiktok', TT, 325)).toBeGreaterThan(850)
+  })
+
+  it('Twitter estima na largura do tweet (≤550)', () => {
+    expect(estimateEmbedHeight('twitter', TW, 700)).toBe(estimateEmbedHeight('twitter', TW, 550))
   })
 })
 
@@ -120,15 +130,9 @@ describe('parseEmbedHeightMessage', () => {
   })
 })
 
-describe('scaleEmbedHeightToWidth', () => {
-  it('escala quando o card é mais largo que o player reportado', () => {
-    expect(scaleEmbedHeightToWidth({ height: 740, width: 325 }, 520)).toBe(
-      Math.ceil(740 * (520 / 325)),
-    )
-  })
-
-  it('não escala quando a largura já é compatível', () => {
-    expect(scaleEmbedHeightToWidth({ height: 900, width: 500 }, 520)).toBe(900)
+describe('applyEmbedHeightReport', () => {
+  it('aplica buffer sem upscale pela largura do card', () => {
+    expect(applyEmbedHeightReport({ height: 740, width: 325 })).toBe(744)
   })
 })
 
