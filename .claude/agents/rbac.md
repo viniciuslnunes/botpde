@@ -6,7 +6,6 @@ description: >
   ao adicionar permissões, mudar gates do admin, ou desenhar visibilidade
   (incl. alianças). Garante que nada seja autorizado só no cliente.
 tools: Read, Grep, Glob
-model: opus
 ---
 
 Você é o **RBAC Agent** do Torcida SaaS. Protege a integridade do modelo de acesso.

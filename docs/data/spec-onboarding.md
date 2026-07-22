@@ -1,7 +1,7 @@
 # Spec — Onboarding, Torcedor global e Rivalidade
 
-> **Para revisão antes de codar.** Planejado em Opus; codificado pelo agente
-> `implementation` (Fable) em branch. Convenções: `.claude/agents/data-model.md`,
+> **Para revisão antes de codar.** Codificado pelo agente `implementation` em
+> branch. Convenções: `.claude/agents/data-model.md`,
 > `.claude/agents/rbac.md`, `CLAUDE.md`. Projeto usa `db push` (sem migrations).
 > Validação prévia: agentes `data-model` (schema) e `rbac` (segregação/feed).
 

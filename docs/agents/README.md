@@ -1,8 +1,10 @@
 # Time de agentes — Torcida SaaS
 
-Modelo de trabalho assistido por IA: **Opus planeja, Fable implementa.** Os agentes
-vivem em `.claude/agents/*.md` e são invocáveis pelo Claude Code (aparecem em
-`/agents`). Este README explica quando usar cada um.
+Modelo de trabalho assistido por IA: **planejar antes de codificar**, com escopo
+mínimo na implementação. Use **Sonnet** ou o **modelo Auto** da sessão — não
+fixar Opus para planejamento. Os agentes vivem em `.claude/agents/*.md` e são
+invocáveis pelo Claude Code (aparecem em `/agents`). Este README explica quando
+usar cada um.
 
 ## Memória de domínio compartilhada
 
@@ -23,19 +25,19 @@ Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
 
 ## Papéis
 
-| Agente | Quando usar | Model |
-|---|---|---|
-| `research-dominio` | Entender o nicho, benchmarks, riscos — antes de decidir | opus |
-| `aliancas-torcidas` | Estudar alianças/rivalidades; recomendar aliados na config | opus |
-| `product-strategy` | Decidir o quê construir e em que ordem | opus |
-| `data-model` | Propor/validar entidades Prisma e integridade | opus |
-| `rbac` | Permissões, autorização e visibilidade cross-tenant | opus |
-| `loja` | Catálogo, sacola, checkout, cupons, pedidos e estoque | opus |
-| `performance` | Auditar latência, queries, cache, bundle e polling; planejar otimizações zero-custo | opus |
-| `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual; captura PNGs reais via Playwright, ver `apps/web/e2e/README.md`) | opus |
-| `qa-verification` | Verificar antes de dar como pronto; rodar Vitest | opus |
-| `implementation` | Codificar o combinado, com escopo mínimo | **fable** |
-| `news-curator` | Curar fila de notícias externas: aprovar/rejeitar com justificativa | opus |
+| Agente | Quando usar |
+|---|---|
+| `research-dominio` | Entender o nicho, benchmarks, riscos — antes de decidir |
+| `aliancas-torcidas` | Estudar alianças/rivalidades; recomendar aliados na config |
+| `product-strategy` | Decidir o quê construir e em que ordem |
+| `data-model` | Propor/validar entidades Prisma e integridade |
+| `rbac` | Permissões, autorização e visibilidade cross-tenant |
+| `loja` | Catálogo, sacola, checkout, cupons, pedidos e estoque |
+| `performance` | Auditar latência, queries, cache, bundle e polling; planejar otimizações zero-custo |
+| `ux-review` | Revisar fluxo/telas (usa o skill `impeccable` no detalhe visual; captura PNGs reais via Playwright, ver `apps/web/e2e/README.md`) |
+| `qa-verification` | Verificar antes de dar como pronto; rodar Vitest |
+| `implementation` | Codificar o combinado, com escopo mínimo |
+| `news-curator` | Curar fila de notícias externas: aprovar/rejeitar com justificativa |
 
 ## Fluxo recomendado por feature
 
@@ -44,8 +46,8 @@ Agentes: `ux-review`, `implementation`, `qa-verification`, `product-strategy`
 3. **Modelar** → `data-model` (dados) + `rbac` (acesso/visibilidade); para loja, também `loja`.
 4. **Desenhar** → `ux-review` valida jornada e estados.
 5. **Performance** (quando relevante) → `performance` audita impacto em TTFB/queries antes de fechar plano em páginas pesadas, feeds ou polling novo.
-6. **Fechar plano** (Opus) → aprovação humana.
-7. **Implementar** → `implementation` (Fable) segue `CLAUDE.md`.
+6. **Fechar plano** → aprovação humana.
+7. **Implementar** → `implementation` segue `CLAUDE.md`.
 8. **Verificar** → `qa-verification` confere DoD e roda testes.
 
 ## Performance (plano concluído — manutenção contínua)
@@ -176,6 +178,7 @@ mantém o knowledge; `product-strategy` prioriza pelo plano; `data-model` /
 
 ## Princípios
 
+- Preferir **Sonnet** ou o **modelo Auto** da sessão; não fixar Opus para planejamento.
 - Não implementar antes de o plano estar fechado e aprovado.
 - Escopo mínimo e seguro; reutilizar o que já existe.
 - Autorização sempre no servidor; auditar toda mutação.

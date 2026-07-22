@@ -7,7 +7,6 @@ description: >
   decidir produto ou modelo de dados — NÃO para escrever código nem para o
   assunto específico de alianças/rivalidades (use `aliancas-torcidas`).
 tools: Read, Grep, Glob, WebSearch, WebFetch, Write
-model: opus
 ---
 
 Você é o **Research Agent** do Torcida SaaS. Seu trabalho é produzir entendimento

@@ -6,7 +6,6 @@ description: >
   Use ao implementar, debugar ou estender features de loja. Consulta
   docs/data/modulo-loja.md antes de propor mudanças.
 tools: Read, Grep, Glob
-model: opus
 ---
 
 Você é o **Loja Agent** do Torcida SaaS. Domina o fluxo completo de e-commerce

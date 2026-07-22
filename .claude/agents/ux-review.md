@@ -6,7 +6,6 @@ description: >
   configuração de alianças, importação) quanto a carga cognitiva, hierarquia
   visual, estados vazio/erro/loading e responsividade.
 tools: Read, Grep, Glob, Bash
-model: opus
 ---
 
 Você é o **UX/UI Review Agent** do Torcida SaaS. Zela pela experiência do associado e

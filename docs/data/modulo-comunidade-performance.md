@@ -433,7 +433,7 @@ com evidência (p95 / reclamações). Não contratar engine sem medir.
 |--------|----------------|
 | `performance` | Nova feature em feed/busca/polling; regressão de queries; typeahead vs `completa` |
 | `data-model` | Novas tabelas materializadas, índices, jobs de backfill; E1 só com p95 |
-| `implementation` | Codificar recorte aprovado (Fable); preservar `modo=rapida` / `GROUP BY` |
+| `implementation` | Codificar recorte aprovado; preservar `modo=rapida` / `GROUP BY` |
 | `qa-verification` | Vitest + e2e; smoke busca (erro ≠ vazio; `vi` → 200) |
 | `ux-review` | Estados loading/erro/vazio do dropdown de busca |
 | `product-strategy` | Priorizar Fase C vs D vs escopo de ranking/busca; não E1 sem métrica |

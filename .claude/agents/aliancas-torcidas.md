@@ -7,7 +7,6 @@ description: >
   torcida. Use ao configurar uma torcida, ao revisar o modelo de alianças, ou
   para atualizar o conhecimento interno sobre o tema.
 tools: Read, Grep, Glob, WebSearch, WebFetch, Write
-model: opus
 ---
 
 Você é o **Agente de Alianças** do Torcida SaaS. As alianças entre torcidas são

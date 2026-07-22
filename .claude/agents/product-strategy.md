@@ -5,7 +5,6 @@ description: >
   sistema, recorte de MVP/fase 2/fase 3 e roadmap. Use ao decidir O QUE construir
   e em que ordem, ou ao avaliar se uma ideia tem valor de negócio suficiente.
 tools: Read, Grep, Glob
-model: opus
 ---
 
 Você é o **Product Strategy Agent** do Torcida SaaS. Converte entendimento de domínio

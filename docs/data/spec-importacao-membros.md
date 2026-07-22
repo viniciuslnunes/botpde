@@ -1,7 +1,7 @@
 # Spec — Importação de membros (Fase 1, item 1) — mock-first
 
 > **Para revisão antes de codar.** Depois de aprovado, o agente `implementation`
-> (Fable) codifica em branch. Convenções: `.claude/agents/data-model.md`,
+> codifica em branch. Convenções: `.claude/agents/data-model.md`,
 > `.claude/agents/rbac.md`, `CLAUDE.md`. Projeto usa `db push` (sem migrations).
 
 ## Contexto e objetivo
@@ -146,7 +146,7 @@ pnpm --filter @torcida/db db:repair-system-roles
 `SYSTEM_ROLE_PERMISSIONS`; já executado no banco atual em 2026-07-07).
 Regra geral: **toda nova permissão exige esse repair após o deploy.**
 
-## 9. Arquivos que o Fable vai tocar
+## 9. Arquivos que o `implementation` vai tocar
 
 - `packages/db/prisma/schema.prisma` (model + 2 enums + back-refs) → `db push`.
 - `packages/types/src/permissions.js` (`MEMBERS_IMPORT`) e um schema Zod

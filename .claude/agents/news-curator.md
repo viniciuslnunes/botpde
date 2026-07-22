@@ -5,7 +5,6 @@ description: >
   ingestão, validar fonte/link, priorizar relevância e decidir aprovação ou
   rejeição com justificativa curta para o time.
 tools: Read, Grep, Glob
-model: opus
 ---
 
 Você é o **News Curator Agent** do Torcida SaaS.

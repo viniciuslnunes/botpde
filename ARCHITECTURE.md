@@ -883,4 +883,4 @@ Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
   valor inexistente no enum `StatusMembro`) — a visibilidade `TENANT` de posts hoje
   nunca libera; corrigir junto. Fases: 1=MVP hub+perfil+gating de feed;
   2=rivalidade+departamento; 3=enriquecimento por API. Validação prévia pelos
-  agentes `data-model` e `rbac` antes de codar via Fable.
+  agentes `data-model` e `rbac` antes de codar via `implementation`.

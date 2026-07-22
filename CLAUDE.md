@@ -86,8 +86,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 
 ## Fluxo de trabalho
 
-- Planejar (Opus) antes de codificar; implementar (Fable via agente `implementation`)
-  com escopo mínimo. Ver `docs/agents/README.md`.
+- Planejar antes de codificar; implementar via agente `implementation` com escopo
+  mínimo. Preferir Sonnet ou o modelo Auto da sessão — não fixar Opus para
+  planejamento. Ver `docs/agents/README.md`.
 - Commit/push só quando pedido. Se estiver na branch default, crie branch antes.
 - Mensagens de commit terminam com:
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
