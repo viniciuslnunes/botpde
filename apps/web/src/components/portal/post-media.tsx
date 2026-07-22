@@ -10,6 +10,7 @@ import {
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
+  estimateEmbedHeight,
   instagramPermalink,
   resolveEmbedFrameWidth,
   tiktokVideoId,
@@ -319,6 +320,92 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
   )
 }
 
+/** Placeholder enquanto o widget oficial (script + iframe) ainda não montou. */
+function EmbedSkeleton({
+  provider,
+  height,
+  fill = false,
+}: {
+  provider: EmbedProvider
+  height?: number
+  /** Preenche o container (ex.: aspect-video do YouTube). */
+  fill?: boolean
+}) {
+  const mediaMinH =
+    provider === 'youtube'
+      ? undefined
+      : Math.max((height ?? 220) - (provider === 'tiktok' ? 120 : 140), 140)
+
+  return (
+    <div
+      role="status"
+      aria-label={`Carregando publicação do ${EMBED_HOSTS[provider]}`}
+      className={[
+        'pointer-events-none animate-pulse overflow-hidden bg-[rgb(var(--background-subtle))]',
+        fill ? 'absolute inset-0 z-[1]' : 'absolute inset-x-0 top-0 z-[1]',
+      ].join(' ')}
+      style={fill ? undefined : { height: height ?? 220 }}
+    >
+      {provider !== 'youtube' && (
+        <div className="flex items-center gap-3 p-4">
+          <div className="h-10 w-10 shrink-0 rounded-full bg-[rgb(var(--border)_/_0.65)]" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-[38%] rounded-md bg-[rgb(var(--border)_/_0.65)]" />
+            <div className="h-2.5 w-[24%] rounded-md bg-[rgb(var(--border)_/_0.45)]" />
+          </div>
+        </div>
+      )}
+      <div
+        className={[
+          'rounded-lg bg-[rgb(var(--border)_/_0.45)]',
+          provider === 'youtube' ? 'absolute inset-0 rounded-none' : 'mx-4',
+        ].join(' ')}
+        style={mediaMinH != null ? { minHeight: mediaMinH } : undefined}
+      />
+      {provider !== 'youtube' && (
+        <div className="space-y-2 px-4 py-4">
+          <div className="h-2.5 w-full rounded-md bg-[rgb(var(--border)_/_0.45)]" />
+          <div className="h-2.5 w-[68%] rounded-md bg-[rgb(var(--border)_/_0.35)]" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function YouTubeEmbed({ url, videoId }: { url: string; videoId: string }) {
+  const [ready, setReady] = useState(false)
+
+  return (
+    <div className="social-embed w-full min-w-0 space-y-2">
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-black">
+        {!ready && <EmbedSkeleton provider="youtube" fill />}
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+          title="YouTube"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; compute-pressure"
+          allowFullScreen
+          onLoad={() => setReady(true)}
+          className={[
+            'relative z-[2] h-full w-full border-0 transition-opacity duration-200',
+            ready ? 'opacity-100' : 'opacity-0',
+          ].join(' ')}
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        Abrir no {EMBED_HOSTS.youtube}
+      </a>
+    </div>
+  )
+}
+
 function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
   const shellRef = useRef<HTMLDivElement>(null)
@@ -396,33 +483,11 @@ function SocialEmbed({ url }: { url: string }) {
   if (provider === 'youtube') {
     const id = youTubeId(url)
     if (!id) return <EmbedFallback url={url} provider={provider} />
-    return (
-      <div className="social-embed w-full min-w-0 space-y-2">
-        <div className="aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-black">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${id}`}
-            title="YouTube"
-            loading="lazy"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; compute-pressure"
-            allowFullScreen
-            className="h-full w-full border-0"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Abrir no {EMBED_HOSTS[provider]}
-        </a>
-      </div>
-    )
+    return <YouTubeEmbed url={url} videoId={id} />
   }
 
   const frameWidth = resolveEmbedFrameWidth(provider, cardWidth || 360)
+  const skeletonHeight = estimateEmbedHeight(provider, url, cardWidth || 360)
   const igPermalink = provider === 'instagram' ? instagramPermalink(url) : null
   if (provider === 'instagram' && !igPermalink) {
     return <EmbedFallback url={url} provider={provider} />
@@ -436,13 +501,14 @@ function SocialEmbed({ url }: { url: string }) {
     <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
       <div
         ref={hostRef}
-        className="social-embed-host mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white"
+        className="social-embed-host relative mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white"
         style={{
           width: frameWidth,
           maxWidth: '100%',
-          minHeight: hasFrame ? undefined : 220,
+          minHeight: hasFrame ? undefined : skeletonHeight,
         }}
       >
+        {!hasFrame && <EmbedSkeleton provider={provider} height={skeletonHeight} />}
         {cardWidth > 0 && (
           <>
             {provider === 'twitter' && (
