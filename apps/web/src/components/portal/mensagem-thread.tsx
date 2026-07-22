@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Loader2,
   LogOut,
+  Pencil,
   Plus,
   Send,
   Smile,
@@ -137,6 +138,9 @@ export function MensagemThread({
   const [stickerOpen, setStickerOpen] = useState(false)
   const [denunciandoId, setDenunciandoId] = useState<string | null>(null)
   const [motivoDenuncia, setMotivoDenuncia] = useState('')
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [editandoTexto, setEditandoTexto] = useState('')
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [painelMembros, setPainelMembros] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
   const [novasPendentes, setNovasPendentes] = useState(0)
@@ -231,6 +235,10 @@ export function MensagemThread({
     setHasMoreHistorico(false)
     setCarregandoHistorico(false)
     carregandoHistoricoRef.current = false
+    setEditandoId(null)
+    setEditandoTexto('')
+    setDenunciandoId(null)
+    setMotivoDenuncia('')
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [conversaId])
 
@@ -604,9 +612,39 @@ export function MensagemThread({
             m.id === mensagemId ? { ...m, removida: true, conteudo: '', midiaUrls: [] } : m,
           ),
         )
+        if (editandoId === mensagemId) {
+          setEditandoId(null)
+          setEditandoTexto('')
+        }
       },
       success: 'Mensagem removida.',
     })
+  }
+
+  async function editarMensagem(mensagemId: string) {
+    const conteudo = editandoTexto.trim()
+    if (!conteudo) {
+      toast.error('Mensagem vazia.')
+      return
+    }
+    if (salvandoEdicao) return
+    setSalvandoEdicao(true)
+    try {
+      const res = await fetch(`/api/conversas/${conversaId}/mensagens/${mensagemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conteudo }),
+      })
+      const data = (await res.json()) as { mensagem?: MensagemDto; error?: string }
+      if (!res.ok || !data.mensagem) throw new Error(data.error ?? 'Erro ao editar.')
+      setMensagens((prev) => prev.map((m) => (m.id === mensagemId ? data.mensagem! : m)))
+      setEditandoId(null)
+      setEditandoTexto('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao editar mensagem.')
+    } finally {
+      setSalvandoEdicao(false)
+    }
   }
 
   async function denunciar(mensagemId: string) {
@@ -798,10 +836,16 @@ export function MensagemThread({
                           currentUserId={currentUserId}
                           denunciandoId={denunciandoId}
                           motivoDenuncia={motivoDenuncia}
+                          editandoId={editandoId}
+                          editandoTexto={editandoTexto}
+                          salvandoEdicao={salvandoEdicao}
                           animate={false}
                           onDenunciandoId={setDenunciandoId}
                           onMotivoDenuncia={setMotivoDenuncia}
+                          onEditandoId={setEditandoId}
+                          onEditandoTexto={setEditandoTexto}
                           onRemover={() => void removerMensagem(msg.id)}
+                          onEditar={() => void editarMensagem(msg.id)}
                           onDenunciar={() => void denunciar(msg.id)}
                         />
                       </div>
@@ -817,10 +861,16 @@ export function MensagemThread({
                     currentUserId={currentUserId}
                     denunciandoId={denunciandoId}
                     motivoDenuncia={motivoDenuncia}
+                    editandoId={editandoId}
+                    editandoTexto={editandoTexto}
+                    salvandoEdicao={salvandoEdicao}
                     animate
                     onDenunciandoId={setDenunciandoId}
                     onMotivoDenuncia={setMotivoDenuncia}
+                    onEditandoId={setEditandoId}
+                    onEditandoTexto={setEditandoTexto}
                     onRemover={() => void removerMensagem(msg.id)}
+                    onEditar={() => void editarMensagem(msg.id)}
                     onDenunciar={() => void denunciar(msg.id)}
                   />
                 ))
@@ -1069,10 +1119,16 @@ function MensagemBubble({
   currentUserId,
   denunciandoId,
   motivoDenuncia,
+  editandoId,
+  editandoTexto,
+  salvandoEdicao,
   animate,
   onDenunciandoId,
   onMotivoDenuncia,
+  onEditandoId,
+  onEditandoTexto,
   onRemover,
+  onEditar,
   onDenunciar,
 }: {
   msg: MensagemDto
@@ -1080,15 +1136,22 @@ function MensagemBubble({
   currentUserId: string
   denunciandoId: string | null
   motivoDenuncia: string
+  editandoId: string | null
+  editandoTexto: string
+  salvandoEdicao: boolean
   animate: boolean
   onDenunciandoId: (id: string | null) => void
   onMotivoDenuncia: (v: string) => void
+  onEditandoId: (id: string | null) => void
+  onEditandoTexto: (v: string) => void
   onRemover: () => void
+  onEditar: () => void
   onDenunciar: () => void
 }) {
   const minha = msg.autor.id === currentUserId
   const midias = ensureSocialEmbedInMidias(msg.conteudo, msg.midiaUrls)
   const conteudoVisivel = stripEmbeddedSocialUrls(msg.conteudo, midias)
+  const editando = editandoId === msg.id
   const Wrapper = animate ? m.div : 'div'
   const motionProps = animate
     ? {
@@ -1121,6 +1184,67 @@ function MensagemBubble({
           )}
           {msg.removida ? (
             <p className="text-sm italic opacity-70">Mensagem removida</p>
+          ) : editando ? (
+            <form
+              className="flex flex-col gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault()
+                onEditar()
+              }}
+            >
+              <textarea
+                value={editandoTexto}
+                onChange={(e) => onEditandoTexto(e.target.value)}
+                maxLength={2000}
+                rows={2}
+                autoFocus
+                disabled={salvandoEdicao}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    onEditandoId(null)
+                    onEditandoTexto('')
+                  }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    onEditar()
+                  }
+                }}
+                className={[
+                  'w-full resize-none rounded-lg border px-2 py-1.5 text-sm outline-none',
+                  minha
+                    ? 'border-[rgb(var(--color-primary-on)_/_0.35)] bg-[rgb(var(--color-primary-on)_/_0.12)] text-[rgb(var(--color-primary-on))] placeholder:text-[rgb(var(--color-primary-on)_/_0.55)]'
+                    : 'border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]',
+                ].join(' ')}
+              />
+              {midias.length > 0 && <PostMedia urls={midias} />}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={salvandoEdicao}
+                  onClick={() => {
+                    onEditandoId(null)
+                    onEditandoTexto('')
+                  }}
+                  className={[
+                    'text-xs font-medium opacity-80 hover:opacity-100',
+                    minha ? 'text-[rgb(var(--color-primary-on))]' : 'text-[rgb(var(--foreground-muted))]',
+                  ].join(' ')}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoEdicao || !editandoTexto.trim()}
+                  className={[
+                    'text-xs font-semibold disabled:opacity-50',
+                    minha ? 'text-[rgb(var(--color-primary-on))]' : 'text-[rgb(var(--color-primary-fg))]',
+                  ].join(' ')}
+                >
+                  {salvandoEdicao ? 'Salvando…' : 'Salvar'}
+                </button>
+              </div>
+            </form>
           ) : (
             <>
               {conteudoVisivel ? (
@@ -1141,22 +1265,38 @@ function MensagemBubble({
             {isTemp(msg.id) && ' · enviando…'}
             {msg.editadaEm && ' · editada'}
           </span>
-          {!isTemp(msg.id) && !msg.removida && (
+          {!isTemp(msg.id) && !msg.removida && !editando && (
             <span className="hidden gap-1 group-hover:flex">
               {minha ? (
-                <button
-                  type="button"
-                  title="Remover mensagem"
-                  onClick={onRemover}
-                  className="rounded p-0.5 text-red-500 hover:bg-red-500/10"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    title="Editar mensagem"
+                    onClick={() => {
+                      onDenunciandoId(null)
+                      onEditandoId(msg.id)
+                      onEditandoTexto(msg.conteudo)
+                    }}
+                    className="rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Remover mensagem"
+                    onClick={onRemover}
+                    className="rounded p-0.5 text-red-500 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
                   title="Denunciar mensagem"
                   onClick={() => {
+                    onEditandoId(null)
+                    onEditandoTexto('')
                     onDenunciandoId(denunciandoId === msg.id ? null : msg.id)
                     onMotivoDenuncia('')
                   }}
