@@ -103,12 +103,29 @@ body {
   overflow-x: hidden;
 }
 
-button:not(:disabled) {
-  cursor: pointer;
-}
+/* Ações clicáveis (navegação / mutação) — pointer por padrão.
+   Em @layer base para utilitários Tailwind (cursor-default, etc.) sobrescreverem. */
+@layer base {
+  a[href],
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  label[for],
+  input[type='button']:not(:disabled),
+  input[type='submit']:not(:disabled),
+  input[type='reset']:not(:disabled),
+  input[type='file']:not(:disabled),
+  input[type='image']:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
 
-button:disabled {
-  cursor: not-allowed;
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  input:is([type='button'], [type='submit'], [type='reset'], [type='file'], [type='image']):disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* ── Utilitários com cor primária do tenant ──────────────────── */
