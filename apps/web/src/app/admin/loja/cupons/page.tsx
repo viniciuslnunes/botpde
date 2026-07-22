@@ -6,7 +6,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { criarCupomForm, toggleCupomForm } from '../actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
-import { ArrowLeft } from 'lucide-react'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { MotionReveal } from '@/components/motion/motion-reveal'
+import { ArrowLeft, Ticket } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Cupons — Loja Admin' }
@@ -33,11 +35,14 @@ export default async function AdminCuponsPage() {
 
   return (
     <div className="app-container space-y-6 py-8">
-      <Link href="/admin/loja" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-        <ArrowLeft className="h-4 w-4" /> Loja
-      </Link>
-      <h1 className="text-xl font-bold">Cupons</h1>
+      <MotionReveal>
+        <Link href="/admin/loja" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
+          <ArrowLeft className="h-4 w-4" /> Loja
+        </Link>
+        <h1 className="mt-3 text-xl font-bold">Cupons</h1>
+      </MotionReveal>
 
+      <MotionReveal index={1}>
       <AdminActionForm
         action={criarCupomForm}
         success="Cupom criado."
@@ -59,7 +64,16 @@ export default async function AdminCuponsPage() {
         </label>
         <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar cupom</button>
       </AdminActionForm>
+      </MotionReveal>
 
+      {cupons.length === 0 ? (
+        <MotionEmptyState
+          icon={<Ticket className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+          title="Nenhum cupom ainda"
+          description="Crie um código de desconto para o checkout da loja."
+        />
+      ) : (
+      <MotionReveal index={2}>
       <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border">
         {cupons.map((c: (typeof cupons)[number]) => (
           <li key={c.id} className="flex items-center justify-between px-4 py-3">
@@ -94,6 +108,8 @@ export default async function AdminCuponsPage() {
           </li>
         ))}
       </ul>
+      </MotionReveal>
+      )}
     </div>
   )
 }

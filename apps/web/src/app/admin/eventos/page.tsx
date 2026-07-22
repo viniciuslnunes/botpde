@@ -18,6 +18,14 @@ import { diasParaEvento } from '@/lib/eventos'
 import { capacidadeEfetiva } from '@/lib/eventos-capacidade'
 import { janelaCalendario, listSedesAtivasParaEvento } from '@/lib/eventos-query'
 import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
+import {
+  listarPresencaPorEvento,
+  resumirComparecimento,
+  type EventoPresencaItem,
+  type EventosComparecimentoResumo,
+} from '@/lib/eventos-insights'
+import { InsightSection, StatCard } from '@/components/admin/ui'
+import { MiniBarChart } from '@/components/admin/charts'
 
 export const metadata: Metadata = { title: 'Agenda — Admin' }
 
@@ -30,6 +38,72 @@ function formatarData(data: Date) {
 
 type Props = {
   searchParams: Promise<{ tipo?: string; q?: string; vista?: string; data?: string }>
+}
+
+function formatarPct(valor: number | null): string {
+  return valor == null ? '—' : `${Math.round(valor * 100)}%`
+}
+
+function EventosInsightsSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-5 w-44 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+async function EventosInsights({ tenantId }: { tenantId: string }) {
+  const [resumo, presencaPorEvento]: [EventosComparecimentoResumo, EventoPresencaItem[]] =
+    await Promise.all([
+      resumirComparecimento(tenantId, '90d'),
+      listarPresencaPorEvento(tenantId, 8),
+    ])
+
+  if (resumo.eventosPassados === 0) return null
+
+  return (
+    <InsightSection
+      title="Comparecimento (90 dias)"
+      description="RSVP × check-in real dos eventos que já aconteceram."
+    >
+      <StatCard
+        label={`Taxa de presença (${resumo.presentes}/${resumo.confirmados})`}
+        value={formatarPct(resumo.taxaPresenca)}
+        tone={
+          resumo.taxaPresenca != null && resumo.taxaPresenca >= 0.7 ? 'success' : 'default'
+        }
+      />
+      <StatCard
+        label="No-show"
+        value={resumo.noShow}
+        tone={resumo.noShow > 0 ? 'warning' : 'default'}
+      />
+      <StatCard label="Ocupação média" value={formatarPct(resumo.ocupacaoMedia)} />
+
+      {presencaPorEvento.length > 0 ? (
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5 lg:col-span-3">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+            Confirmados × presentes por evento
+          </h3>
+          <MiniBarChart
+            data={presencaPorEvento.map((e) => ({
+              rotulo: e.rotulo,
+              valor: e.confirmados,
+              valorSecundario: e.presentes,
+              cor: 'rgb(var(--color-primary) / 0.75)',
+            }))}
+            corSecundaria="rgb(var(--color-success) / 0.75)"
+            legenda={{ principal: 'Confirmados', secundaria: 'Presentes' }}
+          />
+        </div>
+      ) : null}
+    </InsightSection>
+  )
 }
 
 export default async function AdminEventosPage({ searchParams }: Props) {
@@ -270,6 +344,12 @@ export default async function AdminEventosPage({ searchParams }: Props) {
           </div>
         </div>
       </div>
+
+      {!isCal && (
+        <Suspense fallback={<EventosInsightsSkeleton />}>
+          <EventosInsights tenantId={tenant.id} />
+        </Suspense>
+      )}
 
       {isCal ? (
         <AgendaCalendario

@@ -58,3 +58,12 @@ Enums:
 pnpm --filter @torcida/db db:generate
 pnpm --filter @torcida/db db:push
 ```
+
+## Insights administrativos (2026-07-22)
+
+`lib/financeiro.ts` ganhou `resumirFinanceiroMensal` (série receitas×despesas
+por mês, bucketing JS fuso SP) e `compararFinanceiroPeriodo` (atual vs
+anterior). Superfícies: seção "Evolução financeira" no hub `/admin/financeiro`
+(barras 12m + donut por categoria + saldo com delta) e seção Financeiro em
+`/admin/relatorios` (gate `reports:view`). Padrões e regras:
+`docs/frontend/admin-ui-kit.md`.

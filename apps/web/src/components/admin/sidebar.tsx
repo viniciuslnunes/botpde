@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BarChart3,
   LayoutDashboard,
   Building2,
   Users,
@@ -60,6 +61,7 @@ const ICON_BY_ID: Record<string, LucideIcon> = {
   financeiro: Wallet,
   patrimonio: Landmark,
   aliancas: Handshake,
+  relatorios: BarChart3,
   acessos: KeyRound,
   auditoria: ScrollText,
   design: Palette,

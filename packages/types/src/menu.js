@@ -179,6 +179,14 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: PERMISSIONS.ROLES_MANAGE,
     secao: 'governanca',
   },
+  // Leitura de inteligência administrativa (indicadores/insights por módulo).
+  {
+    id: 'relatorios',
+    label: 'Relatórios',
+    href: '/admin/relatorios',
+    permissao: PERMISSIONS.REPORTS_VIEW,
+    secao: 'governanca',
+  },
   // Append-only: sem mutações na UI. Gate: Diretoria (+ owner/admin/vice via ALL_PERMISSIONS).
   {
     id: 'auditoria',

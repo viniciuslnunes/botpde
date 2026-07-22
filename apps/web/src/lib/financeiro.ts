@@ -5,9 +5,16 @@ import { Prisma } from '@torcida/db'
 import {
   FINANCEIRO_PAGE_SIZE,
   formatarMoedaBRL,
+  formatDataCompetenciaInput,
   METODO_PAGAMENTO_BAR_LABEL,
   parseDataCompetencia,
 } from '@torcida/types'
+import {
+  chaveMesSP,
+  resolverIntervaloPeriodo,
+  ultimosMesesSP,
+  type Periodo,
+} from '@/lib/admin-insights'
 
 export type FinanceiroLancamentoLite = {
   id: string
@@ -150,6 +157,65 @@ export const resumirFinanceiro = cache(async function resumirFinanceiro(
     saldo: totalReceitas - totalDespesas,
     quantidade,
   }
+})
+
+export type FinanceiroMensal = {
+  mes: string
+  receitas: number
+  despesas: number
+  saldo: number
+}
+
+/**
+ * Receitas × despesas por mês (fuso São Paulo) — últimos `meses` meses, mês
+ * corrente incluso. Fetch por range (índice `(tenantId, tipo, data)`) + bucket JS.
+ */
+export const resumirFinanceiroMensal = cache(async function resumirFinanceiroMensal(
+  tenantId: string,
+  meses: number,
+): Promise<FinanceiroMensal[]> {
+  const mesesSP = ultimosMesesSP(meses)
+
+  const rows: Array<{ tipo: TipoFinanceiroLancamento; valor: Prisma.Decimal; data: Date }> =
+    await db.financeiroLancamento.findMany({
+      where: { tenantId, data: { gte: mesesSP[0].inicio } },
+      select: { tipo: true, valor: true, data: true },
+    })
+
+  const porChave = new Map<string, FinanceiroMensal>(
+    mesesSP.map((m) => [m.chave, { mes: m.rotulo, receitas: 0, despesas: 0, saldo: 0 }]),
+  )
+  for (const row of rows) {
+    const bucket = porChave.get(chaveMesSP(row.data))
+    if (!bucket) continue
+    const valor = toNumber(row.valor)
+    if (row.tipo === 'RECEITA') bucket.receitas += valor
+    else bucket.despesas += valor
+    bucket.saldo = bucket.receitas - bucket.despesas
+  }
+
+  return [...porChave.values()]
+})
+
+/** Resumo do período vs período imediatamente anterior (comparativos/TrendDelta). */
+export const compararFinanceiroPeriodo = cache(async function compararFinanceiroPeriodo(
+  tenantId: string,
+  periodo: Periodo,
+): Promise<{ atual: FinanceiroResumo; anterior: FinanceiroResumo }> {
+  const { inicio, fim, inicioAnterior, fimAnterior } = resolverIntervaloPeriodo(periodo)
+
+  const [atual, anterior]: [FinanceiroResumo, FinanceiroResumo] = await Promise.all([
+    resumirFinanceiro(tenantId, {
+      dataDe: formatDataCompetenciaInput(inicio),
+      dataAte: formatDataCompetenciaInput(fim),
+    }),
+    resumirFinanceiro(tenantId, {
+      dataDe: formatDataCompetenciaInput(inicioAnterior),
+      dataAte: formatDataCompetenciaInput(fimAnterior),
+    }),
+  ])
+
+  return { atual, anterior }
 })
 
 export type FinanceiroCategoriaResumo = {

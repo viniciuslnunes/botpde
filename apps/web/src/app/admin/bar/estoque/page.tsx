@@ -7,6 +7,7 @@ import { listarProdutosBar, resolveUnidadeBar } from '@/lib/bar'
 import type { BarProdutoLite } from '@/lib/bar'
 import { serializeProdutoBar } from '@/lib/bar-serialize'
 import { BarEstoqueTabela, RegistrarCompraBarForm } from '@/components/admin/bar/bar-estoque'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Estoque — Bar Admin' }
@@ -29,25 +30,29 @@ export default async function AdminBarEstoquePage() {
 
   return (
     <div className="app-container space-y-6 py-8">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/admin/bar"
-          className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
-        >
-          <ArrowLeft className="h-4 w-4" /> Bar
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Estoque do bar</h1>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            {unidade.nome}
-            {baixos > 0
-              ? ` · ${baixos} produto${baixos !== 1 ? 's' : ''} abaixo do mínimo`
-              : ' · nenhum produto abaixo do mínimo'}
-          </p>
+      <MotionReveal>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/bar"
+            className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
+          >
+            <ArrowLeft className="h-4 w-4" /> Bar
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Estoque do bar</h1>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              {unidade.nome}
+              {baixos > 0
+                ? ` · ${baixos} produto${baixos !== 1 ? 's' : ''} abaixo do mínimo`
+                : ' · nenhum produto abaixo do mínimo'}
+            </p>
+          </div>
         </div>
-      </div>
+      </MotionReveal>
 
-      <RegistrarCompraBarForm produtos={serializados} />
+      <MotionReveal index={1}>
+        <RegistrarCompraBarForm produtos={serializados} />
+      </MotionReveal>
 
       <BarEstoqueTabela produtos={serializados} />
     </div>

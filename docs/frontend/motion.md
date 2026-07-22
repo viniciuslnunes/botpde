@@ -1,9 +1,10 @@
 # Motion — guia de animações (`apps/web`)
 
 Documentação de referência para animações com [Motion](https://motion.dev/) (pacote
-`motion` v12). Hoje o **`MotionShell`** está montado em `/portal/comunidade`; este
-guia serve de base para estender o mesmo vocabulário a Loja, Onboarding, Salas,
-Mensagens e Admin.
+`motion` v12). Hoje o **`MotionShell`** está montado nos layouts de `/portal`
+(portal inteiro, incluindo Comunidade e Loja), `/admin`, `/onboarding` e
+`/video-sala`; este guia serve de base para manter o mesmo vocabulário em novas
+superfícies.
 
 ## Princípios
 
@@ -32,9 +33,10 @@ Dentro de `MotionShell` com `LazyMotion strict`, use sempre **`m`**, nunca `moti
 Arquivo: `apps/web/src/components/motion/motion-shell.tsx`
 
 - Envolve rotas que usam `m` / `AnimatePresence`.
-- Hoje: `apps/web/src/app/portal/comunidade/layout.tsx`.
-- **Para expandir:** montar também em `apps/web/src/app/portal/layout.tsx` (portal
-  inteiro) ou por módulo (`loja/layout.tsx`, `onboarding/layout.tsx`).
+- Hoje: `apps/web/src/app/portal/layout.tsx` (portal inteiro),
+  `apps/web/src/app/admin/layout.tsx`, `apps/web/src/app/onboarding/layout.tsx` e
+  `apps/web/src/app/video-sala/[id]/layout.tsx`.
+- **Para expandir:** montar no layout do novo módulo antes de usar `m` nele.
 
 ```tsx
 <MotionShell>
@@ -431,7 +433,7 @@ Commits de referência na `main`:
 | Eventos | `EventosListAnimated`, `EventoDetailReveal`, `EventoConfirmadosGrid`, `RsvpButtons` | lista, detalhe, RSVP |
 | Sedes | `SedesListAnimated`, `SedeDetailReveal`, `SedeLinksAnimated` | lista + detalhe |
 | Carteirinha | `CarteirinhaReveal` | card e detalhes |
-| Admin | `AdminMotionShell`, `AdminRouteTransition`, `AdminDashboardKpis`, `AdminEventosList`, `AdminLojaProdutosGrid`, `ModeracaoDenunciasClient`, `AdminPedidosList`, `AdminMembrosTable` | dashboard, eventos, loja, moderação, pedidos, membros, sedes, sócios, comunidade |
+| Admin | `AdminMotionShell`, `AdminRouteTransition`, kit `components/admin/ui/` (`StatCard`/`KpiGrid`, `TableShell`, `InsightSection`) + charts `components/admin/charts/` (ver `docs/frontend/admin-ui-kit.md`), `AdminEventosList`, `AdminLojaProdutosGrid`, `ModeracaoDenunciasClient`, `AdminPedidosList`, `AdminMembrosTable` | dashboard, relatórios, eventos, loja, bar, financeiro, moderação, pedidos, membros, sedes, sócios, comunidade |
 
 Arquivos genéricos novos:
 

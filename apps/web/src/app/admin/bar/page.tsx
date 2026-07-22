@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, Beer, Boxes, CupSoda, ReceiptText, Store } from 'lucide-react'
@@ -6,13 +7,19 @@ import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import {
   getTurnoAbertoBar,
   listarEstoqueBaixo,
+  listarMaisVendidosBar,
   resolveUnidadeBar,
   resumirMargemBar,
   resumirTurnoBar,
   resumirVendasBar,
+  resumirVendasBarPorDia,
 } from '@/lib/bar'
-import type { BarMargemResumo, BarProdutoLite, BarUnidadeLite, BarVendasResumo } from '@/lib/bar'
+import type { BarMaisVendido, BarMargemResumo, BarProdutoLite, BarUnidadeLite, BarVendasResumo } from '@/lib/bar'
+import type { SerieTemporal } from '@/lib/admin-insights'
 import { BarTurnoPainel } from '@/components/admin/bar/bar-turno-painel'
+import { InsightSection } from '@/components/admin/ui'
+import { MiniBarChart, Sparkline } from '@/components/admin/charts'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
@@ -26,6 +33,72 @@ function rotuloTipo(tipo: BarUnidadeLite['tipo']) {
   if (tipo === 'SEDE') return 'Sede'
   if (tipo === 'SUBSEDE') return 'Subsede'
   return 'PDE'
+}
+
+function BarInsightsSkeleton() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-5 w-44 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.45)] sm:col-span-2" />
+        <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+      </div>
+    </div>
+  )
+}
+
+async function BarInsights({ tenantId, sedeId }: { tenantId: string; sedeId: string }) {
+  const [serie, maisVendidos]: [SerieTemporal, BarMaisVendido[]] = await Promise.all([
+    resumirVendasBarPorDia(tenantId, 30, sedeId),
+    listarMaisVendidosBar(tenantId, '30d', sedeId),
+  ])
+
+  const total30d = serie.reduce((acc, ponto) => acc + ponto.valor, 0)
+
+  return (
+    <InsightSection
+      title="Últimos 30 dias"
+      description="Vendas pagas da unidade e produtos que mais saíram."
+    >
+      {total30d === 0 && maisVendidos.length === 0 ? (
+        <div className="sm:col-span-2 lg:col-span-3">
+          <MotionEmptyState
+            title="Sem vendas nos últimos 30 dias"
+            description="Registre vendas no PDV para acompanhar a evolução da unidade aqui."
+          />
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                Vendas por dia
+              </h3>
+              <p className="text-sm font-bold tabular-nums text-[rgb(var(--foreground))]">
+                {formatarPreco(total30d)}
+              </p>
+            </div>
+            <Sparkline data={serie.map((ponto) => ponto.valor)} width={280} height={48} className="h-12 w-full" />
+          </div>
+
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+              Mais vendidos
+            </h3>
+            {maisVendidos.length === 0 ? (
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">Sem itens no período.</p>
+            ) : (
+              <MiniBarChart
+                height={90}
+                data={maisVendidos.map((p) => ({ rotulo: p.produtoNome, valor: p.quantidade }))}
+                formato="unidades"
+              />
+            )}
+          </div>
+        </>
+      )}
+    </InsightSection>
+  )
 }
 
 export default async function AdminBarPage() {
@@ -185,6 +258,10 @@ export default async function AdminBarPage() {
           </div>
         </MotionReveal>
       )}
+
+      <Suspense fallback={<BarInsightsSkeleton />}>
+        <BarInsights tenantId={tenant.id} sedeId={unidade.id} />
+      </Suspense>
 
       <MotionReveal index={margemHoje ? 5 : 4}>
         <section className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">

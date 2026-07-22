@@ -6,7 +6,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { criarCategoriaForm, excluirCategoriaForm } from '../actions'
 import { AdminActionForm } from '@/components/admin/admin-action-form'
-import { ArrowLeft } from 'lucide-react'
+import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { MotionReveal } from '@/components/motion/motion-reveal'
+import { ArrowLeft, Tags } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Categorias — Loja Admin' }
@@ -29,23 +31,35 @@ export default async function AdminCategoriasPage() {
 
   return (
     <div className="app-container space-y-6 py-8">
-      <Link href="/admin/loja" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-        <ArrowLeft className="h-4 w-4" /> Loja
-      </Link>
-      <h1 className="text-xl font-bold">Categorias</h1>
+      <MotionReveal>
+        <Link href="/admin/loja" className="inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))]">
+          <ArrowLeft className="h-4 w-4" /> Loja
+        </Link>
+        <h1 className="mt-3 text-xl font-bold">Categorias</h1>
+      </MotionReveal>
 
-      <AdminActionForm
-        action={criarCategoriaForm}
-        success="Categoria criada."
-        interpretResult
-        className="space-y-3 rounded-2xl border border-[rgb(var(--border))] p-4"
-      >
-        <h2 className="text-sm font-semibold">Nova categoria</h2>
-        <input name="nome" required placeholder="Nome" className="w-full rounded-lg border px-3 py-2 text-sm" />
-        <input name="ordem" type="number" defaultValue={categorias.length + 1} className="w-24 rounded-lg border px-3 py-2 text-sm" />
-        <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar</button>
-      </AdminActionForm>
+      <MotionReveal index={1}>
+        <AdminActionForm
+          action={criarCategoriaForm}
+          success="Categoria criada."
+          interpretResult
+          className="space-y-3 rounded-2xl border border-[rgb(var(--border))] p-4"
+        >
+          <h2 className="text-sm font-semibold">Nova categoria</h2>
+          <input name="nome" required placeholder="Nome" className="w-full rounded-lg border px-3 py-2 text-sm" />
+          <input name="ordem" type="number" defaultValue={categorias.length + 1} className="w-24 rounded-lg border px-3 py-2 text-sm" />
+          <button type="submit" className="rounded-xl bg-[rgb(var(--primary))] px-4 py-2 text-sm text-white">Criar</button>
+        </AdminActionForm>
+      </MotionReveal>
 
+      {categorias.length === 0 ? (
+        <MotionEmptyState
+          icon={<Tags className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}
+          title="Nenhuma categoria ainda"
+          description="Crie a primeira categoria para organizar o catálogo da loja."
+        />
+      ) : (
+      <MotionReveal index={2}>
       <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))]">
         {categorias.map((c: (typeof categorias)[number]) => (
           <li key={c.id} className="flex items-center justify-between px-4 py-3">
@@ -75,6 +89,8 @@ export default async function AdminCategoriasPage() {
           </li>
         ))}
       </ul>
+      </MotionReveal>
+      )}
     </div>
   )
 }

@@ -72,6 +72,15 @@ Widgets Sofascore na Comunidade são **display** (iframe), não ingestão de `Pa
 - PWA completa de check-in (hoje: fila local no browser)
 - Ônibus/assentos e bilheteria
 
+## Insights administrativos (2026-07-22)
+
+Nova `lib/eventos-insights.ts`: `resumirComparecimento` (taxa de presença =
+check-ins/confirmados — walk-in conta, pode passar de 1; no-show =
+`CONFIRMADO` sem `checkedInAt`; ocupação média vs capacidade efetiva) e
+`listarPresencaPorEvento` (confirmados×presentes dos últimos eventos).
+Superfícies: `InsightSection` no hub `/admin/eventos` e seção Eventos em
+`/admin/relatorios`. Padrões: `docs/frontend/admin-ui-kit.md`.
+
 ## Agentes
 
 `product-strategy` (escopo Agenda), `data-model` (`Partida` / série / waitlist),

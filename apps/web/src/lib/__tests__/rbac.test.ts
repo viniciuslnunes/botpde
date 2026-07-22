@@ -299,14 +299,15 @@ describe('filterMenuByPermissions com OR', () => {
     expect(soMsgMod.map((i) => i.id)).toContain('comunidade-moderacao')
   })
 
-  it('ADMIN_MENU: pacote Financeiro (membro) não abre admin — só Dashboard', () => {
+  it('ADMIN_MENU: pacote Financeiro (membro) não abre operação — só Dashboard + Relatórios (leitura)', () => {
     const financePerms = [
       PERMISSIONS.FINANCE_VIEW,
       PERMISSIONS.REPORTS_VIEW,
       PERMISSIONS.MESSAGES_SEND,
     ]
     const ids = filterMenuByPermissions(ADMIN_MENU, financePerms).map((i) => i.id)
-    expect(ids).toEqual(['dashboard'])
+    // reports:view abre /admin/relatorios (leitura de indicadores) — nunca operação.
+    expect(ids).toEqual(['dashboard', 'relatorios'])
     expect(ids).not.toContain('financeiro')
     expect(ids).not.toContain('membros')
   })
@@ -341,11 +342,14 @@ describe('filterMenuByPermissions com OR', () => {
     expect(groups.find((g) => g.id === 'financeiro')?.label).toBe('Financeiro')
   })
 
-  it('Fase 2: pacote colaborador de toda área canônica não abre área admin', () => {
+  it('Fase 2: pacote colaborador de área canônica não abre operação admin (no máx. Relatórios)', () => {
     for (const area of DEPARTAMENTOS_CANONICOS) {
       const ids = filterMenuByPermissions(ADMIN_MENU, area.permissions).map((i) => i.id)
-      expect(ids, area.nome).toEqual(['dashboard'])
-      expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(false)
+      // reports:view (pacote colaborador de várias áreas) abre só a leitura de
+      // /admin/relatorios — nenhum item de operação (membros, financeiro, loja...).
+      const temRelatorios = area.permissions.includes(PERMISSIONS.REPORTS_VIEW)
+      expect(ids, area.nome).toEqual(temRelatorios ? ['dashboard', 'relatorios'] : ['dashboard'])
+      expect(hasAdminAreaAccess(area.permissions), area.nome).toBe(temRelatorios)
     }
   })
 

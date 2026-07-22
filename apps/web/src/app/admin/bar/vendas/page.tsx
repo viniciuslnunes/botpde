@@ -16,6 +16,9 @@ import {
   BarVendasList,
   type BarVendaListItem,
 } from '@/components/admin/bar/bar-vendas-list'
+import { TablePagination } from '@/components/admin/ui'
+import { buildAdminHref } from '@/lib/admin-href'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Vendas — Bar Admin' }
@@ -106,51 +109,35 @@ export default async function AdminBarVendasPage({
   }))
 
   const totalPaginas = Math.max(1, Math.ceil(lista.total / lista.pageSize))
-  const queryStatus = statusFiltro ? `status=${statusFiltro}&` : ''
 
   return (
     <div className="app-container space-y-6 py-8">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/admin/bar"
-          className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
-        >
-          <ArrowLeft className="h-4 w-4" /> Bar
-        </Link>
-        <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Vendas do bar</h1>
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">{unidade.nome}</p>
-      </div>
+      <MotionReveal>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/bar"
+            className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
+          >
+            <ArrowLeft className="h-4 w-4" /> Bar
+          </Link>
+          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Vendas do bar</h1>
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">{unidade.nome}</p>
+        </div>
+      </MotionReveal>
 
       <BarVendasFiltros options={filtroOptions} />
       <BarVendasList vendas={vendas} podeGerir={podeGerir} />
 
-      {totalPaginas > 1 && (
-        <nav className="flex items-center justify-between text-sm" aria-label="Paginação">
-          {lista.page > 1 ? (
-            <Link
-              href={`/admin/bar/vendas?${queryStatus}page=${lista.page - 1}`}
-              className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 font-medium hover:bg-[rgb(var(--background-subtle))]"
-            >
-              ← Anteriores
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-[rgb(var(--foreground-muted))]">
-            Página {lista.page} de {totalPaginas}
-          </span>
-          {lista.page < totalPaginas ? (
-            <Link
-              href={`/admin/bar/vendas?${queryStatus}page=${lista.page + 1}`}
-              className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 font-medium hover:bg-[rgb(var(--background-subtle))]"
-            >
-              Próximas →
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      )}
+      <TablePagination
+        page={lista.page}
+        totalPages={totalPaginas}
+        buildHref={(p) =>
+          buildAdminHref('/admin/bar/vendas', {
+            status: statusFiltro,
+            page: p > 1 ? p : undefined,
+          })
+        }
+      />
     </div>
   )
 }

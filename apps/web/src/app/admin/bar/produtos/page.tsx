@@ -10,6 +10,7 @@ import { serializeProdutoBar } from '@/lib/bar-serialize'
 import { CriarProdutoBarForm } from '@/components/admin/bar/bar-produto-forms'
 import { BarProdutosGrid } from '@/components/admin/bar/bar-produtos-grid'
 import { BarCategoriasSection, type BarCategoriaItem } from '@/components/admin/bar/bar-categorias'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Produtos — Bar Admin' }
@@ -54,29 +55,35 @@ export default async function AdminBarProdutosPage() {
 
   return (
     <div className="app-container space-y-6 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/admin/bar"
-            className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
-          >
-            <ArrowLeft className="h-4 w-4" /> Bar
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Produtos do bar</h1>
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              {unidade.nome} · {ativos} produto{ativos !== 1 ? 's' : ''} ativo
-              {ativos !== 1 ? 's' : ''}
-            </p>
+      <MotionReveal>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/bar"
+              className="flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
+            >
+              <ArrowLeft className="h-4 w-4" /> Bar
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Produtos do bar</h1>
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                {unidade.nome} · {ativos} produto{ativos !== 1 ? 's' : ''} ativo
+                {ativos !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </MotionReveal>
 
-      <CriarProdutoBarForm categorias={categorias.map((c) => ({ id: c.id, nome: c.nome }))} />
+      <MotionReveal index={1}>
+        <CriarProdutoBarForm categorias={categorias.map((c) => ({ id: c.id, nome: c.nome }))} />
+      </MotionReveal>
 
       <BarProdutosGrid produtos={produtos.map(serializeProdutoBar)} />
 
-      <BarCategoriasSection categorias={categoriasItens} />
+      <MotionReveal index={2}>
+        <BarCategoriasSection categorias={categoriasItens} />
+      </MotionReveal>
     </div>
   )
 }

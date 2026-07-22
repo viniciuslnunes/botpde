@@ -5,7 +5,8 @@ import { PERMISSIONS } from '@torcida/types'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { EditarProdutoForm } from '@/components/admin/produto-forms'
-import { StatusPedidoBadge } from '@/components/admin/produto-forms'
+import { StatusBadge } from '@/components/admin/ui'
+import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -48,16 +49,19 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
 
   return (
     <div className="app-container space-y-8 py-8">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-          <ArrowLeft className="h-4 w-4" /> Loja
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold">{produto.nome}</h1>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">{produto.ativo ? '● Ativo' : '● Inativo'}</p>
+      <MotionReveal>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
+            <ArrowLeft className="h-4 w-4" /> Loja
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold">{produto.nome}</h1>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">{produto.ativo ? '● Ativo' : '● Inativo'}</p>
+          </div>
         </div>
-      </div>
+      </MotionReveal>
 
+      <MotionReveal index={1}>
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
         <h2 className="mb-4 font-semibold">Dados do produto</h2>
         <EditarProdutoForm
@@ -77,8 +81,10 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
           }}
         />
       </div>
+      </MotionReveal>
 
       {pedidoItens.length > 0 && (
+        <MotionReveal index={2}>
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
           <h2 className="mb-4 font-semibold">Pedidos recentes ({pedidoItens.length})</h2>
           <div className="space-y-2">
@@ -91,13 +97,14 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <StatusPedidoBadge status={item.pedido.status} />
+                  <StatusBadge dominio="pedido" status={item.pedido.status} />
                   <span className="text-xs text-[rgb(var(--foreground-muted))]">{formatarData(item.pedido.criadoEm)}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
+        </MotionReveal>
       )}
     </div>
   )

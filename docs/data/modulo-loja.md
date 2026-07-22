@@ -127,6 +127,15 @@ Server actions: `apps/web/src/app/admin/loja/actions.ts`
 - Preencher `discordId`/`canalTicketId` no fluxo web
 - Bot SaaS unificado (tabelas `produtos`/`pedidos` legadas)
 
+## Insights administrativos (2026-07-22)
+
+Nova `lib/loja-insights.ts`: `resumirVendasLoja` (receita/ticket médio/por
+status, comparativo de período), `listarMaisVendidosLoja` (top 5),
+`resumirUsoCupons` (usos + desconto concedido). Receita = pedidos
+`CONFIRMADO`/`ENTREGUE` (`PENDENTE` aguardando; `CANCELADO` fora). Superfícies:
+`InsightSection` no hub `/admin/loja` e seção Loja em `/admin/relatorios`.
+Padrões: `docs/frontend/admin-ui-kit.md`.
+
 ## Diagrama DBML
 
 Espelho em `docs/data/schema.dbml` (seção LOJA + refs).

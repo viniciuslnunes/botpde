@@ -190,3 +190,9 @@ mobile. Detalhe: `proposta-departamentos-portal-admin.md` § Fase 5.
 6. **Preferência de onboarding ≠ membership** (2026-07-17): `SaasMembro.departamentoId`
    é intenção até `APROVADO`; equipe e RBAC de área só depois de `aprovarMembro`
    (ou inclusão manual em Acessos / portal). Ver seção acima.
+7. **`reports:view` abre a área admin** (2026-07-22): com a página
+   `/admin/relatorios`, colaborador de área canônica que tem `reports:view` no
+   pacote passa a acessar a área admin com no máximo **Dashboard + Relatórios
+   (leitura)** — nunca itens de operação (invariante testado em
+   `rbac.test.ts`). Para restringir a gestores, remover `reports:view` dos
+   pacotes colaborador no seed.

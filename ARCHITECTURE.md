@@ -786,6 +786,32 @@ Hub único de eventos (decisão produto **1A** + fases **2C**). Detalhe:
 - **Não fazer:** scrapar SERP Google Sports; tratar widgets Sofascore como ingestão
   de `Partida`.
 
+### 5.12 Admin UI Kit + inteligência administrativa (2026-07-22)
+
+Refactor da área admin em fases (1–3 entregues; ondas 4–5 no roadmap). Guia
+completo: `docs/frontend/admin-ui-kit.md`.
+
+- **Kit** em `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/
+  `KpiGrid`, `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) —
+  **compõe** `@torcida/ui`, nunca duplica; vive em `apps/web` porque depende de
+  Motion. Fica proibido reimplementar header/stat card/badge/paginação inline em
+  page admin nova.
+- **Charts SVG próprios** (zero dependência) em `components/admin/charts/`
+  (`Sparkline`, `MiniBarChart` c/ série dupla, `DonutChart`, `TrendDelta`).
+  Fronteira RSC→client: props só primitivas (nunca `Decimal`/`Date`); funções
+  não atravessam — prop `formato` serializável.
+- **Insights on-the-fly, sem snapshots/tabelas novas**: fetch por range usando
+  índices existentes + bucketing **em JS, fuso `America/Sao_Paulo`**
+  (`lib/admin-insights.ts`) — nunca `date_trunc` SQL em UTC. Libs por módulo
+  com `'server-only'` + `cache()` + tipos explícitos + Decimal→number.
+- **`/admin/relatorios`**: primeira superfície da permissão `reports:view`
+  (existia no RBAC sem consumidor). Gate no server + item de menu na seção
+  governança. Consequência RBAC testada: colaborador de área canônica com
+  `reports:view` passa a abrir a área admin com no máximo Dashboard +
+  Relatórios (leitura) — nunca operação.
+- **Regras de receita**: loja = pedidos `CONFIRMADO`/`ENTREGUE`; bar = vendas
+  `PAGA`; presença de eventos = `checkedInAt` (walk-in conta; no-show =
+  `CONFIRMADO` sem check-in).
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
 - ~~**Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)**~~

@@ -86,3 +86,13 @@ pnpm --filter @torcida/db db:generate
 pnpm --filter @torcida/db db:push
 pnpm --filter @torcida/db seed:bar-gavioes
 ```
+
+## Insights administrativos (2026-07-22)
+
+`lib/bar.ts` ganhou `resumirVendasBarPorDia` (vendas `PAGA` por dia, fuso SP),
+`listarMaisVendidosBar` (top 5 por quantidade via groupBy de `BarVendaItem`) e
+`compararVendasBarPeriodo`; `resumirMargemBar` aceita `sedeId: undefined` =
+torcida inteira (uso nos relatórios). Superfícies: seção "Últimos 30 dias" no
+hub `/admin/bar` (sparkline + top produtos, respeitando a unidade ativa) e
+seção Bar em `/admin/relatorios`. Receita = só vendas `PAGA`. Padrões:
+`docs/frontend/admin-ui-kit.md`.

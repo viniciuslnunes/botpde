@@ -78,8 +78,14 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   codar.
 - **Animações (Motion):** presets em `apps/web/src/lib/motion-presets.ts`; guia em
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
-  `m`, `MotionReveal`, `MotionEmptyState`). Expandir shell para `portal/layout` antes de
-  animar Loja/Onboarding.
+  `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
+- **Área admin (2026-07-22):** páginas admin novas usam o kit de
+  `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
+  `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts
+  SVG de `components/admin/charts/` — nunca reimplementar header/stat/badge/
+  paginação inline. Insights/relatórios: `lib/admin-insights.ts` (bucketing JS
+  fuso SP) + `/admin/relatorios` (gate `reports:view`). Guia:
+  `docs/frontend/admin-ui-kit.md`; decisões: `ARCHITECTURE.md` §5.12.
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.

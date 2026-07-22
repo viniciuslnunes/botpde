@@ -5,6 +5,12 @@ import { db } from '@torcida/db'
 import type { MetodoPagamentoBar, StatusVendaBar, TipoSede } from '@torcida/db'
 import { Prisma } from '@torcida/db'
 import { BAR_PAGE_SIZE } from '@torcida/types'
+import {
+  bucketSomaPorDia,
+  resolverIntervaloPeriodo,
+  type Periodo,
+  type SerieTemporal,
+} from '@/lib/admin-insights'
 
 export type BarUnidadeLite = {
   id: string
@@ -239,6 +245,125 @@ export const resumirVendasBar = cache(async function resumirVendasBar(
 })
 
 /**
+ * Vendas PAGAS por dia (valor = total líquido), últimos `dias` dias.
+ * Sem `sedeId` = torcida inteira (relatórios); com `sedeId` = unidade (hub).
+ */
+export const resumirVendasBarPorDia = cache(async function resumirVendasBarPorDia(
+  tenantId: string,
+  dias: number,
+  sedeId?: string,
+): Promise<SerieTemporal> {
+  const fim = new Date()
+  const inicio = new Date(fim.getTime() - dias * 24 * 60 * 60 * 1000)
+  const where: Prisma.BarVendaWhereInput = { tenantId, status: 'PAGA', criadoEm: { gte: inicio } }
+  if (sedeId) where.sedeId = sedeId
+
+  const rows: Array<{ criadoEm: Date; total: Prisma.Decimal }> = await db.barVenda.findMany({
+    where,
+    select: { criadoEm: true, total: true },
+  })
+
+  return bucketSomaPorDia(
+    rows.map((r) => ({ data: r.criadoEm, valor: Number(r.total) })),
+    inicio,
+    fim,
+  )
+})
+
+export type BarMaisVendido = {
+  produtoNome: string
+  quantidade: number
+  receita: number
+}
+
+/** Top 5 produtos por quantidade nas vendas PAGAS do período. */
+export const listarMaisVendidosBar = cache(async function listarMaisVendidosBar(
+  tenantId: string,
+  periodo: Periodo,
+  sedeId?: string,
+): Promise<BarMaisVendido[]> {
+  const { inicio, fim } = resolverIntervaloPeriodo(periodo)
+  const whereVenda: Prisma.BarVendaWhereInput = {
+    tenantId,
+    status: 'PAGA',
+    criadoEm: { gte: inicio, lte: fim },
+  }
+  if (sedeId) whereVenda.sedeId = sedeId
+
+  const grouped: Array<{
+    produtoId: string | null
+    _sum: { quantidade: number | null; total: Prisma.Decimal | null }
+  }> = await db.barVendaItem.groupBy({
+    by: ['produtoId'],
+    where: { venda: { is: whereVenda } },
+    _sum: { quantidade: true, total: true },
+    orderBy: { _sum: { quantidade: 'desc' } },
+    take: 5,
+  })
+
+  const ids = grouped.map((g) => g.produtoId).filter((id): id is string => id !== null)
+  const produtos: Array<{ id: string; nome: string }> =
+    ids.length === 0
+      ? []
+      : await db.barProduto.findMany({
+          where: { tenantId, id: { in: ids } },
+          select: { id: true, nome: true },
+        })
+  const nomePorId = new Map<string, string>(produtos.map((p) => [p.id, p.nome]))
+
+  return grouped.map((g) => ({
+    // Produto removido do catálogo (produtoId = null via SetNull) vira "Item avulso".
+    produtoNome: (g.produtoId ? nomePorId.get(g.produtoId) : null) ?? 'Item avulso',
+    quantidade: g._sum.quantidade ?? 0,
+    receita: Number(g._sum.total ?? 0),
+  }))
+})
+
+export type BarVendasComparativo = {
+  atual: BarVendasResumo
+  anterior: BarVendasResumo
+}
+
+type BarVendaAggRow = {
+  _sum: { subtotal: Prisma.Decimal | null; total: Prisma.Decimal | null }
+  _count: { _all: number }
+}
+
+function aggParaResumo(agg: BarVendaAggRow): BarVendasResumo {
+  return {
+    totalVendas: Number(agg._sum.subtotal ?? 0),
+    totalPago: Number(agg._sum.total ?? 0),
+    quantidade: agg._count._all,
+  }
+}
+
+/** Vendas PAGAS do período vs período imediatamente anterior (TrendDelta). */
+export const compararVendasBarPeriodo = cache(async function compararVendasBarPeriodo(
+  tenantId: string,
+  periodo: Periodo,
+  sedeId?: string,
+): Promise<BarVendasComparativo> {
+  const { inicio, fim, inicioAnterior, fimAnterior } = resolverIntervaloPeriodo(periodo)
+  const base: Prisma.BarVendaWhereInput = { tenantId, status: 'PAGA' }
+  if (sedeId) base.sedeId = sedeId
+
+  const [atual, anterior]: [BarVendaAggRow, BarVendaAggRow] = await Promise.all([
+    db.barVenda.aggregate({
+      where: { ...base, criadoEm: { gte: inicio, lte: fim } },
+      _sum: { subtotal: true, total: true },
+      _count: { _all: true },
+    }),
+    db.barVenda.aggregate({
+      where: { ...base, criadoEm: { gte: inicioAnterior, lte: fimAnterior } },
+      _sum: { subtotal: true, total: true },
+      _count: { _all: true },
+    }),
+  ])
+
+  return { atual: aggParaResumo(atual), anterior: aggParaResumo(anterior) }
+})
+
+/**
  * Produtos ativos da unidade com estoque igual ou abaixo do mínimo.
  */
 export const listarEstoqueBaixo = cache(async function listarEstoqueBaixo(
@@ -334,19 +459,20 @@ export type BarMargemResumo = {
 }
 
 /**
- * Margem estimada das vendas PAGA da unidade (Σ total − Σ custoUnit×qtd).
+ * Margem estimada das vendas PAGA (Σ total − Σ custoUnit×qtd).
  * Sem schema extra — usa snapshots em BarVendaItem.
+ * `sedeId` opcional: `undefined` agrega a torcida inteira (relatórios).
  */
 export const resumirMargemBar = cache(async function resumirMargemBar(
   tenantId: string,
-  sedeId: string,
+  sedeId: string | undefined,
   opts?: { desde?: Date; turnoId?: string },
 ): Promise<BarMargemResumo> {
   const whereVenda: Prisma.BarVendaWhereInput = {
     tenantId,
-    sedeId,
     status: 'PAGA',
   }
+  if (sedeId) whereVenda.sedeId = sedeId
   if (opts?.turnoId) whereVenda.turnoId = opts.turnoId
   else if (opts?.desde) whereVenda.criadoEm = { gte: opts.desde }
 

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import {
   CATEGORIA_FINANCEIRO_LABEL,
   formatarMoedaBRL,
@@ -9,7 +8,8 @@ import {
 } from '@torcida/types'
 import { excluirLancamentoFinanceiro } from '@/app/admin/financeiro/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
-import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { TablePagination, TableShell } from '@/components/admin/ui'
+import { buildAdminHref } from '@/lib/admin-href'
 import { FinanceiroLancamentoForm } from '@/components/financeiro/financeiro-lancamento-form'
 import { Pencil, Trash2, Wallet } from 'lucide-react'
 
@@ -51,62 +51,59 @@ export function FinanceiroLancamentosLista({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  if (itens.length === 0) {
-    return (
-      <MotionEmptyState
-        icon={<Wallet className="mb-3 h-8 w-8 text-emerald-600 dark:text-emerald-400" />}
-        title={total === 0 ? 'Caixa vazio' : 'Nenhum resultado'}
-        description={
-          total === 0
-            ? 'Gestores registram receitas e despesas do caixa aqui. O saldo é calculado automaticamente.'
-            : 'Ajuste os filtros ou limpe a busca para ver outros lançamentos.'
-        }
-        className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-12 text-center"
-      />
-    )
-  }
-
   const from = (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   function hrefForPage(p: number) {
-    const params = new URLSearchParams()
-    if (query) {
-      for (const [k, v] of Object.entries(query)) {
-        if (v) params.set(k, v)
-      }
-    }
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return qs ? `${basePath}?${qs}` : basePath
+    return buildAdminHref(basePath, {
+      ...(query ?? {}),
+      page: p > 1 ? p : undefined,
+    })
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        Mostrando {from}–{to} de {total} lançamento{total === 1 ? '' : 's'}
-      </p>
-      <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+    <TableShell
+      title={
+        itens.length > 0 ? (
+          <span className="text-xs font-normal text-[rgb(var(--foreground-muted))]">
+            Mostrando {from}–{to} de {total} lançamento{total === 1 ? '' : 's'}
+          </span>
+        ) : undefined
+      }
+      isEmpty={itens.length === 0}
+      empty={{
+        icon: <Wallet className="mb-3 h-8 w-8 text-[rgb(var(--color-success-fg))]" />,
+        title: total === 0 ? 'Caixa vazio' : 'Nenhum resultado',
+        description:
+          total === 0
+            ? 'Gestores registram receitas e despesas do caixa aqui. O saldo é calculado automaticamente.'
+            : 'Ajuste os filtros ou limpe a busca para ver outros lançamentos.',
+      }}
+      footer={<TablePagination page={page} totalPages={totalPages} buildHref={hrefForPage} />}
+    >
+      <tbody className="divide-y divide-[rgb(var(--border))]">
         {itens.map((item) => (
-          <li key={item.id} className="px-4 py-3">
+          <tr key={item.id} className="align-top">
             {editingId === item.id ? (
-              <FinanceiroLancamentoForm
-                compact
-                initial={{
-                  id: item.id,
-                  tipo: item.tipo,
-                  categoria: item.categoria,
-                  valor: item.valor,
-                  descricao: item.descricao,
-                  data: item.data,
-                  observacao: item.observacao,
-                }}
-                onCancel={() => setEditingId(null)}
-              />
+              <td colSpan={2} className="px-4 py-3">
+                <FinanceiroLancamentoForm
+                  compact
+                  initial={{
+                    id: item.id,
+                    tipo: item.tipo,
+                    categoria: item.categoria,
+                    valor: item.valor,
+                    descricao: item.descricao,
+                    data: item.data,
+                    observacao: item.observacao,
+                  }}
+                  onCancel={() => setEditingId(null)}
+                />
+              </td>
             ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
+              <>
+                <td className="px-4 py-3">
                   <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
                     {item.descricao}
                   </p>
@@ -123,67 +120,41 @@ export function FinanceiroLancamentosLista({
                       {item.observacao}
                     </p>
                   )}
-                </div>
-                <div className="flex items-center gap-2 self-end sm:self-start">
-                  <span
-                    className={[
-                      'text-sm font-semibold tabular-nums',
-                      item.tipo === 'RECEITA'
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-red-600 dark:text-red-400',
-                    ].join(' ')}
-                  >
-                    {item.tipo === 'RECEITA' ? '+' : '−'}
-                    {formatarMoedaBRL(item.valor)}
-                  </span>
-                  {podeGerir && (
-                    <>
-                      <button
-                        type="button"
-                        title="Editar"
-                        onClick={() => setEditingId(item.id)}
-                        className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <ExcluirButton id={item.id} descricao={item.descricao} />
-                    </>
-                  )}
-                </div>
-              </div>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <span
+                      className={[
+                        'text-sm font-semibold tabular-nums',
+                        item.tipo === 'RECEITA'
+                          ? 'text-[rgb(var(--color-success-fg))]'
+                          : 'text-[rgb(var(--color-danger-fg))]',
+                      ].join(' ')}
+                    >
+                      {item.tipo === 'RECEITA' ? '+' : '−'}
+                      {formatarMoedaBRL(item.valor)}
+                    </span>
+                    {podeGerir && (
+                      <>
+                        <button
+                          type="button"
+                          title="Editar"
+                          onClick={() => setEditingId(item.id)}
+                          className="app-action rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <ExcluirButton id={item.id} descricao={item.descricao} />
+                      </>
+                    )}
+                  </div>
+                </td>
+              </>
             )}
-          </li>
+          </tr>
         ))}
-      </ul>
-
-      {totalPages > 1 && (
-        <nav className="flex items-center justify-between gap-3 text-sm">
-          {page > 1 ? (
-            <Link
-              href={hrefForPage(page - 1)}
-              className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              ← Anterior
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-[rgb(var(--foreground-muted))]">
-            Página {page} de {totalPages}
-          </span>
-          {page < totalPages ? (
-            <Link
-              href={hrefForPage(page + 1)}
-              className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-            >
-              Próxima →
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      )}
-    </div>
+      </tbody>
+    </TableShell>
   )
 }
 
