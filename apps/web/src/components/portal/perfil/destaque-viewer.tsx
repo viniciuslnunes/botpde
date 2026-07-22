@@ -11,6 +11,7 @@ import { PostMedia } from '../post-media'
 import { PostPoll } from '../post-poll'
 import { PostRepostEmbed } from '../post-repost-embed'
 import { linkPostComunidade } from '@/lib/comunidade-social'
+import { stripEmbeddedSocialUrls } from '@/lib/social-embed'
 import { lightboxBackdrop, springGentle, springSnappy, storySlideVariants } from '@/lib/motion-presets'
 import type { DestaquePerfilItem } from '@/lib/feed'
 
@@ -165,7 +166,12 @@ export function DestaqueViewer({
               onDragEnd={onDragEnd}
               className="w-full max-w-lg cursor-grab space-y-4 active:cursor-grabbing"
             >
-              <PostConteudoRich conteudo={post.conteudo} className="text-center text-lg text-white" />
+              {(() => {
+                const texto = stripEmbeddedSocialUrls(post.conteudo, post.midiaUrls)
+                return texto ? (
+                  <PostConteudoRich conteudo={texto} className="text-center text-lg text-white" />
+                ) : null
+              })()}
               {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
               {post.enquete && <PostPoll enquete={post.enquete} />}
               {post.midiaUrls.length > 0 && (

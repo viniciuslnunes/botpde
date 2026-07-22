@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { Avatar } from './avatar'
 import { PostConteudoRich } from './post-conteudo-rich'
+import { PostMedia } from './post-media'
+import {
+  ensureSocialEmbedInMidias,
+  stripEmbeddedSocialUrls,
+} from '@/lib/social-embed'
 import type { PostOrigemEmbed } from '@/lib/feed'
 
 interface PostRepostEmbedProps {
@@ -15,6 +20,10 @@ export function PostRepostEmbed({ origem }: PostRepostEmbedProps) {
       </div>
     )
   }
+
+  // Espelha FeedPostCard: midias (incl. social no texto) + strip para não duplicar URL.
+  const midias = ensureSocialEmbedInMidias(origem.conteudo, origem.midiaUrls)
+  const conteudoVisivel = stripEmbeddedSocialUrls(origem.conteudo, midias)
 
   return (
     <div className="mt-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
@@ -37,10 +46,15 @@ export function PostRepostEmbed({ origem }: PostRepostEmbedProps) {
           )}
         </div>
       </div>
-      <PostConteudoRich
-        conteudo={origem.conteudo}
-        className="line-clamp-4 text-sm text-[rgb(var(--foreground))]"
-      />
+      {conteudoVisivel ? (
+        <PostConteudoRich
+          conteudo={conteudoVisivel}
+          className="line-clamp-4 text-sm text-[rgb(var(--foreground))]"
+        />
+      ) : null}
+      {midias.length > 0 ? (
+        <PostMedia urls={midias} caption={origem.conteudo} />
+      ) : null}
     </div>
   )
 }

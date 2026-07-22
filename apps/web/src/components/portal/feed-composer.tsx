@@ -33,7 +33,7 @@ import {
 } from '@/app/portal/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS } from '@/lib/social-embed'
+import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias } from '@/lib/social-embed'
 import { emitirPostPublicado } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
@@ -326,10 +326,10 @@ function ComposerBody({
   const embedProvider = embedUrl ? detectEmbedProvider(embedUrl) : null
   const enviando = medias.some((m) => m.url === null && !m.error)
   const pending = canal ? canalPending : modoEnquete ? pollPending : modoEvento ? eventPending : postPending
-  const finalMidias = [
-    ...medias.filter((m) => m.url).map((m) => m.url as string),
-    ...(embedUrl ? [embedUrl] : []),
-  ]
+  const anexos = medias.filter((m) => m.url).map((m) => m.url as string)
+  const finalMidias = embedDispensado
+    ? anexos
+    : ensureSocialEmbedInMidias(texto, [...anexos, ...(embedUrl ? [embedUrl] : [])])
   const opcoesValidas = opcoes.map((o) => o.trim()).filter(Boolean)
   const podePublicar = modoEnquete
     ? texto.trim().length > 0 && opcoesValidas.length >= 2 && !pending

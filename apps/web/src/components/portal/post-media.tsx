@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
@@ -10,38 +10,13 @@ import {
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
+  instagramEmbedSrc,
+  tiktokEmbedSrc,
+  twitterEmbedSrc,
   youTubeId,
   type EmbedProvider,
   type MediaAttachment,
 } from '@/lib/social-embed'
-
-const SCRIPTS: Partial<Record<EmbedProvider, string>> = {
-  twitter: 'https://platform.twitter.com/widgets.js',
-  instagram: 'https://www.instagram.com/embed.js',
-  tiktok: 'https://www.tiktok.com/embed.js',
-}
-
-const loaded = new Set<string>()
-
-function loadScript(src: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (loaded.has(src)) return resolve()
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`)
-    if (existing) {
-      loaded.add(src)
-      return resolve()
-    }
-    const s = document.createElement('script')
-    s.src = src
-    s.async = true
-    s.onload = () => {
-      loaded.add(src)
-      resolve()
-    }
-    s.onerror = () => resolve()
-    document.body.appendChild(s)
-  })
-}
 
 interface PostMediaProps {
   urls: string[]
@@ -289,130 +264,65 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
   )
 }
 
-function SocialEmbed({ url }: { url: string }) {
-  const provider = detectEmbedProvider(url)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [ready, setReady] = useState(false)
-  const [containerWidth, setContainerWidth] = useState(0)
-  const measured = containerWidth > 0
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const update = () => {
-      const w = Math.round(el.getBoundingClientRect().width)
-      if (w > 0) setContainerWidth(w)
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  // Só processa após medir a largura do card — senão IG/X/TikTok fixam ~326px.
-  useEffect(() => {
-    if (!provider || provider === 'youtube' || !measured) return
-    const src = SCRIPTS[provider]
-    if (!src) return
-    let cancelled = false
-    void loadScript(src).then(() => {
-      if (cancelled) return
-      const w = window as unknown as {
-        twttr?: { widgets?: { load: (el?: HTMLElement | null) => void } }
-        instgrm?: { Embeds?: { process: () => void } }
-      }
-      if (provider === 'twitter') w.twttr?.widgets?.load(containerRef.current)
-      if (provider === 'instagram') w.instgrm?.Embeds?.process()
-      setReady(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [provider, url, measured])
-
-  if (!provider) return null
-
+function embedIframeSrc(provider: EmbedProvider, url: string): string | null {
   if (provider === 'youtube') {
     const id = youTubeId(url)
-    if (!id) return <EmbedFallback url={url} provider={provider} />
-    return (
-      <div className="w-full min-w-0 space-y-2">
-        <div className="aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))]">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${id}`}
-            title="YouTube"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
-            allowFullScreen
-            className="h-full w-full"
-          />
-        </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Abrir no {EMBED_HOSTS[provider]}
-        </a>
-      </div>
-    )
+    return id ? `https://www.youtube-nocookie.com/embed/${id}` : null
   }
+  if (provider === 'instagram') return instagramEmbedSrc(url)
+  if (provider === 'twitter') return twitterEmbedSrc(url)
+  if (provider === 'tiktok') return tiktokEmbedSrc(url)
+  return null
+}
 
-  const embedWidth = measured ? String(containerWidth) : undefined
+function embedFrameHeight(provider: EmbedProvider, url: string): number {
+  if (provider === 'youtube') return 0 // aspect-video
+  if (provider === 'instagram') return /\/(reel|reels)\//i.test(url) ? 760 : 640
+  if (provider === 'tiktok') return 740
+  if (provider === 'twitter') return 520
+  return 560
+}
+
+function SocialEmbed({ url }: { url: string }) {
+  const provider = detectEmbedProvider(url)
+  if (!provider) return null
+
+  const src = embedIframeSrc(provider, url)
+  if (!src) return <EmbedFallback url={url} provider={provider} />
+
+  const height = embedFrameHeight(provider, url)
+  const isVideoAspect = provider === 'youtube'
 
   return (
-    <div className="w-full min-w-0 space-y-2">
-      <div ref={containerRef} className="social-embed w-full min-w-0 overflow-hidden">
-        {provider === 'twitter' && (
-          <blockquote className="twitter-tweet" data-dnt="true" data-width={embedWidth}>
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              {url}
-            </a>
-          </blockquote>
-        )}
-        {provider === 'instagram' && (
-          <blockquote
-            className="instagram-media"
-            data-instgrm-permalink={url}
-            data-instgrm-version="14"
-            data-width={embedWidth}
-            style={{
-              width: '100%',
-              maxWidth: '100%',
-              minWidth: '100%',
-              margin: 0,
-            }}
-          >
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              {url}
-            </a>
-          </blockquote>
-        )}
-        {provider === 'tiktok' && (
-          <blockquote
-            className="tiktok-embed"
-            cite={url}
-            style={{ maxWidth: '100%', minWidth: '100%', width: '100%', margin: 0 }}
-          >
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              {url}
-            </a>
-          </blockquote>
-        )}
-        {!ready && <EmbedFallback url={url} provider={provider} />}
+    <div className="social-embed w-full min-w-0 space-y-2">
+      <div
+        className={[
+          'w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white',
+          isVideoAspect ? 'aspect-video' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={isVideoAspect ? undefined : { height }}
+      >
+        <iframe
+          src={src}
+          title={EMBED_HOSTS[provider]}
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          className="h-full w-full border-0"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
       </div>
-      {ready && (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Abrir no {EMBED_HOSTS[provider]}
-        </a>
-      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        Abrir no {EMBED_HOSTS[provider]}
+      </a>
     </div>
   )
 }
