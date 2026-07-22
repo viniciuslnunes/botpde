@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { ComunidadePrefetchLink } from '@/components/portal/comunidade-prefetch-link'
 import { MENCAO_REGEX, HASHTAG_REGEX } from '@torcida/types'
 import { toAbsoluteSocialUrl } from '@/lib/social-embed'
@@ -6,6 +6,8 @@ import { toAbsoluteSocialUrl } from '@/lib/social-embed'
 interface PostConteudoRichProps {
   conteudo: string
   className?: string
+  /** Ref no `<p>` — usado por ExpandableText para medir overflow do clamp. */
+  contentRef?: Ref<HTMLParagraphElement>
 }
 
 /** http(s) ou host social sem protocolo (youtube.com/..., x.com/...). */
@@ -87,10 +89,13 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
 }
 
 /** Renderiza URLs (guia externa), menções @[Nome](user:id) e #hashtags como links. */
-export function PostConteudoRich({ conteudo, className }: PostConteudoRichProps) {
+export function PostConteudoRich({ conteudo, className, contentRef }: PostConteudoRichProps) {
   const lines = conteudo.split('\n')
   return (
-    <p className={className ?? 'whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]'}>
+    <p
+      ref={contentRef}
+      className={className ?? 'whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]'}
+    >
       {lines.map((line, li) => (
         <span key={li}>
           {li > 0 && <br />}

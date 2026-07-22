@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Avatar } from './avatar'
-import { PostConteudoRich } from './post-conteudo-rich'
+import { ExpandableText } from './expandable-text'
 import { PostMedia } from './post-media'
 import {
   ensureSocialEmbedInMidias,
@@ -47,9 +47,10 @@ export function PostRepostEmbed({ origem }: PostRepostEmbedProps) {
         </div>
       </div>
       {conteudoVisivel ? (
-        <PostConteudoRich
+        <ExpandableText
           conteudo={conteudoVisivel}
-          className="line-clamp-4 text-sm text-[rgb(var(--foreground))]"
+          lines={4}
+          className="whitespace-pre-wrap text-sm leading-relaxed text-[rgb(var(--foreground))]"
         />
       ) : null}
       {midias.length > 0 ? (

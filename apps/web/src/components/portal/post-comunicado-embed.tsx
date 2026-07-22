@@ -1,6 +1,7 @@
 import { Megaphone } from 'lucide-react'
 import { Badge } from '@torcida/ui'
 import type { ComunicadoOrigemEmbed } from '@/lib/feed'
+import { ExpandableText } from './expandable-text'
 
 const PRIORIDADE_VARIANT: Record<string, 'neutral' | 'warning' | 'danger'> = {
   NORMAL: 'neutral',
@@ -28,9 +29,11 @@ export function PostComunicadoEmbed({ comunicado }: PostComunicadoEmbedProps) {
         <Badge variant="primary">{comunicado.tenantNome}</Badge>
       </div>
       <h4 className="text-sm font-semibold text-[rgb(var(--foreground))]">{comunicado.titulo}</h4>
-      <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]">
-        {comunicado.corpo}
-      </p>
+      <ExpandableText
+        text={comunicado.corpo}
+        lines={4}
+        className="mt-1 whitespace-pre-wrap text-sm text-[rgb(var(--foreground-muted))]"
+      />
       {comunicado.autorNome && (
         <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">{comunicado.autorNome}</p>
       )}

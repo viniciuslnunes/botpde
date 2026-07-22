@@ -8,7 +8,7 @@ import { PostEngagement } from './post-engagement'
 import { PostMedia } from './post-media'
 import { PostLegacyImage } from './post-legacy-image'
 import { FeedPostMenu } from './feed-post-menu'
-import { PostConteudoRich } from './post-conteudo-rich'
+import { ExpandableText } from './expandable-text'
 import { PostPoll } from './post-poll'
 import { PostRepostEmbed } from './post-repost-embed'
 import { PostComunicadoEmbed } from './post-comunicado-embed'
@@ -129,7 +129,11 @@ export function FeedPostCard({
       )}
 
       {conteudoVisivel ? (
-        <PostConteudoRich conteudo={conteudoVisivel} className="mt-2" />
+        <ExpandableText
+          conteudo={conteudoVisivel}
+          lines={8}
+          className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-[rgb(var(--foreground))]"
+        />
       ) : null}
 
       {post.postOrigem && <PostRepostEmbed origem={post.postOrigem} />}
