@@ -635,7 +635,19 @@ function ensureTileAvatarFallback(
     fallback.appendChild(initial)
   }
 
-  if (!existing) tile.appendChild(fallback)
+  if (!existing) {
+    const metadata = tile.querySelector('.lk-participant-metadata')
+    if (metadata) {
+      tile.insertBefore(fallback, metadata)
+    } else {
+      tile.appendChild(fallback)
+    }
+  } else {
+    const metadata = tile.querySelector('.lk-participant-metadata')
+    if (metadata && fallback.compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      tile.insertBefore(fallback, metadata)
+    }
+  }
 }
 
 function trackTileKey(track: TrackRef): string {
