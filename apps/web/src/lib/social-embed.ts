@@ -123,7 +123,7 @@ export function tiktokEmbedSrc(url: string): string | null {
 /** Largura nativa do player — esticar além disso só cria faixas laterais. */
 export const EMBED_FRAME_MAX_WIDTH: Record<Exclude<EmbedProvider, 'youtube'>, number> = {
   tiktok: 325,
-  instagram: 400,
+  instagram: 540,
   twitter: 550,
 }
 

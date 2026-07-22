@@ -466,10 +466,16 @@ html[data-grid='off'] .app-shell-bg {
   contain-intrinsic-size: auto 420px;
 }
 
-/* Embeds sociais — frame com largura nativa (centralizado); altura via JS */
-.social-embed iframe {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  border: 0;
+/* Embeds sociais — widgets oficiais; largura nativa centralizada, altura automática */
+.social-embed-host > blockquote {
+  margin: 0 !important;
+}
+.social-embed-host iframe {
+  display: block !important;
+  max-width: 100% !important;
+}
+.social-embed-host .instagram-media,
+.social-embed-host .twitter-tweet,
+.social-embed-host .tiktok-embed {
+  max-width: 100% !important;
 }

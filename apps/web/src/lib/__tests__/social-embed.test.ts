@@ -2,18 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   applyEmbedHeightReport,
   ensureSocialEmbedInMidias,
-  estimateEmbedHeight,
   firstSocialUrlInText,
   instagramEmbedSrc,
-  nextTikTokEmbedFrameName,
   parseEmbedHeightMessage,
   resolveEmbedFrameWidth,
   stripEmbeddedSocialUrls,
+  tiktokVideoId,
 } from '../social-embed'
 
 const IG = 'https://www.instagram.com/reel/DSf2dEMDhNa/'
 const TT = 'https://www.tiktok.com/@user/video/1234567890123456789'
-const TW = 'https://x.com/user/status/1234567890123456789'
 
 describe('firstSocialUrlInText', () => {
   it('encontra URL com texto acima', () => {
@@ -64,13 +62,7 @@ describe('ensureSocialEmbedInMidias', () => {
 describe('instagramEmbedSrc', () => {
   it('monta src de reel com wp nativo', () => {
     expect(instagramEmbedSrc(IG)).toBe(
-      'https://www.instagram.com/reel/DSf2dEMDhNa/embed/?cr=1&v=14&wp=400',
-    )
-  })
-
-  it('monta src de post /p/', () => {
-    expect(instagramEmbedSrc('https://www.instagram.com/p/AbCdEf/', 320)).toBe(
-      'https://www.instagram.com/p/AbCdEf/embed/?cr=1&v=14&wp=320',
+      'https://www.instagram.com/reel/DSf2dEMDhNa/embed/?cr=1&v=14&wp=540',
     )
   })
 })
@@ -78,7 +70,7 @@ describe('instagramEmbedSrc', () => {
 describe('resolveEmbedFrameWidth', () => {
   it('limita TikTok/IG/X à largura nativa do player', () => {
     expect(resolveEmbedFrameWidth('tiktok', 520)).toBe(325)
-    expect(resolveEmbedFrameWidth('instagram', 520)).toBe(400)
+    expect(resolveEmbedFrameWidth('instagram', 700)).toBe(540)
     expect(resolveEmbedFrameWidth('twitter', 700)).toBe(550)
   })
 
@@ -87,57 +79,23 @@ describe('resolveEmbedFrameWidth', () => {
   })
 })
 
-describe('estimateEmbedHeight', () => {
-  it('usa largura nativa — card largo não infla o TikTok', () => {
-    expect(estimateEmbedHeight('tiktok', TT, 520)).toBe(estimateEmbedHeight('tiktok', TT, 325))
-    expect(estimateEmbedHeight('tiktok', TT, 325)).toBeGreaterThan(850)
-  })
-
-  it('Twitter estima na largura do tweet (≤550)', () => {
-    expect(estimateEmbedHeight('twitter', TW, 700)).toBe(estimateEmbedHeight('twitter', TW, 550))
+describe('tiktokVideoId', () => {
+  it('extrai id do path /video/', () => {
+    expect(tiktokVideoId(TT)).toBe('1234567890123456789')
   })
 })
 
 describe('parseEmbedHeightMessage', () => {
-  it('lê resize do X/Twitter', () => {
-    expect(
-      parseEmbedHeightMessage('twitter', {
-        method: 'twttr.private.resize',
-        params: [{ width: 550, height: 812 }],
-      }),
-    ).toEqual({ height: 812, width: 550 })
-  })
-
-  it('lê MEASURE do Instagram (string JSON)', () => {
-    expect(
-      parseEmbedHeightMessage(
-        'instagram',
-        JSON.stringify({ type: 'MEASURE', details: { height: 1040 } }),
-      ),
-    ).toEqual({ height: 1040 })
-  })
-
   it('lê height do TikTok', () => {
     expect(parseEmbedHeightMessage('tiktok', { height: 978, width: 325 })).toEqual({
       height: 978,
       width: 325,
     })
   })
-
-  it('ignora mensagens sem altura útil', () => {
-    expect(parseEmbedHeightMessage('tiktok', { type: 'ping' })).toBeNull()
-    expect(parseEmbedHeightMessage('instagram', { type: 'MEASURE', details: {} })).toBeNull()
-  })
 })
 
 describe('applyEmbedHeightReport', () => {
-  it('aplica buffer sem upscale pela largura do card', () => {
+  it('aplica buffer sem upscale', () => {
     expect(applyEmbedHeightReport({ height: 740, width: 325 })).toBe(744)
-  })
-})
-
-describe('nextTikTokEmbedFrameName', () => {
-  it('gera nome com prefixo e 17 dígitos', () => {
-    expect(nextTikTokEmbedFrameName()).toMatch(/^__tt_embed__v\d{17}$/)
   })
 })

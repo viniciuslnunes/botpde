@@ -6,23 +6,70 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { canOptimizeImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { MediaLightbox } from '@/components/portal/media-lightbox'
 import {
-  applyEmbedHeightReport,
   classifyMedia,
   cloudinaryVideoPoster,
   detectEmbedProvider,
   EMBED_HOSTS,
-  EMBED_RESIZE_ORIGINS,
-  estimateEmbedHeight,
-  instagramEmbedSrc,
-  nextTikTokEmbedFrameName,
-  parseEmbedHeightMessage,
   resolveEmbedFrameWidth,
-  tiktokEmbedSrc,
-  twitterEmbedSrc,
+  tiktokVideoId,
   youTubeId,
   type EmbedProvider,
   type MediaAttachment,
 } from '@/lib/social-embed'
+
+const EMBED_SCRIPTS: Partial<Record<EmbedProvider, string>> = {
+  twitter: 'https://platform.twitter.com/widgets.js',
+  instagram: 'https://www.instagram.com/embed.js',
+  tiktok: 'https://www.tiktok.com/embed.js',
+}
+
+const loadedScripts = new Set<string>()
+
+function loadEmbedScript(provider: EmbedProvider): Promise<void> {
+  const src = EMBED_SCRIPTS[provider]
+  if (!src) return Promise.resolve()
+
+  // TikTok só faz scan no load do script — precisa de um script fresco por mount.
+  if (provider === 'tiktok') {
+    document.querySelectorAll('script[data-torcida-tiktok-embed]').forEach((n) => n.remove())
+    return new Promise((resolve) => {
+      const s = document.createElement('script')
+      s.src = src
+      s.async = true
+      s.dataset.torcidaTiktokEmbed = '1'
+      s.onload = () => resolve()
+      s.onerror = () => resolve()
+      document.body.appendChild(s)
+    })
+  }
+
+  return new Promise((resolve) => {
+    if (loadedScripts.has(src)) return resolve()
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`)
+    if (existing) {
+      loadedScripts.add(src)
+      return resolve()
+    }
+    const s = document.createElement('script')
+    s.src = src
+    s.async = true
+    s.onload = () => {
+      loadedScripts.add(src)
+      resolve()
+    }
+    s.onerror = () => resolve()
+    document.body.appendChild(s)
+  })
+}
+
+function processOfficialEmbed(provider: EmbedProvider, host: HTMLElement) {
+  const w = window as unknown as {
+    twttr?: { widgets?: { load: (el?: HTMLElement | null) => void } }
+    instgrm?: { Embeds?: { process: () => void } }
+  }
+  if (provider === 'twitter') w.twttr?.widgets?.load(host)
+  if (provider === 'instagram') w.instgrm?.Embeds?.process()
+}
 
 interface PostMediaProps {
   urls: string[]
@@ -270,26 +317,15 @@ function EmbedFallback({ url, provider }: { url: string; provider: EmbedProvider
   )
 }
 
-function embedIframeSrc(provider: EmbedProvider, url: string, widthPx: number): string | null {
-  if (provider === 'youtube') {
-    const id = youTubeId(url)
-    return id ? `https://www.youtube-nocookie.com/embed/${id}` : null
-  }
-  if (provider === 'instagram') return instagramEmbedSrc(url, widthPx)
-  if (provider === 'twitter') return twitterEmbedSrc(url, widthPx)
-  if (provider === 'tiktok') return tiktokEmbedSrc(url)
-  return null
-}
-
 function SocialEmbed({ url }: { url: string }) {
   const provider = detectEmbedProvider(url)
   const shellRef = useRef<HTMLDivElement>(null)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const processedRef = useRef(false)
   const [cardWidth, setCardWidth] = useState(0)
-  const [reportedHeight, setReportedHeight] = useState<number | null>(null)
-  const [tiktokFrameName] = useState(() =>
-    detectEmbedProvider(url) === 'tiktok' ? nextTikTokEmbedFrameName() : undefined,
-  )
+  const [visible, setVisible] = useState(false)
+  const [activated, setActivated] = useState(false)
+  const [hasFrame, setHasFrame] = useState(false)
 
   useEffect(() => {
     const el = shellRef.current
@@ -304,67 +340,143 @@ function SocialEmbed({ url }: { url: string }) {
     return () => ro.disconnect()
   }, [url])
 
+  // content-visibility no feed: só processa widget quando entra na viewport
   useEffect(() => {
-    setReportedHeight(null)
+    const el = shellRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisible(true)
+          io.disconnect()
+        }
+      },
+      { rootMargin: '240px 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [url])
+
+  useEffect(() => {
+    processedRef.current = false
+    setActivated(false)
+    setHasFrame(false)
+    setVisible(false)
   }, [url])
 
   useEffect(() => {
     if (!provider || provider === 'youtube') return
-    const origins = EMBED_RESIZE_ORIGINS[provider]
-    const onMessage = (event: MessageEvent) => {
-      if (!origins.includes(event.origin)) return
-      const win = iframeRef.current?.contentWindow
-      // Só filtra por source quando o contentWindow já está disponível
-      if (win && event.source && event.source !== win) return
-      const report = parseEmbedHeightMessage(provider, event.data)
-      if (!report) return
-      setReportedHeight(applyEmbedHeightReport(report))
+    if (!visible || cardWidth <= 0 || processedRef.current) return
+    const host = hostRef.current
+    if (!host) return
+
+    processedRef.current = true
+    void loadEmbedScript(provider).then(() => {
+      processOfficialEmbed(provider, host)
+      setActivated(true)
+    })
+  }, [provider, url, visible, cardWidth])
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host || !activated) return
+    const check = () => {
+      if (host.querySelector('iframe')) setHasFrame(true)
     }
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [provider, url])
+    check()
+    const mo = new MutationObserver(check)
+    mo.observe(host, { childList: true, subtree: true })
+    return () => mo.disconnect()
+  }, [activated, url])
 
   if (!provider) return null
 
-  const widthForFrame = resolveEmbedFrameWidth(provider, cardWidth || 360)
-  const src = embedIframeSrc(provider, url, widthForFrame)
-  if (!src) return <EmbedFallback url={url} provider={provider} />
-
-  const isVideoAspect = provider === 'youtube'
-  const height =
-    reportedHeight ?? (isVideoAspect ? 0 : estimateEmbedHeight(provider, url, widthForFrame))
-  // Evita montar o iframe com largura errada (duplo load + scroll fantasma)
-  const frameReady = isVideoAspect || cardWidth > 0
-
-  return (
-    <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
-      <div
-        className={[
-          'mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))]',
-          isVideoAspect ? 'aspect-video w-full bg-black' : 'bg-white',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        style={
-          isVideoAspect
-            ? undefined
-            : { width: widthForFrame, maxWidth: '100%', height: frameReady ? height : undefined, minHeight: frameReady ? undefined : height }
-        }
-      >
-        {frameReady && (
+  if (provider === 'youtube') {
+    const id = youTubeId(url)
+    if (!id) return <EmbedFallback url={url} provider={provider} />
+    return (
+      <div className="social-embed w-full min-w-0 space-y-2">
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-black">
           <iframe
-            ref={iframeRef}
-            src={src}
-            title={EMBED_HOSTS[provider]}
-            name={provider === 'tiktok' ? tiktokFrameName : undefined}
-            width={isVideoAspect ? undefined : widthForFrame}
-            height={isVideoAspect ? undefined : height}
+            src={`https://www.youtube-nocookie.com/embed/${id}`}
+            title="YouTube"
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             className="h-full w-full border-0"
             referrerPolicy="strict-origin-when-cross-origin"
           />
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir no {EMBED_HOSTS[provider]}
+        </a>
+      </div>
+    )
+  }
+
+  const frameWidth = resolveEmbedFrameWidth(provider, cardWidth || 360)
+  const videoId = provider === 'tiktok' ? tiktokVideoId(url) : null
+  if (provider === 'tiktok' && !videoId) {
+    return <EmbedFallback url={url} provider={provider} />
+  }
+
+  return (
+    <div ref={shellRef} className="social-embed w-full min-w-0 space-y-2">
+      <div
+        ref={hostRef}
+        className="social-embed-host mx-auto overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-white"
+        style={{
+          width: frameWidth,
+          maxWidth: '100%',
+          minHeight: hasFrame ? undefined : 220,
+        }}
+      >
+        {cardWidth > 0 && (
+          <>
+            {provider === 'twitter' && (
+              <blockquote className="twitter-tweet" data-dnt="true" data-width={String(frameWidth)}>
+                <a href={url}>{url}</a>
+              </blockquote>
+            )}
+            {provider === 'instagram' && (
+              <blockquote
+                className="instagram-media"
+                data-instgrm-permalink={url.split('?')[0]}
+                data-instgrm-version="14"
+                data-width={String(frameWidth)}
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  minWidth: '100%',
+                  margin: 0,
+                  background: '#fff',
+                }}
+              >
+                <a href={url}>{url}</a>
+              </blockquote>
+            )}
+            {provider === 'tiktok' && videoId && (
+              <blockquote
+                className="tiktok-embed"
+                cite={url}
+                data-video-id={videoId}
+                style={{
+                  width: '100%',
+                  maxWidth: frameWidth,
+                  minWidth: 0,
+                  margin: 0,
+                }}
+              >
+                <a href={url}>{url}</a>
+              </blockquote>
+            )}
+          </>
         )}
       </div>
       <a
