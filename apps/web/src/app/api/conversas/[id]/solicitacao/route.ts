@@ -4,6 +4,7 @@ import { db } from '@torcida/db'
 import {
   aprovarSolicitacaoMensagem,
   rejeitarSolicitacaoMensagem,
+  resolveTenantNotificacaoMensageria,
 } from '@/lib/mensageria'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 import { criarNotificacao } from '@/lib/notificacoes'
@@ -55,9 +56,11 @@ export async function POST(
       await aprovarSolicitacaoMensagem(conversaId, userId)
 
       if (remetente) {
+        const tenantNotif =
+          (await resolveTenantNotificacaoMensageria(remetente.id)) ?? tenant.id
         await criarNotificacao({
           userId: remetente.id,
-          tenantId: tenant.id,
+          tenantId: tenantNotif,
           tipo: 'MENSAGEM_SOLICITACAO_APROVADA',
           titulo: 'Solicitação de mensagem aprovada',
           corpo: `${destinatario?.nome ?? 'O membro'} aceitou sua solicitação de conversa.`,
@@ -80,15 +83,19 @@ export async function POST(
 
     const { remetenteId } = await rejeitarSolicitacaoMensagem(conversaId, userId)
 
+    const tenantNotifRemetente =
+      (await resolveTenantNotificacaoMensageria(remetenteId)) ?? tenant.id
     await criarNotificacao({
       userId: remetenteId,
-      tenantId: tenant.id,
+      tenantId: tenantNotifRemetente,
       tipo: 'MENSAGEM_SOLICITACAO_REJEITADA',
       titulo: 'Solicitação de mensagem recusada',
       corpo: `${destinatario?.nome ?? 'O membro'} recusou sua solicitação de conversa.`,
       link: '/portal/mensagens',
       atorId: userId,
     })
+
+    emitMensagemNova(conversaId, [userId, remetenteId])
 
     return NextResponse.json({ ok: true, status: 'rejeitada' })
   } catch (error) {

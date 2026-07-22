@@ -94,4 +94,11 @@ describe('avaliarAcessoDm', () => {
     const acesso = await avaliarAcessoDm(remetente, destinatario, tenant)
     expect(acesso).toBe('solicitacao')
   })
+
+  it('DM rejeitada não impede nova avaliação quando findDm não a retorna', async () => {
+    vi.mocked(db.conversa.findFirst).mockResolvedValue(null)
+    vi.mocked(db.bloqueioUsuario.findFirst).mockResolvedValue(null)
+    const acesso = await avaliarAcessoDm(remetente, destinatario, null)
+    expect(acesso).toBe('solicitacao')
+  })
 })

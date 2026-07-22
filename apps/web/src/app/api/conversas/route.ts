@@ -14,6 +14,7 @@ import {
   MAX_CONTEUDO_MENSAGEM,
   MAX_MEMBROS_GRUPO,
   mesmaAfiliacaoComunidade,
+  resolveTenantNotificacaoMensageria,
   serializeConversasInbox,
 } from '@/lib/mensageria'
 import {
@@ -22,6 +23,7 @@ import {
   assertPodeEnviarMensagensNacional,
   getStatusInboxMensageria,
 } from '@/lib/mensageria-api'
+import { emitMensagemNova } from '@/lib/mensageria-bus'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import { resolverContextoComunidade } from '@/lib/comunidade-contexto'
 import { criarNotificacao } from '@/lib/notificacoes'
@@ -57,12 +59,14 @@ async function notificarSolicitacaoMensagem(opts: {
   destinatarioId: string
   remetenteId: string
   remetenteNome: string | null | undefined
-  tenantId: string
+  tenantIdFallback: string
   conversaId: string
 }): Promise<void> {
+  const tenantNotif =
+    (await resolveTenantNotificacaoMensageria(opts.destinatarioId)) ?? opts.tenantIdFallback
   await criarNotificacao({
     userId: opts.destinatarioId,
-    tenantId: opts.tenantId,
+    tenantId: tenantNotif,
     tipo: 'MENSAGEM_SOLICITACAO_PENDENTE',
     titulo: 'Nova solicitação de mensagem',
     corpo: `${opts.remetenteNome ?? 'Um torcedor'} quer conversar com você.`,
@@ -131,13 +135,15 @@ async function criarDmOuSolicitacao(opts: {
     opts.tenantContextoId,
   )
 
+  emitMensagemNova(id, [opts.remetenteId, opts.destinatarioId])
+
   if (criadaAgora) {
     registrarAcaoEngajamento(limiterKey)
     await notificarSolicitacaoMensagem({
       destinatarioId: opts.destinatarioId,
       remetenteId: opts.remetenteId,
       remetenteNome: opts.remetenteNome,
-      tenantId: opts.tenantId,
+      tenantIdFallback: opts.tenantId,
       conversaId: id,
     })
   }

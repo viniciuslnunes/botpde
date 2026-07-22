@@ -259,7 +259,34 @@ interface DmExistenteRow {
   membros: Array<{ userId: string; status: StatusParticipacaoConversa }>
 }
 
-/** DM existente entre dois usuários, com status de cada participante. */
+const STATUS_DM_ATIVA: StatusParticipacaoConversa[] = ['ATIVO', 'PENDENTE']
+
+/**
+ * Tenant do sino onde a notificação de mensageria deve aparecer para o usuário:
+ * torcida do sócio aprovado, senão CN sintética do clube.
+ */
+export async function resolveTenantNotificacaoMensageria(
+  userId: string,
+): Promise<string | null> {
+  const socio: { tenantId: string } | null = await db.saasMembro.findFirst({
+    where: { userId, status: 'APROVADO', tipo: 'SOCIO' },
+    orderBy: { criadoEm: 'desc' },
+    select: { tenantId: true },
+  })
+  if (socio) return socio.tenantId
+
+  const perfil: { afiliacaoId: string | null } | null = await db.perfilTorcedor.findUnique({
+    where: { userId },
+    select: { afiliacaoId: true },
+  })
+  if (!perfil?.afiliacaoId) return null
+
+  const { getOrCreateComunidadeNacionalTenant } = await import('./comunidade-contexto')
+  const sintetico = await getOrCreateComunidadeNacionalTenant(perfil.afiliacaoId)
+  return sintetico.id
+}
+
+/** DM ativa/pendente entre dois usuários (ignora REJEITADO — permite nova solicitação após desbloqueio). */
 export async function findDmEntreUsuarios(
   userA: string,
   userB: string,
@@ -268,14 +295,22 @@ export async function findDmEntreUsuarios(
     where: {
       tipo: 'DIRETA',
       AND: [
-        { membros: { some: { userId: userA, saiuEm: null } } },
-        { membros: { some: { userId: userB, saiuEm: null } } },
+        {
+          membros: {
+            some: { userId: userA, saiuEm: null, status: { in: STATUS_DM_ATIVA } },
+          },
+        },
+        {
+          membros: {
+            some: { userId: userB, saiuEm: null, status: { in: STATUS_DM_ATIVA } },
+          },
+        },
       ],
     },
     select: {
       id: true,
       membros: {
-        where: { saiuEm: null },
+        where: { saiuEm: null, status: { in: STATUS_DM_ATIVA } },
         select: { userId: true, status: true },
       },
     },
@@ -350,9 +385,12 @@ export async function criarDmComSolicitacao(
   const existente = await findDmEntreUsuarios(remetenteId, destinatarioId)
   if (existente) {
     const outro = existente.membros.find((m) => m.userId === destinatarioId)
-    if (outro?.status === 'PENDENTE') return { id: existente.id, criadaAgora: false }
-    if (outro?.status === 'REJEITADO') {
-      throw new Error('Sua solicitação anterior foi recusada. Você não pode enviar nova mensagem.')
+    if (outro?.status === 'PENDENTE') {
+      // Reenvio da UI de solicitação: anexa nova intro se veio conteúdo.
+      if (conteudo.trim() || midiaUrls.length > 0) {
+        await criarMensagem(existente.id, remetenteId, conteudo, midiaUrls)
+      }
+      return { id: existente.id, criadaAgora: false }
     }
     return { id: existente.id, criadaAgora: false }
   }
@@ -514,16 +552,7 @@ export async function getOrCreateDmConversa(
   outroId: string,
   tenantContextoId: string,
 ): Promise<{ id: string; criadaAgora: boolean }> {
-  const existente: { id: string } | null = await db.conversa.findFirst({
-    where: {
-      tipo: 'DIRETA',
-      AND: [
-        { membros: { some: { userId } } },
-        { membros: { some: { userId: outroId } } },
-      ],
-    },
-    select: { id: true },
-  })
+  const existente = await findDmEntreUsuarios(userId, outroId)
   if (existente) return { id: existente.id, criadaAgora: false }
 
   const conversa: { id: string } = await db.conversa.create({
@@ -533,8 +562,8 @@ export async function getOrCreateDmConversa(
       criadoPorId: userId,
       membros: {
         create: [
-          { userId, papel: 'MEMBRO' },
-          { userId: outroId, papel: 'MEMBRO' },
+          { userId, papel: 'MEMBRO', status: 'ATIVO' },
+          { userId: outroId, papel: 'MEMBRO', status: 'ATIVO' },
         ],
       },
     },
