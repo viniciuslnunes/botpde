@@ -50,7 +50,8 @@ export function PortalNavLink({
       onClick={onClick}
       onMouseEnter={prefetch === 'hover' ? prefetchOnIntent : undefined}
       onFocus={prefetch === 'hover' ? prefetchOnIntent : undefined}
-      className={className}
+      data-cursor-action=""
+      className={['cursor-pointer', className].filter(Boolean).join(' ')}
     >
       <NavLinkStatusReporter />
       <span className="flex items-center gap-1.5">

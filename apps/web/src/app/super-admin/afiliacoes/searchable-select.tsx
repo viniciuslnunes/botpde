@@ -87,14 +87,18 @@ export function SearchableSelect({
             ) : null}
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            <X
-              className="h-4 w-4 text-zinc-500 hover:text-zinc-300"
+            <button
+              type="button"
+              aria-label="Limpar seleção"
+              className="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
               onClick={(e) => {
                 e.stopPropagation()
                 onChange(null)
               }}
-            />
-            <ChevronsUpDown className="h-4 w-4 text-zinc-500" />
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+            <ChevronsUpDown className="h-4 w-4 text-zinc-500" aria-hidden />
           </span>
         </button>
       ) : (

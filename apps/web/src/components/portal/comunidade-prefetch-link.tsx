@@ -18,10 +18,13 @@ export function ComunidadePrefetchLink({ href, onMouseEnter, onFocus, ...rest }:
     if (path) void router.prefetch(path)
   }, [href, router])
 
+  const { className, ...linkProps } = rest
+
   return (
     <Link
       href={href}
       prefetch={false}
+      data-cursor-action=""
       onMouseEnter={(e) => {
         prefetchOnIntent()
         onMouseEnter?.(e)
@@ -30,7 +33,8 @@ export function ComunidadePrefetchLink({ href, onMouseEnter, onFocus, ...rest }:
         prefetchOnIntent()
         onFocus?.(e)
       }}
-      {...rest}
+      className={['cursor-pointer', className].filter(Boolean).join(' ')}
+      {...linkProps}
     />
   )
 }

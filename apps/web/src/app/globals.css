@@ -103,49 +103,186 @@ body {
   overflow-x: hidden;
 }
 
-/* Ações clicáveis (navegação / mutação) — pointer por padrão.
-   Fora de @layer para vencer o preflight. Inclui descendentes (*)
-   para o I-beam não aparecer sobre texto/ícones dentro do alvo. */
-a[href],
-button:not(:disabled),
-[role='button']:not([aria-disabled='true']),
-summary,
-label[for],
-input[type='button']:not(:disabled),
-input[type='submit']:not(:disabled),
-input[type='reset']:not(:disabled),
-input[type='file']:not(:disabled),
-input[type='image']:not(:disabled),
-select:not(:disabled),
-a[href] *,
-button:not(:disabled) *,
-[role='button']:not([aria-disabled='true']) *,
-summary *,
-label[for] * {
-  cursor: pointer;
+/* ── Cursor de ação (pointer) ───────────────────────────────────
+   Tailwind v4 não define pointer em button (fica auto → I-beam no texto).
+   Unlayered + !important para vencer utilitários em @layer e UA.
+   Descendentes herdam para o I-beam não aparecer em span/ícone/texto. */
+:is(
+  a[href],
+  area[href],
+  button,
+  summary,
+  [role='button'],
+  [role='link'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='treeitem'],
+  label[for],
+  label:has(
+    :is(
+      input[type='checkbox'],
+      input[type='radio'],
+      input[type='file'],
+      select,
+      button
+    )
+  ),
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  input[type='file'],
+  input[type='image'],
+  input[type='color'],
+  input[type='range'],
+  select,
+  .app-action
+):not(:disabled):not([aria-disabled='true']) {
+  cursor: pointer !important;
 }
 
-button:disabled,
-button:disabled *,
-[role='button'][aria-disabled='true'],
-[role='button'][aria-disabled='true'] *,
-input:is([type='button'], [type='submit'], [type='reset'], [type='file'], [type='image']):disabled,
-select:disabled {
-  cursor: not-allowed;
+::file-selector-button {
+  cursor: pointer !important;
 }
 
-/* Utilitários Tailwind precisam vencer a regra acima (mesma cascata unlayered). */
+:is(
+  a[href],
+  area[href],
+  button,
+  summary,
+  [role='button'],
+  [role='link'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='treeitem'],
+  label[for],
+  label:has(
+    :is(
+      input[type='checkbox'],
+      input[type='radio'],
+      input[type='file'],
+      select,
+      button
+    )
+  ),
+  .app-action
+):not(:disabled):not([aria-disabled='true'])
+  :where(*):not(
+    :is(
+      input:not(
+        [type='button'],
+        [type='submit'],
+        [type='reset'],
+        [type='file'],
+        [type='image'],
+        [type='checkbox'],
+        [type='radio'],
+        [type='color'],
+        [type='range']
+      ),
+      textarea,
+      select,
+      [contenteditable='true']
+    )
+  ) {
+  cursor: inherit !important;
+}
+
+:is(button, input, select, textarea, .app-action):disabled,
+:is(button, input, select, textarea, .app-action):disabled *,
+[aria-disabled='true'],
+[aria-disabled='true'] * {
+  cursor: not-allowed !important;
+}
+
+/* Utilitários de cursor — precisam de !important para vencer as regras acima. */
 .cursor-default,
 .cursor-default * {
-  cursor: default;
+  cursor: default !important;
 }
 .cursor-text,
 .cursor-text * {
-  cursor: text;
+  cursor: text !important;
+}
+.cursor-pointer,
+.cursor-pointer * {
+  cursor: pointer !important;
 }
 .cursor-not-allowed,
 .cursor-not-allowed * {
-  cursor: not-allowed;
+  cursor: not-allowed !important;
+}
+.cursor-grab,
+.cursor-grab * {
+  cursor: grab !important;
+}
+.cursor-grabbing,
+.cursor-grabbing * {
+  cursor: grabbing !important;
+}
+.cursor-zoom-in,
+.cursor-zoom-in * {
+  cursor: zoom-in !important;
+}
+.cursor-ns-resize,
+.cursor-ns-resize * {
+  cursor: ns-resize !important;
+}
+.cursor-wait,
+.cursor-wait * {
+  cursor: wait !important;
+}
+.cursor-move,
+.cursor-move * {
+  cursor: move !important;
+}
+.active\:cursor-grabbing:active,
+.active\:cursor-grabbing:active * {
+  cursor: grabbing !important;
+}
+.disabled\:cursor-not-allowed:disabled,
+.disabled\:cursor-not-allowed:disabled * {
+  cursor: not-allowed !important;
+}
+.disabled\:cursor-default:disabled,
+.disabled\:cursor-default:disabled * {
+  cursor: default !important;
+}
+
+/* Evita seleção acidental em controles (não em links de conteúdo). */
+button,
+[role='button'],
+.app-action {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Hit-test no próprio controle — elimina I-beam sobre texto/ícone.
+   Controles aninhados (link/botão/input) recuperam os eventos. */
+:is(a[href], button, [role='button'], .app-action)
+  :where(*):not(
+    :is(a[href], button, input, select, textarea, label, summary, [role='button'])
+  ) {
+  pointer-events: none;
+}
+
+:is(a[href], button, [role='button'], .app-action)
+  :is(a[href], button, input, select, textarea, label, summary, [role='button']),
+:is(a[href], button, [role='button'], .app-action)
+  :is(a[href], button, input, select, textarea, label, summary, [role='button'])
+  * {
+  pointer-events: auto;
 }
 
 /* ── Utilitários com cor primária do tenant ──────────────────── */
