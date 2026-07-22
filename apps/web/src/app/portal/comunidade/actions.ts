@@ -22,6 +22,8 @@ import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
 import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
+import { chave, getBadgesPorAutorTenant } from '@/lib/autor-badges'
+import { formatNomeTorcida } from '@torcida/types'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
@@ -126,13 +128,29 @@ function agendarPosPublicacaoFeed(opts: {
   })
 }
 
-function previewDoPost(opts: {
+async function previewDoPost(opts: {
   post: { id: string; tenantId: string; conteudo: string; midiaUrls: string[]; visibilidade: string; criadoEm: Date }
   autorId: string
   autorNome: string | null
   autorAvatar: string | null
   tenantNome: string
-}): PostPublicadoPreview {
+  /** Tenant sintético da CN — badge padrão "Torcedor" quando não há cargo na torcida. */
+  tenantSintetico?: boolean
+}): Promise<PostPublicadoPreview> {
+  const [badges, perfil] = await Promise.all([
+    getBadgesPorAutorTenant([{ autorId: opts.autorId, tenantId: opts.post.tenantId }]),
+    db.perfilMembro.findUnique({
+      where: { tenantId_userId: { tenantId: opts.post.tenantId, userId: opts.autorId } },
+      select: { nickname: true },
+    }),
+  ])
+  const badge = badges.get(chave(opts.autorId, opts.post.tenantId))
+  let cargoNome = badge?.cargoNome ?? null
+  const departamentoNome = badge?.departamentoNome ?? null
+  if (!cargoNome && opts.tenantSintetico) {
+    cargoNome = 'Torcedor'
+  }
+
   return {
     id: opts.post.id,
     tenantId: opts.post.tenantId,
@@ -144,8 +162,12 @@ function previewDoPost(opts: {
       id: opts.autorId,
       nome: opts.autorNome,
       avatarUrl: opts.autorAvatar,
+      nickname: perfil?.nickname ?? null,
+      sedeNome: badge?.sedeNome ?? null,
+      cargoNome,
+      departamentoNome,
     },
-    tenantNome: opts.tenantNome,
+    tenantNome: formatNomeTorcida(opts.tenantNome),
   }
 }
 
@@ -481,7 +503,7 @@ export async function publicarPost(
     return {
       success: true,
       token: post.id,
-      preview: previewDoPost({
+      preview: await previewDoPost({
         post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
@@ -570,6 +592,7 @@ export async function publicarPostComoTorcedorGlobal(
     autorNome: session.user.name ?? null,
     autorAvatar: avatarPreviewDaSessao(session),
     tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
+    tenantSintetico: true,
   })
 }
 
@@ -1210,7 +1233,7 @@ export async function publicarEnquete(
   return {
     success: true,
     token: post.id,
-    preview: previewDoPost({
+    preview: await previewDoPost({
       post,
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
@@ -1554,7 +1577,7 @@ export async function publicarPostEvento(
   return {
     success: true,
     token: post.id,
-    preview: previewDoPost({
+    preview: await previewDoPost({
       post,
       autorId: session.user.id,
       autorNome: session.user.name ?? null,
@@ -2540,7 +2563,7 @@ export async function publicarPostGrupo(
 
   return {
     success: true,
-    preview: previewDoPost({
+    preview: await previewDoPost({
       post: {
         id: post.id,
         tenantId: post.tenantId,
@@ -3381,7 +3404,7 @@ export async function publicarPostCanal(
     return {
       success: true,
       token: post.id,
-      preview: previewDoPost({
+      preview: await previewDoPost({
         post,
         autorId: session.user.id,
         autorNome: session.user.name ?? null,

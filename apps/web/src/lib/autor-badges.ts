@@ -138,6 +138,7 @@ async function carregarBadgesPorAutorTenant(
     Array<{
       userId: string
       tenantId: string
+      tipo: 'SOCIO' | 'TORCEDOR'
       sede: { nome: string; tipo: TipoSede } | null
       departamento: { nome: string } | null
     }>,
@@ -162,6 +163,7 @@ async function carregarBadgesPorAutorTenant(
       select: {
         userId: true,
         tenantId: true,
+        tipo: true,
         sede: { select: { nome: true, tipo: true } },
         departamento: { select: { nome: true } },
       },
@@ -211,9 +213,14 @@ async function carregarBadgesPorAutorTenant(
       .map((m) => m.departamento.nome)
       .filter((nome, i, arr) => arr.indexOf(nome) === i)
 
+    let cargoNome = principal ? rotuloCargoBadge(principal, tipoSede) : null
+    if (!cargoNome && membro?.tipo === 'TORCEDOR') {
+      cargoNome = 'Torcedor'
+    }
+
     map.set(chave(p.autorId, p.tenantId), {
       sedeNome: membro?.sede?.nome ?? null,
-      cargoNome: principal ? rotuloCargoBadge(principal, tipoSede) : null,
+      cargoNome,
       departamentoNome: resolverDepartamentoBadge({
         memberships: deptoNomes,
         roleDepartamento: principal?.departamentoNome ?? null,

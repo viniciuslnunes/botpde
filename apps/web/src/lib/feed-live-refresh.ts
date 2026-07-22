@@ -1,3 +1,5 @@
+import type { PostSocialItem } from './feed'
+
 /** Debounce do refetch após ping SSE do feed (ms). */
 export const FEED_SSE_DEBOUNCE_MS = 250
 
@@ -13,6 +15,17 @@ export const COMUNIDADE_FEED_REFRESH_TOPO_EVENT = 'comunidade:feed-refresh-topo'
 /** Menu → infinite feed: remove do cache TanStack sem `router.refresh()`. */
 export const COMUNIDADE_POST_EXCLUIDO_EVENT = 'comunidade:post-excluido'
 
+/** Badges do autor no prepend otimista / confirmação pós-publicação. */
+export interface PostPublicadoAutorPreview {
+  id: string
+  nome: string | null
+  avatarUrl: string | null
+  nickname?: string | null
+  sedeNome?: string | null
+  cargoNome?: string | null
+  departamentoNome?: string | null
+}
+
 /** Payload serializável do post acabado de criar — prepend otimista no client. */
 export interface PostPublicadoPreview {
   id: string
@@ -22,11 +35,7 @@ export interface PostPublicadoPreview {
   visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
   /** ISO string */
   criadoEm: string
-  autor: {
-    id: string
-    nome: string | null
-    avatarUrl: string | null
-  }
+  autor: PostPublicadoAutorPreview
   tenantNome: string
 }
 
@@ -66,7 +75,7 @@ export function criarPreviewOtimista(opts: {
   conteudo: string
   midiaUrls: string[]
   visibilidade: PostPublicadoPreview['visibilidade']
-  autor: PostPublicadoPreview['autor']
+  autor: PostPublicadoAutorPreview
   tenantNome: string
 }): PostPublicadoPreview {
   return {
@@ -76,9 +85,67 @@ export function criarPreviewOtimista(opts: {
     midiaUrls: opts.midiaUrls,
     visibilidade: opts.visibilidade,
     criadoEm: new Date().toISOString(),
-    autor: opts.autor,
+    autor: {
+      id: opts.autor.id,
+      nome: opts.autor.nome,
+      avatarUrl: opts.autor.avatarUrl,
+      nickname: opts.autor.nickname ?? null,
+      sedeNome: opts.autor.sedeNome ?? null,
+      cargoNome: opts.autor.cargoNome ?? null,
+      departamentoNome: opts.autor.departamentoNome ?? null,
+    },
     tenantNome: opts.tenantNome,
   }
+}
+
+/** Converte preview de publicação em item do feed (prepend otimista). */
+export function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
+  return {
+    id: preview.id,
+    tenantId: preview.tenantId,
+    titulo: null,
+    conteudo: preview.conteudo,
+    imagemUrl: preview.midiaUrls[0] ?? null,
+    midiaUrls: preview.midiaUrls,
+    tipo: 'MEMBRO',
+    visibilidade: preview.visibilidade,
+    fixado: false,
+    criadoEm: new Date(preview.criadoEm),
+    autorId: preview.autor.id,
+    postOrigemId: null,
+    comunicadoOrigemId: null,
+    eventoId: null,
+    tenant: { nome: preview.tenantNome },
+    autor: {
+      id: preview.autor.id,
+      nome: preview.autor.nome,
+      nickname: preview.autor.nickname ?? null,
+      avatarUrl: preview.autor.avatarUrl,
+      sedeNome: preview.autor.sedeNome ?? null,
+      cargoNome: preview.autor.cargoNome ?? null,
+      departamentoNome: preview.autor.departamentoNome ?? null,
+    },
+    totalReacoes: 0,
+    totalComentarios: 0,
+    minhaReacao: null,
+    postOrigem: null,
+    comunicadoOrigem: null,
+    evento: null,
+    enquete: null,
+    grupo: null,
+  }
+}
+
+/** Exibe o nome da torcida no card quando o post é público ou de outro tenant. */
+export function deveExibirBadgeTorcidaNoFeed(args: {
+  postTenantId: string
+  viewerTenantId: string
+  visibilidade: PostPublicadoPreview['visibilidade']
+  escopoNacional?: boolean
+}): boolean {
+  if (args.escopoNacional) return true
+  if (args.visibilidade === 'PUBLICO') return true
+  return args.postTenantId !== args.viewerTenantId
 }
 
 export function novoIdOtimista(): string {

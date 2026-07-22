@@ -17,9 +17,10 @@ import {
   FEED_SSE_DEBOUNCE_MS,
   feedStreamEndpoint,
   isComunidadeFeedNearTop,
+  previewParaPostSocial,
+  deveExibirBadgeTorcidaNoFeed,
   type PostExcluidoEventDetail,
   type PostPublicadoEventDetail,
-  type PostPublicadoPreview,
 } from '@/lib/feed-live-refresh'
 
 interface CurrentUser {
@@ -34,43 +35,6 @@ interface PageInfo {
 }
 
 type Filtro = 'descobrir' | 'seguindo' | 'grupos' | 'canal'
-
-function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
-  return {
-    id: preview.id,
-    tenantId: preview.tenantId,
-    titulo: null,
-    conteudo: preview.conteudo,
-    imagemUrl: preview.midiaUrls[0] ?? null,
-    midiaUrls: preview.midiaUrls,
-    tipo: 'MEMBRO',
-    visibilidade: preview.visibilidade,
-    fixado: false,
-    criadoEm: new Date(preview.criadoEm),
-    autorId: preview.autor.id,
-    postOrigemId: null,
-    comunicadoOrigemId: null,
-    eventoId: null,
-    tenant: { nome: preview.tenantNome },
-    autor: {
-      id: preview.autor.id,
-      nome: preview.autor.nome,
-      nickname: null,
-      avatarUrl: preview.autor.avatarUrl,
-      sedeNome: null,
-      cargoNome: null,
-      departamentoNome: null,
-    },
-    totalReacoes: 0,
-    totalComentarios: 0,
-    minhaReacao: null,
-    postOrigem: null,
-    comunicadoOrigem: null,
-    evento: null,
-    enquete: null,
-    grupo: null,
-  }
-}
 
 function filtroAceitaPublicacao(
   filtro: Filtro,
@@ -293,7 +257,12 @@ export function ComunidadeFeedInfinite({
                     >
                       <FeedPostCard
                         post={post}
-                        showTenantBadge={post.tenantId !== tenantId}
+                        showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                          postTenantId: post.tenantId,
+                          viewerTenantId: tenantId,
+                          visibilidade: post.visibilidade,
+                          escopoNacional: isNacional,
+                        })}
                         currentUser={currentUser}
                         salvo={salvoSet.has(post.id)}
                       />
@@ -316,7 +285,12 @@ export function ComunidadeFeedInfinite({
                 >
                   <FeedPostCard
                     post={post}
-                    showTenantBadge={post.tenantId !== tenantId}
+                    showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                      postTenantId: post.tenantId,
+                      viewerTenantId: tenantId,
+                      visibilidade: post.visibilidade,
+                      escopoNacional: isNacional,
+                    })}
                     currentUser={currentUser}
                     salvo={salvoSet.has(post.id)}
                   />

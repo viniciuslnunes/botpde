@@ -83,6 +83,7 @@ export function ComunidadeNacionalComposer({ currentUser, tenantId, tenantNome }
           id: currentUser.id,
           nome: currentUser.nome,
           avatarUrl: currentUser.avatarUrl,
+          cargoNome: 'Torcedor',
         },
         tenantNome,
       }),

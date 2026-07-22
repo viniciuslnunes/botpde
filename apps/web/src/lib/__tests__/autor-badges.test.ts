@@ -64,6 +64,7 @@ describe('autor-badges', () => {
   it('combina cargo e departamento sem duplicar área já no nome do perfil', () => {
     expect(formatAutorCargoBadge('Presidente', 'Diretoria')).toBe('Presidente · Diretoria')
     expect(formatAutorCargoBadge('Membro · Design', 'Design')).toBe('Membro · Design')
+    expect(formatAutorCargoBadge('Torcedor', null)).toBe('Torcedor')
     expect(formatAutorCargoBadge('owner', null)).toBe('owner')
     expect(formatAutorCargoBadge(null, 'Design')).toBe('Design')
     expect(formatAutorCargoBadge(null, null)).toBeNull()

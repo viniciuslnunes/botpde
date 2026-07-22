@@ -21,6 +21,10 @@ import {
   Globe2,
   Users,
   Lock,
+  Info,
+  AlertTriangle,
+  Siren,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
@@ -31,6 +35,10 @@ import {
   publicarPostCanal,
   type PublicarPostState,
 } from '@/app/portal/comunidade/actions'
+import {
+  publicarComunicadoComposer,
+  type ComunicadoComposerState,
+} from '@/app/admin/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias } from '@/lib/social-embed'
@@ -39,6 +47,8 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import { PostComunicadoEmbed } from './post-comunicado-embed'
+import { PostMedia } from './post-media'
 import {
   paraTextoLegivel,
   podarMencoes,
@@ -50,9 +60,23 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useConfirmDialog } from '@/lib/confirm-action'
 
 const INITIAL_STATE: PublicarPostState = {}
+const INITIAL_COMUNICADO_STATE: ComunicadoComposerState = {}
 const MAX_ANEXOS = 10
 const MAX_IMG_MB = 10
 const MAX_VIDEO_MB = 100
+
+type Prioridade = 'NORMAL' | 'IMPORTANTE' | 'URGENTE'
+
+const PRIORIDADE_OPCOES: Array<{
+  value: Prioridade
+  label: string
+  descricao: string
+  Icon: LucideIcon
+}> = [
+  { value: 'NORMAL', label: 'Normal', descricao: 'Aviso do dia a dia', Icon: Info },
+  { value: 'IMPORTANTE', label: 'Importante', descricao: 'Merece destaque', Icon: AlertTriangle },
+  { value: 'URGENTE', label: 'Urgente', descricao: 'Notifica a torcida na hora', Icon: Siren },
+]
 
 type VisibilidadePost = 'PUBLICO' | 'TENANT' | 'PRIVADO'
 
@@ -108,6 +132,20 @@ interface FeedComposerProps {
    * visibilidade fica presa aos membros do canal.
    */
   canal?: CanalComposerAlvo
+  /** Cargo/sede/depto do autor — prepend otimista no feed. */
+  autorBadges?: {
+    cargoNome: string | null
+    departamentoNome: string | null
+    sedeNome: string | null
+  }
+  /**
+   * Quando true, publica um Comunicado oficial (admin) em vez de post de
+   * membro: mesmo composer (mídia, menções, emoji), com campo de Título e
+   * seletor de Prioridade no lugar de Enquete/Evento/Visibilidade, mais uma
+   * prévia fiel de como o comunicado vai aparecer no feed. Mutuamente
+   * exclusivo com `canal`.
+   */
+  comunicado?: boolean
 }
 
 export function FeedComposer({
@@ -122,6 +160,8 @@ export function FeedComposer({
   somentePublico = false,
   eventoIdInicial,
   canal,
+  autorBadges,
+  comunicado = false,
 }: FeedComposerProps) {
   if (bloqueioPublicacao) {
     return (
@@ -143,6 +183,8 @@ export function FeedComposer({
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
+      autorBadges={autorBadges}
+      comunicado={comunicado}
     />
   )
 }
@@ -158,6 +200,8 @@ function FeedComposerActive({
   somentePublico = false,
   eventoIdInicial,
   canal,
+  autorBadges,
+  comunicado = false,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
   const optimisticIdRef = useRef<string | null>(null)
   const [postState, postAction, postPending] = useActionState<PublicarPostState, FormData>(
@@ -176,17 +220,25 @@ function FeedComposerActive({
     publicarPostCanal,
     INITIAL_STATE,
   )
+  const [comunicadoState, comunicadoAction, comunicadoPending] = useActionState<
+    ComunicadoComposerState,
+    FormData
+  >(publicarComunicadoComposer, INITIAL_COMUNICADO_STATE)
 
-  const token = canal
-    ? (canalState.token ?? 'novo')
-    : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
-  const state = canal
-    ? canalState
-    : postState.token || postState.success
-      ? postState
-      : pollState.token || pollState.success
-        ? pollState
-        : eventState
+  const token = comunicado
+    ? (comunicadoState.token ?? 'novo')
+    : canal
+      ? (canalState.token ?? 'novo')
+      : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
+  const state = comunicado
+    ? comunicadoState
+    : canal
+      ? canalState
+      : postState.token || postState.success
+        ? postState
+        : pollState.token || pollState.success
+          ? pollState
+          : eventState
 
   function registrarPrependOtimista(opts: {
     conteudo: string
@@ -202,8 +254,15 @@ function FeedComposerActive({
         conteudo: opts.conteudo,
         midiaUrls: opts.midiaUrls,
         visibilidade: opts.visibilidade,
-        autor: { id: userId, nome: userName, avatarUrl: userAvatar },
-        tenantNome,
+        autor: {
+          id: userId,
+          nome: userName,
+          avatarUrl: userAvatar,
+          sedeNome: autorBadges?.sedeNome ?? null,
+          cargoNome: autorBadges?.cargoNome ?? null,
+          departamentoNome: autorBadges?.departamentoNome ?? null,
+        },
+        tenantNome: formatNomeTorcida(tenantNome),
       }),
       filtroAlvo: canal ? 'canal' : 'descobrir',
     })

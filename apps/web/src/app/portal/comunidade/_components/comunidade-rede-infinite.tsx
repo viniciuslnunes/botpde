@@ -9,7 +9,7 @@ import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
-import { useFeedWindow } from '@/lib/use-feed-window'
+import { deveExibirBadgeTorcidaNoFeed } from '@/lib/feed-live-refresh'
 import {
   COMUNIDADE_POST_EXCLUIDO_EVENT,
   FEED_SSE_DEBOUNCE_MS,
@@ -155,7 +155,11 @@ export function ComunidadeRedeInfinite({
                         post={post}
                         currentUser={currentUser}
                         salvo={salvoSet.has(post.id)}
-                        showTenantBadge={post.tenantId !== tenantId}
+                        showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                          postTenantId: post.tenantId,
+                          viewerTenantId: tenantId,
+                          visibilidade: post.visibilidade,
+                        })}
                       />
                     </div>
                   </MotionReveal>
@@ -171,7 +175,11 @@ export function ComunidadeRedeInfinite({
                   post={post}
                   currentUser={currentUser}
                   salvo={salvoSet.has(post.id)}
-                  showTenantBadge={post.tenantId !== tenantId}
+                  showTenantBadge={deveExibirBadgeTorcidaNoFeed({
+                    postTenantId: post.tenantId,
+                    viewerTenantId: tenantId,
+                    visibilidade: post.visibilidade,
+                  })}
                 />
               </div>
             </MotionReveal>

@@ -45,7 +45,12 @@ import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-anim
 import { Avatar } from '@/components/portal/avatar'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { springSnappy } from '@/lib/motion-presets'
-import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
+import {
+  criarPreviewOtimista,
+  emitirPostPublicado,
+  novoIdOtimista,
+  previewParaPostSocial,
+} from '@/lib/feed-live-refresh'
 import type {
   GrupoDetalheItem,
   MembroGrupoItem,
@@ -76,43 +81,6 @@ interface GrupoDetalheClientProps {
   pedidos: MembroGrupoPendenteItem[] | null
   membros: MembroGrupoItem[] | null
   tabInicial?: GrupoAba
-}
-
-function previewParaPostSocial(preview: PostPublicadoPreview): PostSocialItem {
-  return {
-    id: preview.id,
-    tenantId: preview.tenantId,
-    titulo: null,
-    conteudo: preview.conteudo,
-    imagemUrl: preview.midiaUrls[0] ?? null,
-    midiaUrls: preview.midiaUrls,
-    tipo: 'MEMBRO',
-    visibilidade: preview.visibilidade,
-    fixado: false,
-    criadoEm: new Date(preview.criadoEm),
-    autorId: preview.autor.id,
-    postOrigemId: null,
-    comunicadoOrigemId: null,
-    eventoId: null,
-    tenant: { nome: preview.tenantNome },
-    autor: {
-      id: preview.autor.id,
-      nome: preview.autor.nome,
-      nickname: null,
-      avatarUrl: preview.autor.avatarUrl,
-      sedeNome: null,
-      cargoNome: null,
-      departamentoNome: null,
-    },
-    totalReacoes: 0,
-    totalComentarios: 0,
-    minhaReacao: null,
-    postOrigem: null,
-    comunicadoOrigem: null,
-    evento: null,
-    enquete: null,
-    grupo: null,
-  }
 }
 
 export function GrupoDetalheClient({

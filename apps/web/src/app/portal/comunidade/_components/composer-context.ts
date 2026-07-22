@@ -17,6 +17,8 @@ export type ComposerContext = {
     tipo: 'SOCIO' | 'TORCEDOR' | null
     departamentos: string[]
     cargoNome: string | null
+    departamentoNome: string | null
+    sedeNome: string | null
   }
 }
 
@@ -52,12 +54,14 @@ export const getComposerContext = cache(async function getComposerContext(
     eventosComposer: eventos,
     bloqueioPublicacao: bloqueio,
     somentePublico: bloqueio === null && membro?.status !== 'APROVADO',
-    userCard: {
-      numeroSocio: socio?.numeroSocio ?? null,
-      numeroAssociado: membro?.numeroAssociado ?? null,
-      tipo: membro?.tipo ?? null,
-      departamentos: deptos.map((d) => d.departamento.nome),
-      cargoNome: badges.get(chave(userId, tenantId))?.cargoNome ?? null,
-    },
+  userCard: {
+    numeroSocio: socio?.numeroSocio ?? null,
+    numeroAssociado: membro?.numeroAssociado ?? null,
+    tipo: membro?.tipo ?? null,
+    departamentos: deptos.map((d) => d.departamento.nome),
+    cargoNome: badges.get(chave(userId, tenantId))?.cargoNome ?? null,
+    departamentoNome: badges.get(chave(userId, tenantId))?.departamentoNome ?? null,
+    sedeNome: badges.get(chave(userId, tenantId))?.sedeNome ?? null,
+  },
   }
 })

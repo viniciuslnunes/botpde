@@ -59,6 +59,11 @@ export async function ComunidadeComposerSection({
       bloqueioPublicacao={ctx.bloqueioPublicacao}
       somentePublico={ctx.somentePublico}
       eventoIdInicial={eventoIdInicial}
+      autorBadges={{
+        cargoNome: ctx.userCard.cargoNome,
+        departamentoNome: ctx.userCard.departamentoNome,
+        sedeNome: ctx.userCard.sedeNome,
+      }}
     />
   )
 }
