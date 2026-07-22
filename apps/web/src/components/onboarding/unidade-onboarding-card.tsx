@@ -51,7 +51,7 @@ export function UnidadeOnboardingCard({
       type="button"
       onClick={() => onSelecionar(sede.id)}
       aria-pressed={selecionada}
-      className={`flex w-full items-stretch gap-0 overflow-hidden rounded-xl border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
+      className={`flex w-full cursor-pointer items-stretch gap-0 overflow-hidden rounded-xl border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
         selecionada
           ? 'border-[rgb(var(--color-primary))] bg-[rgb(var(--color-primary))]/5'
           : 'border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary))]/50'

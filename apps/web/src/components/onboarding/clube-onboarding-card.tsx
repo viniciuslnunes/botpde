@@ -30,7 +30,7 @@ export function ClubeOnboardingCard({ clube, onSelecionar, compact = false }: Pr
     <button
       type="button"
       onClick={() => onSelecionar(clube)}
-      className={`flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
+      className={`flex h-full w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
         compact ? 'p-3' : 'p-4'
       }`}
     >

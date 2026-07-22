@@ -103,6 +103,14 @@ body {
   overflow-x: hidden;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 /* ── Utilitários com cor primária do tenant ──────────────────── */
 .bg-primary {
   background-color: rgb(var(--color-primary));

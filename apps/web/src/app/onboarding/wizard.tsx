@@ -1887,7 +1887,7 @@ function BotaoVoltar({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:opacity-50"
+      className="mb-4 inline-flex cursor-pointer items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <ArrowLeft className="h-4 w-4" />
       {label}
@@ -1911,7 +1911,7 @@ function BotaoPrimario({
       type="button"
       onClick={onClick}
       disabled={pending || disabled}
-      className="inline-flex items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+      className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[rgb(var(--color-primary))] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}
       {label}

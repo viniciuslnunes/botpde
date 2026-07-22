@@ -27,7 +27,7 @@ export function TorcidaOnboardingCard({
       type="button"
       onClick={() => onEscolher(torcida)}
       disabled={disabled}
-      className="flex h-full w-full items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 [content-visibility:auto] [contain-intrinsic-size:auto_112px]"
+      className="flex h-full w-full cursor-pointer items-stretch overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-0 text-left transition-[border-color,box-shadow,background-color] duration-150 hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:cursor-not-allowed disabled:opacity-50 [content-visibility:auto] [contain-intrinsic-size:auto_112px]"
     >
       <div className="flex w-[5.75rem] shrink-0 items-center justify-center self-stretch border-r border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:w-[7rem]">
         <div className="p-2.5 sm:p-3">
