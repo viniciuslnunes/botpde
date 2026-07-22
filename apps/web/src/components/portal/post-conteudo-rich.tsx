@@ -7,11 +7,19 @@ interface PostConteudoRichProps {
   className?: string
 }
 
+/** http(s) até whitespace; pontuação final comum fica fora do href. */
+const URL_REGEX = /https?:\/\/[^\s<>"']+/gi
+
+function splitUrlMatch(raw: string): { href: string; trailing: string } {
+  const href = raw.replace(/[.,);!?]+$/u, '')
+  return { href, trailing: raw.slice(href.length) }
+}
+
 function renderSegment(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = []
-  // Grupos: 1–2 menção (nome, userId); 3 hashtag.
+  // URL antes de # — evita hashtag engolir fragmento de link.
   const combined = new RegExp(
-    `(?:${MENCAO_REGEX.source})|(?:${HASHTAG_REGEX.source})`,
+    `(?:${URL_REGEX.source})|(?:${MENCAO_REGEX.source})|(?:${HASHTAG_REGEX.source})`,
     'giu',
   )
   let last = 0
@@ -19,7 +27,21 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
   let i = 0
   while ((m = combined.exec(text)) !== null) {
     if (m.index > last) nodes.push(text.slice(last, m.index))
-    if (m[0].startsWith('@[')) {
+    if (/^https?:\/\//i.test(m[0])) {
+      const { href, trailing } = splitUrlMatch(m[0])
+      nodes.push(
+        <a
+          key={`${keyPrefix}-u-${i}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.45)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+        >
+          {href}
+        </a>,
+      )
+      if (trailing) nodes.push(trailing)
+    } else if (m[0].startsWith('@[')) {
       const nome = m[1]
       const userId = m[2]
       nodes.push(
@@ -51,7 +73,7 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
   return nodes
 }
 
-/** Renderiza menções @[Nome](user:id) e #hashtags como links. */
+/** Renderiza URLs (guia externa), menções @[Nome](user:id) e #hashtags como links. */
 export function PostConteudoRich({ conteudo, className }: PostConteudoRichProps) {
   const lines = conteudo.split('\n')
   return (

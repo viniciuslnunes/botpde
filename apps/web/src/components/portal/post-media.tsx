@@ -336,14 +336,25 @@ function SocialEmbed({ url }: { url: string }) {
     const id = youTubeId(url)
     if (!id) return <EmbedFallback url={url} provider={provider} />
     return (
-      <div className="aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))]">
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${id}`}
-          title="YouTube"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
-          allowFullScreen
-          className="h-full w-full"
-        />
+      <div className="w-full min-w-0 space-y-2">
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-[rgb(var(--border))]">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${id}`}
+            title="YouTube"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
+            allowFullScreen
+            className="h-full w-full"
+          />
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir no {EMBED_HOSTS[provider]}
+        </a>
       </div>
     )
   }
@@ -351,38 +362,57 @@ function SocialEmbed({ url }: { url: string }) {
   const embedWidth = measured ? String(containerWidth) : undefined
 
   return (
-    <div ref={containerRef} className="social-embed w-full min-w-0 overflow-hidden">
-      {provider === 'twitter' && (
-        <blockquote className="twitter-tweet" data-dnt="true" data-width={embedWidth}>
-          <a href={url}>{url}</a>
-        </blockquote>
-      )}
-      {provider === 'instagram' && (
-        <blockquote
-          className="instagram-media"
-          data-instgrm-permalink={url}
-          data-instgrm-version="14"
-          data-width={embedWidth}
-          style={{
-            width: '100%',
-            maxWidth: '100%',
-            minWidth: '100%',
-            margin: 0,
-          }}
+    <div className="w-full min-w-0 space-y-2">
+      <div ref={containerRef} className="social-embed w-full min-w-0 overflow-hidden">
+        {provider === 'twitter' && (
+          <blockquote className="twitter-tweet" data-dnt="true" data-width={embedWidth}>
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              {url}
+            </a>
+          </blockquote>
+        )}
+        {provider === 'instagram' && (
+          <blockquote
+            className="instagram-media"
+            data-instgrm-permalink={url}
+            data-instgrm-version="14"
+            data-width={embedWidth}
+            style={{
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: '100%',
+              margin: 0,
+            }}
+          >
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              {url}
+            </a>
+          </blockquote>
+        )}
+        {provider === 'tiktok' && (
+          <blockquote
+            className="tiktok-embed"
+            cite={url}
+            style={{ maxWidth: '100%', minWidth: '100%', width: '100%', margin: 0 }}
+          >
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              {url}
+            </a>
+          </blockquote>
+        )}
+        {!ready && <EmbedFallback url={url} provider={provider} />}
+      </div>
+      {ready && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))] underline decoration-[rgb(var(--color-primary-fg)_/_0.4)] underline-offset-2 hover:decoration-[rgb(var(--color-primary-fg))]"
         >
-          <a href={url}>{url}</a>
-        </blockquote>
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir no {EMBED_HOSTS[provider]}
+        </a>
       )}
-      {provider === 'tiktok' && (
-        <blockquote
-          className="tiktok-embed"
-          cite={url}
-          style={{ maxWidth: '100%', minWidth: '100%', width: '100%', margin: 0 }}
-        >
-          <a href={url}>{url}</a>
-        </blockquote>
-      )}
-      {!ready && <EmbedFallback url={url} provider={provider} />}
     </div>
   )
 }
