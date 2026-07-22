@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
 import { db } from '@torcida/db'
+import { assertSalaAnfitriao } from '@/lib/salas-api'
 import {
   grantParticipantMedia,
   revokeParticipantMedia,
@@ -17,34 +15,13 @@ const midiaSchema = z.object({
   approved: z.boolean().optional(),
 })
 
-async function assertHostSala(salaId: string, userId: string, tenantId: string) {
-  const sala = await db.salaReuniao.findFirst({
-    where: { id: salaId, tenantId, encerradaEm: null },
-    select: { id: true, hostId: true, livekitRoomName: true },
-  })
-  if (!sala) return { error: NextResponse.json({ error: 'Sala indisponível.' }, { status: 404 }) }
-  if (sala.hostId !== userId) {
-    return { error: NextResponse.json({ error: 'Somente o anfitrião pode moderar mídia.' }, { status: 403 }) }
-  }
-  return { sala }
-}
-
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: salaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-    }
-
-    await assertMembroAtivo(tenant.id, session.user.id)
-
-    const hostCheck = await assertHostSala(salaId, session.user.id, tenant.id)
-    if ('error' in hostCheck && hostCheck.error) return hostCheck.error
-    const { sala } = hostCheck
+    const { session, sala } = await assertSalaAnfitriao(salaId)
 
     if (excedeuLimiteMidiaSala(session.user.id)) {
       return NextResponse.json({ error: 'Muitas ações em pouco tempo. Aguarde um momento.' }, { status: 429 })
@@ -70,7 +47,7 @@ export async function POST(
 
     await db.auditLog.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: sala.tenantId,
         atorId: session.user.id,
         acao: approved ? 'SALA_MIDIA_APROVADA' : 'SALA_MIDIA_NEGADA',
         entidade: 'SalaReuniao',
@@ -82,7 +59,8 @@ export async function POST(
     return NextResponse.json({ ok: true, kind, userId: parsed.data.userId, approved })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao moderar mídia.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    const status = message.includes('anfitrião') ? 403 : 400
+    return NextResponse.json({ error: message }, { status })
   }
 }
 
@@ -92,16 +70,7 @@ export async function DELETE(
 ) {
   try {
     const { id: salaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-    }
-
-    await assertMembroAtivo(tenant.id, session.user.id)
-
-    const hostCheck = await assertHostSala(salaId, session.user.id, tenant.id)
-    if ('error' in hostCheck && hostCheck.error) return hostCheck.error
-    const { sala } = hostCheck
+    const { session, sala } = await assertSalaAnfitriao(salaId)
 
     if (excedeuLimiteMidiaSala(session.user.id)) {
       return NextResponse.json({ error: 'Muitas ações em pouco tempo. Aguarde um momento.' }, { status: 429 })
@@ -123,7 +92,7 @@ export async function DELETE(
 
     await db.auditLog.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: sala.tenantId,
         atorId: session.user.id,
         acao: 'SALA_MIDIA_REVOGADA',
         entidade: 'SalaReuniao',
@@ -135,6 +104,7 @@ export async function DELETE(
     return NextResponse.json({ ok: true, kind, userId: parsed.data.userId })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao revogar mídia.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    const status = message.includes('anfitrião') ? 403 : 400
+    return NextResponse.json({ error: message }, { status })
   }
 }

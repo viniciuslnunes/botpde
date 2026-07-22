@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
-import { getTenantFromHost } from '@/lib/tenant'
-import { db } from '@torcida/db'
+import { assertSalaMembro } from '@/lib/salas-api'
+import { invalidarCacheSalasPresenca } from '@/lib/comunidade-cache'
 import {
   contarParticipantesAtivos,
   listParticipantesAtivos,
@@ -11,30 +8,15 @@ import {
   registrarSaidaSala,
 } from '@/lib/salas-presenca'
 
-async function assertSalaAtiva(tenantId: string, salaId: string) {
-  const sala = await db.salaReuniao.findFirst({
-    where: { id: salaId, tenantId, encerradaEm: null },
-    select: { id: true, hostId: true },
-  })
-  if (!sala) throw new Error('Sala indisponível.')
-  return sala
-}
-
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: salaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-    }
+    const { sala } = await assertSalaMembro(salaId)
 
-    await assertMembroAtivo(tenant.id, session.user.id)
-    await assertSalaAtiva(tenant.id, salaId)
-
-    const participantes = await listParticipantesAtivos(tenant.id, salaId)
+    const participantes = await listParticipantesAtivos(sala.tenantId, salaId)
     return NextResponse.json({
       participantes,
       total: participantes.length,
@@ -51,18 +33,13 @@ export async function POST(
 ) {
   try {
     const { id: salaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-    }
+    const { session, sala, isHost, tenant } = await assertSalaMembro(salaId)
 
-    await assertMembroAtivo(tenant.id, session.user.id)
-    const sala = await assertSalaAtiva(tenant.id, salaId)
+    const papel = isHost ? 'HOST' : 'PARTICIPANTE'
+    await registrarEntradaSala(sala.tenantId, salaId, session.user.id, papel)
+    invalidarCacheSalasPresenca(sala.tenantId, tenant.afiliacaoId)
 
-    const papel = sala.hostId === session.user.id ? 'HOST' : 'PARTICIPANTE'
-    await registrarEntradaSala(tenant.id, salaId, session.user.id, papel)
-
-    const total = await contarParticipantesAtivos(tenant.id, salaId)
+    const total = await contarParticipantesAtivos(sala.tenantId, salaId)
     return NextResponse.json({ ok: true, total })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao entrar na sala.'
@@ -76,13 +53,12 @@ export async function DELETE(
 ) {
   try {
     const { id: salaId } = await context.params
-    const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-    if (!session?.user?.id || !tenant) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
-    }
+    const { session, sala, tenant } = await assertSalaMembro(salaId)
 
-    await registrarSaidaSala(tenant.id, salaId, session.user.id)
-    const total = await contarParticipantesAtivos(tenant.id, salaId)
+    await registrarSaidaSala(sala.tenantId, salaId, session.user.id)
+    invalidarCacheSalasPresenca(sala.tenantId, tenant.afiliacaoId)
+
+    const total = await contarParticipantesAtivos(sala.tenantId, salaId)
     return NextResponse.json({ ok: true, total })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro ao sair da sala.'

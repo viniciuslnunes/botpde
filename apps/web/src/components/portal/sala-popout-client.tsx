@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type WheelEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react'
 import {
   ArrowLeftToLine,
   Loader2,
@@ -14,6 +14,7 @@ import {
 import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
+import { useSalaParticipantes } from '@/lib/sala-participantes-client'
 
 type SalaPopoutClientProps = {
   salaId: string
@@ -68,11 +69,17 @@ export function SalaPopoutClient({
   const leaveIntentRef = useRef<'voltar' | 'sair'>('voltar')
   const notifiedOpenerRef = useRef(false)
 
-  const participantProfiles = Object.fromEntries(
-    initialParticipantes.map((participante) => [
-      participante.userId,
-      { nome: participante.nome, avatarUrl: participante.avatarUrl },
-    ]),
+  const { participantes } = useSalaParticipantes(salaId, initialParticipantes, undefined, membersOpen)
+
+  const participantProfiles = useMemo(
+    () =>
+      Object.fromEntries(
+        participantes.map((participante) => [
+          participante.userId,
+          { nome: participante.nome, avatarUrl: participante.avatarUrl },
+        ]),
+      ),
+    [participantes],
   )
 
   const revelarChrome = useCallback(() => {
@@ -364,12 +371,7 @@ export function SalaPopoutClient({
             </button>
           </div>
           <div className={`${panelScroll} p-3`} onWheel={stopWheelBubble}>
-            <SalaParticipantes
-              salaId={salaId}
-              initialParticipantes={initialParticipantes}
-              onCountChange={() => undefined}
-              glass
-            />
+            <SalaParticipantes participantes={participantes} glass />
           </div>
         </aside>
       ) : null}

@@ -6,6 +6,11 @@ import type { TipoSalaReuniao } from '@torcida/db'
 import { tagSalasAtivas, tagSalasNacionais } from './comunidade-cache'
 import { generateInviteSlug } from '@/lib/invite-slug'
 
+/** Contagem de participantes online (presença ativa), alinhada a `salas-presenca`. */
+export const participantesOnlineCountSelect = {
+  participantes: { where: { saiuEm: null } },
+} as const
+
 export type SalaAtivaListItem = {
   id: string
   tenantId: string
@@ -67,7 +72,7 @@ export const listSalasAtivas = cache(async function listSalasAtivas(
             include: {
               host: { select: { id: true, nome: true, avatarUrl: true } },
               evento: { select: { id: true, titulo: true, data: true } },
-              _count: { select: { participantes: true } },
+              _count: { select: participantesOnlineCountSelect },
             },
             orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
           }) as Promise<SalaAtivaListItem[]>,
@@ -122,7 +127,7 @@ export const listSalasNacionais = cache(async function listSalasNacionais(
             include: {
               host: { select: { id: true, nome: true, avatarUrl: true } },
               evento: { select: { id: true, titulo: true, data: true } },
-              _count: { select: { participantes: true } },
+              _count: { select: participantesOnlineCountSelect },
             },
             orderBy: [{ tipo: 'asc' }, { criadoEm: 'desc' }],
           }) as Promise<SalaAtivaListItem[]>,
@@ -146,7 +151,7 @@ export async function getSalaById(tenantId: string, salaId: string): Promise<Sal
         orderBy: [{ destacada: 'desc' }, { criadoEm: 'desc' }],
         take: 50,
       },
-      _count: { select: { participantes: true } },
+      _count: { select: participantesOnlineCountSelect },
     },
   }) as Promise<SalaDetalhe | null>)
 
@@ -182,7 +187,7 @@ export async function createSala(input: CreateSalaInput): Promise<SalaAtivaListI
     include: {
       host: { select: { id: true, nome: true, avatarUrl: true } },
       evento: { select: { id: true, titulo: true, data: true } },
-      _count: { select: { participantes: true } },
+      _count: { select: participantesOnlineCountSelect },
     },
   }) as Promise<SalaAtivaListItem>)
 

@@ -17,10 +17,15 @@ export async function assertSalaMembro(salaId: string) {
       await assertMembroAtivo(tenant.id, session.user.id)
       const sala = await db.salaReuniao.findFirst({
         where: { id: salaId, tenantId: tenant.id, encerradaEm: null },
-        select: { id: true, hostId: true, tenantId: true },
+        select: { id: true, hostId: true, tenantId: true, livekitRoomName: true },
       })
       if (sala) {
-        return { session, tenant: { id: tenant.id }, sala, isHost: sala.hostId === session.user.id }
+        return {
+          session,
+          tenant: { id: tenant.id, afiliacaoId: tenant.afiliacaoId },
+          sala,
+          isHost: sala.hostId === session.user.id,
+        }
       }
     } catch {
       // Sem vínculo ativo neste tenant — tenta o caminho nacional abaixo.
@@ -30,7 +35,7 @@ export async function assertSalaMembro(salaId: string) {
   const nacional = await assertPodeAcessarSalaNacional(salaId)
   return {
     session: nacional.session,
-    tenant: { id: nacional.tenantSinteticoId },
+    tenant: { id: nacional.tenantSinteticoId, afiliacaoId: nacional.afiliacaoId },
     sala: nacional.sala,
     isHost: nacional.isHost,
   }

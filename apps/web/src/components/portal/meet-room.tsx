@@ -40,6 +40,7 @@ import {
 } from '@/lib/sala-moderacao'
 import './meet-room.css'
 import { fadeScale, collapsePanel, springSnappy } from '@/lib/motion-presets'
+import { registrarPresencaSala } from '@/lib/sala-participantes-client'
 
 type MeetRoomProps = {
   salaId: string
@@ -175,17 +176,6 @@ function isSameTrackRef(a: TrackRef, b: TrackRef | undefined): boolean {
   )
 }
 
-async function registrarPresenca(salaId: string, method: 'POST' | 'DELETE'): Promise<number | null> {
-  try {
-    const res = await fetch(`/api/salas/${salaId}/participantes`, { method, cache: 'no-store' })
-    if (!res.ok) return null
-    const data = (await res.json()) as { total?: number }
-    return typeof data.total === 'number' ? data.total : null
-  } catch {
-    return null
-  }
-}
-
 function ScreenShareButton({ lk }: { lk: LiveKitModule }) {
   const { useLocalParticipant } = lk
   const { localParticipant } = useLocalParticipant()
@@ -293,6 +283,7 @@ function MeetControls({
   activeScreenSharers,
   compact = false,
   onLeaveCall,
+  onEncerrarPresenca,
 }: {
   lk: LiveKitModule
   salaId: string
@@ -303,6 +294,7 @@ function MeetControls({
   activeScreenSharers: Array<{ userId: string; userName: string }>
   compact?: boolean
   onLeaveCall?: () => void
+  onEncerrarPresenca: () => Promise<number | null>
 }) {
   const { useLocalParticipant, useRoomContext, TrackToggle } = lk
   const { localParticipant } = useLocalParticipant()
@@ -430,7 +422,7 @@ function MeetControls({
   async function sairDaChamada() {
     if (saindo) return
     setSaindo(true)
-    await registrarPresenca(salaId, 'DELETE')
+    await onEncerrarPresenca()
     room.disconnect()
     onLeaveCall?.()
   }
@@ -865,6 +857,7 @@ function MeetConference({
   onToggleParticipantStrip,
   onScreenShareActiveChange,
   onLeaveCall,
+  onEncerrarPresenca,
 }: {
   lk: LiveKitModule
   salaId: string
@@ -881,6 +874,7 @@ function MeetConference({
   onToggleParticipantStrip?: () => void
   onScreenShareActiveChange?: (active: boolean) => void
   onLeaveCall?: () => void
+  onEncerrarPresenca: () => Promise<number | null>
 }) {
   const {
     RoomAudioRenderer,
@@ -1019,6 +1013,7 @@ function MeetConference({
           activeScreenSharers={activeScreenSharers}
           compact={popoutMode}
           onLeaveCall={onLeaveCall}
+          onEncerrarPresenca={onEncerrarPresenca}
         />
         <RoomAudioRenderer />
       </div>
@@ -1050,6 +1045,8 @@ export function MeetRoom({
   const [lk, setLk] = useState<LiveKitModule | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [mediaHint, setMediaHint] = useState<string | null>(null)
+  const presencaAtivaRef = useRef(false)
+  const presencaSaidaRef = useRef(false)
 
   const profilesWithLocal = useMemo(() => {
     const next = { ...participantProfiles }
@@ -1078,14 +1075,24 @@ export function MeetRoom({
   }, [])
 
   const handleConnected = useCallback(async () => {
-    const total = await registrarPresenca(salaId, 'POST')
+    presencaSaidaRef.current = false
+    presencaAtivaRef.current = true
+    const total = await registrarPresencaSala(salaId, 'POST')
     if (typeof total === 'number') onOnlineCountChange?.(total)
   }, [salaId, onOnlineCountChange])
 
-  const handleDisconnected = useCallback(async () => {
-    const total = await registrarPresenca(salaId, 'DELETE')
+  const encerrarPresenca = useCallback(async (): Promise<number | null> => {
+    if (presencaSaidaRef.current) return null
+    presencaSaidaRef.current = true
+    presencaAtivaRef.current = false
+    const total = await registrarPresencaSala(salaId, 'DELETE')
     if (typeof total === 'number') onOnlineCountChange?.(total)
+    return total
   }, [salaId, onOnlineCountChange])
+
+  const handleDisconnected = useCallback(async () => {
+    await encerrarPresenca()
+  }, [encerrarPresenca])
 
   const handleMediaDeviceFailure = useCallback((failure: MediaDeviceFailure) => {
     setMediaHint(mediaFailureMessage(failure))
@@ -1093,7 +1100,9 @@ export function MeetRoom({
 
   useEffect(() => {
     return () => {
-      void registrarPresenca(salaId, 'DELETE')
+      if (!presencaAtivaRef.current || presencaSaidaRef.current) return
+      presencaSaidaRef.current = true
+      void registrarPresencaSala(salaId, 'DELETE', { keepalive: true })
     }
   }, [salaId])
 
@@ -1114,6 +1123,7 @@ export function MeetRoom({
       onToggleParticipantStrip,
       onScreenShareActiveChange,
       onLeaveCall,
+      onEncerrarPresenca: encerrarPresenca,
     }),
     [
       lk,
@@ -1131,6 +1141,7 @@ export function MeetRoom({
       onToggleParticipantStrip,
       onScreenShareActiveChange,
       onLeaveCall,
+      encerrarPresenca,
     ],
   )
 

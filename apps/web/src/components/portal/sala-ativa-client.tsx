@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, m } from 'motion/react'
@@ -18,6 +18,7 @@ import { MeetRoom } from '@/components/portal/meet-room'
 import { SalaChat, type SalaMensagem } from '@/components/portal/sala-chat'
 import { SalaEnquete } from '@/components/portal/sala-enquete'
 import { SalaParticipantes, type ParticipanteSala } from '@/components/portal/sala-participantes'
+import { useSalaParticipantes } from '@/lib/sala-participantes-client'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { fadeScale, springSnappy } from '@/lib/motion-presets'
 
@@ -113,21 +114,39 @@ export function SalaAtivaClient({
   const popoutPollRef = useRef<number | null>(null)
   const popoutClosedByMessageRef = useRef(false)
 
-  const participantProfiles = Object.fromEntries(
-    initialParticipantes.map((participante) => [
-      participante.userId,
-      {
-        nome: participante.nome,
-        avatarUrl:
-          participante.avatarUrl ??
-          (participante.userId === userId ? userAvatarUrl : null),
-      },
-    ]),
-  )
-
   const handleCountChange = useCallback((count: number) => {
     setOnlineCount(count)
   }, [])
+
+  const { participantes, aplicarTotal } = useSalaParticipantes(
+    sala.id,
+    initialParticipantes,
+    handleCountChange,
+    !sala.encerradaEm,
+  )
+
+  const handleMeetOnlineCountChange = useCallback(
+    (count: number) => {
+      aplicarTotal(count)
+    },
+    [aplicarTotal],
+  )
+
+  const participantProfiles = useMemo(
+    () =>
+      Object.fromEntries(
+        participantes.map((participante) => [
+          participante.userId,
+          {
+            nome: participante.nome,
+            avatarUrl:
+              participante.avatarUrl ??
+              (participante.userId === userId ? userAvatarUrl : null),
+          },
+        ]),
+      ),
+    [participantes, userAvatarUrl, userId],
+  )
 
   const encerrarPopout = useCallback(() => {
     if (popoutPollRef.current !== null) {
@@ -341,7 +360,7 @@ export function SalaAtivaClient({
                   onToggleParticipantStrip={() =>
                     setParticipantStripVisible((visible) => !visible)
                   }
-                  onOnlineCountChange={handleCountChange}
+                  onOnlineCountChange={handleMeetOnlineCountChange}
                   onScreenShareActiveChange={handleScreenShareActiveChange}
                   resumeScreenShare={resumeScreenAfterPopout}
                   onLeaveCall={handleLeaveCall}
@@ -426,11 +445,7 @@ export function SalaAtivaClient({
                   <Users className="h-4 w-4" />
                   Participantes na sala
                 </h2>
-                <SalaParticipantes
-                  salaId={sala.id}
-                  initialParticipantes={initialParticipantes}
-                  onCountChange={handleCountChange}
-                />
+                <SalaParticipantes participantes={participantes} />
               </m.section>
             )}
           </AnimatePresence>
@@ -459,11 +474,7 @@ export function SalaAtivaClient({
                     <Users className="h-4 w-4" />
                     Participantes online
                   </h2>
-                  <SalaParticipantes
-                    salaId={sala.id}
-                    initialParticipantes={initialParticipantes}
-                    onCountChange={handleCountChange}
-                  />
+                  <SalaParticipantes participantes={participantes} />
 
                   <dl className="mt-6 space-y-2 border-t border-[rgb(var(--border))] pt-4 text-sm">
                     <div>
