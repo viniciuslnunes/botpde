@@ -7,20 +7,15 @@ type Props = {
   align?: 'start' | 'center'
 }
 
-/** Metadados do card de torcida no onboarding: sócios/torcedores na plataforma. */
+/** Metadados do card de torcida no onboarding: sócios aprovados na plataforma. */
 export function TorcidaOnboardingMeta({ stats, align = 'start' }: Props) {
   return (
     <div
-      className={`mt-1 flex min-h-[32px] flex-col gap-0.5 ${
+      className={`mt-1 flex min-h-[14px] flex-col gap-0.5 ${
         align === 'center' ? 'items-center justify-start' : 'justify-end'
       }`}
     >
       <LinhaPlataforma rotulo="Sócios" total={stats.sociosTotal} online={stats.sociosOnline} />
-      <LinhaPlataforma
-        rotulo="Torcedores"
-        total={stats.torcedoresTotal}
-        online={stats.torcedoresOnline}
-      />
     </div>
   )
 }

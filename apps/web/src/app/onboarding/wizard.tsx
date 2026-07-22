@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
+import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
 import { TorcidaOnboardingCard } from '@/components/onboarding/torcida-onboarding-card'
 import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboarding-card'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -792,6 +793,15 @@ function PassoTorcida({
             Acesso à comunidade nacional — posts, novidades e conversa entre torcedores.
             Sem vínculo com torcida organizada.
           </p>
+          {clube && (
+            <div className="mt-2">
+              <LinhaPlataforma
+                rotulo="Torcedores"
+                total={clube.stats.torcedoresTotal}
+                online={clube.stats.torcedoresOnline}
+              />
+            </div>
+          )}
         </div>
         <ArrowRight className="hidden h-5 w-5 shrink-0 text-[rgb(var(--color-primary-fg))] sm:block" />
       </button>

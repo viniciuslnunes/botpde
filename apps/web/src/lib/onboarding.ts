@@ -118,7 +118,7 @@ function pesoLogoTorcida(t: TorcidaOnboarding): number {
 }
 
 function valorOrdenacaoMembrosTorcida(t: TorcidaOnboarding): number {
-  return t.stats.sociosTotal + t.stats.torcedoresTotal
+  return t.stats.sociosTotal
 }
 
 function compararTorcidasOnboarding(a: TorcidaOnboarding, b: TorcidaOnboarding): number {
