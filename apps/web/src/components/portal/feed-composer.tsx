@@ -34,6 +34,7 @@ import {
   publicarEnquete,
   publicarPostEvento,
   publicarPostCanal,
+  publicarPostNacional,
   type PublicarPostState,
 } from '@/app/portal/comunidade/actions'
 import {
@@ -146,6 +147,13 @@ interface FeedComposerProps {
    * visibilidade fica presa aos membros do canal.
    */
   canal?: CanalComposerAlvo
+  /**
+   * Comunidade Nacional (torcedor global / aba Nacional): mesmo composer
+   * (mídia, vídeo, menções, emoji, stickers), sempre PUBLICO no tenant
+   * sintético do clube — sem alcance/enquete/evento. Mutuamente exclusivo
+   * com `canal` e `comunicado`.
+   */
+  nacional?: boolean
   /** Cargo/sede/depto do autor — prepend otimista no feed. */
   autorBadges?: {
     cargoNome: string | null
@@ -159,7 +167,7 @@ interface FeedComposerProps {
    * prévia fiel de como o comunicado vai aparecer no feed. Passe um
    * `ComunicadoEdicaoAlvo` para editar um comunicado existente (composer
    * abre pré-preenchido, já expandido, chamando `atualizarComunicadoComposer`
-   * em vez de publicar um novo). Mutuamente exclusivo com `canal`.
+   * em vez de publicar um novo). Mutuamente exclusivo com `canal` / `nacional`.
    */
   comunicado?: boolean | ComunicadoEdicaoAlvo
 }
@@ -176,6 +184,7 @@ export function FeedComposer({
   somentePublico = false,
   eventoIdInicial,
   canal,
+  nacional = false,
   autorBadges,
   comunicado = false,
 }: FeedComposerProps) {
@@ -196,9 +205,10 @@ export function FeedComposer({
       tenantNome={tenantNome}
       perfilPrivado={perfilPrivado}
       eventos={eventos}
-      somentePublico={somentePublico}
+      somentePublico={somentePublico || nacional}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
+      nacional={nacional}
       autorBadges={autorBadges}
       comunicado={comunicado}
     />
@@ -216,6 +226,7 @@ function FeedComposerActive({
   somentePublico = false,
   eventoIdInicial,
   canal,
+  nacional = false,
   autorBadges,
   comunicado = false,
 }: Omit<FeedComposerProps, 'bloqueioPublicacao'>) {
@@ -237,6 +248,10 @@ function FeedComposerActive({
     publicarPostCanal,
     INITIAL_STATE,
   )
+  const [nacionalState, nacionalAction, nacionalPending] = useActionState<
+    PublicarPostState,
+    FormData
+  >(publicarPostNacional, INITIAL_STATE)
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
   const [comunicadoState, comunicadoAction, comunicadoPending] = useActionState<
     ComunicadoComposerState,
@@ -252,16 +267,20 @@ function FeedComposerActive({
     ? (comunicadoState.token ?? 'novo')
     : canal
       ? (canalState.token ?? 'novo')
-      : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
+      : nacional
+        ? (nacionalState.token ?? 'novo')
+        : (postState.token ?? pollState.token ?? eventState.token ?? 'novo')
   const state = comunicado
     ? comunicadoState
     : canal
       ? canalState
-      : postState.token || postState.success
-        ? postState
-        : pollState.token || pollState.success
-          ? pollState
-          : eventState
+      : nacional
+        ? nacionalState
+        : postState.token || postState.success
+          ? postState
+          : pollState.token || pollState.success
+            ? pollState
+            : eventState
 
   function registrarPrependOtimista(opts: {
     conteudo: string
@@ -295,17 +314,23 @@ function FeedComposerActive({
   useEffect(() => {
     const preview = canal
       ? canalState.preview
-      : (postState.preview ?? pollState.preview ?? eventState.preview)
+      : nacional
+        ? nacionalState.preview
+        : (postState.preview ?? pollState.preview ?? eventState.preview)
     const success = canal
       ? canalState.success
-      : postState.success || pollState.success || eventState.success
+      : nacional
+        ? nacionalState.success
+        : postState.success || pollState.success || eventState.success
     const falhou = canal
       ? Boolean(canalState.message && !canalState.success)
-      : Boolean(
-          (postState.message && !postState.success) ||
-            (pollState.message && !pollState.success) ||
-            (eventState.message && !eventState.success),
-        )
+      : nacional
+        ? Boolean(nacionalState.message && !nacionalState.success)
+        : Boolean(
+            (postState.message && !postState.success) ||
+              (pollState.message && !pollState.success) ||
+              (eventState.message && !eventState.success),
+          )
 
     if (success && preview) {
       emitirPostPublicado({
@@ -323,10 +348,15 @@ function FeedComposerActive({
     }
   }, [
     canal,
+    nacional,
     canalState.success,
     canalState.message,
     canalState.token,
     canalState.preview,
+    nacionalState.success,
+    nacionalState.message,
+    nacionalState.token,
+    nacionalState.preview,
     postState.success,
     postState.message,
     postState.token,
@@ -367,16 +397,19 @@ function FeedComposerActive({
       pollAction={pollAction}
       eventAction={eventAction}
       canalAction={canalAction}
+      nacionalAction={nacionalAction}
       comunicadoAction={comunicadoAction}
       postPending={postPending}
       pollPending={pollPending}
       eventPending={eventPending}
       canalPending={canalPending}
+      nacionalPending={nacionalPending}
       comunicadoPending={comunicadoPending}
       eventos={eventos}
       somentePublico={somentePublico}
       eventoIdInicial={eventoIdInicial}
       canal={canal}
+      nacional={nacional}
       comunicado={comunicado}
       onPrependOtimista={registrarPrependOtimista}
       serverError={
@@ -414,17 +447,20 @@ function ComposerBody({
   pollAction,
   eventAction,
   canalAction,
+  nacionalAction,
   comunicadoAction,
   postPending,
   pollPending,
   eventPending,
   canalPending,
+  nacionalPending,
   comunicadoPending,
   serverError,
   eventos,
   somentePublico = false,
   eventoIdInicial,
   canal,
+  nacional = false,
   comunicado = false,
   onPrependOtimista,
 }: {
@@ -437,17 +473,20 @@ function ComposerBody({
   pollAction: (payload: FormData) => void
   eventAction: (payload: FormData) => void
   canalAction: (payload: FormData) => void
+  nacionalAction: (payload: FormData) => void
   comunicadoAction: (payload: FormData) => void
   postPending: boolean
   pollPending: boolean
   eventPending: boolean
   canalPending: boolean
+  nacionalPending: boolean
   comunicadoPending: boolean
   serverError?: string
   eventos: EventoComposerItem[]
   somentePublico?: boolean
   eventoIdInicial?: string
   canal?: CanalComposerAlvo
+  nacional?: boolean
   comunicado?: boolean | ComunicadoEdicaoAlvo
   onPrependOtimista: (opts: {
     conteudo: string
@@ -456,6 +495,8 @@ function ComposerBody({
   }) => void
 }) {
   const comunicadoEdicao = typeof comunicado === 'object' ? comunicado : null
+  /** Enquete/evento/alcance só no feed da torcida — canal, CN e comunicado não. */
+  const ferramentasTorcida = !canal && !comunicado && !nacional
   const eventoPreselecionado =
     eventoIdInicial && eventos.some((e) => e.id === eventoIdInicial)
       ? eventoIdInicial
@@ -529,11 +570,13 @@ function ComposerBody({
     ? comunicadoPending
     : canal
       ? canalPending
-      : modoEnquete
-        ? pollPending
-        : modoEvento
-          ? eventPending
-          : postPending
+      : nacional
+        ? nacionalPending
+        : modoEnquete
+          ? pollPending
+          : modoEvento
+            ? eventPending
+            : postPending
   const anexos = medias.filter((m) => m.url).map((m) => m.url as string)
   const finalMidias = embedDispensado
     ? anexos
@@ -652,6 +695,8 @@ function ComposerBody({
     startTransition(() => {
       if (canal) {
         canalAction(fd)
+      } else if (nacional) {
+        nacionalAction(fd)
       } else if (modoEnquete) {
         pollAction(fd)
       } else if (modoEvento) {
@@ -955,6 +1000,7 @@ function ComposerBody({
               query={mencaoQuery}
               onSelect={inserirMencao}
               onClose={() => setMencaoQuery(null)}
+              escopo={nacional ? 'nacional' : undefined}
             />
           )}
         </div>
@@ -1219,7 +1265,7 @@ function ComposerBody({
                       )}
                     </AnimatePresence>
                   </div>
-                  {!canal && !comunicado && (
+                  {ferramentasTorcida && (
                     <button
                       type="button"
                       onClick={toggleEnquete}
@@ -1230,7 +1276,7 @@ function ComposerBody({
                       <BarChart3 className="h-5 w-5" />
                     </button>
                   )}
-                  {!canal && !comunicado && eventos.length > 0 && (
+                  {ferramentasTorcida && eventos.length > 0 && (
                     <button
                       type="button"
                       onClick={toggleEvento}
@@ -1325,7 +1371,7 @@ function ComposerBody({
                           <StickerIcon className="h-4 w-4 shrink-0" />
                           Sticker
                         </m.button>
-                        {!canal && !comunicado && (
+                        {ferramentasTorcida && (
                           <m.button
                             type="button"
                             custom={2}
@@ -1342,7 +1388,7 @@ function ComposerBody({
                             Enquete
                           </m.button>
                         )}
-                        {!canal && !comunicado && eventos.length > 0 && (
+                        {ferramentasTorcida && eventos.length > 0 && (
                           <m.button
                             type="button"
                             custom={3}
@@ -1361,7 +1407,7 @@ function ComposerBody({
                         )}
                         <m.button
                           type="button"
-                          custom={!canal && !comunicado && eventos.length > 0 ? 4 : 3}
+                          custom={ferramentasTorcida && eventos.length > 0 ? 4 : 3}
                           variants={menuItemStagger}
                           initial="hidden"
                           animate="show"
@@ -1511,7 +1557,7 @@ function ComposerBody({
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para membros do canal
                 </span>
-              ) : somentePublico ? (
+              ) : nacional || somentePublico ? (
                 <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-0">
                   Visível para torcedores do clube
                 </span>

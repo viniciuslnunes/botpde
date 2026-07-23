@@ -558,77 +558,92 @@ export async function publicarPost(
  * Autorização via `assertComunidadeNacional` (cobre torcedor global E sócio
  * aprovado) — usar só `PerfilTorcedor` aqui quebrava a publicação de sócios
  * sem onboarding de torcedor com um 500 mascarado em produção.
+ *
+ * Mesmo `PublicarPostState`/`useActionState` do `FeedComposer` (modo
+ * `nacional`), espelhando `publicarPostCanal`.
  */
-export async function publicarPostComoTorcedorGlobal(
-  conteudo: string,
-  midias: string[],
-): Promise<PostPublicadoPreview> {
-  const { session, afiliacaoId, tenantSintetico: tenant } = await assertComunidadeNacional()
-
-  const parsed = postSchema.safeParse({ conteudo, midias, visibilidade: 'PUBLICO' })
-  if (!parsed.success) {
-    throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Publicação inválida')
-  }
-
-  const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
-  if (erroMencoes) throw new Error(erroMencoes)
-
-  const limiterKey = `post:${tenant.id}:${session.user.id}`
-  if (excedeuLimiteEngajamento(limiterKey)) {
-    throw new Error('Você está postando rápido demais. Aguarde um pouco.')
-  }
-  registrarAcaoEngajamento(limiterKey)
-
-  const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, parsed.data.midias, MAX_MIDIAS)
-
-  const post = await db.post.create({
-    data: {
-      tenantId: tenant.id,
-      autorId: session.user.id,
-      tipo: 'MEMBRO',
+export async function publicarPostNacional(
+  _prevState: PublicarPostState,
+  formData: FormData,
+): Promise<PublicarPostState> {
+  try {
+    const parsed = postSchema.safeParse({
+      conteudo: formData.get('conteudo'),
+      midias: parseMidias(formData.get('midias')),
       visibilidade: 'PUBLICO',
-      conteudo: parsed.data.conteudo,
-      midiaUrls: midiasFinais,
-    },
-  })
-
-  after(() => {
-    void publicarNaTimelineRede({
-      postId: post.id,
-      autorId: session.user.id,
-      tenantId: tenant.id,
-      criadoEm: post.criadoEm,
     })
-  })
+    if (!parsed.success) {
+      return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
+    }
 
-  agendarPosPublicacaoFeed({
-    postId: post.id,
-    tenantId: tenant.id,
-    autorId: session.user.id,
-    autorNome: session.user.name ?? null,
-    conteudo: parsed.data.conteudo,
-  })
+    const { session, afiliacaoId, tenantSintetico: tenant } = await assertComunidadeNacional()
 
-  after(() => {
-    invalidarLeituraComunidade(tenant.id, afiliacaoId)
-  })
+    const erroMencoes = erroMencoesExcessivas(parsed.data.conteudo)
+    if (erroMencoes) return { message: erroMencoes }
 
-  const afiliacao: { nome: string; apelido: string | null } | null = await db.afiliacao.findUnique({
-    where: { id: afiliacaoId },
-    select: { nome: true, apelido: true },
-  })
+    const limiterKey = `post:${tenant.id}:${session.user.id}`
+    if (excedeuLimiteEngajamento(limiterKey)) {
+      return { message: 'Você está postando rápido demais. Aguarde um pouco.' }
+    }
+    registrarAcaoEngajamento(limiterKey)
 
-  const ativo = await getActiveTenant(session.user.id, session.user.email)
+    const midiasFinais = midiasComEmbedDoTexto(parsed.data.conteudo, parsed.data.midias, MAX_MIDIAS)
 
-  return previewDoPost({
-    post,
-    autorId: session.user.id,
-    autorNome: session.user.name ?? null,
-    autorAvatar: avatarPreviewDaSessao(session),
-    tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
-    tenantSintetico: true,
-    torcidaPreferidaId: ativo && !ativo.sintetico ? ativo.id : undefined,
-  })
+    const post = await db.post.create({
+      data: {
+        tenantId: tenant.id,
+        autorId: session.user.id,
+        tipo: 'MEMBRO',
+        visibilidade: 'PUBLICO',
+        conteudo: parsed.data.conteudo,
+        midiaUrls: midiasFinais,
+      },
+    })
+
+    after(() => {
+      void publicarNaTimelineRede({
+        postId: post.id,
+        autorId: session.user.id,
+        tenantId: tenant.id,
+        criadoEm: post.criadoEm,
+      })
+    })
+
+    agendarPosPublicacaoFeed({
+      postId: post.id,
+      tenantId: tenant.id,
+      autorId: session.user.id,
+      autorNome: session.user.name ?? null,
+      conteudo: parsed.data.conteudo,
+    })
+
+    after(() => {
+      invalidarLeituraComunidade(tenant.id, afiliacaoId)
+    })
+
+    const afiliacao: { nome: string; apelido: string | null } | null = await db.afiliacao.findUnique({
+      where: { id: afiliacaoId },
+      select: { nome: true, apelido: true },
+    })
+
+    const ativo = await getActiveTenant(session.user.id, session.user.email)
+
+    return {
+      success: true,
+      token: `${Date.now()}`,
+      preview: await previewDoPost({
+        post,
+        autorId: session.user.id,
+        autorNome: session.user.name ?? null,
+        autorAvatar: avatarPreviewDaSessao(session),
+        tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
+        tenantSintetico: true,
+        torcidaPreferidaId: ativo && !ativo.sintetico ? ativo.id : undefined,
+      }),
+    }
+  } catch (error) {
+    return { message: error instanceof Error ? error.message : 'Não foi possível publicar.' }
+  }
 }
 
 export type SeguimentoResultado = 'APROVADO' | 'PENDENTE'

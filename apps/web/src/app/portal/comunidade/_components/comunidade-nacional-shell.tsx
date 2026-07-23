@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { getNoticiasAprovadas } from '@/lib/noticias'
 import { getPostsFeedNacional } from '@/lib/feed'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
@@ -7,8 +8,16 @@ import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 import { Clock, ListOrdered, Users } from 'lucide-react'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
-import { ComunidadeNacionalComposer } from './comunidade-nacional-composer'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
+
+const FeedComposer = dynamic(
+  () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
+  {
+    loading: () => (
+      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+    ),
+  },
+)
 
 type Props = {
   afiliacao: AfiliacaoComunidade
@@ -95,10 +104,18 @@ export async function ComunidadeNacionalShell({
         </Link>
       )}
 
-      <ComunidadeNacionalComposer
-        currentUser={currentUser}
+      <FeedComposer
+        userId={currentUser.id}
+        userName={currentUser.nome}
+        userAvatar={currentUser.avatarUrl}
         tenantId={tenantSintetico.id}
         tenantNome={`${nomeClube} — Comunidade Nacional`}
+        nacional
+        autorBadges={{
+          cargoNome: 'Torcedor',
+          departamentoNome: null,
+          sedeNome: null,
+        }}
       />
 
       <section className="space-y-3">

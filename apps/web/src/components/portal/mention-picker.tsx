@@ -25,9 +25,11 @@ interface MentionPickerProps {
   query: string
   onSelect: (mencao: MencaoSelecionada) => void
   onClose: () => void
+  /** Comunidade Nacional — typeahead no tenant sintético do clube. */
+  escopo?: 'nacional' | 'torcida'
 }
 
-export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) {
+export function MentionPicker({ query, onSelect, onClose, escopo }: MentionPickerProps) {
   const [membros, setMembros] = useState<MembroMencao[]>([])
   const [carregando, setCarregando] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -39,7 +41,9 @@ export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) 
     }
     setCarregando(true)
     try {
-      const res = await fetch(`/api/comunidade/membros?q=${encodeURIComponent(termo)}`)
+      const params = new URLSearchParams({ q: termo })
+      if (escopo === 'nacional') params.set('escopo', 'nacional')
+      const res = await fetch(`/api/comunidade/membros?${params}`)
       if (!res.ok) return
       const data = (await res.json()) as { membros: MembroMencao[] }
       setMembros(data.membros.slice(0, 6))
@@ -48,7 +52,7 @@ export function MentionPicker({ query, onSelect, onClose }: MentionPickerProps) 
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [escopo])
 
   useEffect(() => {
     const t = setTimeout(() => void buscar(query), 200)

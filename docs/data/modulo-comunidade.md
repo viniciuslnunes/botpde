@@ -84,7 +84,7 @@ visibilidade do post).
 
 ## Server Actions (`comunidade/actions.ts`)
 
-- `publicarPost`, `publicarEnquete`, `publicarPostEvento`, `editarPost`, `excluirPost`, `repostarPost`, `repostarComunicado`
+- `publicarPost`, `publicarPostNacional`, `publicarEnquete`, `publicarPostEvento`, `editarPost`, `excluirPost`, `repostarPost`, `repostarComunicado`
 - `solicitarSeguir`, `deixarDeSeguir`, `aprovarSeguimento`, `rejeitarSeguimento`
 - `atualizarPerfilSocial`, `criarDestaquePerfil`
 - `comentarPost`, `reagirPost`, `votarEnquetePost`, `encerrarEnquetePost`, `listarComentariosPost`, `denunciarPost`
@@ -438,6 +438,11 @@ Comunidade é **público-na-hierarquia** (`packages/types/src/visibility.js`):
   posts `TENANT`/`PRIVADO` para o escopo Nacional. Authz CN:
   `apps/web/src/lib/authz.ts` (`assertComunidadeNacional`,
   `assertPodeAcessarSalaNacional`).
+- **Composer único Nacional (2026-07-23)**: a aba Nacional usa o mesmo
+  `FeedComposer` da torcida com prop `nacional` (mídia/vídeo, emoji, stickers,
+  menções; sempre `PUBLICO`; sem enquete/evento/alcance). Action
+  `publicarPostNacional` → tenant sintético. Typeahead de menções:
+  `/api/comunidade/membros?escopo=nacional`.
 - **Torcedor global pode publicar mesmo PENDENTE**: `assertAutorPublicacaoPost`
   (`apps/web/src/lib/authz.ts`) diferencia sócio de torcedor — um torcedor com
   onboarding concluído na mesma afiliação publica posts com visibilidade
