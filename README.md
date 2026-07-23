@@ -1,6 +1,6 @@
 # Setorize
 
-**O HUB das Arquibancadas**
+**O HUB DAS ARQUIBANCADAS**
 
 Plataforma multi-tenant para **torcidas organizadas de futebol**: operação (membros, departamentos, RBAC), mobilização (eventos, presença), comunidade (feed, alianças, salas), loja, financeiro, bar e patrimônio — com portal do associado, painel admin e bot Discord legado.
 
