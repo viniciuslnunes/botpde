@@ -1,14 +1,17 @@
-# Torcida SaaS
+# Setorize
+
+**O HUB das Arquibancadas**
 
 Plataforma multi-tenant para **torcidas organizadas de futebol**: operação (membros, departamentos, RBAC), mobilização (eventos, presença), comunidade (feed, alianças, salas), loja, financeiro, bar e patrimônio — com portal do associado, painel admin e bot Discord legado.
 
+> Nome do produto: **Setorize**. Repositório Git histórico: `botpde`; pacotes internos ainda usam o escopo `@torcida/*`.  
 > Repositório privado. Não commite `.env`, tokens, senhas ou URLs com credenciais.
 
 ---
 
 ## Finalidade
 
-O produto atende a hierarquia típica de uma torcida:
+O **Setorize** é o hub operacional da arquibancada organizada. Atende a hierarquia típica de uma torcida:
 
 ```
 Sede (torcida principal)
@@ -232,7 +235,7 @@ Hub cross-módulo com período 30d / 90d / 12m: Financeiro, Membros, Associaçã
 
 ## Time de agentes
 
-O projeto é desenvolvido com um **time de agentes especializados** (Claude Code / Cursor). Definições em [`.claude/agents/`](./.claude/agents/); guia de uso em [`docs/agents/README.md`](./docs/agents/README.md).
+O **Setorize** é desenvolvido com um **time de agentes especializados** (Claude Code / Cursor). Definições em [`.claude/agents/`](./.claude/agents/); guia de uso em [`docs/agents/README.md`](./docs/agents/README.md).
 
 **Princípios:** planejar antes de codificar; escopo mínimo; preferir Sonnet / modelo Auto da sessão; autorização sempre no servidor; cada feature justificada pelo domínio.
 
@@ -302,7 +305,7 @@ Plano de investimento / escala: [plano-investimento-infra.md](./docs/ops/plano-i
 
 O produto segue [Semantic Versioning 2.0.0](https://semver.org/lang/pt-BR/): **`MAJOR.MINOR.PATCH`**.
 
-A versão canônica do **produto Torcida SaaS** vive no `package.json` da raiz (`torcida-saas`). Tags Git usam o prefixo `v` (ex.: `v0.2.0`). Pacotes internos (`@torcida/web`, `@torcida/db`, `@torcida/types`, `@torcida/ui`, `@torcida/bot`) são **privados** e acompanham a versão do produto no release — não há publicação independente no npm.
+A versão canônica do **produto Setorize** vive no `package.json` da raiz (nome interno do monorepo: `torcida-saas`). Tags Git usam o prefixo `v` (ex.: `v0.2.0`). Pacotes internos (`@torcida/web`, `@torcida/db`, `@torcida/types`, `@torcida/ui`, `@torcida/bot`) são **privados** e acompanham a versão do produto no release — não há publicação independente no npm.
 
 ### O que cada número significa
 
@@ -539,4 +542,4 @@ Detalhe: [`ARCHITECTURE.md`](./ARCHITECTURE.md) e [`CLAUDE.md`](./CLAUDE.md).
 
 ## Licença
 
-Projeto privado — todos os direitos reservados, salvo acordo explícito em contrário.
+**Setorize** — projeto privado; todos os direitos reservados, salvo acordo explícito em contrário.
