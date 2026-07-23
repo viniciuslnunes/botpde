@@ -434,6 +434,13 @@ escutam long-poll SSE (`ping`|`idle`); polling 60s como rede de segurança.
 | E2 | **Ranking personalizado** (features: rede, tenant, recência, engajamento, afiliação) com A/B offline | Heurística atual é baseline; ML/heurística tunável vem depois | Alto |
 | E3 | **Sugestões de seguir** pré-computadas por tenant (tabela `SugestaoAutor` ou job) | Aside deixa de depender de queries ad hoc | Médio |
 
+### Investimento em infra (orçamento / ads) — ver ops
+
+Para **quanto gastar** (domínio, Cloudflare, resize Railway, Neon, pooler) e
+ordem financeira alinhada a demo + modelo ads: `docs/ops/plano-investimento-infra.md`
+(2026-07-23). Este módulo continua sendo a fonte de **código/métricas** Comunidade;
+o plano ops é a fonte de **faixas de investimento**.
+
 ### Fase F — infra e observabilidade (quando métricas justificarem)
 
 | # | Recorte | Gatilho | Esforço |

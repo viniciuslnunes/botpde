@@ -68,7 +68,7 @@ export function FeedPostCard({
           <div className="flex flex-wrap items-center gap-x-2">
             <ComunidadePrefetchLink
               href={headerHref}
-              className="text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
+              className="text-sm font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
             >
               {headerNome}
             </ComunidadePrefetchLink>
@@ -96,7 +96,7 @@ export function FeedPostCard({
             {post.grupo && (
               <ComunidadePrefetchLink
                 href={`/portal/comunidade/grupos/${post.grupo.id}`}
-                className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))] hover:underline"
+                className="rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
               >
                 em {post.grupo.nome ?? 'grupo'}
               </ComunidadePrefetchLink>
@@ -105,14 +105,14 @@ export function FeedPostCard({
           {!isComunicadoOficial && post.autor.nickname && (
             <ComunidadePrefetchLink
               href={`/portal/comunidade/perfil/${post.autor.id}`}
-              className="block truncate text-xs text-[rgb(var(--foreground-muted))] hover:underline"
+              className="block truncate text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
               @{post.autor.nickname}
             </ComunidadePrefetchLink>
           )}
           <ComunidadePrefetchLink
             href={linkPostComunidade(post.id)}
-            className="text-xs text-[rgb(var(--foreground-muted))] hover:underline"
+            className="text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
           >
             <time dateTime={new Date(post.criadoEm).toISOString()} suppressHydrationWarning>
               {formatRelative(post.criadoEm)}

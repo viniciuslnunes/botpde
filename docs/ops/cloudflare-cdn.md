@@ -4,6 +4,8 @@
 > já definidos em `apps/web/next.config.ts`.
 > Complementa `docs/data/modulo-comunidade-performance.md` (Fase F4) e
 > `docs/ops/deploy-multi-tenant.md`.
+> Encaixa na **Faixa A** do plano de investimento:
+> `docs/ops/plano-investimento-infra.md`.
 
 ## O que ganha
 

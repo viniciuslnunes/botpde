@@ -11,7 +11,9 @@ overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
 `React.cache` salas·tenant, e **busca** 2026-07-17: `modo=rapida` + SQL
 `GROUP BY` — sem `DISTINCT`+`similarity`); **Agenda** 2026-07-17:
 `docs/data/modulo-eventos.md` + `ARCHITECTURE.md` §5.11; agente `performance`
-para auditorias novas.
+para auditorias novas. Investimento em infra (faixas A–D, ads, 1ª carga):
+`docs/ops/plano-investimento-infra.md` — agentes `performance` +
+`product-strategy`.
 
 ## O que é
 

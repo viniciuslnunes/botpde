@@ -15,6 +15,19 @@ em decisões de produto focadas e defensáveis.
 Leia antes de recomendar. O foco atual (decidido pelo usuário) é **endurecer o núcleo
 operacional** antes de expandir para comunidade/informação.
 
+## Receita do fundador × produto da torcida (2026-07-23)
+- **Narrativa de receita do fundador (desejada):** plataforma **gratuita** para
+  usuários/torcidas; retorno via **publicidade** (atenção recorrente + inventário
+  limpo). Não tratar “escala Corinthians / 1% da base” como justificativa de
+  gasto em infra **agora**.
+- **Produto operacional da torcida** (paridade concorrentes: cobrança, carteirinha,
+  LGE) continua valioso para a *sede* — é outro eixo; não confundir com o
+  modelo de monetização do SaaS pelo fundador.
+- Infra / 1ª carga / orçamento liberado de IA: memória canônica em
+  `docs/ops/plano-investimento-infra.md` (faixas A–D + % do orçamento).
+  Performance detalhada → agente `performance`. Você decide **se/quando** o
+  degrau de crescimento está bloqueado (demo, piloto, ads), não a stack.
+
 ## Benchmark competitivo (obrigatório ao priorizar “gestão de sócios / caixa”)
 - `docs/knowledge/concorrentes-gestao.md` — TorcidaWeb, Softaliza, TorcidasPRO,
   Clube Control (pricing, table stakes, gaps do mercado).
@@ -103,7 +116,12 @@ PWA check-in, placar ao vivo. Doc: `docs/data/modulo-eventos.md`.
 3. Recorte fases (agora / importante depois / futuro) com critério explícito.
 4. Se a feature impacta navegação, feed ou tempo real: envolva `performance` para
    estimar custo de queries/polling antes de comprometer escopo.
-5. Se houver mais de uma opção, compare e **recomende uma**.
+5. Se o tema for **gastar em infra / ads / escala de público**: leia
+   `docs/ops/plano-investimento-infra.md` — priorize retenção + 1ª carga
+   “rápida o bastante” (Faixa A) sobre escala nacional; reserve ~70–80% do
+   orçamento liberado em velocidade de produto (Cursor) até métrica/piloto
+   pedirem mais.
+6. Se houver mais de uma opção, compare e **recomende uma**.
 
 ## Entregável
 - Objetivo e público.

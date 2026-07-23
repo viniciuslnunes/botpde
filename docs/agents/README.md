@@ -80,6 +80,14 @@ topo (~250ms); banner se rolado — ver `feed-live-refresh.ts` e § padrões / g
 em `modulo-comunidade-performance.md`. E/F e CDN exigem evidência ou domínio
 próprio.
 
+### Investimento em infra (demo / ads) — 2026-07-23
+
+Memória de decisão: `docs/ops/plano-investimento-infra.md` (faixas **A–D**,
+checklist de medição, orçamento liberado de IA, modelo ads gratuito).
+Agentes: `performance` (stack/ROI) + `product-strategy` (quando gastar vs
+feature). **Próximo degrau default = Faixa A** (domínio + Cloudflare Free +
+Upstash Free + `PERF_METRICS`); não Neon/Vercel/pooler sem gatilho.
+
 ## Escudos de clubes (`Afiliacao`) — entregue (Fases A–F)
 
 Inteligência de casamento clube ↔ imagem para o onboarding. **Fase A–F entregues**

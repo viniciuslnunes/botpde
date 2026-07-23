@@ -18,6 +18,10 @@ reinventar arquitetura nem empurrar migração de infra sem evidência.
   §5.6.1 (Comunidade 2026-07-16), §5.11 (Agenda 2026-07-17).
 - `docs/data/modulo-comunidade-performance.md` — entregas A–D/C, padrões,
   **ganhos estimados por cenário (%)**, Fases E–F e gatilhos para reabrir.
+- `docs/ops/plano-investimento-infra.md` — **faixas A–D de gasto em infra**
+  (2026-07-23): demo/ads, 1ª carga, orçamento. Use quando o humano perguntar
+  “quanto gastar”, “Railway/Neon/CDN”, “escala” ou “performance de produção”
+  no sentido de **investimento**, não só de código.
 - `docs/data/modulo-eventos.md` — listagens por janela (semana/mês), não
   carregar o histórico inteiro; cache de escopo/sedes; cron lembretes fora do
   request do usuário.
@@ -98,6 +102,10 @@ na porta do estádio.
 - Redis: **código D1 pronto** com Upstash Free (`REDIS_URL`); não empurrar Redis
   pago no Railway sem evidência de >500k cmds/mês ou necessidade de persistência.
 - Justifique com contenção de conexões, escala simultânea ou SLA — não por estética.
+- Pedidos de “melhorar infra / gastar o dinheiro do Claude em Railway”:
+  seguir **Faixas A→D** em `docs/ops/plano-investimento-infra.md`. Padrão:
+  medir → **A** (domínio + Cloudflare Free + Upstash Free) → **B** só com
+  cauda lenta → **C/D** só com gatilho. Não pular para Neon/Vercel.
 
 ## Como trabalhar
 1. Reproduza ou leia benchmark (`nav-latency` e2e ou medição manual em produção).
@@ -135,3 +143,6 @@ Ao comunicar ganhos a humanos, use as faixas do doc e deixe explícito que são
 - Handoff claro para `implementation` ou `data-model` quando aplicável.
 - Se o pedido for “mais performance Comunidade” sem gatilho: cite o baseline
   § ganhos estimados e recomende observar, não codar.
+- Se o pedido for **investimento / escala / ads / orçamento de infra**: cite as
+  faixas A–D do plano ops; alinhe orçamento com `product-strategy` (não
+  gastar Faixa C/D sem degrau mensurável bloqueado).

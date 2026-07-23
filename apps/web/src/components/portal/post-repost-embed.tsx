@@ -32,14 +32,14 @@ export function PostRepostEmbed({ origem }: PostRepostEmbedProps) {
         <div className="min-w-0">
           <Link
             href={`/portal/comunidade/perfil/${origem.autor.id}`}
-            className="block truncate text-xs font-semibold hover:underline"
+            className="block truncate text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:text-[rgb(var(--color-primary-fg))]"
           >
             {origem.autor.nome ?? 'Membro'}
           </Link>
           {origem.autor.nickname && (
             <Link
               href={`/portal/comunidade/perfil/${origem.autor.id}`}
-              className="block truncate text-[11px] text-[rgb(var(--foreground-muted))] hover:underline"
+              className="block truncate text-[11px] text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
             >
               @{origem.autor.nickname}
             </Link>

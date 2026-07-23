@@ -119,6 +119,10 @@ botpde/ (monorepo pnpm + turborepo)
     aos poucos para o web/mobile atual.
 - Hobby Plan: $5/mês incluídos, uso atual ~$2.45/mês estimado — dentro da
   margem, sem necessidade de trocar de provedor no MVP.
+- **Plano de investimento em infra (2026-07-23):** faixas A–D (fundação →
+  escala ads), alinhadas a demo/1ª carga e modelo de receita via publicidade —
+  ver `docs/ops/plano-investimento-infra.md`. Não migrar provedor sem critério
+  §5.4 e medição (`PERF_METRICS`).
 
 ---
 
