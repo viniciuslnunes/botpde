@@ -69,13 +69,17 @@ export function serializarMencoes(texto: string, mencoes: MencaoParsed[]): strin
   return result
 }
 
-/** Normaliza hashtags (sem #, minúsculas, sem acentos básicos). */
-export function normalizarHashtag(raw: string): string {
-  return raw
-    .toLowerCase()
+/** Normaliza texto pt-BR para comparação (minúsculas, sem acentos). */
+export function foldAccents(s: string): string {
+  return s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9_]/g, '')
+    .toLowerCase()
+}
+
+/** Normaliza hashtags (sem #, minúsculas, sem acentos básicos). */
+export function normalizarHashtag(raw: string): string {
+  return foldAccents(raw).replace(/[^a-z0-9_]/g, '')
 }
 
 export function extrairHashtags(conteudo: string): string[] {

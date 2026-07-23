@@ -50,6 +50,7 @@ import { Avatar } from './avatar'
 import { EmojiPicker } from './emoji-picker'
 import { StickerPicker } from './sticker-picker'
 import { MentionPicker, detectarMencaoAtiva, type MencaoSelecionada } from './mention-picker'
+import { ComposerMentionHighlight } from './composer-mention-highlight'
 import { ExpandableText } from './expandable-text'
 import { PostMedia } from './post-media'
 import {
@@ -961,38 +962,55 @@ function ComposerBody({
                     : `No que você tá pensando, ${firstName}?`}
               </m.button>
             ) : (
-              <m.textarea
+              <m.div
                 key="composer-textarea"
-                ref={textareaRef}
-                name="conteudo"
-                required
-                maxLength={3000}
-                rows={3}
-                value={texto}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={springGentle}
-                onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
-                onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
-                onPaste={(e) => {
-                  const files = Array.from(e.clipboardData.files).filter(
-                    (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
-                  )
-                  if (files.length) {
-                    e.preventDefault()
-                    addFiles(files)
+                className="relative rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] transition-colors focus-within:border-[rgb(var(--primary))]"
+              >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3.5 py-2.5 text-sm leading-normal text-[rgb(var(--foreground))]"
+                >
+                  <ComposerMentionHighlight texto={texto} mencoes={mencoes} />
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  name="conteudo"
+                  required
+                  maxLength={3000}
+                  rows={3}
+                  value={texto}
+                  onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart)}
+                  onKeyUp={(e) => handleTextoChange(texto, e.currentTarget.selectionStart)}
+                  onScroll={(e) => {
+                    const mirror = e.currentTarget.previousElementSibling as HTMLElement | null
+                    if (mirror) {
+                      mirror.scrollTop = e.currentTarget.scrollTop
+                      mirror.scrollLeft = e.currentTarget.scrollLeft
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const files = Array.from(e.clipboardData.files).filter(
+                      (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+                    )
+                    if (files.length) {
+                      e.preventDefault()
+                      addFiles(files)
+                    }
+                  }}
+                  placeholder={
+                    comunicado
+                      ? 'Escreva o comunicado oficial para a torcida…'
+                      : canal
+                        ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
+                        : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
                   }
-                }}
-                placeholder={
-                  comunicado
-                    ? 'Escreva o comunicado oficial para a torcida…'
-                    : canal
-                      ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
-                      : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
-                }
-                className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
-              />
+                  className="relative z-10 w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-normal text-transparent caret-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))]"
+                />
+              </m.div>
             )}
           </AnimatePresence>
           {mencaoQuery !== null && expanded && (

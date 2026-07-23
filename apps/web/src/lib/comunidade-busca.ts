@@ -7,7 +7,7 @@ import {
   resolverAvatarSocial,
   resolverPerfilPrivadoEfetivo,
 } from './perfil-social'
-import { normalizarHashtag } from './comunidade-social'
+import { normalizarHashtag, foldAccents } from './comunidade-social'
 import {
   postIncludeBusca,
   projetarPostBusca,
@@ -17,6 +17,19 @@ import {
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
 import { formatNomeTorcida } from '@torcida/types'
+
+/**
+ * Expressão SQL que remove acentos comuns pt-BR sem exigir extensão `unaccent`.
+ * Deve espelhar `foldAccents` do lado JS (query já vem folded).
+ */
+const SQL_FOLD_FROM =
+  'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ'
+const SQL_FOLD_TO = 'aaaaaeeeeiiiiooooouuuucnaaaaaeeeeiiiiooooouuuucn'
+
+/** Termo de busca: sem @ inicial, sem acentos, lower. */
+function termoBuscaMembro(q: string): string {
+  return foldAccents(q.replace(/^@+/, '').trim())
+}
 
 /**
  * Escopo de tenants da busca — o mesmo do feed. No tenant sintético da CN
@@ -41,6 +54,7 @@ export type BuscaComunidadeModo = 'rapida' | 'completa'
 export interface MembroBuscaItem {
   id: string
   nome: string | null
+  nickname: string | null
   avatarUrl: string | null
   tenantNome: string
   perfilPrivado: boolean
@@ -113,7 +127,7 @@ type MembroBuscaRaw = {
   userId: string
   tenantId: string
   tipo: 'SOCIO' | 'TORCEDOR'
-  user: { id: string; nome: string | null; avatarUrl: string | null }
+  user: { id: string; nome: string | null; nickname: string | null; avatarUrl: string | null }
   tenant: { nome: string }
 }
 
@@ -148,11 +162,14 @@ async function buscarCandidatosMembrosPorTrgm(
   limit: number,
 ): Promise<string[] | null> {
   if (visibleIds.length === 0) return []
-  const termoLike = `%${q}%`
+  const termo = termoBuscaMembro(q)
+  if (termo.length < 2) return []
+  const termoLike = `%${termo}%`
 
   try {
     // GROUP BY (não DISTINCT): Postgres exige que expressões do ORDER BY
     // apareçam no SELECT quando há DISTINCT — similarity quebrava a busca inteira.
+    // Match sem acento (translate) em nome + nickname + bio.
     const rows = await db.$queryRaw<Array<{ userId: string }>>`
       SELECT m.user_id AS "userId"
       FROM saas_membros m
@@ -164,20 +181,57 @@ async function buscarCandidatosMembrosPorTrgm(
         AND m.tenant_id IN (${Prisma.join(visibleIds)})
         AND m.user_id <> ${userId}
         AND (
-          u.nome ILIKE ${termoLike}
-          OR COALESCE(pm.bio, '') ILIKE ${termoLike}
+          translate(lower(COALESCE(u.nome, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+          OR translate(lower(COALESCE(u.nickname, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+          OR translate(lower(COALESCE(pm.bio, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
         )
-      GROUP BY m.user_id, u.nome
+      GROUP BY m.user_id, u.nome, u.nickname
       ORDER BY GREATEST(
-        similarity(lower(COALESCE(u.nome, '')), lower(${q})),
-        MAX(similarity(lower(COALESCE(pm.bio, '')), lower(${q})))
+        similarity(
+          translate(lower(COALESCE(u.nome, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}),
+          ${termo}
+        ),
+        similarity(
+          translate(lower(COALESCE(u.nickname, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}),
+          ${termo}
+        ),
+        MAX(similarity(
+          translate(lower(COALESCE(pm.bio, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}),
+          ${termo}
+        ))
       ) DESC,
       u.nome ASC NULLS LAST
       LIMIT ${limit}
     `
     return rows.map((row: { userId: string }) => row.userId)
   } catch (error) {
-    if (isPgTrgmUnavailableError(error)) return null
+    if (isPgTrgmUnavailableError(error)) {
+      // Sem pg_trgm: ainda aplica fold + nickname via LIKE.
+      try {
+        const rows = await db.$queryRaw<Array<{ userId: string }>>`
+          SELECT m.user_id AS "userId"
+          FROM saas_membros m
+          INNER JOIN saas_users u ON u.id = m.user_id
+          LEFT JOIN saas_perfis_membro pm
+            ON pm.user_id = m.user_id
+           AND pm.tenant_id = ${tenantId}
+          WHERE m.status = 'APROVADO'
+            AND m.tenant_id IN (${Prisma.join(visibleIds)})
+            AND m.user_id <> ${userId}
+            AND (
+              translate(lower(COALESCE(u.nome, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+              OR translate(lower(COALESCE(u.nickname, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+              OR translate(lower(COALESCE(pm.bio, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+            )
+          GROUP BY m.user_id, u.nome
+          ORDER BY u.nome ASC NULLS LAST
+          LIMIT ${limit}
+        `
+        return rows.map((row: { userId: string }) => row.userId)
+      } catch {
+        return null
+      }
+    }
     throw error
   }
 }
@@ -458,6 +512,7 @@ export async function getSugestoesMembrosParaBusca(
     enriquecidos.push({
       id: r.user.id,
       nome: r.user.nome,
+      nickname: null,
       avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
       tenantNome: formatNomeTorcida(r.tenant.nome),
       perfilPrivado,
@@ -493,7 +548,8 @@ export async function buscarMembrosComunidade(
   q: string,
   opts: { visibleTenantIds?: string[]; modo?: BuscaComunidadeModo } = {},
 ): Promise<MembroBuscaItem[]> {
-  if (q.length < 2) return []
+  const termo = termoBuscaMembro(q)
+  if (termo.length < 2) return []
 
   const modo = opts.modo ?? 'completa'
   const limites = LIMITES_POR_MODO[modo]
@@ -528,6 +584,7 @@ export async function buscarMembrosComunidade(
             user: {
               OR: [
                 { nome: { contains: q, mode: 'insensitive' } },
+                { nickname: { contains: termo, mode: 'insensitive' } },
                 {
                   perfisMembro: {
                     some: {
@@ -545,7 +602,7 @@ export async function buscarMembrosComunidade(
       userId: true,
       tenantId: true,
       tipo: true,
-      user: { select: { id: true, nome: true, avatarUrl: true } },
+      user: { select: { id: true, nome: true, nickname: true, avatarUrl: true } },
       tenant: { select: { nome: true } },
     },
     take: limites.membrosCand,
@@ -583,33 +640,49 @@ export async function buscarMembrosComunidade(
       const nomeClube =
         tenantMeta.afiliacao?.apelido || tenantMeta.afiliacao?.nome || 'Comunidade nacional'
       const restantes = limites.membrosOut - candidatos.length
-      const torcedores: Array<{
-        userId: string
-        user: { id: string; nome: string | null; avatarUrl: string | null }
-      }> = await db.perfilTorcedor.findMany({
-        where: {
-          afiliacaoId: tenantMeta.afiliacaoId,
-          onboardingConcluidoEm: { not: null },
-          userId: { notIn: [...vistos, userId, ...bloqueadosIds] },
-          user: { nome: { contains: q, mode: 'insensitive' } },
-        },
-        take: restantes,
-        orderBy: { atualizadoEm: 'desc' },
-        select: {
-          userId: true,
-          user: { select: { id: true, nome: true, avatarUrl: true } },
-        },
-      })
-      for (const t of torcedores) {
-        if (vistos.has(t.userId)) continue
-        vistos.add(t.userId)
-        candidatos.push({
-          userId: t.userId,
-          tenantId,
-          tipo: 'TORCEDOR',
-          user: t.user,
-          tenant: { nome: nomeClube },
+      const termoLike = `%${termo}%`
+      const torcedorIds = await db.$queryRaw<Array<{ userId: string }>>`
+        SELECT pt.user_id AS "userId"
+        FROM saas_perfis_torcedor pt
+        INNER JOIN saas_users u ON u.id = pt.user_id
+        WHERE pt.afiliacao_id = ${tenantMeta.afiliacaoId}
+          AND pt.onboarding_concluido_em IS NOT NULL
+          AND pt.user_id <> ${userId}
+          AND (
+            translate(lower(COALESCE(u.nome, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+            OR translate(lower(COALESCE(u.nickname, '')), ${SQL_FOLD_FROM}, ${SQL_FOLD_TO}) LIKE ${termoLike}
+          )
+        ORDER BY pt.atualizado_em DESC
+        LIMIT ${restantes + bloqueadosIds.size + vistos.size}
+      `
+      const idsFiltrados = torcedorIds
+        .map((r: { userId: string }) => r.userId)
+        .filter((id: string) => !vistos.has(id) && !bloqueadosIds.has(id))
+        .slice(0, restantes)
+
+      if (idsFiltrados.length > 0) {
+        const torcedores: Array<{
+          id: string
+          nome: string | null
+          nickname: string | null
+          avatarUrl: string | null
+        }> = await db.user.findMany({
+          where: { id: { in: idsFiltrados } },
+          select: { id: true, nome: true, nickname: true, avatarUrl: true },
         })
+        const porId = new Map(torcedores.map((u) => [u.id, u]))
+        for (const id of idsFiltrados) {
+          const u = porId.get(id)
+          if (!u || vistos.has(id)) continue
+          vistos.add(id)
+          candidatos.push({
+            userId: id,
+            tenantId,
+            tipo: 'TORCEDOR',
+            user: u,
+            tenant: { nome: nomeClube },
+          })
+        }
       }
     }
   }
@@ -632,6 +705,7 @@ export async function buscarMembrosComunidade(
       return {
         id: r.user.id,
         nome: r.user.nome,
+        nickname: r.user.nickname,
         avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
         tenantNome: formatNomeTorcida(r.tenant.nome),
         perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {
@@ -673,6 +747,7 @@ export async function buscarMembrosComunidade(
     return {
       id: r.user.id,
       nome: r.user.nome,
+      nickname: r.user.nickname,
       avatarUrl: resolverAvatarSocial(r.user.avatarUrl),
       tenantNome: formatNomeTorcida(r.tenant.nome),
       perfilPrivado: resolverPerfilPrivadoEfetivo(perfil?.perfilPrivado, {

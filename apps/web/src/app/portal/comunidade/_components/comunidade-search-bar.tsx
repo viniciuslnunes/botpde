@@ -293,7 +293,11 @@ export function ComunidadeSearchBar() {
                               <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
                                 {membro.nome ?? 'Membro'}
                               </p>
-                              <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{membro.tenantNome}</p>
+                              <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+                                {membro.nickname
+                                  ? `@${membro.nickname} · ${membro.tenantNome}`
+                                  : membro.tenantNome}
+                              </p>
                             </div>
                           </Link>
                         </m.div>

@@ -63,7 +63,7 @@ function renderSegment(text: string, keyPrefix: string): ReactNode[] {
         <ComunidadePrefetchLink
           key={`${keyPrefix}-m-${i}`}
           href={`/portal/comunidade/perfil/${userId}`}
-          className="font-semibold text-[rgb(var(--foreground))] underline decoration-[rgb(var(--foreground)_/_0.45)] underline-offset-2 hover:decoration-[rgb(var(--foreground))]"
+          className="font-semibold text-[rgb(var(--color-primary-fg))] hover:text-[rgb(var(--color-primary-fg))]"
         >
           @{nome}
         </ComunidadePrefetchLink>,

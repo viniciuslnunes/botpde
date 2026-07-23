@@ -13,6 +13,7 @@ import { menuItemStagger, popoverPanel, springSnappy } from '@/lib/motion-preset
 interface MembroMencao {
   id: string
   nome: string | null
+  nickname: string | null
   avatarUrl: string | null
 }
 
@@ -110,6 +111,7 @@ export function MentionPicker({ query, onSelect, onClose, escopo }: MentionPicke
           >
             {membros.map((membro, i) => {
               const nome = membro.nome?.trim() || 'Membro'
+              const nick = membro.nickname?.trim() || null
               return (
                 <m.button
                   key={membro.id}
@@ -129,8 +131,15 @@ export function MentionPicker({ query, onSelect, onClose, escopo }: MentionPicke
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--background-subtle))]"
                 >
                   <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="xs" />
-                  <span className="truncate font-medium text-[rgb(var(--foreground))]">
-                    {nome}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-[rgb(var(--foreground))]">
+                      {nome}
+                    </span>
+                    {nick && (
+                      <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
+                        @{nick}
+                      </span>
+                    )}
                   </span>
                 </m.button>
               )
