@@ -511,13 +511,17 @@ button,
 
 /* ── Shell do app: largura padrão (navbar) + grid de fundo ─────────
    Use .app-shell-bg no wrapper externo; .app-container no conteúdo.
-   Cards e superfícies internas não devem herdar o grid. */
+   Cards e superfícies internas não devem herdar o grid.
+   Shell padrão = 90rem (1440px): comunidade 3 colunas + SaaS.
+   Superfícies densas (admin tabelas/relatórios) ou estreitas
+   (formulários) podem optar por max-width próprio — não herdar
+   automaticamente um container mais largo no futuro. */
 .app-container {
   margin-left: auto;
   margin-right: auto;
   width: 100%;
   min-width: 0;
-  max-width: 80rem; /* max-w-7xl — alinhado à navbar */
+  max-width: 90rem; /* 1440px — shell padrão (navbar + portal/admin) */
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
 }
