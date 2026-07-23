@@ -3728,12 +3728,16 @@ export async function denunciarPost(
 
 /** Marca como lidas apenas notificações sociais (central da Comunidade). */
 export async function marcarTodasNotificacoesLidas(): Promise<void> {
-  const { session, tenant } = await getSessionAndPortalTenant()
-  if (!session?.user?.id || !tenant) throw new Error('Não autenticado')
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Não autenticado')
+
+  // Mesmo resolver da inbox/navbar — cobre CN sintética (torcedor global).
+  const tenantId = await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+  if (!tenantId) throw new Error('Tenant não encontrado')
 
   await db.notificacao.updateMany({
     where: {
-      tenantId: tenant.id,
+      tenantId,
       userId: session.user.id,
       lida: false,
       tipo: { in: TIPOS_NOTIFICACAO_SOCIAL },

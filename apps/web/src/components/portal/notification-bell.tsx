@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { AnimatePresence, m } from 'motion/react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -8,6 +9,7 @@ import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
 import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
 import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
+import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 
 export interface NotificationItem {
   id: string
@@ -51,12 +53,33 @@ export function NotificationBell({
   const [itemsSignature, setItemsSignature] = useState(initialSignature)
   const [pending, startTransition] = useTransition()
   const pathname = usePathname()
+  const rootRef = useRef<HTMLDivElement>(null)
   const itemsRef = useRef(items)
   itemsRef.current = items
 
   useEffect(() => {
     setOpen(false)
   }, [pathname])
+
+  // pointerdown (não onClick): fecha no toque, sem esperar mouseup.
+  // Evita o backdrop `fixed inset-0` do header (z-50), que não cobre o
+  // sidebar (z-60) e ainda bloqueava cliques no admin.
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: PointerEvent) {
+      if (rootRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   // Marca como lidos os itens que já estavam visíveis quando o dropdown
   // abriu, após um delay — dá tempo do usuário perceber o destaque de
@@ -97,7 +120,7 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -115,11 +138,17 @@ export function NotificationBell({
         )}
       </button>
 
-      {open && (
-        <>
-          <button type="button" onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-          <div
+      <AnimatePresence>
+        {open && (
+          <m.div
+            key="notification-menu"
             role="menu"
+            variants={popoverPanel}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={springSnappy}
+            style={{ transformOrigin: 'top right' }}
             className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg"
           >
             <div className="border-b border-[rgb(var(--border))] px-2 pb-2">
@@ -184,9 +213,9 @@ export function NotificationBell({
                 Atualizando...
               </p>
             )}
-          </div>
-        </>
-      )}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

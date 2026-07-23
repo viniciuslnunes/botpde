@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   notificacaoUpdateMany: vi.fn(),
   authFn: vi.fn(),
   getTenantFromHostFn: vi.fn(),
+  resolveTenantIdPortalComunidadeFn: vi.fn(),
   emitNotificacaoPing: vi.fn(),
   revalidatePath: vi.fn(),
 }))
@@ -22,6 +23,9 @@ vi.mock('@torcida/db', () => ({
 
 vi.mock('@/lib/auth', () => ({ auth: mocks.authFn }))
 vi.mock('@/lib/tenant', () => ({ getTenantFromHost: mocks.getTenantFromHostFn }))
+vi.mock('@/lib/comunidade-contexto', () => ({
+  resolveTenantIdPortalComunidade: mocks.resolveTenantIdPortalComunidadeFn,
+}))
 vi.mock('@/lib/notificacoes-bus', () => ({ emitNotificacaoPing: mocks.emitNotificacaoPing }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 
@@ -42,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.authFn.mockResolvedValue(SESSION)
   mocks.getTenantFromHostFn.mockResolvedValue(TENANT)
+  mocks.resolveTenantIdPortalComunidadeFn.mockResolvedValue(TENANT.id)
 })
 
 describe('marcarNotificacaoLida', () => {
@@ -51,19 +56,18 @@ describe('marcarNotificacaoLida', () => {
     expect(mocks.notificacaoUpdateMany).not.toHaveBeenCalled()
   })
 
-  it('lança erro sem tenant', async () => {
-    mocks.getTenantFromHostFn.mockResolvedValue(null)
-    await expect(marcarNotificacaoLida('notif-1')).rejects.toThrow('Tenant não encontrado')
-    expect(mocks.notificacaoUpdateMany).not.toHaveBeenCalled()
-  })
-
-  it('atualiza escopado a id+tenantId+userId, emite ping e revalida o lado portal quando o tipo é social', async () => {
-    mocks.notificacaoFindFirst.mockResolvedValue({ tipo: TIPO_SOCIAL })
+  it('atualiza escopado a id+userId (dono), sem depender do host', async () => {
+    mocks.notificacaoFindFirst.mockResolvedValue({ tipo: TIPO_SOCIAL, tenantId: TENANT.id })
 
     await marcarNotificacaoLida('notif-1')
 
+    expect(mocks.getTenantFromHostFn).not.toHaveBeenCalled()
+    expect(mocks.notificacaoFindFirst).toHaveBeenCalledWith({
+      where: { id: 'notif-1', userId: SESSION.user.id },
+      select: { tipo: true, tenantId: true },
+    })
     expect(mocks.notificacaoUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'notif-1', tenantId: TENANT.id, userId: SESSION.user.id },
+      where: { id: 'notif-1', userId: SESSION.user.id },
       data: { lida: true },
     })
     expect(mocks.emitNotificacaoPing).toHaveBeenCalledWith(TENANT.id, SESSION.user.id)
@@ -74,7 +78,7 @@ describe('marcarNotificacaoLida', () => {
   })
 
   it('revalida o lado admin quando o tipo está em TIPOS_NOTIFICACAO_ADMIN', async () => {
-    mocks.notificacaoFindFirst.mockResolvedValue({ tipo: TIPO_ADMIN })
+    mocks.notificacaoFindFirst.mockResolvedValue({ tipo: TIPO_ADMIN, tenantId: TENANT.id })
 
     await marcarNotificacaoLida('notif-2')
 
@@ -84,7 +88,7 @@ describe('marcarNotificacaoLida', () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalledWith('/portal')
   })
 
-  it('não faz nada quando a notificação não existe para o usuário/tenant', async () => {
+  it('não faz nada quando a notificação não existe para o usuário', async () => {
     mocks.notificacaoFindFirst.mockResolvedValue(null)
 
     await marcarNotificacaoLida('notif-inexistente')
@@ -92,6 +96,17 @@ describe('marcarNotificacaoLida', () => {
     expect(mocks.notificacaoUpdateMany).not.toHaveBeenCalled()
     expect(mocks.emitNotificacaoPing).not.toHaveBeenCalled()
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('pinga o tenantId da própria notificação (pode divergir do host)', async () => {
+    mocks.notificacaoFindFirst.mockResolvedValue({
+      tipo: TIPO_SOCIAL,
+      tenantId: 'tenant-sintetico-cn',
+    })
+
+    await marcarNotificacaoLida('notif-cn')
+
+    expect(mocks.emitNotificacaoPing).toHaveBeenCalledWith('tenant-sintetico-cn', SESSION.user.id)
   })
 })
 
@@ -103,7 +118,7 @@ describe('marcarNotificacoesLidasPorIds', () => {
     expect(mocks.notificacaoUpdateMany).not.toHaveBeenCalled()
   })
 
-  it('retorna cedo quando nenhuma notificação do lote pertence ao usuário/tenant', async () => {
+  it('retorna cedo quando nenhuma notificação do lote pertence ao usuário', async () => {
     mocks.notificacaoFindMany.mockResolvedValue([])
 
     await marcarNotificacoesLidasPorIds(['a', 'b'])
@@ -112,16 +127,21 @@ describe('marcarNotificacoesLidasPorIds', () => {
     expect(mocks.emitNotificacaoPing).not.toHaveBeenCalled()
   })
 
-  it('revalida os dois lados e emite ping uma vez quando o lote mistura tipos admin+portal', async () => {
-    mocks.notificacaoFindMany.mockResolvedValue([{ tipo: TIPO_SOCIAL }, { tipo: TIPO_ADMIN }])
+  it('revalida os dois lados e emite ping por tenant quando o lote mistura tipos', async () => {
+    mocks.notificacaoFindMany.mockResolvedValue([
+      { tipo: TIPO_SOCIAL, tenantId: TENANT.id },
+      { tipo: TIPO_ADMIN, tenantId: TENANT.id },
+    ])
 
     await marcarNotificacoesLidasPorIds(['a', 'b'])
 
+    expect(mocks.getTenantFromHostFn).not.toHaveBeenCalled()
     expect(mocks.notificacaoUpdateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['a', 'b'] }, tenantId: TENANT.id, userId: SESSION.user.id },
+      where: { id: { in: ['a', 'b'] }, userId: SESSION.user.id },
       data: { lida: true },
     })
     expect(mocks.emitNotificacaoPing).toHaveBeenCalledTimes(1)
+    expect(mocks.emitNotificacaoPing).toHaveBeenCalledWith(TENANT.id, SESSION.user.id)
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/portal/comunidade/notificacoes')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/notificacoes')
@@ -131,11 +151,16 @@ describe('marcarNotificacoesLidasPorIds', () => {
 })
 
 describe('marcarTodasNotificacoesLidas / marcarTodasNotificacoesAdminLidas', () => {
-  it('marcarTodasNotificacoesLidas atualiza sem filtro de tipo e emite ping só quando há linhas afetadas', async () => {
+  it('marcarTodasNotificacoesLidas usa resolveTenantIdPortalComunidade e não emite ping sem linhas', async () => {
     mocks.notificacaoUpdateMany.mockResolvedValue({ count: 0 })
 
     await marcarTodasNotificacoesLidas()
 
+    expect(mocks.resolveTenantIdPortalComunidadeFn).toHaveBeenCalledWith(
+      SESSION.user.id,
+      undefined,
+    )
+    expect(mocks.getTenantFromHostFn).not.toHaveBeenCalled()
     expect(mocks.notificacaoUpdateMany).toHaveBeenCalledWith({
       where: { tenantId: TENANT.id, userId: SESSION.user.id, lida: false },
       data: { lida: true },
@@ -153,11 +178,19 @@ describe('marcarTodasNotificacoesLidas / marcarTodasNotificacoesAdminLidas', () 
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin')
   })
 
-  it('marcarTodasNotificacoesAdminLidas filtra por TIPOS_NOTIFICACAO_ADMIN e revalida só o lado admin', async () => {
+  it('marcarTodasNotificacoesLidas lança sem tenant do portal', async () => {
+    mocks.resolveTenantIdPortalComunidadeFn.mockResolvedValue(null)
+    await expect(marcarTodasNotificacoesLidas()).rejects.toThrow('Tenant não encontrado')
+    expect(mocks.notificacaoUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('marcarTodasNotificacoesAdminLidas filtra por TIPOS_NOTIFICACAO_ADMIN via host', async () => {
     mocks.notificacaoUpdateMany.mockResolvedValue({ count: 2 })
 
     await marcarTodasNotificacoesAdminLidas()
 
+    expect(mocks.getTenantFromHostFn).toHaveBeenCalled()
+    expect(mocks.resolveTenantIdPortalComunidadeFn).not.toHaveBeenCalled()
     expect(mocks.notificacaoUpdateMany).toHaveBeenCalledWith({
       where: {
         tenantId: TENANT.id,

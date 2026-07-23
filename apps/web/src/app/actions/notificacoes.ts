@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import type { TipoNotificacao } from '@torcida/db'
 import { auth } from '@/lib/auth'
+import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { getTenantFromHost } from '@/lib/tenant'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
@@ -13,17 +14,23 @@ import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
  * é exatamente `TIPOS_NOTIFICACAO_ADMIN` (chamada por
  * `marcarTodasNotificacoesAdminLidas`), ambos os lados quando `tipos` é
  * `undefined` (marcar todas sem filtro pode tocar admin e portal).
+ *
+ * Portal usa `resolveTenantIdPortalComunidade` (mesmo resolver da inbox /
+ * navbar). Admin usa `getTenantFromHost` (área operacional do host).
  */
 async function marcarLidasDoUsuario(tipos?: TipoNotificacao[]): Promise<void> {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
-  const tenant = await getTenantFromHost()
-  if (!tenant) throw new Error('Tenant não encontrado')
+  const apenasAdmin = tipos === TIPOS_NOTIFICACAO_ADMIN
+  const tenantId = apenasAdmin
+    ? (await getTenantFromHost())?.id ?? null
+    : await resolveTenantIdPortalComunidade(session.user.id, session.user.email)
+  if (!tenantId) throw new Error('Tenant não encontrado')
 
   const { count } = await db.notificacao.updateMany({
     where: {
-      tenantId: tenant.id,
+      tenantId,
       userId: session.user.id,
       lida: false,
       ...(tipos ? { tipo: { in: tipos } } : {}),
@@ -33,9 +40,8 @@ async function marcarLidasDoUsuario(tipos?: TipoNotificacao[]): Promise<void> {
 
   if (count === 0) return
 
-  emitNotificacaoPing(tenant.id, session.user.id)
+  emitNotificacaoPing(tenantId, session.user.id)
 
-  const apenasAdmin = tipos === TIPOS_NOTIFICACAO_ADMIN
   if (apenasAdmin) {
     revalidatePath('/admin')
     revalidatePath('/admin/notificacoes')
@@ -50,30 +56,28 @@ async function marcarLidasDoUsuario(tipos?: TipoNotificacao[]): Promise<void> {
 }
 
 /**
- * Marca notificação como lida. Qualquer usuário autenticado no tenant dono
- * da notificação (admin ou portal) — não exige COMMUNITY_POST. Invalida só
- * as rotas do lado (admin/portal) a que o tipo pertence, mais a central
- * compartilhada de notificações do portal.
+ * Marca notificação como lida. Escopo por `userId` (dono) — não por
+ * `getTenantFromHost()`, que diverge da inbox do portal
+ * (`resolveTenantIdPortalComunidade`: CN sintética / cookie / vínculo).
+ * Sem isso o client zera o badge otimista e o refresh traz a não-lida de novo.
  */
 export async function marcarNotificacaoLida(notificacaoId: string): Promise<void> {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
-  const tenant = await getTenantFromHost()
-  if (!tenant) throw new Error('Tenant não encontrado')
-
-  const notificacao: { tipo: TipoNotificacao } | null = await db.notificacao.findFirst({
-    where: { id: notificacaoId, tenantId: tenant.id, userId: session.user.id },
-    select: { tipo: true },
-  })
+  const notificacao: { tipo: TipoNotificacao; tenantId: string } | null =
+    await db.notificacao.findFirst({
+      where: { id: notificacaoId, userId: session.user.id },
+      select: { tipo: true, tenantId: true },
+    })
   if (!notificacao) return
 
   await db.notificacao.updateMany({
-    where: { id: notificacaoId, tenantId: tenant.id, userId: session.user.id },
+    where: { id: notificacaoId, userId: session.user.id },
     data: { lida: true },
   })
 
-  emitNotificacaoPing(tenant.id, session.user.id)
+  emitNotificacaoPing(notificacao.tenantId, session.user.id)
 
   revalidatePath('/portal/comunidade/notificacoes')
   if (TIPOS_NOTIFICACAO_ADMIN.includes(notificacao.tipo)) {
@@ -88,7 +92,7 @@ export async function marcarNotificacaoLida(notificacaoId: string): Promise<void
 /**
  * Marca um lote de notificações como lidas (por ids). Usado pelo
  * "marcar como lida ao visualizar" (sino/central) com delay no client.
- * Mesmo padrão de revalidação seletiva de `marcarNotificacaoLida`.
+ * Mesmo padrão de ownership por `userId` de `marcarNotificacaoLida`.
  */
 export async function marcarNotificacoesLidasPorIds(ids: string[]): Promise<void> {
   if (ids.length === 0) return
@@ -96,21 +100,22 @@ export async function marcarNotificacoesLidasPorIds(ids: string[]): Promise<void
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
-  const tenant = await getTenantFromHost()
-  if (!tenant) throw new Error('Tenant não encontrado')
-
-  const notificacoes: Array<{ tipo: TipoNotificacao }> = await db.notificacao.findMany({
-    where: { id: { in: ids }, tenantId: tenant.id, userId: session.user.id },
-    select: { tipo: true },
-  })
+  const notificacoes: Array<{ tipo: TipoNotificacao; tenantId: string }> =
+    await db.notificacao.findMany({
+      where: { id: { in: ids }, userId: session.user.id },
+      select: { tipo: true, tenantId: true },
+    })
   if (notificacoes.length === 0) return
 
   await db.notificacao.updateMany({
-    where: { id: { in: ids }, tenantId: tenant.id, userId: session.user.id },
+    where: { id: { in: ids }, userId: session.user.id },
     data: { lida: true },
   })
 
-  emitNotificacaoPing(tenant.id, session.user.id)
+  const tenantIds = [...new Set(notificacoes.map((n) => n.tenantId))]
+  for (const tenantId of tenantIds) {
+    emitNotificacaoPing(tenantId, session.user.id)
+  }
 
   revalidatePath('/portal/comunidade/notificacoes')
   const tipos = notificacoes.map((n) => n.tipo)
@@ -124,7 +129,7 @@ export async function marcarNotificacoesLidasPorIds(ids: string[]): Promise<void
   }
 }
 
-/** Marca todas as notificações do usuário no tenant (safe como form action). */
+/** Marca todas as notificações do usuário no tenant do portal (safe como form action). */
 export async function marcarTodasNotificacoesLidas(): Promise<void> {
   await marcarLidasDoUsuario()
 }
