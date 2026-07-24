@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Crosshair,
+  Image as ImageIcon,
   Link2,
   Loader2,
   MapPin,
@@ -45,6 +46,7 @@ import {
   buildStreetViewImageUrl,
   geocodeLatLng,
   isGoogleMapsConfigured,
+  isGoogleMapsUrl,
   parseCoordsFromGoogleMapsUrl,
   reverseGeocodeEndereco,
   STREET_VIEW_DEFAULTS,
@@ -181,6 +183,17 @@ function markFormDirty(formId: string) {
   requestAnimationFrame(() => {
     form?.dispatchEvent(new Event('input', { bubbles: true }))
   })
+}
+
+/** Compara só o nome da rua (ignora número/complemento) ao preservar dígitos no CEP. */
+function normalizarInicioEndereco(valor: string): string {
+  return valor
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/,?\s*\d+[a-z]?.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /** Após persistir um campo no servidor, alinha o baseline do StickyPersistBar. */
@@ -413,6 +426,7 @@ function SedeLocalizacaoFields({
     defaults?.streetViewPitch ?? STREET_VIEW_DEFAULTS.pitch,
   )
   const [svFov, setSvFov] = useState(defaults?.streetViewFov ?? STREET_VIEW_DEFAULTS.fov)
+  const [mapPanelTab, setMapPanelTab] = useState<'mapa' | 'street'>('mapa')
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropTitle, setCropTitle] = useState('Ajustar foto')
   const [previewNonce, setPreviewNonce] = useState(0)
@@ -433,12 +447,29 @@ function SedeLocalizacaoFields({
   const pinManualRef = useRef(pinManualInicial)
   const [pinManual, setPinManual] = useState(pinManualInicial)
   const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const linkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Evita reaplicar o mesmo link enquanto o campo é sincronizado pelas coords. */
+  const lastAppliedLinkRef = useRef('')
 
   useEffect(() => {
     return () => {
       if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
+      if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
     }
   }, [])
+
+  function syncMapsLinkFromCoords(coords: { lat: number; lng: number }) {
+    const url = buildGoogleMapsUrl({
+      lat: coords.lat,
+      lng: coords.lng,
+      endereco: enderecoRef.current?.value,
+      cidade: cidadeRef.current?.value,
+      estado: estadoRef.current?.value,
+    })
+    if (!url) return
+    lastAppliedLinkRef.current = url
+    setMapsLink(url)
+  }
 
   async function buscarEndereco(valorCep: string) {
     const digitos = valorCep.replace(/\D/g, '')
@@ -447,8 +478,13 @@ function SedeLocalizacaoFields({
     try {
       const endereco = await buscarEnderecoPorCep(valorCep)
       if (!endereco) return
-      // Sempre sobrescreve — um CEP novo e válido substitui o endereço
-      // anterior na hora, mesmo que os campos já estivessem preenchidos.
+      // CEP novo = intenção de mudar o local — libera geocode mesmo com pin prévio.
+      pinManualRef.current = false
+      setPinManual(false)
+
+      if (cepRef.current) {
+        cepRef.current.value = `${digitos.slice(0, 5)}-${digitos.slice(5)}`
+      }
       if (endereco.localidade && cidadeRef.current) {
         cidadeRef.current.value = endereco.localidade
         cidadeRef.current.dispatchEvent(new Event('input', { bubbles: true }))
@@ -458,21 +494,45 @@ function SedeLocalizacaoFields({
         estadoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
       }
       if (endereco.logradouro && enderecoRef.current) {
-        enderecoRef.current.value = endereco.logradouro
+        // Mantém número/complemento se o usuário já tinha digitado na mesma rua.
+        const atual = enderecoRef.current.value.trim()
+        const numero = atual.match(/,?\s*(\d+[A-Za-z]?.*)$/)
+        const mesmoLogradouro =
+          atual.length > 0 &&
+          normalizarInicioEndereco(atual) === normalizarInicioEndereco(endereco.logradouro)
+        enderecoRef.current.value =
+          mesmoLogradouro && numero
+            ? `${endereco.logradouro}, ${numero[1].replace(/^,\s*/, '')}`
+            : endereco.logradouro
         enderecoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
       }
+      markFormDirty(formId)
+      // Após o paint dos inputs uncontrolled, geocodifica e atualiza mapa + link.
+      requestAnimationFrame(() => {
+        void geocodificar({ silent: true })
+      })
     } finally {
       setBuscandoCep(false)
     }
   }
 
-  /** Debounce: geocodifica sozinho ao digitar endereço/cidade/estado, sem exigir clique. */
+  /** Debounce: geocodifica ao digitar endereço/cidade/estado (ex.: número após o CEP). */
   function agendarGeocodeReativo() {
     if (pinManualRef.current || !mapsConfigured) return
     if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
     geocodeTimerRef.current = setTimeout(() => {
       void geocodificar({ silent: true })
     }, 700)
+  }
+
+  function agendarAplicarLink(raw: string) {
+    if (linkTimerRef.current) clearTimeout(linkTimerRef.current)
+    const trimmed = raw.trim()
+    if (!trimmed || !isGoogleMapsUrl(trimmed)) return
+    if (trimmed === lastAppliedLinkRef.current) return
+    linkTimerRef.current = setTimeout(() => {
+      void aplicarLinkMaps(trimmed)
+    }, 650)
   }
 
   const latN = lat.trim() ? Number(lat) : null
@@ -496,8 +556,8 @@ function SedeLocalizacaoFields({
   const streetViewPreview =
     mapsConfigured && hasCoords
       ? buildStreetViewImageUrl(previewSede, {
-          width: 400,
-          height: 225,
+          width: 640,
+          height: 360,
           heading: svHeading,
           pitch: svPitch,
           fov: svFov,
@@ -513,6 +573,24 @@ function SedeLocalizacaoFields({
   const zoomPercent = Math.round(
     ((zoomSlider - SV_FOV_MIN) / (SV_FOV_MAX - SV_FOV_MIN)) * 100,
   )
+
+  useEffect(() => {
+    if (!hasCoords && mapPanelTab === 'street') setMapPanelTab('mapa')
+  }, [hasCoords, mapPanelTab])
+
+  function confirmarLocalizacaoNoMapa() {
+    if (!hasCoords) {
+      toast.error('Defina a localização no mapa antes de ajustar o Street View.')
+      return
+    }
+    setMapPanelTab('street')
+  }
+
+  function salvarFormularioLocalizacao() {
+    const form = document.getElementById(formId) as HTMLFormElement | null
+    if (!form) return
+    form.requestSubmit()
+  }
 
   useEffect(() => {
     return () => {
@@ -543,6 +621,7 @@ function SedeLocalizacaoFields({
   ) {
     setLat(String(coords.lat))
     setLng(String(coords.lng))
+    syncMapsLinkFromCoords(coords)
     if (origem === 'geo') setGeoStatus('ok')
     if (origem === 'link') setLinkStatus('ok')
     if (origem === 'search') setSearchStatus('ok')
@@ -562,6 +641,7 @@ function SedeLocalizacaoFields({
       endereco: String(fd.get('endereco') ?? ''),
       cidade: String(fd.get('cidade') ?? ''),
       estado: String(fd.get('estado') ?? ''),
+      cep: String(fd.get('cep') ?? cepRef.current?.value ?? ''),
     })
     if (!query) {
       setGeoStatus(opts?.silent ? 'idle' : 'error')
@@ -594,21 +674,30 @@ function SedeLocalizacaoFields({
         estadoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
       }
       if (endereco.cep && cepRef.current) {
-        cepRef.current.value = endereco.cep
-        cepRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+        const digitos = endereco.cep.replace(/\D/g, '')
+        cepRef.current.value =
+          digitos.length === 8 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : endereco.cep
+        // Sem dispatch de input: o onChange do CEP rodaria ViaCEP+geocode e
+        // sobrescreveria o pin preciso vindo do link.
       }
+      // Endereço veio do link/mapa — só sincroniza o link canônico (não reabre geocode).
+      syncMapsLinkFromCoords(coords)
+      markFormDirty(formId)
     })
   }
 
-  async function aplicarLinkMaps() {
-    const raw = mapsLink.trim()
+  async function aplicarLinkMaps(rawOverride?: string) {
+    const raw = (rawOverride ?? mapsLink).trim()
     if (!raw) {
       setLinkStatus('error')
       return
     }
+    if (raw === lastAppliedLinkRef.current && rawOverride) return
 
     const local = parseCoordsFromGoogleMapsUrl(raw)
     if (local) {
+      lastAppliedLinkRef.current = raw
+      if (rawOverride && rawOverride !== mapsLink) setMapsLink(rawOverride)
       aplicarCoords(local, 'link')
       preencherEnderecoDeCoords(local)
       return
@@ -621,6 +710,8 @@ function SedeLocalizacaoFields({
       toast.error(result.message)
       return
     }
+    lastAppliedLinkRef.current = raw
+    if (rawOverride && rawOverride !== mapsLink) setMapsLink(rawOverride)
     aplicarCoords({ lat: result.lat, lng: result.lng }, 'link')
     preencherEnderecoDeCoords({ lat: result.lat, lng: result.lng })
   }
@@ -832,8 +923,17 @@ function SedeLocalizacaoFields({
                   type="url"
                   value={mapsLink}
                   onChange={(e) => {
-                    setMapsLink(e.target.value)
+                    const value = e.target.value
+                    setMapsLink(value)
                     setLinkStatus('idle')
+                    agendarAplicarLink(value)
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text')
+                    if (pasted) {
+                      // Deixa o onChange rodar com o valor colado e agenda apply.
+                      requestAnimationFrame(() => agendarAplicarLink(pasted))
+                    }
                   }}
                   placeholder="https://maps.app.goo.gl/… ou maps.google.com/…"
                 />
@@ -891,7 +991,7 @@ function SedeLocalizacaoFields({
 
             {(linkStatus === 'ok' || searchStatus === 'ok' || geoStatus === 'ok') && (
               <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                Coordenadas atualizadas. Salve para publicar no mapa do portal.
+                Coordenadas atualizadas. Confirme no mapa e ajuste o Street View.
               </p>
             )}
             {geoStatus === 'error' && (
@@ -929,109 +1029,204 @@ function SedeLocalizacaoFields({
           </div>
         </div>
 
-        <div className="flex min-h-[20rem] flex-col lg:min-h-0">
+        <div className="flex min-h-[22rem] flex-col lg:min-h-0">
           {mapsConfigured ? (
             mapVisible ? (
-              <div className="flex min-h-[20rem] flex-1 flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-3 py-2">
-                  <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
-                    Mapa interativo
-                  </p>
-                  <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
-                    Clique ou arraste o pin
-                  </p>
+              <div className="flex min-h-[22rem] flex-1 flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+                <div
+                  role="tablist"
+                  aria-label="Mapa e Street View"
+                  className="flex shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/50"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mapPanelTab === 'mapa'}
+                    id="sede-map-tab-mapa"
+                    aria-controls="sede-map-panel-mapa"
+                    onClick={() => setMapPanelTab('mapa')}
+                    className={[
+                      'flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors',
+                      mapPanelTab === 'mapa'
+                        ? 'border-b-2 border-[rgb(var(--color-primary))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]'
+                        : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                    ].join(' ')}
+                  >
+                    <MapPin className="h-3.5 w-3.5" aria-hidden />
+                    Mapa
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mapPanelTab === 'street'}
+                    id="sede-map-tab-street"
+                    aria-controls="sede-map-panel-street"
+                    disabled={!hasCoords}
+                    title={
+                      hasCoords
+                        ? 'Ajustar fachada Street View'
+                        : 'Defina a localização no mapa primeiro'
+                    }
+                    onClick={() => {
+                      if (hasCoords) setMapPanelTab('street')
+                    }}
+                    className={[
+                      'flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                      mapPanelTab === 'street'
+                        ? 'border-b-2 border-[rgb(var(--color-primary))] bg-[rgb(var(--surface))] text-[rgb(var(--foreground))]'
+                        : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
+                    ].join(' ')}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" aria-hidden />
+                    Street View
+                  </button>
                 </div>
-                <div className="relative min-h-[18rem] flex-1">
-                  <SedeMapPicker
-                    lat={hasCoords ? latN : null}
-                    lng={hasCoords ? lngN : null}
-                    onPick={(coords) => aplicarCoords(coords, 'map')}
-                    className="absolute inset-0 h-full w-full rounded-none border-0"
-                  />
-                </div>
+
+                {mapPanelTab === 'mapa' ? (
+                  <div
+                    id="sede-map-panel-mapa"
+                    role="tabpanel"
+                    aria-labelledby="sede-map-tab-mapa"
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <div className="relative min-h-[14rem] flex-1 bg-[rgb(var(--background-subtle))]">
+                      <SedeMapPicker
+                        lat={hasCoords ? latN : null}
+                        lng={hasCoords ? lngN : null}
+                        onPick={(coords) => aplicarCoords(coords, 'map')}
+                        className="absolute inset-0 h-full w-full rounded-none border-0"
+                      />
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
+                      <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+                        {hasCoords
+                          ? 'Pin no lugar certo? Confirme para ajustar a fachada.'
+                          : 'Clique ou arraste o pin para marcar o local.'}
+                      </p>
+                      <button
+                        type="button"
+                        disabled={!hasCoords}
+                        onClick={confirmarLocalizacaoNoMapa}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Check className="h-3.5 w-3.5" aria-hidden />
+                        Confirmar localização
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    id="sede-map-panel-street"
+                    role="tabpanel"
+                    aria-labelledby="sede-map-tab-street"
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
+                          Fachada Street View
+                        </p>
+                        <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+                          Ajuste o enquadramento exibido nas listagens de unidades.
+                        </p>
+                      </div>
+                      {streetViewPreview ? (
+                        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+                          <Image
+                            src={streetViewPreview}
+                            alt="Prévia Street View"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 1024px) 100vw, 40vw"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex aspect-[16/9] items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] text-sm text-[rgb(var(--foreground-muted))]">
+                          Sem cobertura Street View neste ponto
+                        </div>
+                      )}
+                      <div className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 p-3">
+                        <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                          Direção ({svHeading}°)
+                          <input
+                            type="range"
+                            min={0}
+                            max={359}
+                            value={svHeading}
+                            onChange={(e) => {
+                              setSvHeading(Number(e.target.value))
+                              markFormDirty(formId)
+                            }}
+                            className="mt-1 w-full accent-[rgb(var(--primary))]"
+                          />
+                        </label>
+                        <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                          Inclinação ({svPitch}°)
+                          <input
+                            type="range"
+                            min={-45}
+                            max={45}
+                            value={svPitch}
+                            onChange={(e) => {
+                              setSvPitch(Number(e.target.value))
+                              markFormDirty(formId)
+                            }}
+                            className="mt-1 w-full accent-[rgb(var(--primary))]"
+                          />
+                        </label>
+                        <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                          Zoom ({zoomPercent}%)
+                          <input
+                            type="range"
+                            min={SV_FOV_MIN}
+                            max={SV_FOV_MAX}
+                            value={zoomSlider}
+                            onChange={(e) => {
+                              setSvFov(SV_FOV_MAX + SV_FOV_MIN - Number(e.target.value))
+                              markFormDirty(formId)
+                            }}
+                            className="mt-1 w-full accent-[rgb(var(--primary))]"
+                          />
+                        </label>
+                      </div>
+                      <FieldError errors={state.errors?.streetViewHeading} />
+                      <FieldError errors={state.errors?.streetViewPitch} />
+                      <FieldError errors={state.errors?.streetViewFov} />
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setMapPanelTab('mapa')}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                        Voltar ao mapa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={salvarFormularioLocalizacao}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] transition-opacity hover:opacity-90"
+                      >
+                        <Check className="h-3.5 w-3.5" aria-hidden />
+                        Salvar alterações
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex min-h-[20rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 text-sm text-[rgb(var(--foreground-muted))]">
+              <div className="flex min-h-[22rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 text-sm text-[rgb(var(--foreground-muted))]">
                 Abra a etapa Localização para o mapa
               </div>
             )
           ) : (
-            <div className="flex min-h-[20rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="flex min-h-[22rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
               Google Maps não configurado. Informe latitude e longitude manualmente.
             </div>
           )}
         </div>
       </div>
-
-      {mapsConfigured && hasCoords && streetViewPreview && (
-        <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 p-4">
-          <div>
-            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Street View</p>
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              Ajuste a fachada exibida no mapa e nas listagens de unidades.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <div className="relative aspect-[16/9] w-full max-w-sm shrink-0 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-              <Image
-                src={streetViewPreview}
-                alt="Prévia Street View"
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, 24rem"
-                unoptimized
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-3 sm:max-w-[14rem]">
-              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-                Direção ({svHeading}°)
-                <input
-                  type="range"
-                  min={0}
-                  max={359}
-                  value={svHeading}
-                  onChange={(e) => {
-                    setSvHeading(Number(e.target.value))
-                    markFormDirty(formId)
-                  }}
-                  className="mt-1 w-full accent-[rgb(var(--primary))]"
-                />
-              </label>
-              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-                Inclinação ({svPitch}°)
-                <input
-                  type="range"
-                  min={-45}
-                  max={45}
-                  value={svPitch}
-                  onChange={(e) => {
-                    setSvPitch(Number(e.target.value))
-                    markFormDirty(formId)
-                  }}
-                  className="mt-1 w-full accent-[rgb(var(--primary))]"
-                />
-              </label>
-              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-                Zoom ({zoomPercent}%)
-                <input
-                  type="range"
-                  min={SV_FOV_MIN}
-                  max={SV_FOV_MAX}
-                  value={zoomSlider}
-                  onChange={(e) => {
-                    setSvFov(SV_FOV_MAX + SV_FOV_MIN - Number(e.target.value))
-                    markFormDirty(formId)
-                  }}
-                  className="mt-1 w-full accent-[rgb(var(--primary))]"
-                />
-              </label>
-            </div>
-          </div>
-          <FieldError errors={state.errors?.streetViewHeading} />
-          <FieldError errors={state.errors?.streetViewPitch} />
-          <FieldError errors={state.errors?.streetViewFov} />
-        </div>
-      )}
 
       <input type="hidden" name="streetViewHeading" value={String(svHeading)} />
       <input type="hidden" name="streetViewPitch" value={String(svPitch)} />

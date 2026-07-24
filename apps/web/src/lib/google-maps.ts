@@ -37,8 +37,11 @@ export function buildGeocodeQuery(sede: {
   endereco?: string | null
   cidade?: string | null
   estado?: string | null
+  cep?: string | null
 }): string | null {
-  const partes = [sede.endereco, sede.cidade, sede.estado, 'Brasil'].filter(Boolean)
+  const cep = sede.cep?.replace(/\D/g, '')
+  const cepFmt = cep && cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : null
+  const partes = [sede.endereco, sede.cidade, sede.estado, cepFmt, 'Brasil'].filter(Boolean)
   if (partes.length <= 1) return null
   return partes.join(', ')
 }
@@ -57,6 +60,28 @@ export function isGoogleMapsShortUrl(raw: string): boolean {
       host === 'g.co' ||
       host.endsWith('.app.goo.gl')
     )
+  } catch {
+    return false
+  }
+}
+
+/** Qualquer URL do Google Maps (curta, place, search, @lat,lng…). */
+export function isGoogleMapsUrl(raw: string): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed) return false
+  if (isGoogleMapsShortUrl(trimmed)) return true
+  if (parseCoordsFromGoogleMapsUrl(trimmed)) return true
+  try {
+    const u = new URL(trimmed)
+    const host = u.hostname.toLowerCase()
+    if (host === 'maps.google.com' || host === 'maps.google.com.br') return true
+    if (
+      (host === 'www.google.com' || host === 'google.com' || host === 'www.google.com.br') &&
+      u.pathname.startsWith('/maps')
+    ) {
+      return true
+    }
+    return false
   } catch {
     return false
   }

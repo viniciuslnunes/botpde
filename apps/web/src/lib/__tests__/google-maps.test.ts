@@ -1,11 +1,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import {
   buildDirectionsUrl,
+  buildGeocodeQuery,
   buildGoogleMapsUrl,
   buildStreetViewImageUrl,
   getGoogleMapsMapId,
   isGoogleMapsConfigured,
   isGoogleMapsShortUrl,
+  isGoogleMapsUrl,
   parseCoordsFromGoogleMapsUrl,
   resolveSedeLocationImage,
   reverseGeocodeEndereco,
@@ -97,6 +99,26 @@ describe('google-maps', () => {
   it('reconhece links curtos do Maps', () => {
     expect(isGoogleMapsShortUrl('https://maps.app.goo.gl/abc123')).toBe(true)
     expect(isGoogleMapsShortUrl('https://www.google.com/maps/place/Foo')).toBe(false)
+  })
+
+  it('reconhece URLs longas do Maps', () => {
+    expect(
+      isGoogleMapsUrl(
+        'https://www.google.com/maps/search/?api=1&query=-23.5195922,-46.6453042',
+      ),
+    ).toBe(true)
+    expect(isGoogleMapsUrl('https://example.com/foo')).toBe(false)
+  })
+
+  it('inclui CEP na query de geocode', () => {
+    const q = buildGeocodeQuery({
+      endereco: 'Rua Aviador Bittencourt, 100',
+      cidade: 'São Vicente',
+      estado: 'SP',
+      cep: '11370120',
+    })
+    expect(q).toContain('11370-120')
+    expect(q).toContain('São Vicente')
   })
 
   it('extrai coords de URL completa do Maps', () => {
