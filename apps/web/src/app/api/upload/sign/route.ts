@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { assertMembroAtivo } from '@/lib/authz'
+import { assertMembroAtivo, assertPermission } from '@/lib/authz'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getCloudinaryConfig, signCloudinaryParams } from '@/lib/cloudinary'
 import { db } from '@torcida/db'
+import { PERMISSIONS } from '@torcida/types'
 
-const purposeSchema = z.enum(['comunidade', 'perfil-banner', 'perfil-avatar', 'cadastro'])
+const purposeSchema = z.enum([
+  'comunidade',
+  'perfil-banner',
+  'perfil-avatar',
+  'cadastro',
+  'sede',
+])
 
 const bodySchema = z.object({
   purpose: purposeSchema.optional(),
@@ -17,6 +24,7 @@ const bodySchema = z.object({
  * Gera assinatura para upload direto ao Cloudinary.
  * purpose define a pasta de destino.
  * `cadastro` — onboarding (comprovante de vínculo), sem exigir membro ativo.
+ * `sede` — foto de unidade; exige `SEDES_MANAGE`.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -57,6 +65,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Torcida não encontrada.' }, { status: 400 })
       }
       folder = `torcida/${torcida.id}/cadastro/${session.user.id}`
+    } else if (purpose === 'sede') {
+      const { tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
+      folder = `torcida/${tenant.id}/sedes`
     } else if (
       tenantIdCadastro
       && (purpose === 'perfil-banner' || purpose === 'perfil-avatar')

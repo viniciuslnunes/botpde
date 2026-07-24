@@ -43,6 +43,112 @@ export function buildGeocodeQuery(sede: {
   return partes.join(', ')
 }
 
+function coordsValidas(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+}
+
+/** Link curto do Maps que precisa de redirect para expor lat/lng na URL final. */
+export function isGoogleMapsShortUrl(raw: string): boolean {
+  try {
+    const host = new URL(raw.trim()).hostname.toLowerCase()
+    return (
+      host === 'maps.app.goo.gl' ||
+      host === 'goo.gl' ||
+      host === 'g.co' ||
+      host.endsWith('.app.goo.gl')
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Extrai lat/lng de URL completa do Google Maps, ou de "lat,lng" puro.
+ * Prefere `!3d!4d` (pin do lugar) sobre `@lat,lng` (centro do viewport).
+ */
+export function parseCoordsFromGoogleMapsUrl(
+  raw: string,
+): { lat: number; lng: number } | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+
+  const bare = trimmed.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/)
+  if (bare) {
+    const lat = Number(bare[1])
+    const lng = Number(bare[2])
+    if (coordsValidas(lat, lng)) return { lat, lng }
+  }
+
+  // !3dLAT!4dLNG — coordenada do lugar (antes de validar URL, cobre query encoded)
+  const bang = trimmed.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/)
+  if (bang) {
+    const lat = Number(bang[1])
+    const lng = Number(bang[2])
+    if (coordsValidas(lat, lng)) return { lat, lng }
+  }
+
+  let url: URL
+  try {
+    url = new URL(trimmed)
+  } catch {
+    return null
+  }
+
+  const at = `${url.pathname}${url.search}${url.hash}`.match(
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+  )
+  if (at) {
+    const lat = Number(at[1])
+    const lng = Number(at[2])
+    if (coordsValidas(lat, lng)) return { lat, lng }
+  }
+
+  for (const key of ['q', 'query', 'll', 'center', 'destination']) {
+    const v = url.searchParams.get(key)
+    if (!v) continue
+    const m = decodeURIComponent(v).match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+    if (!m) continue
+    const lat = Number(m[1])
+    const lng = Number(m[2])
+    if (coordsValidas(lat, lng)) return { lat, lng }
+  }
+
+  return null
+}
+
+/**
+ * Segue redirects de links curtos (`maps.app.goo.gl`, etc.) e devolve a URL final.
+ * Só faz sentido no servidor (CORS no browser).
+ */
+export async function expandGoogleMapsShortUrl(raw: string): Promise<string | null> {
+  const trimmed = raw.trim()
+  if (!trimmed || !isGoogleMapsShortUrl(trimmed)) return null
+  try {
+    const res = await fetch(trimmed, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; TorcidaSaaS/1.0)',
+        Accept: 'text/html',
+      },
+    })
+    return res.url?.trim() || null
+  } catch {
+    return null
+  }
+}
+
+/** Resolve coordenadas a partir de link (curto ou completo) do Google Maps. */
+export async function resolveCoordsFromGoogleMapsLink(
+  raw: string,
+): Promise<{ lat: number; lng: number } | null> {
+  const direct = parseCoordsFromGoogleMapsUrl(raw)
+  if (direct) return direct
+  const expanded = await expandGoogleMapsShortUrl(raw)
+  if (!expanded) return null
+  return parseCoordsFromGoogleMapsUrl(expanded)
+}
+
 /** Imagem estática Street View (fachada) quando há cobertura. */
 export function buildStreetViewImageUrl(
   sede: {
@@ -123,7 +229,11 @@ export type GoogleMapsNamespace = {
     ) => GoogleMapInstance
     LatLngBounds: new () => GoogleLatLngBounds
     event: {
-      addListener: (instance: object, eventName: string, handler: () => void) => { remove: () => void }
+      addListener: (
+        instance: object,
+        eventName: string,
+        handler: (...args: unknown[]) => void,
+      ) => { remove: () => void }
       clearInstanceListeners: (instance: object) => void
     }
   }

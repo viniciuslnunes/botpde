@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState, useTransition } from 'react'
+import { useId, useRef, useState, useTransition, type ChangeEvent } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -8,33 +8,39 @@ import {
   criarSede,
   editarSede,
   alterarStatusSede,
+  resolverCoordsDeLinkMaps,
   type SedeState,
 } from '@/app/admin/sedes/actions'
 import {
   Crosshair,
+  ImagePlus,
+  Link2,
   Loader2,
   MapPin,
   Power,
   PowerOff,
+  Search,
 } from 'lucide-react'
-import { FieldError, Input, Select, Textarea } from '@torcida/ui'
+import { FieldError, Input, Select, Textarea, toast } from '@torcida/ui'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import {
   buildGeocodeQuery,
   buildStreetViewImageUrl,
   geocodeLatLng,
   isGoogleMapsConfigured,
+  parseCoordsFromGoogleMapsUrl,
 } from '@/lib/google-maps'
+import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 
-const SedesMap = dynamic(
-  () => import('@/components/portal/sedes-map').then((m) => m.SedesMap),
+const SedeMapPicker = dynamic(
+  () => import('@/components/admin/sede-map-picker').then((m) => m.SedeMapPicker),
   {
     ssr: false,
     loading: () => (
-      <div className="h-44 w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]" />
+      <div className="h-52 w-full animate-pulse rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]" />
     ),
   },
 )
@@ -87,6 +93,11 @@ const FORM_LABELS: Record<string, string> = {
   lng: 'Longitude',
 }
 
+function markFormDirty(formId: string) {
+  const form = document.getElementById(formId) as HTMLFormElement | null
+  form?.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 function SedeLocalizacaoFields({
   formId,
   defaults,
@@ -99,7 +110,13 @@ function SedeLocalizacaoFields({
   const [lat, setLat] = useState(defaults?.lat != null ? String(defaults.lat) : '')
   const [lng, setLng] = useState(defaults?.lng != null ? String(defaults.lng) : '')
   const [fotoUrl, setFotoUrl] = useState(defaults?.fotoUrl ?? '')
+  const [mapsLink, setMapsLink] = useState('')
+  const [mapSearch, setMapSearch] = useState('')
   const [geoStatus, setGeoStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
+  const [linkStatus, setLinkStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const mapsConfigured = isGoogleMapsConfigured()
 
   const latN = lat.trim() ? Number(lat) : null
@@ -119,14 +136,20 @@ function SedeLocalizacaoFields({
   const streetViewUrl =
     previewSede.fotoUrl ??
     (mapsConfigured
-      ? buildStreetViewImageUrl(
-          {
-            ...previewSede,
-            // lê endereço atual do form se possível via DOM no render — usa defaults + coords
-          },
-          { width: 640, height: 280 },
-        )
+      ? buildStreetViewImageUrl(previewSede, { width: 640, height: 280 })
       : null)
+
+  function aplicarCoords(
+    coords: { lat: number; lng: number },
+    origem: 'geo' | 'link' | 'search' | 'map',
+  ) {
+    setLat(String(coords.lat))
+    setLng(String(coords.lng))
+    if (origem === 'geo') setGeoStatus('ok')
+    if (origem === 'link') setLinkStatus('ok')
+    if (origem === 'search') setSearchStatus('ok')
+    markFormDirty(formId)
+  }
 
   async function geocodificar() {
     const form = document.getElementById(formId) as HTMLFormElement | null
@@ -147,11 +170,78 @@ function SedeLocalizacaoFields({
       setGeoStatus('error')
       return
     }
-    setLat(String(coords.lat))
-    setLng(String(coords.lng))
-    setGeoStatus('ok')
-    // dispara input event para o tracked form marcar dirty
-    form.dispatchEvent(new Event('input', { bubbles: true }))
+    aplicarCoords(coords, 'geo')
+  }
+
+  async function aplicarLinkMaps() {
+    const raw = mapsLink.trim()
+    if (!raw) {
+      setLinkStatus('error')
+      return
+    }
+
+    const local = parseCoordsFromGoogleMapsUrl(raw)
+    if (local) {
+      aplicarCoords(local, 'link')
+      return
+    }
+
+    setLinkStatus('loading')
+    const result = await resolverCoordsDeLinkMaps(raw)
+    if (!result.ok) {
+      setLinkStatus('error')
+      toast.error(result.message)
+      return
+    }
+    aplicarCoords({ lat: result.lat, lng: result.lng }, 'link')
+  }
+
+  async function buscarNoMapa() {
+    const q = mapSearch.trim()
+    if (!q) {
+      setSearchStatus('error')
+      return
+    }
+    setSearchStatus('loading')
+    const coords = await geocodeLatLng(q.includes('Brasil') ? q : `${q}, Brasil`)
+    if (!coords) {
+      setSearchStatus('error')
+      toast.error('Não encontramos esse local. Tente outro termo ou um link do Maps.')
+      return
+    }
+    aplicarCoords(coords, 'search')
+  }
+
+  async function onFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione um arquivo de imagem.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Imagem muito grande. Máximo: 10MB.')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const url = await toast
+        .promise(uploadMediaToCloudinary(file, undefined, 'sede'), {
+          loading: 'Enviando foto…',
+          success: 'Foto enviada.',
+          error: (err) => (err instanceof Error ? err.message : 'Falha no upload.'),
+        })
+        .unwrap()
+      setFotoUrl(url)
+      markFormDirty(formId)
+    } catch {
+      // toast.promise já notificou
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -222,6 +312,91 @@ function SedeLocalizacaoFields({
         </div>
       </div>
 
+      <div className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 p-3">
+        <p className="text-[11px] text-[rgb(var(--foreground-muted))]">
+          Defina o pin no mapa: cole um link do Google Maps, busque o local ou clique no mapa.
+        </p>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Link do Google Maps
+            </label>
+            <Input
+              type="url"
+              value={mapsLink}
+              onChange={(e) => {
+                setMapsLink(e.target.value)
+                setLinkStatus('idle')
+              }}
+              placeholder="https://maps.app.goo.gl/… ou maps.google.com/…"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void aplicarLinkMaps()}
+            disabled={linkStatus === 'loading' || !mapsLink.trim()}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
+          >
+            {linkStatus === 'loading' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Link2 className="h-3.5 w-3.5" />
+            )}
+            Aplicar link
+          </button>
+        </div>
+
+        {mapsConfigured && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                Buscar no mapa
+              </label>
+              <Input
+                type="search"
+                value={mapSearch}
+                onChange={(e) => {
+                  setMapSearch(e.target.value)
+                  setSearchStatus('idle')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void buscarNoMapa()
+                  }
+                }}
+                placeholder="Ex: PDE Cubatão, SP"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void buscarNoMapa()}
+              disabled={searchStatus === 'loading' || !mapSearch.trim()}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
+            >
+              {searchStatus === 'loading' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Search className="h-3.5 w-3.5" />
+              )}
+              Buscar
+            </button>
+          </div>
+        )}
+
+        {(linkStatus === 'ok' || searchStatus === 'ok' || geoStatus === 'ok') && (
+          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+            Coordenadas atualizadas. Salve para publicar no mapa do portal.
+          </p>
+        )}
+        {geoStatus === 'error' && (
+          <p className="text-xs text-red-500" role="alert">
+            Não foi possível geocodificar o endereço. Use o link do Maps, a busca ou lat/lng.
+          </p>
+        )}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -253,63 +428,67 @@ function SedeLocalizacaoFields({
         </div>
       </div>
 
-      {geoStatus === 'error' && (
-        <p className="text-xs text-red-500" role="alert">
-          Não foi possível geocodificar. Confira endereço/cidade/UF ou preencha lat/lng manualmente.
-        </p>
-      )}
-      {geoStatus === 'ok' && (
-        <p className="text-xs text-emerald-600 dark:text-emerald-400">
-          Coordenadas atualizadas a partir do endereço.
-        </p>
+      {mapsConfigured && (
+        <SedeMapPicker
+          lat={hasCoords ? latN : null}
+          lng={hasCoords ? lngN : null}
+          onPick={(coords) => aplicarCoords(coords, 'map')}
+          className="h-52 w-full"
+        />
       )}
 
       <div>
         <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          URL da foto (opcional)
+          Foto (opcional)
         </label>
-        <Input
-          name="fotoUrl"
-          type="url"
-          value={fotoUrl}
-          onChange={(e) => setFotoUrl(e.target.value)}
-          placeholder="https://…"
-        />
-        <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
-          Se vazio, o portal usa Street View quando a chave do Maps estiver configurada.
-        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ImagePlus className="h-4 w-4" />
+            )}
+            {uploading ? 'Enviando…' : 'Enviar foto'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={onFileSelect}
+          />
+          <div className="min-w-0 flex-1">
+            <Input
+              name="fotoUrl"
+              type="url"
+              value={fotoUrl}
+              onChange={(e) => setFotoUrl(e.target.value)}
+              placeholder="Ou cole a URL da imagem (https://…)"
+            />
+            <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+              Prefira enviar a foto. Se vazio, o portal usa Street View quando o Maps estiver
+              configurado.
+            </p>
+          </div>
+        </div>
         <FieldError errors={state.errors?.fotoUrl} />
       </div>
 
-      {(streetViewUrl || hasCoords) && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {streetViewUrl && (
-            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-              <Image
-                src={streetViewUrl}
-                alt="Prévia da fachada"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 40vw"
-                unoptimized
-              />
-            </div>
-          )}
-          {hasCoords && (
-            <SedesMap
-              sedes={[
-                {
-                  id: defaults?.id ?? 'preview',
-                  nome: defaults?.nome ?? 'Local',
-                  lat: latN,
-                  lng: lngN,
-                },
-              ]}
-              selectedId={defaults?.id ?? 'preview'}
-              onSelect={() => undefined}
-              className="h-44 w-full lg:h-full lg:min-h-[11rem]"
-            />
-          )}
+      {streetViewUrl && (
+        <div className="relative aspect-[16/9] max-w-md overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+          <Image
+            src={streetViewUrl}
+            alt="Prévia da fachada"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 28rem"
+            unoptimized
+          />
         </div>
       )}
     </div>
@@ -355,11 +534,11 @@ function SedeFormFields({
           >
             <option value="SEDE">Sede</option>
             <option value="SUBSEDE">Subsede</option>
-            <option value="PONTO_ENCONTRO">Ponto de Encontro</option>
+            <option value="PONTO_ENCONTRO">PDE</option>
           </Select>
           <FieldError errors={state.errors?.tipo} />
           <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
-            Hierarquia: Sede → Subsede → Ponto de encontro
+            Hierarquia: Sede → Subsede → PDE
           </p>
         </div>
 
@@ -389,7 +568,7 @@ function SedeFormFields({
             <option value="">— Selecione a unidade pai —</option>
             {sedesPai.map((s) => (
               <option key={s.id} value={s.id}>
-                [{s.tipo === 'SEDE' ? 'Sede' : s.tipo === 'SUBSEDE' ? 'Subsede' : 'PE'}] {s.nome}
+                [{s.tipo === 'SEDE' ? 'Sede' : s.tipo === 'SUBSEDE' ? 'Subsede' : 'PDE'}] {s.nome}
               </option>
             ))}
           </Select>

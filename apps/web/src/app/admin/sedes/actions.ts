@@ -7,7 +7,7 @@ import {
   validarRebaixamentoComFilhos,
   type TipoSede,
 } from '@/lib/sede-regras'
-import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured } from '@/lib/google-maps'
+import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured, resolveCoordsFromGoogleMapsLink } from '@/lib/google-maps'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -339,6 +339,28 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   invalidateHierarchyCache(tenant.id)
+}
+
+export type ResolverMapsLinkResult =
+  | { ok: true; lat: number; lng: number }
+  | { ok: false; message: string }
+
+/** Resolve lat/lng a partir de link do Google Maps (completo ou curto). */
+export async function resolverCoordsDeLinkMaps(url: string): Promise<ResolverMapsLinkResult> {
+  await assertPermission(PERMISSIONS.SEDES_MANAGE)
+  const trimmed = url.trim()
+  if (!trimmed) {
+    return { ok: false, message: 'Cole um link do Google Maps.' }
+  }
+  const coords = await resolveCoordsFromGoogleMapsLink(trimmed)
+  if (!coords) {
+    return {
+      ok: false,
+      message:
+        'Não foi possível ler as coordenadas deste link. Abra o local no Maps, copie o link completo (ou use Buscar no mapa).',
+    }
+  }
+  return { ok: true, lat: coords.lat, lng: coords.lng }
 }
 
 /**

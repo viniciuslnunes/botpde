@@ -14,6 +14,8 @@ import { EditarSedeForm } from '@/components/admin/sede-forms'
 import { PromoverSedeButton } from '@/components/admin/promover-sede-button'
 import { KpiGrid, StatCard } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { labelTipoUnidade } from '@/lib/canais-shared'
+import { Badge } from '@torcida/ui'
 import { ArrowLeft, Calendar, MapPin, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -162,11 +164,16 @@ export default async function EditarSedePage({
           <ArrowLeft className="h-4 w-4" />
           Voltar para sedes
         </Link>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Editar sede</h1>
-        <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{sede.nome}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{sede.nome}</h1>
+          <Badge variant={sede.tipo === 'PONTO_ENCONTRO' ? 'success' : 'info'}>
+            {labelTipoUnidade(sede.tipo)}
+          </Badge>
+        </div>
         {semCoords && (
           <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-            Sem coordenadas — use “Geocodificar endereço” para aparecer no mapa do portal.
+            Sem coordenadas — cole um link do Google Maps, busque no mapa ou geocodifique o
+            endereço para aparecer no portal.
           </p>
         )}
       </div>

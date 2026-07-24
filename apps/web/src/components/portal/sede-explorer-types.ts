@@ -37,7 +37,7 @@ export type SedeExplorerItem = {
 export const TIPO_LABEL: Record<SedeTipo, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
-  PONTO_ENCONTRO: 'Ponto de Encontro',
+  PONTO_ENCONTRO: 'PDE',
 }
 
 export const TIPO_CLASS: Record<SedeTipo, string> = {

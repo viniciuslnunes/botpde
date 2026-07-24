@@ -251,7 +251,9 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
     setUnidadeId(sedeId)
     setUnidadeNaoListada(naoListada)
     limparErro()
-    avancarPara('vinculo', 'escolha')
+    // Quem escolheu organizada + unidade já pediu vínculo com a torcida —
+    // vai direto à solicitação de sócio (sem reoferecer comunidade nacional).
+    avancarPara('vinculo', 'socio')
   }
 
   function abrirModoSocio() {
@@ -1366,7 +1368,7 @@ function ListaUnidades({
   )
 }
 
-// ─── Passo 5: Vínculo (torcedor da torcida ou sócio) ────────────────────────────
+// ─── Passo 5: Vínculo (solicitação de sócio; atalho torcedor da torcida) ─────
 
 /** Máscara progressiva de telefone BR: (XX) XXXX-XXXX ou (XX) XXXXX-XXXX. */
 function maskTelefone(raw: string): string {
@@ -1800,13 +1802,26 @@ function PassoVinculo({
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-3">
         <BotaoPrimario
           onClick={() => enviar('SOCIO')}
           pending={pending || uploadPend}
           disabled={!imagemProva || !numeroAssociado || !anosSocio || !cep}
           label="Enviar solicitação"
         />
+        <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Não é sócio da organizada?{' '}
+          <button
+            type="button"
+            onClick={() => enviar('TORCEDOR')}
+            disabled={pending || unidadePendente}
+            className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            Entrar só como torcedor da torcida
+          </button>
+          {' '}
+          (sem aprovação nem mural exclusivo).
+        </p>
       </div>
       </div>
     )
@@ -1831,7 +1846,7 @@ function PassoVinculo({
 const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
-  PONTO_ENCONTRO: 'Ponto de encontro',
+  PONTO_ENCONTRO: 'PDE',
 }
 
 /** Info-box da unidade escolhida (ou pendente de cadastro), com link para o mapa. */

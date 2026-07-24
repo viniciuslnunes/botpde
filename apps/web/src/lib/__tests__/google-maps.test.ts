@@ -5,6 +5,8 @@ import {
   buildStreetViewImageUrl,
   getGoogleMapsMapId,
   isGoogleMapsConfigured,
+  isGoogleMapsShortUrl,
+  parseCoordsFromGoogleMapsUrl,
 } from '@/lib/google-maps'
 
 describe('google-maps', () => {
@@ -61,5 +63,27 @@ describe('google-maps', () => {
     })
     expect(url).toContain('google.com/maps/dir')
     expect(url).toContain(encodeURIComponent('-23.5,-46.6'))
+  })
+
+  it('reconhece links curtos do Maps', () => {
+    expect(isGoogleMapsShortUrl('https://maps.app.goo.gl/abc123')).toBe(true)
+    expect(isGoogleMapsShortUrl('https://www.google.com/maps/place/Foo')).toBe(false)
+  })
+
+  it('extrai coords de URL completa do Maps', () => {
+    expect(
+      parseCoordsFromGoogleMapsUrl(
+        'https://www.google.com/maps/place/Foo/@-23.895,-46.425,17z/data=!3d-23.8965!4d-46.4251',
+      ),
+    ).toEqual({ lat: -23.8965, lng: -46.4251 })
+
+    expect(
+      parseCoordsFromGoogleMapsUrl('https://www.google.com/maps?q=-23.5505,-46.6333'),
+    ).toEqual({ lat: -23.5505, lng: -46.6333 })
+
+    expect(parseCoordsFromGoogleMapsUrl('-23.55,-46.63')).toEqual({
+      lat: -23.55,
+      lng: -46.63,
+    })
   })
 })

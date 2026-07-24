@@ -10,7 +10,7 @@ import { useActionStateToast } from '@/lib/toast-action'
 const TIPO_SEDE_LABEL: Record<string, string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
-  PONTO_ENCONTRO: 'Ponto de Encontro',
+  PONTO_ENCONTRO: 'PDE',
 }
 
 type Props = {

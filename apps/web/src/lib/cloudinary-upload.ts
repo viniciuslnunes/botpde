@@ -9,7 +9,7 @@ const AVATAR_MAX_WIDTH = 1024
 const JPEG_QUALITY = 0.85
 const AVATAR_JPEG_QUALITY = 0.92
 
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro'
+type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede'
 
 interface SignResponse {
   cloudName: string
@@ -129,7 +129,11 @@ export async function uploadMediaToCloudinary(
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/')
   if (purpose !== 'comunidade' && isVideo) {
-    throw new Error('Apenas imagens são permitidas para o perfil.')
+    throw new Error(
+      purpose === 'sede'
+        ? 'Apenas imagens são permitidas para a foto da unidade.'
+        : 'Apenas imagens são permitidas para o perfil.',
+    )
   }
   if (purpose === 'cadastro' && !tenantId) {
     throw new Error('Torcida inválida para upload.')

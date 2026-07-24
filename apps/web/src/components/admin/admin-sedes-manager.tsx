@@ -47,7 +47,7 @@ type FiltroTipo = 'TODAS' | AdminSedeListItem['tipo'] | 'SEM_COORDS' | 'INATIVAS
 const TIPO_LABEL: Record<AdminSedeListItem['tipo'], string> = {
   SEDE: 'Sede',
   SUBSEDE: 'Subsede',
-  PONTO_ENCONTRO: 'Ponto de Encontro',
+  PONTO_ENCONTRO: 'PDE',
 }
 
 const TIPO_CLASS: Record<AdminSedeListItem['tipo'], string> = {
@@ -231,7 +231,7 @@ export function AdminSedesManager({
     { id: 'TODAS', label: 'Todas', count: contagens.TODAS },
     { id: 'SEDE', label: 'Sede', count: contagens.SEDE },
     { id: 'SUBSEDE', label: 'Subsede', count: contagens.SUBSEDE },
-    { id: 'PONTO_ENCONTRO', label: 'Ponto', count: contagens.PONTO_ENCONTRO },
+    { id: 'PONTO_ENCONTRO', label: 'PDE', count: contagens.PONTO_ENCONTRO },
     { id: 'SEM_COORDS', label: 'Sem mapa', count: semCoordsCount },
     { id: 'INATIVAS', label: 'Inativas', count: inativasCount },
   ]
