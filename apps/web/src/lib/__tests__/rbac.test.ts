@@ -17,6 +17,7 @@ import {
   MAX_VICE_PRESIDENTES,
   PERMISSIONS,
   podeTerVice,
+  podeCriarUnidadeTerritorial,
   permissionsOfRole,
   rotuloCargoMaximo,
   rotuloCargoSistema,
@@ -172,6 +173,12 @@ describe('perfil de sistema Vice', () => {
     expect(podeTerVice('SEDE')).toBe(true)
     expect(podeTerVice('SUBSEDE')).toBe(false)
     expect(podeTerVice('PONTO_ENCONTRO')).toBe(false)
+  })
+
+  it('criar unidade territorial só na Sede principal', () => {
+    expect(podeCriarUnidadeTerritorial('SEDE')).toBe(true)
+    expect(podeCriarUnidadeTerritorial('SUBSEDE')).toBe(false)
+    expect(podeCriarUnidadeTerritorial('PONTO_ENCONTRO')).toBe(false)
   })
 })
 

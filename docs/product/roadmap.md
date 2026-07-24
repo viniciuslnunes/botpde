@@ -91,4 +91,7 @@ rivalidade e recomendações) · **I. Informação do nicho** 🆕 ·
 **M. Comunidade Nacional / torcedor global** ✅ entregue — shell dual Nacional ×
 Torcida (2026-07-22); ver `dominio.md` e `docs/data/modulo-comunidade.md` · **N. Controle de acesso por Departamentos**
 ✅ entregue, ver `docs/data/modulo-departamentos.md` · **O. Performance Comunidade**
-✅ ondas A–B (`0dca679`); manutenção e Fases C–F em `docs/data/modulo-comunidade-performance.md`.
+✅ ondas A–B (`0dca679`); manutenção e Fases C–F em `docs/data/modulo-comunidade-performance.md` ·
+**P. Media crop / localização** 🔄 padrão entregue em sedes/eventos/loja/bar/perfil/canais/grupos/mural;
+backlog (onboarding comprovante, stories 9:16, etc.) em
+`docs/frontend/media-upload-crop.md`.

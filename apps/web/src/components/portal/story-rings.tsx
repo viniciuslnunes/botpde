@@ -6,6 +6,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { toast } from '@torcida/ui'
 import { Avatar } from './avatar'
 import { StoryViewer } from './story-viewer'
+import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { publicarMomentoStory } from '@/app/portal/comunidade/actions'
 import type { StoryRingItem } from '@/lib/stories'
@@ -31,7 +32,19 @@ export function StoryRings({
   const meuRing = rings.find((r) => r.userId === currentUserId)
   const outrosRings = rings.filter((r) => r.userId !== currentUserId)
 
-  function publicar(file: File) {
+  async function publicarUrl(url: string) {
+    const result = await publicarMomentoStory(url)
+    if (!result.success) {
+      toast.error(result.message ?? 'Não foi possível publicar o momento.', {
+        id: 'story-upload',
+      })
+      return
+    }
+    toast.success('Momento publicado! Expira em 24h.', { id: 'story-upload' })
+    window.location.reload()
+  }
+
+  function publicarArquivo(file: File) {
     startTransition(async () => {
       try {
         const url = await toast
@@ -42,30 +55,53 @@ export function StoryRings({
             id: 'story-upload',
           })
           .unwrap()
-        const result = await publicarMomentoStory(url)
-        if (!result.success) {
-          toast.error(result.message ?? 'Não foi possível publicar o momento.', {
-            id: 'story-upload',
-          })
-          return
-        }
-        toast.success('Momento publicado! Expira em 24h.', { id: 'story-upload' })
-        window.location.reload()
+        await publicarUrl(url)
       } catch {
         // erro já notificado
       }
     })
   }
 
+  const crop = useCroppedImageUpload({
+    aspect: 9 / 16,
+    title: 'Ajustar momento',
+    confirmLabel: 'Publicar',
+    onDone: ({ url }) => {
+      if (!url) return
+      startTransition(async () => {
+        try {
+          await publicarUrl(url)
+        } catch {
+          // erro já notificado
+        }
+      })
+    },
+  })
+
+  function onArquivoEscolhido(file: File) {
+    if (file.type.startsWith('video/')) {
+      publicarArquivo(file)
+      return
+    }
+    if (file.type.startsWith('image/')) {
+      crop.open(file)
+      return
+    }
+    toast.error('Selecione uma imagem ou um vídeo.')
+  }
+
   if (rings.length === 0 && !currentUserId) return null
+
+  const ocupado = pending || crop.busy
 
   return (
     <>
+      {crop.dialog}
       <div className="app-scrollbar-none flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {currentUserId && (
           <m.button
             type="button"
-            disabled={pending}
+            disabled={ocupado}
             onClick={() => inputRef.current?.click()}
             whileTap={{ scale: 0.92 }}
             transition={springSnappy}
@@ -78,7 +114,7 @@ export function StoryRings({
                 </div>
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[rgb(var(--primary))] p-0.5 text-white">
-                {pending ? (
+                {ocupado ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Plus className="h-3 w-3" />
@@ -95,7 +131,7 @@ export function StoryRings({
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) publicar(file)
+                if (file) onArquivoEscolhido(file)
                 e.target.value = ''
               }}
             />

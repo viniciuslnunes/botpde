@@ -14,7 +14,7 @@ type TlsSystemCaApi = {
   setDefaultCACertificates?: (certs: readonly string[]) => void
 }
 
-export function useSystemCaCertificates(): void {
+export function applySystemCaCertificates(): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync bootstrap before any TLS
   const tls = require('node:tls') as TlsSystemCaApi
   const { getCACertificates, setDefaultCACertificates } = tls

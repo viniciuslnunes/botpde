@@ -69,6 +69,7 @@ export async function promoverSedeParaTenant(params: {
       tenantId: true,
       sedeId: true,
       responsavelUserId: true,
+      canalConversaId: true,
     },
   })
 
@@ -244,6 +245,17 @@ export async function promoverSedeParaTenant(params: {
         sedeId: sede.id,
       },
     })
+
+    // Owner do novo tenant é dono da própria unidade — sem isso ele ficava de
+    // fora do canal oficial dela até pedir entrada manualmente (mesmo bug do
+    // FIEL CUBATÃO em promoverUnidadeAPortal / vincularMembroCanaisAposAprovacao).
+    if (sede.canalConversaId) {
+      await tx.membroConversa.upsert({
+        where: { conversaId_userId: { conversaId: sede.canalConversaId, userId: ownerUserId } },
+        create: { conversaId: sede.canalConversaId, userId: ownerUserId, papel: 'ADMIN' },
+        update: { papel: 'ADMIN', saiuEm: null },
+      })
+    }
 
     await tx.auditLog.create({
       data: {

@@ -13,8 +13,11 @@ import { FieldError, Input, Textarea, SubmitButton } from '@torcida/ui'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
+import { ImageUploadField } from '@/components/media/image-upload-field'
 
 function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
+  const [imagemUrl, setImagemUrl] = useState(initial?.imagemUrl ?? '')
+
   return (
     <>
       {state.message && (
@@ -52,18 +55,16 @@ function PostFields({ state, initial }: { state: PostState; initial?: Post }) {
         <FieldError errors={state.errors?.conteudo} />
       </div>
 
-      <div>
-        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          URL da imagem (opcional)
-        </label>
-        <Input
-          name="imagemUrl"
-          type="url"
-          defaultValue={initial?.imagemUrl ?? ''}
-          placeholder="https://..."
-        />
-        <FieldError errors={state.errors?.imagemUrl} />
-      </div>
+      <ImageUploadField
+        name="imagemUrl"
+        label="Imagem (opcional)"
+        value={imagemUrl}
+        onChange={setImagemUrl}
+        aspect={16 / 9}
+        purpose="comunidade"
+        fieldErrors={state.errors?.imagemUrl}
+        buttonLabel="Enviar imagem"
+      />
     </>
   )
 }

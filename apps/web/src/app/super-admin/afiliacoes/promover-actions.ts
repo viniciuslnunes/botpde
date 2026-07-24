@@ -186,6 +186,7 @@ export async function promoverUnidadeAPortal(
           create: {
             tenantId: novoTenant.id,
             userId: ownerUserId,
+            sedeId: sede.id,
             tipo: 'SOCIO',
             nome: ownerUser?.nome ?? sede.nome,
             status: 'APROVADO',
@@ -193,7 +194,7 @@ export async function promoverUnidadeAPortal(
             aprovadoPorNome: session.user.name ?? 'Super-admin',
             aprovadoEm: new Date(),
           },
-          update: {},
+          update: { sedeId: sede.id },
         })
 
         await vincularMembroCanaisAposAprovacao({

@@ -3,6 +3,7 @@ import {
   tiposPaiPermitidos,
   validarHierarquiaSede,
   validarRebaixamentoComFilhos,
+  isPaiHerdadoDeTorcidaPrincipal,
 } from '@/lib/sede-regras'
 
 describe('sede-regras', () => {
@@ -48,5 +49,12 @@ describe('sede-regras', () => {
     expect(tiposPaiPermitidos('SEDE')).toBeNull()
     expect(tiposPaiPermitidos('SUBSEDE')).toEqual(['SEDE'])
     expect(tiposPaiPermitidos('PONTO_ENCONTRO')).toEqual(['SEDE', 'SUBSEDE'])
+  })
+
+  it('detecta pai herdado da torcida principal (Caso B)', () => {
+    expect(isPaiHerdadoDeTorcidaPrincipal('tenant-mae', 'tenant-filho')).toBe(true)
+    expect(isPaiHerdadoDeTorcidaPrincipal('tenant-a', 'tenant-a')).toBe(false)
+    expect(isPaiHerdadoDeTorcidaPrincipal(null, 'tenant-a')).toBe(false)
+    expect(isPaiHerdadoDeTorcidaPrincipal(undefined, 'tenant-a')).toBe(false)
   })
 })

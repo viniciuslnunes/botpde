@@ -105,6 +105,34 @@ function fallbackTenantSlug(host: string): string | null {
 }
 
 /**
+ * Fallback do logo do tenant: sem Tenant.logoUrl (marca não configurada em
+ * Design), usa a foto da Sede raiz (matriz) e, por fim, o avatar do canal
+ * oficial — mesma cascata usada na topbar do portal (resolverContextoComunidade),
+ * agora também no header do admin, para refletir a foto da sede assim que salva.
+ */
+export async function resolveTenantLogoUrl(
+  tenantId: string,
+  tenantLogoUrl: string | null,
+): Promise<string | null> {
+  if (tenantLogoUrl) return tenantLogoUrl
+
+  const sedesDoTenant: Array<{ id: string; sedeId: string | null; fotoUrl: string | null }> =
+    await db.sede.findMany({
+      where: { tenantId },
+      select: { id: true, sedeId: true, fotoUrl: true },
+    })
+  const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
+  const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
+  if (raiz?.fotoUrl) return raiz.fotoUrl
+
+  const canalOficial: { avatarUrl: string | null } | null = await db.conversa.findFirst({
+    where: { tenantId, tipo: 'CANAL', canalOficial: true },
+    select: { avatarUrl: true },
+  })
+  return canalOficial?.avatarUrl ?? null
+}
+
+/**
  * URL base do portal de uma torcida (subdomínio quando ROOT_DOMAIN existe).
  * Retorna path relativo quando a torcida é a do deploy atual (TENANT_SLUG).
  */

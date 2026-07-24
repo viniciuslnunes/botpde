@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -16,7 +16,6 @@ import {
   LogOut,
   Check,
   X,
-  Camera,
   Settings,
   Inbox,
   UserMinus,
@@ -43,7 +42,8 @@ import {
 import { ComunidadeTabBar } from '../../_components/comunidade-tab-bar'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import { Avatar } from '@/components/portal/avatar'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { springSnappy } from '@/lib/motion-presets'
 import {
   criarPreviewOtimista,
@@ -94,7 +94,6 @@ export function GrupoDetalheClient({
   tabInicial = 'mural',
 }: GrupoDetalheClientProps) {
   const router = useRouter()
-  const fotoRef = useRef<HTMLInputElement>(null)
   const [grupo, setGrupo] = useState(grupoInicial)
   const [pedidos, setPedidos] = useState(pedidosIniciais)
   const [membros, setMembros] = useState(membrosIniciais)
@@ -106,7 +105,6 @@ export function GrupoDetalheClient({
   const [nomeEdit, setNomeEdit] = useState(grupoInicial.nome ?? '')
   const [descEdit, setDescEdit] = useState(grupoInicial.descricao ?? '')
   const [publicaEdit, setPublicaEdit] = useState(grupoInicial.publica)
-  const [uploadingFoto, setUploadingFoto] = useState(false)
   const [codigoConvite, setCodigoConvite] = useState(grupoInicial.codigoConvite)
   const [somenteAdminEdit, setSomenteAdminEdit] = useState(grupoInicial.somenteAdminPublica)
   const [pendingMembership, startMembership] = useTransition()
@@ -118,6 +116,25 @@ export function GrupoDetalheClient({
   const [carregandoMais, setCarregandoMais] = useState(false)
   const [buscaMembros, setBuscaMembros] = useState('')
   const confirmAction = useConfirmAction()
+  const [removendoFoto, setRemovendoFoto] = useState(false)
+  const crop = useCroppedImageUpload({
+    aspect: 1,
+    purpose: 'comunidade',
+    title: 'Ajustar foto do grupo',
+    onDone: async ({ url }) => {
+      if (!url) return
+      await atualizarGrupo({
+        conversaId: grupo.id,
+        nome: (grupo.nome ?? nomeEdit).trim() || 'Grupo',
+        descricao: grupo.descricao,
+        publica: grupo.publica,
+        avatarUrl: url,
+      })
+      setGrupo((g) => ({ ...g, avatarUrl: url }))
+      toast.success('Foto do grupo atualizada.')
+    },
+  })
+  const uploadingFoto = crop.busy || removendoFoto
 
   function irParaAba(id: GrupoAba) {
     setAba(id)
@@ -360,34 +377,16 @@ export function GrupoDetalheClient({
     })
   }
 
-  async function onFotoChange(file: File | null) {
-    if (!file) return
+  function onFotoChange(file: File) {
     if (!file.type.startsWith('image/')) {
       toast.error('Selecione uma imagem.')
       return
     }
-    setUploadingFoto(true)
-    try {
-      const url = await uploadMediaToCloudinary(file, undefined, 'comunidade')
-      await atualizarGrupo({
-        conversaId: grupo.id,
-        nome: (grupo.nome ?? nomeEdit).trim() || 'Grupo',
-        descricao: grupo.descricao,
-        publica: grupo.publica,
-        avatarUrl: url,
-      })
-      setGrupo((g) => ({ ...g, avatarUrl: url }))
-      toast.success('Foto do grupo atualizada.')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha no upload.')
-    } finally {
-      setUploadingFoto(false)
-      if (fotoRef.current) fotoRef.current.value = ''
-    }
+    crop.open(file)
   }
 
   async function removerFoto() {
-    setUploadingFoto(true)
+    setRemovendoFoto(true)
     try {
       await atualizarGrupo({
         conversaId: grupo.id,
@@ -401,7 +400,7 @@ export function GrupoDetalheClient({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível remover.')
     } finally {
-      setUploadingFoto(false)
+      setRemovendoFoto(false)
     }
   }
 
@@ -448,6 +447,8 @@ export function GrupoDetalheClient({
     : [{ kind: 'button' as const, id: 'sobre', label: 'Sobre' }]
 
   return (
+    <>
+      {crop.dialog}
     <div className="space-y-4">
       <m.header
         initial={{ opacity: 0, y: 8 }}
@@ -747,43 +748,29 @@ export function GrupoDetalheClient({
               </h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <GrupoAvatar nome={grupo.nome} avatarUrl={grupo.avatarUrl} size="xl" />
-              <div className="space-y-2">
-                <p className="text-sm text-[rgb(var(--foreground-muted))]">Foto do grupo</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={uploadingFoto || pendingConfig}
-                    onClick={() => fotoRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                  >
-                    {uploadingFoto ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                    {grupo.avatarUrl ? 'Trocar foto' : 'Adicionar foto'}
-                  </button>
-                  {grupo.avatarUrl && (
-                    <button
-                      type="button"
-                      disabled={uploadingFoto || pendingConfig}
-                      onClick={() => void removerFoto()}
-                      className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                    >
-                      Remover
-                    </button>
-                  )}
-                </div>
-                <input
-                  ref={fotoRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => void onFotoChange(e.target.files?.[0] ?? null)}
-                />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <GrupoAvatar nome={grupo.nome} avatarUrl={grupo.avatarUrl} size="xl" />
+                <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                  Foto atual do grupo — troque abaixo.
+                </p>
               </div>
+              <ImageDropZone
+                label="Foto do grupo"
+                busy={uploadingFoto || pendingConfig}
+                formatsHint="JPEG, PNG ou WebP — ajuste 1:1 antes do envio"
+                file={
+                  grupo.avatarUrl
+                    ? {
+                        name: 'foto-grupo.jpg',
+                        status: uploadingFoto ? 'uploading' : 'done',
+                        previewUrl: grupo.avatarUrl,
+                      }
+                    : null
+                }
+                onClear={grupo.avatarUrl ? () => void removerFoto() : undefined}
+                onFile={onFotoChange}
+              />
             </div>
 
             <form onSubmit={salvarConfig} className="space-y-4">
@@ -1028,6 +1015,7 @@ export function GrupoDetalheClient({
         )}
       </AnimatePresence>
     </div>
+    </>
   )
 }
 

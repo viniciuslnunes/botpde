@@ -209,6 +209,8 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   `SaasMembro.departamentoId` **sem** membership até aprovação da diretoria.
   Ver `docs/data/modulo-departamentos.md` § preferência ≠ membership.
   Copy do wizard: “Informativo para a diretoria — só entra na equipe após aprovação.”
+  **Foto-prova / provas de unidade:** crop 4:3 via `useCroppedImageUpload`
+  (`purpose: cadastro`) antes do upload — ver `docs/frontend/media-upload-crop.md`.
 - Tela de pendência reaproveita `apps/web/src/app/portal/cadastro/page.tsx`.
 - Server Actions com `assertPermission` nas mutações administrativas + `AuditLog`.
 - **Admin `/admin/membros`:** coluna Departamento + diálogo “Aprovar e incluir em X?”

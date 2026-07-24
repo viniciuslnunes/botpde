@@ -12,6 +12,7 @@ import {
 import type { BarActionState } from '@/app/admin/bar/actions'
 import type { BarProdutoSerializado } from '@/lib/bar-serialize'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { ImageUploadField } from '@/components/media/image-upload-field'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
@@ -145,23 +146,19 @@ function ProdutoBarFormFields({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Imagem</label>
-        <div className="mt-2 flex items-start gap-4">
-          <ProdutoImagem src={imagemUrl || null} alt="Prévia" variant="thumb" />
-          <div className="flex-1 space-y-1">
-            <input
-              name="imagemUrl"
-              data-unsaved-label="Imagem"
-              type="url"
-              value={imagemUrl}
-              onChange={(e) => setImagemUrl(e.target.value)}
-              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-              placeholder="URL da imagem (https://...)"
-            />
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">Opcional.</p>
-          </div>
-        </div>
-        <FieldError errors={state.fieldErrors?.imagemUrl} />
+        <ImageUploadField
+          name="imagemUrl"
+          label="Imagem"
+          value={imagemUrl}
+          onChange={setImagemUrl}
+          aspect={1}
+          purpose="comunidade"
+          unsavedLabel="Imagem"
+          fieldErrors={state.fieldErrors?.imagemUrl}
+          buttonLabel="Enviar imagem"
+          hint="Opcional — ajuste o enquadramento antes do upload."
+          preview={<ProdutoImagem src={imagemUrl || null} alt="Prévia" variant="thumb" />}
+        />
       </div>
 
       <div className="flex flex-wrap gap-6">

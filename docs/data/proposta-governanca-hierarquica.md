@@ -105,6 +105,28 @@ já que Caso B satisfaz R1/R2/R3. Registrado como opção futura em `ARCHITECTUR
   **read-only** nas unidades da worktree — nunca escrita.
 - Definir quem, na subsede, é a "diretoria local" (cargos de sistema do tenant-filho).
 
+**Liderança real (Role) é sempre por tenant — nunca escopada por unidade
+dentro do mesmo tenant (2026-07-24).** `UserRole`/`UserDepartamento` valem
+para o tenant inteiro em que foram concedidos; não existe hoje um "admin
+escopado à Subsede/PDE X" dentro do tenant-mãe. Consequência aceita: uma
+mesma pessoa pode ser liderança (OWNER/ADMIN) da sua unidade promovida
+(Caso B — tenant próprio) **e**, separadamente, `Gestor · Financeiro` (ou
+outro perfil) no tenant da Sede-mãe — são dois vínculos independentes, um
+por tenant. Para unidades Caso A (Subsede/PDE dentro do tenant-mãe), a única
+"liderança" formal é `Sede.responsavelUserId` (campo informativo — não
+concede permissão), mais o papel `ADMIN` do `MembroConversa` no canal
+oficial da unidade (escopado ao canal, não ao tenant). Se um dia for preciso
+admin real escopado por unidade dentro do mesmo tenant, é desenho de RBAC
+novo — não existe hoje (consultar agente `rbac` antes de implementar).
+
+Corrigido no mesmo dia: os três caminhos que criam/promovem uma unidade
+(`aprovarSolicitacao`→`criarUnidadeDaSolicitacao`, `promoverSedeAction`→
+`promoverSedeParaTenant`, `promoverUnidadeAPortal`) e os dois que atribuem
+liderança fora deles (`criarSede`/`editarSede` via `responsavelUserId`,
+concessão de OWNER/ADMIN em `/admin/acessos`) agora vinculam a liderança
+como `MembroConversa` ADMIN do canal oficial da unidade — antes ficava de
+fora até pedir entrada manualmente.
+
 ### 4.3 Visibilidade (agente `data-model` + `hierarquia.ts`)
 - **R3 — NÃO gatear `getAncestorTenantIds`.** (Correção pós-validação `data-model`.)
   Essa função só devolve IDs de ancestrais; a limitação a PÚBLICO já vem de

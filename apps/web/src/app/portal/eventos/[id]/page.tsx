@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { RsvpButtons } from './rsvp-buttons'
@@ -73,7 +73,8 @@ export default async function EventoDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   if (!tenant) notFound()
 
   const evento = await getEventoEmbarque(tenant.id, id)

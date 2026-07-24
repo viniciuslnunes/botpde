@@ -43,6 +43,16 @@ const navLinks = [
   { href: '/portal/loja', label: 'Loja', icon: ShoppingBag, prefetch: 'hover' as const },
 ] as const
 
+/** Torcedor global (modo nacional) não tem torcida ativa — essas seções são
+ * por tenant e ficariam vazias para ele. Escondidas até definirmos o que faz
+ * sentido oferecer nesse modo. */
+const LINKS_SOMENTE_TORCIDA = new Set([
+  '/portal/carteirinha',
+  '/portal/eventos',
+  '/portal/sedes',
+  '/portal/loja',
+])
+
 /** Único atalho de departamentos na navbar (não lista cada área). */
 const departamentosLink = {
   href: '/portal/departamentos',
@@ -106,7 +116,7 @@ export function PortalNavbar({
 
   const firstName = userName?.split(' ')[0] ?? 'Torcedor'
   const baseLinks = modoNacional
-    ? navLinks.filter((link) => link.href !== '/portal/carteirinha')
+    ? navLinks.filter((link) => !LINKS_SOMENTE_TORCIDA.has(link.href))
     : [...navLinks]
   // Departamentos no meio do fluxo operacional (após Comunidade), não no fim.
   const links = temDepartamentos
@@ -144,15 +154,22 @@ export function PortalNavbar({
             {brandTenant.logoUrl ? (
               canOptimizeImageUrl(brandTenant.logoUrl) ? (
                 <Image
+                  key={brandTenant.logoUrl}
                   src={brandTenant.logoUrl}
                   alt={brandTenant.nome}
-                  width={28}
-                  height={28}
+                  width={56}
+                  height={56}
+                  quality={95}
                   className="h-7 w-7 shrink-0 rounded-lg object-contain"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={brandTenant.logoUrl} alt={brandTenant.nome} className="h-7 w-7 shrink-0 rounded-lg object-contain" />
+                <img
+                  key={brandTenant.logoUrl}
+                  src={brandTenant.logoUrl}
+                  alt={brandTenant.nome}
+                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
+                />
               )
             ) : (
               <div

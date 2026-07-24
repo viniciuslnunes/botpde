@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { db, withDbRetry } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { getEscopoEventosVisiveis, diasParaEvento } from '@/lib/eventos'
 import {
   EventosListAnimated,
@@ -113,7 +113,8 @@ export default async function EventosPage({ searchParams }: Props) {
     sp.vista === 'lista' || sp.vista === 'semana' ? sp.vista : 'mes'
   const q = (sp.q ?? '').trim()
 
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
 
   let podeCriar = false
   let sedes: Awaited<ReturnType<typeof listSedesAtivasParaEvento>> = []
@@ -267,7 +268,8 @@ async function AgendaConteudo({
   q: string
   dataRef?: string
 }) {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   if (!tenant) return null
 
   const agora = new Date()

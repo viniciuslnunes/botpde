@@ -5,15 +5,16 @@ import { wouldCreateSedeCycle, invalidateHierarchyCache } from '@/lib/hierarquia
 import {
   validarHierarquiaSede,
   validarRebaixamentoComFilhos,
+  isPaiHerdadoDeTorcidaPrincipal,
   type TipoSede,
 } from '@/lib/sede-regras'
-import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured, resolveCoordsFromGoogleMapsLink } from '@/lib/google-maps'
+import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured } from '@/lib/google-maps'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
-import { ensureCanalOficialParaSede } from '@/lib/canais'
-import { PERMISSIONS } from '@torcida/types'
+import { ensureCanalOficialParaSede, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
+import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
 
@@ -132,16 +133,24 @@ async function resolverResponsavelUser(
 async function resolverPai(
   sedePaiId: string | null,
   tenantId: string,
+  opts?: { permitirPaiExternoId?: string | null },
 ): Promise<{ pai: { id: string; tipo: TipoSede; tenantId: string | null } | null; error?: string }> {
   if (!sedePaiId) return { pai: null }
   const pai = await db.sede.findUnique({
     where: { id: sedePaiId },
     select: { id: true, tipo: true, tenantId: true },
   })
-  if (!pai || pai.tenantId !== tenantId) {
+  if (!pai) {
     return { pai: null, error: 'Sede pai não encontrada.' }
   }
-  return { pai: { id: pai.id, tipo: pai.tipo as TipoSede, tenantId: pai.tenantId } }
+  if (pai.tenantId === tenantId) {
+    return { pai: { id: pai.id, tipo: pai.tipo as TipoSede, tenantId: pai.tenantId } }
+  }
+  // Caso B: preservar vínculo já materializado com a torcida principal.
+  if (opts?.permitirPaiExternoId && sedePaiId === opts.permitirPaiExternoId) {
+    return { pai: { id: pai.id, tipo: pai.tipo as TipoSede, tenantId: pai.tenantId } }
+  }
+  return { pai: null, error: 'Sede pai não encontrada.' }
 }
 
 export async function criarSede(
@@ -149,6 +158,19 @@ export async function criarSede(
   formData: FormData,
 ): Promise<SedeState> {
   const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
+
+  // Só a Sede principal expande a hierarquia — subsede/PDE (Caso B) editam
+  // a própria unidade com SEDES_MANAGE, mas não adicionam locais.
+  const sedeRaiz: { tipo: string } | null = await db.sede.findFirst({
+    where: { tenantId: tenant.id, tipo: 'SEDE' },
+    select: { tipo: true },
+  })
+  if (!podeCriarUnidadeTerritorial(sedeRaiz?.tipo ?? 'PONTO_ENCONTRO')) {
+    return {
+      message:
+        'Apenas administradores da sede principal podem adicionar locais na hierarquia.',
+    }
+  }
 
   const parsed = sedeSchema.safeParse(parseSedeForm(formData))
   if (!parsed.success) {
@@ -194,6 +216,12 @@ export async function criarSede(
     canalConversaId = canal.id
   }
 
+  await vincularResponsavelAoCanalDaSede({
+    sedeId: sede.id,
+    canalConversaId,
+    responsavelUserId: resp.userId,
+  })
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -212,6 +240,8 @@ export async function criarSede(
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath('/portal/comunidade/canais')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
 }
@@ -232,6 +262,9 @@ export async function editarSede(
     where: { id: sedeId },
     select: {
       tenantId: true,
+      sedeId: true,
+      tipo: true,
+      canalConversaId: true,
       filhos: { select: { tipo: true } },
     },
   })
@@ -239,8 +272,25 @@ export async function editarSede(
     return { message: 'Sede não encontrada.' }
   }
 
-  const { nome, tipo, sedeId: sedePaiId, responsavelUserId, responsavel, ...rest } =
+  const { nome, tipo, sedeId: sedePaiIdForm, responsavelUserId, responsavel, ...rest } =
     parsed.data
+
+  // Caso B: pai na torcida principal — trava tipo + sedeId (não se altera aqui).
+  let tipoFinal: TipoSede = tipo
+  let sedePaiId: string | null = sedePaiIdForm
+  let permitirPaiExternoId: string | null = null
+
+  if (existing.sedeId) {
+    const paiAtual: { tenantId: string | null } | null = await db.sede.findUnique({
+      where: { id: existing.sedeId },
+      select: { tenantId: true },
+    })
+    if (isPaiHerdadoDeTorcidaPrincipal(paiAtual?.tenantId, tenant.id)) {
+      permitirPaiExternoId = existing.sedeId
+      sedePaiId = existing.sedeId
+      tipoFinal = existing.tipo as TipoSede
+    }
+  }
 
   if (sedePaiId && (await wouldCreateSedeCycle(sedeId, sedePaiId))) {
     return {
@@ -248,16 +298,18 @@ export async function editarSede(
     }
   }
 
-  const { pai, error: paiError } = await resolverPai(sedePaiId, tenant.id)
+  const { pai, error: paiError } = await resolverPai(sedePaiId, tenant.id, {
+    permitirPaiExternoId,
+  })
   if (paiError) return { errors: { sedeId: [paiError] } }
 
-  const hierarquiaErro = validarHierarquiaSede(tipo, pai)
+  const hierarquiaErro = validarHierarquiaSede(tipoFinal, pai)
   if (hierarquiaErro) {
     return { errors: { sedeId: [hierarquiaErro], tipo: [hierarquiaErro] } }
   }
 
   const rebaixamentoErro = validarRebaixamentoComFilhos(
-    tipo,
+    tipoFinal,
     existing.filhos.map((f: { tipo: string }) => f.tipo as TipoSede),
   )
   if (rebaixamentoErro) {
@@ -271,12 +323,18 @@ export async function editarSede(
     where: { id: sedeId },
     data: {
       nome,
-      tipo,
+      tipo: tipoFinal,
       sedeId: sedePaiId ?? null,
       responsavelUserId: resp.userId,
       responsavel: resp.nome ?? responsavel ?? null,
       ...rest,
     },
+  })
+
+  await vincularResponsavelAoCanalDaSede({
+    sedeId,
+    canalConversaId: existing.canalConversaId,
+    responsavelUserId: resp.userId,
   })
 
   await db.auditLog.create({
@@ -287,8 +345,9 @@ export async function editarSede(
       entidade: 'Sede',
       entidadeId: sedeId,
       detalhes: {
-        tipo,
+        tipo: tipoFinal,
         temCoords: rest.lat != null && rest.lng != null,
+        ...(permitirPaiExternoId ? { paiHerdado: true } : {}),
       },
     },
   })
@@ -296,12 +355,70 @@ export async function editarSede(
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
-  // Header do portal (navbar) usa Sede.fotoUrl como fallback do logo do tenant
-  // (ver resolverContextoComunidade) — sem revalidar o layout, a foto nova só
+  // Header admin/portal usa Sede.fotoUrl como fallback do logo do tenant
+  // (resolveTenantLogoUrl) — sem revalidar os layouts, a foto nova só
   // aparece depois que o router cache do cliente expira sozinho.
+  revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
   redirect('/admin/sedes')
+}
+
+/**
+ * Persiste só a foto da unidade (upload imediato no formulário de edição).
+ * Revalida layouts para o header refletir o fallback resolveTenantLogoUrl.
+ */
+export async function salvarFotoSede(
+  sedeId: string,
+  fotoUrl: string | null,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
+
+  const parsed = z
+    .string()
+    .nullable()
+    .superRefine((val, ctx) => {
+      if (val != null && val !== '' && !/^https?:\/\//i.test(val)) {
+        ctx.addIssue({ code: 'custom', message: 'URL inválida (use http:// ou https://)' })
+      }
+    })
+    .safeParse(fotoUrl)
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'URL inválida.' }
+  }
+
+  const url = parsed.data?.trim() ? parsed.data.trim() : null
+
+  const existing: { id: string } | null = await db.sede.findFirst({
+    where: { id: sedeId, tenantId: tenant.id },
+    select: { id: true },
+  })
+  if (!existing) return { ok: false, message: 'Sede não encontrada.' }
+
+  await db.sede.update({
+    where: { id: sedeId },
+    data: { fotoUrl: url },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'SEDE_FOTO_ATUALIZADA',
+      entidade: 'Sede',
+      entidadeId: sedeId,
+      detalhes: { temFoto: url != null },
+    },
+  })
+
+  revalidatePath('/admin/sedes')
+  revalidatePath(`/admin/sedes/${sedeId}`)
+  revalidatePath('/portal/sedes')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/portal', 'layout')
+
+  return { ok: true }
 }
 
 export async function alterarStatusSede(sedeId: string, ativa: boolean) {
@@ -339,28 +456,6 @@ export async function alterarStatusSede(sedeId: string, ativa: boolean) {
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   invalidateHierarchyCache(tenant.id)
-}
-
-export type ResolverMapsLinkResult =
-  | { ok: true; lat: number; lng: number }
-  | { ok: false; message: string }
-
-/** Resolve lat/lng a partir de link do Google Maps (completo ou curto). */
-export async function resolverCoordsDeLinkMaps(url: string): Promise<ResolverMapsLinkResult> {
-  await assertPermission(PERMISSIONS.SEDES_MANAGE)
-  const trimmed = url.trim()
-  if (!trimmed) {
-    return { ok: false, message: 'Cole um link do Google Maps.' }
-  }
-  const coords = await resolveCoordsFromGoogleMapsLink(trimmed)
-  if (!coords) {
-    return {
-      ok: false,
-      message:
-        'Não foi possível ler as coordenadas deste link. Abra o local no Maps, copie o link completo (ou use Buscar no mapa).',
-    }
-  }
-  return { ok: true, lat: coords.lat, lng: coords.lng }
 }
 
 /**

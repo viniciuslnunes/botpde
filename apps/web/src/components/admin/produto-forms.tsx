@@ -1,13 +1,11 @@
 'use client'
 
-import { useActionState, useTransition, useRef, useState, useId } from 'react'
+import { useActionState, useTransition, useRef, useState, useId, useCallback } from 'react'
 import { criarProduto, editarProduto, alterarStatusProduto, atualizarStatusPedido } from '@/app/admin/loja/actions'
 import type { ProdutoState } from '@/app/admin/loja/actions'
-import { useCallback } from 'react'
-import { FieldError, toast } from '@torcida/ui'
-import { ImagePlus, Loader2 } from 'lucide-react'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { FieldError } from '@torcida/ui'
 import { ProdutoImagem } from '@/components/portal/produto-imagem'
+import { ImageUploadField } from '@/components/media/image-upload-field'
 import { runPersistAction, useActionStateToast } from '@/lib/toast-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
@@ -60,83 +58,23 @@ function ImagemProdutoField({
   onUrlChange?: (url: string) => void
 }) {
   const [imagemUrl, setImagemUrl] = useState(defaultUrl ?? '')
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  async function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Selecione um arquivo de imagem.')
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Imagem muito grande. Máximo: 10MB.')
-      return
-    }
-
-    setUploading(true)
-    try {
-      const url = await toast
-        .promise(uploadMediaToCloudinary(file), {
-          loading: 'Enviando imagem…',
-          success: 'Imagem enviada.',
-          error: (err) => (err instanceof Error ? err.message : 'Falha no upload.'),
-        })
-        .unwrap()
-      setImagemUrl(url)
-      onUrlChange?.(url)
-    } catch {
-      // erro já notificado pelo toast.promise
-    } finally {
-      setUploading(false)
-    }
-  }
 
   return (
-    <div>
-      <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Imagem do produto</label>
-
-      <div className="mt-2 flex items-start gap-4">
-        <ProdutoImagem src={imagemUrl} alt="Prévia" variant="thumb" />
-
-        <div className="flex-1 space-y-2">
-          <input type="hidden" name="imagemUrl" value={imagemUrl} />
-
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-            {uploading ? 'Enviando...' : 'Enviar imagem'}
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
-            onChange={onFileSelect}
-          />
-
-          <input
-            type="url"
-            value={imagemUrl}
-            onChange={(e) => { setImagemUrl(e.target.value); onUrlChange?.(e.target.value) }}
-            className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-            placeholder="Ou cole a URL da imagem (https://...)"
-          />
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Prefira enviar a imagem — URLs externas (ex.: Discord) podem expirar.
-          </p>
-        </div>
-      </div>
-
-      <FieldError errors={fieldErrors} />
-    </div>
+    <ImageUploadField
+      name="imagemUrl"
+      label="Imagem do produto"
+      value={imagemUrl}
+      onChange={(url) => {
+        setImagemUrl(url)
+        onUrlChange?.(url)
+      }}
+      aspect={1}
+      purpose="comunidade"
+      fieldErrors={fieldErrors}
+      buttonLabel="Enviar imagem"
+      hint="Prefira enviar a imagem — URLs externas (ex.: Discord) podem expirar."
+      preview={<ProdutoImagem src={imagemUrl} alt="Prévia" variant="thumb" />}
+    />
   )
 }
 

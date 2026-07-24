@@ -44,6 +44,7 @@ import {
 } from '@/app/admin/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { FileDropOverlay, dataTransferHasFiles, useFileDragOver } from '@/components/media/file-drop-overlay'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias, classifyMedia } from '@/lib/social-embed'
 import { emitirPostPublicado, criarPreviewOtimista, novoIdOtimista } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
@@ -535,8 +536,8 @@ function ComposerBody({
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
   const [embedDispensado, setEmbedDispensado] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
   const [extrasOpen, setExtrasOpen] = useState(false)
+  const fileDrag = useFileDragOver(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const extrasRef = useRef<HTMLDivElement>(null)
@@ -903,19 +904,22 @@ function ComposerBody({
       className="card-soft min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
     >
     <div
-      onDragOver={(e) => {
-        if (!expanded) return
-        e.preventDefault()
-        setDragOver(true)
+      onDragEnter={(e) => {
+        fileDrag.onDragEnter(e)
+        if (!expanded && dataTransferHasFiles(e.dataTransfer)) setExpanded(true)
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragOver={fileDrag.onDragOver}
+      onDragLeave={fileDrag.onDragLeave}
       onDrop={(e) => {
-        e.preventDefault()
-        setDragOver(false)
-        if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files)
+        const files = fileDrag.finishDrop(e)
+        if (files.length) {
+          setExpanded(true)
+          addFiles(files)
+        }
       }}
-      className={dragOver ? 'rounded-xl outline-2 outline-dashed outline-[rgb(var(--primary))]' : ''}
+      className="relative"
     >
+      <FileDropOverlay active={fileDrag.active} />
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
       {canal ? (
         <input type="hidden" name="conversaId" value={canal.conversaId} />

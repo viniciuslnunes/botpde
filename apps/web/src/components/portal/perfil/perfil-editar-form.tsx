@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCsrfToken } from 'next-auth/react'
-import { ArrowUpDown as ArrowsUpDown, Camera, Eye, ImagePlus, Loader2, Save, Sparkles } from 'lucide-react'
+import { ArrowUpDown as ArrowsUpDown, Camera, Eye, Loader2, Save, Sparkles } from 'lucide-react'
 import { toast } from '@torcida/ui'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 
 interface PerfilEditarFormProps {
@@ -72,8 +73,6 @@ export function PerfilEditarForm({
   const [uploading, setUploading] = useState<'banner' | 'avatar' | null>(null)
   const [avatarMenu, setAvatarMenu] = useState(false)
   const [pending, startTransition] = useTransition()
-  const bannerRef = useRef<HTMLInputElement>(null)
-  const avatarRef = useRef<HTMLInputElement>(null)
   const avatarBox = useRef<HTMLDivElement>(null)
   const privacidadeRef = useRef<HTMLDivElement>(null)
   const privacidadeInputRef = useRef<HTMLInputElement>(null)
@@ -238,30 +237,41 @@ export function PerfilEditarForm({
     return () => document.removeEventListener('mousedown', onDown)
   }, [avatarMenu])
 
-  async function handleUpload(file: File, tipo: 'banner' | 'avatar') {
-    setUploading(tipo)
-    const toastId = tipo === 'banner' ? 'perfil-banner-upload' : 'perfil-avatar-upload'
-    try {
-      const purpose = tipo === 'banner' ? 'perfil-banner' : 'perfil-avatar'
-      const url = await toast
-        .promise(uploadMediaToCloudinary(file, undefined, purpose, tenantId), {
-          loading: tipo === 'banner' ? 'Enviando capa…' : 'Enviando foto…',
-          success: 'Arquivo enviado. Salvando no perfil…',
-          error: (e) => (e instanceof Error ? e.message : 'Falha no upload.'),
-          id: toastId,
-        })
-        .unwrap()
-      if (tipo === 'banner') {
+  const cropBanner = useCroppedImageUpload({
+    aspect: 3,
+    purpose: 'perfil-banner',
+    tenantId,
+    title: 'Ajustar capa',
+    onDone: async ({ url }) => {
+      if (!url) return
+      setUploading('banner')
+      try {
         setBannerUrl(url)
         setBannerPos(50)
-        await persistPerfil({ bannerUrl: url, bannerPos: 50 }, { silent: true, refresh: true, apenasMidia: true })
-        toast.success('Capa salva no perfil.', { id: toastId })
-      } else {
+        await persistPerfil(
+          { bannerUrl: url, bannerPos: 50 },
+          { silent: true, refresh: true, apenasMidia: true },
+        )
+        toast.success('Capa salva no perfil.')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível salvar a capa.')
+      } finally {
+        setUploading(null)
+      }
+    },
+  })
+
+  const cropAvatar = useCroppedImageUpload({
+    aspect: 1,
+    purpose: 'perfil-avatar',
+    tenantId,
+    title: 'Ajustar foto de perfil',
+    onDone: async ({ url }) => {
+      if (!url) return
+      setUploading('avatar')
+      try {
         setAvatarUrl(url)
         await persistPerfil({ avatarUrl: url }, { silent: true, refresh: true, apenasMidia: true })
-        // Sincroniza a foto na sessão (JWT) — sem isso topbar/menu ficam com a
-        // imagem antiga até o usuário deslogar e logar de novo. O endpoint de
-        // update do NextAuth exige csrfToken + payload embrulhado em `data`.
         const csrfToken = await getCsrfToken()
         await fetch('/api/auth/session', {
           method: 'POST',
@@ -269,14 +279,14 @@ export function PerfilEditarForm({
           body: JSON.stringify({ csrfToken, data: { image: url } }),
         }).catch(() => {})
         router.refresh()
-        toast.success('Foto de perfil salva.', { id: toastId })
+        toast.success('Foto de perfil salva.')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível salvar a foto.')
+      } finally {
+        setUploading(null)
       }
-    } catch {
-      // erro já notificado pelo toast.promise
-    } finally {
-      setUploading(null)
-    }
-  }
+    },
+  })
 
   function salvar() {
     startTransition(async () => {
@@ -290,35 +300,15 @@ export function PerfilEditarForm({
 
   return (
     <section className="space-y-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+      {cropBanner.dialog}
+      {cropAvatar.dialog}
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
         Editar perfil social
       </h2>
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
-        Capa e foto são salvas automaticamente após o upload. Use o botão abaixo para bio e privacidade.
+        Capa e foto são salvas automaticamente após o ajuste. Use o botão abaixo para bio e
+        privacidade.
       </p>
-
-      <input
-        ref={bannerRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0]
-          if (f) void handleUpload(f, 'banner')
-          e.target.value = ''
-        }}
-      />
-      <input
-        ref={avatarRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0]
-          if (f) void handleUpload(f, 'avatar')
-          e.target.value = ''
-        }}
-      />
 
       <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))]">
         <div
@@ -341,36 +331,28 @@ export function PerfilEditarForm({
             <div className="h-full w-full bg-gradient-to-b from-[rgb(var(--primary)_/_0.28)] via-[rgb(var(--primary)_/_0.10)] to-[rgb(var(--surface))]" />
           )}
 
-          {uploading === 'banner' && (
+          {(uploading === 'banner' || cropBanner.busy) && (
             <div className="absolute inset-0 grid place-items-center bg-black/40">
               <Loader2 className="h-5 w-5 animate-spin text-white" />
             </div>
           )}
 
-          {bannerUrl && uploading !== 'banner' && (
+          {bannerUrl && uploading !== 'banner' && !cropBanner.busy && (
             <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium text-white backdrop-blur">
               <ArrowsUpDown className="h-3 w-3" />
               Arraste para enquadrar
             </span>
           )}
-
-          <button
-            type="button"
-            disabled={uploading !== null || pending}
-            onClick={() => bannerRef.current?.click()}
-            className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            <Camera className="h-3.5 w-3.5" />
-            {bannerUrl ? 'Trocar capa' : 'Adicionar capa'}
-          </button>
         </div>
 
-        <div className="flex items-center gap-3 bg-[rgb(var(--surface))] px-4 pb-3">
+        <div className="flex items-center gap-3 bg-[rgb(var(--surface))] px-4 pb-3 pt-1">
           <div ref={avatarBox} className="relative -mt-8 shrink-0">
             <button
               type="button"
-              disabled={uploading !== null || pending}
-              onClick={() => (displayAvatar ? setAvatarMenu((v) => !v) : avatarRef.current?.click())}
+              disabled={uploading !== null || pending || cropAvatar.busy}
+              onClick={() => {
+                if (displayAvatar) setAvatarMenu((v) => !v)
+              }}
               className="group relative block h-16 w-16 overflow-hidden rounded-full ring-4 ring-[rgb(var(--surface))] disabled:opacity-60"
             >
               {displayAvatar ? (
@@ -381,10 +363,7 @@ export function PerfilEditarForm({
                   <Camera className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
                 </span>
               )}
-              <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
-                <Camera className="h-4 w-4 text-white" />
-              </span>
-              {uploading === 'avatar' && (
+              {(uploading === 'avatar' || cropAvatar.busy) && (
                 <span className="absolute inset-0 grid place-items-center bg-black/45">
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
                 </span>
@@ -404,24 +383,76 @@ export function PerfilEditarForm({
                   <Eye className="h-4 w-4" />
                   Ver imagem
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAvatarMenu(false)
-                    avatarRef.current?.click()
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  <ImagePlus className="h-4 w-4" />
-                  Alterar imagem de perfil
-                </button>
               </div>
             )}
           </div>
           <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            A capa aparece no topo do perfil assim que o upload terminar.
+            Prévia da capa e da foto. Envie as imagens abaixo.
           </p>
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ImageDropZone
+          label="Foto de capa"
+          busy={uploading === 'banner' || cropBanner.busy || pending}
+          formatsHint="JPEG, PNG ou WebP — ajuste ~3:1 antes do envio"
+          file={
+            bannerUrl
+              ? {
+                  name: 'capa.jpg',
+                  status:
+                    uploading === 'banner' || cropBanner.busy ? 'uploading' : 'done',
+                  previewUrl: bannerUrl,
+                }
+              : null
+          }
+          onClear={
+            bannerUrl
+              ? () => {
+                  void persistPerfil(
+                    { bannerUrl: null, bannerPos: null },
+                    { silent: true, refresh: true, apenasMidia: true },
+                  )
+                    .then(() => toast.success('Capa removida.'))
+                    .catch((err: unknown) =>
+                      toast.error(err instanceof Error ? err.message : 'Não foi possível remover.'),
+                    )
+                }
+              : undefined
+          }
+          onFile={(file) => cropBanner.open(file)}
+        />
+        <ImageDropZone
+          label="Foto de perfil"
+          busy={uploading === 'avatar' || cropAvatar.busy || pending}
+          formatsHint="JPEG, PNG ou WebP — ajuste 1:1 antes do envio"
+          file={
+            avatarUrl
+              ? {
+                  name: 'avatar.jpg',
+                  status:
+                    uploading === 'avatar' || cropAvatar.busy ? 'uploading' : 'done',
+                  previewUrl: avatarUrl,
+                }
+              : null
+          }
+          onClear={
+            avatarUrl
+              ? () => {
+                  void persistPerfil(
+                    { avatarUrl: null },
+                    { silent: true, refresh: true, apenasMidia: true },
+                  )
+                    .then(() => toast.success('Foto de perfil removida.'))
+                    .catch((err: unknown) =>
+                      toast.error(err instanceof Error ? err.message : 'Não foi possível remover.'),
+                    )
+                }
+              : undefined
+          }
+          onFile={(file) => cropAvatar.open(file)}
+        />
       </div>
 
       <textarea

@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { getEscopoEventosVisiveis, diasParaEvento } from '@/lib/eventos'
 import {
   EventosListAnimated,
@@ -54,7 +54,8 @@ function ListaFallback() {
 }
 
 export async function EventosProximosSection() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   const agora = new Date()
 
   const escopoVisivel = tenant
@@ -101,7 +102,8 @@ export async function EventosProximosSection() {
 }
 
 export async function EventosPassadosSection() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   const agora = new Date()
 
   const escopoVisivel = tenant

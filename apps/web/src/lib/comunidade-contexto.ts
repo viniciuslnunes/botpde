@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import { getActiveTenant } from '@/lib/tenant'
+import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 
 export type AfiliacaoComunidade = {
   id: string
@@ -68,34 +68,9 @@ export const resolverContextoComunidade = cache(
       }
 
       // Subsede/PDE promovida a tenant próprio: sem logo de marca definido,
-      // usa a foto da Sede raiz do tenant — senão a topbar mostra a inicial
-      // da unidade mesmo com foto já cadastrada. A unidade promovida (Caso B)
-      // mantém Sede.sedeId apontando pra Sede-mãe (outro tenant), então não dá
-      // pra achar a raiz por `sedeId: null`; e se ela tiver filhos territoriais
-      // movidos junto (mesmo tenantId), um findFirst sem esse critério pode
-      // pegar a foto de um filho em vez da própria unidade.
-      let logoUrl = tenant.logoUrl
-      if (!logoUrl) {
-        const sedesDoTenant: Array<{ id: string; sedeId: string | null; fotoUrl: string | null }> =
-          await db.sede.findMany({
-            where: { tenantId: tenant.id },
-            select: { id: true, sedeId: true, fotoUrl: true },
-          })
-        const idsDoTenant = new Set(sedesDoTenant.map((s) => s.id))
-        const raiz = sedesDoTenant.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
-        logoUrl = raiz?.fotoUrl ?? null
-      }
-      // Ainda sem foto: cai pro avatar do canal oficial (mural da unidade),
-      // mesma fonte que já alimenta o fallback de avatar em `canais.ts` — sem
-      // isso, uma unidade que só configurou a foto do canal oficial (e não a
-      // Sede.fotoUrl) mostra a inicial na topbar mas o avatar certo nas conversas.
-      if (!logoUrl) {
-        const canalOficial: { avatarUrl: string | null } | null = await db.conversa.findFirst({
-          where: { tenantId: tenant.id, tipo: 'CANAL', canalOficial: true },
-          select: { avatarUrl: true },
-        })
-        logoUrl = canalOficial?.avatarUrl ?? null
-      }
+      // usa a foto da Sede raiz do tenant (ou o avatar do canal oficial) —
+      // senão a topbar mostra a inicial da unidade mesmo com foto já cadastrada.
+      const logoUrl = await resolveTenantLogoUrl(tenant.id, tenant.logoUrl)
 
       const tenantSintetico = tenant.afiliacaoId
         ? await getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)

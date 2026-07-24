@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import {
   criarEvento,
@@ -17,6 +17,8 @@ import { submitRedirectAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { PartidaFields } from '@/components/eventos/partida-fields'
+import { ImageUploadField } from '@/components/media/image-upload-field'
+import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import type { PartidaOption } from '@/lib/partidas'
 
 const TIPOS = Object.keys(TIPO_EVENTO_LABEL) as Array<keyof typeof TIPO_EVENTO_LABEL>
@@ -152,46 +154,48 @@ function RecorrenciaField({ errors }: { errors?: string[] }) {
   )
 }
 
-function GeoFields({
+function EventoFotoELocalFields({
+  formId,
+  defaultFotoUrl,
   defaultLat,
   defaultLng,
+  errorsFoto,
   errorsLat,
   errorsLng,
 }: {
+  formId: string
+  defaultFotoUrl?: string | null
   defaultLat?: number | null
   defaultLng?: number | null
+  errorsFoto?: string[]
   errorsLat?: string[]
   errorsLng?: string[]
 }) {
+  const [fotoUrl, setFotoUrl] = useState(defaultFotoUrl ?? '')
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div>
-        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Latitude (opcional)
-        </label>
-        <Input
-          name="lat"
-          type="number"
-          step="any"
-          placeholder="-23.545"
-          defaultValue={defaultLat != null ? String(defaultLat) : ''}
-        />
-        <FieldError errors={errorsLat} />
-      </div>
-      <div>
-        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Longitude (opcional)
-        </label>
-        <Input
-          name="lng"
-          type="number"
-          step="any"
-          placeholder="-46.474"
-          defaultValue={defaultLng != null ? String(defaultLng) : ''}
-        />
-        <FieldError errors={errorsLng} />
-      </div>
-    </div>
+    <>
+      <ImageUploadField
+        name="fotoUrl"
+        label="Foto de capa"
+        value={fotoUrl}
+        onChange={setFotoUrl}
+        aspect={16 / 9}
+        purpose="comunidade"
+        buttonLabel="Enviar foto"
+        fieldErrors={errorsFoto}
+        hint="Ajuste o enquadramento antes do upload. Também pode usar Street View abaixo."
+      />
+      <LocationPickerFields
+        formId={formId}
+        defaultLat={defaultLat}
+        defaultLng={defaultLng}
+        errorsLat={errorsLat}
+        errorsLng={errorsLng}
+        enableStreetViewPhoto
+        onStreetViewPhoto={setFotoUrl}
+      />
+    </>
   )
 }
 
@@ -245,6 +249,7 @@ export function CriarEventoForm({
 }) {
   const [state, setState] = useState<EventoState>({})
   const [tipo, setTipo] = useState(defaultTipo)
+  const formId = useId()
   const { formRef } = useTrackedForm({ title: 'Novo evento' })
 
   const amanha = new Date()
@@ -253,6 +258,7 @@ export function CriarEventoForm({
 
   return (
     <form
+      id={formId}
       ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => criarEvento({}, fd), setState, {
@@ -322,15 +328,13 @@ export function CriarEventoForm({
         temAfiliacao={temAfiliacao}
         errors={state.errors?.partidaId}
       />
-      <div>
-        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Foto de capa (URL)
-        </label>
-        <Input name="fotoUrl" type="url" placeholder="https://…" />
-        <FieldError errors={state.errors?.fotoUrl} />
-      </div>
+      <EventoFotoELocalFields
+        formId={formId}
+        errorsFoto={state.errors?.fotoUrl}
+        errorsLat={state.errors?.lat}
+        errorsLng={state.errors?.lng}
+      />
       <RecorrenciaField errors={state.errors?.recorrenciasSemanas} />
-      <GeoFields errorsLat={state.errors?.lat} errorsLng={state.errors?.lng} />
 
       {(lockTipo ? defaultTipo === 'CARAVANA' : tipo === 'CARAVANA') && (
         <ValorVagaField errors={state.errors?.valorVaga} />
@@ -398,6 +402,7 @@ export function EditarEventoForm({
 }) {
   const [state, setState] = useState<EventoState>({})
   const [tipo, setTipo] = useState(evento.tipo ?? 'GERAL')
+  const formId = useId()
   const { formRef } = useTrackedForm({
     id: `editar-evento-${evento.id}`,
     title: 'Editar evento',
@@ -411,6 +416,7 @@ export function EditarEventoForm({
 
   return (
     <form
+      id={formId}
       ref={formRef}
       action={async (fd) => {
         await submitRedirectAction(() => editarEvento(evento.id, {}, fd), setState, {
@@ -477,16 +483,12 @@ export function EditarEventoForm({
         temAfiliacao={temAfiliacao}
         errors={state.errors?.partidaId}
       />
-      <div>
-        <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-          Foto de capa (URL)
-        </label>
-        <Input name="fotoUrl" type="url" defaultValue={evento.fotoUrl ?? ''} placeholder="https://…" />
-        <FieldError errors={state.errors?.fotoUrl} />
-      </div>
-      <GeoFields
+      <EventoFotoELocalFields
+        formId={formId}
+        defaultFotoUrl={evento.fotoUrl}
         defaultLat={evento.lat}
         defaultLng={evento.lng}
+        errorsFoto={state.errors?.fotoUrl}
         errorsLat={state.errors?.lat}
         errorsLng={state.errors?.lng}
       />

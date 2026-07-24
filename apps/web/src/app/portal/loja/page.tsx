@@ -1,12 +1,13 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { Package, Tag } from 'lucide-react'
 import { SacolaBadge } from '@/components/portal/loja-ui'
+import { formatNomeTorcida } from '@torcida/types'
 import type { Metadata } from 'next'
 import {
   LojaCatalogoFallback,
@@ -30,10 +31,12 @@ export default async function PortalLojaPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
-  const [session, tenant, params] = await Promise.all([auth(), getTenantFromHost(), searchParams])
+  const [session, params] = await Promise.all([auth(), searchParams])
 
-  if (!tenant) redirect('/')
   if (!session?.user?.id) redirect('/entrar')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
+  if (!tenant) redirect('/')
 
   const tenantIds = await getVisibleTenantIds(tenant.id, 'loja')
 
@@ -59,7 +62,7 @@ export default async function PortalLojaPage({
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-gradient-to-br from-[rgb(var(--primary)_/_0.15)] to-transparent p-4 sm:p-6">
         <h1 className="text-xl font-bold text-[rgb(var(--foreground))] sm:text-2xl">Loja oficial da torcida</h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Produtos exclusivos dos Gaviões da Fiel
+          Produtos exclusivos da {formatNomeTorcida(tenant.nome)}
         </p>
         <div className="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
           <Tag className="h-3.5 w-3.5 shrink-0" />

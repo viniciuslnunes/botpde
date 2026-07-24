@@ -97,13 +97,23 @@ export function useTrackedForm({
     })
 
     const onAny = () => recompute()
+    const onBaselinePatch = (e: Event) => {
+      const detail = (e as CustomEvent<Record<string, string>>).detail
+      if (!detail || !baselineRef.current) return
+      for (const [key, value] of Object.entries(detail)) {
+        baselineRef.current.set(key, [value])
+      }
+      recompute()
+    }
     form.addEventListener('input', onAny)
     form.addEventListener('change', onAny)
+    form.addEventListener('torcida:baseline-patch', onBaselinePatch)
 
     return () => {
       cancelAnimationFrame(raf)
       form.removeEventListener('input', onAny)
       form.removeEventListener('change', onAny)
+      form.removeEventListener('torcida:baseline-patch', onBaselinePatch)
     }
   }, [enabled, id, remove, captureBaseline, recompute, setChangesIfChanged])
 

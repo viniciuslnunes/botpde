@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
+import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import {
   ALL_PERMISSIONS,
   MAX_VICE_PRESIDENTES,
@@ -112,6 +113,18 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const validRoleIds = new Set(rolesTenant.map((r) => r.id))
   const roleIdsAtuais = new Set(userRolesAtuais.map((r) => r.roleId))
 
+  // Liderança (OWNER/ADMIN) recém-atribuída aqui nunca passou pelo auto-vínculo
+  // de canais de `aprovarMembro` — sem isso a pessoa vira admin do tenant mas
+  // fica de fora do canal oficial da própria unidade até pedir entrada manual.
+  const liderancaRoleIds = new Set(
+    rolesTenant
+      .filter((r) => r.isSystem && (r.nome === SYSTEM_ROLES.OWNER || r.nome === SYSTEM_ROLES.ADMIN))
+      .map((r) => r.id),
+  )
+  const ganhouLideranca = [...liderancaRoleIds].some(
+    (id) => perfilIds.has(id) && !roleIdsAtuais.has(id),
+  )
+
   const cobertoPorPerfis = new Set<string>()
   for (const role of rolesTenant) {
     if (!perfilIds.has(role.id)) continue
@@ -169,6 +182,19 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
       },
     })
   })
+
+  if (ganhouLideranca) {
+    const membro: { sedeId: string | null } | null = await db.saasMembro.findFirst({
+      where: { userId, tenantId: tenant.id },
+      select: { sedeId: true },
+    })
+    await vincularMembroCanaisAposAprovacao({
+      tenantId: tenant.id,
+      userId,
+      sedeId: membro?.sedeId ?? null,
+      fallbackCriadoPorId: session.user.id,
+    })
+  }
 
   invalidatePermissionsCache(userId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)

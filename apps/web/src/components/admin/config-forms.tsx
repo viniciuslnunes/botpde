@@ -13,6 +13,7 @@ import {
   permissionsDoPacoteDepartamento,
 } from '@torcida/types'
 import { AccessPermissionPreview, AccessPermissionCompare } from '@/components/admin/access-permission-preview'
+import { ImageUploadField } from '@/components/media/image-upload-field'
 import {
   salvarPerfilTenant,
   salvarDiscordGuildId,
@@ -406,12 +407,13 @@ interface CanalOficialFormProps {
 export function CanalOficialForm({
   nome,
   descricao,
-  avatarUrl,
+  avatarUrl: avatarUrlInicial,
   visibilidadeCanal,
   somenteAdminPublica,
   publica,
 }: CanalOficialFormProps) {
   const [pending, startTransition] = useTransition()
+  const [avatarUrl, setAvatarUrl] = useState(avatarUrlInicial ?? '')
   const { formRef, markPristine } = useTrackedForm({ title: 'Canal oficial' })
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -468,14 +470,15 @@ export function CanalOficialForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
-          Foto do canal (URL)
-        </label>
-        <input
+        <ImageUploadField
           name="avatarUrl"
-          defaultValue={avatarUrl ?? ''}
-          placeholder="https://…"
-          className="mt-1.5 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+          label="Foto do canal"
+          value={avatarUrl}
+          onChange={setAvatarUrl}
+          aspect={1}
+          purpose="comunidade"
+          buttonLabel="Enviar foto"
+          hint="Quadrada — ajuste o enquadramento antes do upload."
         />
       </div>
 

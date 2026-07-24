@@ -158,7 +158,13 @@ export function buildStreetViewImageUrl(
     lat?: number | null
     lng?: number | null
   },
-  opts?: { width?: number; height?: number },
+  opts?: {
+    width?: number
+    height?: number
+    heading?: number
+    pitch?: number
+    fov?: number
+  },
 ): string | null {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
   const location = queryLocal(sede)
@@ -166,12 +172,16 @@ export function buildStreetViewImageUrl(
   // Street View Static API: máximo 640×640.
   const w = Math.min(opts?.width ?? 640, 640)
   const h = Math.min(opts?.height ?? 280, 640)
+  const heading = opts?.heading ?? 0
+  const pitch = opts?.pitch ?? 0
+  const fov = opts?.fov ?? 80
   const params = new URLSearchParams({
     size: `${w}x${h}`,
     location,
     key,
-    fov: '80',
-    pitch: '0',
+    fov: String(Math.min(120, Math.max(10, fov))),
+    pitch: String(Math.min(90, Math.max(-90, pitch))),
+    heading: String(((heading % 360) + 360) % 360),
   })
   return `https://maps.googleapis.com/maps/api/streetview?${params.toString()}`
 }
@@ -257,7 +267,8 @@ export type GoogleMarkerInstance = {
   content: HTMLElement | null
   zIndex: number | null
   title: string
-  addEventListener: (type: string, listener: () => void) => void
+  gmpDraggable?: boolean
+  addEventListener: (type: string, listener: (...args: unknown[]) => void) => void
 }
 
 /** PinElement estende HTMLElement; a API antiga expunha `.element` (deprecated). */
@@ -270,6 +281,7 @@ export type GoogleMapsMarkerLibrary = {
     title?: string
     zIndex?: number
     content?: HTMLElement
+    gmpDraggable?: boolean
   }) => GoogleMarkerInstance
   PinElement: new (opts: {
     background?: string

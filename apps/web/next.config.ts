@@ -38,7 +38,10 @@ const nextConfig: NextConfig = {
     },
   },
   // CDN (Cloudflare Free): origin respeitado na edge — ver docs/ops/cloudflare-cdn.md
+  // Em dev, Cache-Control immutable em /_next/static quebra HMR do Turbopack
+  // (chunks stale → "module factory is not available"). Só em produção.
   async headers() {
+    if (process.env.NODE_ENV !== 'production') return []
     return [
       {
         source: '/_next/static/:path*',

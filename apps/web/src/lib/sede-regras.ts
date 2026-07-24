@@ -67,3 +67,14 @@ export function tiposPaiPermitidos(tipoFilho: TipoSede): TipoSede[] | null {
   if (tipoFilho === 'SUBSEDE') return ['SEDE']
   return ['SEDE', 'SUBSEDE']
 }
+
+/**
+ * Pai em outro tenant (Caso B / promoção): a unidade herda a torcida principal
+ * via `Sede.sedeId` e não deve trocar esse vínculo no admin local.
+ */
+export function isPaiHerdadoDeTorcidaPrincipal(
+  paiTenantId: string | null | undefined,
+  tenantAtualId: string,
+): boolean {
+  return Boolean(paiTenantId && paiTenantId !== tenantAtualId)
+}

@@ -234,6 +234,33 @@ export async function ensureCanalOficialParaSede(opts: {
   return { id: canal.id, criadoAgora: true }
 }
 
+/**
+ * Garante que o responsável (liderança) de uma unidade Caso A seja ADMIN do
+ * canal oficial dela. Cobre a criação (canal e responsável definidos juntos)
+ * e a edição (responsável trocado depois que o canal já existe) — antes
+ * disso a liderança só entrava via `pedirEntradaCanal`. Idempotente, no-op
+ * se a unidade ainda não tem canal ou responsável.
+ */
+export async function vincularResponsavelAoCanalDaSede(opts: {
+  sedeId: string
+  canalConversaId: string | null
+  responsavelUserId: string | null
+}): Promise<void> {
+  if (!opts.canalConversaId || !opts.responsavelUserId) return
+  await db.membroConversa.upsert({
+    where: {
+      conversaId_userId: { conversaId: opts.canalConversaId, userId: opts.responsavelUserId },
+    },
+    create: {
+      conversaId: opts.canalConversaId,
+      userId: opts.responsavelUserId,
+      papel: 'ADMIN',
+      status: 'ATIVO',
+    },
+    update: { papel: 'ADMIN', saiuEm: null },
+  })
+}
+
 export async function getOrCreateCanalOficial(
   tenantId: string,
   fallbackCriadoPorId?: string | null,

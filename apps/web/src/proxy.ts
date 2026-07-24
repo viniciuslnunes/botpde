@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
-import { NextResponse } from 'next/server'
-import { resetPrismaQueryCount } from '@torcida/db'
+import { NextResponse, after } from 'next/server'
+import { resetPrismaQueryCount, getAndResetPrismaMetrics, metricsEnabled } from '@torcida/db'
 
 const PUBLIC_PATHS = [
   '/entrar',
@@ -68,15 +68,39 @@ export const proxy = auth((req) => {
     return NextResponse.redirect(dest)
   }
 
-  const requestHeaders = new Headers(req.headers)
   // Medição de rota: dev sempre; produção via PERF_METRICS=1 (opt-in).
-  if (process.env.NODE_ENV === 'development' || process.env.PERF_METRICS === '1') {
-    requestHeaders.set('x-pathname', pathname)
-    requestHeaders.set('x-method', req.method)
-    requestHeaders.set('x-request-start', String(Date.now()))
+  // Registrado aqui (não via headers() num Server Component) para não competir
+  // com rotas que streamam atrás de loading.tsx — after() no proxy só dispara
+  // quando a resposta inteira (incl. conteúdo suspenso) já foi enviada.
+  if (metricsEnabled()) {
+    const startedAt = Date.now()
+    const method = req.method
+    after(() => {
+      const { count, dbMs } = getAndResetPrismaMetrics()
+      if (count === 0) return
+      const wallMs = Date.now() - startedAt
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[prisma] ${method} ${pathname} — ${count} queries (${Math.round(dbMs)}ms db)`)
+        return
+      }
+
+      // Produção (PERF_METRICS=1): linha estruturada para agregação de p95.
+      console.log(
+        JSON.stringify({
+          perf: 'route',
+          method,
+          route: pathname,
+          queries: count,
+          dbMs: Math.round(dbMs),
+          wallMs,
+          ts: new Date().toISOString(),
+        }),
+      )
+    })
   }
 
-  return NextResponse.next({ request: { headers: requestHeaders } })
+  return NextResponse.next()
 })
 
 export const config = {

@@ -508,6 +508,18 @@ export function podeTerVice(tipoSede) {
 }
 
 /**
+ * Expandir a hierarquia territorial (Adicionar local) só na Sede principal.
+ * `sedes:manage` em subsede/PDE (Caso B) permite editar a própria unidade,
+ * não criar novos locais sob a torcida.
+ *
+ * @param {string} tipoSede - TipoSede ('SEDE' | 'SUBSEDE' | 'PONTO_ENCONTRO')
+ * @returns {boolean}
+ */
+export function podeCriarUnidadeTerritorial(tipoSede) {
+  return tipoSede === 'SEDE'
+}
+
+/**
  * Rótulo do cargo máximo do tenant: 'Presidente' na Sede principal,
  * 'Liderança' em subsedes/PDEs.
  *

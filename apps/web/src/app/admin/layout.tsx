@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
+import { getActiveTenant, getUserPermissionsInTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
 import { AdminRouteTransition } from '@/components/motion/admin-route-transition'
@@ -41,7 +41,7 @@ export default async function AdminLayout({
     redirect('/definir-apelido')
   }
 
-  const tenant = await getTenantFromHost()
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
 
   if (!tenant) {
     if (isSuperAdmin) redirect('/super-admin/torcidas')
@@ -86,9 +86,10 @@ export default async function AdminLayout({
     8,
     TIPOS_NOTIFICACAO_ADMIN,
   )
-  const [avatarUrl, userName] = await Promise.all([
+  const [avatarUrl, userName, tenantLogoUrl] = await Promise.all([
     getAvatarAtualDoUsuario(session.user.id),
     getNomeAtualDoUsuario(session.user.id),
+    resolveTenantLogoUrl(tenant.id, tenant.logoUrl),
   ])
 
   return (
@@ -96,7 +97,7 @@ export default async function AdminLayout({
       tenantNome={tenant.nome}
       tenantCor={tenant.corPrimaria}
       tenantSlug={tenant.slug}
-      tenantLogoUrl={tenant.logoUrl}
+      tenantLogoUrl={tenantLogoUrl}
       tenantDesign={tenant.design}
       userName={userName ?? session.user.name ?? null}
       userAvatar={avatarUrl}

@@ -102,15 +102,18 @@ function AdminTopbar({
           {tenantLogoUrl ? (
             canOptimizeImageUrl(tenantLogoUrl) ? (
               <Image
+                key={tenantLogoUrl}
                 src={tenantLogoUrl}
                 alt={tenantNome}
-                width={28}
-                height={28}
+                width={56}
+                height={56}
+                quality={95}
                 className="h-7 w-7 shrink-0 rounded-lg object-contain"
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                key={tenantLogoUrl}
                 src={tenantLogoUrl}
                 alt={tenantNome}
                 className="h-7 w-7 shrink-0 rounded-lg object-contain"

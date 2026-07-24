@@ -24,6 +24,9 @@ export interface SolicitacaoParaMaterializar {
   cidade: string
   estado: string
   endereco: string | null
+  contatoNome: string
+  /** Quem pediu o cadastro (onboarding) — vira responsável/liderança da unidade. */
+  solicitadoPorId: string | null
 }
 
 export async function criarUnidadeDaSolicitacao(
@@ -37,6 +40,11 @@ export async function criarUnidadeDaSolicitacao(
     select: { id: true },
   })
 
+  // Liderança local = quem solicitou (onboarding), não quem aprovou (Presidente/
+  // super-admin) — sem isso a unidade nascia com o canal oficial vazio de
+  // liderança e sem "responsável" definido, obrigando pedido manual de entrada.
+  const liderancaUserId = solicitacao.solicitadoPorId
+
   const sede: { id: string } = await tx.sede.create({
     data: {
       tenantId: solicitacao.tenantId,
@@ -47,12 +55,16 @@ export async function criarUnidadeDaSolicitacao(
       endereco: solicitacao.endereco,
       sedeId: raiz?.id ?? null,
       ativa: true,
+      ...(liderancaUserId
+        ? { responsavelUserId: liderancaUserId, responsavel: solicitacao.contatoNome }
+        : {}),
     },
     select: { id: true },
   })
 
   // Canal oficial da unidade — Conversa no tenant da torcida (leitura por
   // participação). Espelha Departamento.canalConversa; ponteiro em Sede.canalConversaId.
+  // ADMIN do canal é a liderança local (solicitante), não o aprovador.
   const canal: { id: string } = await tx.conversa.create({
     data: {
       tipo: 'CANAL',
@@ -65,7 +77,7 @@ export async function criarUnidadeDaSolicitacao(
       somenteAdminPublica: false,
       publica: false,
       criadoPorId: atorId,
-      membros: { create: { userId: atorId, papel: 'ADMIN' } },
+      membros: { create: { userId: liderancaUserId ?? atorId, papel: 'ADMIN' } },
     },
     select: { id: true },
   })
@@ -74,6 +86,17 @@ export async function criarUnidadeDaSolicitacao(
     where: { id: sede.id },
     data: { canalConversaId: canal.id },
   })
+
+  // Se a liderança já é sócio do tenant, vincula a unidade recém-criada como
+  // a dela — senão a contagem de membros da unidade (/admin/sedes) fica
+  // zerada mesmo com o responsável definido (mesma causa do bug do FIEL
+  // CUBATÃO em promoverUnidadeAPortal).
+  if (liderancaUserId) {
+    await tx.saasMembro.updateMany({
+      where: { tenantId: solicitacao.tenantId, userId: liderancaUserId },
+      data: { sedeId: sede.id },
+    })
+  }
 
   return { sedeId: sede.id, canalConversaId: canal.id }
 }

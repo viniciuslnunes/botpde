@@ -22,6 +22,7 @@ import {
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { FileDropOverlay, useFileDragOver } from '@/components/media/file-drop-overlay'
 import {
   tituloConversa,
   type ContatoDto,
@@ -168,6 +169,8 @@ export function MensagemThread({
   const uploadPendente = medias.some((m) => m.url === null && !m.error)
   const podeEnviar =
     !enviando && !uploadPendente && (texto.trim().length > 0 || medias.some((m) => Boolean(m.url)))
+  const conversaBloqueada =
+    conversa.solicitacaoRecebida || conversa.aguardandoAprovacao
   const { confirmDiscard } = useUnsavedChangesContext()
 
   const draftChanges = useMemo(() => {
@@ -176,6 +179,8 @@ export function MensagemThread({
     if (medias.length > 0) list.push(`Anexos (${medias.length})`)
     return list
   }, [texto, medias.length])
+
+  const fileDrag = useFileDragOver(!conversaBloqueada)
 
   useUnsavedChanges({
     id: `mensagem-draft-${conversaId}`,
@@ -506,9 +511,6 @@ export function MensagemThread({
     }
   }
 
-  const conversaBloqueada =
-    conversa.solicitacaoRecebida || conversa.aguardandoAprovacao
-
   async function responderSolicitacao(acao: 'aprovar' | 'rejeitar') {
     setProcessandoSolicitacao(true)
     try {
@@ -682,8 +684,16 @@ export function MensagemThread({
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={springSnappy}
-      className="flex h-full min-h-0 flex-col"
+      className="relative flex h-full min-h-0 flex-col"
+      onDragEnter={fileDrag.onDragEnter}
+      onDragOver={fileDrag.onDragOver}
+      onDragLeave={fileDrag.onDragLeave}
+      onDrop={(e) => {
+        const files = fileDrag.finishDrop(e)
+        if (files.length) addFiles(files)
+      }}
     >
+      <FileDropOverlay active={fileDrag.active} />
       {/* Cabeçalho */}
       <div className="flex items-center gap-3 border-b border-[rgb(var(--border))] px-4 py-3">
         <button

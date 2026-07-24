@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { assertMembroAtivo } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
 import { capacidadeEfetiva, lotacaoCheia } from '@/lib/eventos-capacidade'
@@ -18,8 +18,9 @@ export async function responderRsvp(
   eventoId: string,
   status: 'CONFIRMADO' | 'RECUSADO' | 'LISTA_ESPERA',
 ): Promise<RsvpResult> {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) return { ok: false, error: 'Não autenticado' }
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
   if (!tenant) return { ok: false, error: 'Tenant não encontrado' }
 
   await assertMembroAtivo(tenant.id, session.user.id)

@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { auth } from '@/lib/auth'
+import { getActiveTenant } from '@/lib/tenant'
 import { SedesExplorer } from '@/components/portal/sedes-explorer'
 import type {
   SedeExplorerItem,
@@ -15,7 +16,8 @@ type PageProps = {
 
 export default async function SedesPage({ searchParams }: PageProps) {
   const { sede: sedeParam } = await searchParams
-  const tenant = await getTenantFromHost()
+  const session = await auth()
+  const tenant = await getActiveTenant(session?.user?.id, session?.user?.email)
   const agora = new Date()
 
   type SedeRow = {

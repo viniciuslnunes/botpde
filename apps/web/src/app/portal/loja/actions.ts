@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
@@ -25,8 +25,9 @@ export type ActionState = {
 }
 
 async function assertAuth() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
+  const session = await auth()
   if (!session?.user?.id) throw new Error('Você precisa estar logado.')
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
   if (!tenant) throw new Error('Tenant não encontrado.')
   return { session, tenant, userId: session.user.id }
 }

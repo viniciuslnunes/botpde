@@ -125,3 +125,8 @@ escopo registradas nas ondas 4–5:
   `overflow-hidden` sensível; o form já anima via `StickyPersistBar`.
 - `StatCard` ganhou `badgeTone` (linha auxiliar em danger/warning/default —
   default `success`) e o modo `compact` passou a renderizar `badge`.
+
+## Ver também
+
+- Upload/crop de imagem e picker de localização:
+  [`docs/frontend/media-upload-crop.md`](media-upload-crop.md)

@@ -71,6 +71,9 @@ Widgets Sofascore na Comunidade são **display** (iframe), não ingestão de `Pa
 - Placar ao vivo / status `AO_VIVO` automático
 - PWA completa de check-in (hoje: fila local no browser)
 - Ônibus/assentos e bilheteria
+- **Capa + mapa (2026-07-24):** admin eventos já usa crop 16:9 +
+  `LocationPickerFields` (link Maps / pin / Street View). Padrão e backlog
+  restante: `docs/frontend/media-upload-crop.md`.
 
 ## Insights administrativos (2026-07-22)
 

@@ -4,20 +4,17 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useTransition,
 } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import {
-  Camera,
   Crosshair,
   Loader2,
   Lock,
   MapPin,
   Plus,
-  Radio,
   Search,
   Users,
   X,
@@ -26,7 +23,8 @@ import { toast } from '@torcida/ui'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import {
   distanciaKm,
@@ -117,8 +115,17 @@ export function CanaisClient({
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-  const [uploadingFoto, setUploadingFoto] = useState(false)
-  const fotoRef = useRef<HTMLInputElement>(null)
+  const crop = useCroppedImageUpload({
+    aspect: 1,
+    purpose: 'comunidade',
+    title: 'Ajustar foto do canal',
+    onDone: ({ url }) => {
+      if (url) {
+        setAvatarUrl(url)
+        toast.success('Foto pronta para o canal.')
+      }
+    },
+  })
   const [visibilidade, setVisibilidade] = useState<'TENANT' | 'HIERARQUIA' | 'ALIADOS' | 'PUBLICO'>(
     'ALIADOS',
   )
@@ -299,23 +306,12 @@ export function CanaisClient({
     )
   }
 
-  async function onFotoChange(file: File | null) {
-    if (!file) return
+  function onFotoChange(file: File) {
     if (!file.type.startsWith('image/')) {
       toast.error('Selecione uma imagem.')
       return
     }
-    setUploadingFoto(true)
-    try {
-      const url = await uploadMediaToCloudinary(file, undefined, 'comunidade')
-      setAvatarUrl(url)
-      toast.success('Foto pronta para o canal.')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Falha no upload.')
-    } finally {
-      setUploadingFoto(false)
-      if (fotoRef.current) fotoRef.current.value = ''
-    }
+    crop.open(file)
   }
 
   function entrar(id: string) {
@@ -380,6 +376,7 @@ export function CanaisClient({
 
   return (
     <div className="space-y-5">
+      {crop.dialog}
       <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="relative min-w-0 flex-1">
@@ -577,55 +574,22 @@ export function CanaisClient({
               placeholder="Descrição (opcional)"
               className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm"
             />
-            <div className="flex flex-wrap items-center gap-3">
-              {avatarUrl.trim() ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl.trim()}
-                  alt=""
-                  className="h-12 w-12 shrink-0 rounded-lg border border-[rgb(var(--border))] object-cover"
-                />
-              ) : (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]">
-                  <Radio className="h-5 w-5" />
-                </div>
-              )}
-              <div className="min-w-0 space-y-1.5">
-                <p className="text-xs text-[rgb(var(--foreground-muted))]">Foto do canal (opcional)</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={uploadingFoto || pending}
-                    onClick={() => fotoRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm font-medium hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                  >
-                    {uploadingFoto ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                    {avatarUrl.trim() ? 'Trocar foto' : 'Adicionar foto'}
-                  </button>
-                  {avatarUrl.trim() ? (
-                    <button
-                      type="button"
-                      disabled={uploadingFoto || pending}
-                      onClick={() => setAvatarUrl('')}
-                      className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-                    >
-                      Remover
-                    </button>
-                  ) : null}
-                </div>
-                <input
-                  ref={fotoRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => void onFotoChange(e.target.files?.[0] ?? null)}
-                />
-              </div>
-            </div>
+            <ImageDropZone
+              label="Foto do canal (opcional)"
+              busy={crop.busy || pending}
+              formatsHint="JPEG, PNG ou WebP — ajuste 1:1 antes do envio"
+              file={
+                avatarUrl.trim()
+                  ? {
+                      name: 'foto-canal.jpg',
+                      status: crop.busy ? 'uploading' : 'done',
+                      previewUrl: avatarUrl.trim(),
+                    }
+                  : null
+              }
+              onClear={avatarUrl.trim() ? () => setAvatarUrl('') : undefined}
+              onFile={onFotoChange}
+            />
             <select
               value={visibilidade}
               onChange={(e) =>
@@ -656,7 +620,7 @@ export function CanaisClient({
             </label>
             <button
               type="submit"
-              disabled={pending || uploadingFoto}
+              disabled={pending || crop.busy}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--color-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
             >
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}

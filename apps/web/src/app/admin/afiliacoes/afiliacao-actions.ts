@@ -72,6 +72,8 @@ interface SolicitacaoLite {
   cidade: string
   estado: string
   endereco: string | null
+  contatoNome: string
+  solicitadoPorId: string | null
 }
 
 async function carregarSolicitacao(id: string): Promise<SolicitacaoLite> {
@@ -86,6 +88,8 @@ async function carregarSolicitacao(id: string): Promise<SolicitacaoLite> {
       cidade: true,
       estado: true,
       endereco: true,
+      contatoNome: true,
+      solicitadoPorId: true,
     },
   })
   if (!s) throw new ExpectedError('Solicitação não encontrada.')
@@ -154,6 +158,8 @@ export async function aprovarSolicitacao(
           cidade: solicitacao.cidade,
           estado: solicitacao.estado,
           endereco: solicitacao.endereco,
+          contatoNome: solicitacao.contatoNome,
+          solicitadoPorId: solicitacao.solicitadoPorId,
         },
         ator.userId,
       )

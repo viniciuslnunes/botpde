@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 
 import { resolveVisibility } from '@/lib/hierarquia'
 
@@ -41,11 +41,13 @@ export default async function ProdutoDetailPage({ params }: { params: Promise<{ 
 
   const { id } = await params
 
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-
-  if (!tenant) redirect('/')
+  const session = await auth()
 
   if (!session?.user?.id) redirect('/entrar')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
+
+  if (!tenant) redirect('/')
 
 
 

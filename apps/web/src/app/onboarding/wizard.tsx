@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Upload, Loader2, Camera, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
@@ -11,7 +11,8 @@ import { UnidadeOnboardingCard } from '@/components/onboarding/unidade-onboardin
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { Input, Select } from '@torcida/ui'
-import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
 import {
   routePage,
   springGentle,
@@ -897,9 +898,26 @@ function PassoUnidade({
   const [vinculo, setVinculo] = useState('')
   const [observacao, setObservacao] = useState('')
   const [provasUrls, setProvasUrls] = useState<string[]>([])
-  const [uploadProvaPend, setUploadProvaPend] = useState(false)
   const [errosUnidade, setErrosUnidade] = useState<Record<string, string[]>>({})
   const [enviando, startEnvio] = useTransition()
+  const cropProva = useCroppedImageUpload({
+    aspect: 4 / 3,
+    purpose: 'cadastro',
+    tenantId: torcida.id,
+    title: 'Ajustar prova',
+    confirmLabel: 'Confirmar e anexar',
+    onDone: ({ url }) => {
+      if (!url) return
+      setProvasUrls((atuais) => {
+        if (atuais.length >= 5) {
+          onErro('Envie no máximo 5 imagens de prova.')
+          return atuais
+        }
+        return [...atuais, url]
+      })
+    },
+  })
+  const uploadProvaPend = cropProva.busy
   const [localizacaoEfetiva, setLocalizacaoEfetiva] = useState(localizacao)
   const [sedesResolvidas, setSedesResolvidas] = useState(torcida.sedes)
   const [geoRegiaoPend, setGeoRegiaoPend] = useState(() => !localizacao && Boolean(cidade.trim() && uf.trim()))
@@ -1011,26 +1029,23 @@ function PassoUnidade({
     })
   }
 
-  async function anexarProvaUnidade(file: File | undefined) {
+  function anexarProvaUnidade(file: File | undefined) {
     if (!file) return
     if (provasUrls.length >= 5) {
       onErro('Envie no máximo 5 imagens de prova.')
       return
     }
-    setUploadProvaPend(true)
-    onErro(null)
-    try {
-      const url = await uploadMediaToCloudinary(file, undefined, 'cadastro', torcida.id)
-      setProvasUrls((atuais) => [...atuais, url])
-    } catch (err) {
-      onErro(err instanceof Error ? err.message : 'Falha ao enviar a imagem da unidade.')
-    } finally {
-      setUploadProvaPend(false)
+    if (!file.type.startsWith('image/')) {
+      onErro('Selecione um arquivo de imagem.')
+      return
     }
+    onErro(null)
+    cropProva.open(file)
   }
 
   return (
     <div className="min-w-0 pb-20">
+      {cropProva.dialog}
       <BotaoVoltar onClick={onVoltar} disabled={pending || enviando} />
       <h1 className="text-xl font-bold text-balance break-words text-[rgb(var(--foreground))] sm:text-2xl">
         Onde você participa na {torcida.nome}?
@@ -1235,46 +1250,35 @@ function PassoUnidade({
             </Campo>
 
             <div>
-              <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                Provas (até 5 imagens)
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <label
-                  htmlFor="unidade-provas-upload"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[rgb(var(--border))] px-3 py-2 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
-                >
-                  {uploadProvaPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Anexar
-                </label>
-                <input
-                  id="unidade-provas-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadProvaPend || provasUrls.length >= 5}
-                  onChange={(e) => {
-                    void anexarProvaUnidade(e.target.files?.[0])
-                    e.target.value = ''
-                  }}
-                />
-                {provasUrls.length > 0 && (
-                  <span className="text-xs text-emerald-600">
-                    {provasUrls.length} anexada(s)
-                  </span>
-                )}
-              </div>
+              <ImageDropZone
+                label="Provas (até 5 imagens)"
+                busy={uploadProvaPend}
+                disabled={provasUrls.length >= 5}
+                formatsHint="JPEG, PNG ou WebP — até 5 imagens, com ajuste antes do envio"
+                browseLabel={provasUrls.length >= 5 ? 'Limite atingido' : 'Procurar arquivo'}
+                onFile={(file) => anexarProvaUnidade(file)}
+              />
               {provasUrls.length > 0 && (
-                <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                <ul className="mt-3 space-y-2">
                   {provasUrls.map((url, index) => (
                     <li
                       key={url}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-[rgb(var(--border))] px-2.5 py-1.5 text-xs text-[rgb(var(--foreground-muted))]"
+                      className="flex items-center gap-3 rounded-2xl bg-[rgb(var(--background-subtle))] px-3 py-2.5"
                     >
-                      <span className="truncate">Prova {index + 1}</span>
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[rgb(var(--surface))] ring-1 ring-[rgb(var(--border))]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+                          Prova {index + 1}
+                        </p>
+                        <p className="text-xs text-[rgb(var(--foreground-muted))]">Anexada</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setProvasUrls((atuais) => atuais.filter((item) => item !== url))}
-                        className="text-[rgb(var(--foreground-muted))] hover:text-red-500"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--foreground))]"
                         aria-label={`Remover prova ${index + 1}`}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -1428,7 +1432,17 @@ function PassoVinculo({
   const [anosSocio, setAnosSocio] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [imagemProva, setImagemProva] = useState<string | undefined>()
-  const [uploadPend, setUploadPend] = useState(false)
+  const cropComprovante = useCroppedImageUpload({
+    aspect: 4 / 3,
+    purpose: 'cadastro',
+    tenantId: torcida.id,
+    title: 'Ajustar comprovante',
+    confirmLabel: 'Confirmar e enviar',
+    onDone: ({ url }) => {
+      if (url) setImagemProva(url)
+    },
+  })
+  const uploadPend = cropComprovante.busy
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
   // getDepartamentosDoTenant já exclui legados; filtro defensivo no client.
@@ -1513,18 +1527,14 @@ function PassoVinculo({
     })
   }
 
-  async function onArquivo(file: File | undefined) {
+  function onArquivo(file: File | undefined) {
     if (!file) return
-    setUploadPend(true)
-    onErro(null)
-    try {
-      const url = await uploadMediaToCloudinary(file, undefined, 'cadastro', torcida.id)
-      setImagemProva(url)
-    } catch (err) {
-      onErro(err instanceof Error ? err.message : 'Falha no upload da imagem.')
-    } finally {
-      setUploadPend(false)
+    if (!file.type.startsWith('image/')) {
+      onErro('Selecione um arquivo de imagem.')
+      return
     }
+    onErro(null)
+    cropComprovante.open(file)
   }
 
   const conteudo =
@@ -1794,6 +1804,7 @@ function PassoVinculo({
               uploadPend={uploadPend}
               erros={errosCampo.imagemProva}
               onArquivo={onArquivo}
+              onLimpar={() => setImagemProva(undefined)}
             />
           </div>
           <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
@@ -1827,7 +1838,9 @@ function PassoVinculo({
     )
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <>
+      {cropComprovante.dialog}
+      <AnimatePresence mode="wait" initial={false}>
       <m.div
         key={modo}
         initial={{ opacity: 0, y: 8 }}
@@ -1838,6 +1851,7 @@ function PassoVinculo({
         {conteudo}
       </m.div>
     </AnimatePresence>
+    </>
   )
 }
 
@@ -1900,64 +1914,37 @@ function BlocoImagemProva({
   uploadPend,
   erros,
   onArquivo,
+  onLimpar,
 }: {
   imagemProva?: string
   uploadPend: boolean
   erros?: string[]
   onArquivo: (file: File | undefined) => void
+  onLimpar: () => void
 }) {
-  const inputGaleriaId = 'onboarding-upload-galeria'
-  const inputCameraId = 'onboarding-upload-camera'
-
   return (
     <div>
-      <span className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-        Foto da carteirinha ou comprovante de vínculo <span className="text-red-500">*</span>
-      </span>
-      <div className="flex flex-wrap gap-2">
-        <label
-          htmlFor={inputGaleriaId}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-        >
-          {uploadPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Enviar arquivo
-        </label>
-        <label
-          htmlFor={inputCameraId}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--surface))]"
-        >
-          {uploadPend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-          Tirar foto
-        </label>
-      </div>
-      <input
-        id={inputGaleriaId}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        disabled={uploadPend}
-        onChange={(e) => {
-          void onArquivo(e.target.files?.[0])
-          e.target.value = ''
-        }}
+      <ImageDropZone
+        label={
+          <>
+            Foto da carteirinha ou comprovante de vínculo <span className="text-red-500">*</span>
+          </>
+        }
+        busy={uploadPend}
+        cameraLabel="Tirar foto"
+        formatsHint="JPEG, PNG ou WebP — ajuste o enquadramento antes de enviar"
+        file={
+          imagemProva
+            ? {
+                name: 'comprovante.jpg',
+                status: uploadPend ? 'uploading' : 'done',
+                previewUrl: imagemProva,
+              }
+            : null
+        }
+        onClear={imagemProva ? onLimpar : undefined}
+        onFile={(file) => onArquivo(file)}
       />
-      <input
-        id={inputCameraId}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        disabled={uploadPend}
-        onChange={(e) => {
-          void onArquivo(e.target.files?.[0])
-          e.target.value = ''
-        }}
-      />
-      {imagemProva && (
-        <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
-          <Check className="h-3 w-3" /> Imagem anexada
-        </p>
-      )}
       {erros?.[0] && <p className="mt-1 text-xs text-red-600">{erros[0]}</p>}
     </div>
   )
