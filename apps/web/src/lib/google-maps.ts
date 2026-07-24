@@ -302,6 +302,7 @@ export type GoogleMapsNamespace = {
         handler: (...args: unknown[]) => void,
       ) => { remove: () => void }
       clearInstanceListeners: (instance: object) => void
+      trigger: (instance: object, eventName: string, ...args: unknown[]) => void
     }
   }
 }

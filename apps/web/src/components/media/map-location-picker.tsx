@@ -167,6 +167,24 @@ export function MapLocationPicker({ lat, lng, onPick, className }: Props) {
     }
   }, [mapReady, lat, lng])
 
+  // Contêiner com altura flexível (stretch no form): o Maps precisa de resize
+  // quando o box muda após o layout inicial.
+  useEffect(() => {
+    const map = mapRef.current
+    const el = containerRef.current
+    const g = gRef.current
+    if (!mapReady || !map || !el || !g) return
+
+    const ro = new ResizeObserver(() => {
+      g.maps.event.trigger(map, 'resize')
+      if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+        map.panTo({ lat, lng })
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mapReady, lat, lng])
+
   if (!configured || loadFailed) {
     return (
       <div
@@ -188,7 +206,7 @@ export function MapLocationPicker({ lat, lng, onPick, className }: Props) {
         ref={containerRef}
         role="application"
         aria-label="Mapa para marcar a localização"
-        className="h-full w-full overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]"
+        className="h-full w-full overflow-hidden bg-[rgb(var(--background-subtle))]"
       />
       {mapLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-[rgb(var(--background-subtle))]/90 text-[rgb(var(--foreground-muted))]">

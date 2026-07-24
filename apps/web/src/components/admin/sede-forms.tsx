@@ -61,7 +61,7 @@ const SedeMapPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-72 w-full animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]" />
+      <div className="h-full min-h-[18rem] w-full animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]" />
     ),
   },
 )
@@ -496,8 +496,8 @@ function SedeLocalizacaoFields({
   const streetViewPreview =
     mapsConfigured && hasCoords
       ? buildStreetViewImageUrl(previewSede, {
-          width: 640,
-          height: 360,
+          width: 400,
+          height: 225,
           heading: svHeading,
           pitch: svPitch,
           fov: svFov,
@@ -505,6 +505,14 @@ function SedeLocalizacaoFields({
       : null
 
   const fotoPreview = fotoUrl.trim() || null
+
+  // FOV alto = mais aberto; o slider de Zoom inverte (direita = aproximar).
+  const SV_FOV_MIN = 30
+  const SV_FOV_MAX = 100
+  const zoomSlider = SV_FOV_MAX + SV_FOV_MIN - svFov
+  const zoomPercent = Math.round(
+    ((zoomSlider - SV_FOV_MIN) / (SV_FOV_MAX - SV_FOV_MIN)) * 100,
+  )
 
   useEffect(() => {
     return () => {
@@ -757,7 +765,7 @@ function SedeLocalizacaoFields({
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-stretch">
         <div className="space-y-4">
           <div>
             <FieldLabel>
@@ -921,11 +929,11 @@ function SedeLocalizacaoFields({
           </div>
         </div>
 
-        <div className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+        <div className="flex min-h-[20rem] flex-col lg:min-h-0">
           {mapsConfigured ? (
             mapVisible ? (
-              <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                <div className="flex items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-3 py-2">
+              <div className="flex min-h-[20rem] flex-1 flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[rgb(var(--border))] px-3 py-2">
                   <p className="text-xs font-semibold text-[rgb(var(--foreground))]">
                     Mapa interativo
                   </p>
@@ -933,20 +941,22 @@ function SedeLocalizacaoFields({
                     Clique ou arraste o pin
                   </p>
                 </div>
-                <SedeMapPicker
-                  lat={hasCoords ? latN : null}
-                  lng={hasCoords ? lngN : null}
-                  onPick={(coords) => aplicarCoords(coords, 'map')}
-                  className="h-72 w-full sm:h-80"
-                />
+                <div className="relative min-h-[18rem] flex-1">
+                  <SedeMapPicker
+                    lat={hasCoords ? latN : null}
+                    lng={hasCoords ? lngN : null}
+                    onPick={(coords) => aplicarCoords(coords, 'map')}
+                    className="absolute inset-0 h-full w-full rounded-none border-0"
+                  />
+                </div>
               </div>
             ) : (
-              <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 text-sm text-[rgb(var(--foreground-muted))] sm:h-80">
+              <div className="flex min-h-[20rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 text-sm text-[rgb(var(--foreground-muted))]">
                 Abra a etapa Localização para o mapa
               </div>
             )
           ) : (
-            <div className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
+            <div className="flex min-h-[20rem] flex-1 items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
               Google Maps não configurado. Informe latitude e longitude manualmente.
             </div>
           )}
@@ -961,18 +971,18 @@ function SedeLocalizacaoFields({
               Ajuste a fachada exibida no mapa e nas listagens de unidades.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,14rem)] sm:items-stretch">
-            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="relative aspect-[16/9] w-full max-w-sm shrink-0 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
               <Image
                 src={streetViewPreview}
                 alt="Prévia Street View"
                 fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 55vw"
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, 24rem"
                 unoptimized
               />
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 sm:max-w-[14rem]">
               <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
                 Direção ({svHeading}°)
                 <input
@@ -1002,14 +1012,14 @@ function SedeLocalizacaoFields({
                 />
               </label>
               <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-                Zoom ({svFov}° FOV)
+                Zoom ({zoomPercent}%)
                 <input
                   type="range"
-                  min={30}
-                  max={100}
-                  value={svFov}
+                  min={SV_FOV_MIN}
+                  max={SV_FOV_MAX}
+                  value={zoomSlider}
                   onChange={(e) => {
-                    setSvFov(Number(e.target.value))
+                    setSvFov(SV_FOV_MAX + SV_FOV_MIN - Number(e.target.value))
                     markFormDirty(formId)
                   }}
                   className="mt-1 w-full accent-[rgb(var(--primary))]"
