@@ -78,3 +78,8 @@ export function isPaiHerdadoDeTorcidaPrincipal(
 ): boolean {
   return Boolean(paiTenantId && paiTenantId !== tenantAtualId)
 }
+
+/** Sede raiz (tipo SEDE) não pode mudar de tipo na edição. */
+export function isTipoSedeTravado(tipoAtual: TipoSede): boolean {
+  return tipoAtual === 'SEDE'
+}

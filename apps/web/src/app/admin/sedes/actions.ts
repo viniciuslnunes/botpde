@@ -6,6 +6,7 @@ import {
   validarHierarquiaSede,
   validarRebaixamentoComFilhos,
   isPaiHerdadoDeTorcidaPrincipal,
+  isTipoSedeTravado,
   type TipoSede,
 } from '@/lib/sede-regras'
 import { buildGeocodeQuery, geocodeLatLng, isGoogleMapsConfigured } from '@/lib/google-maps'
@@ -290,6 +291,11 @@ export async function editarSede(
       sedePaiId = existing.sedeId
       tipoFinal = existing.tipo as TipoSede
     }
+  }
+
+  // Sede raiz: tipo SEDE não pode ser rebaixado via form (tampers no cliente).
+  if (isTipoSedeTravado(existing.tipo as TipoSede)) {
+    tipoFinal = 'SEDE'
   }
 
   if (sedePaiId && (await wouldCreateSedeCycle(sedeId, sedePaiId))) {

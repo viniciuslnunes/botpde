@@ -4,6 +4,7 @@ import {
   validarHierarquiaSede,
   validarRebaixamentoComFilhos,
   isPaiHerdadoDeTorcidaPrincipal,
+  isTipoSedeTravado,
 } from '@/lib/sede-regras'
 
 describe('sede-regras', () => {
@@ -56,5 +57,11 @@ describe('sede-regras', () => {
     expect(isPaiHerdadoDeTorcidaPrincipal('tenant-a', 'tenant-a')).toBe(false)
     expect(isPaiHerdadoDeTorcidaPrincipal(null, 'tenant-a')).toBe(false)
     expect(isPaiHerdadoDeTorcidaPrincipal(undefined, 'tenant-a')).toBe(false)
+  })
+
+  it('trava tipo da sede raiz na edição', () => {
+    expect(isTipoSedeTravado('SEDE')).toBe(true)
+    expect(isTipoSedeTravado('SUBSEDE')).toBe(false)
+    expect(isTipoSedeTravado('PONTO_ENCONTRO')).toBe(false)
   })
 })

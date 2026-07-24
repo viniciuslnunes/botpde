@@ -53,7 +53,7 @@ import {
   reverseGeocodeEndereco,
 } from '@/lib/google-maps'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
+import { isTipoSedeTravado, tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
@@ -982,12 +982,12 @@ function SedeLocalizacaoFields({
               Usar como foto
             </button>
           </div>
-          <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+          <div className="relative aspect-[16/9] max-h-56 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:max-h-64">
             <Image
               src={streetViewPreview}
               alt="Prévia Street View"
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 40vw"
               unoptimized
             />
@@ -1038,6 +1038,7 @@ function SedeLocalizacaoFields({
           </p>
         </div>
         <ImageDropZone
+          layout="split"
           busy={uploading}
           onFile={onImageFile}
           formatsHint="JPEG, PNG, WebP ou GIF, até 10 MB — ajuste o enquadramento antes do envio"
@@ -1083,6 +1084,9 @@ function SedeIdentidadeFields({
 }) {
   const [tipo, setTipo] = useState<TipoSede>((defaults?.tipo as TipoSede) ?? 'PONTO_ENCONTRO')
   const hierarquiaTravada = Boolean(paiHerdado)
+  const sedePrincipalTravada =
+    Boolean(defaults?.id) && isTipoSedeTravado((defaults?.tipo as TipoSede) ?? tipo)
+  const tipoTravado = hierarquiaTravada || sedePrincipalTravada
   const paisPermitidos = hierarquiaTravada ? null : tiposPaiPermitidos(tipo)
   const sedesPai = paisPermitidos
     ? sedes.filter((s) => paisPermitidos.includes(s.tipo as TipoSede))
@@ -1094,21 +1098,25 @@ function SedeIdentidadeFields({
         ? 'Subsede'
         : 'PDE'
 
+  const hierarquiaHint = hierarquiaTravada
+    ? 'PDE afiliado à torcida principal — tipo e vínculo pai ficam fixos nesta edição.'
+    : sedePrincipalTravada
+      ? 'Sede principal da torcida — o tipo não pode ser alterado.'
+      : 'Sede → Subsede → PDE. O tipo define quais unidades podem ser pai desta.'
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/35 px-4 py-3">
         <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Hierarquia da torcida</p>
         <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
-          {hierarquiaTravada
-            ? 'PDE afiliado à torcida principal — tipo e vínculo pai ficam fixos nesta edição.'
-            : 'Sede → Subsede → PDE. O tipo define quais unidades podem ser pai desta.'}
+          {hierarquiaHint}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <FieldLabel required>Tipo</FieldLabel>
-          {hierarquiaTravada ? (
+          {tipoTravado ? (
             <>
               <input type="hidden" name="tipo" value={tipo} />
               <Select value={tipo} disabled aria-readonly="true">
