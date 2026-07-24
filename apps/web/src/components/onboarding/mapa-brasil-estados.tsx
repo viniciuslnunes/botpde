@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Loader2, MapPin, Search, Sparkles, X, ZoomOut } from 'lucide-react'
 import { BandeiraEstado } from '@/components/onboarding/bandeira-estado'
@@ -31,8 +31,12 @@ import {
 
 const VIEWBOX_FULL = '0 0 450 460'
 
-/** Altura máxima do bloco mapa + listagem (evita página vazia ao rolar). */
-const ALTURA_BLOCO = 'min(72vh, 580px)'
+/**
+ * Altura do bloco mapa + listagem só em desktop (lado a lado).
+ * No mobile o bloco cresce com o conteúdo — altura fixa + mapa + chips
+ * espremia a lista a ~0px e os clubes sumiam da viewport.
+ */
+const ALTURA_BLOCO_LG = 'lg:h-[min(72vh,580px)]'
 
 type Props = {
   afiliacoes: AfiliacaoOnboarding[]
@@ -263,7 +267,7 @@ function ListaClubesScroll({
     )
   }
 
-  return (
+return (
     <m.ul
       className="grid grid-cols-1 gap-2.5 p-3 sm:grid-cols-1 sm:p-4"
       variants={staggerContainer}
@@ -271,7 +275,7 @@ function ListaClubesScroll({
       animate="show"
     >
       {clubes.map((c) => (
-        <m.li key={c.id} variants={staggerItem}>
+        <m.li key={c.id} variants={staggerItem} className="min-w-0">
           <ClubeOnboardingCard clube={c} onSelecionar={onSelecionarClube} compact />
         </m.li>
       ))}
@@ -289,6 +293,7 @@ function PainelLateral({
   onSelecionarClube,
   reduceMotion,
   busca,
+  panelRef,
 }: {
   modo: 'estado' | 'busca'
   uf?: string
@@ -299,6 +304,7 @@ function PainelLateral({
   onSelecionarClube: (a: AfiliacaoOnboarding) => void
   reduceMotion: boolean
   busca?: string
+  panelRef?: RefObject<HTMLElement | null>
 }) {
   const filtrados = useMemo(() => {
     const q = filtroLocal.trim().toLowerCase()
@@ -322,6 +328,7 @@ function PainelLateral({
 
   return (
     <m.aside
+      ref={panelRef}
       key={modo === 'estado' ? uf : 'busca'}
       initial={{ opacity: 0, x: reduceMotion ? 0 : 16 }}
       animate={{ opacity: 1, x: 0 }}
@@ -339,7 +346,11 @@ function PainelLateral({
         mostrarFiltro={clubes.length > 4}
         reduceMotion={reduceMotion}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+      {/*
+        Mobile: lista no fluxo da página (sem altura fixa do pai) — overflow visível.
+        Desktop: scroll interno dentro do painel lado a lado.
+      */}
+      <div className="min-h-0 flex-1 overscroll-contain lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
         <ListaClubesScroll
           clubes={filtrados}
           onSelecionarClube={onSelecionarClube}
@@ -371,6 +382,7 @@ export function MapaBrasilEstados({
   const [regiaoDestaque, setRegiaoDestaque] = useState<RegiaoBrasilId | null>(null)
   const [viewport, setViewport] = useState<MapViewport>(VIEWBOX_BRASIL)
   const [filtroPainel, setFiltroPainel] = useState('')
+  const painelRef = useRef<HTMLElement | null>(null)
 
   const buscaAtiva = Boolean(busca.trim())
   const painelAtivo = Boolean(ufSelecionada) || buscaAtiva
@@ -422,6 +434,19 @@ export function MapaBrasilEstados({
     setViewport(VIEWBOX_BRASIL)
   }, [ufSelecionada, regiaoDestaque, buscaAtiva])
 
+  // No mobile o mapa fica acima da lista — ao selecionar UF/busca, leva o painel à vista.
+  useEffect(() => {
+    if (!painelAtivo || !painelRef.current) return
+    if (typeof window === 'undefined') return
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches
+    if (isDesktop) return
+    const el = painelRef.current
+    const id = window.requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [painelAtivo, ufSelecionada, buscaAtiva, reduceMotion])
+
   function selecionarUf(uf: string) {
     if ((totalPorUf.get(uf) ?? 0) === 0) return
     onUfSelecionar(ufSelecionada === uf ? '' : uf)
@@ -468,8 +493,9 @@ export function MapaBrasilEstados({
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm"
-      style={painelAtivo ? { height: ALTURA_BLOCO } : undefined}
+      className={`flex flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-sm ${
+        painelAtivo ? ALTURA_BLOCO_LG : ''
+      }`}
     >
       <div
         className="shrink-0 border-b border-[rgb(var(--border))] px-4 py-3.5 sm:px-5"
@@ -513,15 +539,11 @@ export function MapaBrasilEstados({
         </div>
       </div>
 
-      <div
-        className={`flex min-h-0 flex-1 flex-col lg:flex-row ${
-          painelAtivo ? '' : ''
-        }`}
-      >
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div
           className={`relative flex shrink-0 flex-col overflow-hidden transition-opacity ${
             painelAtivo
-              ? 'h-[min(38vh,240px)] lg:h-auto lg:min-h-0 lg:flex-1'
+              ? 'h-[min(32vh,200px)] lg:h-auto lg:min-h-0 lg:flex-1'
               : 'flex-1'
           } ${buscaAtiva ? 'opacity-60' : ''}`}
         >
@@ -613,7 +635,7 @@ export function MapaBrasilEstados({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex min-h-0 flex-1 items-center justify-center border-t border-[rgb(var(--border))] lg:border-l lg:border-t-0"
+              className="flex min-h-[120px] flex-1 items-center justify-center border-t border-[rgb(var(--border))] lg:min-h-0 lg:border-l lg:border-t-0"
             >
               <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
             </m.div>
@@ -628,6 +650,7 @@ export function MapaBrasilEstados({
               onLimpar={fecharPainel}
               onSelecionarClube={onSelecionarClube}
               reduceMotion={reduceMotion ?? false}
+              panelRef={painelRef}
             />
           ) : modoPainel === 'busca' ? (
             <PainelLateral
@@ -640,12 +663,14 @@ export function MapaBrasilEstados({
               onSelecionarClube={onSelecionarClube}
               reduceMotion={reduceMotion ?? false}
               busca={busca}
+              panelRef={painelRef}
             />
           ) : null}
         </AnimatePresence>
       </div>
 
-      {!buscaAtiva && (
+      {/* Chips de região só quando ainda não há painel — no mobile competiam com a lista. */}
+      {!buscaAtiva && !ufSelecionada && (
         <m.div
           variants={fadeUp}
           initial="hidden"

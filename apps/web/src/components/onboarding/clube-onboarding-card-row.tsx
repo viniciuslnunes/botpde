@@ -12,11 +12,13 @@ type Props = {
 
 /** Card horizontal — listas do painel do mapa e destaques. */
 export function ClubeOnboardingCardRow({ clube, onSelecionar }: Props) {
+  const label = clube.apelido || clube.nome
   return (
     <button
       type="button"
       onClick={() => onSelecionar(clube)}
-      className="group flex w-full cursor-pointer items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2.5 text-left transition-all hover:border-[rgb(var(--color-primary))]/70 hover:bg-[rgb(var(--color-primary))]/[0.04] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
+      aria-label={`Selecionar ${label}`}
+      className="group flex w-full cursor-pointer items-center gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2.5 text-left transition-all hover:border-[rgb(var(--color-primary))]/70 hover:bg-[rgb(var(--color-primary))]/[0.04] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] [&_*]:pointer-events-none"
     >
       <EscudoClube
         nome={clube.nome}

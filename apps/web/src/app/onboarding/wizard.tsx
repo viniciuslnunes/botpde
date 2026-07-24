@@ -212,6 +212,8 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
 
   // ── Passo 1 → 2: salva clube (+ região se já preenchida depois) ──────────────
   function selecionarClube(afiliacao: AfiliacaoOnboarding) {
+    // Ref sincronizada já: avancarPara → passoAlcancavel lê clubeRef antes do re-render.
+    clubeRef.current = afiliacao
     setClube(afiliacao)
     limparErro()
     avancarPara('regiao')
@@ -236,6 +238,8 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
 
   // ── Passo 3: escolher torcida ou seguir como torcedor global ─────────────────
   function escolherTorcida(t: TorcidaOnboarding) {
+    // Idem: passoAlcancavel bloqueia unidade/vínculo sem torcidaRef.
+    torcidaRef.current = t
     setTorcida(t)
     setUnidadeId(null)
     setUnidadeNaoListada(false)
@@ -268,11 +272,11 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col">
       {/* Cabeçalho + progresso */}
-      <header className="mb-8">
+      <header className="mb-8 min-w-0">
         <div className="mb-6 flex items-center gap-2 text-[rgb(var(--color-primary-fg))]">
-          <Shield className="h-6 w-6" />
+          <Shield className="h-6 w-6 shrink-0" />
           <span className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
             Bem-vindo
           </span>
@@ -286,7 +290,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
         </div>
       )}
 
-      <div className="flex-1">
+      <div className="min-w-0 flex-1 overflow-x-hidden">
         <AnimatePresence mode="wait" custom={slideDir}>
           {passo === 'clube' && (
             <m.div
@@ -297,6 +301,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               animate="animate"
               exit="exit"
               transition={springGentle}
+              className="min-w-0"
             >
               <PassoClube
                 afiliacoesIniciais={afiliacoesIniciais}
@@ -315,6 +320,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               animate="animate"
               exit="exit"
               transition={springGentle}
+              className="min-w-0"
             >
               <PassoRegiao
                 clube={clube}
@@ -352,6 +358,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               animate="animate"
               exit="exit"
               transition={springGentle}
+              className="min-w-0"
             >
               <PassoTorcida
                 clube={clube}
@@ -373,6 +380,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               animate="animate"
               exit="exit"
               transition={springGentle}
+              className="min-w-0"
             >
               <PassoUnidade
                 torcida={torcida}
@@ -397,6 +405,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
               animate="animate"
               exit="exit"
               transition={springGentle}
+              className="min-w-0"
             >
               <PassoVinculo
                 clube={clube}
@@ -437,12 +446,12 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
 
 function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
   return (
-    <ol className="flex items-center gap-2">
+    <ol className="flex min-w-0 items-center gap-1.5 sm:gap-2">
       {PASSOS_VISIVEIS.map((p, i) => {
         const feito = i < indiceAtual
         const atual = i === indiceAtual
         return (
-          <li key={p.key} className="relative flex flex-1 flex-col gap-1.5">
+          <li key={p.key} className="relative flex min-w-0 flex-1 flex-col gap-1.5">
             <div className="h-1.5 overflow-hidden rounded-full bg-[rgb(var(--border))]">
               <m.div
                 className="h-full rounded-full bg-[rgb(var(--color-primary))]"
@@ -452,7 +461,7 @@ function ProgressBar({ indiceAtual }: { indiceAtual: number }) {
               />
             </div>
             <span
-              className={`text-[11px] ${
+              className={`truncate text-[10px] sm:text-[11px] ${
                 atual
                   ? 'font-semibold text-[rgb(var(--foreground))]'
                   : 'font-medium text-[rgb(var(--foreground-muted))]'
@@ -752,59 +761,64 @@ function PassoTorcida({
 }) {
   const nomeClube = clube?.apelido || clube?.nome || 'seu clube'
   return (
-    <div>
+    <div className="min-w-0">
       <BotaoVoltar onClick={onVoltar} disabled={pending} />
-      <h1 className="text-2xl font-bold tracking-tight text-[rgb(var(--foreground))] text-balance sm:text-3xl">
+      <h1 className="text-2xl font-bold tracking-tight text-balance text-[rgb(var(--foreground))] sm:text-3xl">
         Você pertence a alguma organizada?
       </h1>
       <p className="mt-1.5 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
         Comece como torcedor do {nomeClube} ou vincule-se a uma torcida na plataforma.
       </p>
 
-      {/* Caminho padrão: só torcedor — sempre primeiro */}
-      <button
-        type="button"
-        onClick={onTorcedorGlobal}
-        disabled={pending}
-        className="mt-6 flex w-full items-center gap-4 rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50 sm:gap-5 sm:p-5"
-      >
-        {pending ? (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
-          </div>
-        ) : (
-          <EscudoClube
-            nome={nomeClube}
-            apelido={clube?.apelido}
-            escudoUrl={clube?.escudoUrl}
-            size="xl"
-            shape="circle"
-            priority
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-            Sem organizada
-          </p>
-          <p className="mt-0.5 text-base font-semibold text-[rgb(var(--foreground))] sm:text-lg">
-            Sou só torcedor do {nomeClube}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-[rgb(var(--foreground-muted))]">
-            Acesso à comunidade nacional — posts, novidades e conversa entre torcedores.
-            Sem vínculo com torcida organizada.
-          </p>
-          {clube && (
-            <div className="mt-2">
-              <LinhaPlataforma
-                rotulo="Torcedores"
-                total={clube.stats.torcedoresTotal}
-                online={clube.stats.torcedoresOnline}
-              />
+      {/* Caminho padrão: só torcedor — 1ª célula da grade (não estica full-width) */}
+      <ul className="mt-6 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+        <li className="min-w-0">
+          <button
+            type="button"
+            onClick={onTorcedorGlobal}
+            disabled={pending}
+            className="group flex h-full w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border-2 border-[rgb(var(--color-primary))]/35 bg-[rgb(var(--color-primary))]/5 text-center transition-[border-color,background-color,box-shadow] duration-150 hover:border-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] disabled:opacity-50"
+          >
+            <div className="flex w-full shrink-0 items-center justify-center bg-[rgb(var(--background-subtle))]/60 px-5 py-6 sm:px-6 sm:py-7">
+              {pending ? (
+                <div className="flex h-28 w-28 items-center justify-center sm:h-32 sm:w-32">
+                  <Loader2 className="h-6 w-6 animate-spin text-[rgb(var(--foreground-muted))]" />
+                </div>
+              ) : (
+                <div className="relative h-28 w-28 sm:h-32 sm:w-32">
+                  <EscudoClube
+                    nome={nomeClube}
+                    apelido={clube?.apelido}
+                    escudoUrl={clube?.escudoUrl}
+                    size="fill"
+                    priority
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <ArrowRight className="hidden h-5 w-5 shrink-0 text-[rgb(var(--color-primary-fg))] sm:block" />
-      </button>
+            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 p-3.5 sm:p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
+                Sem organizada
+              </p>
+              <p className="line-clamp-2 w-full text-xs font-semibold leading-snug text-[rgb(var(--foreground))] sm:text-sm">
+                Sou só torcedor do {nomeClube}
+              </p>
+              <p className="line-clamp-3 w-full text-[11px] leading-snug text-[rgb(var(--foreground-muted))]">
+                Comunidade nacional — sem vínculo com torcida organizada.
+              </p>
+              {clube ? (
+                <div className="mt-auto flex w-full justify-center pt-1">
+                  <LinhaPlataforma
+                    rotulo="Torcedores"
+                    total={clube.stats.torcedoresTotal}
+                    online={clube.stats.torcedoresOnline}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </button>
+        </li>
+      </ul>
 
       {torcidas.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] p-8 text-center">
@@ -825,15 +839,15 @@ function PassoTorcida({
             <div className="h-px flex-1 bg-[rgb(var(--border))]" />
           </div>
 
-          <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+          <ul className="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {torcidas.map((t, i) => (
-              <li key={t.id}>
-                <MotionReveal index={i} className="h-full">
+              <li key={t.id} className="min-w-0">
+                <MotionReveal index={i} className="h-full min-w-0 w-full">
                   <TorcidaOnboardingCard
                     torcida={t}
                     onEscolher={onEscolher}
                     disabled={pending}
-                    priority={i < 4}
+                    priority={i < 6}
                   />
                 </MotionReveal>
               </li>
@@ -886,17 +900,29 @@ function PassoUnidade({
   const [enviando, startEnvio] = useTransition()
   const [localizacaoEfetiva, setLocalizacaoEfetiva] = useState(localizacao)
   const [sedesResolvidas, setSedesResolvidas] = useState(torcida.sedes)
+  const [geoRegiaoPend, setGeoRegiaoPend] = useState(() => !localizacao && Boolean(cidade.trim() && uf.trim()))
+  const [geoSedesPend, setGeoSedesPend] = useState(() =>
+    torcida.sedes.some((s) => s.lat == null || s.lng == null),
+  )
 
-  // Garante coords mesmo se o usuário avançou antes do geocode da cidade terminar.
+  // Garante coords da região do usuário (cidade/UF) para calcular km.
   useEffect(() => {
     if (localizacao) {
       setLocalizacaoEfetiva(localizacao)
+      setGeoRegiaoPend(false)
       return
     }
-    if (!cidade.trim() || !uf.trim()) return
+    if (!cidade.trim() || !uf.trim()) {
+      setLocalizacaoEfetiva(undefined)
+      setGeoRegiaoPend(false)
+      return
+    }
     let ativo = true
+    setGeoRegiaoPend(true)
     void forwardGeocodeRegion(cidade, uf).then((regiao) => {
-      if (ativo && regiao) setLocalizacaoEfetiva(regiao)
+      if (!ativo) return
+      setLocalizacaoEfetiva(regiao ?? undefined)
+      setGeoRegiaoPend(false)
     })
     return () => {
       ativo = false
@@ -907,8 +933,16 @@ function PassoUnidade({
   useEffect(() => {
     let ativo = true
     setSedesResolvidas(torcida.sedes)
+    const precisaEnrich = torcida.sedes.some((s) => s.lat == null || s.lng == null)
+    if (!precisaEnrich) {
+      setGeoSedesPend(false)
+      return
+    }
+    setGeoSedesPend(true)
     void enrichSedesComCoordenadas(torcida.sedes).then((sedes) => {
-      if (ativo) setSedesResolvidas(sedes)
+      if (!ativo) return
+      setSedesResolvidas(sedes)
+      setGeoSedesPend(false)
     })
     return () => {
       ativo = false
@@ -922,6 +956,10 @@ function PassoUnidade({
     localizacaoEfetiva,
   )
   const temUnidades = sedesResolvidas.length > 0
+  const temAlgumaDistancia =
+    recomendadas.some((s) => s.distanciaKm != null) ||
+    outras.some((s) => s.distanciaKm != null)
+  const resolvendoDistancias = (geoRegiaoPend || geoSedesPend) && !temAlgumaDistancia
 
   function selecionarUnidade(id: string) {
     setModoNaoListada(false)
@@ -990,53 +1028,76 @@ function PassoUnidade({
   }
 
   return (
-    <div className="pb-20">
+    <div className="min-w-0 pb-20">
       <BotaoVoltar onClick={onVoltar} disabled={pending || enviando} />
-      <h1 className="text-xl font-bold text-balance text-[rgb(var(--foreground))] sm:text-2xl">
+      <h1 className="text-xl font-bold text-balance break-words text-[rgb(var(--foreground))] sm:text-2xl">
         Onde você participa na {torcida.nome}?
       </h1>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-sm text-[rgb(var(--foreground-muted))]">
-          Escolha a sede, subsede ou PDE da sua região.
+      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="min-w-0 text-sm text-[rgb(var(--foreground-muted))]">
+          Escolha a sede, subsede ou PDE da sua região
+          {temAlgumaDistancia ? ' — com distância em km' : ''}.
         </p>
         {regiaoLabel && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground))]">
-            <MapPin className="h-3 w-3 text-[rgb(var(--color-primary-fg))]" aria-hidden />
-            {regiaoLabel}
+          <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground))]">
+            <MapPin className="h-3 w-3 shrink-0 text-[rgb(var(--color-primary-fg))]" aria-hidden />
+            <span className="truncate">{regiaoLabel}</span>
           </span>
         )}
+        {resolvendoDistancias && !temAlgumaDistancia ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            Calculando distâncias…
+          </span>
+        ) : null}
       </div>
 
       {!temUnidades ? (
-        <div className="mt-4 rounded-xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
+        <div className="mt-6 rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-5 text-center text-sm text-[rgb(var(--foreground-muted))]">
           Ainda não há unidades cadastradas para esta torcida. Solicite o cadastro abaixo.
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
+        <div className="mt-6 min-w-0">
           {recomendadas.length > 0 && (
             <ListaUnidades
               titulo="Recomendadas"
               sedes={recomendadas}
               selecionada={selecionada}
               onSelecionar={selecionarUnidade}
-              priorityCount={3}
+              priorityCount={2}
+              colunas={3}
             />
           )}
+
           {outras.length > 0 && (
-            <ListaUnidades
-              titulo="Outras unidades"
-              sedes={outras}
-              selecionada={selecionada}
-              onSelecionar={selecionarUnidade}
-            />
+            <>
+              {recomendadas.length > 0 && (
+                <div className="mt-8 flex items-center gap-3" role="separator">
+                  <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+                  <p className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                    Ou escolha outra unidade
+                  </p>
+                  <div className="h-px flex-1 bg-[rgb(var(--border))]" />
+                </div>
+              )}
+              <div className={recomendadas.length > 0 ? 'mt-5' : undefined}>
+                <ListaUnidades
+                  titulo={recomendadas.length > 0 ? undefined : 'Unidades'}
+                  sedes={outras}
+                  selecionada={selecionada}
+                  onSelecionar={selecionarUnidade}
+                  colunas={3}
+                />
+              </div>
+            </>
           )}
         </div>
       )}
 
       {/* Ação secundária sempre visível perto da lista — sem card grande até expandir */}
       {!modoNaoListada ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-[rgb(var(--border))] pt-3">
+          <p className="min-w-0 text-xs text-[rgb(var(--foreground-muted))]">
             Não encontrou sua unidade?
           </p>
           <button
@@ -1046,7 +1107,7 @@ function PassoUnidade({
               setSelecionada(null)
               onErro(null)
             }}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+            className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >
             <Mail className="h-3.5 w-3.5" />
             Solicitar cadastro
@@ -1257,31 +1318,47 @@ function ListaUnidades({
   selecionada,
   onSelecionar,
   priorityCount = 0,
+  colunas = 2,
 }: {
-  titulo: string
+  titulo?: string
   sedes: SedeOnboardingComDistancia[]
   selecionada: string | null
   onSelecionar: (id: string) => void
   /** Quantas imagens priorizar (LCP) no topo da lista. */
   priorityCount?: number
+  /** Grade no desktop — mesmo padrão do passo Torcida (2 colunas). */
+  colunas?: 1 | 2 | 3
 }) {
+  const compact = colunas > 1
+  const gridClass =
+    colunas === 3
+      ? 'grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4'
+      : colunas === 2
+        ? 'grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4'
+        : 'grid min-w-0 grid-cols-1 gap-3'
+
   return (
-    <div>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-        {titulo}
-        <span className="ml-1.5 font-normal tabular-nums text-[rgb(var(--foreground-muted))]/80">
-          ({sedes.length})
-        </span>
-      </p>
-      <ul className="grid gap-2 sm:grid-cols-2">
+    <div className="min-w-0 w-full">
+      {titulo ? (
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          {titulo}
+          <span className="ml-1.5 font-normal tabular-nums text-[rgb(var(--foreground-muted))]/80">
+            ({sedes.length})
+          </span>
+        </p>
+      ) : null}
+      <ul className={gridClass}>
         {sedes.map((s, index) => (
-          <li key={s.id}>
-            <UnidadeOnboardingCard
-              sede={s}
-              selecionada={selecionada === s.id}
-              onSelecionar={onSelecionar}
-              priority={index < priorityCount}
-            />
+          <li key={s.id} className="min-w-0">
+            <MotionReveal index={index} className="h-full min-w-0 w-full">
+              <UnidadeOnboardingCard
+                sede={s}
+                selecionada={selecionada === s.id}
+                onSelecionar={onSelecionar}
+                priority={index < priorityCount}
+                compact={compact}
+              />
+            </MotionReveal>
           </li>
         ))}
       </ul>
@@ -1488,7 +1565,6 @@ function PassoVinculo({
                 apelido={clube?.apelido}
                 escudoUrl={clube?.escudoUrl}
                 size="xl"
-                shape="circle"
                 priority
               />
             </div>
@@ -1543,7 +1619,6 @@ function PassoVinculo({
                 nome={torcida.nome}
                 escudoUrl={torcida.logoUrl}
                 size="xl"
-                shape="circle"
                 priority
               />
               <span
@@ -1603,7 +1678,7 @@ function PassoVinculo({
             Preencha seus dados. A liderança da {torcida.nome} vai analisar.
           </p>
         </div>
-        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="xl" shape="circle" />
+        <EscudoClube nome={torcida.nome} escudoUrl={torcida.logoUrl} size="xl" />
       </div>
 
       <div className="mt-6 space-y-4">

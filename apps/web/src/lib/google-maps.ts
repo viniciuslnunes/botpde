@@ -57,8 +57,9 @@ export function buildStreetViewImageUrl(
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
   const location = queryLocal(sede)
   if (!key || !location) return null
-  const w = opts?.width ?? 640
-  const h = opts?.height ?? 280
+  // Street View Static API: máximo 640×640.
+  const w = Math.min(opts?.width ?? 640, 640)
+  const h = Math.min(opts?.height ?? 280, 640)
   const params = new URLSearchParams({
     size: `${w}x${h}`,
     location,

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Shield } from 'lucide-react'
+import { detectarEscudoCircular } from '@/lib/escudo-forma'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 
 const SIZES = {
@@ -15,14 +16,20 @@ const SIZES = {
 } as const
 
 export type EscudoClubeSize = keyof typeof SIZES
-export type EscudoClubeShape = 'rounded' | 'circle'
+export type EscudoClubeShape = 'rounded' | 'circle' | 'auto'
 
 type Props = {
   nome: string
   apelido?: string | null
   escudoUrl?: string | null
   size?: EscudoClubeSize
-  /** Forma do placeholder (sem imagem). Com logo: sem moldura — o PNG fala por si. */
+  /**
+   * Forma do frame.
+   * - `auto` (default): só aplica máscara circular quando detecta logo redondo
+   *   com cantos brancos opacos (fundo assado). PNG com alpha (ex.: Gaviões)
+   *   permanece natural — o card já aparece pelo transparência.
+   * - `circle` / `rounded`: força o placeholder; com imagem, `circle` mascara.
+   */
   shape?: EscudoClubeShape
   /** Prioriza decode/fetch (primeiros cards acima da dobra). */
   priority?: boolean
@@ -37,25 +44,61 @@ export function inicialClubeEscudo(nome: string, apelido?: string | null): strin
 }
 
 /**
- * Escudo do clube/torcida no onboarding: frame fixo + object-contain (nunca corta o logo).
- * Com imagem: sem borda/fundo circular — logo transparente sobre o card.
- * Placeholder neutro quando ausente ou com falha — nunca inventa escudo.
+ * Escudo do clube/torcida no onboarding: frame fixo + object-contain.
+ * Máscara circular só quando detecta badge redondo com cantos brancos
+ * (Camisa 12 / Pavilhão Nove). PNG com alpha (Gaviões) fica natural.
  */
 export function EscudoClube({
   nome,
   apelido,
   escudoUrl,
   size = 'md',
-  shape = 'rounded',
+  shape = 'auto',
   priority = false,
   className,
 }: Props) {
   const [imagemFalhou, setImagemFalhou] = useState(false)
+  const [circularDetectado, setCircularDetectado] = useState(shape === 'circle')
+  const [deteccaoPronta, setDeteccaoPronta] = useState(shape !== 'auto')
   const s = SIZES[size]
   const label = apelido || nome
   const mostrarImagem = Boolean(escudoUrl && !imagemFalhou)
 
-  const boxClass = ['relative flex shrink-0 items-center justify-center', s.box, className ?? '']
+  useEffect(() => {
+    if (!escudoUrl || imagemFalhou) {
+      setDeteccaoPronta(true)
+      return
+    }
+    if (shape === 'circle') {
+      setCircularDetectado(true)
+      setDeteccaoPronta(true)
+      return
+    }
+    if (shape === 'rounded') {
+      setCircularDetectado(false)
+      setDeteccaoPronta(true)
+      return
+    }
+    let ativo = true
+    setDeteccaoPronta(false)
+    setCircularDetectado(false)
+    void detectarEscudoCircular(escudoUrl).then((circular) => {
+      if (!ativo) return
+      setCircularDetectado(circular)
+      setDeteccaoPronta(true)
+    })
+    return () => {
+      ativo = false
+    }
+  }, [escudoUrl, imagemFalhou, shape])
+
+  const aplicarMascara = circularDetectado && mostrarImagem && deteccaoPronta
+  const boxClass = [
+    'relative flex shrink-0 items-center justify-center',
+    s.box,
+    aplicarMascara ? 'overflow-hidden rounded-full' : '',
+    className ?? '',
+  ]
     .filter(Boolean)
     .join(' ')
 
@@ -91,7 +134,8 @@ export function EscudoClube({
     )
   }
 
-  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-xl'
+  const radius =
+    shape === 'circle' || (shape === 'auto' && circularDetectado) ? 'rounded-full' : 'rounded-xl'
   const placeholderClass = [
     boxClass,
     'overflow-hidden border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]',

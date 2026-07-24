@@ -22,15 +22,19 @@ type Props = {
 
 /**
  * Card de clube do passo Clube — mesma informação da grade e do hover do mapa.
+ * Hit-target = card inteiro (`[&_*]:pointer-events-none` evita imagem/meta
+ * interceptarem o clique no mobile).
  */
 export function ClubeOnboardingCard({ clube, onSelecionar, compact = false }: Props) {
   const escudoSize: EscudoClubeSize = compact ? 'sm' : 'md'
+  const label = clube.apelido || clube.nome
 
   return (
     <button
       type="button"
       onClick={() => onSelecionar(clube)}
-      className={`flex h-full w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] ${
+      aria-label={`Selecionar ${label}`}
+      className={`flex h-full w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] text-center transition-all hover:border-[rgb(var(--color-primary))] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] [&_*]:pointer-events-none ${
         compact ? 'p-3' : 'p-4'
       }`}
     >

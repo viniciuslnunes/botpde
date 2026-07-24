@@ -10,8 +10,8 @@ export default function OnboardingLayout({
 }) {
   return (
     <MotionShell>
-      <div className="app-shell-bg min-h-screen">
-        <main className="app-container relative flex min-h-screen flex-col py-8">
+      <div className="app-shell-bg min-h-screen overflow-x-hidden">
+        <main className="app-container relative flex min-h-screen min-w-0 flex-col py-8">
           {children}
         </main>
       </div>
