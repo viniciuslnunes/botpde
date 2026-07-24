@@ -93,8 +93,8 @@ export async function podeVerCanal(
 
 /**
  * Fallback de avatar dos canais oficiais: quando `Conversa.avatarUrl` é nulo,
- * usa `Sede.fotoUrl` da unidade dona do canal e, se também nulo,
- * `Tenant.logoUrl`. Batch por tenantId para evitar N+1 em listagens.
+ * usa `Sede.fotoUrl` da sede raiz do tenant e, se também nulo, `Tenant.logoUrl`.
+ * Batch por tenantId para evitar N+1 em listagens.
  */
 async function resolveFallbackAvatarsCanalOficial(
   tenantIds: string[],
@@ -103,24 +103,39 @@ async function resolveFallbackAvatarsCanalOficial(
   if (uniqueIds.length === 0) return new Map()
 
   const [sedes, tenants]: [
-    Array<{ tenantId: string | null; fotoUrl: string | null }>,
+    Array<{ id: string; tenantId: string | null; sedeId: string | null; fotoUrl: string | null }>,
     Array<{ id: string; logoUrl: string | null }>,
   ] = await Promise.all([
     db.sede.findMany({
       where: { tenantId: { in: uniqueIds } },
-      select: { tenantId: true, fotoUrl: true },
+      select: { id: true, tenantId: true, sedeId: true, fotoUrl: true },
     }),
     db.tenant.findMany({
       where: { id: { in: uniqueIds } },
       select: { id: true, logoUrl: true },
     }),
   ])
-  const sedeMap = new Map(sedes.filter((s) => s.tenantId).map((s) => [s.tenantId!, s.fotoUrl]))
+
+  const sedesPorTenant = new Map<string, Array<{ id: string; sedeId: string | null; fotoUrl: string | null }>>()
+  for (const s of sedes) {
+    if (!s.tenantId) continue
+    const list = sedesPorTenant.get(s.tenantId) ?? []
+    list.push({ id: s.id, sedeId: s.sedeId, fotoUrl: s.fotoUrl })
+    sedesPorTenant.set(s.tenantId, list)
+  }
+
+  const sedeRaizFoto = new Map<string, string | null>()
+  for (const [tenantId, list] of sedesPorTenant) {
+    const ids = new Set(list.map((s) => s.id))
+    const raiz = list.find((s) => !s.sedeId || !ids.has(s.sedeId))
+    sedeRaizFoto.set(tenantId, raiz?.fotoUrl ?? null)
+  }
+
   const tenantMap = new Map(tenants.map((t) => [t.id, t.logoUrl]))
 
   const result = new Map<string, string | null>()
   for (const id of uniqueIds) {
-    result.set(id, sedeMap.get(id) ?? tenantMap.get(id) ?? null)
+    result.set(id, sedeRaizFoto.get(id) ?? tenantMap.get(id) ?? null)
   }
   return result
 }

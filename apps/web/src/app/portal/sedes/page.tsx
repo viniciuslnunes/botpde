@@ -36,6 +36,9 @@ export default async function SedesPage({ searchParams }: PageProps) {
     responsavel: string | null
     descricao: string | null
     fotoUrl: string | null
+    streetViewHeading: number | null
+    streetViewPitch: number | null
+    streetViewFov: number | null
     sede: { id: string; nome: string; tipo: SedeTipo } | null
     filhos: Array<{ id: string; nome: string; tipo: SedeTipo; cidade: string | null }>
     eventos: Array<{ id: string; titulo: string; data: Date }>
@@ -61,6 +64,9 @@ export default async function SedesPage({ searchParams }: PageProps) {
           responsavel: true,
           descricao: true,
           fotoUrl: true,
+          streetViewHeading: true,
+          streetViewPitch: true,
+          streetViewFov: true,
           sede: { select: { id: true, nome: true, tipo: true } },
           filhos: {
             where: { ativa: true },
@@ -93,6 +99,9 @@ export default async function SedesPage({ searchParams }: PageProps) {
     responsavel: s.responsavel,
     descricao: s.descricao,
     fotoUrl: s.fotoUrl,
+    streetViewHeading: s.streetViewHeading,
+    streetViewPitch: s.streetViewPitch,
+    streetViewFov: s.streetViewFov,
     sedePai: s.sede,
     filhos: s.filhos,
     eventos: s.eventos.map((e) => ({

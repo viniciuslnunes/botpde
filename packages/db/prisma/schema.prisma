@@ -1398,6 +1398,11 @@ model Sede {
 
   lng         Float?
 
+  /// Ângulos Street View Static (fachada nas listagens de localização).
+  streetViewHeading Int? @map("street_view_heading")
+  streetViewPitch   Int? @map("street_view_pitch")
+  streetViewFov     Int? @map("street_view_fov")
+
   capacidade  Int?
 
   responsavel String?

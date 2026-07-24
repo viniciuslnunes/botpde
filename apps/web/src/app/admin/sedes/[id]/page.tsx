@@ -49,6 +49,9 @@ export default async function EditarSedePage({
     fotoUrl: string | null
     lat: number | null
     lng: number | null
+    streetViewHeading: number | null
+    streetViewPitch: number | null
+    streetViewFov: number | null
     ativa: boolean
     tenantId: string | null
   }
@@ -83,6 +86,9 @@ export default async function EditarSedePage({
         fotoUrl: true,
         lat: true,
         lng: true,
+        streetViewHeading: true,
+        streetViewPitch: true,
+        streetViewFov: true,
         ativa: true,
         tenantId: true,
       },
@@ -319,6 +325,9 @@ export default async function EditarSedePage({
               fotoUrl: sede.fotoUrl,
               lat: sede.lat,
               lng: sede.lng,
+              streetViewHeading: sede.streetViewHeading,
+              streetViewPitch: sede.streetViewPitch,
+              streetViewFov: sede.streetViewFov,
               ativa: sede.ativa,
             }}
             sedes={todasSedes}

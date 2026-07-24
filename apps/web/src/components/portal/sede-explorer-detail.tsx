@@ -16,8 +16,7 @@ import {
 import {
   buildDirectionsUrl,
   buildGoogleMapsUrl,
-  buildStreetViewImageUrl,
-  isGoogleMapsConfigured,
+  resolveSedeLocationImage,
 } from '@/lib/google-maps'
 import { formatarDistanciaKm } from '@/lib/onboarding-unidade'
 import {
@@ -38,11 +37,7 @@ type Props = {
 export function SedeExplorerDetail({ sede, distanciaKm, onSelectFilho }: Props) {
   const mapsUrl = buildGoogleMapsUrl(sede)
   const directionsUrl = buildDirectionsUrl(sede)
-  const heroUrl =
-    sede.fotoUrl ??
-    (isGoogleMapsConfigured()
-      ? buildStreetViewImageUrl(sede, { width: HERO_W, height: HERO_H })
-      : null)
+  const heroUrl = resolveSedeLocationImage(sede, { width: HERO_W, height: HERO_H })
   const enderecoCompleto = [sede.endereco, sede.cidade, sede.estado, sede.cep]
     .filter(Boolean)
     .join(', ')

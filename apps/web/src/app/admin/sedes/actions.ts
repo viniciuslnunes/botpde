@@ -73,6 +73,33 @@ const sedeSchema = z.object({
       return Number.isFinite(n) ? n : Number.NaN
     })
     .refine((n) => n === null || (n >= -180 && n <= 180), 'Longitude inválida'),
+  streetViewHeading: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v?.trim()) return null
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) ? n : Number.NaN
+    })
+    .refine((n) => n === null || (n >= 0 && n <= 359), 'Direção Street View inválida'),
+  streetViewPitch: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v?.trim()) return null
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) ? n : Number.NaN
+    })
+    .refine((n) => n === null || (n >= -90 && n <= 90), 'Inclinação Street View inválida'),
+  streetViewFov: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v?.trim()) return null
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) ? n : Number.NaN
+    })
+    .refine((n) => n === null || (n >= 10 && n <= 120), 'Zoom Street View inválido'),
 })
 
 export type SedeState = {
@@ -106,6 +133,9 @@ function parseSedeForm(formData: FormData) {
     fotoUrl: formData.get('fotoUrl') as string | undefined,
     lat: formData.get('lat') as string | undefined,
     lng: formData.get('lng') as string | undefined,
+    streetViewHeading: formData.get('streetViewHeading') as string | undefined,
+    streetViewPitch: formData.get('streetViewPitch') as string | undefined,
+    streetViewFov: formData.get('streetViewFov') as string | undefined,
   }
 }
 
@@ -361,9 +391,9 @@ export async function editarSede(
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
-  // Header admin/portal usa Sede.fotoUrl como fallback do logo do tenant
-  // (resolveTenantLogoUrl) — sem revalidar os layouts, a foto nova só
-  // aparece depois que o router cache do cliente expira sozinho.
+  // Header admin/portal usa Sede.fotoUrl da raiz como logo (resolveTenantLogoUrl)
+  // — sem revalidar os layouts, a foto nova só aparece depois que o router
+  // cache do cliente expira sozinho.
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
   invalidateHierarchyCache(tenant.id)
@@ -372,7 +402,7 @@ export async function editarSede(
 
 /**
  * Persiste só a foto da unidade (upload imediato no formulário de edição).
- * Revalida layouts para o header refletir o fallback resolveTenantLogoUrl.
+ * Revalida layouts para o header refletir resolveTenantLogoUrl (foto da raiz).
  */
 export async function salvarFotoSede(
   sedeId: string,

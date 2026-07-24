@@ -36,6 +36,9 @@ export default async function AdminSedesPage() {
     ativa: boolean
     lat: number | null
     lng: number | null
+    streetViewHeading: number | null
+    streetViewPitch: number | null
+    streetViewFov: number | null
   }
 
   type MembroCountRow = { sedeId: string | null; _count: { _all: number } }
@@ -64,6 +67,9 @@ export default async function AdminSedesPage() {
         ativa: true,
         lat: true,
         lng: true,
+        streetViewHeading: true,
+        streetViewPitch: true,
+        streetViewFov: true,
       },
     }),
     db.saasMembro.groupBy({
@@ -109,6 +115,9 @@ export default async function AdminSedesPage() {
       fotoUrl: string | null
       lat: number | null
       lng: number | null
+      streetViewHeading: number | null
+      streetViewPitch: number | null
+      streetViewFov: number | null
       endereco: string | null
       cidade: string | null
       estado: string | null
@@ -124,6 +133,9 @@ export default async function AdminSedesPage() {
         fotoUrl: true,
         lat: true,
         lng: true,
+        streetViewHeading: true,
+        streetViewPitch: true,
+        streetViewFov: true,
         endereco: true,
         cidade: true,
         estado: true,
@@ -142,6 +154,9 @@ export default async function AdminSedesPage() {
         fotoUrl: pai.fotoUrl,
         lat: pai.lat,
         lng: pai.lng,
+        streetViewHeading: pai.streetViewHeading,
+        streetViewPitch: pai.streetViewPitch,
+        streetViewFov: pai.streetViewFov,
         endereco: pai.endereco,
         cidade: pai.cidade,
         estado: pai.estado,

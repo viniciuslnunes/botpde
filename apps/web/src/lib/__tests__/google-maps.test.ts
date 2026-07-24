@@ -7,6 +7,7 @@ import {
   isGoogleMapsConfigured,
   isGoogleMapsShortUrl,
   parseCoordsFromGoogleMapsUrl,
+  resolveSedeLocationImage,
   reverseGeocodeEndereco,
 } from '@/lib/google-maps'
 
@@ -45,6 +46,33 @@ describe('google-maps', () => {
     })
     expect(url).toContain('maps.googleapis.com/maps/api/streetview')
     expect(url).toContain('key=test-key')
+    expect(url).toContain('heading=180')
+  })
+
+  it('resolveSedeLocationImage usa ângulos salvos (não fotoUrl)', () => {
+    const url = resolveSedeLocationImage(
+      {
+        lat: -23.5,
+        lng: -46.6,
+        streetViewHeading: 90,
+        streetViewPitch: 5,
+        streetViewFov: 70,
+      },
+      { width: 160, height: 120 },
+    )
+    expect(url).toContain('heading=90')
+    expect(url).toContain('pitch=5')
+    expect(url).toContain('fov=70')
+  })
+
+  it('resolveSedeLocationImage retorna null sem coords', () => {
+    expect(
+      resolveSedeLocationImage({
+        endereco: 'Rua X',
+        cidade: 'SP',
+        estado: 'SP',
+      }),
+    ).toBeNull()
   })
 
   it('monta link de busca no Google Maps', () => {

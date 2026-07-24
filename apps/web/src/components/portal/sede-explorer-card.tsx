@@ -2,10 +2,7 @@
 
 import Image from 'next/image'
 import { MapPin, Navigation } from 'lucide-react'
-import {
-  buildStreetViewImageUrl,
-  isGoogleMapsConfigured,
-} from '@/lib/google-maps'
+import { resolveSedeLocationImage } from '@/lib/google-maps'
 import { formatarDistanciaKm } from '@/lib/onboarding-unidade'
 import {
   TIPO_CLASS,
@@ -36,11 +33,10 @@ export function SedeExplorerCard({
   priority = false,
   maisProxima = false,
 }: Props) {
-  const streetViewUrl =
-    sede.fotoUrl ??
-    (isGoogleMapsConfigured()
-      ? buildStreetViewImageUrl(sede, { width: THUMB_W, height: THUMB_H })
-      : null)
+  const streetViewUrl = resolveSedeLocationImage(sede, {
+    width: THUMB_W,
+    height: THUMB_H,
+  })
   const local = [sede.cidade, sede.estado].filter(Boolean).join(' · ')
   const distanciaLabel = distanciaKm != null ? formatarDistanciaKm(distanciaKm) : null
   const enderecoLinha = sede.endereco

@@ -148,6 +148,9 @@ export type SedeOnboarding = {
   lat: number | null
   lng: number | null
   fotoUrl: string | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
 }
 
 export type TorcidaOnboarding = {
@@ -407,6 +410,9 @@ export const getTorcidasPorAfiliacao = cache(
       lat: number | null
       lng: number | null
       fotoUrl: string | null
+      streetViewHeading: number | null
+      streetViewPitch: number | null
+      streetViewFov: number | null
     }
     type TenantComContagem = {
       id: string
@@ -443,6 +449,9 @@ export const getTorcidasPorAfiliacao = cache(
             lat: true,
             lng: true,
             fotoUrl: true,
+            streetViewHeading: true,
+            streetViewPitch: true,
+            streetViewFov: true,
           },
           orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
         },
@@ -480,6 +489,9 @@ export const getTorcidasPorAfiliacao = cache(
           lat: s.lat,
           lng: s.lng,
           fotoUrl: s.fotoUrl,
+          streetViewHeading: s.streetViewHeading,
+          streetViewPitch: s.streetViewPitch,
+          streetViewFov: s.streetViewFov,
         })),
         stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),

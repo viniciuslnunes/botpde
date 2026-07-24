@@ -26,7 +26,7 @@ Re-exports de compatibilidade: `components/admin/image-crop-dialog.tsx`,
 
 | Superfície | Crop (aspecto) | Mapa / coords |
 |---|---|---|
-| Admin sedes | 16:9 + Street View → foto | Completo |
+| Admin sedes | 16:9 (foto identidade) + Street View (localização, ângulos persistidos) | Completo — fluxos separados |
 | Admin eventos | 16:9 + Street View → capa | Completo |
 | Admin loja (produto) | 1:1 | — |
 | Admin bar (produto) | 1:1 | — |
@@ -42,6 +42,18 @@ Re-exports de compatibilidade: `components/admin/image-crop-dialog.tsx`,
 Convenções: `purpose` Cloudinary (`sede`, `comunidade`, `perfil-*`, `cadastro`, …);
 URL externa continua opcional; sem chave Maps, localização degrada
 (geocode/mapa/Street View somem, lat/lng manuais ficam).
+
+### Sedes — Street View ≠ Foto da unidade
+
+Dois fluxos distintos no formulário admin:
+
+| Bloco | Campo(s) | Uso |
+|-------|----------|-----|
+| Street View | `lat`/`lng` + `streetViewHeading`/`Pitch`/`Fov` | Fachada nas listagens/portal de unidades (`resolveSedeLocationImage`) |
+| Foto da unidade | `Sede.fotoUrl` (upload) | Identidade: topbar (`resolveTenantLogoUrl`) e fallback de canais oficiais |
+
+Não há mais “Usar como foto” que copia Street View para `fotoUrl`. Eventos
+mantêm Street View → capa (domínio diferente).
 
 ## Backlog — implementação futura
 

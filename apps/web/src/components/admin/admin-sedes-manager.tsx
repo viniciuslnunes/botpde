@@ -22,10 +22,7 @@ import {
 import { CriarSedeForm, ToggleSedeButton } from '@/components/admin/sede-forms'
 import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/sedes/actions'
-import {
-  buildStreetViewImageUrl,
-  isGoogleMapsConfigured,
-} from '@/lib/google-maps'
+import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { toast } from 'sonner'
 
@@ -42,6 +39,9 @@ export type PaiHerdadoListItem = {
   fotoUrl: string | null
   lat: number | null
   lng: number | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
   endereco: string | null
   cidade: string | null
   estado: string | null
@@ -63,6 +63,9 @@ export type AdminSedeListItem = {
   ativa: boolean
   lat: number | null
   lng: number | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
   membrosCount: number
   /** Preenchido quando o pai está em outro tenant (promoção / afiliação). */
   paiHerdado?: PaiHerdadoListItem | null
@@ -95,6 +98,9 @@ type SedeExternoNode = {
   fotoUrl: string | null
   lat: number | null
   lng: number | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
   endereco: string | null
   cidade: string | null
   estado: string | null
@@ -103,9 +109,11 @@ type SedeExternoNode = {
 type TreeNode = SedeLocalNode | SedeExternoNode
 
 type CoverInput = {
-  fotoUrl: string | null
   lat: number | null
   lng: number | null
+  streetViewHeading?: number | null
+  streetViewPitch?: number | null
+  streetViewFov?: number | null
   endereco?: string | null
   cidade?: string | null
   estado?: string | null
@@ -118,19 +126,7 @@ function labelTipoPai(tipo: string): string {
 }
 
 function resolveCoverUrl(sede: CoverInput): string | null {
-  if (sede.fotoUrl) return sede.fotoUrl
-  if (!isGoogleMapsConfigured()) return null
-  if (sede.lat == null || sede.lng == null) return null
-  return buildStreetViewImageUrl(
-    {
-      lat: sede.lat,
-      lng: sede.lng,
-      endereco: sede.endereco,
-      cidade: sede.cidade,
-      estado: sede.estado,
-    },
-    { width: THUMB_W, height: THUMB_H },
-  )
+  return resolveSedeLocationImage(sede, { width: THUMB_W, height: THUMB_H })
 }
 
 function formatLocal(sede: {
@@ -242,6 +238,9 @@ function buildTree(sedes: AdminSedeListItem[]): TreeNode[] {
           fotoUrl: node.paiHerdado.fotoUrl,
           lat: node.paiHerdado.lat,
           lng: node.paiHerdado.lng,
+          streetViewHeading: node.paiHerdado.streetViewHeading,
+          streetViewPitch: node.paiHerdado.streetViewPitch,
+          streetViewFov: node.paiHerdado.streetViewFov,
           endereco: node.paiHerdado.endereco,
           cidade: node.paiHerdado.cidade,
           estado: node.paiHerdado.estado,
@@ -483,7 +482,7 @@ export function AdminSedesManager({
   const semFotoCount = useMemo(
     () =>
       sedes.filter(
-        (s) => s.ativa && !s.fotoUrl && (s.lat == null || s.lng == null || !isGoogleMapsConfigured()),
+        (s) => s.ativa && (s.lat == null || s.lng == null || !isGoogleMapsConfigured()),
       ).length,
     [sedes],
   )

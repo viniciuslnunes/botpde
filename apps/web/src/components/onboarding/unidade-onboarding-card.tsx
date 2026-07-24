@@ -5,8 +5,7 @@ import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { Check, ExternalLink, MapPin, Navigation } from 'lucide-react'
 import {
   buildGoogleMapsUrl,
-  buildStreetViewImageUrl,
-  isGoogleMapsConfigured,
+  resolveSedeLocationImage,
 } from '@/lib/google-maps'
 import {
   formatarDistanciaKm,
@@ -38,8 +37,8 @@ type Props = {
 }
 
 /**
- * Card vertical: Street View / foto em cima; tipo, nome, endereço e distância
- * no corpo. Distância também no canto da mídia.
+ * Card vertical: Street View (localização) em cima; tipo, nome, endereço e
+ * distância no corpo. Distância também no canto da mídia.
  */
 export function UnidadeOnboardingCard({
   sede,
@@ -50,11 +49,10 @@ export function UnidadeOnboardingCard({
 }: Props) {
   const thumb = compact ? THUMB.compact : THUMB.featured
   const mapsUrl = buildGoogleMapsUrl(sede)
-  const streetViewUrl =
-    sede.fotoUrl ??
-    (isGoogleMapsConfigured()
-      ? buildStreetViewImageUrl(sede, { width: thumb.w, height: thumb.h })
-      : null)
+  const streetViewUrl = resolveSedeLocationImage(sede, {
+    width: thumb.w,
+    height: thumb.h,
+  })
   const [midiaFalhou, setMidiaFalhou] = useState(false)
   const mostrarFoto = Boolean(streetViewUrl) && !midiaFalhou
   const local = [sede.cidade, sede.estado].filter(Boolean).join(' · ')

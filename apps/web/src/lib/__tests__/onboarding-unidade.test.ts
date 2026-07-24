@@ -12,6 +12,9 @@ const base = {
   lat: null,
   lng: null,
   fotoUrl: null,
+  streetViewHeading: null,
+  streetViewPitch: null,
+  streetViewFov: null,
 } satisfies Partial<SedeOnboarding>
 
 const sedes: SedeOnboarding[] = [

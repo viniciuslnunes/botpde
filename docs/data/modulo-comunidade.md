@@ -247,15 +247,14 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
 - **Canal oficial** — um `Conversa` `tipo: CANAL` com `canalOficial: true` por tenant
   (`getOrCreateCanalOficial`); publicação restrita a admins (`CHANNELS_MANAGE`,
   `COMMUNITY_MANAGE` ou `ANNOUNCEMENTS_PUBLISH`); avatar resolvido com fallback
-  `Sede.fotoUrl` → `Tenant.logoUrl` quando `Conversa.avatarUrl` é nulo
+  `Sede.fotoUrl` (sede raiz) → `Tenant.logoUrl` quando `Conversa.avatarUrl` é nulo
   (`resolveAvatarCanalOficial` em `lib/canais.ts`) — não depende de setar
   `Conversa.avatarUrl` manualmente. Governança segue o RBAC do tenant da unidade
-  (sem cascata especial de permissão por `Sede.tipo`). **Topbar da subsede/PDE
-  promovida a tenant próprio (2026-07-21)**: `resolverContextoComunidade`
-  (`lib/comunidade-contexto.ts`) aplica o mesmo fallback `Sede.fotoUrl` quando
-  `Tenant.logoUrl` é nulo — sem isso, a foto da unidade cadastrada em
-  `/admin/sedes` aparecia no post/canal mas a `PortalNavbar` continuava
-  mostrando a inicial (ela só lia `Tenant.logoUrl`, sem o fallback).
+  (sem cascata especial de permissão por `Sede.tipo`). **Topbar (2026-07-24)**:
+  `resolveTenantLogoUrl` / `resolverContextoComunidade` priorizam
+  `Sede.fotoUrl` da raiz sobre `Tenant.logoUrl` (Design), depois canal oficial —
+  a foto da unidade em `/admin/sedes` atualiza header e canais; Street View
+  fica só nas listagens de localização.
 - **Listagem e visibilidade (2026-07-22):**
   - Gate puro em `decidePodeVerCanal` (`canais-shared.ts`): `PUBLICO` = vitrine
     (sócio **e** torcedor no alcance comunidade); `TENANT`/`HIERARQUIA`/`ALIADOS`

@@ -28,7 +28,11 @@ export type SedeExplorerItem = {
   capacidade: number | null
   responsavel: string | null
   descricao: string | null
+  /** Identidade (header/canais) — não usar como capa de localização. */
   fotoUrl: string | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
   sedePai: SedeExplorerRef | null
   filhos: SedeExplorerRef[]
   eventos: SedeExplorerEvento[]

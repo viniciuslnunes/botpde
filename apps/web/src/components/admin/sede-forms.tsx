@@ -19,15 +19,11 @@ import {
   salvarFotoSede,
   type SedeState,
 } from '@/app/admin/sedes/actions'
-import {
-  obterStreetViewParaCrop,
-  resolverCoordsDeLinkMaps,
-} from '@/lib/maps-actions'
+import { resolverCoordsDeLinkMaps } from '@/lib/maps-actions'
 import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Crop,
   Crosshair,
   Link2,
   Loader2,
@@ -51,6 +47,7 @@ import {
   isGoogleMapsConfigured,
   parseCoordsFromGoogleMapsUrl,
   reverseGeocodeEndereco,
+  STREET_VIEW_DEFAULTS,
 } from '@/lib/google-maps'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { isTipoSedeTravado, tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
@@ -97,6 +94,9 @@ export type SedeFormData = {
   fotoUrl: string | null
   lat: number | null
   lng: number | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
   ativa: boolean
 }
 
@@ -123,6 +123,9 @@ const FORM_LABELS: Record<string, string> = {
   fotoUrl: 'Foto',
   lat: 'Latitude',
   lng: 'Longitude',
+  streetViewHeading: 'Direção Street View',
+  streetViewPitch: 'Inclinação Street View',
+  streetViewFov: 'Zoom Street View',
 }
 
 type SedeStepId = 'identidade' | 'localizacao' | 'operacao'
@@ -149,7 +152,18 @@ const SEDE_STEPS: Array<{
     short: '2',
     description: 'Endereço, mapa e foto',
     icon: MapPin,
-    errorKeys: ['endereco', 'cidade', 'estado', 'cep', 'lat', 'lng', 'fotoUrl'],
+    errorKeys: [
+      'endereco',
+      'cidade',
+      'estado',
+      'cep',
+      'lat',
+      'lng',
+      'streetViewHeading',
+      'streetViewPitch',
+      'streetViewFov',
+      'fotoUrl',
+    ],
   },
   {
     id: 'operacao',
@@ -392,9 +406,13 @@ function SedeLocalizacaoFields({
   const [linkStatus, setLinkStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
   const [uploading, setUploading] = useState(false)
-  const [svHeading, setSvHeading] = useState(0)
-  const [svPitch, setSvPitch] = useState(0)
-  const [svFov, setSvFov] = useState(80)
+  const [svHeading, setSvHeading] = useState(
+    defaults?.streetViewHeading ?? STREET_VIEW_DEFAULTS.heading,
+  )
+  const [svPitch, setSvPitch] = useState(
+    defaults?.streetViewPitch ?? STREET_VIEW_DEFAULTS.pitch,
+  )
+  const [svFov, setSvFov] = useState(defaults?.streetViewFov ?? STREET_VIEW_DEFAULTS.fov)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropTitle, setCropTitle] = useState('Ajustar foto')
   const [previewNonce, setPreviewNonce] = useState(0)
@@ -682,30 +700,6 @@ function SedeLocalizacaoFields({
     markFormDirty(formId)
   }
 
-  async function usarStreetViewComoFoto() {
-    if (!hasCoords || latN == null || lngN == null) {
-      toast.error('Defina a localização no mapa antes de usar o Street View.')
-      return
-    }
-    setUploading(true)
-    try {
-      const result = await obterStreetViewParaCrop({
-        lat: latN,
-        lng: lngN,
-        heading: svHeading,
-        pitch: svPitch,
-        fov: svFov,
-      })
-      if (!result.ok) {
-        toast.error(result.message)
-        return
-      }
-      openCrop(result.dataUrl, 'Ajustar Street View')
-    } finally {
-      setUploading(false)
-    }
-  }
-
   return (
     <div className="space-y-5">
       {cropSrc && (
@@ -961,80 +955,83 @@ function SedeLocalizacaoFields({
 
       {mapsConfigured && hasCoords && streetViewPreview && (
         <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Street View</p>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                Ajuste a fachada e use como foto da unidade
-              </p>
+          <div>
+            <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Street View</p>
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Ajuste a fachada exibida no mapa e nas listagens de unidades.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,14rem)] sm:items-stretch">
+            <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
+              <Image
+                src={streetViewPreview}
+                alt="Prévia Street View"
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 55vw"
+                unoptimized
+              />
             </div>
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => void usarStreetViewComoFoto()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-50"
-            >
-              {uploading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Crop className="h-3.5 w-3.5" />
-              )}
-              Usar como foto
-            </button>
+            <div className="flex flex-col gap-3">
+              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                Direção ({svHeading}°)
+                <input
+                  type="range"
+                  min={0}
+                  max={359}
+                  value={svHeading}
+                  onChange={(e) => {
+                    setSvHeading(Number(e.target.value))
+                    markFormDirty(formId)
+                  }}
+                  className="mt-1 w-full accent-[rgb(var(--primary))]"
+                />
+              </label>
+              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                Inclinação ({svPitch}°)
+                <input
+                  type="range"
+                  min={-45}
+                  max={45}
+                  value={svPitch}
+                  onChange={(e) => {
+                    setSvPitch(Number(e.target.value))
+                    markFormDirty(formId)
+                  }}
+                  className="mt-1 w-full accent-[rgb(var(--primary))]"
+                />
+              </label>
+              <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
+                Zoom ({svFov}° FOV)
+                <input
+                  type="range"
+                  min={30}
+                  max={100}
+                  value={svFov}
+                  onChange={(e) => {
+                    setSvFov(Number(e.target.value))
+                    markFormDirty(formId)
+                  }}
+                  className="mt-1 w-full accent-[rgb(var(--primary))]"
+                />
+              </label>
+            </div>
           </div>
-          <div className="relative aspect-[16/9] max-h-56 overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] sm:max-h-64">
-            <Image
-              src={streetViewPreview}
-              alt="Prévia Street View"
-              fill
-              className="object-contain"
-              sizes="(max-width: 768px) 100vw, 40vw"
-              unoptimized
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-              Direção ({svHeading}°)
-              <input
-                type="range"
-                min={0}
-                max={359}
-                value={svHeading}
-                onChange={(e) => setSvHeading(Number(e.target.value))}
-                className="mt-1 w-full accent-[rgb(var(--primary))]"
-              />
-            </label>
-            <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-              Inclinação ({svPitch}°)
-              <input
-                type="range"
-                min={-45}
-                max={45}
-                value={svPitch}
-                onChange={(e) => setSvPitch(Number(e.target.value))}
-                className="mt-1 w-full accent-[rgb(var(--primary))]"
-              />
-            </label>
-            <label className="block text-[11px] text-[rgb(var(--foreground-muted))]">
-              Zoom ({svFov}° FOV)
-              <input
-                type="range"
-                min={30}
-                max={100}
-                value={svFov}
-                onChange={(e) => setSvFov(Number(e.target.value))}
-                className="mt-1 w-full accent-[rgb(var(--primary))]"
-              />
-            </label>
-          </div>
+          <FieldError errors={state.errors?.streetViewHeading} />
+          <FieldError errors={state.errors?.streetViewPitch} />
+          <FieldError errors={state.errors?.streetViewFov} />
         </div>
       )}
+
+      <input type="hidden" name="streetViewHeading" value={String(svHeading)} />
+      <input type="hidden" name="streetViewPitch" value={String(svPitch)} />
+      <input type="hidden" name="streetViewFov" value={String(svFov)} />
 
       <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] p-4">
         <div>
           <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Foto da unidade</p>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            Opcional. Se vazio, o portal usa Street View automaticamente.
+            Usada no header e no avatar dos canais oficiais quando não há avatar próprio.
           </p>
         </div>
         <ImageDropZone

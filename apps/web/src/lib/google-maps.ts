@@ -160,6 +160,24 @@ export async function resolveCoordsFromGoogleMapsLink(
   return parseCoordsFromGoogleMapsUrl(expanded)
 }
 
+/** Defaults dos ângulos Street View quando a sede ainda não salvou framing. */
+export const STREET_VIEW_DEFAULTS = {
+  heading: 180,
+  pitch: 0,
+  fov: 80,
+} as const
+
+export type SedeLocationImageInput = {
+  endereco?: string | null
+  cidade?: string | null
+  estado?: string | null
+  lat?: number | null
+  lng?: number | null
+  streetViewHeading?: number | null
+  streetViewPitch?: number | null
+  streetViewFov?: number | null
+}
+
 /** Imagem estática Street View (fachada) quando há cobertura. */
 export function buildStreetViewImageUrl(
   sede: {
@@ -183,9 +201,9 @@ export function buildStreetViewImageUrl(
   // Street View Static API: máximo 640×640.
   const w = Math.min(opts?.width ?? 640, 640)
   const h = Math.min(opts?.height ?? 280, 640)
-  const heading = opts?.heading ?? 0
-  const pitch = opts?.pitch ?? 0
-  const fov = opts?.fov ?? 80
+  const heading = opts?.heading ?? STREET_VIEW_DEFAULTS.heading
+  const pitch = opts?.pitch ?? STREET_VIEW_DEFAULTS.pitch
+  const fov = opts?.fov ?? STREET_VIEW_DEFAULTS.fov
   const params = new URLSearchParams({
     size: `${w}x${h}`,
     location,
@@ -195,6 +213,34 @@ export function buildStreetViewImageUrl(
     heading: String(((heading % 360) + 360) % 360),
   })
   return `https://maps.googleapis.com/maps/api/streetview?${params.toString()}`
+}
+
+/**
+ * Capa de localização da sede: só Street View (nunca `fotoUrl`, que é identidade).
+ * Requer Maps configurado + coordenadas.
+ */
+export function resolveSedeLocationImage(
+  sede: SedeLocationImageInput,
+  opts?: { width?: number; height?: number },
+): string | null {
+  if (!isGoogleMapsConfigured()) return null
+  if (sede.lat == null || sede.lng == null) return null
+  return buildStreetViewImageUrl(
+    {
+      lat: sede.lat,
+      lng: sede.lng,
+      endereco: sede.endereco,
+      cidade: sede.cidade,
+      estado: sede.estado,
+    },
+    {
+      width: opts?.width,
+      height: opts?.height,
+      heading: sede.streetViewHeading ?? STREET_VIEW_DEFAULTS.heading,
+      pitch: sede.streetViewPitch ?? STREET_VIEW_DEFAULTS.pitch,
+      fov: sede.streetViewFov ?? STREET_VIEW_DEFAULTS.fov,
+    },
+  )
 }
 
 /** Abre o local no Google Maps (app/web). */
