@@ -5,22 +5,31 @@
  *
  * Mescla o store do sistema no default do processo. Idempotente e no-op se a
  * API não existir (Node < 22.19) ou se getCACertificates('system') falhar.
+ *
+ * Tipagem local: `@types/node@20` (e o Node 20 do Railway) ainda não expõem
+ * getCACertificates / setDefaultCACertificates em `node:tls`.
  */
+type TlsSystemCaApi = {
+  getCACertificates?: (type?: string) => readonly string[]
+  setDefaultCACertificates?: (certs: readonly string[]) => void
+}
+
 export function useSystemCaCertificates(): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync bootstrap before any TLS
-  const tls = require('node:tls') as typeof import('node:tls')
+  const tls = require('node:tls') as TlsSystemCaApi
+  const { getCACertificates, setDefaultCACertificates } = tls
   if (
-    typeof tls.getCACertificates !== 'function' ||
-    typeof tls.setDefaultCACertificates !== 'function'
+    typeof getCACertificates !== 'function' ||
+    typeof setDefaultCACertificates !== 'function'
   ) {
     return
   }
 
   try {
-    const bundled = tls.getCACertificates('default')
-    const system = tls.getCACertificates('system')
+    const bundled = getCACertificates('default')
+    const system = getCACertificates('system')
     if (system.length === 0) return
-    tls.setDefaultCACertificates([...new Set([...bundled, ...system])])
+    setDefaultCACertificates([...new Set([...bundled, ...system])])
   } catch {
     // Ambiente sem store de sistema (ex.: alguns containers) — deixa o default.
   }

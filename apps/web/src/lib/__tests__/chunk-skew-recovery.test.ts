@@ -5,7 +5,7 @@ import {
   isChunkLoadError,
 } from '../chunk-skew-recovery'
 import { beforeSend } from '../sentry-filter'
-import type { ErrorEvent, EventHint } from '@sentry/nextjs'
+import type { ErrorEvent as SentryErrorEvent, EventHint } from '@sentry/nextjs'
 
 describe('isChunkLoadError', () => {
   it('detecta ChunkLoadError por name', () => {
@@ -102,14 +102,14 @@ describe('installChunkSkewRecovery', () => {
   it('não recarrega em erro sem relação com chunk', () => {
     const reload = vi.fn()
     installChunkSkewRecovery(reload)
-    errorHandler?.({ error: new Error('boom'), message: 'boom' } as ErrorEvent)
+    errorHandler?.({ error: new Error('boom'), message: 'boom' } as unknown as ErrorEvent)
     expect(reload).not.toHaveBeenCalled()
   })
 })
 
 describe('beforeSend ChunkLoadError', () => {
   it('descarta ChunkLoadError do hint', () => {
-    const event = { exception: { values: [] } } as unknown as ErrorEvent
+    const event = { exception: { values: [] } } as unknown as SentryErrorEvent
     const hint = {
       originalException: Object.assign(new Error('Failed to load chunk'), {
         name: 'ChunkLoadError',
@@ -121,7 +121,7 @@ describe('beforeSend ChunkLoadError', () => {
   it('descarta por type no event', () => {
     const event = {
       exception: { values: [{ type: 'ChunkLoadError', value: 'Failed to load chunk' }] },
-    } as unknown as ErrorEvent
+    } as unknown as SentryErrorEvent
     expect(beforeSend(event, {} as EventHint)).toBeNull()
   })
 })
