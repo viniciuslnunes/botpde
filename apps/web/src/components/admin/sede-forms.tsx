@@ -50,9 +50,11 @@ import {
   geocodeLatLng,
   isGoogleMapsConfigured,
   parseCoordsFromGoogleMapsUrl,
+  reverseGeocodeEndereco,
 } from '@/lib/google-maps'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { tiposPaiPermitidos, type TipoSede } from '@/lib/sede-regras'
+import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { runPersistAction, submitRedirectAction } from '@/lib/toast-action'
 import { useTrackedForm } from '@/lib/unsaved-changes'
 import { springSnappy } from '@/lib/motion-presets'
@@ -400,6 +402,60 @@ function SedeLocalizacaoFields({
   const mapsConfigured = isGoogleMapsConfigured()
   const router = useRouter()
   const sedeId = defaults?.id
+  const [buscandoCep, setBuscandoCep] = useState(false)
+  const cepRef = useRef<HTMLInputElement>(null)
+  const enderecoRef = useRef<HTMLInputElement>(null)
+  const cidadeRef = useRef<HTMLInputElement>(null)
+  const estadoRef = useRef<HTMLInputElement>(null)
+  // Uma vez que o usuário arrasta o pin, cola um link ou busca no mapa, a posição
+  // é considerada intencional — edições no endereço não devem mais empurrá-la.
+  const pinManualInicial = Boolean(
+    defaults?.lat != null && defaults?.lng != null && Number.isFinite(defaults.lat) && Number.isFinite(defaults.lng),
+  )
+  const pinManualRef = useRef(pinManualInicial)
+  const [pinManual, setPinManual] = useState(pinManualInicial)
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
+    }
+  }, [])
+
+  async function buscarEndereco(valorCep: string) {
+    const digitos = valorCep.replace(/\D/g, '')
+    if (digitos.length !== 8) return
+    setBuscandoCep(true)
+    try {
+      const endereco = await buscarEnderecoPorCep(valorCep)
+      if (!endereco) return
+      // Sempre sobrescreve — um CEP novo e válido substitui o endereço
+      // anterior na hora, mesmo que os campos já estivessem preenchidos.
+      if (endereco.localidade && cidadeRef.current) {
+        cidadeRef.current.value = endereco.localidade
+        cidadeRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (endereco.uf && estadoRef.current) {
+        estadoRef.current.value = endereco.uf
+        estadoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (endereco.logradouro && enderecoRef.current) {
+        enderecoRef.current.value = endereco.logradouro
+        enderecoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    } finally {
+      setBuscandoCep(false)
+    }
+  }
+
+  /** Debounce: geocodifica sozinho ao digitar endereço/cidade/estado, sem exigir clique. */
+  function agendarGeocodeReativo() {
+    if (pinManualRef.current || !mapsConfigured) return
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
+    geocodeTimerRef.current = setTimeout(() => {
+      void geocodificar({ silent: true })
+    }, 700)
+  }
 
   const latN = lat.trim() ? Number(lat) : null
   const lngN = lng.trim() ? Number(lng) : null
@@ -464,10 +520,15 @@ function SedeLocalizacaoFields({
     if (origem === 'geo') setGeoStatus('ok')
     if (origem === 'link') setLinkStatus('ok')
     if (origem === 'search') setSearchStatus('ok')
+    // Arrastar/colar link/buscar é posicionamento manual — endereço não move mais o pin sozinho.
+    if (origem === 'map' || origem === 'link' || origem === 'search') {
+      pinManualRef.current = true
+      setPinManual(true)
+    }
     markFormDirty(formId)
   }
 
-  async function geocodificar() {
+  async function geocodificar(opts?: { silent?: boolean }) {
     const form = document.getElementById(formId) as HTMLFormElement | null
     if (!form) return
     const fd = new FormData(form)
@@ -477,16 +538,40 @@ function SedeLocalizacaoFields({
       estado: String(fd.get('estado') ?? ''),
     })
     if (!query) {
-      setGeoStatus('error')
+      setGeoStatus(opts?.silent ? 'idle' : 'error')
       return
     }
     setGeoStatus('loading')
     const coords = await geocodeLatLng(query)
     if (!coords) {
-      setGeoStatus('error')
+      setGeoStatus(opts?.silent ? 'idle' : 'error')
       return
     }
     aplicarCoords(coords, 'geo')
+  }
+
+  // Sobrescreve CEP/endereço/cidade/UF com o que o Maps devolve para essa
+  // coordenada — o link colado passa a ser a fonte da verdade do endereço.
+  function preencherEnderecoDeCoords(coords: { lat: number; lng: number }) {
+    void reverseGeocodeEndereco(coords).then((endereco) => {
+      if (!endereco) return
+      if (endereco.endereco && enderecoRef.current) {
+        enderecoRef.current.value = endereco.endereco
+        enderecoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (endereco.cidade && cidadeRef.current) {
+        cidadeRef.current.value = endereco.cidade
+        cidadeRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (endereco.estado && estadoRef.current) {
+        estadoRef.current.value = endereco.estado
+        estadoRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (endereco.cep && cepRef.current) {
+        cepRef.current.value = endereco.cep
+        cepRef.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    })
   }
 
   async function aplicarLinkMaps() {
@@ -499,6 +584,7 @@ function SedeLocalizacaoFields({
     const local = parseCoordsFromGoogleMapsUrl(raw)
     if (local) {
       aplicarCoords(local, 'link')
+      preencherEnderecoDeCoords(local)
       return
     }
 
@@ -510,6 +596,7 @@ function SedeLocalizacaoFields({
       return
     }
     aplicarCoords({ lat: result.lat, lng: result.lng }, 'link')
+    preencherEnderecoDeCoords({ lat: result.lat, lng: result.lng })
   }
 
   async function buscarNoMapa() {
@@ -645,16 +732,25 @@ function SedeLocalizacaoFields({
             {hasCoords ? 'Pin definido no mapa' : 'Esta unidade ainda não aparece no portal'}
           </p>
           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-            {hasCoords
-              ? 'Salve para publicar as coordenadas. Você ainda pode ajustar o pin.'
-              : 'Cole um link do Maps, busque o local ou geocodifique o endereço.'}
+            {geoStatus === 'loading' && !pinManual
+              ? 'Localizando endereço no mapa…'
+              : hasCoords
+                ? pinManual
+                  ? 'Arraste o pin para ajustar. Salve para publicar no portal.'
+                  : 'Digite o endereço completo (rua e número) para localizar automaticamente.'
+                : 'Digite o endereço, cole um link do Maps ou busque o local.'}
           </p>
         </div>
         {mapsConfigured && (
           <button
             type="button"
-            onClick={() => void geocodificar()}
+            onClick={() => {
+              pinManualRef.current = false
+              setPinManual(false)
+              void geocodificar()
+            }}
             disabled={geoStatus === 'loading'}
+            title={pinManual ? 'Recalcular a partir do endereço (substitui o ajuste manual do pin)' : undefined}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:border-[rgb(var(--color-primary))]/50 disabled:opacity-60"
           >
             {geoStatus === 'loading' ? (
@@ -670,37 +766,54 @@ function SedeLocalizacaoFields({
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="space-y-4">
           <div>
+            <FieldLabel>
+              CEP {buscandoCep && <span className="font-normal normal-case text-[rgb(var(--foreground-muted))]">(buscando…)</span>}
+            </FieldLabel>
+            <Input
+              ref={cepRef}
+              name="cep"
+              type="text"
+              defaultValue={defaults?.cep ?? ''}
+              placeholder="00000-000"
+              onChange={(e) => void buscarEndereco(e.target.value)}
+              onBlur={(e) => void buscarEndereco(e.target.value)}
+            />
+          </div>
+
+          <div>
             <FieldLabel>Endereço</FieldLabel>
             <Input
+              ref={enderecoRef}
               name="endereco"
               type="text"
               defaultValue={defaults?.endereco ?? ''}
               placeholder="Rua, número, complemento"
+              onChange={agendarGeocodeReativo}
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <FieldLabel>CEP</FieldLabel>
-              <Input name="cep" type="text" defaultValue={defaults?.cep ?? ''} placeholder="00000-000" />
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <FieldLabel>Cidade</FieldLabel>
               <Input
+                ref={cidadeRef}
                 name="cidade"
                 type="text"
                 defaultValue={defaults?.cidade ?? ''}
                 placeholder="São Paulo"
+                onChange={agendarGeocodeReativo}
               />
             </div>
             <div>
               <FieldLabel>Estado</FieldLabel>
               <Input
+                ref={estadoRef}
                 name="estado"
                 type="text"
                 defaultValue={defaults?.estado ?? ''}
                 placeholder="SP"
                 maxLength={2}
+                onChange={agendarGeocodeReativo}
               />
             </div>
           </div>

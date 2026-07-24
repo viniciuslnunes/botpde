@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { CriarSedeForm, ToggleSedeButton } from '@/components/admin/sede-forms'
+import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/sedes/actions'
 import {
   buildStreetViewImageUrl,
@@ -197,7 +198,14 @@ function BrandMark({
   return (
     <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
       {logoUrl ? (
-        <Image src={logoUrl} alt="" fill className="object-contain p-1" sizes="44px" unoptimized />
+        <LogoImage
+          src={logoUrl}
+          alt=""
+          fill
+          sizes="44px"
+          unoptimized
+          className="object-contain p-1"
+        />
       ) : (
         <span className="text-sm font-bold text-[rgb(var(--color-primary-fg))]">
           {nome.trim().charAt(0).toUpperCase() || 'T'}

@@ -9,7 +9,13 @@ const AVATAR_MAX_WIDTH = 1024
 const JPEG_QUALITY = 0.85
 const AVATAR_JPEG_QUALITY = 0.92
 
-type UploadPurpose = 'comunidade' | 'perfil-banner' | 'perfil-avatar' | 'cadastro' | 'sede'
+type UploadPurpose =
+  | 'comunidade'
+  | 'perfil-banner'
+  | 'perfil-avatar'
+  | 'cadastro'
+  | 'sede'
+  | 'mensagem'
 
 interface SignResponse {
   cloudName: string
@@ -26,15 +32,16 @@ const SIGN_CACHE_MS = 4 * 60 * 1000
 async function obterAssinaturaUpload(
   purpose: UploadPurpose,
   tenantId?: string,
+  conversaId?: string,
 ): Promise<SignResponse> {
-  const cacheKey = `${purpose}:${tenantId ?? ''}`
+  const cacheKey = `${purpose}:${tenantId ?? ''}:${conversaId ?? ''}`
   const hit = signCache.get(cacheKey)
   if (hit && hit.expiresAt > Date.now()) return hit.sign
 
   const signRes = await fetch('/api/upload/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ purpose, tenantId }),
+    body: JSON.stringify({ purpose, tenantId, conversaId }),
   })
   if (signRes.status === 501) {
     throw new Error('O upload de arquivos ainda não está ativo. Configure o Cloudinary.')
@@ -126,9 +133,10 @@ export async function uploadMediaToCloudinary(
   onProgress?: (pct: number) => void,
   purpose: UploadPurpose = 'comunidade',
   tenantId?: string,
+  conversaId?: string,
 ): Promise<string> {
   const isVideo = file.type.startsWith('video/')
-  if (purpose !== 'comunidade' && isVideo) {
+  if (purpose !== 'comunidade' && purpose !== 'mensagem' && isVideo) {
     throw new Error(
       purpose === 'sede'
         ? 'Apenas imagens são permitidas para a foto da unidade.'
@@ -138,8 +146,11 @@ export async function uploadMediaToCloudinary(
   if (purpose === 'cadastro' && !tenantId) {
     throw new Error('Torcida inválida para upload.')
   }
+  if (purpose === 'mensagem' && !conversaId) {
+    throw new Error('Conversa inválida para upload.')
+  }
 
-  const sign = await obterAssinaturaUpload(purpose, tenantId)
+  const sign = await obterAssinaturaUpload(purpose, tenantId, conversaId)
 
   // Vídeo sobe sem compressão no cliente; imagem é redimensionada antes.
   const blob = isVideo ? file : await compress(file, purpose)

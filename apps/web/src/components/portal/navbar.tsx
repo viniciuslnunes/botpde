@@ -28,6 +28,7 @@ import Image from 'next/image'
 import { NavPendingProvider } from '@/components/portal/nav-pending-context'
 import { PortalNavLink } from '@/components/portal/portal-nav-link'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
@@ -152,25 +153,14 @@ export function PortalNavbar({
 
           <PortalNavLink href="/portal/comunidade" className="flex min-w-0 shrink items-center gap-2" showSpinner={false}>
             {brandTenant.logoUrl ? (
-              canOptimizeImageUrl(brandTenant.logoUrl) ? (
-                <Image
-                  key={brandTenant.logoUrl}
-                  src={brandTenant.logoUrl}
-                  alt={brandTenant.nome}
-                  width={56}
-                  height={56}
-                  quality={95}
-                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={brandTenant.logoUrl}
-                  src={brandTenant.logoUrl}
-                  alt={brandTenant.nome}
-                  className="h-7 w-7 shrink-0 rounded-lg object-contain"
-                />
-              )
+              <LogoImage
+                src={brandTenant.logoUrl}
+                alt={brandTenant.nome}
+                size={56}
+                quality={95}
+                className="h-7 w-7 shrink-0 object-contain"
+                rounded="rounded-lg"
+              />
             ) : (
               <div
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"

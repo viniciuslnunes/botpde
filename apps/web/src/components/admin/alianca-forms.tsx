@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState, useTransition, type ReactNode } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import {
   Check,
@@ -36,7 +35,7 @@ type RecomendacaoAliancaListItemProp = Omit<RecomendacaoAliancaListItem, 'criado
 }
 import { linkTorcidaComunidadePublica } from '@/lib/canais-shared'
 import { formatDateTimeShort } from '@/lib/format-datetime'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { toast } from '@torcida/ui'
 import { useConfirmAction } from '@/lib/confirm-action'
 
@@ -60,6 +59,8 @@ interface AliancaFormsProps {
   aliancas: AliancaListItemProp[]
   recomendacoes: RecomendacaoAliancaListItemProp[]
   tenants: TenantOption[]
+  /** Subsede/PDE: só herda a visão das ATIVAs da sede — nunca gerencia. */
+  readOnly?: boolean
 }
 
 type TabId = 'recomendacoes' | 'recebidas' | 'enviadas' | 'ativas' | 'propor' | 'historico'
@@ -84,21 +85,7 @@ function TorcidaThumb({
   const imgClass = `${s.box} shrink-0 object-contain`
 
   if (logoUrl) {
-    if (canOptimizeImageUrl(logoUrl)) {
-      return (
-        <Image
-          src={logoUrl}
-          alt=""
-          width={s.px}
-          height={s.px}
-          className={imgClass}
-        />
-      )
-    }
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={logoUrl} alt="" className={imgClass} loading="lazy" decoding="async" />
-    )
+    return <LogoImage src={logoUrl} alt="" size={s.px} className={imgClass} />
   }
 
   return (
@@ -181,6 +168,7 @@ export function AliancaForms({
   aliancas,
   recomendacoes,
   tenants,
+  readOnly = false,
 }: AliancaFormsProps) {
   const [pending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
@@ -226,8 +214,14 @@ export function AliancaForms({
   const recomendacoesAlta = recomendacoes.filter(
     (r: RecomendacaoAliancaListItemProp) => r.confianca === 'ALTA' && r.tipo === 'ALIADA',
   )
+  // Co-irmã é informativa (mesmo clube) e nunca vira Alianca — segue visível
+  // em modo leitura; só a proposta formal (ALIADA) é exclusiva da sede.
+  const recomendacoesVisiveis = readOnly
+    ? recomendacoes.filter((r: RecomendacaoAliancaListItemProp) => r.tipo === 'CO_IRMA')
+    : recomendacoes
 
   const defaultTab: TabId = (() => {
+    if (readOnly) return 'ativas'
     if (pendentesRecebidas.length > 0) return 'recebidas'
     if (recomendacoes.length > 0) return 'recomendacoes'
     if (ativas.length > 0) return 'ativas'
@@ -237,26 +231,36 @@ export function AliancaForms({
 
   const [tab, setTab] = useState<TabId>(defaultTab)
 
-  const tabs: Array<{ id: TabId; label: string; count: number; icon: LucideIcon; highlight?: boolean }> = [
-    {
-      id: 'recomendacoes',
-      label: 'Recomendações',
-      count: recomendacoes.length,
-      icon: Sparkles,
-      highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
-    },
-    {
-      id: 'recebidas',
-      label: 'Recebidas',
-      count: pendentesRecebidas.length,
-      icon: Inbox,
-      highlight: pendentesRecebidas.length > 0,
-    },
-    { id: 'enviadas', label: 'Enviadas', count: pendentesEnviadas.length, icon: Send },
-    { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
-    { id: 'propor', label: 'Propor', count: 0, icon: Handshake },
-  ]
-  if (encerradas.length > 0) {
+  const tabs: Array<{ id: TabId; label: string; count: number; icon: LucideIcon; highlight?: boolean }> = readOnly
+    ? [
+        {
+          id: 'recomendacoes',
+          label: 'Co-irmãs',
+          count: recomendacoesVisiveis.length,
+          icon: Sparkles,
+        },
+        { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
+      ]
+    : [
+        {
+          id: 'recomendacoes',
+          label: 'Recomendações',
+          count: recomendacoes.length,
+          icon: Sparkles,
+          highlight: recomendacoesAlta.length > 0 && ativas.length === 0,
+        },
+        {
+          id: 'recebidas',
+          label: 'Recebidas',
+          count: pendentesRecebidas.length,
+          icon: Inbox,
+          highlight: pendentesRecebidas.length > 0,
+        },
+        { id: 'enviadas', label: 'Enviadas', count: pendentesEnviadas.length, icon: Send },
+        { id: 'ativas', label: 'Ativas', count: ativas.length, icon: Users },
+        { id: 'propor', label: 'Propor', count: 0, icon: Handshake },
+      ]
+  if (!readOnly && encerradas.length > 0) {
     tabs.push({ id: 'historico', label: 'Histórico', count: encerradas.length, icon: History })
   }
 
@@ -416,7 +420,7 @@ export function AliancaForms({
           </div>
         )}
 
-        {item.status === 'ATIVA' && (
+        {!readOnly && item.status === 'ATIVA' && (
           <div className="mt-3">
             <button
               type="button"
@@ -505,13 +509,20 @@ export function AliancaForms({
       <div role="tabpanel" className="min-h-[12rem]">
         {tab === 'recomendacoes' && (
           <div className="space-y-3">
-            {recomendacoes.length === 0 ? (
+            {readOnly && (
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                Outras organizadas do mesmo clube. Relação informativa — não é uma aliança formal.
+              </p>
+            )}
+            {recomendacoesVisiveis.length === 0 ? (
               <EmptyState>
-                Ainda não há recomendações. Use a aba Propor para buscar manualmente.
+                {readOnly
+                  ? 'Nenhuma co-irmã encontrada.'
+                  : 'Ainda não há recomendações. Use a aba Propor para buscar manualmente.'}
               </EmptyState>
             ) : (
               <div className="space-y-3">
-                {recomendacoes.map((item: RecomendacaoAliancaListItemProp) => (
+                {recomendacoesVisiveis.map((item: RecomendacaoAliancaListItemProp) => (
                   <div
                     key={item.id}
                     className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-5 py-4"
@@ -633,14 +644,22 @@ export function AliancaForms({
         {tab === 'ativas' && (
           <div className="space-y-3">
             <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Parcerias confirmadas. PDEs e subsedes herdam este vínculo.
+              {readOnly
+                ? 'Parcerias confirmadas pela sede. Somente administradores da sede podem propor ou encerrar alianças.'
+                : 'Parcerias confirmadas. PDEs e subsedes herdam este vínculo.'}
             </p>
             {ativas.length === 0 ? (
               <EmptyState>
-                Você ainda não possui alianças ativas.
-                {recomendacoesAlta.length > 0
-                  ? ' Comece pelas recomendações de alta confiança.'
-                  : ''}
+                {readOnly
+                  ? 'A sede ainda não possui alianças ativas.'
+                  : (
+                    <>
+                      Você ainda não possui alianças ativas.
+                      {recomendacoesAlta.length > 0
+                        ? ' Comece pelas recomendações de alta confiança.'
+                        : ''}
+                    </>
+                  )}
               </EmptyState>
             ) : (
               <div className="space-y-3">

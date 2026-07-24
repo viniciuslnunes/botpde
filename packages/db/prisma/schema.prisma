@@ -871,6 +871,19 @@ model SaasMembro {
 
   dataNascimento DateTime? @map("data_nascimento")
 
+  sexo                          String?
+  estadoCivil                   String?   @map("estado_civil")
+  nacionalidade                 String?
+  logradouro                    String?
+  bairro                        String?
+  uf                            String?   @db.Char(2)
+  fotoDocumentoUrl              String?   @map("foto_documento_url")
+  comprovanteResidenciaUrl      String?   @map("comprovante_residencia_url")
+  responsavelNome               String?   @map("responsavel_nome")
+  responsavelDocumento          String?   @map("responsavel_documento")
+  autorizacaoMenorAceitaEm      DateTime? @map("autorizacao_menor_aceita_em")
+  termoResponsabilidadeAceitoEm DateTime? @map("termo_responsabilidade_aceito_em")
+
 
 
   /// Plano de associação da torcida (não confundir com Tenant.plano SaaS).

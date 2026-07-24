@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getActiveTenant, getUserPermissionsInTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
@@ -67,9 +68,18 @@ export default async function AdminLayout({
     exibirConsoleTorcida = sede !== null
   }
 
+  // 'Solicitações de afiliação' só decide quem administra a Sede principal —
+  // Subsede/PDE (tenant promovido, com ancestral na árvore) não vê a aba.
+  let exibirAfiliacoes = isSuperAdmin
+  if (!isSuperAdmin && hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE)) {
+    const ancestrais = await getAncestorTenantIds(tenant.id)
+    exibirAfiliacoes = ancestrais.length === 0
+  }
+
   const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
   const menuItems = menuBase
     .filter((item) => item.id !== 'torcida' || exibirConsoleTorcida)
+    .filter((item) => item.id !== 'afiliacoes' || exibirAfiliacoes)
     .map((item) => ({
       id: item.id,
       label: item.label,

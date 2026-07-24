@@ -4,7 +4,7 @@ import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import { getActiveTenant, getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { getDescendantTenantIds } from '@/lib/hierarquia'
+import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
 
@@ -102,6 +102,48 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
   if (!permissions.some((p) => hasPermission(effective, p))) throw new Error('Sem permissão')
 
   return { session, tenant }
+}
+
+/**
+ * Gerenciar alianças (propor/aceitar/rejeitar/cancelar/encerrar): exige
+ * ALLIANCES_MANAGE E que o tenant atual seja a Sede raiz — Subsede/PDE
+ * apenas herdam a visualização das alianças da sede (leitura em
+ * `listAliancasForTenant` a partir do tenant raiz), nunca gerenciam.
+ */
+export async function assertAliancasManage(): Promise<AuthzResult> {
+  const ctx = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+
+  if (isSuperAdminEmail(ctx.session.user.email)) {
+    return ctx
+  }
+
+  const ancestrais = await getAncestorTenantIds(ctx.tenant.id)
+  if (ancestrais.length > 0) {
+    throw new Error('Somente a sede pode gerenciar alianças — subsedes e PDEs apenas visualizam.')
+  }
+
+  return ctx
+}
+
+/**
+ * Decidir solicitações de afiliação de unidade (/admin/afiliacoes): exige
+ * AFFILIATION_MANAGE E que o tenant atual seja a Sede raiz — Subsede/PDE
+ * (promovida a tenant próprio) não valida afiliação de outras unidades,
+ * só a Sede principal ou o super-admin.
+ */
+export async function assertAffiliationManage(): Promise<AuthzResult> {
+  const ctx = await assertPermission(PERMISSIONS.AFFILIATION_MANAGE)
+
+  if (isSuperAdminEmail(ctx.session.user.email)) {
+    return ctx
+  }
+
+  const ancestrais = await getAncestorTenantIds(ctx.tenant.id)
+  if (ancestrais.length > 0) {
+    throw new Error('Somente a administração da sede pode validar solicitações de afiliação.')
+  }
+
+  return ctx
 }
 
 /**

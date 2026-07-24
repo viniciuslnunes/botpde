@@ -6,6 +6,7 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { getCloudinaryConfig, signCloudinaryParams } from '@/lib/cloudinary'
 import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
+import { assertPodeEnviarNaConversa } from '@/lib/mensageria'
 
 const purposeSchema = z.enum([
   'comunidade',
@@ -13,11 +14,13 @@ const purposeSchema = z.enum([
   'perfil-avatar',
   'cadastro',
   'sede',
+  'mensagem',
 ])
 
 const bodySchema = z.object({
   purpose: purposeSchema.optional(),
   tenantId: z.string().uuid().optional(),
+  conversaId: z.string().uuid().optional(),
 })
 
 /**
@@ -35,10 +38,12 @@ export async function POST(request: NextRequest) {
 
     let purpose: z.infer<typeof purposeSchema> = 'comunidade'
     let tenantIdCadastro: string | undefined
+    let conversaId: string | undefined
     try {
       const body = bodySchema.parse(await request.json())
       purpose = body.purpose ?? 'comunidade'
       tenantIdCadastro = body.tenantId
+      conversaId = body.conversaId
     } catch {
       purpose = 'comunidade'
     }
@@ -68,6 +73,15 @@ export async function POST(request: NextRequest) {
     } else if (purpose === 'sede') {
       const { tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
       folder = `torcida/${tenant.id}/sedes`
+    } else if (purpose === 'mensagem') {
+      if (!conversaId) {
+        return NextResponse.json({ error: 'Conversa inválida para upload.' }, { status: 400 })
+      }
+      // Anexo de DM: autoriza por participação na conversa (`MembroConversa`),
+      // não por vínculo de sócio no tenant — torcedor sem cadastro de associado
+      // também pode anexar mídia em conversas das quais participa.
+      const { membro } = await assertPodeEnviarNaConversa(conversaId, session.user.id)
+      folder = `torcida/${membro.conversa.tenantId}/mensagens/${conversaId}`
     } else if (
       tenantIdCadastro
       && (purpose === 'perfil-banner' || purpose === 'perfil-avatar')

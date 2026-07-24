@@ -5,7 +5,7 @@ import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
-import { assertPermission, assertTenantOwner } from '@/lib/authz'
+import { assertAffiliationManage, assertTenantOwner } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -15,7 +15,6 @@ import {
   type StatusSolicitacaoUnidade,
 } from '@/lib/afiliacao-unidade'
 import { criarUnidadeDaSolicitacao } from '@/lib/afiliacao'
-import { PERMISSIONS } from '@torcida/types'
 
 /**
  * Server Actions da SOLICITAÇÃO de unidade (afiliação de subsede/PDE — proposta
@@ -48,7 +47,7 @@ async function resolverAtor(): Promise<AtorResolvido> {
     }
   }
 
-  const { tenant } = await assertPermission(PERMISSIONS.AFFILIATION_MANAGE)
+  const { tenant } = await assertAffiliationManage()
   let isOwner = false
   try {
     await assertTenantOwner(session.user.id, tenant.id)

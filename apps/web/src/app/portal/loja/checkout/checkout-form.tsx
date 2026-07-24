@@ -10,6 +10,7 @@ import type { CheckoutItemSerializado } from '@/lib/loja-serialize'
 import { MotionSuccessPanel } from '@/components/motion/motion-success-panel'
 import { collapsePanel, springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { buscarEnderecoPorCep } from '@/lib/viacep'
 
 function formatarPreco(preco: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(preco)
@@ -113,12 +114,25 @@ export function CheckoutForm({ itens, subtotal }: { itens: CheckoutItemSerializa
                 >
                   <div className="space-y-3 rounded-xl border border-[rgb(var(--border))] p-4">
                     <input name="enderecoEntrega" type="hidden" value="" id="endereco-json" />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <input id="cep" placeholder="CEP" required className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
-                      <input id="numero" placeholder="Número" required className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
-                    </div>
+                    <input
+                      id="cep"
+                      placeholder="CEP"
+                      required
+                      onChange={async (e) => {
+                        // Sempre sobrescreve — um CEP novo e válido substitui a
+                        // rua anterior na hora, mesmo que o campo já estivesse preenchido.
+                        const endereco = await buscarEnderecoPorCep(e.target.value)
+                        if (!endereco) return
+                        const rua = document.getElementById('rua') as HTMLInputElement | null
+                        if (endereco.logradouro && rua) rua.value = endereco.logradouro
+                      }}
+                      className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm"
+                    />
                     <input id="rua" placeholder="Rua" required className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
-                    <input id="complemento" placeholder="Complemento (opcional)" className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input id="numero" placeholder="Número" required className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
+                      <input id="complemento" placeholder="Complemento (opcional)" className="rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm" />
+                    </div>
                   </div>
                 </m.div>
               )}

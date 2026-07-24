@@ -16,7 +16,12 @@ import {
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
-import { isDepartamentoLegado } from '@torcida/types'
+import {
+  isDepartamentoLegado,
+  normalizarCpf,
+  validarCpfDigitos,
+  parseDataCompetencia,
+} from '@torcida/types'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
 
@@ -234,6 +239,95 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   unidadeNaoListada: z.boolean().optional(),
+  // ─── LGE / cadastro completo (2026-07): coletado direto no onboarding ────────
+  // Obrigatória só para SOCIO (checado no `.superRefine` abaixo).
+  dataNascimento: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  sexo: z
+    .string()
+    .max(40)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  estadoCivil: z
+    .string()
+    .max(40)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  nacionalidade: z
+    .string()
+    .max(40)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  // Obrigatório só para SOCIO — exigência aplicada no `.superRefine` abaixo.
+  rg: z
+    .string()
+    .max(30)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  // Obrigatório só para SOCIO — exigência aplicada no `.superRefine` abaixo.
+  cpf: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .superRefine((v, ctx) => {
+      if (!v) return
+      const n = normalizarCpf(v)
+      if (!n || !validarCpfDigitos(n)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF inválido' })
+      }
+    })
+    .transform((v) => (v ? (normalizarCpf(v) ?? undefined) : undefined)),
+  nomePai: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  nomeMae: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  profissao: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  // Endereço — obrigatórios só para SOCIO (mesmo padrão de `cep`).
+  logradouro: z
+    .string()
+    .max(160)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  bairro: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  uf: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v.toUpperCase() : undefined))
+    .refine((v) => v === undefined || /^[A-Z]{2}$/.test(v), 'UF inválida'),
+  // Documentos opcionais — nunca travam o cadastro (mesmo para SOCIO).
+  fotoDocumentoUrl: z.string().url().optional(),
+  comprovanteResidenciaUrl: z.string().url().optional(),
+  // Responsável legal — obrigatório só quando SOCIO é menor de idade.
+  responsavelNome: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  responsavelDocumento: z
+    .string()
+    .max(30)
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  termoResponsabilidadeAceito: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.tipo !== 'SOCIO') return
   if (!data.imagemProva) {
@@ -264,7 +358,100 @@ const solicitarVinculoSchema = z.object({
       message: 'Informe seu CEP',
     })
   }
+  if (!data.logradouro) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['logradouro'],
+      message: 'Informe seu endereço',
+    })
+  }
+  if (!data.bairro) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['bairro'],
+      message: 'Informe seu bairro',
+    })
+  }
+  if (!data.uf) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['uf'],
+      message: 'Informe o estado',
+    })
+  }
+  if (!data.rg) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['rg'],
+      message: 'Informe seu RG',
+    })
+  }
+  if (!data.cpf) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['cpf'],
+      message: 'Informe seu CPF',
+    })
+  }
+  let nascimento: Date | null = null
+  if (!data.dataNascimento) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataNascimento'],
+      message: 'Informe sua data de nascimento',
+    })
+  } else {
+    nascimento = parseDataCompetencia(data.dataNascimento)
+    if (!nascimento || nascimento > new Date()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dataNascimento'],
+        message: 'Data de nascimento inválida',
+      })
+      nascimento = null
+    } else if (calcularIdadeAnos(nascimento) < 6) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dataNascimento'],
+        message: 'Idade mínima: 6 anos',
+      })
+    }
+  }
+  if (nascimento && calcularIdadeAnos(nascimento) < 18) {
+    if (!data.responsavelNome) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['responsavelNome'],
+        message: 'Informe o nome do responsável legal',
+      })
+    }
+    if (!data.responsavelDocumento) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['responsavelDocumento'],
+        message: 'Informe o documento do responsável legal',
+      })
+    }
+  }
+  if (data.termoResponsabilidadeAceito !== true) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['termoResponsabilidadeAceito'],
+      message: 'É necessário aceitar o termo de responsabilidade',
+    })
+  }
 })
+
+/** Idade em anos completos na data atual, a partir da data de nascimento. */
+function calcularIdadeAnos(nascimento: Date): number {
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - nascimento.getFullYear()
+  const aindaNaoFezAniversario =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())
+  if (aindaNaoFezAniversario) idade -= 1
+  return idade
+}
 
 export type SolicitarVinculoInput = z.input<typeof solicitarVinculoSchema>
 
@@ -484,6 +671,25 @@ export async function solicitarVinculo(
     return { message: 'Torcida não encontrada.' }
   }
 
+  // `nomePai`/`nomeMae` não viram coluna própria — concatenam em `filiacao`.
+  const partesFiliacao: string[] = []
+  if (data.nomePai) partesFiliacao.push(`Pai: ${data.nomePai}`)
+  if (data.nomeMae) partesFiliacao.push(`Mãe: ${data.nomeMae}`)
+  const filiacao = partesFiliacao.length > 0 ? partesFiliacao.join(' · ') : undefined
+
+  const dataNascimento = data.dataNascimento ? parseDataCompetencia(data.dataNascimento) : null
+  const menorDeIdade = dataNascimento
+    ? (() => {
+        const hoje = new Date()
+        let idade = hoje.getFullYear() - dataNascimento.getFullYear()
+        const aindaNaoFezAniversario =
+          hoje.getMonth() < dataNascimento.getMonth() ||
+          (hoje.getMonth() === dataNascimento.getMonth() && hoje.getDate() < dataNascimento.getDate())
+        if (aindaNaoFezAniversario) idade -= 1
+        return idade < 18
+      })()
+    : false
+
   const dadosMembro = {
     nome: data.nome,
     tipo: data.tipo,
@@ -497,6 +703,25 @@ export async function solicitarVinculo(
     numeroAssociado: data.numeroAssociado,
     anosSocio: data.anosSocio,
     imagemProva: data.imagemProva,
+    // LGE / cadastro completo (2026-07)
+    dataNascimento: dataNascimento ?? undefined,
+    sexo: data.sexo,
+    estadoCivil: data.estadoCivil,
+    nacionalidade: data.nacionalidade,
+    rg: data.rg,
+    cpf: data.cpf,
+    filiacao,
+    profissao: data.profissao,
+    logradouro: data.logradouro,
+    bairro: data.bairro,
+    uf: data.uf,
+    fotoDocumentoUrl: data.fotoDocumentoUrl,
+    comprovanteResidenciaUrl: data.comprovanteResidenciaUrl,
+    responsavelNome: menorDeIdade ? data.responsavelNome : undefined,
+    responsavelDocumento: menorDeIdade ? data.responsavelDocumento : undefined,
+    autorizacaoMenorAceitaEm:
+      menorDeIdade && data.responsavelNome && data.responsavelDocumento ? new Date() : undefined,
+    termoResponsabilidadeAceitoEm: data.termoResponsabilidadeAceito ? new Date() : undefined,
     sedeId: undefined as string | undefined,
     departamentoId: null as string | null,
   }

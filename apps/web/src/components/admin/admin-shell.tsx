@@ -20,6 +20,7 @@ import {
 } from '@/components/portal/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { useAdminNavbarContext, markAdminNavbarNotificationRead } from '@/lib/use-admin-navbar-context'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
@@ -100,25 +101,14 @@ function AdminTopbar({
 
         <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
           {tenantLogoUrl ? (
-            canOptimizeImageUrl(tenantLogoUrl) ? (
-              <Image
-                key={tenantLogoUrl}
-                src={tenantLogoUrl}
-                alt={tenantNome}
-                width={56}
-                height={56}
-                quality={95}
-                className="h-7 w-7 shrink-0 rounded-lg object-contain"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={tenantLogoUrl}
-                src={tenantLogoUrl}
-                alt={tenantNome}
-                className="h-7 w-7 shrink-0 rounded-lg object-contain"
-              />
-            )
+            <LogoImage
+              src={tenantLogoUrl}
+              alt={tenantNome}
+              size={56}
+              quality={95}
+              className="h-7 w-7 shrink-0 object-contain"
+              rounded="rounded-lg"
+            />
           ) : (
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"

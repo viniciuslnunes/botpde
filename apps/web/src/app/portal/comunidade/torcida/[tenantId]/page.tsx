@@ -1,11 +1,10 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import { getPostIdsSalvos, getPostsPublicosDoTenant } from '@/lib/feed'
 import { getAvatarAtualDoUsuario } from '@/lib/perfil-social'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { ComunidadePostsAnimated } from '../../_components/comunidade-posts-animated'
 import type { Metadata } from 'next'
 
@@ -50,22 +49,12 @@ export default async function TorcidaComunidadePublicaPage({
       >
         <div className="flex items-start gap-4 p-4">
           {logoUrl ? (
-            canOptimizeImageUrl(logoUrl) ? (
-              <Image
-                src={logoUrl}
-                alt=""
-                width={64}
-                height={64}
-                className="h-16 w-16 shrink-0 object-contain"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoUrl}
-                alt=""
-                className="h-16 w-16 shrink-0 object-contain"
-              />
-            )
+            <LogoImage
+              src={logoUrl}
+              alt=""
+              size={64}
+              className="h-16 w-16 shrink-0 object-contain"
+            />
           ) : (
             <div
               className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-xl font-bold text-white"

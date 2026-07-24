@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@torcida/db'
 import type { Alianca, StatusAlianca } from '@torcida/db'
 import { z } from 'zod'
-import { assertPermission } from '@/lib/authz'
+import { assertAliancasManage } from '@/lib/authz'
 import { findAliancaEntreTenants } from '@/lib/aliancas'
 import { getTorcidaLineageTenantIds, invalidateHierarchyCache } from '@/lib/hierarquia'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
@@ -50,7 +50,7 @@ function assertStatus(alianca: Alianca, expected: StatusAlianca): void {
  * Unicidade do par é bidirecional (A→B e B→A contam como o mesmo vínculo).
  */
 export async function proporAlianca(tenantAliadoId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { session, tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(tenantAliadoId)
   if (!parsed.success) throw new Error('Torcida aliada inválida')
@@ -144,7 +144,7 @@ export async function proporAlianca(tenantAliadoId: string): Promise<void> {
  * Propõe a partir de uma recomendação ALTA com tenant mapeado.
  */
 export async function proporAliancaFromRecomendacao(recomendacaoId: string): Promise<void> {
-  const { tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(recomendacaoId)
   if (!parsed.success) throw new Error('Recomendação inválida')
@@ -179,7 +179,7 @@ export async function proporAliancaFromRecomendacao(recomendacaoId: string): Pro
 }
 
 export async function aceitarAlianca(aliancaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { session, tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(aliancaId)
   if (!parsed.success) throw new Error('Aliança inválida')
@@ -228,7 +228,7 @@ export async function aceitarAlianca(aliancaId: string): Promise<void> {
 }
 
 export async function rejeitarAlianca(aliancaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { session, tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(aliancaId)
   if (!parsed.success) throw new Error('Aliança inválida')
@@ -280,7 +280,7 @@ export async function rejeitarAlianca(aliancaId: string): Promise<void> {
  * Cancela proposta enviada — só o tenant origem, enquanto PENDENTE.
  */
 export async function cancelarProposta(aliancaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { session, tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(aliancaId)
   if (!parsed.success) throw new Error('Aliança inválida')
@@ -329,7 +329,7 @@ export async function cancelarProposta(aliancaId: string): Promise<void> {
 }
 
 export async function encerrarAlianca(aliancaId: string): Promise<void> {
-  const { session, tenant } = await assertPermission(PERMISSIONS.ALLIANCES_MANAGE)
+  const { session, tenant } = await assertAliancasManage()
 
   const parsed = uuidSchema.safeParse(aliancaId)
   if (!parsed.success) throw new Error('Aliança inválida')

@@ -49,6 +49,7 @@ import type {
   RegiaoOnboarding,
 } from '@/lib/onboarding'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { buscarEnderecoPorCep } from '@/lib/viacep'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
@@ -1394,6 +1395,29 @@ function maskCep(raw: string): string {
   return `${digitos.slice(0, 5)}-${digitos.slice(5)}`
 }
 
+/** Máscara progressiva de CPF: 000.000.000-00. */
+function maskCpf(raw: string): string {
+  const digitos = raw.replace(/\D/g, '').slice(0, 11)
+  const partes = [digitos.slice(0, 3), digitos.slice(3, 6), digitos.slice(6, 9)].filter(Boolean)
+  let out = partes.join('.')
+  if (digitos.length > 9) out += `-${digitos.slice(9)}`
+  return out
+}
+
+/** Idade em anos completos a partir de uma data `YYYY-MM-DD`; `null` se inválida. */
+function calcularIdadeDeInput(isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim())
+  if (!m) return null
+  const nascimento = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - nascimento.getFullYear()
+  const aindaNaoFezAniversario =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())
+  if (aindaNaoFezAniversario) idade -= 1
+  return idade
+}
+
 function PassoVinculo({
   clube,
   torcida,
@@ -1443,6 +1467,73 @@ function PassoVinculo({
     },
   })
   const uploadPend = cropComprovante.busy
+
+  // ─── Identificação / LGE (2026-07): coletado direto no onboarding ───────────
+  const [dataNascimento, setDataNascimento] = useState('')
+  const [sexo, setSexo] = useState('')
+  const [estadoCivil, setEstadoCivil] = useState('')
+  const [nacionalidade, setNacionalidade] = useState('')
+  const [rg, setRg] = useState('')
+  const [cpf, setCpf] = useState('')
+  const [nomePai, setNomePai] = useState('')
+  const [nomeMae, setNomeMae] = useState('')
+  const [profissao, setProfissao] = useState('')
+
+  // ─── Endereço completo ──────────────────────────────────────────────────────
+  const [logradouro, setLogradouro] = useState('')
+  const [bairro, setBairro] = useState('')
+  const [ufEndereco, setUfEndereco] = useState('')
+  const [buscandoCep, setBuscandoCep] = useState(false)
+
+  async function buscarEndereco(valorCep: string) {
+    const digitos = valorCep.replace(/\D/g, '')
+    if (digitos.length !== 8) return
+    setBuscandoCep(true)
+    try {
+      const endereco = await buscarEnderecoPorCep(valorCep)
+      if (!endereco) return
+      // Sempre sobrescreve — um CEP novo e válido deve substituir o endereço
+      // anterior na hora, mesmo que os campos já estivessem preenchidos.
+      if (endereco.logradouro) setLogradouro(endereco.logradouro)
+      if (endereco.bairro) setBairro(endereco.bairro)
+      if (endereco.uf) setUfEndereco(endereco.uf)
+    } finally {
+      setBuscandoCep(false)
+    }
+  }
+
+  // ─── Documentos opcionais ───────────────────────────────────────────────────
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | undefined>()
+  const cropFotoDocumento = useCroppedImageUpload({
+    aspect: 4 / 3,
+    purpose: 'cadastro',
+    tenantId: torcida.id,
+    title: 'Ajustar foto do documento',
+    confirmLabel: 'Confirmar e enviar',
+    onDone: ({ url }) => {
+      if (url) setFotoDocumentoUrl(url)
+    },
+  })
+  const [comprovanteResidenciaUrl, setComprovanteResidenciaUrl] = useState<string | undefined>()
+  const cropComprovanteResidencia = useCroppedImageUpload({
+    aspect: 4 / 3,
+    purpose: 'cadastro',
+    tenantId: torcida.id,
+    title: 'Ajustar comprovante de residência',
+    confirmLabel: 'Confirmar e enviar',
+    onDone: ({ url }) => {
+      if (url) setComprovanteResidenciaUrl(url)
+    },
+  })
+
+  // ─── Menor de idade / responsável legal ─────────────────────────────────────
+  const idadeCalculada = dataNascimento ? calcularIdadeDeInput(dataNascimento) : null
+  const ehMenorDeIdade = idadeCalculada !== null && idadeCalculada < 18
+  const [responsavelNome, setResponsavelNome] = useState('')
+  const [responsavelDocumento, setResponsavelDocumento] = useState('')
+
+  // ─── Termo de responsabilidade ──────────────────────────────────────────────
+  const [termoAceito, setTermoAceito] = useState(false)
 
   const [departamentos, setDepartamentos] = useState<DepartamentoOnboarding[] | null>(null)
   // getDepartamentosDoTenant já exclui legados; filtro defensivo no client.
@@ -1497,6 +1588,26 @@ function PassoVinculo({
         onErro('Informe seu CEP.')
         return
       }
+      if (!logradouro || !bairro || !ufEndereco) {
+        onErro('Complete seu endereço (logradouro, bairro e estado).')
+        return
+      }
+      if (!rg || !cpf) {
+        onErro('Informe seu RG e CPF.')
+        return
+      }
+      if (!dataNascimento) {
+        onErro('Informe sua data de nascimento.')
+        return
+      }
+      if (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) {
+        onErro('Informe o nome e o documento do responsável legal.')
+        return
+      }
+      if (!termoAceito) {
+        onErro('É necessário aceitar o termo de responsabilidade.')
+        return
+      }
     }
     startTransition(async () => {
       const res = await solicitarVinculo({
@@ -1516,6 +1627,23 @@ function PassoVinculo({
         departamentoId: departamentoId || undefined,
         sedeId: unidadeId ?? undefined,
         unidadeNaoListada,
+        dataNascimento: dataNascimento || undefined,
+        sexo: sexo || undefined,
+        estadoCivil: estadoCivil || undefined,
+        nacionalidade: nacionalidade || undefined,
+        rg: rg || undefined,
+        cpf: cpf || undefined,
+        nomePai: nomePai || undefined,
+        nomeMae: nomeMae || undefined,
+        profissao: profissao || undefined,
+        logradouro: logradouro || undefined,
+        bairro: bairro || undefined,
+        uf: ufEndereco || undefined,
+        fotoDocumentoUrl,
+        comprovanteResidenciaUrl,
+        responsavelNome: ehMenorDeIdade ? responsavelNome || undefined : undefined,
+        responsavelDocumento: ehMenorDeIdade ? responsavelDocumento || undefined : undefined,
+        termoResponsabilidadeAceito: tipo === 'SOCIO' ? termoAceito : undefined,
       })
       // Sucesso redireciona no servidor; se retornou, houve erro/validação.
       if (res?.errors) {
@@ -1699,11 +1827,179 @@ function PassoVinculo({
           unidadeNaoListada={unidadeNaoListada}
         />
 
-        <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
-        </Campo>
+        {/* ─── Identificação ────────────────────────────────────────────── */}
+        <SecaoFormulario titulo="Identificação">
+          <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
+          </Campo>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo label="Data de nascimento" obrigatorio erros={errosCampo.dataNascimento}>
+              <Input
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => setDataNascimento(e.target.value)}
+              />
+            </Campo>
+            <Campo label="Telefone / WhatsApp" erros={errosCampo.telefone}>
+              <Input
+                type="tel"
+                maxLength={16}
+                value={telefone}
+                onChange={(e) => setTelefone(maskTelefone(e.target.value))}
+                placeholder="(11) 99999-9999"
+              />
+            </Campo>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo label="Sexo" erros={errosCampo.sexo}>
+              <Select value={sexo} onChange={(e) => setSexo(e.target.value)}>
+                <option value="">Selecione (opcional)</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+                <option value="Prefiro não informar">Prefiro não informar</option>
+              </Select>
+            </Campo>
+            <Campo label="Estado civil" erros={errosCampo.estadoCivil}>
+              <Select value={estadoCivil} onChange={(e) => setEstadoCivil(e.target.value)}>
+                <option value="">Selecione (opcional)</option>
+                <option value="Solteiro(a)">Solteiro(a)</option>
+                <option value="Casado(a)">Casado(a)</option>
+                <option value="Divorciado(a)">Divorciado(a)</option>
+                <option value="Viúvo(a)">Viúvo(a)</option>
+                <option value="Outro">Outro</option>
+              </Select>
+            </Campo>
+          </div>
+
+          <Campo label="Nacionalidade" erros={errosCampo.nacionalidade}>
+            <Input
+              value={nacionalidade}
+              onChange={(e) => setNacionalidade(e.target.value)}
+              placeholder="Brasileira"
+            />
+          </Campo>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo label="RG" obrigatorio erros={errosCampo.rg}>
+              <Input value={rg} onChange={(e) => setRg(e.target.value)} placeholder="Ex: 12.345.678-9" />
+            </Campo>
+            <Campo label="CPF" obrigatorio erros={errosCampo.cpf}>
+              <Input
+                inputMode="numeric"
+                maxLength={14}
+                value={cpf}
+                onChange={(e) => setCpf(maskCpf(e.target.value))}
+                placeholder="000.000.000-00"
+              />
+            </Campo>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo label="Nome do pai" erros={errosCampo.nomePai}>
+              <Input value={nomePai} onChange={(e) => setNomePai(e.target.value)} placeholder="Opcional" />
+            </Campo>
+            <Campo label="Nome da mãe" erros={errosCampo.nomeMae}>
+              <Input value={nomeMae} onChange={(e) => setNomeMae(e.target.value)} placeholder="Opcional" />
+            </Campo>
+          </div>
+
+          <Campo label="Profissão" erros={errosCampo.profissao}>
+            <Input
+              value={profissao}
+              onChange={(e) => setProfissao(e.target.value)}
+              placeholder="Opcional"
+            />
+          </Campo>
+        </SecaoFormulario>
+
+        {/* ─── Endereço ──────────────────────────────────────────────────── */}
+        <SecaoFormulario titulo="Endereço">
+          {regiao && (
+            <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
+              <span className="font-medium text-[rgb(var(--foreground))]">Região:</span> {regiao}
+            </p>
+          )}
+
+          <Campo label="CEP" obrigatorio erros={errosCampo.cep}>
+            <Input
+              inputMode="numeric"
+              maxLength={9}
+              value={cep}
+              onChange={(e) => {
+                const masked = maskCep(e.target.value)
+                setCep(masked)
+                void buscarEndereco(masked)
+              }}
+              onBlur={() => void buscarEndereco(cep)}
+              placeholder="00000-000"
+            />
+            {buscandoCep && (
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">Buscando endereço…</p>
+            )}
+          </Campo>
+
+          <Campo label="Logradouro" obrigatorio erros={errosCampo.logradouro}>
+            <Input
+              value={logradouro}
+              onChange={(e) => setLogradouro(e.target.value)}
+              placeholder="Rua, avenida…"
+            />
+          </Campo>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Campo label="Número" erros={errosCampo.numero}>
+              <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ex: 120" />
+            </Campo>
+            <Campo label="Bloco" erros={errosCampo.bloco}>
+              <Input value={bloco} onChange={(e) => setBloco(e.target.value)} placeholder="Opcional" />
+            </Campo>
+            <Campo label="Complemento" erros={errosCampo.complemento}>
+              <Input
+                value={complemento}
+                onChange={(e) => setComplemento(e.target.value)}
+                placeholder="Opcional"
+              />
+            </Campo>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Campo label="Bairro" obrigatorio erros={errosCampo.bairro}>
+              <Input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" />
+            </Campo>
+            <Campo label="UF" obrigatorio erros={errosCampo.uf}>
+              <Input
+                maxLength={2}
+                value={ufEndereco}
+                onChange={(e) => setUfEndereco(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                placeholder="SP"
+              />
+            </Campo>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Campo label="Nº de associado" obrigatorio erros={errosCampo.numeroAssociado}>
+              <Input
+                inputMode="numeric"
+                maxLength={7}
+                value={numeroAssociado}
+                onChange={(e) => setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))}
+                placeholder="Até 7 dígitos"
+              />
+            </Campo>
+            <Campo label="Há quantos anos é sócio" obrigatorio erros={errosCampo.anosSocio}>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={anosSocio}
+                onChange={(e) => setAnosSocio(e.target.value)}
+                placeholder="Ex: 3"
+              />
+            </Campo>
+          </div>
+
           <Campo label="Idade" erros={errosCampo.idade}>
             <Input
               type="text"
@@ -1713,92 +2009,27 @@ function PassoVinculo({
               placeholder="Ex: 25"
             />
           </Campo>
-          <Campo label="Telefone / WhatsApp" erros={errosCampo.telefone}>
-            <Input
-              type="tel"
-              maxLength={16}
-              value={telefone}
-              onChange={(e) => setTelefone(maskTelefone(e.target.value))}
-              placeholder="(11) 99999-9999"
-            />
-          </Campo>
-        </div>
 
-        {regiao && (
-          <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-            <span className="font-medium text-[rgb(var(--foreground))]">Região:</span> {regiao}
-          </p>
-        )}
+          {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
+            <Campo label="Departamento pretendido" erros={errosCampo.departamentoId}>
+              <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
+                <option value="">Selecione (opcional)</option>
+                {departamentosSelecionaveis.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nome}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                Informativo para a diretoria — só entra na equipe após aprovação.
+              </p>
+            </Campo>
+          )}
+        </SecaoFormulario>
 
-        <Campo label="CEP" obrigatorio erros={errosCampo.cep}>
-          <Input
-            inputMode="numeric"
-            maxLength={9}
-            value={cep}
-            onChange={(e) => setCep(maskCep(e.target.value))}
-            placeholder="00000-000"
-          />
-        </Campo>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Campo label="Número" erros={errosCampo.numero}>
-            <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ex: 120" />
-          </Campo>
-          <Campo label="Bloco" erros={errosCampo.bloco}>
-            <Input value={bloco} onChange={(e) => setBloco(e.target.value)} placeholder="Opcional" />
-          </Campo>
-          <Campo label="Complemento" erros={errosCampo.complemento}>
-            <Input
-              value={complemento}
-              onChange={(e) => setComplemento(e.target.value)}
-              placeholder="Opcional"
-            />
-          </Campo>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo label="Nº de associado" obrigatorio erros={errosCampo.numeroAssociado}>
-            <Input
-              inputMode="numeric"
-              maxLength={7}
-              value={numeroAssociado}
-              onChange={(e) => setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))}
-              placeholder="Até 7 dígitos"
-            />
-          </Campo>
-          <Campo label="Há quantos anos é sócio" obrigatorio erros={errosCampo.anosSocio}>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              value={anosSocio}
-              onChange={(e) => setAnosSocio(e.target.value)}
-              placeholder="Ex: 3"
-            />
-          </Campo>
-        </div>
-
-        {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
-          <Campo label="Departamento pretendido" erros={errosCampo.departamentoId}>
-            <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
-              <option value="">Selecione (opcional)</option>
-              {departamentosSelecionaveis.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nome}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
-              Informativo para a diretoria — só entra na equipe após aprovação.
-            </p>
-          </Campo>
-        )}
-
-        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-          <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-            Verificação de vínculo
-          </p>
-          <div className="mt-3">
+        {/* ─── Documentos ────────────────────────────────────────────────── */}
+        <SecaoFormulario titulo="Documentos">
+          <div>
             <BlocoImagemProva
               imagemProva={imagemProva}
               uploadPend={uploadPend}
@@ -1806,18 +2037,126 @@ function PassoVinculo({
               onArquivo={onArquivo}
               onLimpar={() => setImagemProva(undefined)}
             />
+            <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+              Usado só para validar seu vínculo com a torcida; não fica visível a outros associados.
+            </p>
           </div>
-          <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
-            Usado só para validar seu vínculo com a torcida; não fica visível a outros associados.
-          </p>
-        </div>
+
+          <div>
+            <ImageDropZone
+              label="Foto do RG (opcional)"
+              busy={cropFotoDocumento.busy}
+              cameraLabel="Tirar foto"
+              formatsHint="JPEG, PNG ou WebP — pode ser enviada depois"
+              file={
+                fotoDocumentoUrl
+                  ? {
+                      name: 'documento.jpg',
+                      status: cropFotoDocumento.busy ? 'uploading' : 'done',
+                      previewUrl: fotoDocumentoUrl,
+                    }
+                  : null
+              }
+              onClear={fotoDocumentoUrl ? () => setFotoDocumentoUrl(undefined) : undefined}
+              onFile={(file) => cropFotoDocumento.open(file)}
+            />
+            {errosCampo.fotoDocumentoUrl?.[0] && (
+              <p className="mt-1 text-xs text-red-600">{errosCampo.fotoDocumentoUrl[0]}</p>
+            )}
+          </div>
+
+          <div>
+            <ImageDropZone
+              label="Comprovante de residência (opcional)"
+              busy={cropComprovanteResidencia.busy}
+              cameraLabel="Tirar foto"
+              formatsHint="JPEG, PNG ou WebP — pode ser solicitado depois"
+              file={
+                comprovanteResidenciaUrl
+                  ? {
+                      name: 'comprovante-residencia.jpg',
+                      status: cropComprovanteResidencia.busy ? 'uploading' : 'done',
+                      previewUrl: comprovanteResidenciaUrl,
+                    }
+                  : null
+              }
+              onClear={
+                comprovanteResidenciaUrl ? () => setComprovanteResidenciaUrl(undefined) : undefined
+              }
+              onFile={(file) => cropComprovanteResidencia.open(file)}
+            />
+            {errosCampo.comprovanteResidenciaUrl?.[0] && (
+              <p className="mt-1 text-xs text-red-600">{errosCampo.comprovanteResidenciaUrl[0]}</p>
+            )}
+          </div>
+        </SecaoFormulario>
+
+        {/* ─── Autorização do responsável (só menor de idade) ───────────────── */}
+        {ehMenorDeIdade && (
+          <SecaoFormulario titulo="Autorização do responsável">
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Por ser menor de idade, é necessária a autorização de um responsável legal
+              para participar de atividades e caravanas da torcida.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo label="Nome do responsável" obrigatorio erros={errosCampo.responsavelNome}>
+                <Input
+                  value={responsavelNome}
+                  onChange={(e) => setResponsavelNome(e.target.value)}
+                  placeholder="Nome completo"
+                />
+              </Campo>
+              <Campo
+                label="Documento do responsável"
+                obrigatorio
+                erros={errosCampo.responsavelDocumento}
+              >
+                <Input
+                  value={responsavelDocumento}
+                  onChange={(e) => setResponsavelDocumento(e.target.value)}
+                  placeholder="RG ou CPF"
+                />
+              </Campo>
+            </div>
+          </SecaoFormulario>
+        )}
+
+        {/* ─── Termo de responsabilidade ─────────────────────────────────── */}
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+          <input
+            type="checkbox"
+            checked={termoAceito}
+            onChange={(e) => setTermoAceito(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+          />
+          <span className="min-w-0 text-sm text-[rgb(var(--foreground))]">
+            Declaro que serei responsável pelos meus atos ao usar os símbolos da torcida em
+            jogos e eventos, e concordo em receber comunicações da torcida.
+          </span>
+        </label>
+        {errosCampo.termoResponsabilidadeAceito?.[0] && (
+          <p className="text-xs text-red-600">{errosCampo.termoResponsabilidadeAceito[0]}</p>
+        )}
       </div>
 
       <div className="mt-8 space-y-3">
         <BotaoPrimario
           onClick={() => enviar('SOCIO')}
           pending={pending || uploadPend}
-          disabled={!imagemProva || !numeroAssociado || !anosSocio || !cep}
+          disabled={
+            !imagemProva ||
+            !numeroAssociado ||
+            !anosSocio ||
+            !cep ||
+            !logradouro ||
+            !bairro ||
+            !ufEndereco ||
+            !rg ||
+            !cpf ||
+            !dataNascimento ||
+            (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) ||
+            !termoAceito
+          }
           label="Enviar solicitação"
         />
         <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
@@ -1864,6 +2203,22 @@ const TIPO_SEDE_LABEL: Record<string, string> = {
 }
 
 /** Info-box da unidade escolhida (ou pendente de cadastro), com link para o mapa. */
+/** Sub-seção visual do passo Vínculo (Identificação, Endereço, Documentos…). */
+function SecaoFormulario({
+  titulo,
+  children,
+}: {
+  titulo: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</p>
+      <div className="mt-3 space-y-4">{children}</div>
+    </div>
+  )
+}
+
 function UnidadeInfoBox({
   unidadeSelecionada,
   unidadeNaoListada,

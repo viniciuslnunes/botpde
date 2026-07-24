@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import {
   buildDirectionsUrl,
   buildGoogleMapsUrl,
@@ -7,6 +7,7 @@ import {
   isGoogleMapsConfigured,
   isGoogleMapsShortUrl,
   parseCoordsFromGoogleMapsUrl,
+  reverseGeocodeEndereco,
 } from '@/lib/google-maps'
 
 describe('google-maps', () => {
@@ -85,5 +86,64 @@ describe('google-maps', () => {
       lat: -23.55,
       lng: -46.63,
     })
+  })
+
+  it('em permalink de Street View, prioriza a posição da câmera (mais precisa) sobre o pin do lugar', () => {
+    // URL real de Street View: @lat,lng,3a,... é onde a foto foi tirada (em frente
+    // à fachada); !3d!4d é o pin do cadastro comercial, que pode estar alguns
+    // metros longe do endereço exato.
+    const url =
+      'https://www.google.com/maps/place/Gavi%C3%B5es+da+Fiel/@-23.5195922,-46.6453042,3a,75y,163.81h,99.18t/data=!3m7!1e1!3m5!1szJEtwFbfUm8ns8TccZxLAA!2e0!7i16384!8i8192!4m14!1m7!3m6!1s0x94ce587140f89c67:0x98746b746587c4bf!2sGavi%C3%B5es+da+Fiel!8m2!3d-23.5199093!4d-46.645141!16s%2Fg%2F121mvxc1'
+    expect(parseCoordsFromGoogleMapsUrl(url)).toEqual({
+      lat: -23.5195922,
+      lng: -46.6453042,
+    })
+  })
+
+  it('reverseGeocodeEndereco extrai rua+número, cidade, UF e CEP da resposta do Geocoding', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'OK',
+        results: [
+          {
+            address_components: [
+              { long_name: '183', short_name: '183', types: ['street_number'] },
+              { long_name: 'Rua Cristina Tomás', short_name: 'R. Cristina Tomás', types: ['route'] },
+              { long_name: 'São Paulo', short_name: 'São Paulo', types: ['administrative_area_level_2'] },
+              { long_name: 'São Paulo', short_name: 'SP', types: ['administrative_area_level_1'] },
+              { long_name: '05045-000', short_name: '05045-000', types: ['postal_code'] },
+            ],
+          },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const endereco = await reverseGeocodeEndereco({ lat: -23.5195922, lng: -46.6453042 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('latlng=-23.5195922%2C-46.6453042')
+    expect(endereco).toEqual({
+      endereco: 'Rua Cristina Tomás, 183',
+      cidade: 'São Paulo',
+      estado: 'SP',
+      cep: '05045-000',
+    })
+
+    vi.unstubAllGlobals()
+  })
+
+  it('reverseGeocodeEndereco retorna null sem API key configurada', async () => {
+    delete process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const endereco = await reverseGeocodeEndereco({ lat: -23.5195922, lng: -46.6453042 })
+
+    expect(endereco).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    vi.unstubAllGlobals()
   })
 })

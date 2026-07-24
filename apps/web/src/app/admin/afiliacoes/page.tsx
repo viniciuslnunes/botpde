@@ -6,7 +6,7 @@ import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
 import type { Metadata } from 'next'
 import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torcida/types'
-import { assertPermission } from '@/lib/authz'
+import { assertAffiliationManage } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminPageHeader } from '@/components/admin/ui'
@@ -34,7 +34,7 @@ export default async function AfiliacoesPage() {
   let tenant: Tenant
   let session: Session
   try {
-    ;({ session, tenant } = await assertPermission(PERMISSIONS.AFFILIATION_MANAGE))
+    ;({ session, tenant } = await assertAffiliationManage())
   } catch {
     redirect('/admin')
   }

@@ -122,6 +122,7 @@ vi.mock('@torcida/db', () => ({
 
 vi.mock('@/lib/authz', () => ({
   assertPermission,
+  assertAliancasManage: assertPermission,
 }))
 
 vi.mock('@/lib/hierarquia', () => ({

@@ -64,7 +64,9 @@ export function isGoogleMapsShortUrl(raw: string): boolean {
 
 /**
  * Extrai lat/lng de URL completa do Google Maps, ou de "lat,lng" puro.
- * Prefere `!3d!4d` (pin do lugar) sobre `@lat,lng` (centro do viewport).
+ * Prioridade: câmera do Street View (`@lat,lng,3a,...`, a posição real de onde a
+ * foto foi tirada) > `!3d!4d` (pin do lugar — cadastro comercial, pode estar
+ * alguns metros longe da fachada) > `@lat,lng` genérico (centro do viewport).
  */
 export function parseCoordsFromGoogleMapsUrl(
   raw: string,
@@ -76,6 +78,15 @@ export function parseCoordsFromGoogleMapsUrl(
   if (bare) {
     const lat = Number(bare[1])
     const lng = Number(bare[2])
+    if (coordsValidas(lat, lng)) return { lat, lng }
+  }
+
+  // Permalink de Street View: @LAT,LNG,3a,FOVy,HEADINGh,PITCHt — LAT/LNG é onde a
+  // câmera estava, ou seja, o ponto exato em frente ao que aparece na foto.
+  const streetView = trimmed.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),3a,/)
+  if (streetView) {
+    const lat = Number(streetView[1])
+    const lng = Number(streetView[2])
     if (coordsValidas(lat, lng)) return { lat, lng }
   }
 
@@ -524,6 +535,55 @@ export async function reverseGeocodeRegion(
 
   if (!cidade || !estado) return null
   return { cidade, estado, lat: coords.lat, lng: coords.lng }
+}
+
+export type GoogleMapsEnderecoReverso = {
+  endereco: string
+  cidade: string
+  estado: string
+  cep: string
+}
+
+/**
+ * Resolve endereço completo (rua+número, cidade, UF, CEP) a partir de lat/lng.
+ * Usado para preencher os campos de endereço ao colar um link do Maps/arrastar o pin.
+ */
+export async function reverseGeocodeEndereco(
+  coords: { lat: number; lng: number },
+): Promise<GoogleMapsEnderecoReverso | null> {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
+  if (!key) return null
+
+  const params = new URLSearchParams({
+    latlng: `${coords.lat},${coords.lng}`,
+    key,
+    language: 'pt-BR',
+    region: 'br',
+  })
+  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`)
+  if (!res.ok) return null
+
+  const data = (await res.json()) as GeocodeResponse
+  const componentes = data.results?.[0]?.address_components
+  if (data.status !== 'OK' || !componentes) return null
+
+  const rua = componente(componentes, 'route') ?? ''
+  const numero = componente(componentes, 'street_number') ?? ''
+  const cidade =
+    componente(componentes, 'administrative_area_level_2') ??
+    componente(componentes, 'locality') ??
+    componente(componentes, 'sublocality') ??
+    ''
+  const estado = componente(componentes, 'administrative_area_level_1', 'short_name') ?? ''
+  const cep = componente(componentes, 'postal_code') ?? ''
+
+  if (!rua && !cidade) return null
+  return {
+    endereco: [rua, numero].filter(Boolean).join(', '),
+    cidade,
+    estado,
+    cep,
+  }
 }
 
 /**

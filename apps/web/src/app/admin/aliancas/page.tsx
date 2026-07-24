@@ -4,6 +4,7 @@ import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { listAliancasForTenant, listRecomendacoesForTenant } from '@/lib/aliancas'
+import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
 import { MotionReveal } from '@/components/motion/motion-reveal'
@@ -31,9 +32,18 @@ export default async function AdminAliancasPage() {
     redirect('/admin')
   }
 
-  await reconciliarPropostasAliancaPendentes(authz.tenant.id)
+  // Subsede/PDE não gerencia alianças — apenas herda a visão das ATIVAs da
+  // sede raiz (decisão de produto: aliança é nível-torcida, ver
+  // docs/knowledge/aliancas.md § vocabulário).
+  const ancestrais = await getAncestorTenantIds(authz.tenant.id)
+  const isSedeRaiz = ancestrais.length === 0
+  const rootTenantId = isSedeRaiz ? authz.tenant.id : ancestrais[ancestrais.length - 1]
 
-  const [aliancas, recomendacoes, tenantsRaw]: [
+  if (isSedeRaiz) {
+    await reconciliarPropostasAliancaPendentes(authz.tenant.id)
+  }
+
+  const [aliancasRaw, recomendacoes, tenantsRaw]: [
     Awaited<ReturnType<typeof listAliancasForTenant>>,
     Awaited<ReturnType<typeof listRecomendacoesForTenant>>,
     Array<{
@@ -51,24 +61,36 @@ export default async function AdminAliancasPage() {
       } | null
     }>,
   ] = await Promise.all([
-    listAliancasForTenant(authz.tenant.id),
-    listRecomendacoesForTenant(authz.tenant.id),
-    db.tenant.findMany({
-      where: { ativo: true, sintetico: false, id: { not: authz.tenant.id } },
-      orderBy: { nome: 'asc' },
-      select: {
-        id: true,
-        nome: true,
-        slug: true,
-        logoUrl: true,
-        afiliacaoId: true,
-        torcidaConhecida: { select: { logoUrl: true } },
-        afiliacao: {
-          select: { nome: true, apelido: true, cidade: true, estado: true },
-        },
-      },
-    }),
+    listAliancasForTenant(rootTenantId),
+    // Co-irmãs dependem do `afiliacaoId` do clube — só a sede raiz costuma
+    // ter esse campo preenchido (Subsede/PDE nasce sem afiliacaoId próprio),
+    // então resolve sempre a partir do tenant raiz, igual às alianças.
+    // São informativas (nunca viram Alianca) e seguem visíveis em modo
+    // leitura; só a proposta formal (ALIADA) é exclusiva da sede (filtrado
+    // no client via `readOnly`).
+    listRecomendacoesForTenant(rootTenantId),
+    isSedeRaiz
+      ? db.tenant.findMany({
+          where: { ativo: true, sintetico: false, id: { not: authz.tenant.id } },
+          orderBy: { nome: 'asc' },
+          select: {
+            id: true,
+            nome: true,
+            slug: true,
+            logoUrl: true,
+            afiliacaoId: true,
+            torcidaConhecida: { select: { logoUrl: true } },
+            afiliacao: {
+              select: { nome: true, apelido: true, cidade: true, estado: true },
+            },
+          },
+        })
+      : Promise.resolve([]),
   ])
+
+  // Subsede/PDE só enxerga o vínculo herdado (ATIVA) — o resto do fluxo
+  // (pendente/histórico) é exclusivo de quem propôs/recebeu na sede raiz.
+  const aliancas = isSedeRaiz ? aliancasRaw : aliancasRaw.filter((a) => a.status === 'ATIVA')
 
   const tenantOptions: TenantOption[] = tenantsRaw.map((t) => ({
     id: t.id,
@@ -109,11 +131,12 @@ export default async function AdminAliancasPage() {
         <div className="app-container">
           <MotionReveal>
             <AliancaForms
-              tenantId={authz.tenant.id}
+              tenantId={rootTenantId}
               afiliacaoId={authz.tenant.afiliacaoId ?? null}
               aliancas={aliancasSerializadas}
               recomendacoes={recomendacoesSerializadas}
               tenants={tenantOptions}
+              readOnly={!isSedeRaiz}
             />
           </MotionReveal>
         </div>

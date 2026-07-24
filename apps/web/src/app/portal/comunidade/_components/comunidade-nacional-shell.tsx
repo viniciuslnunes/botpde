@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { getNoticiasAprovadas } from '@/lib/noticias'
@@ -7,7 +6,7 @@ import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 import { Clock, ListOrdered, Users } from 'lucide-react'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
-import { canOptimizeImageUrl } from '@/lib/optimizable-image'
+import { LogoImage } from '@/components/media/logo-image'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 
 const FeedComposer = dynamic(
@@ -42,22 +41,12 @@ export async function ComunidadeNacionalShell({
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6">
         <div className="flex items-start gap-3">
           {afiliacao.escudoUrl ? (
-            canOptimizeImageUrl(afiliacao.escudoUrl) ? (
-              <Image
-                src={afiliacao.escudoUrl}
-                alt={`Escudo do ${nomeClube}`}
-                width={44}
-                height={44}
-                className="h-11 w-11 shrink-0 object-contain"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={afiliacao.escudoUrl}
-                alt={`Escudo do ${nomeClube}`}
-                className="h-11 w-11 shrink-0 object-contain"
-              />
-            )
+            <LogoImage
+              src={afiliacao.escudoUrl}
+              alt={`Escudo do ${nomeClube}`}
+              size={44}
+              className="h-11 w-11 shrink-0 object-contain"
+            />
           ) : (
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary-fg))]">
               <Users className="h-5 w-5" />

@@ -191,6 +191,65 @@ describe('solicitarVinculo — validação', () => {
     expect(membroCreate).not.toHaveBeenCalled()
   })
 
+  it('rejeita SOCIO sem termo de responsabilidade aceito', async () => {
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      numeroAssociado: '123456',
+      anosSocio: 3,
+      cep: '01310-100',
+      logradouro: 'Rua das Torcidas',
+      bairro: 'Centro',
+      uf: 'SP',
+      rg: '12.345.678-9',
+      cpf: '111.444.777-35',
+      dataNascimento: '1990-01-01',
+      termoResponsabilidadeAceito: false,
+    })
+    expect(r.errors?.termoResponsabilidadeAceito).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejeita CPF inválido', async () => {
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      numeroAssociado: '123456',
+      anosSocio: 3,
+      cep: '01310-100',
+      logradouro: 'Rua das Torcidas',
+      bairro: 'Centro',
+      uf: 'SP',
+      rg: '12.345.678-9',
+      cpf: '111.111.111-11',
+      dataNascimento: '1990-01-01',
+      termoResponsabilidadeAceito: true,
+    })
+    expect(r.errors?.cpf).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
+  it('exige responsável legal quando SOCIO é menor de idade', async () => {
+    const anoAtual = new Date().getFullYear()
+    const r = await solicitarVinculo({
+      ...vinculoBase,
+      tipo: 'SOCIO',
+      numeroAssociado: '123456',
+      anosSocio: 1,
+      cep: '01310-100',
+      logradouro: 'Rua das Torcidas',
+      bairro: 'Centro',
+      uf: 'SP',
+      rg: '12.345.678-9',
+      cpf: '111.444.777-35',
+      dataNascimento: `${anoAtual - 15}-01-01`,
+      termoResponsabilidadeAceito: true,
+    })
+    expect(r.errors?.responsavelNome).toBeTruthy()
+    expect(r.errors?.responsavelDocumento).toBeTruthy()
+    expect(membroCreate).not.toHaveBeenCalled()
+  })
+
   it('rejeita numeroAssociado com mais de 7 dígitos ou não numérico', async () => {
     const r = await solicitarVinculo({
       ...vinculoBase,
@@ -234,6 +293,13 @@ describe('solicitarVinculo — validação', () => {
         numeroAssociado: '123456',
         anosSocio: 3,
         cep: '01310-100',
+        logradouro: 'Rua das Torcidas',
+        bairro: 'Centro',
+        uf: 'SP',
+        rg: '12.345.678-9',
+        cpf: '111.444.777-35',
+        dataNascimento: '1990-01-01',
+        termoResponsabilidadeAceito: true,
       }),
     ).rejects.toThrow('REDIRECT')
     expect(membroCreate).toHaveBeenCalledWith(

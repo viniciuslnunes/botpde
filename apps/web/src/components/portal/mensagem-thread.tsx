@@ -501,7 +501,7 @@ export function MensagemThread({
         error: null,
       }
       setMedias((prev) => [...prev, item])
-      void uploadMediaToCloudinary(file)
+      void uploadMediaToCloudinary(file, undefined, 'mensagem', undefined, conversaId)
         .then((url) => setMedias((prev) => prev.map((m) => (m.id === id ? { ...m, url } : m))))
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : 'Falha no upload'
