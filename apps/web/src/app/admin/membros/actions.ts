@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
+import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { notificarSafe } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
@@ -171,23 +172,17 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
   })
   if (solicitacoesLidas > 0) emitNotificacaoPing(tenant.id, session.user.id)
 
-  // Auto-vínculo no canal oficial da unidade (governança hierárquica, Fase 2):
-  // se o tenant tem Sede com canal provisionado, o membro aprovado entra nele.
+  // Auto-vínculo de canais (governança hierárquica, Fase 2): SÓ o canal da
+  // própria unidade (SaasMembro.sedeId) + o canal principal (mural oficial
+  // da torcida) — nunca todas as unidades. Demais canais permanecem privados
+  // (entrada via pedirEntradaCanal/decidirPedidoCanal/adicionarMembroCanal).
   // SEMPRE aqui (aprovação) — nunca em GET/solicitação (anti-padrão write-on-GET).
-  const sedesComCanal: { canalConversaId: string | null }[] = await db.sede.findMany({
-    where: { tenantId: tenant.id, canalConversaId: { not: null } },
-    select: { canalConversaId: true },
+  await vincularMembroCanaisAposAprovacao({
+    tenantId: tenant.id,
+    userId: membro.userId,
+    sedeId: membro.sedeId,
+    fallbackCriadoPorId: session.user.id,
   })
-  for (const sede of sedesComCanal) {
-    if (!sede.canalConversaId) continue
-    await db.membroConversa.upsert({
-      where: {
-        conversaId_userId: { conversaId: sede.canalConversaId, userId: membro.userId },
-      },
-      create: { conversaId: sede.canalConversaId, userId: membro.userId, papel: 'MEMBRO' },
-      update: { saiuEm: null },
-    })
-  }
 
   await db.auditLog.create({
     data: {

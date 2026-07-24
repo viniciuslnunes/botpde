@@ -326,6 +326,52 @@ export async function getOrCreateCanalOficial(
 }
 
 /**
+ * Vínculo automático de canais na aprovação de sócio (governança hierárquica,
+ * Fase 2): entra SÓ no canal da própria unidade (`SaasMembro.sedeId` →
+ * `Sede.canalConversaId`) e no canal principal (mural oficial — `Sede` tipo
+ * SEDE, com fallback `getOrCreateCanalOficial` para tenants novos sem
+ * ponteiro ainda). Demais canais de unidade permanecem privados: entrada só
+ * via `pedirEntradaCanal` / `decidirPedidoCanal` / `adicionarMembroCanal`.
+ * Idempotente — seguro chamar mais de uma vez para o mesmo usuário/tenant.
+ */
+export async function vincularMembroCanaisAposAprovacao(opts: {
+  tenantId: string
+  userId: string
+  sedeId: string | null
+  /** Fallback de `criadoPorId` se o canal principal ainda não existir. */
+  fallbackCriadoPorId?: string | null
+}): Promise<void> {
+  const canalIds = new Set<string>()
+
+  if (opts.sedeId) {
+    const sedeUnidade: { canalConversaId: string | null } | null = await db.sede.findFirst({
+      where: { id: opts.sedeId, tenantId: opts.tenantId },
+      select: { canalConversaId: true },
+    })
+    if (sedeUnidade?.canalConversaId) canalIds.add(sedeUnidade.canalConversaId)
+  }
+
+  const sedeRaiz: { canalConversaId: string | null } | null = await db.sede.findFirst({
+    where: { tenantId: opts.tenantId, tipo: 'SEDE', canalConversaId: { not: null } },
+    select: { canalConversaId: true },
+  })
+  if (sedeRaiz?.canalConversaId) {
+    canalIds.add(sedeRaiz.canalConversaId)
+  } else {
+    const principal = await getOrCreateCanalOficial(opts.tenantId, opts.fallbackCriadoPorId)
+    canalIds.add(principal.id)
+  }
+
+  for (const conversaId of canalIds) {
+    await db.membroConversa.upsert({
+      where: { conversaId_userId: { conversaId, userId: opts.userId } },
+      create: { conversaId, userId: opts.userId, papel: 'MEMBRO' },
+      update: { saiuEm: null },
+    })
+  }
+}
+
+/**
  * Garante canais oficiais visíveis na listagem do tenant ativo:
  * - self + descendentes Caso B (`getOrCreateCanalOficial`)
  * - unidades Caso A (SUBSEDE/PDE no mesmo tenant sem `Sede.canalConversaId`)

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { bootstrapAcessoTenant, db } from '@torcida/db'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
@@ -174,7 +175,8 @@ export async function promoverUnidadeAPortal(
         // Sem SaasMembro no tenant novo, o owner não é resolvido como "tenant
         // casa" no pós-login (resolveUserTenantSlugForUser exige SaasMembro
         // APROVADO/SOCIO) e o auto-vínculo ao canal oficial (que só roda em
-        // aprovarMembro) nunca dispara. Espelha aprovarMembro aqui.
+        // aprovarMembro) nunca dispara. Espelha aprovarMembro aqui — só a
+        // unidade promovida (a única do tenant novo) + o canal principal.
         const ownerUser: { nome: string | null } | null = await db.user.findUnique({
           where: { id: ownerUserId },
           select: { nome: true },
@@ -194,20 +196,12 @@ export async function promoverUnidadeAPortal(
           update: {},
         })
 
-        const sedesComCanal: { canalConversaId: string | null }[] = await db.sede.findMany({
-          where: { tenantId: novoTenant.id, canalConversaId: { not: null } },
-          select: { canalConversaId: true },
+        await vincularMembroCanaisAposAprovacao({
+          tenantId: novoTenant.id,
+          userId: ownerUserId,
+          sedeId: sede.id,
+          fallbackCriadoPorId: ownerUserId,
         })
-        for (const s of sedesComCanal) {
-          if (!s.canalConversaId) continue
-          await db.membroConversa.upsert({
-            where: {
-              conversaId_userId: { conversaId: s.canalConversaId, userId: ownerUserId },
-            },
-            create: { conversaId: s.canalConversaId, userId: ownerUserId, papel: 'MEMBRO' },
-            update: { saiuEm: null },
-          })
-        }
       }
     }
 

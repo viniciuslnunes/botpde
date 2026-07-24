@@ -574,6 +574,53 @@ function rankDescobrirPosts(posts: PostSocialItem[], tenantId: string): PostSoci
   })
 }
 
+/**
+ * Decide se um post do Descobrir deve passar pelo gate de privacidade do
+ * autor (`getAutoresSemAcesso`). Comunicados oficiais (INSTITUCIONAL +
+ * comunicadoOrigemId) e posts "Só torcida" (TENANT) não podem ser escondidos
+ * pela privacidade do autor: sócios são privatizados na aprovação
+ * (`privatizarPerfilAoAprovarSocio`), mas isso não deve esconder comunicados
+ * da diretoria nem publicações de outros sócios visíveis só pela torcida.
+ */
+export function deveAplicarGatePrivacidadeAutorDescobrir(post: {
+  tipo?: string
+  comunicadoOrigemId?: string | null
+  visibilidade?: string
+}): boolean {
+  if (post.tipo === 'INSTITUCIONAL' && post.comunicadoOrigemId) return false
+  if (post.visibilidade === 'TENANT') return false
+  return true
+}
+
+/**
+ * Na rede/Seguindo, posts TENANT de autores seguidos só passam se o viewer
+ * for sócio APROVADO no tenant do post (mesma regra do Descobrir TENANT).
+ */
+async function filtrarPostsTenantDaRede<
+  T extends { autorId: string; tenantId: string; visibilidade: string },
+>(viewerId: string, posts: T[]): Promise<T[]> {
+  const tenantIds = [
+    ...new Set(
+      posts
+        .filter((p) => p.visibilidade === 'TENANT' && p.autorId !== viewerId)
+        .map((p) => p.tenantId),
+    ),
+  ]
+  if (tenantIds.length === 0) return posts
+
+  const podePorTenant = new Map<string, boolean>()
+  await Promise.all(
+    tenantIds.map(async (id) => {
+      podePorTenant.set(id, await podeVerFeedSocios(viewerId, id))
+    }),
+  )
+
+  return posts.filter((p) => {
+    if (p.visibilidade !== 'TENANT' || p.autorId === viewerId) return true
+    return podePorTenant.get(p.tenantId) ?? false
+  })
+}
+
 function revivePostSocialItem(post: PostSocialItem): PostSocialItem {
   return {
     ...post,
@@ -615,6 +662,36 @@ async function getDescobrirPostsBaseCached(
   )()
 
   return cached.map(revivePostSocialItem)
+}
+
+/**
+ * Candidatos "Só torcida" (TENANT) do Descobrir — só para sócios com vínculo
+ * APROVADO no tenant (`podeVerFeedSocios`). Consulta por request, sem
+ * `unstable_cache`: visibilidade TENANT depende do vínculo do viewer, então
+ * cachear misturaria com o cache compartilhado PUBLICO do Descobrir e
+ * vazaria para viewers sem permissão.
+ */
+async function getDescobrirPostsTenantSocios(
+  visibleTenantIds: string[],
+  cursor: FeedCursor | null,
+  fetchLimit: number,
+): Promise<PostSocialItem[]> {
+  const cursorWhere = buildCursorWhere(cursor)
+  const postsRaw = (await db.post.findMany({
+    where: {
+      tenantId: { in: visibleTenantIds },
+      tenant: { sintetico: false },
+      tipo: 'MEMBRO',
+      visibilidade: 'TENANT',
+      oculto: false,
+      ...escopoFeedSemConversa,
+      ...cursorWhere,
+    },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    take: fetchLimit,
+    include: postIncludeLista(),
+  })) as PostRaw[]
+  return postsRaw.map(projetarPost)
 }
 
 async function hidratarPostsDoUsuario(
@@ -714,9 +791,12 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       decodedCursor,
       fetchLimit,
     )
-    const autorIds = sugeridos.map((p) => p.autorId)
+    const candidatosGate = sugeridos.filter(deveAplicarGatePrivacidadeAutorDescobrir)
+    const autorIds = candidatosGate.map((p) => p.autorId)
     const semAcesso = await getAutoresSemAcesso(undefined, tenantId, autorIds)
-    const visiveis = sugeridos.filter((p) => !semAcesso.has(p.autorId))
+    const visiveis = sugeridos.filter(
+      (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
+    )
     const ranqueados = rankDescobrirPosts(visiveis, tenantId)
     const slice = await finalizarPosts(ranqueados.slice(0, take))
     const hasMore = ranqueados.length > take
@@ -734,7 +814,7 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
   const redeIds = [userId, ...seguindo.map((s) => s.seguidoId)]
   const redeSet = new Set(redeIds)
 
-  const [postsRedeRaw, discoverBase] = await Promise.all([
+  const [postsRedeRaw, discoverBase, podeVerSocios] = await Promise.all([
     db.post.findMany({
       where: {
         tenantId: { in: visibleTenantIds },
@@ -749,19 +829,53 @@ export const getPostsParaFeed = cache(async function getPostsParaFeed(
       include: postInclude(userId),
     }) as Promise<PostRaw[]>,
     getDescobrirPostsBaseCached(tenantId, visibleTenantIds, decodedCursor, fetchLimit),
+    podeVerFeedSocios(userId, tenantId),
   ])
 
-  const seguindoOrdenados = postsRedeRaw.map(projetarPost).sort(sortPostsDesc)
+  const seguindoOrdenados = await filtrarPostsTenantDaRede(
+    userId,
+    postsRedeRaw.map(projetarPost).sort(sortPostsDesc),
+  )
 
   const discoverExternos = discoverBase.filter(
     (p) => !redeSet.has(p.autorId) || (p.tipo === 'INSTITUCIONAL' && p.comunicadoOrigemId),
   )
-  const autorIdsExternos = discoverExternos.map((p) => p.autorId)
+  const candidatosGate = discoverExternos.filter(deveAplicarGatePrivacidadeAutorDescobrir)
+  const autorIdsExternos = candidatosGate.map((p) => p.autorId)
   const semAcesso = await getAutoresSemAcesso(userId, tenantId, autorIdsExternos)
-  const discoverVisiveis = discoverExternos.filter((p) => !semAcesso.has(p.autorId))
+  const discoverVisiveis = discoverExternos.filter(
+    (p) => !deveAplicarGatePrivacidadeAutorDescobrir(p) || !semAcesso.has(p.autorId),
+  )
+
+  // Posts "Só torcida" (TENANT) só entram no Descobrir para sócio com vínculo
+  // APROVADO no *tenant do post* — não basta poder ver a hierarquia. Sem
+  // gate de privacidade do autor (a visibilidade já é o escopo).
+  let discoverTenantExternos: PostSocialItem[] = []
+  if (podeVerSocios) {
+    const tenantCandidatos = await getDescobrirPostsTenantSocios(
+      visibleTenantIds,
+      decodedCursor,
+      fetchLimit,
+    )
+    const tenantIdsTenant = [
+      ...new Set(tenantCandidatos.map((p) => p.tenantId).filter((id) => id !== tenantId)),
+    ]
+    const podePorTenant = new Map<string, boolean>([[tenantId, true]])
+    await Promise.all(
+      tenantIdsTenant.map(async (id) => {
+        podePorTenant.set(id, await podeVerFeedSocios(userId, id))
+      }),
+    )
+    discoverTenantExternos = tenantCandidatos.filter(
+      (p) => !redeSet.has(p.autorId) && (podePorTenant.get(p.tenantId) ?? false),
+    )
+  }
 
   // Ranking único: rede (inclui o autor) + externos — post fresco do viewer sobe no Descobrir.
-  const candidatos = rankDescobrirPosts([...discoverVisiveis, ...seguindoOrdenados], tenantId)
+  const candidatos = rankDescobrirPosts(
+    [...discoverVisiveis, ...discoverTenantExternos, ...seguindoOrdenados],
+    tenantId,
+  )
   const hasMore = candidatos.length > take
   const paginaBruta = candidatos.slice(0, take)
   const pagina = await finalizarPosts(await hidratarPostsDoUsuario(paginaBruta, userId))
@@ -1006,14 +1120,22 @@ export async function podeVerPost(
     tenantId: string
     visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
     oculto: boolean
+    tipo?: string
+    comunicadoOrigemId?: string | null
   },
 ): Promise<boolean> {
   if (post.oculto) return false
-  if (!(await podeVerConteudoSocial(viewerId, post.autorId, post.tenantId))) return false
   if (viewerId === post.autorId) return true
+
+  // Comunicados oficiais e posts "Só torcida" não dependem do perfil do autor.
+  if (!deveAplicarGatePrivacidadeAutorDescobrir(post)) {
+    if (post.visibilidade === 'TENANT') return podeVerFeedSocios(viewerId, post.tenantId)
+    return true
+  }
+
+  if (!(await podeVerConteudoSocial(viewerId, post.autorId, post.tenantId))) return false
   if (post.visibilidade === 'PUBLICO') return true
   if (post.visibilidade === 'TENANT') {
-    // TODO(onboarding): aplicar podeVerFeedSocios no where — ver spec §3.1
     return podeVerFeedSocios(viewerId, post.tenantId)
   }
   const status = await getSeguimentoStatus(viewerId, post.autorId)
@@ -1025,6 +1147,8 @@ type PostVisibilidadeInput = {
   tenantId: string
   visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
   oculto?: boolean
+  tipo?: string
+  comunicadoOrigemId?: string | null
 }
 
 /** Filtra posts visíveis ao viewer em batch (perfil + visibilidade do post). */
@@ -1037,6 +1161,7 @@ export async function filtrarPostsVisiveis<T extends PostVisibilidadeInput>(
   const porTenant = new Map<string, string[]>()
   for (const post of posts) {
     if (post.oculto === true) continue
+    if (!deveAplicarGatePrivacidadeAutorDescobrir(post)) continue
     const ids = porTenant.get(post.tenantId) ?? []
     ids.push(post.autorId)
     porTenant.set(post.tenantId, ids)
@@ -1050,9 +1175,11 @@ export async function filtrarPostsVisiveis<T extends PostVisibilidadeInput>(
     }),
   )
 
-  const candidatos = posts.filter(
-    (p) => p.oculto !== true && !bloqueados.has(`${p.tenantId}:${p.autorId}`),
-  )
+  const candidatos = posts.filter((p) => {
+    if (p.oculto === true) return false
+    if (!deveAplicarGatePrivacidadeAutorDescobrir(p)) return true
+    return !bloqueados.has(`${p.tenantId}:${p.autorId}`)
+  })
   if (candidatos.length === 0) return []
 
   const privadoAutorIds = [
@@ -1110,6 +1237,8 @@ export async function getPostPorId(
     tenantId: post.tenantId,
     visibilidade: post.visibilidade,
     oculto: false,
+    tipo: post.tipo,
+    comunicadoOrigemId: post.comunicadoOrigemId,
   })
   return ok ? (await finalizarPosts([post]))[0] ?? null : null
 }
@@ -1161,9 +1290,15 @@ export const getPostsDaRede = cache(async function getPostsDaRede(
     })) as PostRaw[]
 
     const byId = new Map(postsRaw.map((raw) => [raw.id, projetarPost(raw)]))
+    const lote: PostSocialItem[] = []
     for (const row of timelineRows) {
       const post = byId.get(row.postId)
       if (!post || seen.has(post.id)) continue
+      lote.push(post)
+    }
+    const loteVisivel = await filtrarPostsTenantDaRede(userId, lote)
+    for (const post of loteVisivel) {
+      if (seen.has(post.id)) continue
       seen.add(post.id)
       ordenados.push(post)
       if (ordenados.length >= take + 1) break
