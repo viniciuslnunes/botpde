@@ -387,8 +387,11 @@ export function postIncludeLista(userId?: string) {
   } as const
 }
 
-/** OR do feed nacional — Prisma rejeita `in: []`; omitir o ramo de seguidos vazio. */
-function orFeedNacionalDescobrir(seguindoAprovados: string[]): Prisma.PostWhereInput[] {
+/**
+ * OR do feed nacional — Prisma rejeita `in: []`; omitir o ramo de seguidos vazio.
+ * Exportado para `comunidade-busca.ts` reaplicar o mesmo gate na busca de posts da CN.
+ */
+export function orFeedNacionalDescobrir(seguindoAprovados: string[]): Prisma.PostWhereInput[] {
   return compactOr([
     { tenant: { sintetico: true } },
     seguindoAprovados.length > 0 ? { autorId: { in: seguindoAprovados } } : null,

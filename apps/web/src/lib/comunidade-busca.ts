@@ -9,6 +9,7 @@ import {
 } from './perfil-social'
 import { normalizarHashtag, foldAccents } from './comunidade-social'
 import {
+  orFeedNacionalDescobrir,
   postIncludeBusca,
   projetarPostBusca,
   resolveVisibleTenantIdsForFeed,
@@ -266,20 +267,37 @@ async function buscarPostIdsPorTrgm(
   visibleTenantIds: string[],
   termo: string,
   limit: number,
+  opts: { nacional?: boolean; seguindoAprovados?: string[] } = {},
 ): Promise<string[] | null> {
   if (visibleTenantIds.length === 0) return []
   const termoLike = `%${termo}%`
+  const seguidos = opts.seguindoAprovados ?? []
+
+  // CN: mesmo gate do feed nacional (orFeedNacionalDescobrir em feed.ts) —
+  // sintético ∪ alcanceNacional ∪ seguidos APROVADO — não só `tenant_id IN visibleTenantIds`.
+  const nacionalClause = opts.nacional
+    ? Prisma.sql`AND (
+        t.sintetico = true
+        OR p.alcance_nacional = true
+        ${seguidos.length > 0 ? Prisma.sql`OR p.autor_id IN (${Prisma.join(seguidos)})` : Prisma.empty}
+      )`
+    : Prisma.empty
+  const joinClause = opts.nacional
+    ? Prisma.sql`INNER JOIN saas_tenants t ON t.id = p.tenant_id`
+    : Prisma.empty
 
   try {
     const rows = await db.$queryRaw<Array<{ id: string }>>`
       SELECT p.id AS id
       FROM saas_posts p
+      ${joinClause}
       WHERE p.tenant_id IN (${Prisma.join(visibleTenantIds)})
         AND p.tipo = 'MEMBRO'
         AND p.oculto = false
         AND p.visibilidade = 'PUBLICO'
         AND p.conversa_id IS NULL
         AND p.conteudo ILIKE ${termoLike}
+        ${nacionalClause}
       ORDER BY similarity(lower(p.conteudo), lower(${termo})) DESC, p.criado_em DESC, p.id DESC
       LIMIT ${limit}
     `
@@ -781,6 +799,16 @@ export async function buscarComunidade(
   const normalizedTag = normalizarHashtag(termo.replace(/^#/, ''))
   const modoNacional = followContextoId === null
 
+  // CN: posts usam o mesmo gate do feed nacional (sintético ∪ alcanceNacional ∪
+  // seguidos APROVADO) — visibleTenantIds sozinho é largo demais (todas as TOs da afiliação).
+  const seguindoAprovados: { seguidoId: string }[] = modoNacional
+    ? await db.seguimento.findMany({
+        where: { seguidorId: userId, status: 'APROVADO' },
+        select: { seguidoId: true },
+      })
+    : []
+  const seguidosIds = seguindoAprovados.map((s) => s.seguidoId)
+
   const [membros, hashtagRowsTrgm, postIdsTrgm, canaisUnidades]: [
     MembroBuscaItem[],
     Array<{ tag: string; total: number }> | null,
@@ -789,7 +817,10 @@ export async function buscarComunidade(
   ] = await Promise.all([
     buscarMembrosComunidade(tenantId, userId, termo, { visibleTenantIds, modo }),
     buscarHashtagsPorTrgm(visibleTenantIds, normalizedTag, limites.hashtags),
-    buscarPostIdsPorTrgm(visibleTenantIds, termo, limites.postsCand),
+    buscarPostIdsPorTrgm(visibleTenantIds, termo, limites.postsCand, {
+      nacional: modoNacional,
+      seguindoAprovados: seguidosIds,
+    }),
     // CN: só canais PUBLICO (mesmo critério da vitrine nacional) — nunca TENANT/HIERARQUIA.
     modo === 'rapida'
       ? Promise.resolve({ canais: [] as CanalItem[], unidades: [] as UnidadeBuscaItem[] })
@@ -837,6 +868,8 @@ export async function buscarComunidade(
         visibilidade: 'PUBLICO',
         conversaId: null,
         conteudo: { contains: termo, mode: 'insensitive' },
+        // CN: mesmo gate do feed nacional — não basta estar no conjunto largo de TOs.
+        ...(modoNacional ? { OR: orFeedNacionalDescobrir(seguidosIds) } : {}),
       },
       orderBy: { criadoEm: 'desc' },
       take: limites.postsCand,
