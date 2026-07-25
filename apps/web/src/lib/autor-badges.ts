@@ -109,14 +109,14 @@ async function carregarBadgesPorAutorTenant(
   const autorIds = [...new Set(unicos.map((p) => p.autorId))]
   const tenantIds = [...new Set(unicos.map((p) => p.tenantId))]
 
-  // Fallback de `tipoSede` quando o membro não tem `sedeId` (ex.: torcida com
-  // Sede única, sem seleção no cadastro): usa o tipo da Sede raiz do próprio
-  // tenant, em vez de assumir 'SEDE' — senão uma subsede/PDE promovida a
-  // tenant próprio (Caso B) exibe "Presidente" em vez de "Liderança". Uma
-  // unidade promovida mantém Sede.sedeId apontando pra Sede-mãe (outro
-  // tenant), então a raiz não é identificável por `sedeId: null` — e se ela
-  // tiver filhos territoriais movidos junto (mesmo tenantId), a raiz é a
-  // única cujo `sedeId` não aponta pra outra Sede do mesmo tenant.
+  // `tipoSede` do badge usa a Sede raiz do tenant (não a unidade pessoal do
+  // membro — ver uso abaixo), em vez de assumir 'SEDE' — senão uma subsede/PDE
+  // promovida a tenant próprio (Caso B) exibe "Presidente" em vez de
+  // "Liderança". Uma unidade promovida mantém Sede.sedeId apontando pra
+  // Sede-mãe (outro tenant), então a raiz não é identificável por
+  // `sedeId: null` — e se ela tiver filhos territoriais movidos junto (mesmo
+  // tenantId), a raiz é a única cujo `sedeId` não aponta pra outra Sede do
+  // mesmo tenant.
   const sedesDoTenant: Array<{ id: string; tenantId: string | null; sedeId: string | null; tipo: TipoSede }> =
     await db.sede.findMany({
       where: { tenantId: { in: tenantIds } },
@@ -208,8 +208,11 @@ async function carregarBadgesPorAutorTenant(
         departamentoNome: r.role.departamento?.nome ?? null,
       }))
     const principal = escolherCargoPrincipal(rolesDoAutor)
+    // Cargo de sistema (Presidente/Liderança) é sempre relativo à Sede raiz do
+    // tenant, não à unidade pessoal do membro — um Presidente pode estar
+    // cadastrado numa subsede/PDE e continua Presidente da torcida inteira.
     const tipoSede: TipoSede =
-      membro?.sede?.tipo ?? tipoSedeRaizMap.get(p.tenantId) ?? 'SEDE'
+      tipoSedeRaizMap.get(p.tenantId) ?? membro?.sede?.tipo ?? 'SEDE'
     const deptoNomes = memberships
       .filter((m) => m.userId === p.autorId && m.tenantId === p.tenantId)
       .map((m) => m.departamento.nome)
