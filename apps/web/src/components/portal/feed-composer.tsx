@@ -44,7 +44,7 @@ import {
 } from '@/app/admin/comunidade/actions'
 import type { EventoComposerItem } from '@/lib/eventos'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
-import { FileDropOverlay, dataTransferHasFiles, useFileDragOver } from '@/components/media/file-drop-overlay'
+import { FileDropOverlay, useFileDragOver } from '@/components/media/file-drop-overlay'
 import { firstSocialUrlInText, detectEmbedProvider, EMBED_HOSTS, ensureSocialEmbedInMidias, classifyMedia } from '@/lib/social-embed'
 import { emitirPostPublicado, criarPreviewOtimista, novoIdOtimista } from '@/lib/feed-live-refresh'
 import { Avatar } from './avatar'
@@ -899,15 +899,10 @@ function ComposerBody({
 
   return (
     <m.form
-      layout
+      // Layout projection desalinha o overlay absoluto durante o arraste.
+      layout={!fileDrag.active}
       onSubmit={submit}
-      className="card-soft min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
-    >
-    <div
-      onDragEnter={(e) => {
-        fileDrag.onDragEnter(e)
-        if (!expanded && dataTransferHasFiles(e.dataTransfer)) setExpanded(true)
-      }}
+      onDragEnter={fileDrag.onDragEnter}
       onDragOver={fileDrag.onDragOver}
       onDragLeave={fileDrag.onDragLeave}
       onDrop={(e) => {
@@ -917,7 +912,7 @@ function ComposerBody({
           addFiles(files)
         }
       }}
-      className="relative"
+      className="card-soft relative min-w-0 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
     >
       <FileDropOverlay active={fileDrag.active} />
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
@@ -1743,7 +1738,6 @@ function ComposerBody({
           </m.div>
         )}
       </AnimatePresence>
-    </div>
     </m.form>
   )
 }
