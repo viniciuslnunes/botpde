@@ -73,7 +73,16 @@ async function sincronizarSedesNacionaisCatalogo() {
     const catalogo = acharCatalogoTorcida(curada)
     if (!catalogo?.sede) continue
 
-    const sedeId = `sede-principal-${tenant.slug}`
+    // Não criar uma 2ª Sede de propósito: se o tenant já tem uma Sede (tipo
+    // SEDE), mesmo com id diferente do padrão `sede-principal-{slug}`, o
+    // catálogo atualiza ESSA — nunca duplica (a raiz do tenant vira ambígua
+    // pra quem depende de "existe tipo SEDE" pra rotular Presidente/Liderança).
+    const sedeExistente = await db.sede.findFirst({
+      where: { tenantId: tenant.id, tipo: 'SEDE' },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    })
+    const sedeId = sedeExistente?.id ?? `sede-principal-${tenant.slug}`
     if (DRY_RUN) {
       console.log(`  · [SEDE catálogo] ${tenant.slug} ← ${catalogo.sede.slice(0, 50)}…`)
       atualizadas += 1

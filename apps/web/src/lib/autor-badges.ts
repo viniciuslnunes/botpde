@@ -112,11 +112,12 @@ async function carregarBadgesPorAutorTenant(
   // `tipoSede` do badge usa a Sede raiz do tenant (não a unidade pessoal do
   // membro — ver uso abaixo), em vez de assumir 'SEDE' — senão uma subsede/PDE
   // promovida a tenant próprio (Caso B) exibe "Presidente" em vez de
-  // "Liderança". Uma unidade promovida mantém Sede.sedeId apontando pra
-  // Sede-mãe (outro tenant), então a raiz não é identificável por
-  // `sedeId: null` — e se ela tiver filhos territoriais movidos junto (mesmo
-  // tenantId), a raiz é a única cujo `sedeId` não aponta pra outra Sede do
-  // mesmo tenant.
+  // "Liderança". Mesmo critério de `getOrganizacaoTree`: existe `tipo: 'SEDE'`
+  // no tenant → é a raiz (não depende de `sedeId`, que em Caso B costuma
+  // apontar pra fora do tenant — pra Sede-mãe — e não deve ser tratado como
+  // "qualquer sede sem pai local == raiz", senão uma Sede de teste/lixo com
+  // `sedeId` externo pode ganhar de uma Sede real por ordenação não
+  // determinística do `findMany`).
   const sedesDoTenant: Array<{ id: string; tenantId: string | null; sedeId: string | null; tipo: TipoSede }> =
     await db.sede.findMany({
       where: { tenantId: { in: tenantIds } },
@@ -131,6 +132,11 @@ async function carregarBadgesPorAutorTenant(
   }
   const tipoSedeRaizMap = new Map<string, TipoSede>()
   for (const [tenantId, sedes] of sedesPorTenant) {
+    const sedeTipoSede = sedes.find((s) => s.tipo === 'SEDE')
+    if (sedeTipoSede) {
+      tipoSedeRaizMap.set(tenantId, 'SEDE')
+      continue
+    }
     const idsDoTenant = new Set(sedes.map((s) => s.id))
     const raiz = sedes.find((s) => !s.sedeId || !idsDoTenant.has(s.sedeId))
     if (raiz) tipoSedeRaizMap.set(tenantId, raiz.tipo)

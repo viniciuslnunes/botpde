@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { AnimatePresence, m } from 'motion/react'
+import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react'
 import { Bell } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { TipoNotificacao } from '@torcida/db'
 import { marcarNotificacaoLida, marcarNotificacoesLidasPorIds } from '@/app/actions/notificacoes'
-import { NotificationAvatar, formatarTituloNotificacao } from '@/components/portal/notification-item-visual'
+import {
+  NotificationAvatar,
+  formatarTituloNotificacao,
+} from '@/components/portal/notification-item-visual'
 import { NOTIFICATION_AUTO_READ_DELAY_MS } from '@/lib/notificacao-auto-read'
 import { popoverPanel, springSnappy } from '@/lib/motion-presets'
 
@@ -138,84 +141,86 @@ export function NotificationBell({
         )}
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <m.div
-            key="notification-menu"
-            role="menu"
-            variants={popoverPanel}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            transition={springSnappy}
-            style={{ transformOrigin: 'top right' }}
-            className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg"
-          >
-            <div className="border-b border-[rgb(var(--border))] px-2 pb-2">
-              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Notificações</p>
-            </div>
-
-            {items.length === 0 ? (
-              <p className="px-2 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
-                Nenhuma notificação ainda.
-              </p>
-            ) : (
-              <div className="max-h-80 overflow-auto py-1">
-                {items.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={item.link ?? '#'}
-                    role="menuitem"
-                    onClick={() => {
-                      marcarLida(item)
-                      setOpen(false)
-                    }}
-                    className={[
-                      'block rounded-lg px-2 py-2 transition-colors',
-                      item.lida
-                        ? 'hover:bg-[rgb(var(--background-subtle))]'
-                        : 'bg-[rgb(var(--color-primary)_/_0.08)] hover:bg-[rgb(var(--color-primary)_/_0.12)]',
-                    ].join(' ')}
-                  >
-                    <span className="flex items-start gap-2.5">
-                      <NotificationAvatar ator={item.ator} tipo={item.tipo} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[rgb(var(--foreground))]">
-                          {formatarTituloNotificacao(item)}
-                        </p>
-                        {item.corpo && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
-                            {item.corpo}
-                          </p>
-                        )}
-                        <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">
-                          {formatarData(item.criadoEm)}
-                        </p>
-                      </span>
-                    </span>
-                  </Link>
-                ))}
+      <LazyMotion features={domAnimation}>
+        <AnimatePresence>
+          {open && (
+            <m.div
+              key="notification-menu"
+              role="menu"
+              variants={popoverPanel}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              transition={springSnappy}
+              style={{ transformOrigin: 'top right' }}
+              className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-2 shadow-lg"
+            >
+              <div className="border-b border-[rgb(var(--border))] px-2 pb-2">
+                <p className="text-sm font-semibold text-[rgb(var(--foreground))]">Notificações</p>
               </div>
-            )}
 
-            <div className="border-t border-[rgb(var(--border))] px-2 py-2">
-              <Link
-                href={verTodasHref}
-                onClick={() => setOpen(false)}
-                className="block rounded-lg px-2 py-2 text-center text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--background-subtle))]"
-              >
-                {verTodasLabel}
-              </Link>
-            </div>
+              {items.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-[rgb(var(--foreground-muted))]">
+                  Nenhuma notificação ainda.
+                </p>
+              ) : (
+                <div className="max-h-80 overflow-auto py-1">
+                  {items.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={item.link ?? '#'}
+                      role="menuitem"
+                      onClick={() => {
+                        marcarLida(item)
+                        setOpen(false)
+                      }}
+                      className={[
+                        'block rounded-lg px-2 py-2 transition-colors',
+                        item.lida
+                          ? 'hover:bg-[rgb(var(--background-subtle))]'
+                          : 'bg-[rgb(var(--color-primary)_/_0.08)] hover:bg-[rgb(var(--color-primary)_/_0.12)]',
+                      ].join(' ')}
+                    >
+                      <span className="flex items-start gap-2.5">
+                        <NotificationAvatar ator={item.ator} tipo={item.tipo} size="sm" />
+                        <span className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                            {formatarTituloNotificacao(item)}
+                          </p>
+                          {item.corpo && (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
+                              {item.corpo}
+                            </p>
+                          )}
+                          <p className="mt-1 text-[10px] text-[rgb(var(--foreground-muted))]">
+                            {formatarData(item.criadoEm)}
+                          </p>
+                        </span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
 
-            {pending && (
-              <p className="px-2 pb-1 pt-2 text-right text-[10px] text-[rgb(var(--foreground-muted))]">
-                Atualizando...
-              </p>
-            )}
-          </m.div>
-        )}
-      </AnimatePresence>
+              <div className="border-t border-[rgb(var(--border))] px-2 py-2">
+                <Link
+                  href={verTodasHref}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-lg px-2 py-2 text-center text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:bg-[rgb(var(--background-subtle))]"
+                >
+                  {verTodasLabel}
+                </Link>
+              </div>
+
+              {pending && (
+                <p className="px-2 pb-1 pt-2 text-right text-[10px] text-[rgb(var(--foreground-muted))]">
+                  Atualizando...
+                </p>
+              )}
+            </m.div>
+          )}
+        </AnimatePresence>
+      </LazyMotion>
     </div>
   )
 }

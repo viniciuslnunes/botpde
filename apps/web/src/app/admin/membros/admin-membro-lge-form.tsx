@@ -22,6 +22,8 @@ export function AdminMembroLgeForm({
   planos,
   podeDesligar,
   desligadoEm,
+  espelhado,
+  aprovadoNaUnidadeNome,
 }: {
   membroId: string
   initial: {
@@ -36,6 +38,9 @@ export function AdminMembroLgeForm({
   planos: PlanoOption[]
   podeDesligar: boolean
   desligadoEm: Date | null
+  /** Espelho na Sede — LGE só leitura; edite na unidade de origem. */
+  espelhado?: boolean
+  aprovadoNaUnidadeNome?: string | null
 }) {
   const [lgeState, lgeAction, lgePending] = useActionState(atualizarDadosLge, {} as MembroLgeState)
   const [dismissState, dismissAction, dismissPending] = useActionState(
@@ -48,6 +53,65 @@ export function AdminMembroLgeForm({
   useEffect(() => {
     if (dismissState.ok) window.location.reload()
   }, [dismissState.ok])
+
+  const via = aprovadoNaUnidadeNome?.trim()
+  const campoSomenteLeitura =
+    'mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]'
+
+  if (espelhado) {
+    const planoNome =
+      planos.find((p) => p.id === initial.planoAssociacaoId)?.nome ?? null
+    return (
+      <div className="space-y-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+          Dados LGE (Lei 14.597/2023)
+        </h2>
+        <p className="text-xs text-[rgb(var(--foreground-muted))]">
+          {via
+            ? `Registro espelhado — aprovado via ${via}. Edite na unidade de origem.`
+            : 'Registro espelhado — edite na unidade de origem.'}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">CPF</p>
+            <p className={campoSomenteLeitura}>{initial.cpf || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">RG</p>
+            <p className={campoSomenteLeitura}>{initial.rg || '—'}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Filiação</p>
+            <p className={campoSomenteLeitura}>{initial.filiacao || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Escolaridade</p>
+            <p className={campoSomenteLeitura}>{initial.escolaridade || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Profissão</p>
+            <p className={campoSomenteLeitura}>{initial.profissao || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Data de nascimento
+            </p>
+            <p className={campoSomenteLeitura}>
+              {initial.dataNascimento
+                ? formatDataCompetenciaInput(initial.dataNascimento)
+                : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Plano de associação
+            </p>
+            <p className={campoSomenteLeitura}>{planoNome || '—'}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

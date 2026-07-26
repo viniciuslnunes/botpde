@@ -208,6 +208,13 @@ export function MembroDetalheModal({
                       {membro.tipo}
                     </span>
                     <StatusBadge dominio="membro" status={membro.status} />
+                    {membro.espelhado && (
+                      <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                        {membro.aprovadoNaUnidadeNome?.trim()
+                          ? `Aprovado via ${membro.aprovadoNaUnidadeNome.trim()}`
+                          : 'Espelho da Sede'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -339,6 +346,8 @@ export function MembroDetalheModal({
                 membroId={membro.id}
                 status={membro.status}
                 departamentoNome={membro.departamentoNome}
+                espelhado={membro.espelhado}
+                aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
               />
             </div>
           </m.div>

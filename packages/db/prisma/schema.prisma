@@ -960,6 +960,36 @@ model SaasMembro {
 
 
 
+  /// true = esta linha é um ESPELHO gerado pela aprovação em outra unidade da
+
+  /// mesma torcida (Caso B). false = linha orgânica. Espelhos nunca são
+
+  /// mutáveis diretamente pela Sede — só leitura.
+
+  espelhado Boolean @default(false) @map("espelhado")
+
+
+
+  /// Só no espelho: tenantId da Subsede/PDE que aprovou originalmente.
+
+  aprovadoNaUnidadeTenantId String? @map("aprovado_na_unidade_tenant_id")
+
+
+
+  /// Ponteiro 1:1 para a linha de ORIGEM (na Subsede/PDE) que este espelho
+
+  /// reflete. SetNull (não Cascade): se o tenant-filho for excluído, o
+
+  /// espelho vira histórico órfão em vez de sumir (LGE: sem exclusão física).
+
+  membroOrigemId String?     @unique @map("membro_origem_id")
+
+  membroOrigem   SaasMembro? @relation("MembroEspelho", fields: [membroOrigemId], references: [id], onDelete: SetNull)
+
+  membroEspelho  SaasMembro? @relation("MembroEspelho")
+
+
+
   criadoEm     DateTime @default(now()) @map("criado_em")
 
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
@@ -989,6 +1019,8 @@ model SaasMembro {
   @@index([tenantId, adimplente])
 
   @@index([planoAssociacaoId])
+
+  @@index([espelhado])
 
   @@map("saas_membros")
 
@@ -3319,6 +3351,32 @@ enum TipoNotificacao {
 
   MENSAGEM_SOLICITACAO_REJEITADA
 
+  PEDIDO_CONFIRMADO
+
+  PEDIDO_CANCELADO
+
+  PEDIDO_ENTREGUE
+
+  SOCIO_CARTEIRINHA_EMITIDA
+
+  SOCIO_CARTEIRINHA_RENOVADA
+
+  SOCIO_CARTEIRINHA_REVOGADA
+
+  ACESSO_ATUALIZADO
+
+  DEPARTAMENTO_ADICIONADO
+
+  DEPARTAMENTO_REMOVIDO
+
+  SEDE_RESPONSAVEL_DEFINIDO
+
+  BAR_VENDA_ESTORNADA
+
+  PATRIMONIO_RESPONSAVEL_DEFINIDO
+
+  PEDIDO_RECEBIDO
+
 }
 
 
@@ -4060,6 +4118,8 @@ model AuditLog {
 
 
   @@index([tenantId, criadoEm])
+
+  @@index([criadoEm])
 
   @@map("saas_audit_logs")
 

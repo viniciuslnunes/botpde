@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { CriarSedeForm, ToggleSedeButton } from '@/components/admin/sede-forms'
+import { CriarSedeForm, ExcluirSedeButton, ToggleSedeButton } from '@/components/admin/sede-forms'
 import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/sedes/actions'
 import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
@@ -69,6 +69,12 @@ export type AdminSedeListItem = {
   membrosCount: number
   /** Preenchido quando o pai está em outro tenant (promoção / afiliação). */
   paiHerdado?: PaiHerdadoListItem | null
+  /**
+   * Calculado no servidor: super-admin sempre; Presidente/Vice só quando
+   * esta é uma Sede (`tipo: 'SEDE'`) duplicada — ver `assertPresidenteGlobal`
+   * e `excluirSede`.
+   */
+  podeExcluir: boolean
 }
 
 type SedeOption = { id: string; nome: string; tipo: string }
@@ -276,7 +282,15 @@ function filterTree(nodes: TreeNode[], pred: (s: AdminSedeListItem) => boolean):
   return out
 }
 
-function PaiExternoCard({ node, nivel = 0 }: { node: SedeExternoNode; nivel?: number }) {
+function PaiExternoCard({
+  node,
+  nivel = 0,
+  sedesOption,
+}: {
+  node: SedeExternoNode
+  nivel?: number
+  sedesOption: SedeOption[]
+}) {
   const fotoOuStreet = resolveCoverUrl(node)
   // Torcida principal: foto da sede → Street View → logo do tenant (nunca "sem foto" se há logo).
   const coverUrl = fotoOuStreet ?? node.logoUrl
@@ -321,9 +335,14 @@ function PaiExternoCard({ node, nivel = 0 }: { node: SedeExternoNode; nivel?: nu
         <div className="mt-3 space-y-3">
           {node.filhos.map((filho) =>
             filho.kind === 'externo' ? (
-              <PaiExternoCard key={filho.id} node={filho} nivel={nivel + 1} />
+              <PaiExternoCard
+                key={filho.id}
+                node={filho}
+                nivel={nivel + 1}
+                sedesOption={sedesOption}
+              />
             ) : (
-              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} />
+              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} sedesOption={sedesOption} />
             ),
           )}
         </div>
@@ -332,7 +351,15 @@ function PaiExternoCard({ node, nivel = 0 }: { node: SedeExternoNode; nivel?: nu
   )
 }
 
-function SedeCard({ sede, nivel = 0 }: { sede: SedeLocalNode; nivel?: number }) {
+function SedeCard({
+  sede,
+  nivel = 0,
+  sedesOption,
+}: {
+  sede: SedeLocalNode
+  nivel?: number
+  sedesOption: SedeOption[]
+}) {
   const semCoords = sede.lat == null || sede.lng == null
   const coverUrl = resolveCoverUrl(sede)
   const local = formatLocal(sede)
@@ -424,7 +451,7 @@ function SedeCard({ sede, nivel = 0 }: { sede: SedeLocalNode; nivel?: number }) 
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 self-end sm:flex-col sm:items-stretch sm:self-center lg:flex-row">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:flex-col sm:items-stretch sm:self-center lg:flex-row">
               <ToggleSedeButton sedeId={sede.id} ativa={sede.ativa} />
               <Link
                 href={`/admin/sedes/${sede.id}`}
@@ -433,6 +460,13 @@ function SedeCard({ sede, nivel = 0 }: { sede: SedeLocalNode; nivel?: number }) 
                 Editar
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
               </Link>
+              {sede.podeExcluir && (
+                <ExcluirSedeButton
+                  sedeId={sede.id}
+                  sedeNome={sede.nome}
+                  destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -442,9 +476,14 @@ function SedeCard({ sede, nivel = 0 }: { sede: SedeLocalNode; nivel?: number }) 
         <div className="mt-3 space-y-3">
           {sede.filhos.map((filho) =>
             filho.kind === 'externo' ? (
-              <PaiExternoCard key={filho.id} node={filho} nivel={nivel + 1} />
+              <PaiExternoCard
+                key={filho.id}
+                node={filho}
+                nivel={nivel + 1}
+                sedesOption={sedesOption}
+              />
             ) : (
-              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} />
+              <SedeCard key={filho.id} sede={filho} nivel={nivel + 1} sedesOption={sedesOption} />
             ),
           )}
         </div>
@@ -729,9 +768,9 @@ export function AdminSedesManager({
           <div className="space-y-4">
             {tree.map((node) =>
               node.kind === 'externo' ? (
-                <PaiExternoCard key={`ext-${node.id}`} node={node} />
+                <PaiExternoCard key={`ext-${node.id}`} node={node} sedesOption={sedesOption} />
               ) : (
-                <SedeCard key={node.id} sede={node} />
+                <SedeCard key={node.id} sede={node} sedesOption={sedesOption} />
               ),
             )}
           </div>

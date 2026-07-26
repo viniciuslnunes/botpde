@@ -6,6 +6,7 @@ import { db, Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { ExpectedError } from '@/lib/expected-error'
 import { novoQrTokenSocio } from '@/lib/pix-gateway'
+import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS } from '@torcida/types'
 
 // Carteirinha/sócio reaproveita MEMBERS_APPROVE — não existe permissão
@@ -34,9 +35,7 @@ const RevogarCarteirinhaSchema = z.object({
 })
 
 function isUniqueViolation(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
-  )
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 }
 
 export async function emitirCarteirinha(formData: FormData) {
@@ -60,7 +59,8 @@ export async function emitirCarteirinha(formData: FormData) {
   })
   if (!membro) throw new Error('Membro não encontrado')
   if (membro.status !== 'APROVADO') throw new Error('Membro não está aprovado')
-  if (membro.tipo !== 'SOCIO') throw new Error('Apenas membros do tipo Sócio podem receber carteirinha')
+  if (membro.tipo !== 'SOCIO')
+    throw new Error('Apenas membros do tipo Sócio podem receber carteirinha')
 
   const jaTem: { id: string } | null = await db.saasSocio.findFirst({
     where: { tenantId: tenant.id, userId },
@@ -115,6 +115,16 @@ export async function emitirCarteirinha(formData: FormData) {
     },
   })
 
+  await notificarSafe({
+    userId,
+    tenantId: tenant.id,
+    tipo: 'SOCIO_CARTEIRINHA_EMITIDA',
+    titulo: 'Carteirinha de sócio emitida',
+    corpo: `Você é o sócio nº ${socio.numeroSocio}.`,
+    link: '/portal/carteirinha',
+    atorId: session.user.id,
+  })
+
   revalidatePath('/admin/socios')
   revalidatePath('/admin')
 }
@@ -131,7 +141,7 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
 
   const socio = await db.saasSocio.findFirst({
     where: { id: parsed.data.socioId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, userId: true },
   })
   if (!socio) throw new Error('Carteirinha não encontrada')
 
@@ -151,6 +161,16 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
     },
   })
 
+  await notificarSafe({
+    userId: socio.userId,
+    tenantId: tenant.id,
+    tipo: 'SOCIO_CARTEIRINHA_RENOVADA',
+    titulo: 'Carteirinha renovada',
+    corpo: `Sua carteirinha agora é válida até ${parsed.data.novaValidade}.`,
+    link: '/portal/carteirinha',
+    atorId: session.user.id,
+  })
+
   revalidatePath('/admin/socios')
 }
 
@@ -164,7 +184,7 @@ export async function revogarCarteirinha(socioId: string) {
 
   const socio = await db.saasSocio.findFirst({
     where: { id: parsed.data.socioId, tenantId: tenant.id },
-    select: { id: true, nome: true, numeroSocio: true },
+    select: { id: true, nome: true, numeroSocio: true, userId: true },
   })
   if (!socio) throw new Error('Carteirinha não encontrada')
 
@@ -181,6 +201,15 @@ export async function revogarCarteirinha(socioId: string) {
       entidadeId: socio.id,
       detalhes: { nome: socio.nome, numeroSocio: socio.numeroSocio },
     },
+  })
+
+  await notificarSafe({
+    userId: socio.userId,
+    tenantId: tenant.id,
+    tipo: 'SOCIO_CARTEIRINHA_REVOGADA',
+    titulo: 'Carteirinha revogada',
+    link: '/portal/carteirinha',
+    atorId: session.user.id,
   })
 
   revalidatePath('/admin/socios')

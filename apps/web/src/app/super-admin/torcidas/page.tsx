@@ -5,6 +5,7 @@ import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isSuperAdminEmail, listarTorcidasParaSelecao, listarTorcidasParaTransferencia } from '@/lib/tenant-context'
 import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import { ArrowRight, Building2, FileSearch, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 import { TransferirOwnerPainel } from './transferir-owner-painel'
@@ -28,19 +29,18 @@ export default async function TorcidasPage() {
   const semProvisionamento = totalTenants <= 5
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Gerenciar torcidas</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Selecione a torcida no menu ao lado (ou abaixo) e você entra no painel administrativo
-          dela — aprovar membros, eventos, comunicados, tudo isolado por torcida.
-        </p>
-      </div>
+    <div className="flex min-h-full flex-col">
+      <AdminPageHeader
+        title="Gerenciar torcidas"
+        description="Selecione a torcida no menu ao lado (ou abaixo) e você entra no painel administrativo dela — aprovar membros, eventos, comunicados, tudo isolado por torcida."
+        icon={<Building2 className="h-5 w-5" />}
+      />
 
+      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
       {torcidas.length > 0 && (
-        <div className="rounded-2xl border border-violet-800 bg-violet-950/40 p-6">
-          <h2 className="text-sm font-semibold text-violet-200">Selecionar torcida</h2>
-          <p className="mt-1 text-xs text-violet-300/80">
+        <div className="rounded-2xl border border-[rgb(var(--color-primary)_/_0.35)] bg-[rgb(var(--color-primary)_/_0.08)] p-6">
+          <h2 className="text-sm font-semibold text-[rgb(var(--color-primary-fg))]">Selecionar torcida</h2>
+          <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
             {tenantAtual
               ? `Ativa agora: ${tenantAtual.nome}`
               : 'Nenhuma selecionada — escolha para abrir o admin.'}
@@ -50,14 +50,14 @@ export default async function TorcidasPage() {
               torcidas={torcidas}
               torcidaAtualSlug={tenantAtual?.slug ?? null}
               destino="admin"
-              variant="super-admin"
+              variant="admin"
             />
           </div>
           {tenantAtual && (
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href="/admin"
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
               >
                 <Settings className="h-4 w-4" />
                 Abrir admin — {tenantAtual.nome}
@@ -65,7 +65,7 @@ export default async function TorcidasPage() {
               </Link>
               <Link
                 href="/admin/membros"
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+                className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-4 py-2 text-sm text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
               >
                 <Users className="h-4 w-4" />
                 Aprovar membros
@@ -76,12 +76,12 @@ export default async function TorcidasPage() {
       )}
 
       {semProvisionamento && (
-        <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-4 text-sm text-amber-200">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <p className="font-semibold">Provisionar torcidas no banco</p>
-          <p className="mt-1 text-amber-300/90">
+          <p className="mt-1 opacity-90">
             Popule o catálogo nacional e crie os tenants vazios (sem presidente) a partir dele:
           </p>
-          <code className="mt-2 block rounded bg-zinc-950 px-3 py-2 text-xs text-zinc-300">
+          <code className="mt-2 block rounded bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs text-[rgb(var(--foreground))]">
             pnpm --filter @torcida/db seed:torcidas-conhecidas
             <br />
             pnpm --filter @torcida/db seed:torcidas-tenants
@@ -89,20 +89,20 @@ export default async function TorcidasPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
               <FileSearch className="h-4 w-4" />
               Relatórios operacionais
             </h2>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
               Abra o relatório de perfis de torcedores marcados como privados por torcida ou clube.
             </p>
           </div>
           <Link
             href="/super-admin/relatorios/perfis-torcedores-privados"
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-950 transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg bg-[rgb(var(--foreground))] px-4 py-2 text-sm font-semibold text-[rgb(var(--surface))] transition-opacity hover:opacity-90"
           >
             Abrir relatório
             <ArrowRight className="h-4 w-4" />
@@ -110,30 +110,37 @@ export default async function TorcidasPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
           <Building2 className="h-4 w-4" />
           {totalTenants} torcida(s) ativa(s)
         </h2>
-        <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm text-zinc-400">
+        <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm text-[rgb(var(--foreground-muted))]">
           {torcidas.map((t) => (
-            <li key={t.id} className="flex justify-between gap-2 rounded px-2 py-1 hover:bg-zinc-800">
-              <span className="truncate text-zinc-300">{t.nome}</span>
-              <span className="shrink-0 font-mono text-xs text-zinc-500">{t.slug}</span>
+            <li
+              key={t.id}
+              className="flex justify-between gap-2 rounded px-2 py-1 hover:bg-[rgb(var(--background-subtle))]"
+            >
+              <span className="truncate text-[rgb(var(--foreground))]">{t.nome}</span>
+              <span className="shrink-0 font-mono text-xs text-[rgb(var(--foreground-muted))]">{t.slug}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      <details className="rounded-xl border border-zinc-800 bg-zinc-900 p-4" open>
-        <summary className="cursor-pointer text-sm font-medium text-zinc-300">
+      <details
+        className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+        open
+      >
+        <summary className="cursor-pointer text-sm font-medium text-[rgb(var(--foreground))]">
           Transferir propriedade (presidente)
         </summary>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
           Quando a diretoria estiver pronta, transfira o cargo owner para o e-mail do presidente.
         </p>
         <TransferirOwnerPainel torcidas={torcidasTransferencia} />
       </details>
+      </div>
     </div>
   )
 }

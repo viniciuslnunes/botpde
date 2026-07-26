@@ -18,6 +18,7 @@ import {
   slugify,
 } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
+import { notificarSafe } from '@/lib/notificacoes'
 import {
   confirmarVendaBarPaga,
   getTurnoAbertoBar,
@@ -58,7 +59,10 @@ function revalidateBar() {
 
 const AjusteEstoqueBarSchema = z.object({
   produtoId: z.string().uuid('Produto inválido'),
-  novaQtd: z.coerce.number().int('Quantidade deve ser inteira').min(0, 'Quantidade não pode ser negativa'),
+  novaQtd: z.coerce
+    .number()
+    .int('Quantidade deve ser inteira')
+    .min(0, 'Quantidade não pode ser negativa'),
   motivo: z.string().trim().min(3, 'Informe o motivo').max(200, 'Motivo muito longo'),
 })
 
@@ -73,7 +77,10 @@ function revalidateFinanceiro() {
 
 // ── Catálogo: produtos (BAR_MANAGE) ──────────────────────────────────────────
 
-export async function criarProdutoBar(_prev: BarActionState, formData: FormData): Promise<BarActionState> {
+export async function criarProdutoBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
     const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
@@ -260,7 +267,10 @@ export async function excluirProdutoBar(id: string): Promise<BarActionState> {
 
 // ── Catálogo: categorias (BAR_MANAGE) ────────────────────────────────────────
 
-export async function criarCategoriaBar(_prev: BarActionState, formData: FormData): Promise<BarActionState> {
+export async function criarCategoriaBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
     const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
@@ -314,10 +324,11 @@ export async function excluirCategoriaBar(id: string): Promise<BarActionState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
     const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
-    const existente: { id: string; nome: string; slug: string } | null = await db.barCategoria.findFirst({
-      where: { id, tenantId: tenant.id, sedeId: unidade.id },
-      select: { id: true, nome: true, slug: true },
-    })
+    const existente: { id: string; nome: string; slug: string } | null =
+      await db.barCategoria.findFirst({
+        where: { id, tenantId: tenant.id, sedeId: unidade.id },
+        select: { id: true, nome: true, slug: true },
+      })
     if (!existente) return { error: 'Categoria não encontrada' }
 
     // Produtos vinculados ficam sem categoria (SetNull).
@@ -343,7 +354,10 @@ export async function excluirCategoriaBar(id: string): Promise<BarActionState> {
 
 // ── Compra / reposição de insumo (BAR_MANAGE) ────────────────────────────────
 
-export async function registrarCompraBar(_prev: BarActionState, formData: FormData): Promise<BarActionState> {
+export async function registrarCompraBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
     const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
@@ -442,7 +456,10 @@ export async function registrarCompraBar(_prev: BarActionState, formData: FormDa
  */
 export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaBarResult> {
   try {
-    const { session, tenant } = await assertAnyPermission([PERMISSIONS.BAR_OPERATE, PERMISSIONS.BAR_MANAGE])
+    const { session, tenant } = await assertAnyPermission([
+      PERMISSIONS.BAR_OPERATE,
+      PERMISSIONS.BAR_MANAGE,
+    ])
     const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
 
     const parsed = VendaBarSchema.safeParse(input)
@@ -522,13 +539,9 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
         throw new Error('Total deve ser maior que zero para pagamento via PIX')
       }
 
-      const resumoItens = linhas
-        .map((l) => `${l.produtoNome} ×${l.quantidade}`)
-        .join(', ')
+      const resumoItens = linhas.map((l) => `${l.produtoNome} ×${l.quantidade}`).join(', ')
       const descricaoVenda =
-        resumoItens.length > 0
-          ? `Venda do bar — ${resumoItens}`.slice(0, 240)
-          : 'Venda do bar'
+        resumoItens.length > 0 ? `Venda do bar — ${resumoItens}`.slice(0, 240) : 'Venda do bar'
 
       let financeiroLancamentoId: string | null = null
       if (pago) {
@@ -612,13 +625,25 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
             pixCopiaCola: cobranca.copiaCola,
           },
         })
-        pix = { copiaCola: cobranca.copiaCola, externalId: cobranca.externalId, provider: cobranca.provider }
+        pix = {
+          copiaCola: cobranca.copiaCola,
+          externalId: cobranca.externalId,
+          provider: cobranca.provider,
+        }
       } catch {
         // Gateway falhou: cancela a venda e restaura o estoque para não deixar
         // venda pendente órfã (sem cobrança que possa ser paga).
-        await cancelarVendaPendenteTx(tenant.id, criada.vendaId, session.user.id ?? null, 'Falha ao gerar cobrança PIX')
+        await cancelarVendaPendenteTx(
+          tenant.id,
+          criada.vendaId,
+          session.user.id ?? null,
+          'Falha ao gerar cobrança PIX',
+        )
         revalidateBar()
-        return { success: false, error: 'Não foi possível gerar a cobrança PIX. A venda foi cancelada.' }
+        return {
+          success: false,
+          error: 'Não foi possível gerar a cobrança PIX. A venda foi cancelada.',
+        }
       }
     }
 
@@ -662,10 +687,11 @@ async function cancelarVendaPendenteTx(
     })
     if (!venda) throw new Error('Venda não encontrada')
 
-    const itens: { produtoId: string | null; quantidade: number }[] = await tx.barVendaItem.findMany({
-      where: { vendaId },
-      select: { produtoId: true, quantidade: true },
-    })
+    const itens: { produtoId: string | null; quantidade: number }[] =
+      await tx.barVendaItem.findMany({
+        where: { vendaId },
+        select: { produtoId: true, quantidade: true },
+      })
     for (const item of itens) {
       if (!item.produtoId) continue
       await tx.barProduto.update({
@@ -787,7 +813,12 @@ export async function cancelarVendaBar(vendaId: string): Promise<BarActionState>
       return { error: 'Venda paga: use estorno em vez de cancelar' }
     }
 
-    await cancelarVendaPendenteTx(tenant.id, venda.id, session.user.id ?? null, 'Cancelamento de venda')
+    await cancelarVendaPendenteTx(
+      tenant.id,
+      venda.id,
+      session.user.id ?? null,
+      'Cancelamento de venda',
+    )
 
     await db.auditLog.create({
       data: {
@@ -822,10 +853,11 @@ export async function registrarAjusteEstoqueBar(
     if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
     const movId: string = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const produto: { id: string; nome: string; estoque: number } | null = await tx.barProduto.findFirst({
-        where: { id: parsed.data.produtoId, tenantId: tenant.id, sedeId: unidade.id },
-        select: { id: true, nome: true, estoque: true },
-      })
+      const produto: { id: string; nome: string; estoque: number } | null =
+        await tx.barProduto.findFirst({
+          where: { id: parsed.data.produtoId, tenantId: tenant.id, sedeId: unidade.id },
+          select: { id: true, nome: true, estoque: true },
+        })
       if (!produto) throw new Error('Produto não encontrado')
 
       await tx.barProduto.update({
@@ -854,7 +886,11 @@ export async function registrarAjusteEstoqueBar(
         acao: 'BAR_ESTOQUE_AJUSTADO',
         entidade: 'BarMovimentacaoEstoque',
         entidadeId: movId,
-        detalhes: { produtoId: parsed.data.produtoId, novaQtd: parsed.data.novaQtd, motivo: parsed.data.motivo },
+        detalhes: {
+          produtoId: parsed.data.produtoId,
+          novaQtd: parsed.data.novaQtd,
+          motivo: parsed.data.motivo,
+        },
       },
     })
 
@@ -933,7 +969,9 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
       },
     })
 
-    const diferenca = round2(parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria)
+    const diferenca = round2(
+      parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria,
+    )
 
     await db.auditLog.create({
       data: {
@@ -978,6 +1016,7 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
       status: StatusVendaBar
       total: Prisma.Decimal
       sedeId: string
+      operadorId: string | null
       financeiroLancamentoId: string | null
       financeiroEstornoLancamentoId: string | null
       itens: Array<{ produtoId: string | null; produtoNome: string; quantidade: number }>
@@ -990,6 +1029,7 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
         status: true,
         total: true,
         sedeId: true,
+        operadorId: true,
         financeiroLancamentoId: true,
         financeiroEstornoLancamentoId: true,
         itens: { select: { produtoId: true, produtoNome: true, quantidade: true } },
@@ -1001,9 +1041,7 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
       return { error: 'Só é possível estornar vendas pagas' }
     }
 
-    const resumoItens = venda.itens
-      .map((i) => `${i.produtoNome} ×${i.quantidade}`)
-      .join(', ')
+    const resumoItens = venda.itens.map((i) => `${i.produtoNome} ×${i.quantidade}`).join(', ')
     const descricaoEstorno =
       resumoItens.length > 0
         ? `Estorno bar — ${resumoItens}`.slice(0, 240)
@@ -1071,6 +1109,18 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
         },
       },
     })
+
+    if (venda.operadorId && venda.operadorId !== session.user.id) {
+      await notificarSafe({
+        userId: venda.operadorId,
+        tenantId: tenant.id,
+        tipo: 'BAR_VENDA_ESTORNADA',
+        titulo: 'Uma venda sua foi estornada',
+        corpo: `Venda de R$ ${venda.total} estornada.`,
+        link: '/admin/bar',
+        atorId: session.user.id,
+      })
+    }
 
     revalidateBar()
     revalidateFinanceiro()

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FileSearch } from 'lucide-react'
 import { getTenantFromHost } from '@/lib/tenant'
 // listarTorcidasParaSelecao não é usada — usamos a listagem específica para relatórios.
 import {
@@ -10,6 +11,10 @@ import {
   type ResumoPrivacidade,
   type ScopeType,
 } from '@/lib/super-admin/perfis-torcedores-privados'
+import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
+import { TableShell } from '@/components/admin/ui/table-shell'
+import { TablePagination } from '@/components/admin/ui/table-pagination'
+import { buildAdminHref } from '@/lib/admin-href'
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback
@@ -21,16 +26,6 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 function toScopeType(value: string | undefined): ScopeType {
   if (value === 'CLUBE') return 'CLUBE'
   return 'TORCIDA'
-}
-
-function buildQuery(params: Record<string, string | number | undefined>): string {
-  const sp = new URLSearchParams()
-  for (const [k, v] of Object.entries(params)) {
-    if (v === undefined) continue
-    sp.set(k, String(v))
-  }
-  const qs = sp.toString()
-  return qs ? `?${qs}` : ''
 }
 
 export default async function PerfisTorcedoresPrivadosPage({
@@ -58,11 +53,21 @@ export default async function PerfisTorcedoresPrivadosPage({
 
   const scopeId = params.scopeId ?? (scopeType === 'TORCIDA' ? fallbackTenantId : fallbackAfiliacaoId)
 
+  const header = (
+    <AdminPageHeader
+      title="Perfis — torcedores marcados como privados"
+      description="Relatório operacional para validar o backfill (e regressões) do campo `perfil_privado` para torcedores aprovados."
+      icon={<FileSearch className="h-5 w-5" />}
+    />
+  )
+
   if (!scopeId) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-zinc-100">Relatório</h1>
-        <p className="text-sm text-zinc-400">Nenhum escopo disponível.</p>
+      <div className="flex min-h-full flex-col">
+        {header}
+        <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">Nenhum escopo disponível.</p>
+        </div>
       </div>
     )
   }
@@ -77,9 +82,13 @@ export default async function PerfisTorcedoresPrivadosPage({
 
   if (!tenantFocus) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-zinc-100">Relatório</h1>
-        <p className="text-sm text-zinc-400">Nenhuma torcida disponível para esse clube.</p>
+      <div className="flex min-h-full flex-col">
+        {header}
+        <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhuma torcida disponível para esse clube.
+          </p>
+        </div>
       </div>
     )
   }
@@ -101,8 +110,6 @@ export default async function PerfisTorcedoresPrivadosPage({
 
   const total = reportFocus.total
   const totalPages = Math.max(1, Math.ceil(total / take))
-  const hasPrev = page > 1
-  const hasNext = page < totalPages
 
   const baseQuery = {
     scopeType: scopeType === 'CLUBE' ? 'CLUBE' : 'TORCIDA',
@@ -110,200 +117,190 @@ export default async function PerfisTorcedoresPrivadosPage({
     tenantFocus: scopeType === 'CLUBE' ? tenantFocus : undefined,
   }
 
-  const prevHref = `${buildQuery({ ...baseQuery, page: hasPrev ? page - 1 : 1 })}`
-  const nextHref = `${buildQuery({ ...baseQuery, page: hasNext ? page + 1 : totalPages })}`
+  const buildHref = (p: number) =>
+    buildAdminHref('/super-admin/relatorios/perfis-torcedores-privados', { ...baseQuery, page: p })
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Perfis — torcedores marcados como privados</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Relatório operacional para validar o backfill (e regressões) do campo `perfil_privado`
-          para torcedores aprovados.
-        </p>
-      </div>
+    <div className="flex min-h-full flex-col">
+      {header}
 
-      <form method="get" className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <label className="block text-sm font-medium text-zinc-200">Escopo</label>
-            <select
-              name="scopeType"
-              defaultValue={scopeType}
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-            >
-              <option value="TORCIDA">Torcida</option>
-              <option value="CLUBE">Clube</option>
-            </select>
+      <div className="app-container min-w-0 flex-1 space-y-6 py-5 sm:py-8">
+        <form
+          method="get"
+          className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5"
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Escopo</label>
+              <select
+                name="scopeType"
+                defaultValue={scopeType}
+                className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
+              >
+                <option value="TORCIDA">Torcida</option>
+                <option value="CLUBE">Clube</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                {scopeType === 'TORCIDA' ? 'Torcida' : 'Clube (afiliacao)'}
+              </label>
+              <select
+                name="scopeId"
+                defaultValue={scopeId}
+                className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
+              >
+                {scopeType === 'TORCIDA' ? (
+                  torcidas.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                      {t.clubeNome ? ` — ${t.clubeNome}` : ''}
+                      {t.clubeUf ? `/${t.clubeUf}` : ''}
+                    </option>
+                  ))
+                ) : (
+                  afiliacoes.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.apelido ?? a.nome}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {scopeType === 'CLUBE' && (
+              <div>
+                <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                  Torcida em foco
+                </label>
+                <select
+                  name="tenantFocus"
+                  defaultValue={tenantFocus}
+                  className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--color-primary))] focus:ring-1 focus:ring-[rgb(var(--color-primary))]"
+                >
+                  {clubesTenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-200">
-              {scopeType === 'TORCIDA' ? 'Torcida' : 'Clube (afiliacao)'}
-            </label>
-            <select
-              name="scopeId"
-              defaultValue={scopeId}
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+          <div className="mt-4 flex gap-3">
+            <button
+              type="submit"
+              className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90"
             >
-              {scopeType === 'TORCIDA' ? (
-                torcidas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}
-                    {t.clubeNome ? ` — ${t.clubeNome}` : ''}
-                    {t.clubeUf ? `/${t.clubeUf}` : ''}
-                  </option>
-                ))
-              ) : (
-                afiliacoes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.apelido ?? a.nome}
-                  </option>
-                ))
-              )}
-            </select>
+              Filtrar
+            </button>
+            <Link
+              href="/super-admin/relatorios/perfis-torcedores-privados"
+              className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-[rgb(var(--surface-raised))]"
+            >
+              Resetar
+            </Link>
+          </div>
+        </form>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+            <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Resumo — foco</h2>
+            <div className="mt-3 space-y-2 text-sm text-[rgb(var(--foreground))]">
+              <div>
+                <span className="text-[rgb(var(--foreground-muted))]">Torcida:</span>{' '}
+                {resumoFocus.tenantNome} ({resumoFocus.tenantSlug})
+              </div>
+              <div>
+                <span className="text-[rgb(var(--foreground-muted))]">Torcedores aprovados:</span>{' '}
+                {resumoFocus.totalTorcedoresAprovados}
+              </div>
+              <div>
+                <span className="text-[rgb(var(--foreground-muted))]">
+                  Marcados como privados (perfil_privado=true):
+                </span>{' '}
+                {resumoFocus.torcedoresComPerfilMarcadoPrivado}
+              </div>
+              <div>
+                <span className="text-[rgb(var(--foreground-muted))]">Publicos efetivos (após regra):</span>{' '}
+                {resumoFocus.torcedoresPublicosEfetivos}
+              </div>
+            </div>
           </div>
 
           {scopeType === 'CLUBE' && (
-            <div>
-              <label className="block text-sm font-medium text-zinc-200">Torcida em foco</label>
-              <select
-                name="tenantFocus"
-                defaultValue={tenantFocus}
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-              >
-                {clubesTenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome} ({t.slug})
-                  </option>
+            <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
+              <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Resumo — clube</h2>
+              <div className="mt-3 space-y-2 text-sm text-[rgb(var(--foreground))]">
+                {resumoClubSorted.slice(0, 6).map((r) => (
+                  <div key={r.tenantId} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="truncate">{r.tenantNome}</span>
+                      <span className="ml-2 text-xs text-[rgb(var(--foreground-muted))]">{r.tenantSlug}</span>
+                    </div>
+                    <div className="shrink-0 font-mono text-xs text-[rgb(var(--foreground))]">
+                      {r.torcedoresComPerfilMarcadoPrivado}
+                    </div>
+                  </div>
                 ))}
-              </select>
+                {resumoClubSorted.length > 6 && (
+                  <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                    + {resumoClubSorted.length - 6} torcida(s)
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        <div className="mt-4 flex gap-3">
-          <button
-            type="submit"
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Filtrar
-          </button>
-          <Link
-            href="/super-admin/relatorios/perfis-torcedores-privados"
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-700"
-          >
-            Resetar
-          </Link>
-        </div>
-      </form>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="text-sm font-semibold text-zinc-200">Resumo — foco</h2>
-          <div className="mt-3 space-y-2 text-sm text-zinc-300">
-            <div>
-              <span className="text-zinc-500">Torcida:</span> {resumoFocus.tenantNome} ({resumoFocus.tenantSlug})
-            </div>
-            <div>
-              <span className="text-zinc-500">Torcedores aprovados:</span> {resumoFocus.totalTorcedoresAprovados}
-            </div>
-            <div>
-              <span className="text-zinc-500">Marcados como privados (perfil_privado=true):</span>{' '}
-              {resumoFocus.torcedoresComPerfilMarcadoPrivado}
-            </div>
-            <div>
-              <span className="text-zinc-500">Publicos efetivos (após regra):</span>{' '}
-              {resumoFocus.torcedoresPublicosEfetivos}
-            </div>
-          </div>
-        </div>
-
-        {scopeType === 'CLUBE' && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-            <h2 className="text-sm font-semibold text-zinc-200">Resumo — clube</h2>
-            <div className="mt-3 space-y-2 text-sm text-zinc-300">
-              {resumoClubSorted.slice(0, 6).map((r) => (
-                <div key={r.tenantId} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <span className="truncate">{r.tenantNome}</span>
-                    <span className="ml-2 text-xs text-zinc-500">{r.tenantSlug}</span>
-                  </div>
-                  <div className="shrink-0 font-mono text-xs text-zinc-200">
-                    {r.torcedoresComPerfilMarcadoPrivado}
-                  </div>
-                </div>
-              ))}
-              {resumoClubSorted.length > 6 && (
-                <p className="text-xs text-zinc-500">+ {resumoClubSorted.length - 6} torcida(s)</p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-zinc-200">Lista — privados no foco</h2>
-          <div className="text-xs text-zinc-500">
-            {total} resultado(s) · página {page} / {totalPages}
-          </div>
-        </div>
-
-        {total === 0 ? (
-          <p className="mt-4 text-sm text-zinc-400">Nenhum torcedor com perfil marcado como privado neste foco.</p>
-        ) : (
-          <>
-            <div className="mt-4 overflow-auto rounded-lg border border-zinc-800">
-              <table className="min-w-full text-sm">
-                <thead className="bg-zinc-950 text-zinc-300">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">Torcedor</th>
-                    <th className="px-3 py-2 text-left font-semibold">User</th>
-                    <th className="px-3 py-2 text-left font-semibold">perfilPrivado</th>
-                    <th className="px-3 py-2 text-left font-semibold">Atualizado em</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800 bg-zinc-900">
-                  {reportFocus.rows.map((r) => (
-                    <tr key={r.userId}>
-                      <td className="px-3 py-2 text-zinc-200">
-                        <div className="font-medium">{r.torcedorNome}</div>
-                        <div className="text-xs text-zinc-500 font-mono">{r.userId}</div>
-                      </td>
-                      <td className="px-3 py-2 text-zinc-200">
-                        <div className="font-medium">{r.userNome ?? '—'}</div>
-                        <div className="text-xs text-zinc-500">{r.userEmail ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-zinc-200">{String(r.perfilPrivadoBanco)}</td>
-                      <td className="px-3 py-2 text-zinc-300">
-                        {r.atualizadoEm.toISOString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <Link
-                href={`/super-admin/relatorios/perfis-torcedores-privados${prevHref}`}
-                className={hasPrev ? 'rounded-lg bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-700' : 'pointer-events-none rounded-lg bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-500'}
-              >
-                Página anterior
-              </Link>
-
-              <Link
-                href={`/super-admin/relatorios/perfis-torcedores-privados${nextHref}`}
-                className={hasNext ? 'rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90' : 'pointer-events-none rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-violet-200'}
-              >
-                Próxima página
-              </Link>
-            </div>
-          </>
-        )}
+        <TableShell
+          title={
+            <span>
+              Lista — privados no foco{' '}
+              <span className="font-normal text-[rgb(var(--foreground-muted))]">
+                ({total} resultado{total === 1 ? '' : 's'})
+              </span>
+            </span>
+          }
+          isEmpty={total === 0}
+          empty={{
+            title: 'Nenhum torcedor com perfil marcado como privado',
+            description: 'Nenhum registro encontrado para este foco.',
+          }}
+          footer={<TablePagination page={page} totalPages={totalPages} buildHref={buildHref} />}
+        >
+          <thead className="bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground))]">
+            <tr>
+              <th className="px-3 py-2 text-left font-semibold">Torcedor</th>
+              <th className="px-3 py-2 text-left font-semibold">User</th>
+              <th className="px-3 py-2 text-left font-semibold">perfilPrivado</th>
+              <th className="px-3 py-2 text-left font-semibold">Atualizado em</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[rgb(var(--border))]">
+            {reportFocus.rows.map((r) => (
+              <tr key={r.userId}>
+                <td className="px-3 py-2 text-[rgb(var(--foreground))]">
+                  <div className="font-medium">{r.torcedorNome}</div>
+                  <div className="font-mono text-xs text-[rgb(var(--foreground-muted))]">{r.userId}</div>
+                </td>
+                <td className="px-3 py-2 text-[rgb(var(--foreground))]">
+                  <div className="font-medium">{r.userNome ?? '—'}</div>
+                  <div className="text-xs text-[rgb(var(--foreground-muted))]">{r.userEmail ?? '—'}</div>
+                </td>
+                <td className="px-3 py-2 font-mono text-[rgb(var(--foreground))]">
+                  {String(r.perfilPrivadoBanco)}
+                </td>
+                <td className="px-3 py-2 text-[rgb(var(--foreground))]">
+                  {r.atualizadoEm.toISOString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableShell>
       </div>
     </div>
   )
 }
-

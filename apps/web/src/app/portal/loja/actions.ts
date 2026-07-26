@@ -5,6 +5,7 @@ import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
 import { getActiveTenant } from '@/lib/tenant'
 import { getVisibleTenantIds } from '@/lib/hierarquia'
+import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 import {
@@ -14,6 +15,8 @@ import {
   calcularDesconto,
   validarCupom,
   rotuloTamanho,
+  formatarMoedaBRL,
+  PERMISSIONS,
 } from '@torcida/types'
 
 export type ActionState = {
@@ -44,15 +47,17 @@ async function assertProdutoVisivel(
   if (!produto) throw new Error('Produto não encontrado ou inativo.')
   if (produto.tenantId === tenantId) return produto.tenantId
 
-  const visible =
-    visibleTenantIds ?? new Set(await getVisibleTenantIds(tenantId, 'loja'))
+  const visible = visibleTenantIds ?? new Set(await getVisibleTenantIds(tenantId, 'loja'))
   if (!visible.has(produto.tenantId)) {
     throw new Error('Produto não encontrado ou inativo.')
   }
   return produto.tenantId
 }
 
-export async function adicionarAoCarrinho(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function adicionarAoCarrinho(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   try {
     const { userId, tenant } = await assertAuth()
     const parsed = CarrinhoItemSchema.safeParse(Object.fromEntries(formData))
@@ -102,7 +107,10 @@ export async function adicionarAoCarrinho(_prev: ActionState, formData: FormData
   }
 }
 
-export async function atualizarItemCarrinho(itemId: string, quantidade: number): Promise<ActionState> {
+export async function atualizarItemCarrinho(
+  itemId: string,
+  quantidade: number,
+): Promise<ActionState> {
   try {
     const { userId } = await assertAuth()
     if (quantidade < 1 || quantidade > 10) return { error: 'Quantidade inválida.' }
@@ -137,7 +145,11 @@ export async function removerDoCarrinho(itemId: string): Promise<ActionState> {
   }
 }
 
-export async function validarCupomAction(codigo: string, subtotal: number, tenantDonoId: string): Promise<ActionState & { desconto?: number }> {
+export async function validarCupomAction(
+  codigo: string,
+  subtotal: number,
+  tenantDonoId: string,
+): Promise<ActionState & { desconto?: number }> {
   try {
     const { userId } = await assertAuth()
     if (!codigo.trim()) return { error: 'Informe o cupom.' }
@@ -161,7 +173,10 @@ export async function validarCupomAction(codigo: string, subtotal: number, tenan
   }
 }
 
-export async function finalizarPedido(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function finalizarPedido(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   try {
     const { userId, tenant } = await assertAuth()
 
@@ -181,7 +196,15 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
       where: { userId },
       include: {
         produto: {
-          select: { id: true, nome: true, preco: true, estoque: true, tamanhos: true, tenantId: true, ativo: true },
+          select: {
+            id: true,
+            nome: true,
+            preco: true,
+            estoque: true,
+            tamanhos: true,
+            tenantId: true,
+            ativo: true,
+          },
         },
       },
     })
@@ -191,7 +214,8 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
     const visibleLojaIds = new Set(await getVisibleTenantIds(tenant.id, 'loja'))
 
     for (const item of itensCarrinho) {
-      if (!item.produto.ativo) return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
+      if (!item.produto.ativo)
+        return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
       if (item.produto.tenantId !== tenant.id && !visibleLojaIds.has(item.produto.tenantId)) {
         return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
       }
@@ -229,7 +253,9 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
           const chave = item.tamanho
           const disponivel = estoque[chave] ?? 0
           if (disponivel < item.quantidade) {
-            throw new Error(`Estoque insuficiente para "${produto.nome}" (${rotuloTamanho(chave) ?? 'único'}).`)
+            throw new Error(
+              `Estoque insuficiente para "${produto.nome}" (${rotuloTamanho(chave) ?? 'único'}).`,
+            )
           }
 
           const precoUnit = Number(produto.preco)
@@ -254,13 +280,20 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
         let cupomCodigo: string | null = null
         if (parsed.data.cupomCodigo?.trim()) {
           const cupom = await tx.saasCupom.findFirst({
-            where: { tenantId: tenantDonoId, codigo: parsed.data.cupomCodigo.toUpperCase().trim(), ativo: true },
+            where: {
+              tenantId: tenantDonoId,
+              codigo: parsed.data.cupomCodigo.toUpperCase().trim(),
+              ativo: true,
+            },
           })
           if (!cupom) throw new Error('Cupom inválido.')
           const pedidosAnteriores = await tx.saasPedido.count({
             where: { tenantId: tenantDonoId, userId, status: { not: 'CANCELADO' } },
           })
-          const check = validarCupom({ ...cupom, valor: Number(cupom.valor) }, { subtotal, userJaComprou: pedidosAnteriores > 0 })
+          const check = validarCupom(
+            { ...cupom, valor: Number(cupom.valor) },
+            { subtotal, userJaComprou: pedidosAnteriores > 0 },
+          )
           if (!check.ok) throw new Error(check.erro)
           desconto = calcularDesconto({ tipo: cupom.tipo, valor: Number(cupom.valor) }, subtotal)
           cupomCodigo = cupom.codigo
@@ -299,11 +332,32 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
 
     const session = await auth()
     for (const pedidoId of pedidoIds) {
-      const p = await db.saasPedido.findUnique({ where: { id: pedidoId }, select: { tenantId: true } })
+      const p = await db.saasPedido.findUnique({
+        where: { id: pedidoId },
+        select: { tenantId: true, total: true },
+      })
       if (p && session?.user?.id) {
         await db.auditLog.create({
-          data: { tenantId: p.tenantId, atorId: session.user.id, acao: 'PEDIDO_CRIADO', entidade: 'SaasPedido', entidadeId: pedidoId },
+          data: {
+            tenantId: p.tenantId,
+            atorId: session.user.id,
+            acao: 'PEDIDO_CRIADO',
+            entidade: 'SaasPedido',
+            entidadeId: pedidoId,
+          },
         })
+        await notificarAdminsPorPermissao(
+          [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
+          {
+            tenantId: p.tenantId,
+            tipo: 'PEDIDO_RECEBIDO',
+            titulo: 'Novo pedido na loja',
+            corpo: `Pedido de ${formatarMoedaBRL(Number(p.total))} recebido.`,
+            link: '/admin/loja/pedidos',
+            atorId: session.user.id,
+            excetoUserId: session.user.id,
+          },
+        )
       }
     }
 
@@ -319,6 +373,9 @@ export async function finalizarPedido(_prev: ActionState, formData: FormData): P
 /** @deprecated Use adicionarAoCarrinho + finalizarPedido */
 export type FazerPedidoState = ActionState
 
-export async function fazerPedido(_prev: FazerPedidoState, formData: FormData): Promise<FazerPedidoState> {
+export async function fazerPedido(
+  _prev: FazerPedidoState,
+  formData: FormData,
+): Promise<FazerPedidoState> {
   return adicionarAoCarrinho(_prev, formData)
 }

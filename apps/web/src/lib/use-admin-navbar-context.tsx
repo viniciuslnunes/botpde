@@ -53,9 +53,7 @@ export function markAdminNavbarNotificationRead(id: string): void {
   publish({
     ...base,
     unreadNotifications: Math.max(0, base.unreadNotifications - 1),
-    notifications: base.notifications.map((n) =>
-      n.id === id ? { ...n, lida: true } : n,
-    ),
+    notifications: base.notifications.map((n) => (n.id === id ? { ...n, lida: true } : n)),
   })
 }
 
@@ -109,15 +107,11 @@ export function useAdminNavbarContext(initial: NotificationItem[]): {
   menuBadges: Record<string, number>
 } {
   const router = useRouter()
-  const [notifications, setNotifications] = useState(
-    () => cached?.notifications ?? initial,
-  )
+  const [notifications, setNotifications] = useState(() => cached?.notifications ?? initial)
   const [unreadNotifications, setUnreadNotifications] = useState(
     () => cached?.unreadNotifications ?? 0,
   )
-  const [menuBadges, setMenuBadges] = useState(
-    () => cached?.menuBadges ?? {},
-  )
+  const [menuBadges, setMenuBadges] = useState(() => cached?.menuBadges ?? {})
 
   const refresh = useCallback(() => {
     void loadAdminNavbarContext(true).then((data) => {
@@ -146,7 +140,7 @@ export function useAdminNavbarContext(initial: NotificationItem[]): {
   }, [])
 
   useVisibleInterval(() => refresh(), CACHE_MS)
-  useNotificationStream(() => refresh())
+  useNotificationStream(() => refresh(), 'admin')
 
   return { notifications, unreadNotifications, menuBadges }
 }

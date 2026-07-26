@@ -14,7 +14,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { ensureCanalOficialParaSede, vincularResponsavelAoCanalDaSede } from '@/lib/canais'
+import { notificarSafe } from '@/lib/notificacoes'
 import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
@@ -153,7 +155,11 @@ async function resolverResponsavelUser(
     },
   })
   if (!membro) {
-    return { userId: null, nome: null, error: 'Responsável precisa ser membro aprovado deste tenant.' }
+    return {
+      userId: null,
+      nome: null,
+      error: 'Responsável precisa ser membro aprovado deste tenant.',
+    }
   }
   return {
     userId: membro.userId,
@@ -165,7 +171,10 @@ async function resolverPai(
   sedePaiId: string | null,
   tenantId: string,
   opts?: { permitirPaiExternoId?: string | null },
-): Promise<{ pai: { id: string; tipo: TipoSede; tenantId: string | null } | null; error?: string }> {
+): Promise<{
+  pai: { id: string; tipo: TipoSede; tenantId: string | null } | null
+  error?: string
+}> {
   if (!sedePaiId) return { pai: null }
   const pai = await db.sede.findUnique({
     where: { id: sedePaiId },
@@ -184,10 +193,7 @@ async function resolverPai(
   return { pai: null, error: 'Sede pai não encontrada.' }
 }
 
-export async function criarSede(
-  _prev: SedeState,
-  formData: FormData,
-): Promise<SedeState> {
+export async function criarSede(_prev: SedeState, formData: FormData): Promise<SedeState> {
   const { session, tenant } = await assertPermission(PERMISSIONS.SEDES_MANAGE)
 
   // Só a Sede principal expande a hierarquia — subsede/PDE (Caso B) editam
@@ -198,8 +204,7 @@ export async function criarSede(
   })
   if (!podeCriarUnidadeTerritorial(sedeRaiz?.tipo ?? 'PONTO_ENCONTRO')) {
     return {
-      message:
-        'Apenas administradores da sede principal podem adicionar locais na hierarquia.',
+      message: 'Apenas administradores da sede principal podem adicionar locais na hierarquia.',
     }
   }
 
@@ -268,6 +273,18 @@ export async function criarSede(
     },
   })
 
+  if (resp.userId) {
+    await notificarSafe({
+      userId: resp.userId,
+      tenantId: tenant.id,
+      tipo: 'SEDE_RESPONSAVEL_DEFINIDO',
+      titulo: 'Você foi definido responsável por uma unidade',
+      corpo: `Você é responsável por ${nome}.`,
+      link: '/portal/sedes',
+      atorId: session.user.id,
+    })
+  }
+
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath('/portal/comunidade/canais')
@@ -296,6 +313,7 @@ export async function editarSede(
       sedeId: true,
       tipo: true,
       canalConversaId: true,
+      responsavelUserId: true,
       filhos: { select: { tipo: true } },
     },
   })
@@ -303,8 +321,7 @@ export async function editarSede(
     return { message: 'Sede não encontrada.' }
   }
 
-  const { nome, tipo, sedeId: sedePaiIdForm, responsavelUserId, responsavel, ...rest } =
-    parsed.data
+  const { nome, tipo, sedeId: sedePaiIdForm, responsavelUserId, responsavel, ...rest } = parsed.data
 
   // Caso B: pai na torcida principal — trava tipo + sedeId (não se altera aqui).
   let tipoFinal: TipoSede = tipo
@@ -330,7 +347,9 @@ export async function editarSede(
 
   if (sedePaiId && (await wouldCreateSedeCycle(sedeId, sedePaiId))) {
     return {
-      errors: { sedeId: ['Esta sede não pode ser filha de si mesma ou de uma de suas próprias subsedes.'] },
+      errors: {
+        sedeId: ['Esta sede não pode ser filha de si mesma ou de uma de suas próprias subsedes.'],
+      },
     }
   }
 
@@ -387,6 +406,18 @@ export async function editarSede(
       },
     },
   })
+
+  if (resp.userId && resp.userId !== existing.responsavelUserId) {
+    await notificarSafe({
+      userId: resp.userId,
+      tenantId: tenant.id,
+      tipo: 'SEDE_RESPONSAVEL_DEFINIDO',
+      titulo: 'Você foi definido responsável por uma unidade',
+      corpo: `Você é responsável por ${nome}.`,
+      link: '/portal/sedes',
+      atorId: session.user.id,
+    })
+  }
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
@@ -584,6 +615,122 @@ export async function geocodificarSedesSemCoords(): Promise<GeocodeLoteResult> {
       pendentes.length === 0
         ? 'Todas as sedes ativas já têm coordenadas.'
         : `Geocodificadas ${atualizadas} de ${pendentes.length} (falhas: ${falhas}).`,
+  }
+}
+
+export type ExcluirSedeResult =
+  { ok: true; membrosRemanejados: number; message: string } | { ok: false; error: string }
+
+/**
+ * Exclui uma Sede/Subsede/PDE, remanejando membros e eventos vinculados para
+ * outra unidade do mesmo tenant. Ação destrutiva com dois níveis de poder:
+ * - **Super-admin**: pode excluir qualquer unidade.
+ * - **Presidente/Vice da sede principal**: só pode excluir uma Sede
+ *   (`tipo: 'SEDE'`) duplicada — isto é, quando existe MAIS DE UMA Sede
+ *   `tipo: 'SEDE'` no tenant. Fora desse caso de limpeza de duplicidade, a
+ *   remoção de unidades (incluindo Subsede/PDE) é exclusiva do super-admin.
+ * Bloqueia se houver unidades filhas (reatribua antes) ou dados do Bar
+ * (catálogo/estoque/vendas têm `onDelete: Cascade` por `sedeId` — apagar
+ * silenciosamente destruiria histórico financeiro/estoque).
+ */
+export async function excluirSede(
+  sedeId: string,
+  destinoSedeId: string,
+): Promise<ExcluirSedeResult> {
+  const { session, tenant } = await assertPresidenteGlobal()
+  const isSuperAdmin = isSuperAdminEmail(session.user.email)
+
+  if (sedeId === destinoSedeId) {
+    return { ok: false, error: 'Escolha uma unidade de destino diferente.' }
+  }
+
+  const [sede, destino] = await Promise.all([
+    db.sede.findUnique({
+      where: { id: sedeId },
+      select: { tenantId: true, nome: true, tipo: true, canalConversaId: true },
+    }),
+    db.sede.findUnique({ where: { id: destinoSedeId }, select: { tenantId: true, tipo: true } }),
+  ])
+  if (!sede || sede.tenantId !== tenant.id) {
+    return { ok: false, error: 'Unidade não encontrada.' }
+  }
+  if (!destino || destino.tenantId !== tenant.id) {
+    return { ok: false, error: 'Unidade de destino não encontrada.' }
+  }
+  // Sócio de Subsede/PDE já conta como sócio da Sede (o número agrega na
+  // hierarquia) — remanejar só faz sentido Sede → Sede, nunca pra uma
+  // unidade territorial menor.
+  if (destino.tipo !== 'SEDE') {
+    return { ok: false, error: 'O destino do remanejamento precisa ser uma Sede.' }
+  }
+
+  if (!isSuperAdmin) {
+    if (sede.tipo !== 'SEDE') {
+      return {
+        ok: false,
+        error: 'Só o super-admin pode excluir Subsede/PDE. O Presidente só remove Sedes duplicadas.',
+      }
+    }
+    const sedesTipoSede = await db.sede.count({ where: { tenantId: tenant.id, tipo: 'SEDE' } })
+    if (sedesTipoSede <= 1) {
+      return {
+        ok: false,
+        error: 'Só é possível excluir quando há Sede duplicada. Para os demais casos, peça ao super-admin.',
+      }
+    }
+  }
+
+  const [filhos, dadosBar] = await Promise.all([
+    db.sede.count({ where: { sedeId, tenantId: tenant.id } }),
+    db.barProduto.count({ where: { sedeId } }),
+  ])
+  if (filhos > 0) {
+    return {
+      ok: false,
+      error: `Esta unidade tem ${filhos} unidade(s) filha(s). Reatribua-as (Editar → Unidade pai) antes de excluir.`,
+    }
+  }
+  if (dadosBar > 0) {
+    return {
+      ok: false,
+      error:
+        'Esta unidade tem catálogo/estoque do Bar vinculado. Migre esses dados manualmente antes de excluir.',
+    }
+  }
+
+  const [{ count: membrosRemanejados }] = await db.$transaction([
+    db.saasMembro.updateMany({
+      where: { tenantId: tenant.id, sedeId },
+      data: { sedeId: destinoSedeId },
+    }),
+    db.evento.updateMany({
+      where: { tenantId: tenant.id, sedeId },
+      data: { sedeId: destinoSedeId },
+    }),
+    db.sede.delete({ where: { id: sedeId } }),
+  ])
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'SEDE_EXCLUIDA',
+      entidade: 'Sede',
+      entidadeId: sedeId,
+      detalhes: { nome: sede.nome, destinoSedeId, membrosRemanejados },
+    },
+  })
+
+  revalidatePath('/admin/sedes')
+  revalidatePath('/portal/sedes')
+  revalidatePath('/admin', 'layout')
+  revalidatePath('/portal', 'layout')
+  invalidateHierarchyCache(tenant.id)
+
+  return {
+    ok: true,
+    membrosRemanejados,
+    message: `“${sede.nome}” excluída. ${membrosRemanejados} membro(s) remanejado(s).`,
   }
 }
 

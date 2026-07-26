@@ -103,6 +103,23 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
     menuId: 'aliancas',
   },
+  PEDIDO_CONFIRMADO: { escopo: 'social' },
+  PEDIDO_CANCELADO: { escopo: 'social' },
+  PEDIDO_ENTREGUE: { escopo: 'social' },
+  SOCIO_CARTEIRINHA_EMITIDA: { escopo: 'social' },
+  SOCIO_CARTEIRINHA_RENOVADA: { escopo: 'social' },
+  SOCIO_CARTEIRINHA_REVOGADA: { escopo: 'social' },
+  ACESSO_ATUALIZADO: { escopo: 'social' },
+  DEPARTAMENTO_ADICIONADO: { escopo: 'social' },
+  DEPARTAMENTO_REMOVIDO: { escopo: 'social' },
+  SEDE_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
+  BAR_VENDA_ESTORNADA: { escopo: 'social' },
+  PATRIMONIO_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
+  PEDIDO_RECEBIDO: {
+    escopo: 'admin',
+    permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
+    menuId: 'loja-pedidos',
+  },
 }
 
 export { agregarBadgesPorMenu, menuIdParaTipo } from '@/lib/notificacoes-menu-badges'
@@ -188,18 +205,15 @@ export async function notificarNovoMembroPendente(params: {
   const label = tipoVinculo === 'SOCIO' ? 'sócio' : 'torcedor'
 
   await Promise.all([
-    notificarAdminsPorPermissao(
-      [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
-      {
-        tenantId,
-        tipo: 'MEMBRO_SOLICITADO',
-        titulo: `Nova solicitação de ${label}`,
-        corpo: `${solicitanteNome} solicitou ingresso como ${label} em ${tenantNome}.`,
-        link: '/admin/membros?status=PENDENTE',
-        atorId: solicitanteUserId,
-        excetoUserId: solicitanteUserId,
-      },
-    ),
+    notificarAdminsPorPermissao([PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW], {
+      tenantId,
+      tipo: 'MEMBRO_SOLICITADO',
+      titulo: `Nova solicitação de ${label}`,
+      corpo: `${solicitanteNome} solicitou ingresso como ${label} em ${tenantNome}.`,
+      link: '/admin/membros?status=PENDENTE',
+      atorId: solicitanteUserId,
+      excetoUserId: solicitanteUserId,
+    }),
     notificarSafe({
       userId: solicitanteUserId,
       tenantId,
@@ -244,13 +258,10 @@ export async function notificarDenunciaPost(params: {
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarDenunciaAdmins(
-    [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
-    {
-      ...params,
-      titulo: 'Nova denúncia pendente',
-    },
-  )
+  return notificarDenunciaAdmins([PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE], {
+    ...params,
+    titulo: 'Nova denúncia pendente',
+  })
 }
 
 /** Denúncia de mensagem — moderadores de mensagens/comunidade (OR). */
@@ -259,13 +270,10 @@ export async function notificarDenunciaMensagem(params: {
   motivo: string
   denuncianteUserId: string
 }): Promise<number> {
-  return notificarDenunciaAdmins(
-    [PERMISSIONS.MESSAGES_MODERATE, PERMISSIONS.COMMUNITY_MODERATE],
-    {
-      ...params,
-      titulo: 'Nova denúncia de mensagem',
-    },
-  )
+  return notificarDenunciaAdmins([PERMISSIONS.MESSAGES_MODERATE, PERMISSIONS.COMMUNITY_MODERATE], {
+    ...params,
+    titulo: 'Nova denúncia de mensagem',
+  })
 }
 
 /** Comunicado urgente: membros aprovados + admins de comunicados (sem duplicar). */

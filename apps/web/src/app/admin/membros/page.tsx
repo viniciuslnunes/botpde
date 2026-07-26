@@ -275,6 +275,22 @@ export default async function MembrosPage({
     }
   }
 
+  const unidadeOrigemIds = [
+    ...new Set(
+      membros
+        .map((m: (typeof membros)[number]) => m.aprovadoNaUnidadeTenantId)
+        .filter((id: string | null): id is string => !!id),
+    ),
+  ]
+  const unidadesOrigem: { id: string; nome: string }[] =
+    unidadeOrigemIds.length > 0
+      ? await db.tenant.findMany({
+          where: { id: { in: unidadeOrigemIds } },
+          select: { id: true, nome: true },
+        })
+      : []
+  const nomeUnidadePorId = new Map(unidadesOrigem.map((u) => [u.id, u.nome]))
+
   const count: Record<string, number> = { PENDENTE: 0, APROVADO: 0, REPROVADO: 0 }
   for (const c of contagens) count[c.status] = c._count
 
@@ -411,6 +427,10 @@ export default async function MembrosPage({
                 : undefined,
               tentativas: tentativasPorMembro.get(membro.id) ?? 1,
               ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
+              espelhado: membro.espelhado,
+              aprovadoNaUnidadeNome: membro.aprovadoNaUnidadeTenantId
+                ? (nomeUnidadePorId.get(membro.aprovadoNaUnidadeTenantId) ?? null)
+                : null,
             }
           })}
         />

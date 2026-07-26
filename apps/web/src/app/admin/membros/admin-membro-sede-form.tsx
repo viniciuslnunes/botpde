@@ -18,18 +18,23 @@ export function AdminMembroSedeForm({
   sedeIdAtual,
   sedes,
   canEdit,
+  espelhado,
+  aprovadoNaUnidadeNome,
 }: {
   membroId: string
   sedeIdAtual: string | null
   sedes: SedeOption[]
   canEdit: boolean
+  espelhado?: boolean
+  aprovadoNaUnidadeNome?: string | null
 }) {
   const [sedeId, setSedeId] = useState(sedeIdAtual ?? '')
   const [pending, startTransition] = useTransition()
   const dirty = (sedeId || null) !== (sedeIdAtual ?? null)
 
-  if (!canEdit) {
+  if (espelhado || !canEdit) {
     const atual = sedes.find((s) => s.id === sedeIdAtual)
+    const via = aprovadoNaUnidadeNome?.trim()
     return (
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-[rgb(var(--foreground))]">
@@ -41,6 +46,13 @@ export function AdminMembroSedeForm({
             ? `[${TIPO_CURTO[atual.tipo] ?? atual.tipo}] ${atual.nome}`
             : 'Sem unidade vinculada'}
         </p>
+        {espelhado && (
+          <p className="mt-2 text-xs text-[rgb(var(--foreground-muted))]">
+            {via
+              ? `Registro espelhado — aprovado via ${via}. Altere na unidade de origem.`
+              : 'Registro espelhado — altere na unidade de origem.'}
+          </p>
+        )}
       </div>
     )
   }

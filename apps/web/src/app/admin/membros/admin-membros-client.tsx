@@ -174,6 +174,8 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
                       membroId={membro.id}
                       status={membro.status}
                       departamentoNome={membro.departamentoNome}
+                      espelhado={membro.espelhado}
+                      aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
                     />
                   </td>
                 </m.tr>

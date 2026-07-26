@@ -39,4 +39,8 @@ export interface AdminMembroItem {
   /** Nº de solicitações (cadastro + recadastros) registradas no AuditLog. */
   tentativas?: number
   ultimoMotivoReprovacao?: string
+  /** true = registro espelho na Sede (só leitura; origem em outra unidade). */
+  espelhado?: boolean
+  /** Nome da Subsede/PDE que aprovou o sócio original (quando espelhado). */
+  aprovadoNaUnidadeNome?: string | null
 }

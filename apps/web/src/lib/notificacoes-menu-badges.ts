@@ -16,6 +16,7 @@ export const MENU_ID_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
   COBRANCA_VENCIDA: 'cobrancas',
   EVENTO_RSVP: 'eventos',
   EVENTO_DIA_GESTOR: 'eventos',
+  PEDIDO_RECEBIDO: 'loja-pedidos',
 }
 
 /** Menu do sidebar admin associado ao tipo, se houver badge operacional. */

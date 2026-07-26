@@ -5,6 +5,14 @@ import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
+import { ExpectedError } from '@/lib/expected-error'
+import {
+  desligarEspelhoDaOrigem,
+  lockNumeroAssociadoDaTorcida,
+  propagarLgeParaEspelho,
+  sincronizarSocioNaSedeRaiz,
+  validarNumeroAssociadoUnicoNaTorcida,
+} from '@/lib/membros-sede'
 import { notificarSafe } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
@@ -16,6 +24,9 @@ import {
   PAPEL_DEPARTAMENTO,
   PERMISSIONS,
 } from '@torcida/types'
+
+const ERRO_ESPELHO_MUTACAO =
+  'Este registro é um espelho da Sede. Altere na unidade de origem.'
 
 /**
  * Concede acesso básico ao portal quando um membro é aprovado:
@@ -131,6 +142,31 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
   const incluirDepartamento = opts?.incluirDepartamento !== false
 
   const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existente: { id: string; espelhado: boolean; tipo: string; userId: string; numeroAssociado: string | null } | null =
+      await tx.saasMembro.findFirst({
+        where: { id: membroId, tenantId: tenant.id },
+        select: {
+          id: true,
+          espelhado: true,
+          tipo: true,
+          userId: true,
+          numeroAssociado: true,
+        },
+      })
+    if (!existente) throw new ExpectedError('Membro não encontrado.')
+    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+
+    if (existente.tipo === 'SOCIO' && existente.numeroAssociado) {
+      await lockNumeroAssociadoDaTorcida(tx, tenant.id)
+      await validarNumeroAssociadoUnicoNaTorcida(
+        tx,
+        tenant.id,
+        existente.userId,
+        existente.numeroAssociado,
+        existente.id,
+      )
+    }
+
     const atualizado = await tx.saasMembro.update({
       where: { id: membroId, tenantId: tenant.id },
       data: {
@@ -153,6 +189,12 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
           tx,
         )
       }
+      await sincronizarSocioNaSedeRaiz(tx, {
+        tenantOrigemId: tenant.id,
+        membro: atualizado,
+        aprovadoPorUserId: session.user.id,
+        aprovadoPorNome: session.user.name ?? 'Admin',
+      })
     }
 
     return atualizado
@@ -223,6 +265,13 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
 
   const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existente: { id: string; espelhado: boolean } | null = await tx.saasMembro.findFirst({
+      where: { id: membroId, tenantId: tenant.id },
+      select: { id: true, espelhado: true },
+    })
+    if (!existente) throw new ExpectedError('Membro não encontrado.')
+    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+
     const atualizado = await tx.saasMembro.update({
       where: { id: membroId, tenantId: tenant.id },
       data: {
@@ -236,6 +285,11 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     // Preferência do onboarding NÃO vira equipe; limpa qualquer membership
     // órfã (ex.: bug antigo que upsertava UserDepartamento no cadastro).
     await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+    await desligarEspelhoDaOrigem(
+      tx,
+      atualizado.id,
+      motivo?.trim() || 'Reprovado na unidade de origem',
+    )
 
     return atualizado
   })
@@ -287,6 +341,13 @@ export async function reverterMembro(membroId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existente: { id: string; espelhado: boolean } | null = await tx.saasMembro.findFirst({
+      where: { id: membroId, tenantId: tenant.id },
+      select: { id: true, espelhado: true },
+    })
+    if (!existente) throw new ExpectedError('Membro não encontrado.')
+    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+
     const atualizado = await tx.saasMembro.update({
       where: { id: membroId, tenantId: tenant.id },
       data: {
@@ -299,6 +360,7 @@ export async function reverterMembro(membroId: string) {
 
     // Pendente não herda departamento — remove membership concedida na aprovação.
     await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+    await desligarEspelhoDaOrigem(tx, atualizado.id, 'Revertido para pendente')
   })
 
   await db.auditLog.create({
@@ -349,11 +411,12 @@ export async function atualizarDadosLge(
   }
 
   const data = parsed.data
-  const existente: { id: string } | null = await db.saasMembro.findFirst({
+  const existente: { id: string; espelhado: boolean } | null = await db.saasMembro.findFirst({
     where: { id: data.membroId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, espelhado: true },
   })
   if (!existente) return { error: 'Membro não encontrado' }
+  if (existente.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
 
   if (data.planoAssociacaoId) {
     const plano: { id: string } | null = await db.planoAssociacao.findFirst({
@@ -369,18 +432,24 @@ export async function atualizarDadosLge(
     dataNascimento = parseDataCompetencia(data.dataNascimento)
   }
 
+  const dadosLge = {
+    rg: data.rg ?? null,
+    cpf: data.cpf ?? null,
+    filiacao: data.filiacao ?? null,
+    escolaridade: data.escolaridade ?? null,
+    profissao: data.profissao ?? null,
+    dataNascimento,
+  }
+
   await db.saasMembro.update({
     where: { id: existente.id },
     data: {
-      rg: data.rg ?? null,
-      cpf: data.cpf ?? null,
-      filiacao: data.filiacao ?? null,
-      escolaridade: data.escolaridade ?? null,
-      profissao: data.profissao ?? null,
-      dataNascimento,
+      ...dadosLge,
       planoAssociacaoId: data.planoAssociacaoId ?? null,
     },
   })
+
+  await propagarLgeParaEspelho(db, existente.id, dadosLge)
 
   await db.auditLog.create({
     data: {
@@ -411,20 +480,25 @@ export async function desligarMembro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const membro: { id: string; desligadoEm: Date | null } | null = await db.saasMembro.findFirst({
-    where: { id: parsed.data.membroId, tenantId: tenant.id },
-    select: { id: true, desligadoEm: true },
-  })
+  const membro: { id: string; desligadoEm: Date | null; espelhado: boolean } | null =
+    await db.saasMembro.findFirst({
+      where: { id: parsed.data.membroId, tenantId: tenant.id },
+      select: { id: true, desligadoEm: true, espelhado: true },
+    })
   if (!membro) return { error: 'Membro não encontrado' }
+  if (membro.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
   if (membro.desligadoEm) return { error: 'Membro já desligado' }
 
-  await db.saasMembro.update({
-    where: { id: membro.id },
-    data: {
-      desligadoEm: new Date(),
-      desligadoMotivo: parsed.data.motivo,
-      desligadoPorId: session.user.id,
-    },
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.saasMembro.update({
+      where: { id: membro.id },
+      data: {
+        desligadoEm: new Date(),
+        desligadoMotivo: parsed.data.motivo,
+        desligadoPorId: session.user.id,
+      },
+    })
+    await desligarEspelhoDaOrigem(tx, membro.id, parsed.data.motivo)
   })
 
   await db.auditLog.create({
@@ -523,11 +597,15 @@ export async function reatribuirSedeMembro(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  const membro = await db.saasMembro.findFirst({
-    where: { id: membroId, tenantId: tenant.id },
-    select: { id: true, sedeId: true },
-  })
+  const membro: { id: string; sedeId: string | null; espelhado: boolean } | null =
+    await db.saasMembro.findFirst({
+      where: { id: membroId, tenantId: tenant.id },
+      select: { id: true, sedeId: true, espelhado: true },
+    })
   if (!membro) return { ok: false, error: 'Membro não encontrado.' }
+  if (membro.espelhado) {
+    return { ok: false, error: 'Registro espelhado — altere na unidade de origem.' }
+  }
 
   let sedeAlvoId: string | null = sedeId?.trim() || null
   if (sedeAlvoId) {

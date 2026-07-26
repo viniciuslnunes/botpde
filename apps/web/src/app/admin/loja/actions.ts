@@ -6,7 +6,15 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { assertPermission } from '@/lib/authz'
 import { garantirLancamentoFinanceiroPedido } from '@/lib/loja-financeiro'
-import { PERMISSIONS, CategoriaSchema, CupomSchema, parseTamanhosCsv, slugify, chaveTamanho } from '@torcida/types'
+import { notificarSafe } from '@/lib/notificacoes'
+import {
+  PERMISSIONS,
+  CategoriaSchema,
+  CupomSchema,
+  parseTamanhosCsv,
+  slugify,
+  chaveTamanho,
+} from '@torcida/types'
 
 // ── Schema produto admin ──────────────────────────────────────────────────────
 
@@ -114,7 +122,12 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PRODUTO_CRIADO', entidade: 'SaasProduto' },
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'PRODUTO_CRIADO',
+        entidade: 'SaasProduto',
+      },
     })
 
     revalidatePath('/admin/loja')
@@ -124,7 +137,11 @@ export async function criarProduto(_prev: ProdutoState, formData: FormData): Pro
   }
 }
 
-export async function editarProduto(id: string, _prev: ProdutoState, formData: FormData): Promise<ProdutoState> {
+export async function editarProduto(
+  id: string,
+  _prev: ProdutoState,
+  formData: FormData,
+): Promise<ProdutoState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
     const raw = Object.fromEntries(formData)
@@ -159,7 +176,13 @@ export async function editarProduto(id: string, _prev: ProdutoState, formData: F
     })
 
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'PRODUTO_EDITADO', entidade: 'SaasProduto', entidadeId: id },
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'PRODUTO_EDITADO',
+        entidade: 'SaasProduto',
+        entidadeId: id,
+      },
     })
 
     revalidatePath('/admin/loja')
@@ -174,7 +197,13 @@ export async function alterarStatusProduto(id: string, ativo: boolean) {
   const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
   await db.saasProduto.update({ where: { id, tenantId: tenant.id }, data: { ativo } })
   await db.auditLog.create({
-    data: { tenantId: tenant.id, atorId: session.user.id, acao: ativo ? 'PRODUTO_ATIVADO' : 'PRODUTO_DESATIVADO', entidade: 'SaasProduto', entidadeId: id },
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: ativo ? 'PRODUTO_ATIVADO' : 'PRODUTO_DESATIVADO',
+      entidade: 'SaasProduto',
+      entidadeId: id,
+    },
   })
   revalidatePath('/admin/loja')
 }
@@ -189,10 +218,21 @@ export async function criarCategoria(_prev: ActionState, formData: FormData): Pr
 
     const slug = parsed.data.slug ?? slugify(parsed.data.nome)
     await db.saasCategoria.create({
-      data: { tenantId: tenant.id, nome: parsed.data.nome, slug, ordem: parsed.data.ordem, parentId: parsed.data.parentId ?? null },
+      data: {
+        tenantId: tenant.id,
+        nome: parsed.data.nome,
+        slug,
+        ordem: parsed.data.ordem,
+        parentId: parsed.data.parentId ?? null,
+      },
     })
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CATEGORIA_CRIADA', entidade: 'SaasCategoria' },
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'CATEGORIA_CRIADA',
+        entidade: 'SaasCategoria',
+      },
     })
     revalidatePath('/admin/loja/categorias')
     return { success: true }
@@ -205,7 +245,13 @@ export async function excluirCategoria(id: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
   await db.saasCategoria.delete({ where: { id, tenantId: tenant.id } })
   await db.auditLog.create({
-    data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CATEGORIA_EXCLUIDA', entidade: 'SaasCategoria', entidadeId: id },
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'CATEGORIA_EXCLUIDA',
+      entidade: 'SaasCategoria',
+      entidadeId: id,
+    },
   })
   revalidatePath('/admin/loja/categorias')
 }
@@ -246,7 +292,12 @@ export async function criarCupom(_prev: ActionState, formData: FormData): Promis
       },
     })
     await db.auditLog.create({
-      data: { tenantId: tenant.id, atorId: session.user.id, acao: 'CUPOM_CRIADO', entidade: 'SaasCupom' },
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'CUPOM_CRIADO',
+        entidade: 'SaasCupom',
+      },
     })
     revalidatePath('/admin/loja/cupons')
     return { success: true }
@@ -259,7 +310,13 @@ export async function toggleCupom(id: string, ativo: boolean) {
   const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
   await db.saasCupom.update({ where: { id, tenantId: tenant.id }, data: { ativo } })
   await db.auditLog.create({
-    data: { tenantId: tenant.id, atorId: session.user.id, acao: ativo ? 'CUPOM_ATIVADO' : 'CUPOM_DESATIVADO', entidade: 'SaasCupom', entidadeId: id },
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: ativo ? 'CUPOM_ATIVADO' : 'CUPOM_DESATIVADO',
+      entidade: 'SaasCupom',
+      entidadeId: id,
+    },
   })
   revalidatePath('/admin/loja/cupons')
 }
@@ -272,7 +329,11 @@ export async function toggleCupomForm(formData: FormData) {
 
 // ── Status Pedidos ───────────────────────────────────────────────────────────
 
-export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState, formData: FormData): Promise<PedidoStatusState> {
+export async function atualizarStatusPedido(
+  id: string,
+  _prev: PedidoStatusState,
+  formData: FormData,
+): Promise<PedidoStatusState> {
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.STORE_MANAGE)
     const status = formData.get('status') as string
@@ -283,6 +344,7 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
       status: string
       total: Prisma.Decimal
       financeiroLancamentoId: string | null
+      userId: string
       itens: Array<{ produtoNome: string; quantidade: number }>
     } | null = await db.saasPedido.findFirst({
       where: { id, tenantId: tenant.id },
@@ -290,6 +352,7 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
         status: true,
         total: true,
         financeiroLancamentoId: true,
+        userId: true,
         itens: { select: { produtoNome: true, quantidade: true } },
       },
     })
@@ -313,9 +376,7 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
         !pedido.financeiroLancamentoId &&
         session.user.id
       ) {
-        const resumoItens = pedido.itens
-          .map((i) => `${i.produtoNome} ×${i.quantidade}`)
-          .join(', ')
+        const resumoItens = pedido.itens.map((i) => `${i.produtoNome} ×${i.quantidade}`).join(', ')
         await garantirLancamentoFinanceiroPedido(tx, {
           tenantId: tenant.id,
           pedidoId: id,
@@ -336,6 +397,30 @@ export async function atualizarStatusPedido(id: string, _prev: PedidoStatusState
         detalhes: { status: statusNovo },
       },
     })
+
+    if (statusNovo !== pedido.status) {
+      const notificacaoPorStatus: Partial<
+        Record<
+          typeof statusNovo,
+          { tipo: 'PEDIDO_CONFIRMADO' | 'PEDIDO_CANCELADO' | 'PEDIDO_ENTREGUE'; titulo: string }
+        >
+      > = {
+        CONFIRMADO: { tipo: 'PEDIDO_CONFIRMADO', titulo: 'Pedido confirmado' },
+        CANCELADO: { tipo: 'PEDIDO_CANCELADO', titulo: 'Pedido cancelado' },
+        ENTREGUE: { tipo: 'PEDIDO_ENTREGUE', titulo: 'Pedido entregue' },
+      }
+      const notificacao = notificacaoPorStatus[statusNovo]
+      if (notificacao) {
+        await notificarSafe({
+          userId: pedido.userId,
+          tenantId: tenant.id,
+          tipo: notificacao.tipo,
+          titulo: notificacao.titulo,
+          link: '/portal/loja/pedidos',
+          atorId: session.user.id,
+        })
+      }
+    }
 
     revalidatePath('/admin/loja/pedidos')
     revalidatePath('/portal/loja/pedidos')

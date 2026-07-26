@@ -8,6 +8,7 @@ import {
   PERMISSIONS,
 } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
+import { notificarSafe } from '@/lib/notificacoes'
 
 export type PatrimonioState = {
   ok?: boolean
@@ -109,10 +110,11 @@ export async function editarPatrimonioItem(
   }
 
   const data = parsed.data
-  const existente: { id: string } | null = await db.patrimonioItem.findFirst({
-    where: { id: data.id, tenantId: tenant.id },
-    select: { id: true },
-  })
+  const existente: { id: string; responsavelId: string | null; nome: string } | null =
+    await db.patrimonioItem.findFirst({
+      where: { id: data.id, tenantId: tenant.id },
+      select: { id: true, responsavelId: true, nome: true },
+    })
   if (!existente) return { error: 'Item não encontrado' }
 
   const respErr = await assertResponsavelNoTenant(tenant.id, data.responsavelId)
@@ -142,6 +144,18 @@ export async function editarPatrimonioItem(
       detalhes: { nome: data.nome, categoria: data.categoria, status: data.status },
     },
   })
+
+  if (data.responsavelId && data.responsavelId !== existente.responsavelId) {
+    await notificarSafe({
+      userId: data.responsavelId,
+      tenantId: tenant.id,
+      tipo: 'PATRIMONIO_RESPONSAVEL_DEFINIDO',
+      titulo: 'Você é responsável por um item de patrimônio',
+      corpo: `Você agora é responsável por "${data.nome}".`,
+      link: '/portal/patrimonio',
+      atorId: session.user.id,
+    })
+  }
 
   revalidatePatrimonio()
   return { ok: true }

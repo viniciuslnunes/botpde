@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -14,13 +15,7 @@ const schema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? parseInt(v, 10) : undefined))
-    .pipe(
-      z
-        .number()
-        .min(10, 'Idade mínima: 10 anos')
-        .max(120, 'Idade inválida')
-        .optional(),
-    ),
+    .pipe(z.number().min(10, 'Idade mínima: 10 anos').max(120, 'Idade inválida').optional()),
   telefone: z
     .string()
     .max(20)
@@ -161,6 +156,14 @@ export async function solicitarCadastro(
       },
     })
   }
+
+  await notificarNovoMembroPendente({
+    tenantId: tenant.id,
+    tenantNome: tenant.nome,
+    solicitanteUserId: session.user.id,
+    solicitanteNome: data.nome,
+    tipoVinculo: data.tipo,
+  })
 
   revalidatePath('/portal')
   redirect('/portal?cadastro=enviado')

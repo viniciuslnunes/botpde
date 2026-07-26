@@ -94,6 +94,7 @@ export async function TorcidaConsole({
           where: {
             tenantId,
             status: 'APROVADO',
+            espelhado: false,
             sedeId: { in: sedeIdsLocais },
           },
           _count: { _all: true },
@@ -109,7 +110,7 @@ export async function TorcidaConsole({
     // Membros do tenant sem sedeId → contam na SEDE raiz.
     db.saasMembro.groupBy({
       by: ['sedeId', 'tipo'],
-      where: { tenantId, status: 'APROVADO', sedeId: null },
+      where: { tenantId, status: 'APROVADO', espelhado: false, sedeId: null },
       _count: { _all: true },
     }) as Promise<MembroPorSede[]>,
   ])

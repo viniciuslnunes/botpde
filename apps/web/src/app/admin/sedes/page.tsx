@@ -1,5 +1,6 @@
 import { db } from '@torcida/db'
-import { assertPermission } from '@/lib/authz'
+import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
+import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
 import { redirect } from 'next/navigation'
@@ -164,10 +165,24 @@ export default async function AdminSedesPage() {
     }
   }
 
+  // Excluir Sede é destrutivo (remaneja membros/eventos e reorganiza a
+  // hierarquia). Super-admin pode excluir qualquer unidade; Presidente/Vice
+  // da sede principal só pode excluir uma Sede (`tipo: 'SEDE'`) duplicada —
+  // fora desse caso de limpeza, remover unidades é exclusivo do super-admin
+  // (ver `excluirSede` em actions.ts, mesma regra espelhada aqui pra UI).
+  const presidenteSession = await assertPresidenteGlobal()
+    .then((r) => r.session)
+    .catch(() => null)
+  const isSuperAdmin = Boolean(presidenteSession && isSuperAdminEmail(presidenteSession.user.email))
+  const sedesTipoSedeCount = rows.filter((s) => s.tipo === 'SEDE').length
+
   const sedes: AdminSedeListItem[] = rows.map((s) => ({
     ...s,
     membrosCount: countBySede.get(s.id) ?? 0,
     paiHerdado: s.sedeId ? (paisExternos.get(s.sedeId) ?? null) : null,
+    podeExcluir:
+      isSuperAdmin ||
+      (presidenteSession != null && s.tipo === 'SEDE' && sedesTipoSedeCount > 1),
   }))
   const sedesOption = rows.map((s) => ({ id: s.id, nome: s.nome, tipo: s.tipo }))
   const candidatos = candidatosRaw.map((m) => ({

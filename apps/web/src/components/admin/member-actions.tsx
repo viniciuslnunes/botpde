@@ -9,11 +9,30 @@ interface MemberActionsProps {
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
   /** Departamento pretendido no onboarding (sócio); exibido no diálogo de aprovação. */
   departamentoNome?: string | null
+  /** Espelho na Sede — só leitura; ações ficam na unidade de origem. */
+  espelhado?: boolean
+  /** Nome da unidade que aprovou o sócio original. */
+  aprovadoNaUnidadeNome?: string | null
 }
 
-export function MemberActions({ membroId, status, departamentoNome }: MemberActionsProps) {
+export function MemberActions({
+  membroId,
+  status,
+  departamentoNome,
+  espelhado,
+  aprovadoNaUnidadeNome,
+}: MemberActionsProps) {
   const confirmAction = useConfirmAction()
   const depto = departamentoNome?.trim() || null
+
+  if (espelhado) {
+    const via = aprovadoNaUnidadeNome?.trim()
+    return (
+      <span className="text-xs text-[rgb(var(--foreground-muted))]">
+        {via ? `Aprovado via ${via}` : 'Espelho da Sede'}
+      </span>
+    )
+  }
 
   async function handleAprovar(incluirDepartamento: boolean) {
     const comArea = incluirDepartamento && !!depto

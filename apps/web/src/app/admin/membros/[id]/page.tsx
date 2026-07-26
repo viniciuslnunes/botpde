@@ -50,6 +50,8 @@ export default async function MembroDetalhePage({ params }: Props) {
     dataNascimento: Date | null
     planoAssociacaoId: string | null
     sedeId: string | null
+    espelhado: boolean
+    aprovadoNaUnidadeTenantId: string | null
     planoAssociacao: { nome: string } | null
     departamento: { id: string; nome: string } | null
     user: { email: string | null }
@@ -82,6 +84,8 @@ export default async function MembroDetalhePage({ params }: Props) {
         dataNascimento: true,
         planoAssociacaoId: true,
         sedeId: true,
+        espelhado: true,
+        aprovadoNaUnidadeTenantId: true,
         planoAssociacao: { select: { nome: true } },
         departamento: { select: { id: true, nome: true } },
         user: { select: { email: true } },
@@ -101,6 +105,14 @@ export default async function MembroDetalhePage({ params }: Props) {
   ])
 
   if (!membro) notFound()
+
+  const unidadeOrigem: { nome: string } | null = membro.aprovadoNaUnidadeTenantId
+    ? await db.tenant.findFirst({
+        where: { id: membro.aprovadoNaUnidadeTenantId },
+        select: { nome: true },
+      })
+    : null
+  const aprovadoNaUnidadeNome = unidadeOrigem?.nome ?? null
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
   const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
@@ -130,6 +142,13 @@ export default async function MembroDetalhePage({ params }: Props) {
                   {membro.nome}
                 </h1>
                 <StatusBadge dominio="membro" status={membro.status} />
+                {membro.espelhado && (
+                  <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                    {aprovadoNaUnidadeNome
+                      ? `Aprovado via ${aprovadoNaUnidadeNome}`
+                      : 'Espelho da Sede'}
+                  </span>
+                )}
               </div>
               <p className="text-sm text-[rgb(var(--foreground-muted))]">
                 {membro.tipo}
@@ -154,6 +173,8 @@ export default async function MembroDetalhePage({ params }: Props) {
             membroId={membro.id}
             status={membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO'}
             departamentoNome={membro.departamento?.nome}
+            espelhado={membro.espelhado}
+            aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
           />
         </div>
       </MotionReveal>
@@ -170,6 +191,8 @@ export default async function MembroDetalhePage({ params }: Props) {
           sedeIdAtual={membro.sedeId}
           sedes={sedes}
           canEdit={podeReatribuirSede}
+          espelhado={membro.espelhado}
+          aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
         />
       </MotionReveal>
 
@@ -188,6 +211,8 @@ export default async function MembroDetalhePage({ params }: Props) {
           planos={planos}
           podeDesligar={podeDesligar}
           desligadoEm={membro.desligadoEm}
+          espelhado={membro.espelhado}
+          aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
         />
       </MotionReveal>
     </div>

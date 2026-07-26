@@ -16,6 +16,7 @@ import {
   criarSede,
   editarSede,
   alterarStatusSede,
+  excluirSede,
   salvarFotoSede,
   type SedeState,
 } from '@/app/admin/sedes/actions'
@@ -34,6 +35,8 @@ import {
   Search,
   Settings2,
   Shield,
+  Trash2,
+  X,
 } from 'lucide-react'
 import { m } from 'motion/react'
 import { FieldError, Input, Select, Textarea, toast } from '@torcida/ui'
@@ -1778,5 +1781,97 @@ export function ToggleSedeButton({ sedeId, ativa }: { sedeId: string; ativa: boo
       )}
       {ativa ? 'Desativar' : 'Ativar'}
     </button>
+  )
+}
+
+/**
+ * Excluir Sede duplicada, remanejando sócios e eventos para outra Sede.
+ * `destinos` já vem filtrado (Sede → Sede, nunca Subsede/PDE — sócio de
+ * unidade menor já conta pra Sede na agregação, então o destino tem que ser
+ * sempre uma Sede).
+ */
+export function ExcluirSedeButton({
+  sedeId,
+  sedeNome,
+  destinos,
+}: {
+  sedeId: string
+  sedeNome: string
+  destinos: { id: string; nome: string; tipo: string }[]
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [destinoSedeId, setDestinoSedeId] = useState(destinos[0]?.id ?? '')
+  const [pending, startTransition] = useTransition()
+
+  if (destinos.length === 0) return null
+
+  function excluir() {
+    startTransition(async () => {
+      const ok = await runPersistAction(() => excluirSede(sedeId, destinoSedeId), {
+        success: 'Sede excluída e sócios remanejados.',
+      })
+      if (ok) setAberto(false)
+    })
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Excluir
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full rounded-xl border border-red-200 bg-[rgb(var(--surface))] p-3 text-xs shadow-lg dark:border-red-900 sm:w-72">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium text-red-700 dark:text-red-300">Excluir “{sedeNome}”?</p>
+        <button
+          type="button"
+          onClick={() => setAberto(false)}
+          className="shrink-0 rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]"
+          aria-label="Cancelar"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <p className="mt-2 text-[11px] text-[rgb(var(--foreground-muted))]">
+        Sócios e eventos são remanejados para
+      </p>
+
+      {destinos.length === 1 ? (
+        <p className="mt-0.5 rounded-lg bg-[rgb(var(--background-subtle))] px-2 py-1.5 text-xs font-semibold text-[rgb(var(--foreground))]">
+          {destinos[0]!.nome}
+        </p>
+      ) : (
+        <Select
+          value={destinoSedeId}
+          onChange={(e) => setDestinoSedeId(e.target.value)}
+          className="mt-1 text-xs"
+        >
+          {destinos.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.nome}
+            </option>
+          ))}
+        </Select>
+      )}
+
+      <button
+        type="button"
+        onClick={excluir}
+        disabled={pending}
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+        Confirmar exclusão
+      </button>
+    </div>
   )
 }

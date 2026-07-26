@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { Check, Handshake, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
+import { Badge, type BadgeVariant } from '@torcida/ui'
 import {
   aprovarSolicitacao,
   criarSolicitacaoManual,
@@ -46,11 +47,10 @@ const TIPO_LABEL: Record<SolicitacaoView['tipo'], string> = {
   PONTO_ENCONTRO: 'PDE',
 }
 
-const STATUS_STYLE: Record<SolicitacaoView['status'], string> = {
-  PENDENTE: 'bg-amber-950/60 text-amber-200 border-amber-800',
-  APROVADA: 'bg-emerald-950/60 text-emerald-200 border-emerald-800',
-  RECUSADA:
-    'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] border-[rgb(var(--border))]',
+const STATUS_VARIANT: Record<SolicitacaoView['status'], BadgeVariant> = {
+  PENDENTE: 'warning',
+  APROVADA: 'success',
+  RECUSADA: 'neutral',
 }
 
 const INPUT_CLASS =
@@ -311,11 +311,9 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
           )}
           {s.motivo && <ClampComTexto label="Motivo" texto={s.motivo} />}
         </div>
-        <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[s.status]}`}
-        >
+        <Badge variant={STATUS_VARIANT[s.status]} className="shrink-0">
           {s.status}
-        </span>
+        </Badge>
       </div>
 
       {s.status === 'APROVADA' &&

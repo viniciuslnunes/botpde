@@ -14,7 +14,7 @@ const MAX_VISIVEL = 40
 /**
  * Combobox de busca (autocomplete) para listas grandes — filtragem client-side
  * por label/sublabel, fecha ao clicar fora, teto de resultados visíveis.
- * Estilo zinc (super-admin). Sem dependência externa.
+ * Sem dependência externa.
  */
 export function SearchableSelect({
   options,
@@ -78,19 +78,19 @@ export function SearchableSelect({
           type="button"
           disabled={disabled}
           onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-left text-sm text-zinc-100 outline-none hover:border-zinc-600 focus:border-violet-500 disabled:opacity-50"
+          className="flex w-full items-center justify-between gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-left text-sm text-[rgb(var(--foreground))] outline-none hover:border-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))] disabled:opacity-50"
         >
           <span className="min-w-0 truncate">
             {selected.label}
             {selected.sublabel ? (
-              <span className="ml-1.5 text-xs text-zinc-500">{selected.sublabel}</span>
+              <span className="ml-1.5 text-xs text-[rgb(var(--foreground-muted))]">{selected.sublabel}</span>
             ) : null}
           </span>
           <span className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               aria-label="Limpar seleção"
-              className="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
+              className="rounded p-0.5 text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
               onClick={(e) => {
                 e.stopPropagation()
                 onChange(null)
@@ -98,12 +98,12 @@ export function SearchableSelect({
             >
               <X className="h-4 w-4" aria-hidden />
             </button>
-            <ChevronsUpDown className="h-4 w-4 text-zinc-500" aria-hidden />
+            <ChevronsUpDown className="h-4 w-4 text-[rgb(var(--foreground-muted))]" aria-hidden />
           </span>
         </button>
       ) : (
-        <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 focus-within:border-violet-500">
-          <Search className="h-4 w-4 shrink-0 text-zinc-500" />
+        <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 focus-within:border-[rgb(var(--color-primary))]">
+          <Search className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
           <input
             type="text"
             value={query}
@@ -122,7 +122,7 @@ export function SearchableSelect({
             }}
             aria-expanded={open}
             aria-controls={listId}
-            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600 disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent text-sm text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] disabled:opacity-50"
           />
         </div>
       )}
@@ -131,10 +131,10 @@ export function SearchableSelect({
         <div
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
+          className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-1 shadow-xl"
         >
           {filtered.itens.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-zinc-500">{emptyText}</p>
+            <p className="px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">{emptyText}</p>
           ) : (
             <>
               {filtered.itens.map((o) => {
@@ -148,7 +148,9 @@ export function SearchableSelect({
                     onClick={() => selecionar(o.id)}
                     className={[
                       'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm transition-colors',
-                      ativo ? 'bg-violet-950/60 text-violet-100' : 'text-zinc-200 hover:bg-zinc-800',
+                      ativo
+                        ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                        : 'text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]',
                     ].join(' ')}
                   >
                     <span className="min-w-0">
@@ -157,19 +159,19 @@ export function SearchableSelect({
                         <span
                           className={[
                             'block truncate text-xs',
-                            ativo ? 'text-violet-300' : 'text-zinc-500',
+                            ativo ? 'text-[rgb(var(--color-primary-fg))]' : 'text-[rgb(var(--foreground-muted))]',
                           ].join(' ')}
                         >
                           {o.sublabel}
                         </span>
                       ) : null}
                     </span>
-                    {ativo ? <Check className="h-4 w-4 shrink-0 text-violet-300" /> : null}
+                    {ativo ? <Check className="h-4 w-4 shrink-0 text-[rgb(var(--color-primary-fg))]" /> : null}
                   </button>
                 )
               })}
               {filtered.total > filtered.itens.length && (
-                <p className="px-3 py-1.5 text-xs text-zinc-600">
+                <p className="px-3 py-1.5 text-xs text-[rgb(var(--foreground-muted))]">
                   +{filtered.total - filtered.itens.length} — refine a busca para ver mais
                 </p>
               )}

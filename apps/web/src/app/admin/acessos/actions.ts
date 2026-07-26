@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
+import { notificarSafe } from '@/lib/notificacoes'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
@@ -19,7 +20,11 @@ import {
   PAPEL_DEPARTAMENTO,
 } from '@torcida/types'
 import { auth } from '@/lib/auth'
-import { getActiveTenant, getUserPermissionsInTenant, invalidatePermissionsCache } from '@/lib/tenant'
+import {
+  getActiveTenant,
+  getUserPermissionsInTenant,
+  invalidatePermissionsCache,
+} from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 
 const ALL_PERMISSIONS_SET: readonly string[] = ALL_PERMISSIONS
@@ -106,7 +111,9 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
       where: { tenantId: tenant.id, roleId: viceRole.id, userId: { not: userId } },
     })
     if (outrosVices >= MAX_VICE_PRESIDENTES) {
-      throw new Error(`Limite de ${MAX_VICE_PRESIDENTES} vice-presidentes já atingido nesta torcida.`)
+      throw new Error(
+        `Limite de ${MAX_VICE_PRESIDENTES} vice-presidentes já atingido nesta torcida.`,
+      )
     }
   }
 
@@ -128,7 +135,7 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const cobertoPorPerfis = new Set<string>()
   for (const role of rolesTenant) {
     if (!perfilIds.has(role.id)) continue
-    const depto = role.departamentoId ? deptoById.get(role.departamentoId) ?? null : null
+    const depto = role.departamentoId ? (deptoById.get(role.departamentoId) ?? null) : null
     for (const p of permissionsOfRole(role, depto)) cobertoPorPerfis.add(p)
   }
 
@@ -198,6 +205,17 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
   invalidatePermissionsCache(userId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)
+
+  await notificarSafe({
+    userId,
+    tenantId: tenant.id,
+    tipo: 'ACESSO_ATUALIZADO',
+    titulo: 'Seu acesso foi atualizado',
+    corpo: 'Seus perfis ou permissões nesta torcida mudaram.',
+    link: '/portal',
+    atorId: session.user.id,
+  })
+
   revalidatePath('/admin/acessos')
   revalidatePath('/admin/hierarquia')
   revalidatePath('/portal/departamentos')
@@ -217,7 +235,9 @@ export async function salvarPerfilComposto(formData: FormData) {
   const papelRaw = String(formData.get('papelNoDepartamento') ?? '').trim()
   const extras = applyPermissionCascade(
     [],
-    (formData.getAll('permissionsExtras') as string[]).filter((p) => ALL_PERMISSIONS_SET.includes(p)),
+    (formData.getAll('permissionsExtras') as string[]).filter((p) =>
+      ALL_PERMISSIONS_SET.includes(p),
+    ),
   )
 
   if (nome.length < 2) throw new Error('Nome do perfil é obrigatório')
@@ -324,7 +344,10 @@ async function assertPodeGerirDepartamento(departamentoId: string) {
     return { session, tenant }
   }
 
-  const { rolePermissions, overrides }: {
+  const {
+    rolePermissions,
+    overrides,
+  }: {
     rolePermissions: string[]
     overrides: { permission: string; granted: boolean }[]
   } = await getUserPermissionsInTenant(session.user.id, tenant.id)
@@ -402,6 +425,17 @@ export async function adicionarMembroDepartamento(departamentoId: string, target
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)
+
+  await notificarSafe({
+    userId: targetUserId,
+    tenantId: tenant.id,
+    tipo: 'DEPARTAMENTO_ADICIONADO',
+    titulo: 'Você entrou em um departamento',
+    corpo: `Você foi adicionado a ${departamento.nome}.`,
+    link: '/portal/departamentos',
+    atorId: session.user.id,
+  })
+
   revalidatePath('/admin/acessos')
   revalidatePath('/portal/departamentos', 'layout')
 }
@@ -409,9 +443,9 @@ export async function adicionarMembroDepartamento(departamentoId: string, target
 export async function removerMembroDepartamento(departamentoId: string, targetUserId: string) {
   const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
 
-  const departamento: { id: string } | null = await db.departamento.findFirst({
+  const departamento: { id: string; nome: string } | null = await db.departamento.findFirst({
     where: { id: departamentoId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, nome: true },
   })
   if (!departamento) throw new Error('Departamento não encontrado')
 
@@ -438,6 +472,17 @@ export async function removerMembroDepartamento(departamentoId: string, targetUs
 
   invalidatePermissionsCache(targetUserId, tenant.id)
   invalidarBadgesAutorTenant(tenant.id)
+
+  await notificarSafe({
+    userId: targetUserId,
+    tenantId: tenant.id,
+    tipo: 'DEPARTAMENTO_REMOVIDO',
+    titulo: 'Você saiu de um departamento',
+    corpo: `Você foi removido de ${departamento.nome}.`,
+    link: '/portal/departamentos',
+    atorId: session.user.id,
+  })
+
   revalidatePath('/admin/acessos')
   revalidatePath('/portal/departamentos', 'layout')
 }

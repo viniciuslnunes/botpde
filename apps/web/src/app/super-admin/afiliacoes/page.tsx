@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
+import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
 import { auth } from '@/lib/auth'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import {
   AfiliacoesConsole,
   type SolicitacaoView,
@@ -106,16 +108,15 @@ export default async function AfiliacoesSuperAdminPage() {
   }))
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Afiliações de unidades</h1>
-        <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-          Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui.
-          Ao aprovar, a unidade é criada sob a torcida. Presidente/Vice também decidem no console da
-          torcida.
-        </p>
+    <div className="flex min-h-full flex-col">
+      <AdminPageHeader
+        title="Afiliações de unidades"
+        description="Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui. Ao aprovar, a unidade é criada sob a torcida. Presidente/Vice também decidem no console da torcida."
+        icon={<Handshake className="h-5 w-5" />}
+      />
+      <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
+        <AfiliacoesConsole solicitacoes={solicitacoes} torcidas={torcidas} />
       </div>
-      <AfiliacoesConsole solicitacoes={solicitacoes} torcidas={torcidas} />
     </div>
   )
 }
