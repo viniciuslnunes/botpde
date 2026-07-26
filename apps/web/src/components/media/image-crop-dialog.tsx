@@ -20,6 +20,8 @@ type Props = {
   /** Proporção da janela (padrão 16:9; sede/logo usam 1). */
   aspect?: number
   confirmLabel?: string
+  /** Força o formato de saída; por padrão é detectado automaticamente (transparência real → PNG). */
+  format?: 'image/jpeg' | 'image/png'
   onCancel: () => void
   onConfirm: (file: File) => void | Promise<void>
 }
@@ -32,6 +34,7 @@ export function ImageCropDialog({
   title = 'Ajustar imagem',
   aspect = 16 / 9,
   confirmLabel = 'Usar imagem',
+  format,
   onCancel,
   onConfirm,
 }: Props) {
@@ -127,8 +130,10 @@ export function ImageCropDialog({
         frameW: frameSize.w,
         frameH: frameSize.h,
         viewport,
+        format,
       })
-      const file = new File([blob], 'sede-foto.jpg', { type: 'image/jpeg' })
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg'
+      const file = new File([blob], `sede-foto.${ext}`, { type: blob.type })
       await onConfirm(file)
     } catch {
       // erro notificado pelo caller (toast)

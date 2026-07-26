@@ -1568,9 +1568,13 @@ model SolicitacaoUnidade {
 
   regiao   String?
 
+  cep      String?
+
+  fotoUrl  String? @map("foto_url")
 
 
-  contatoNome     String  @map("contato_nome")
+
+  contatoNome     String? @map("contato_nome")
 
   contatoEmail    String? @map("contato_email")
 

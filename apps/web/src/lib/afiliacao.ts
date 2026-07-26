@@ -24,7 +24,9 @@ export interface SolicitacaoParaMaterializar {
   cidade: string
   estado: string
   endereco: string | null
-  contatoNome: string
+  contatoNome: string | null
+  cep: string | null
+  fotoUrl: string | null
   /** Quem pediu o cadastro (onboarding) — vira responsável/liderança da unidade. */
   solicitadoPorId: string | null
 }
@@ -53,11 +55,12 @@ export async function criarUnidadeDaSolicitacao(
       cidade: solicitacao.cidade,
       estado: solicitacao.estado,
       endereco: solicitacao.endereco,
+      cep: solicitacao.cep,
+      fotoUrl: solicitacao.fotoUrl,
       sedeId: raiz?.id ?? null,
       ativa: true,
-      ...(liderancaUserId
-        ? { responsavelUserId: liderancaUserId, responsavel: solicitacao.contatoNome }
-        : {}),
+      ...(solicitacao.contatoNome ? { responsavel: solicitacao.contatoNome } : {}),
+      ...(liderancaUserId ? { responsavelUserId: liderancaUserId } : {}),
     },
     select: { id: true },
   })
@@ -73,7 +76,7 @@ export async function criarUnidadeDaSolicitacao(
       descricao: 'Canal oficial da unidade',
       institucional: true,
       canalOficial: true,
-      visibilidadeCanal: 'ALIADOS',
+      visibilidadeCanal: 'TENANT',
       somenteAdminPublica: false,
       publica: false,
       criadoPorId: atorId,

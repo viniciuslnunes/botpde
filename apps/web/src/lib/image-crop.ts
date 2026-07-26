@@ -54,8 +54,26 @@ export function clampCropOffset(
   }
 }
 
+/** Amostra a alpha do canvas para decidir se o recorte precisa de PNG (transparência real). */
+function hasTransparency(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  const { data } = ctx.getImageData(0, 0, w, h)
+  // Amostragem em grade (não pixel a pixel) — suficiente pra detectar transparência real
+  // sem custo de varrer todo o buffer em imagens grandes.
+  const stepX = Math.max(1, Math.floor(w / 96))
+  const stepY = Math.max(1, Math.floor(h / 96))
+  for (let y = 0; y < h; y += stepY) {
+    for (let x = 0; x < w; x += stepX) {
+      const idx = (y * w + x) * 4 + 3
+      if (data[idx] < 255) return true
+    }
+  }
+  return false
+}
+
 /**
- * Exporta o recorte atual para um Blob JPEG.
+ * Exporta o recorte atual para um Blob. Por padrão detecta transparência real no
+ * recorte e usa PNG (sem letterbox) quando ela existe — ex.: logo/foto de unidade
+ * com fundo transparente; caso contrário usa JPEG com fundo neutro no letterbox.
  * A viewport espelha o preview: imagem centrada, scale = cover * zoom, + offset.
  */
 export async function exportCroppedImage(opts: {
@@ -65,15 +83,10 @@ export async function exportCroppedImage(opts: {
   viewport: CropViewport
   outputMaxWidth?: number
   quality?: number
+  /** Força o formato; por padrão é detectado automaticamente (transparência → PNG). */
+  format?: 'image/jpeg' | 'image/png'
 }): Promise<Blob> {
-  const {
-    image,
-    frameW,
-    frameH,
-    viewport,
-    outputMaxWidth = 1600,
-    quality = 0.92,
-  } = opts
+  const { image, frameW, frameH, viewport, outputMaxWidth = 1600, quality = 0.92, format } = opts
 
   const imageW = 'naturalWidth' in image ? image.naturalWidth : image.width
   const imageH = 'naturalHeight' in image ? image.naturalHeight : image.height
@@ -102,15 +115,12 @@ export async function exportCroppedImage(opts: {
   const sx = outW / frameW
   const sy = outH / frameH
 
+  // Desenha sem fundo primeiro — letterbox (zoom < 1) fica transparente até decidirmos o formato.
   const canvas = document.createElement('canvas')
   canvas.width = outW
   canvas.height = outH
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas indisponível.')
-
-  // Fundo neutro para letterbox quando zoom < 1 (imagem menor que a janela)
-  ctx.fillStyle = '#0a0a0a'
-  ctx.fillRect(0, 0, outW, outH)
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(
@@ -125,8 +135,27 @@ export async function exportCroppedImage(opts: {
     drawnH * sy,
   )
 
+  const resolvedFormat = format ?? (hasTransparency(ctx, outW, outH) ? 'image/png' : 'image/jpeg')
+
+  if (resolvedFormat === 'image/png') {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) throw new Error('Falha ao gerar a imagem recortada.')
+    return blob
+  }
+
+  // JPEG não tem alpha — compõe sobre um fundo opaco (cobre o letterbox e qualquer
+  // transparência residual) antes de exportar.
+  const opaque = document.createElement('canvas')
+  opaque.width = outW
+  opaque.height = outH
+  const octx = opaque.getContext('2d')
+  if (!octx) throw new Error('Canvas indisponível.')
+  octx.fillStyle = '#0a0a0a'
+  octx.fillRect(0, 0, outW, outH)
+  octx.drawImage(canvas, 0, 0)
+
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', quality),
+    opaque.toBlob(resolve, 'image/jpeg', quality),
   )
   if (!blob) throw new Error('Falha ao gerar a imagem recortada.')
   return blob

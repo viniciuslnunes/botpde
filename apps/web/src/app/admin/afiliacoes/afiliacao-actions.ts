@@ -26,6 +26,7 @@ import { criarUnidadeDaSolicitacao } from '@/lib/afiliacao'
 export type SolicitacaoActionState = {
   success?: boolean
   message?: string
+  values?: Record<string, string>
 }
 
 interface AtorResolvido {
@@ -71,7 +72,9 @@ interface SolicitacaoLite {
   cidade: string
   estado: string
   endereco: string | null
-  contatoNome: string
+  contatoNome: string | null
+  cep: string | null
+  fotoUrl: string | null
   solicitadoPorId: string | null
 }
 
@@ -88,6 +91,8 @@ async function carregarSolicitacao(id: string): Promise<SolicitacaoLite> {
       estado: true,
       endereco: true,
       contatoNome: true,
+      cep: true,
+      fotoUrl: true,
       solicitadoPorId: true,
     },
   })
@@ -158,6 +163,8 @@ export async function aprovarSolicitacao(
           estado: solicitacao.estado,
           endereco: solicitacao.endereco,
           contatoNome: solicitacao.contatoNome,
+          cep: solicitacao.cep,
+          fotoUrl: solicitacao.fotoUrl,
           solicitadoPorId: solicitacao.solicitadoPorId,
         },
         ator.userId,
@@ -323,7 +330,24 @@ const criarManualSchema = z.object({
     .max(160)
     .optional()
     .transform((v) => (v && v.trim() ? v.trim() : null)),
-  contatoNome: z.string().trim().min(3, 'Informe o contato').max(100),
+  contatoNome: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : null)),
+  cep: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const digitos = (v ?? '').replace(/\D/g, '')
+      return digitos.length === 8 ? digitos : null
+    }),
+  fotoUrl: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : null)),
 })
 
 export async function criarSolicitacaoManual(
@@ -343,8 +367,15 @@ export async function criarSolicitacaoManual(
     estado: String(formData.get('estado') ?? ''),
     endereco: String(formData.get('endereco') ?? ''),
     contatoNome: String(formData.get('contatoNome') ?? ''),
+    cep: String(formData.get('cep') ?? ''),
+    fotoUrl: String(formData.get('fotoUrl') ?? ''),
   })
-  if (!parsed.success) return { message: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
+  if (!parsed.success) {
+    return {
+      message: parsed.error.issues[0]?.message ?? 'Dados inválidos',
+      values: Object.fromEntries(formData.entries()) as Record<string, string>,
+    }
+  }
 
   try {
     const tenant: { id: string; nome: string } | null = await db.tenant.findFirst({
@@ -362,7 +393,11 @@ export async function criarSolicitacaoManual(
         estado: parsed.data.estado,
         endereco: parsed.data.endereco,
         contatoNome: parsed.data.contatoNome,
-        solicitadoPorId: session.user.id,
+        cep: parsed.data.cep,
+        fotoUrl: parsed.data.fotoUrl,
+        // Quem faz o intake manual (super-admin) NÃO é a liderança local —
+        // deixar null evita que ele vire responsável/ADMIN do canal ao aprovar.
+        solicitadoPorId: null,
       },
       select: { id: true },
     })

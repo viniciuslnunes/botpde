@@ -119,8 +119,10 @@ async function compress(file: File, purpose: UploadPurpose): Promise<Blob> {
     const canvas = scaleToCanvas(bitmap, bitmap.width, bitmap.height, destW, destH)
     bitmap.close()
     if (!canvas) return file
+    // PNG preserva transparência (ex.: foto de unidade/logo com fundo transparente).
+    const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
     const blob = await new Promise<Blob | null>((res) =>
-      canvas.toBlob(res, 'image/jpeg', quality),
+      canvas.toBlob(res, outputType, outputType === 'image/jpeg' ? quality : undefined),
     )
     return blob ?? file
   } catch {

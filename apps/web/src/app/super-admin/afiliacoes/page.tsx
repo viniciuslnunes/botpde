@@ -21,7 +21,8 @@ interface SolicitacaoRow {
   cidade: string
   estado: string
   endereco: string | null
-  contatoNome: string
+  contatoNome: string | null
+  fotoUrl: string | null
   contatoEmail: string | null
   contatoTelefone: string | null
   vinculo: string | null
@@ -60,6 +61,8 @@ export default async function AfiliacoesSuperAdminPage() {
         estado: true,
         endereco: true,
         contatoNome: true,
+        cep: true,
+        fotoUrl: true,
         contatoEmail: true,
         contatoTelefone: true,
         vinculo: true,
@@ -89,6 +92,7 @@ export default async function AfiliacoesSuperAdminPage() {
     estado: s.estado,
     endereco: s.endereco,
     contatoNome: s.contatoNome,
+    fotoUrl: s.fotoUrl,
     contatoEmail: s.contatoEmail,
     contatoTelefone: s.contatoTelefone,
     vinculo: s.vinculo,

@@ -1,7 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
-import { Check, Handshake, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
+import { useActionState, useEffect, useState } from 'react'
+import { Check, Handshake, ImagePlus, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
 import {
   aprovarSolicitacao,
@@ -10,6 +10,8 @@ import {
   recusarSolicitacao,
   type SolicitacaoActionState,
 } from '@/app/admin/afiliacoes/afiliacao-actions'
+import { buscarEnderecoPorCep } from '@/lib/viacep'
+import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 
@@ -22,7 +24,8 @@ export interface SolicitacaoView {
   cidade: string
   estado: string
   endereco: string | null
-  contatoNome: string
+  contatoNome: string | null
+  fotoUrl: string | null
   contatoEmail: string | null
   contatoTelefone: string | null
   vinculo: string | null
@@ -71,6 +74,15 @@ function Feedback({ state }: { state: SolicitacaoActionState }) {
   )
 }
 
+const CAMPOS_MANUAL_INICIAIS = {
+  nome: '',
+  cidade: '',
+  estado: '',
+  endereco: '',
+  contatoNome: '',
+  cep: '',
+}
+
 function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
   const [state, action, pending] = useActionState<SolicitacaoActionState, FormData>(
     criarSolicitacaoManual,
@@ -78,12 +90,65 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
   )
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [aberto, setAberto] = useState(false)
+  const [campos, setCampos] = useState(CAMPOS_MANUAL_INICIAIS)
+  const [buscandoCep, setBuscandoCep] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [erroFoto, setErroFoto] = useState<string | null>(null)
 
   const torcidaOptions: ComboOption[] = torcidas.map((t) => ({
     id: t.id,
     label: t.nome,
     sublabel: t.clubeNome ?? undefined,
   }))
+
+  // Só reseta o form no sucesso — em erro de validação os campos controlados
+  // devem permanecer (React 19 requestFormReset limparia inputs uncontrolled).
+  useEffect(() => {
+    if (state.success) {
+      setCampos(CAMPOS_MANUAL_INICIAIS)
+      setTenantId(null)
+      setFotoUrl('')
+      setErroFoto(null)
+    }
+  }, [state.success])
+
+  function setCampo(name: keyof typeof CAMPOS_MANUAL_INICIAIS, value: string) {
+    setCampos((prev) => ({ ...prev, [name]: value }))
+  }
+
+  async function onCepChange(value: string) {
+    setCampo('cep', value)
+    const digitos = value.replace(/\D/g, '')
+    if (digitos.length !== 8) return
+    setBuscandoCep(true)
+    try {
+      const endereco = await buscarEnderecoPorCep(value)
+      if (!endereco) return
+      setCampos((prev) => ({
+        ...prev,
+        cidade: endereco.localidade || prev.cidade,
+        estado: endereco.uf || prev.estado,
+        endereco: prev.endereco.trim() ? prev.endereco : endereco.logradouro,
+      }))
+    } finally {
+      setBuscandoCep(false)
+    }
+  }
+
+  async function onFotoChange(file: File | undefined) {
+    if (!file) return
+    setUploading(true)
+    setErroFoto(null)
+    try {
+      const url = await uploadMediaToCloudinary(file, undefined, 'sede')
+      setFotoUrl(url)
+    } catch (err) {
+      setErroFoto(err instanceof Error ? err.message : 'Falha ao subir a foto.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   if (!aberto) {
     return (
@@ -117,6 +182,7 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
       </div>
 
       <input type="hidden" name="tenantId" value={tenantId ?? ''} />
+      <input type="hidden" name="fotoUrl" value={fotoUrl} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
@@ -129,7 +195,40 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
             placeholder="Buscar torcida por nome…"
           />
         </div>
-        <Campo name="nome" label="Nome da unidade" placeholder="Ex.: Gaviões Praia Grande" />
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            Foto da unidade (opcional)
+          </label>
+          <div className="flex items-center gap-2">
+            {fotoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={fotoUrl} alt="" className="h-12 w-12 rounded object-cover" />
+            ) : null}
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]">
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ImagePlus className="h-3.5 w-3.5" />
+              )}
+              {fotoUrl ? 'Trocar foto' : 'Enviar foto'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void onFotoChange(e.target.files?.[0])}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+          {erroFoto && <p className="text-xs text-red-400">{erroFoto}</p>}
+        </div>
+        <Campo
+          name="nome"
+          label="Nome da unidade"
+          placeholder="Ex.: Gaviões Praia Grande"
+          value={campos.nome}
+          onChange={(v) => setCampo('nome', v)}
+        />
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Tipo</label>
           <select name="tipo" defaultValue="PONTO_ENCONTRO" className={INPUT_CLASS}>
@@ -137,16 +236,56 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
             <option value="SUBSEDE">Subsede</option>
           </select>
         </div>
-        <Campo name="cidade" label="Cidade" placeholder="Cidade" />
-        <Campo name="estado" label="UF" placeholder="SP" maxLength={2} />
-        <Campo name="endereco" label="Endereço (opcional)" placeholder="Rua, nº, bairro" wide />
-        <Campo name="contatoNome" label="Contato (liderança)" placeholder="Nome do responsável" wide />
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+            CEP (opcional) {buscandoCep ? '· buscando…' : ''}
+          </label>
+          <input
+            name="cep"
+            value={campos.cep}
+            onChange={(e) => void onCepChange(e.target.value)}
+            placeholder="00000-000"
+            maxLength={9}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <Campo
+          name="cidade"
+          label="Cidade"
+          placeholder="Cidade"
+          value={campos.cidade}
+          onChange={(v) => setCampo('cidade', v)}
+        />
+        <Campo
+          name="estado"
+          label="UF"
+          placeholder="SP"
+          maxLength={2}
+          value={campos.estado}
+          onChange={(v) => setCampo('estado', v)}
+        />
+        <Campo
+          name="endereco"
+          label="Endereço (opcional)"
+          placeholder="Rua, nº, bairro"
+          value={campos.endereco}
+          onChange={(v) => setCampo('endereco', v)}
+          wide
+        />
+        <Campo
+          name="contatoNome"
+          label="Contato (liderança) — opcional, pode preencher depois"
+          placeholder="Nome do responsável (opcional)"
+          value={campos.contatoNome}
+          onChange={(v) => setCampo('contatoNome', v)}
+          wide
+        />
       </div>
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || !tenantId}
+          disabled={pending || uploading || !tenantId}
           className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-40"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -164,17 +303,28 @@ function Campo({
   placeholder,
   maxLength,
   wide,
+  value,
+  onChange,
 }: {
   name: string
   label: string
   placeholder: string
   maxLength?: number
   wide?: boolean
+  value: string
+  onChange: (value: string) => void
 }) {
   return (
     <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">{label}</label>
-      <input name={name} placeholder={placeholder} maxLength={maxLength} className={INPUT_CLASS} />
+      <input
+        name={name}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={INPUT_CLASS}
+      />
     </div>
   )
 }
@@ -271,45 +421,51 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
   return (
     <li className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
-            {s.nome}
-            <span className="ml-1.5 rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--foreground-muted))]">
-              {TIPO_LABEL[s.tipo]}
-            </span>
-          </p>
-          <p className="badge-primary mt-1.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
-            → {s.torcidaNome}
-          </p>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-[rgb(var(--foreground-muted))]">
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {s.cidade}/{s.estado}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Phone className="h-3 w-3" />
-              {s.contatoNome}
-              {s.contatoTelefone ? ` · ${s.contatoTelefone}` : ''}
-              {s.contatoEmail ? ` · ${s.contatoEmail}` : ''}
-            </span>
-          </p>
-          {s.vinculo && <ClampComTexto label="Credenciamento" texto={s.vinculo} />}
-          {s.provasUrls.length > 0 && (
-            <p className="mt-1 flex flex-wrap gap-2 text-xs">
-              {s.provasUrls.map((url, i) => (
-                <a
-                  key={url}
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[rgb(var(--color-primary-fg))] hover:underline"
-                >
-                  prova {i + 1}
-                </a>
-              ))}
+        <div className="flex min-w-0 items-start gap-2">
+          {s.fotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={s.fotoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
+          ) : null}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+              {s.nome}
+              <span className="ml-1.5 rounded bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--foreground-muted))]">
+                {TIPO_LABEL[s.tipo]}
+              </span>
             </p>
-          )}
-          {s.motivo && <ClampComTexto label="Motivo" texto={s.motivo} />}
+            <p className="badge-primary mt-1.5 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+              → {s.torcidaNome}
+            </p>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-[rgb(var(--foreground-muted))]">
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {s.cidade}/{s.estado}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {s.contatoNome ?? 'Sem liderança definida'}
+                {s.contatoTelefone ? ` · ${s.contatoTelefone}` : ''}
+                {s.contatoEmail ? ` · ${s.contatoEmail}` : ''}
+              </span>
+            </p>
+            {s.vinculo && <ClampComTexto label="Credenciamento" texto={s.vinculo} />}
+            {s.provasUrls.length > 0 && (
+              <p className="mt-1 flex flex-wrap gap-2 text-xs">
+                {s.provasUrls.map((url, i) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[rgb(var(--color-primary-fg))] hover:underline"
+                  >
+                    prova {i + 1}
+                  </a>
+                ))}
+              </p>
+            )}
+            {s.motivo && <ClampComTexto label="Motivo" texto={s.motivo} />}
+          </div>
         </div>
         <Badge variant={STATUS_VARIANT[s.status]} className="shrink-0">
           {s.status}
