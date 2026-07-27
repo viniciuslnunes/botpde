@@ -203,7 +203,7 @@ export default async function EditarSedePage({
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={sede.tipo === 'PONTO_ENCONTRO' ? 'success' : 'info'}>
+            <Badge variant="info">
               {labelTipoUnidade(sede.tipo)}
             </Badge>
             <Badge variant={sede.ativa ? 'success' : 'neutral'}>

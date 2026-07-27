@@ -19,9 +19,11 @@ import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
+  encontrarConflitoNumeroAssociado,
+  lockNumeroAssociadoDaTorcida,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
-import { isExpectedError } from '@/lib/expected-error'
+import { ExpectedError, isExpectedError } from '@/lib/expected-error'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
@@ -916,63 +918,90 @@ export async function solicitarVinculo(
     // Nacional do clube. Só SOCIO passa pela fila de aprovação do admin.
     const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
-    const existing = await db.saasMembro.findUnique({
+    const existing: { id: string; status: string } | null = await db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
       select: { id: true, status: true },
     })
 
-    if (existing) {
-      if (existing.status === 'APROVADO') {
-        return { message: 'Você já é membro aprovado desta torcida.' }
-      }
-      if (existing.status === 'PENDENTE') {
-        await db.saasMembro.update({
-          where: { id: existing.id },
-          data: {
-            ...dadosMembro,
-            status: statusInicial,
-          },
-        })
-      } else {
-        // REPROVADO — permite nova tentativa (atualiza o registro).
-        await db.saasMembro.update({
-          where: { id: existing.id },
-          data: {
-            ...dadosMembro,
-            status: statusInicial,
-            aprovadoPorId: null,
-            aprovadoPorNome: null,
-            aprovadoEm: null,
-          },
-        })
-        await db.auditLog.create({
-          data: {
-            tenantId: tenantDestino.id,
-            atorId: userId,
-            acao: 'RECADASTRO_SOLICITADO',
-            entidade: 'SaasMembro',
-            entidadeId: existing.id,
-          },
-        })
-      }
-    } else {
-      const novo = await db.saasMembro.create({
-        data: {
-          tenantId: tenantDestino.id,
-          userId,
-          ...dadosMembro,
-          status: statusInicial,
-        },
+    if (existing?.status === 'APROVADO') {
+      return { message: 'Você já é membro aprovado desta torcida.' }
+    }
+
+    // Sócio: lock + unicidade de nº na mesma transaction do create/update —
+    // impede race e garante que o número nunca entre duplicado na lineage.
+    try {
+      await db.$transaction(async (tx: Prisma.TransactionClient) => {
+        if (data.tipo === 'SOCIO' && data.numeroAssociado) {
+          await lockNumeroAssociadoDaTorcida(tx, tenantDestino.id)
+          const conflitoNumero = await encontrarConflitoNumeroAssociado(tx, {
+            tenantOrigemId: tenantDestino.id,
+            userId,
+            numeroAssociado: data.numeroAssociado,
+          })
+          if (conflitoNumero) {
+            throw new ExpectedError(
+              `Número de associado ${data.numeroAssociado} já está em uso nesta torcida.`,
+            )
+          }
+        }
+
+        if (existing) {
+          if (existing.status === 'PENDENTE') {
+            await tx.saasMembro.update({
+              where: { id: existing.id },
+              data: {
+                ...dadosMembro,
+                status: statusInicial,
+              },
+            })
+          } else {
+            // REPROVADO — permite nova tentativa (atualiza o registro).
+            await tx.saasMembro.update({
+              where: { id: existing.id },
+              data: {
+                ...dadosMembro,
+                status: statusInicial,
+                aprovadoPorId: null,
+                aprovadoPorNome: null,
+                aprovadoEm: null,
+              },
+            })
+            await tx.auditLog.create({
+              data: {
+                tenantId: tenantDestino.id,
+                atorId: userId,
+                acao: 'RECADASTRO_SOLICITADO',
+                entidade: 'SaasMembro',
+                entidadeId: existing.id,
+              },
+            })
+          }
+        } else {
+          const novo: { id: string } = await tx.saasMembro.create({
+            data: {
+              tenantId: tenantDestino.id,
+              userId,
+              ...dadosMembro,
+              status: statusInicial,
+            },
+            select: { id: true },
+          })
+          await tx.auditLog.create({
+            data: {
+              tenantId: tenantDestino.id,
+              atorId: userId,
+              acao: 'CADASTRO_SOLICITADO',
+              entidade: 'SaasMembro',
+              entidadeId: novo.id,
+            },
+          })
+        }
       })
-      await db.auditLog.create({
-        data: {
-          tenantId: tenantDestino.id,
-          atorId: userId,
-          acao: 'CADASTRO_SOLICITADO',
-          entidade: 'SaasMembro',
-          entidadeId: novo.id,
-        },
-      })
+    } catch (err) {
+      if (isExpectedError(err)) {
+        return { errors: { numeroAssociado: [err.message] } }
+      }
+      throw err
     }
 
     // Conclui o onboarding (garante que o perfil exista) ANTES do fan-out /

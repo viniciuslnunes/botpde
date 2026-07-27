@@ -297,9 +297,47 @@ export async function lockNumeroAssociadoDaTorcida(
 }
 
 /**
- * Garante unicidade de numeroAssociado entre sócios APROVADOS ativos em toda
- * a torcida (lineage). Não identifica o dono do conflito.
+ * Unicidade de `numeroAssociado` na torcida (lineage: Sede + afiliadas).
+ * Qualquer vínculo ativo de outro user (PENDENTE / APROVADO / REPROVADO, não
+ * desligado) conta — onboarding e aprovação usam a mesma regra para o número
+ * nunca ser registrado em duplicata.
+ *
+ * Espelhos (`espelhado`) são ignorados: o canônico é a origem (mesmo userId).
+ * Não identifica o dono do conflito (LGPD / UX).
  */
+type DbOrTxNumero = {
+  saasMembro: {
+    findFirst: Prisma.TransactionClient['saasMembro']['findFirst']
+  }
+}
+
+export async function encontrarConflitoNumeroAssociado(
+  client: DbOrTxNumero,
+  opts: {
+    tenantOrigemId: string
+    userId: string
+    numeroAssociado: string
+    excludeMembroId?: string
+  },
+): Promise<{ id: string } | null> {
+  const numero = opts.numeroAssociado.trim()
+  if (!numero) return null
+
+  const lineage: string[] = await getTorcidaLineageTenantIds(opts.tenantOrigemId)
+  const conflito: { id: string } | null = await client.saasMembro.findFirst({
+    where: {
+      tenantId: { in: lineage },
+      numeroAssociado: numero,
+      espelhado: false,
+      desligadoEm: null,
+      userId: { not: opts.userId },
+      ...(opts.excludeMembroId ? { id: { not: opts.excludeMembroId } } : {}),
+    },
+    select: { id: true },
+  })
+  return conflito
+}
+
 export async function validarNumeroAssociadoUnicoNaTorcida(
   tx: Prisma.TransactionClient,
   tenantOrigemId: string,
@@ -307,20 +345,16 @@ export async function validarNumeroAssociadoUnicoNaTorcida(
   numeroAssociado: string,
   excludeMembroId?: string,
 ): Promise<void> {
-  const lineage: string[] = await getTorcidaLineageTenantIds(tenantOrigemId)
-  const conflito: { id: string } | null = await tx.saasMembro.findFirst({
-    where: {
-      tenantId: { in: lineage },
-      numeroAssociado,
-      status: 'APROVADO',
-      desligadoEm: null,
-      userId: { not: userId },
-      ...(excludeMembroId ? { id: { not: excludeMembroId } } : {}),
-    },
-    select: { id: true },
+  const conflito = await encontrarConflitoNumeroAssociado(tx, {
+    tenantOrigemId,
+    userId,
+    numeroAssociado,
+    excludeMembroId,
   })
   if (conflito) {
-    throw new ExpectedError('Número de associado já está em uso nesta torcida.')
+    throw new ExpectedError(
+      `Número de associado ${numeroAssociado.trim()} já está em uso nesta torcida.`,
+    )
   }
 }
 

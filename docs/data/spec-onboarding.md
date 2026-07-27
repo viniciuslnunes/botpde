@@ -209,6 +209,12 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   `SaasMembro.departamentoId` **sem** membership até aprovação da diretoria.
   Ver `docs/data/modulo-departamentos.md` § preferência ≠ membership.
   Copy do wizard: “Informativo para a diretoria — só entra na equipe após aprovação.”
+  **Nº de associado:** único na lineage da torcida (Sede + afiliadas). O onboarding
+  rejeita no submit (campo `numeroAssociado`) se outro user já tiver o mesmo nº em
+  vínculo ativo (`desligadoEm` null, registro canônico — não espelho), com
+  `pg_advisory_xact_lock` + create/update na mesma transaction. A aprovação
+  revalida a mesma regra (`encontrarConflitoNumeroAssociado` /
+  `validarNumeroAssociadoUnicoNaTorcida`).
   **Foto-prova / provas de unidade:** crop 4:3 via `useCroppedImageUpload`
   (`purpose: cadastro`) antes do upload — ver `docs/frontend/media-upload-crop.md`.
 - Tela de pendência reaproveita `apps/web/src/app/portal/cadastro/page.tsx`.

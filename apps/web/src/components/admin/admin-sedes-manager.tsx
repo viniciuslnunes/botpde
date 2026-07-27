@@ -97,7 +97,9 @@ const TIPO_LABEL: Record<AdminSedeListItem['tipo'], string> = {
 const TIPO_CLASS: Record<AdminSedeListItem['tipo'], string> = {
   SEDE: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
   SUBSEDE: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  PONTO_ENCONTRO: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  // Evita “verde de dashboard” fora do contexto de identidade (ex.: Gaviões/Corinthians).
+  // Mantém o tipo visível, mas sem emerald/emerald.
+  PONTO_ENCONTRO: 'bg-[rgb(var(--color-primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]',
 }
 
 type SedeLocalNode = AdminSedeListItem & { kind: 'local'; filhos: TreeNode[] }

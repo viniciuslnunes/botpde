@@ -15,6 +15,6 @@ export class ExpectedError extends Error {
 }
 
 /** True para erros esperados (inclusive quando só o `name` sobrevive à serialização). */
-export function isExpectedError(err: unknown): boolean {
+export function isExpectedError(err: unknown): err is ExpectedError {
   return err instanceof Error && err.name === 'ExpectedError'
 }

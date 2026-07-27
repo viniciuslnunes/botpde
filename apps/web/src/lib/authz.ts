@@ -105,6 +105,19 @@ export async function assertAnyPermission(permissions: string[]): Promise<AuthzR
 }
 
 /**
+ * Tenant da administração central (Sede principal): possui registro `Sede` com
+ * `tipo: 'SEDE'`. Subsedes e PDEs promovidos a portal próprio não passam —
+ * alinhado a `assertPresidenteGlobal` e ao gate de `/admin/afiliacoes`.
+ */
+export async function tenantIsAdministracaoSede(tenantId: string): Promise<boolean> {
+  const sede: { id: string } | null = await db.sede.findFirst({
+    where: { tenantId, tipo: 'SEDE' },
+    select: { id: true },
+  })
+  return sede !== null
+}
+
+/**
  * Gerenciar alianças (propor/aceitar/rejeitar/cancelar/encerrar): exige
  * ALLIANCES_MANAGE E que o tenant atual seja a Sede raiz — Subsede/PDE
  * apenas herdam a visualização das alianças da sede (leitura em
@@ -138,8 +151,7 @@ export async function assertAffiliationManage(): Promise<AuthzResult> {
     return ctx
   }
 
-  const ancestrais = await getAncestorTenantIds(ctx.tenant.id)
-  if (ancestrais.length > 0) {
+  if (!(await tenantIsAdministracaoSede(ctx.tenant.id))) {
     throw new Error('Somente a administração da sede pode validar solicitações de afiliação.')
   }
 
@@ -169,13 +181,7 @@ export async function assertPresidenteGlobal(): Promise<AuthzResult> {
 
   if (!hasPermission(effective, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) throw new Error('Sem permissão')
 
-  // Busca explícita por tipo SEDE — findFirst sem filtro pode pegar PDE
-  // co-tenant se a ordem do banco favorecer uma unidade territorial.
-  const sede: { id: string } | null = await db.sede.findFirst({
-    where: { tenantId: tenant.id, tipo: 'SEDE' },
-    select: { id: true },
-  })
-  if (!sede) throw new Error('Sem permissão')
+  if (!(await tenantIsAdministracaoSede(tenant.id))) throw new Error('Sem permissão')
 
   return { session, tenant }
 }

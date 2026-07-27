@@ -390,7 +390,10 @@ export function OnboardingWizard({
       </header>
 
       {erro && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+        >
           {erro}
         </div>
       )}
@@ -2028,6 +2031,18 @@ function PassoVinculo({
     termoAceito,
   ])
 
+  function aplicarErrosERevelar(
+    erros: Record<string, string[]>,
+    mensagem = 'Confira os campos destacados.',
+  ) {
+    setErrosCampo(erros)
+    onErro(mensagem)
+    // Espera o paint com ring/role=alert antes de rolar/focar.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => revelarPrimeiroErroCampos(erros))
+    })
+  }
+
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
     setErrosCampo({})
@@ -2037,59 +2052,56 @@ function PassoVinculo({
     }
     // Só o vínculo de sócio exige comprovação e os dados de associado — torcedor entra direto.
     if (tipo === 'SOCIO') {
+      const errosLocais: Record<string, string[]> = {}
       if (!imagemProva) {
-        onErro('Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.')
-        return
+        errosLocais.imagemProva = [
+          'Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.',
+        ]
       }
       if (!numeroAssociado) {
-        onErro('Informe seu número de associado.')
-        return
+        errosLocais.numeroAssociado = ['Informe seu número de associado.']
       }
       if (!anosSocio) {
-        onErro('Informe há quantos anos é sócio da torcida.')
-        return
+        errosLocais.anosSocio = ['Informe há quantos anos é sócio da torcida.']
       }
       if (!cep) {
-        onErro('Informe seu CEP.')
-        return
+        errosLocais.cep = ['Informe seu CEP.']
       }
-      if (!logradouro || !bairro || !ufEndereco || !cidadeEndereco) {
-        onErro('Complete seu endereço (logradouro, cidade, bairro e estado).')
-        return
-      }
-      if (!rg || !cpf) {
-        onErro('Informe seu RG e CPF.')
-        return
-      }
-      if (!validarRg(rg)) {
-        setErrosCampo((prev) => ({ ...prev, rg: ['RG inválido'] }))
-        onErro('Confira os campos destacados.')
-        return
-      }
-      const cpfNorm = normalizarCpf(cpf)
-      if (!cpfNorm || !validarCpfDigitos(cpfNorm)) {
-        setErrosCampo((prev) => ({ ...prev, cpf: ['CPF inválido'] }))
-        onErro('Confira os campos destacados.')
-        return
+      if (!logradouro) errosLocais.logradouro = ['Informe o logradouro.']
+      if (!bairro) errosLocais.bairro = ['Informe o bairro.']
+      if (!ufEndereco) errosLocais.uf = ['Informe o estado (UF).']
+      if (!cidadeEndereco) errosLocais.cidade = ['Informe a cidade.']
+      if (!rg) errosLocais.rg = ['Informe seu RG.']
+      else if (!validarRg(rg)) errosLocais.rg = ['RG inválido']
+      if (!cpf) errosLocais.cpf = ['Informe seu CPF.']
+      else {
+        const cpfNorm = normalizarCpf(cpf)
+        if (!cpfNorm || !validarCpfDigitos(cpfNorm)) errosLocais.cpf = ['CPF inválido']
       }
       if (!dataNascimento) {
-        onErro('Informe sua data de nascimento.')
-        return
+        errosLocais.dataNascimento = ['Informe sua data de nascimento.']
       }
       if (documentosObrigatorios && !fotoDocumentoUrl) {
-        onErro('Envie a foto do RG.')
-        return
+        errosLocais.fotoDocumentoUrl = ['Envie a foto do RG.']
       }
       if (documentosObrigatorios && !comprovanteResidenciaUrl) {
-        onErro('Envie o comprovante de residência.')
-        return
+        errosLocais.comprovanteResidenciaUrl = ['Envie o comprovante de residência.']
       }
-      if (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) {
-        onErro('Informe o nome e o documento do responsável legal.')
-        return
+      if (ehMenorDeIdade) {
+        if (!responsavelNome) {
+          errosLocais.responsavelNome = ['Informe o nome do responsável legal.']
+        }
+        if (!responsavelDocumento) {
+          errosLocais.responsavelDocumento = ['Informe o documento do responsável.']
+        }
       }
       if (!termoAceito) {
-        onErro('É necessário aceitar o termo de responsabilidade.')
+        errosLocais.termoResponsabilidadeAceito = [
+          'É necessário aceitar o termo de responsabilidade.',
+        ]
+      }
+      if (Object.keys(errosLocais).length > 0) {
+        aplicarErrosERevelar(errosLocais)
         return
       }
     }
@@ -2137,8 +2149,7 @@ function PassoVinculo({
           return
         }
         if (res?.errors) {
-          setErrosCampo(res.errors)
-          onErro('Confira os campos destacados.')
+          aplicarErrosERevelar(res.errors)
         } else if (res?.message) {
           onErro(res.message)
         }
@@ -2326,19 +2337,24 @@ function PassoVinculo({
 
         {/* ─── Identificação ────────────────────────────────────────────── */}
         <SecaoFormulario titulo="Identificação">
-          <Campo label="Nome completo" obrigatorio erros={errosCampo.nome}>
+          <Campo name="nome" label="Nome completo" obrigatorio erros={errosCampo.nome}>
             <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
           </Campo>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Campo label="Data de nascimento" obrigatorio erros={errosCampo.dataNascimento}>
+            <Campo
+              name="dataNascimento"
+              label="Data de nascimento"
+              obrigatorio
+              erros={errosCampo.dataNascimento}
+            >
               <Input
                 type="date"
                 value={dataNascimento}
                 onChange={(e) => setDataNascimento(e.target.value)}
               />
             </Campo>
-            <Campo label="Telefone / WhatsApp" erros={errosCampo.telefone}>
+            <Campo name="telefone" label="Telefone / WhatsApp" erros={errosCampo.telefone}>
               <Input
                 type="tel"
                 maxLength={16}
@@ -2350,7 +2366,7 @@ function PassoVinculo({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Campo label="Sexo" erros={errosCampo.sexo}>
+            <Campo name="sexo" label="Sexo" erros={errosCampo.sexo}>
               <Select value={sexo} onChange={(e) => setSexo(e.target.value)}>
                 <option value="">Selecione (opcional)</option>
                 <option value="Masculino">Masculino</option>
@@ -2358,7 +2374,7 @@ function PassoVinculo({
                 <option value="Prefiro não informar">Prefiro não informar</option>
               </Select>
             </Campo>
-            <Campo label="Estado civil" erros={errosCampo.estadoCivil}>
+            <Campo name="estadoCivil" label="Estado civil" erros={errosCampo.estadoCivil}>
               <Select value={estadoCivil} onChange={(e) => setEstadoCivil(e.target.value)}>
                 <option value="">Selecione (opcional)</option>
                 <option value="Solteiro(a)">Solteiro(a)</option>
@@ -2370,7 +2386,7 @@ function PassoVinculo({
             </Campo>
           </div>
 
-          <Campo label="Nacionalidade" erros={errosCampo.nacionalidade}>
+          <Campo name="nacionalidade" label="Nacionalidade" erros={errosCampo.nacionalidade}>
             <Input
               value={nacionalidade}
               onChange={(e) => setNacionalidade(e.target.value)}
@@ -2379,7 +2395,7 @@ function PassoVinculo({
           </Campo>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Campo label="RG" obrigatorio erros={errosCampo.rg}>
+            <Campo name="rg" label="RG" obrigatorio erros={errosCampo.rg}>
               <Input
                 inputMode="text"
                 autoComplete="off"
@@ -2405,7 +2421,7 @@ function PassoVinculo({
                 placeholder="00.000.000-0"
               />
             </Campo>
-            <Campo label="CPF" obrigatorio erros={errosCampo.cpf}>
+            <Campo name="cpf" label="CPF" obrigatorio erros={errosCampo.cpf}>
               <Input
                 inputMode="numeric"
                 maxLength={14}
@@ -2434,15 +2450,15 @@ function PassoVinculo({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Campo label="Nome do pai" erros={errosCampo.nomePai}>
+            <Campo name="nomePai" label="Nome do pai" erros={errosCampo.nomePai}>
               <Input value={nomePai} onChange={(e) => setNomePai(e.target.value)} placeholder="Opcional" />
             </Campo>
-            <Campo label="Nome da mãe" erros={errosCampo.nomeMae}>
+            <Campo name="nomeMae" label="Nome da mãe" erros={errosCampo.nomeMae}>
               <Input value={nomeMae} onChange={(e) => setNomeMae(e.target.value)} placeholder="Opcional" />
             </Campo>
           </div>
 
-          <Campo label="Profissão" erros={errosCampo.profissao}>
+          <Campo name="profissao" label="Profissão" erros={errosCampo.profissao}>
             <Input
               value={profissao}
               onChange={(e) => setProfissao(e.target.value)}
@@ -2460,7 +2476,12 @@ function PassoVinculo({
             </p>
           )}
 
-          <Campo label="CEP" obrigatorio erros={erroCepLocal ? [erroCepLocal] : errosCampo.cep}>
+          <Campo
+            name="cep"
+            label="CEP"
+            obrigatorio
+            erros={erroCepLocal ? [erroCepLocal] : errosCampo.cep}
+          >
             <div className="flex gap-2">
               <Input
                 inputMode="numeric"
@@ -2504,7 +2525,7 @@ function PassoVinculo({
             )}
           </Campo>
 
-          <Campo label="Logradouro" obrigatorio erros={errosCampo.logradouro}>
+          <Campo name="logradouro" label="Logradouro" obrigatorio erros={errosCampo.logradouro}>
             <Input
               value={logradouro}
               onChange={(e) => setLogradouro(e.target.value)}
@@ -2513,13 +2534,13 @@ function PassoVinculo({
           </Campo>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Campo label="Número" erros={errosCampo.numero}>
+            <Campo name="numero" label="Número" erros={errosCampo.numero}>
               <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ex: 120" />
             </Campo>
-            <Campo label="Bloco" erros={errosCampo.bloco}>
+            <Campo name="bloco" label="Bloco" erros={errosCampo.bloco}>
               <Input value={bloco} onChange={(e) => setBloco(e.target.value)} placeholder="Opcional" />
             </Campo>
-            <Campo label="Complemento" erros={errosCampo.complemento}>
+            <Campo name="complemento" label="Complemento" erros={errosCampo.complemento}>
               <Input
                 value={complemento}
                 onChange={(e) => setComplemento(e.target.value)}
@@ -2529,17 +2550,17 @@ function PassoVinculo({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Campo label="Cidade" obrigatorio erros={errosCampo.cidade}>
+            <Campo name="cidade" label="Cidade" obrigatorio erros={errosCampo.cidade}>
               <Input
                 value={cidadeEndereco}
                 onChange={(e) => setCidadeEndereco(e.target.value)}
                 placeholder="Cidade"
               />
             </Campo>
-            <Campo label="Bairro" obrigatorio erros={errosCampo.bairro}>
+            <Campo name="bairro" label="Bairro" obrigatorio erros={errosCampo.bairro}>
               <Input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" />
             </Campo>
-            <Campo label="UF" obrigatorio erros={errosCampo.uf}>
+            <Campo name="uf" label="UF" obrigatorio erros={errosCampo.uf}>
               <Input
                 maxLength={2}
                 value={ufEndereco}
@@ -2550,16 +2571,35 @@ function PassoVinculo({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Campo label="Nº de associado" obrigatorio erros={errosCampo.numeroAssociado}>
+            <Campo
+              name="numeroAssociado"
+              label="Nº de associado"
+              obrigatorio
+              erros={errosCampo.numeroAssociado}
+            >
               <Input
                 inputMode="numeric"
                 maxLength={7}
                 value={numeroAssociado}
-                onChange={(e) => setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))}
+                onChange={(e) => {
+                  setNumeroAssociado(e.target.value.replace(/\D/g, '').slice(0, 7))
+                  if (errosCampo.numeroAssociado) {
+                    setErrosCampo((prev) => {
+                      const next = { ...prev }
+                      delete next.numeroAssociado
+                      return next
+                    })
+                  }
+                }}
                 placeholder="Até 7 dígitos"
               />
             </Campo>
-            <Campo label="Há quantos anos é sócio" obrigatorio erros={errosCampo.anosSocio}>
+            <Campo
+              name="anosSocio"
+              label="Há quantos anos é sócio"
+              obrigatorio
+              erros={errosCampo.anosSocio}
+            >
               <Input
                 type="number"
                 min={0}
@@ -2571,7 +2611,7 @@ function PassoVinculo({
             </Campo>
           </div>
 
-          <Campo label="Idade" erros={errosCampo.idade}>
+          <Campo name="idade" label="Idade" erros={errosCampo.idade}>
             <Input
               type="text"
               inputMode="numeric"
@@ -2582,7 +2622,11 @@ function PassoVinculo({
           </Campo>
 
           {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
-            <Campo label="Departamento pretendido" erros={errosCampo.departamentoId}>
+            <Campo
+              name="departamentoId"
+              label="Departamento pretendido"
+              erros={errosCampo.departamentoId}
+            >
               <Select value={departamentoId} onChange={(e) => setDepartamentoId(e.target.value)}>
                 <option value="">Selecione (opcional)</option>
                 {departamentosSelecionaveis.map((d) => (
@@ -2613,7 +2657,14 @@ function PassoVinculo({
             </p>
           </div>
 
-          <div>
+          <div
+            data-campo="fotoDocumentoUrl"
+            className={
+              errosCampo.fotoDocumentoUrl?.[0]
+                ? 'rounded-xl bg-red-500/[0.04] p-2 -m-2 ring-2 ring-red-500/45'
+                : undefined
+            }
+          >
             <ImageDropZone
               layout="split"
               label={
@@ -2649,11 +2700,20 @@ function PassoVinculo({
               onFile={(file) => cropFotoDocumento.open(file)}
             />
             {errosCampo.fotoDocumentoUrl?.[0] && (
-              <p className="mt-1 text-xs text-red-600">{errosCampo.fotoDocumentoUrl[0]}</p>
+              <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errosCampo.fotoDocumentoUrl[0]}
+              </p>
             )}
           </div>
 
-          <div>
+          <div
+            data-campo="comprovanteResidenciaUrl"
+            className={
+              errosCampo.comprovanteResidenciaUrl?.[0]
+                ? 'rounded-xl bg-red-500/[0.04] p-2 -m-2 ring-2 ring-red-500/45'
+                : undefined
+            }
+          >
             <ImageDropZone
               layout="split"
               label={
@@ -2691,7 +2751,9 @@ function PassoVinculo({
               onFile={(file) => cropComprovanteResidencia.open(file)}
             />
             {errosCampo.comprovanteResidenciaUrl?.[0] && (
-              <p className="mt-1 text-xs text-red-600">{errosCampo.comprovanteResidenciaUrl[0]}</p>
+              <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errosCampo.comprovanteResidenciaUrl[0]}
+              </p>
             )}
           </div>
         </SecaoFormulario>
@@ -2704,7 +2766,12 @@ function PassoVinculo({
               para participar de atividades e caravanas da torcida.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo label="Nome do responsável" obrigatorio erros={errosCampo.responsavelNome}>
+              <Campo
+                name="responsavelNome"
+                label="Nome do responsável"
+                obrigatorio
+                erros={errosCampo.responsavelNome}
+              >
                 <Input
                   value={responsavelNome}
                   onChange={(e) => setResponsavelNome(e.target.value)}
@@ -2712,6 +2779,7 @@ function PassoVinculo({
                 />
               </Campo>
               <Campo
+                name="responsavelDocumento"
                 label="Documento do responsável"
                 obrigatorio
                 erros={errosCampo.responsavelDocumento}
@@ -2727,21 +2795,41 @@ function PassoVinculo({
         )}
 
         {/* ─── Termo de responsabilidade ─────────────────────────────────── */}
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-          <input
-            type="checkbox"
-            checked={termoAceito}
-            onChange={(e) => setTermoAceito(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
-          />
-          <span className="min-w-0 text-sm text-[rgb(var(--foreground))]">
-            Declaro que serei responsável pelos meus atos ao usar os símbolos da torcida em
-            jogos e eventos, e concordo em receber comunicações da torcida.
-          </span>
-        </label>
-        {errosCampo.termoResponsabilidadeAceito?.[0] && (
-          <p className="text-xs text-red-600">{errosCampo.termoResponsabilidadeAceito[0]}</p>
-        )}
+        <div
+          data-campo="termoResponsabilidadeAceito"
+          className={
+            errosCampo.termoResponsabilidadeAceito?.[0]
+              ? 'rounded-xl bg-red-500/[0.04] p-1 ring-2 ring-red-500/45'
+              : undefined
+          }
+        >
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={termoAceito}
+              onChange={(e) => {
+                setTermoAceito(e.target.checked)
+                if (errosCampo.termoResponsabilidadeAceito) {
+                  setErrosCampo((prev) => {
+                    const next = { ...prev }
+                    delete next.termoResponsabilidadeAceito
+                    return next
+                  })
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+            />
+            <span className="min-w-0 text-sm text-[rgb(var(--foreground))]">
+              Declaro que serei responsável pelos meus atos ao usar os símbolos da torcida em
+              jogos e eventos, e concordo em receber comunicações da torcida.
+            </span>
+          </label>
+          {errosCampo.termoResponsabilidadeAceito?.[0] && (
+            <p role="alert" className="mt-1 px-1 text-xs text-red-600 dark:text-red-400">
+              {errosCampo.termoResponsabilidadeAceito[0]}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-8 space-y-3">
@@ -2886,8 +2974,16 @@ function BlocoImagemProva({
   onArquivo: (file: File | undefined) => void
   onLimpar: () => void
 }) {
+  const hasError = Boolean(erros?.[0])
   return (
-    <div>
+    <div
+      data-campo="imagemProva"
+      className={
+        hasError
+          ? 'rounded-xl bg-red-500/[0.04] p-2 -m-2 ring-2 ring-red-500/45'
+          : undefined
+      }
+    >
       <ImageDropZone
         layout="split"
         label={
@@ -2910,7 +3006,11 @@ function BlocoImagemProva({
         onClear={imagemProva ? onLimpar : undefined}
         onFile={(file) => onArquivo(file)}
       />
-      {erros?.[0] && <p className="mt-1 text-xs text-red-600">{erros[0]}</p>}
+      {erros?.[0] && (
+        <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+          {erros[0]}
+        </p>
+      )}
     </div>
   )
 }
@@ -2963,25 +3063,71 @@ function BotaoPrimario({
 }
 
 function Campo({
+  name,
   label,
   obrigatorio,
   erros,
   children,
 }: {
+  /** Chave do campo — usada para scroll/foco quando há erro no submit. */
+  name?: string
   label: string
   obrigatorio?: boolean
   erros?: string[]
   children: React.ReactNode
 }) {
+  const hasError = Boolean(erros && erros.length > 0)
+  const erroId = useId()
   return (
-    <div>
+    <div
+      data-campo={name}
+      className={
+        hasError
+          ? 'rounded-xl bg-red-500/[0.04] p-2 -m-2 ring-2 ring-red-500/45'
+          : undefined
+      }
+    >
       <label className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
         {label} {obrigatorio && <span className="text-red-500">*</span>}
       </label>
       {children}
-      {erros && erros.length > 0 && (
-        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{erros[0]}</p>
+      {hasError && (
+        <p
+          id={erroId}
+          role="alert"
+          className="mt-1 text-xs text-red-600 dark:text-red-400"
+        >
+          {erros![0]}
+        </p>
       )}
     </div>
   )
+}
+
+/** Rola até o primeiro campo com erro (ordem do DOM) e foca o controle. */
+function revelarPrimeiroErroCampos(erros: Record<string, string[]>) {
+  if (typeof document === 'undefined') return
+  const keys = Object.keys(erros).filter((k) => (erros[k]?.length ?? 0) > 0)
+  if (keys.length === 0) return
+
+  const nodes = document.querySelectorAll<HTMLElement>('[data-campo]')
+  let target: HTMLElement | null = null
+  for (const node of nodes) {
+    const campo = node.dataset.campo
+    if (campo && keys.includes(campo)) {
+      target = node
+      break
+    }
+  }
+  if (!target) {
+    target = document.querySelector<HTMLElement>(`[data-campo="${CSS.escape(keys[0]!)}"]`)
+  }
+  if (!target) return
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+  const focusable = target.querySelector<HTMLElement>(
+    'input:not([type="hidden"]), select, textarea, button, [tabindex]:not([tabindex="-1"])',
+  )
+  focusable?.focus({ preventScroll: true })
 }

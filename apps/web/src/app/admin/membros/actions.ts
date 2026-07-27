@@ -5,7 +5,7 @@ import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
-import { ExpectedError } from '@/lib/expected-error'
+import { ExpectedError, isExpectedError } from '@/lib/expected-error'
 import {
   assertOrigemDescendenteDaSede,
   desligarEspelhoDaOrigem,
@@ -256,7 +256,10 @@ export type AprovarMembroOpts = {
   incluirDepartamento?: boolean
 }
 
-export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) {
+export async function aprovarMembro(
+  membroId: string,
+  opts?: AprovarMembroOpts,
+): Promise<{ error: string } | void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
   const incluirDepartamento = opts?.incluirDepartamento !== false
   const aprovadoPorNome = session.user.name ?? 'Admin'
@@ -270,6 +273,7 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
     tenantNotificarNome: string
   }
 
+  try {
   const resultado: ResultadoAprovacao = await db.$transaction(
     async (tx: Prisma.TransactionClient) => {
       const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
@@ -544,9 +548,16 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
   revalidatePath(`/portal/comunidade/perfil/${origem.userId}`)
+  } catch (err) {
+    if (isExpectedError(err)) return { error: err.message }
+    throw err
+  }
 }
 
-export async function reprovarMembro(membroId: string, motivo?: string) {
+export async function reprovarMembro(
+  membroId: string,
+  motivo?: string,
+): Promise<{ error: string } | void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
   const aprovadoPorNome = session.user.name ?? 'Admin'
   const aprovadoPorId = session.user.id
@@ -560,6 +571,7 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     tenantNotificarNome: string
   }
 
+  try {
   const resultado: ResultadoReprovacao = await db.$transaction(
     async (tx: Prisma.TransactionClient) => {
       const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
@@ -751,14 +763,19 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/carteirinha')
+  } catch (err) {
+    if (isExpectedError(err)) return { error: err.message }
+    throw err
+  }
 }
 
-export async function reverterMembro(membroId: string) {
+export async function reverterMembro(membroId: string): Promise<{ error: string } | void> {
   // Reverte aprovação/reprovação para pendente — reaproveita MEMBERS_APPROVE
   // (não existe permissão dedicada para "reverter"; é a mesma decisão de
   // aprovação sendo desfeita). Espelho só é revertível pela origem.
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
+  try {
   const resultado: { origemId: string; origemTenantId: string; espelhoId: string | null } =
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
       const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
@@ -840,6 +857,10 @@ export async function reverterMembro(membroId: string) {
   revalidatePath('/portal/carteirinha')
   revalidatePath('/admin/membros')
   revalidatePath('/portal/departamentos', 'layout')
+  } catch (err) {
+    if (isExpectedError(err)) return { error: err.message }
+    throw err
+  }
 }
 
 export type MembroLgeState = {

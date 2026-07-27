@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
-import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { getActiveTenant, getUserPermissionsInTenant, resolveTenantLogoUrl } from '@/lib/tenant'
+import { tenantIsAdministracaoSede } from '@/lib/authz'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { AdminMotionShell } from '@/components/motion/admin-motion-shell'
 import { AdminRouteTransition } from '@/components/motion/admin-route-transition'
@@ -58,25 +57,25 @@ export default async function AdminLayout({
     redirect('/portal')
   }
 
-  // 'Visão da torcida' é o console global do Presidente — só existe na Sede
-  // principal. Liderança de subsede/PDE tem a permissão via owner ('*'), mas
-  // o item some (e a rota bloqueia via assertPresidenteGlobal). Super-admin vê sempre.
-  let exibirConsoleTorcida = isSuperAdmin
-  if (!isSuperAdmin && hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW)) {
-    const sede: { id: string } | null = await db.sede.findFirst({
-      where: { tenantId: tenant.id, tipo: 'SEDE' },
-      select: { id: true },
-    })
-    exibirConsoleTorcida = sede !== null
+  // Console global e afiliações só existem na Sede principal (tipo SEDE).
+  // Liderança de subsede/PDE tem owner ('*'), mas o item some e a rota bloqueia.
+  let tenantEhSedePrincipal = isSuperAdmin
+  if (
+    !isSuperAdmin &&
+    (hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW) ||
+      hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE))
+  ) {
+    tenantEhSedePrincipal = await tenantIsAdministracaoSede(tenant.id)
   }
 
-  // 'Solicitações de afiliação' só decide quem administra a Sede principal —
-  // Subsede/PDE (tenant promovido, com ancestral na árvore) não vê a aba.
-  let exibirAfiliacoes = isSuperAdmin
-  if (!isSuperAdmin && hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE)) {
-    const ancestrais = await getAncestorTenantIds(tenant.id)
-    exibirAfiliacoes = ancestrais.length === 0
-  }
+  const exibirConsoleTorcida =
+    isSuperAdmin ||
+    (tenantEhSedePrincipal &&
+      hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW))
+
+  const exibirAfiliacoes =
+    isSuperAdmin ||
+    (tenantEhSedePrincipal && hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE))
 
   const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
   const menuItems = menuBase
