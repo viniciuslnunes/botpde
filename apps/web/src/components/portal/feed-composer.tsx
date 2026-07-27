@@ -604,6 +604,8 @@ function ComposerBody({
     PRIORIDADE_OPCOES.find((opcao) => opcao.value === prioridade) ?? PRIORIDADE_OPCOES[0]!
   const PrioridadeIcon = opcaoPrioridadeAtual.Icon
 
+  const popoverAberto = alcanceOpen || emojiOpen || stickerOpen || extrasOpen
+
   const composerChanges = useMemo(() => {
     const list: string[] = []
     if (comunicadoEdicao) {
@@ -912,7 +914,10 @@ function ComposerBody({
           addFiles(files)
         }
       }}
-      className="card-soft relative min-w-0 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4"
+      className={[
+        'card-soft relative min-w-0 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 sm:p-4',
+        popoverAberto ? 'overflow-visible' : 'overflow-hidden',
+      ].join(' ')}
     >
       <FileDropOverlay active={fileDrag.active} />
       <input type="hidden" name="midias" value={JSON.stringify(finalMidias)} />
@@ -967,7 +972,7 @@ function ComposerBody({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={springGentle}
-                className="relative rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] transition-colors focus-within:border-[rgb(var(--primary))]"
+                className="relative isolate rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] transition-colors focus-within:border-[rgb(var(--primary))]"
               >
                 <div
                   aria-hidden
@@ -1007,7 +1012,7 @@ function ComposerBody({
                         ? `Publicar em ${canal.nome ?? 'canal'}… Use @ para mencionar e # para hashtags`
                         : `No que você tá pensando, ${firstName}? Use @ para mencionar e # para hashtags`
                   }
-                  className="relative z-10 w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-normal text-transparent caret-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))]"
+                  className="relative z-[1] w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-normal text-transparent caret-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))]"
                 />
               </m.div>
             )}
@@ -1097,7 +1102,10 @@ function ComposerBody({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={springGentle}
-            className={alcanceOpen ? 'overflow-visible' : 'overflow-hidden'}
+            className={[
+              popoverAberto ? 'overflow-visible' : 'overflow-hidden',
+              popoverAberto ? 'relative z-20' : '',
+            ].join(' ')}
           >
           {/* Prévia dos anexos */}
           {medias.length > 0 && (

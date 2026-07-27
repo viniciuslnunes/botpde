@@ -35,7 +35,9 @@ export async function CanalComposerSection({
       tenantId={tenantId}
       tenantNome={tenant?.nome ?? 'Torcida'}
       perfilPrivado={ctx.perfilPrivado}
-      bloqueioPublicacao={ctx.bloqueioPublicacao}
+      // Gate de publicação é `podePublicarNoCanal` (só mostra o composer se
+      // liberado) — não reusa o bloqueio do feed (`community:post`).
+      bloqueioPublicacao={null}
       canal={{ conversaId, nome: canalNome }}
     />
   )

@@ -238,6 +238,11 @@ export type TorcidaOnboarding = {
   stats: StatsTorcidaOnboarding
   /** Se o portal desta torcida está neste host (subdomínio ou TENANT_SLUG). */
   acessivelNoHost: boolean
+  /**
+   * Quando true (padrão), onboarding SOCIO exige foto do RG e comprovante
+   * de residência. Configurável em /admin/configuracoes.
+   */
+  exigirDocumentosCadastro: boolean
 }
 
 export type DepartamentoOnboarding = {
@@ -481,6 +486,7 @@ export const getTorcidasPorAfiliacao = cache(
       slug: string
       logoUrl: string | null
       corPrimaria: string
+      exigirDocumentosCadastro: boolean
       torcidaConhecidaId: string | null
       torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
@@ -493,6 +499,7 @@ export const getTorcidasPorAfiliacao = cache(
         slug: true,
         logoUrl: true,
         corPrimaria: true,
+        exigirDocumentosCadastro: true,
         torcidaConhecidaId: true,
         torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
@@ -543,6 +550,7 @@ export const getTorcidasPorAfiliacao = cache(
         sedes: sedesMap.get(t.id) ?? [],
         stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
+        exigirDocumentosCadastro: t.exigirDocumentosCadastro,
       }))
       .sort(compararTorcidasOnboarding)
   },

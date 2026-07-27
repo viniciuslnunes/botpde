@@ -193,13 +193,13 @@ function checklistDocumentos(m: AdminMembroItem): CheckItem[] {
       id: 'documento',
       label: 'Foto do documento',
       ok: preenchido(m.fotoDocumentoUrl),
-      obrigatorio: false,
+      obrigatorio: true,
     },
     {
       id: 'residencia',
       label: 'Comprovante de residência',
       ok: preenchido(m.comprovanteResidenciaUrl),
-      obrigatorio: false,
+      obrigatorio: true,
     },
   ]
 }
@@ -482,7 +482,7 @@ function TabDocumentos({
       ) : (
         <EmptyTab
           titulo="Nenhum anexo enviado"
-          descricao="Peça o comprovante de vínculo (obrigatório) e, se preciso, documento e residência."
+          descricao="Peça o comprovante de vínculo (obrigatório) e os documentos de RG e residência quando a torcida exigir."
         />
       )}
     </div>

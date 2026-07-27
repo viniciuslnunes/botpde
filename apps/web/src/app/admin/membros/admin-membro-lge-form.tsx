@@ -1,15 +1,31 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
-import { formatDataCompetenciaInput } from '@torcida/types'
+import { useActionState, useEffect, useState } from 'react'
+import {
+  formatDataCompetenciaInput,
+  formatRg,
+  maskRg,
+  normalizarCpf,
+  validarCpfDigitos,
+  validarRg,
+} from '@torcida/types'
 import {
   atualizarDadosLge,
   desligarMembro,
   type MembroLgeState,
 } from './actions'
 import { useActionStateToast } from '@/lib/toast-action'
+import { formatCpfAdmin } from '@/lib/admin-membro-map'
 
 export type PlanoOption = { id: string; nome: string }
+
+function maskCpf(raw: string): string {
+  const digitos = raw.replace(/\D/g, '').slice(0, 11)
+  const partes = [digitos.slice(0, 3), digitos.slice(3, 6), digitos.slice(6, 9)].filter(Boolean)
+  let out = partes.join('.')
+  if (digitos.length > 9) out += `-${digitos.slice(9)}`
+  return out
+}
 
 function FieldError({ messages }: { messages?: string[] }) {
   if (!messages?.[0]) return null
@@ -50,6 +66,11 @@ export function AdminMembroLgeForm({
   useActionStateToast(lgeState, lgePending, 'Dados LGE salvos.')
   useActionStateToast(dismissState, dismissPending, 'Membro desligado.')
 
+  const [cpf, setCpf] = useState(() => formatCpfAdmin(initial.cpf) ?? '')
+  const [rg, setRg] = useState(() => formatRg(initial.rg) ?? '')
+  const [erroCpfLocal, setErroCpfLocal] = useState<string | null>(null)
+  const [erroRgLocal, setErroRgLocal] = useState<string | null>(null)
+
   useEffect(() => {
     if (dismissState.ok) window.location.reload()
   }, [dismissState.ok])
@@ -57,6 +78,8 @@ export function AdminMembroLgeForm({
   const via = aprovadoNaUnidadeNome?.trim()
   const campoSomenteLeitura =
     'mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-sm text-[rgb(var(--foreground))]'
+  const cpfExibicao = formatCpfAdmin(initial.cpf) ?? initial.cpf
+  const rgExibicao = formatRg(initial.rg) ?? initial.rg
 
   if (espelhado) {
     const planoNome =
@@ -74,11 +97,11 @@ export function AdminMembroLgeForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">CPF</p>
-            <p className={campoSomenteLeitura}>{initial.cpf || '—'}</p>
+            <p className={campoSomenteLeitura}>{cpfExibicao || '—'}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">RG</p>
-            <p className={campoSomenteLeitura}>{initial.rg || '—'}</p>
+            <p className={campoSomenteLeitura}>{rgExibicao || '—'}</p>
           </div>
           <div className="sm:col-span-2">
             <p className="text-xs font-medium text-[rgb(var(--foreground-muted))]">Filiação</p>
@@ -129,19 +152,43 @@ export function AdminMembroLgeForm({
             CPF
             <input
               name="cpf"
-              defaultValue={initial.cpf ?? ''}
+              inputMode="numeric"
+              maxLength={14}
+              value={cpf}
+              onChange={(e) => {
+                setCpf(maskCpf(e.target.value))
+                setErroCpfLocal(null)
+              }}
+              onBlur={() => {
+                if (!cpf) return
+                const n = normalizarCpf(cpf)
+                if (!n || !validarCpfDigitos(n)) setErroCpfLocal('CPF inválido')
+              }}
               placeholder="000.000.000-00"
               className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
             />
-            <FieldError messages={lgeState.errors?.cpf} />
+            <FieldError messages={erroCpfLocal ? [erroCpfLocal] : lgeState.errors?.cpf} />
           </label>
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
             RG
             <input
               name="rg"
-              defaultValue={initial.rg ?? ''}
+              inputMode="text"
+              autoComplete="off"
+              maxLength={12}
+              value={rg}
+              onChange={(e) => {
+                setRg(maskRg(e.target.value))
+                setErroRgLocal(null)
+              }}
+              onBlur={() => {
+                if (!rg) return
+                if (!validarRg(rg)) setErroRgLocal('RG inválido')
+              }}
+              placeholder="00.000.000-0"
               className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
             />
+            <FieldError messages={erroRgLocal ? [erroRgLocal] : lgeState.errors?.rg} />
           </label>
           <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))] sm:col-span-2">
             Filiação

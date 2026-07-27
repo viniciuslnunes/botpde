@@ -47,6 +47,73 @@ export function validarCpfDigitos(cpfDigits) {
   return d1 === Number(cpfDigits[9]) && d2 === Number(cpfDigits[10])
 }
 
+/**
+ * Normaliza RG no formato brasileiro comum (SP): dígitos + verificador opcional `X`.
+ * Aceita 5–9 caracteres alfanuméricos (ex.: `12.345.678-9` → `123456789`).
+ * @param {string | undefined | null} raw
+ */
+export function normalizarRg(raw) {
+  if (!raw) return null
+  const upper = String(raw).toUpperCase().replace(/[^0-9X]/g, '')
+  // `X` só é permitido como dígito verificador (último caractere).
+  if (/X/.test(upper.slice(0, -1))) return null
+  if (upper.length < 5 || upper.length > 9) return null
+  return upper
+}
+
+/**
+ * Valida RG normalizado: tamanho 5–9, `X` só no fim, rejeita sequência repetida.
+ * @param {string | undefined | null} raw
+ */
+export function validarRg(raw) {
+  const n = normalizarRg(raw)
+  if (!n) return false
+  const corpo = n.endsWith('X') ? n.slice(0, -1) : n
+  if (!/^\d+$/.test(corpo)) return false
+  if (/^(\d)\1+$/.test(corpo)) return false
+  return true
+}
+
+/**
+ * Máscara progressiva de RG (formato SP): `00.000.000-0` — verificador pode ser `X`.
+ * @param {string | undefined | null} raw
+ */
+export function maskRg(raw) {
+  const upper = String(raw ?? '')
+    .toUpperCase()
+    .replace(/[^0-9X]/g, '')
+  let limpo = ''
+  for (let i = 0; i < upper.length; i++) {
+    const c = upper[i]
+    if (c === 'X') {
+      if (i === upper.length - 1 && limpo.length > 0) limpo += 'X'
+    } else {
+      limpo += c
+    }
+  }
+  limpo = limpo.slice(0, 9)
+  const p1 = limpo.slice(0, 2)
+  const p2 = limpo.slice(2, 5)
+  const p3 = limpo.slice(5, 8)
+  const p4 = limpo.slice(8, 9)
+  let out = p1
+  if (p2) out += `.${p2}`
+  if (p3) out += `.${p3}`
+  if (p4) out += `-${p4}`
+  return out
+}
+
+/**
+ * Formata RG armazenado (normalizado ou mascarado) para exibição.
+ * @param {string | undefined | null} raw
+ */
+export function formatRg(raw) {
+  if (!raw) return null
+  const upper = String(raw).toUpperCase().replace(/[^0-9X]/g, '')
+  if (!upper) return null
+  return maskRg(upper)
+}
+
 const cpfField = z
   .string()
   .trim()
@@ -60,6 +127,19 @@ const cpfField = z
     }
   })
   .transform((v) => (v ? normalizarCpf(v) : undefined))
+
+const rgField = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v.length > 0 ? v : undefined))
+  .superRefine((v, ctx) => {
+    if (!v) return
+    if (!validarRg(v)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'RG inválido' })
+    }
+  })
+  .transform((v) => (v ? normalizarRg(v) ?? undefined : undefined))
 
 const dataNascimentoField = z
   .string()
@@ -86,7 +166,7 @@ const dataNascimentoField = z
 
 export const AtualizarMembroLgeSchema = z.object({
   membroId: z.string().uuid(),
-  rg: z.string().trim().max(30).optional().transform((v) => (v && v.length > 0 ? v : undefined)),
+  rg: rgField,
   cpf: cpfField,
   filiacao: z
     .string()

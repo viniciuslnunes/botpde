@@ -21,6 +21,7 @@ import {
   salvarBalancoFinanceiroVisivel,
   salvarBalancoDetalheNivel,
   salvarHierarquiaVisivel,
+  salvarExigirDocumentosCadastro,
   salvarCanalOficial,
   criarRole,
   atualizarRole,
@@ -263,6 +264,62 @@ export function HierarquiaVisivelForm({ visivel }: HierarquiaVisivelFormProps) {
               : ativo
                 ? 'Hierarquia completa visível para as unidades'
                 : 'Cada unidade vê só a si mesma'}
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
+// ── Cadastro de sócios (documentos no onboarding) ─────────────────────────────
+
+interface DocumentosCadastroFormProps {
+  exigir: boolean
+}
+
+export function DocumentosCadastroForm({ exigir }: DocumentosCadastroFormProps) {
+  const [pending, startTransition] = useTransition()
+  const [ativo, setAtivo] = useState(exigir)
+
+  function salvar(next: boolean) {
+    setAtivo(next)
+    const fd = new FormData()
+    fd.set('exigirDocumentosCadastro', next ? 'true' : 'false')
+    startTransition(async () => {
+      const ok = await runPersistAction(() => salvarExigirDocumentosCadastro(fd), {
+        success: next
+          ? 'Foto do RG e comprovante de residência passam a ser obrigatórios no cadastro de sócio.'
+          : 'Documentos de RG e residência ficam opcionais no cadastro de sócio.',
+      })
+      if (!ok) setAtivo(!next)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        No onboarding de sócio, a foto do RG e o comprovante de residência ficam
+        obrigatórios por padrão — para controle e registro na admissão. Desative
+        se a torcida preferir solicitar esses documentos depois da aprovação.
+      </p>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
+        <input
+          type="checkbox"
+          checked={ativo}
+          disabled={pending}
+          onChange={(e) => salvar(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+            Exigir foto do RG e comprovante de residência no cadastro
+          </span>
+          <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+            {pending
+              ? 'Salvando…'
+              : ativo
+                ? 'Documentos obrigatórios na solicitação de sócio'
+                : 'Documentos opcionais — podem ser pedidos depois'}
           </span>
         </span>
       </label>

@@ -23,7 +23,7 @@ import {
 import {
   NOME_UF,
 } from '@/lib/regioes-brasil'
-import { isDepartamentoLegado } from '@torcida/types'
+import { isDepartamentoLegado, maskRg, normalizarCpf, validarCpfDigitos, validarRg } from '@torcida/types'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -271,7 +271,11 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
     aplicarPasso('concluindo', 1)
     startTransition(async () => {
       const res = await concluirComoTorcedor()
-      // Se retornou (não redirecionou), houve erro.
+      if (res?.redirectTo) {
+        window.location.assign(res.redirectTo)
+        return
+      }
+      // Se retornou sem redirect, houve erro.
       if (res?.message) {
         corrigirPasso('torcida')
         setErro(res.message)
@@ -1577,6 +1581,14 @@ function calcularIdadeDeInput(isoDate: string): number | null {
   return idade
 }
 
+/** Extrai cidade/UF de rótulos como `Praia Grande - SP` ou `Praia Grande/SP`. */
+function parseRegiaoLabel(regiao?: string): { cidade: string; uf: string } {
+  if (!regiao?.trim()) return { cidade: '', uf: '' }
+  const m = regiao.trim().match(/^(.+?)\s*[-/]\s*([A-Za-z]{2})$/)
+  if (m) return { cidade: m[1]!.trim(), uf: m[2]!.toUpperCase() }
+  return { cidade: regiao.trim(), uf: '' }
+}
+
 function PassoVinculo({
   clube,
   torcida,
@@ -1602,6 +1614,7 @@ function PassoVinculo({
 }) {
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
+  const regiaoInicial = parseRegiaoLabel(regiao)
 
   // Campos de sócio
   const [nome, setNome] = useState(nomeInicial)
@@ -1625,8 +1638,6 @@ function PassoVinculo({
       if (url) setImagemProva(url)
     },
   })
-  const uploadPend = cropComprovante.busy
-
   // ─── Identificação / LGE (2026-07): coletado direto no onboarding ───────────
   const [dataNascimento, setDataNascimento] = useState('')
   const [sexo, setSexo] = useState('')
@@ -1641,27 +1652,46 @@ function PassoVinculo({
   // ─── Endereço completo ──────────────────────────────────────────────────────
   const [logradouro, setLogradouro] = useState('')
   const [bairro, setBairro] = useState('')
-  const [ufEndereco, setUfEndereco] = useState('')
+  const [ufEndereco, setUfEndereco] = useState(regiaoInicial.uf)
+  const [cidadeEndereco, setCidadeEndereco] = useState(regiaoInicial.cidade)
   const [buscandoCep, setBuscandoCep] = useState(false)
+  const [erroCepLocal, setErroCepLocal] = useState<string | null>(null)
 
-  async function buscarEndereco(valorCep: string) {
+  // Região exibida reage ao CEP (ViaCEP localidade+UF); cai no valor do passo anterior.
+  const regiaoEfetiva = (() => {
+    const cidade = cidadeEndereco.trim()
+    const estado = ufEndereco.trim()
+    if (cidade && estado) return `${cidade} - ${estado}`
+    if (cidade) return cidade
+    return regiao
+  })()
+
+  async function buscarEndereco(valorCep: string, opts?: { manual?: boolean }) {
     const digitos = valorCep.replace(/\D/g, '')
-    if (digitos.length !== 8) return
+    if (digitos.length !== 8) {
+      if (opts?.manual) setErroCepLocal('Informe um CEP com 8 dígitos')
+      return
+    }
     setBuscandoCep(true)
+    setErroCepLocal(null)
     try {
       const endereco = await buscarEnderecoPorCep(valorCep)
-      if (!endereco) return
+      if (!endereco) {
+        setErroCepLocal('CEP não encontrado')
+        return
+      }
       // Sempre sobrescreve — um CEP novo e válido deve substituir o endereço
       // anterior na hora, mesmo que os campos já estivessem preenchidos.
       if (endereco.logradouro) setLogradouro(endereco.logradouro)
       if (endereco.bairro) setBairro(endereco.bairro)
       if (endereco.uf) setUfEndereco(endereco.uf)
+      if (endereco.localidade) setCidadeEndereco(endereco.localidade)
     } finally {
       setBuscandoCep(false)
     }
   }
 
-  // ─── Documentos opcionais ───────────────────────────────────────────────────
+  // ─── Documentos (RG / residência) ───────────────────────────────────────────
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | undefined>()
   const cropFotoDocumento = useCroppedImageUpload({
     aspect: 4 / 3,
@@ -1684,6 +1714,9 @@ function PassoVinculo({
       if (url) setComprovanteResidenciaUrl(url)
     },
   })
+  const documentosObrigatorios = torcida.exigirDocumentosCadastro
+  const uploadDocsPend =
+    cropComprovante.busy || cropFotoDocumento.busy || cropComprovanteResidencia.busy
 
   // ─── Menor de idade / responsável legal ─────────────────────────────────────
   const idadeCalculada = dataNascimento ? calcularIdadeDeInput(dataNascimento) : null
@@ -1748,16 +1781,35 @@ function PassoVinculo({
         onErro('Informe seu CEP.')
         return
       }
-      if (!logradouro || !bairro || !ufEndereco) {
-        onErro('Complete seu endereço (logradouro, bairro e estado).')
+      if (!logradouro || !bairro || !ufEndereco || !cidadeEndereco) {
+        onErro('Complete seu endereço (logradouro, cidade, bairro e estado).')
         return
       }
       if (!rg || !cpf) {
         onErro('Informe seu RG e CPF.')
         return
       }
+      if (!validarRg(rg)) {
+        setErrosCampo((prev) => ({ ...prev, rg: ['RG inválido'] }))
+        onErro('Confira os campos destacados.')
+        return
+      }
+      const cpfNorm = normalizarCpf(cpf)
+      if (!cpfNorm || !validarCpfDigitos(cpfNorm)) {
+        setErrosCampo((prev) => ({ ...prev, cpf: ['CPF inválido'] }))
+        onErro('Confira os campos destacados.')
+        return
+      }
       if (!dataNascimento) {
         onErro('Informe sua data de nascimento.')
+        return
+      }
+      if (documentosObrigatorios && !fotoDocumentoUrl) {
+        onErro('Envie a foto do RG.')
+        return
+      }
+      if (documentosObrigatorios && !comprovanteResidenciaUrl) {
+        onErro('Envie o comprovante de residência.')
         return
       }
       if (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) {
@@ -1770,47 +1822,58 @@ function PassoVinculo({
       }
     }
     startTransition(async () => {
-      const res = await solicitarVinculo({
-        tenantId: torcida.id,
-        tipo,
-        nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
-        idade: idade || undefined,
-        telefone: telefone || undefined,
-        cidade: regiao || undefined,
-        cep: cep || undefined,
-        numero: numero || undefined,
-        bloco: bloco || undefined,
-        complemento: complemento || undefined,
-        numeroAssociado: numeroAssociado || undefined,
-        anosSocio: anosSocio || undefined,
-        imagemProva,
-        departamentoId: departamentoId || undefined,
-        sedeId: unidadeId ?? undefined,
-        unidadeNaoListada,
-        dataNascimento: dataNascimento || undefined,
-        sexo: sexo || undefined,
-        estadoCivil: estadoCivil || undefined,
-        nacionalidade: nacionalidade || undefined,
-        rg: rg || undefined,
-        cpf: cpf || undefined,
-        nomePai: nomePai || undefined,
-        nomeMae: nomeMae || undefined,
-        profissao: profissao || undefined,
-        logradouro: logradouro || undefined,
-        bairro: bairro || undefined,
-        uf: ufEndereco || undefined,
-        fotoDocumentoUrl,
-        comprovanteResidenciaUrl,
-        responsavelNome: ehMenorDeIdade ? responsavelNome || undefined : undefined,
-        responsavelDocumento: ehMenorDeIdade ? responsavelDocumento || undefined : undefined,
-        termoResponsabilidadeAceito: tipo === 'SOCIO' ? termoAceito : undefined,
-      })
-      // Sucesso redireciona no servidor; se retornou, houve erro/validação.
-      if (res?.errors) {
-        setErrosCampo(res.errors)
-        onErro('Confira os campos destacados.')
-      } else if (res?.message) {
-        onErro(res.message)
+      try {
+        const res = await solicitarVinculo({
+          tenantId: torcida.id,
+          tipo,
+          nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
+          idade: idade || undefined,
+          telefone: telefone || undefined,
+          cidade: regiaoEfetiva || undefined,
+          cep: cep || undefined,
+          numero: numero || undefined,
+          bloco: bloco || undefined,
+          complemento: complemento || undefined,
+          numeroAssociado: numeroAssociado || undefined,
+          anosSocio: anosSocio || undefined,
+          imagemProva,
+          departamentoId: departamentoId || undefined,
+          sedeId: unidadeId ?? undefined,
+          unidadeNaoListada,
+          dataNascimento: dataNascimento || undefined,
+          sexo: sexo || undefined,
+          estadoCivil: estadoCivil || undefined,
+          nacionalidade: nacionalidade || undefined,
+          rg: rg || undefined,
+          cpf: cpf || undefined,
+          nomePai: nomePai || undefined,
+          nomeMae: nomeMae || undefined,
+          profissao: profissao || undefined,
+          logradouro: logradouro || undefined,
+          bairro: bairro || undefined,
+          uf: ufEndereco || undefined,
+          fotoDocumentoUrl,
+          comprovanteResidenciaUrl,
+          responsavelNome: ehMenorDeIdade ? responsavelNome || undefined : undefined,
+          responsavelDocumento: ehMenorDeIdade ? responsavelDocumento || undefined : undefined,
+          termoResponsabilidadeAceito: tipo === 'SOCIO' ? termoAceito : undefined,
+        })
+        if (res?.redirectTo) {
+          window.location.assign(res.redirectTo)
+          return
+        }
+        if (res?.errors) {
+          setErrosCampo(res.errors)
+          onErro('Confira os campos destacados.')
+        } else if (res?.message) {
+          onErro(res.message)
+        }
+      } catch (err) {
+        onErro(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Não foi possível enviar a solicitação. Tente de novo.',
+        )
       }
     })
   }
@@ -2043,14 +2106,54 @@ function PassoVinculo({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Campo label="RG" obrigatorio erros={errosCampo.rg}>
-              <Input value={rg} onChange={(e) => setRg(e.target.value)} placeholder="Ex: 12.345.678-9" />
+              <Input
+                inputMode="text"
+                autoComplete="off"
+                maxLength={12}
+                value={rg}
+                onChange={(e) => {
+                  const masked = maskRg(e.target.value)
+                  setRg(masked)
+                  if (errosCampo.rg) {
+                    setErrosCampo((prev) => {
+                      const next = { ...prev }
+                      delete next.rg
+                      return next
+                    })
+                  }
+                }}
+                onBlur={() => {
+                  if (!rg) return
+                  if (!validarRg(rg)) {
+                    setErrosCampo((prev) => ({ ...prev, rg: ['RG inválido'] }))
+                  }
+                }}
+                placeholder="00.000.000-0"
+              />
             </Campo>
             <Campo label="CPF" obrigatorio erros={errosCampo.cpf}>
               <Input
                 inputMode="numeric"
                 maxLength={14}
                 value={cpf}
-                onChange={(e) => setCpf(maskCpf(e.target.value))}
+                onChange={(e) => {
+                  const masked = maskCpf(e.target.value)
+                  setCpf(masked)
+                  if (errosCampo.cpf) {
+                    setErrosCampo((prev) => {
+                      const next = { ...prev }
+                      delete next.cpf
+                      return next
+                    })
+                  }
+                }}
+                onBlur={() => {
+                  if (!cpf) return
+                  const n = normalizarCpf(cpf)
+                  if (!n || !validarCpfDigitos(n)) {
+                    setErrosCampo((prev) => ({ ...prev, cpf: ['CPF inválido'] }))
+                  }
+                }}
                 placeholder="000.000.000-00"
               />
             </Campo>
@@ -2076,25 +2179,52 @@ function PassoVinculo({
 
         {/* ─── Endereço ──────────────────────────────────────────────────── */}
         <SecaoFormulario titulo="Endereço">
-          {regiao && (
+          {regiaoEfetiva && (
             <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
-              <span className="font-medium text-[rgb(var(--foreground))]">Região:</span> {regiao}
+              <span className="font-medium text-[rgb(var(--foreground))]">Região:</span>{' '}
+              {regiaoEfetiva}
             </p>
           )}
 
-          <Campo label="CEP" obrigatorio erros={errosCampo.cep}>
-            <Input
-              inputMode="numeric"
-              maxLength={9}
-              value={cep}
-              onChange={(e) => {
-                const masked = maskCep(e.target.value)
-                setCep(masked)
-                void buscarEndereco(masked)
-              }}
-              onBlur={() => void buscarEndereco(cep)}
-              placeholder="00000-000"
-            />
+          <Campo label="CEP" obrigatorio erros={erroCepLocal ? [erroCepLocal] : errosCampo.cep}>
+            <div className="flex gap-2">
+              <Input
+                inputMode="numeric"
+                maxLength={9}
+                value={cep}
+                onChange={(e) => {
+                  const masked = maskCep(e.target.value)
+                  setCep(masked)
+                  setErroCepLocal(null)
+                  if (errosCampo.cep) {
+                    setErrosCampo((prev) => {
+                      const next = { ...prev }
+                      delete next.cep
+                      return next
+                    })
+                  }
+                  const digitos = masked.replace(/\D/g, '')
+                  if (digitos.length === 8) void buscarEndereco(masked)
+                }}
+                onBlur={() => void buscarEndereco(cep)}
+                placeholder="00000-000"
+                className="min-w-0 flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => void buscarEndereco(cep, { manual: true })}
+                disabled={buscandoCep || cep.replace(/\D/g, '').length !== 8}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Buscar endereço pelo CEP"
+              >
+                {buscandoCep ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Buscar
+              </button>
+            </div>
             {buscandoCep && (
               <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">Buscando endereço…</p>
             )}
@@ -2125,6 +2255,13 @@ function PassoVinculo({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
+            <Campo label="Cidade" obrigatorio erros={errosCampo.cidade}>
+              <Input
+                value={cidadeEndereco}
+                onChange={(e) => setCidadeEndereco(e.target.value)}
+                placeholder="Cidade"
+              />
+            </Campo>
             <Campo label="Bairro" obrigatorio erros={errosCampo.bairro}>
               <Input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Bairro" />
             </Campo>
@@ -2192,7 +2329,7 @@ function PassoVinculo({
           <div>
             <BlocoImagemProva
               imagemProva={imagemProva}
-              uploadPend={uploadPend}
+              uploadPend={cropComprovante.busy}
               erros={errosCampo.imagemProva}
               onArquivo={onArquivo}
               onLimpar={() => setImagemProva(undefined)}
@@ -2204,10 +2341,27 @@ function PassoVinculo({
 
           <div>
             <ImageDropZone
-              label="Foto do RG (opcional)"
+              layout="split"
+              label={
+                <>
+                  Foto do RG
+                  {documentosObrigatorios ? (
+                    <span className="text-red-500"> *</span>
+                  ) : (
+                    <span className="font-normal text-[rgb(var(--foreground-muted))]">
+                      {' '}
+                      (opcional)
+                    </span>
+                  )}
+                </>
+              }
               busy={cropFotoDocumento.busy}
               cameraLabel="Tirar foto"
-              formatsHint="JPEG, PNG ou WebP — pode ser enviada depois"
+              formatsHint={
+                documentosObrigatorios
+                  ? 'JPEG, PNG ou WebP, até 10 MB — ajuste o enquadramento antes do envio'
+                  : 'JPEG, PNG ou WebP — pode ser enviada depois'
+              }
               file={
                 fotoDocumentoUrl
                   ? {
@@ -2227,10 +2381,27 @@ function PassoVinculo({
 
           <div>
             <ImageDropZone
-              label="Comprovante de residência (opcional)"
+              layout="split"
+              label={
+                <>
+                  Comprovante de residência
+                  {documentosObrigatorios ? (
+                    <span className="text-red-500"> *</span>
+                  ) : (
+                    <span className="font-normal text-[rgb(var(--foreground-muted))]">
+                      {' '}
+                      (opcional)
+                    </span>
+                  )}
+                </>
+              }
               busy={cropComprovanteResidencia.busy}
               cameraLabel="Tirar foto"
-              formatsHint="JPEG, PNG ou WebP — pode ser solicitado depois"
+              formatsHint={
+                documentosObrigatorios
+                  ? 'JPEG, PNG ou WebP, até 10 MB — ajuste o enquadramento antes do envio'
+                  : 'JPEG, PNG ou WebP — pode ser solicitado depois'
+              }
               file={
                 comprovanteResidenciaUrl
                   ? {
@@ -2302,7 +2473,7 @@ function PassoVinculo({
       <div className="mt-8 space-y-3">
         <BotaoPrimario
           onClick={() => enviar('SOCIO')}
-          pending={pending || uploadPend}
+          pending={pending || uploadDocsPend}
           disabled={
             !imagemProva ||
             !numeroAssociado ||
@@ -2314,6 +2485,8 @@ function PassoVinculo({
             !rg ||
             !cpf ||
             !dataNascimento ||
+            (documentosObrigatorios && !fotoDocumentoUrl) ||
+            (documentosObrigatorios && !comprovanteResidenciaUrl) ||
             (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) ||
             !termoAceito
           }
@@ -2339,6 +2512,8 @@ function PassoVinculo({
   return (
     <>
       {cropComprovante.dialog}
+      {cropFotoDocumento.dialog}
+      {cropComprovanteResidencia.dialog}
       <AnimatePresence mode="wait" initial={false}>
       <m.div
         key={modo}
@@ -2440,6 +2615,7 @@ function BlocoImagemProva({
   return (
     <div>
       <ImageDropZone
+        layout="split"
         label={
           <>
             Foto da carteirinha ou comprovante de vínculo <span className="text-red-500">*</span>
@@ -2447,7 +2623,7 @@ function BlocoImagemProva({
         }
         busy={uploadPend}
         cameraLabel="Tirar foto"
-        formatsHint="JPEG, PNG ou WebP — ajuste o enquadramento antes de enviar"
+        formatsHint="JPEG, PNG ou WebP, até 10 MB — ajuste o enquadramento antes do envio"
         file={
           imagemProva
             ? {

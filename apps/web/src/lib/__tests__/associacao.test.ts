@@ -9,8 +9,12 @@ import {
   CriarCobrancaSchema,
   CriarPlanoAssociacaoSchema,
   DesligarMembroSchema,
+  formatRg,
+  maskRg,
   normalizarCpf,
+  normalizarRg,
   validarCpfDigitos,
+  validarRg,
 } from '@torcida/types'
 import { montarPayloadQr, parsePayloadQr } from '@/lib/carteirinha-qr'
 
@@ -27,6 +31,29 @@ describe('associacao — CPF', () => {
   it('normalizarCpf extrai 11 dígitos', () => {
     expect(normalizarCpf('529.982.247-25')).toBe('52998224725')
     expect(normalizarCpf('')).toBeNull()
+  })
+})
+
+describe('associacao — RG', () => {
+  it('normalizarRg aceita máscara e verificador X', () => {
+    expect(normalizarRg('12.345.678-9')).toBe('123456789')
+    expect(normalizarRg('12.345.678-X')).toBe('12345678X')
+    expect(normalizarRg('')).toBeNull()
+    expect(normalizarRg('123')).toBeNull()
+  })
+
+  it('validarRg rejeita sequência repetida e formato inválido', () => {
+    expect(validarRg('12.345.678-9')).toBe(true)
+    expect(validarRg('111111111')).toBe(false)
+    expect(validarRg('12')).toBe(false)
+    expect(validarRg('X12345678')).toBe(false)
+  })
+
+  it('maskRg / formatRg aplicam máscara SP', () => {
+    expect(maskRg('123456789')).toBe('12.345.678-9')
+    expect(maskRg('12345678x')).toBe('12.345.678-X')
+    expect(formatRg('123456789')).toBe('12.345.678-9')
+    expect(formatRg(null)).toBeNull()
   })
 })
 
@@ -67,6 +94,21 @@ describe('associacao — schemas Zod', () => {
     })
     expect(parsed.success).toBe(true)
     if (parsed.success) expect(parsed.data.planoAssociacaoId).toBeNull()
+  })
+
+  it('AtualizarMembroLgeSchema rejeita RG inválido e normaliza RG válido', () => {
+    const invalid = AtualizarMembroLgeSchema.safeParse({
+      membroId: '550e8400-e29b-41d4-a716-446655440000',
+      rg: '111111111',
+    })
+    expect(invalid.success).toBe(false)
+
+    const valid = AtualizarMembroLgeSchema.safeParse({
+      membroId: '550e8400-e29b-41d4-a716-446655440000',
+      rg: '12.345.678-9',
+    })
+    expect(valid.success).toBe(true)
+    if (valid.success) expect(valid.data.rg).toBe('123456789')
   })
 
   it('DesligarMembroSchema exige motivo mínimo', () => {

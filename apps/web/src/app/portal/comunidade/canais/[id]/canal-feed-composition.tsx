@@ -296,7 +296,7 @@ export function CanalFeedComposition({
                   )}
                   {canal.canalOficial && podeGerenciarMembros && (
                     <Link
-                      href="/admin/configuracoes#canal-oficial"
+                      href="/admin/configuracoes?tab=canal-oficial"
                       onClick={() => setMenuOpen(false)}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))]"
                     >

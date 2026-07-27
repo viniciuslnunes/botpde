@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CadastroForm } from '@/components/portal/cadastro-form'
 import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
 import type { Metadata } from 'next'
+import { SolicitacaoResumoCard } from '@/components/onboarding/solicitacao-resumo-card'
 
 export const metadata: Metadata = { title: 'Solicitar cadastro' }
 
@@ -18,7 +19,29 @@ export default async function CadastroPage() {
     tenant
       ? db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-          select: { id: true, status: true, nome: true, tipo: true },
+          select: {
+            id: true,
+            status: true,
+            nome: true,
+            tipo: true,
+            telefone: true,
+            cidade: true,
+            dataNascimento: true,
+            rg: true,
+            cpf: true,
+            logradouro: true,
+            numero: true,
+            bloco: true,
+            complemento: true,
+            bairro: true,
+            cep: true,
+            uf: true,
+            responsavelNome: true,
+            responsavelDocumento: true,
+            imagemProva: true,
+            fotoDocumentoUrl: true,
+            comprovanteResidenciaUrl: true,
+          },
         })
       : null,
     tenant
@@ -75,6 +98,34 @@ export default async function CadastroPage() {
             <li>Se for sócio, o admin emite sua carteirinha digital</li>
           </ul>
         </div>
+
+        <SolicitacaoResumoCard
+          data={{
+            nome: membro.nome,
+            tipo: membro.tipo === 'SOCIO' ? 'Sócio' : 'Torcedor',
+            telefone: membro.telefone,
+            cidade: membro.cidade,
+            dataNascimentoLabel: membro.dataNascimento
+              ? new Date(membro.dataNascimento).toLocaleDateString('pt-BR')
+              : null,
+            rg: membro.rg,
+            cpf: membro.cpf,
+            logradouro: membro.logradouro,
+            numero: membro.numero,
+            bloco: membro.bloco,
+            complemento: membro.complemento,
+            bairro: membro.bairro,
+            cep: membro.cep,
+            uf: membro.uf,
+            responsavelNome: membro.responsavelNome,
+            responsavelDocumento: membro.responsavelDocumento,
+            imagemProva: membro.imagemProva,
+            fotoDocumentoUrl: membro.fotoDocumentoUrl,
+            comprovanteResidenciaUrl: membro.comprovanteResidenciaUrl,
+          }}
+          titulo="Informações da sua solicitação"
+          descricao="Estes são os dados e anexos que já foram enviados para análise da diretoria."
+        />
       </div>
     )
   }

@@ -2,7 +2,6 @@
 
 import { auth } from '@/lib/auth'
 import { db, type Prisma } from '@torcida/db'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import {
   getAfiliacoesParaOnboarding,
@@ -22,12 +21,15 @@ import {
   criarOuAtualizarPendenciaEspelhoNaSede,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
+import { isExpectedError } from '@/lib/expected-error'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
   isDepartamentoLegado,
   normalizarCpf,
+  normalizarRg,
   validarCpfDigitos,
+  validarRg,
   parseDataCompetencia,
   PERMISSIONS,
 } from '@torcida/types'
@@ -82,6 +84,12 @@ export type OnboardingActionState = {
   errors?: Record<string, string[]>
   message?: string
   emailHref?: string
+  /**
+   * Navegação no cliente (`window.location` / router). Evita `redirect()` na
+   * Server Action — em produção o App Router re-renderiza o destino no mesmo
+   * flight e qualquer falha vira digest genérico após o vínculo já gravado.
+   */
+  redirectTo?: string
 }
 
 function getSuperAdminEmails(): string[] {
@@ -176,7 +184,7 @@ export async function concluirComoTorcedor(): Promise<OnboardingActionState> {
   // fixado uma torcida específica) — torcedor global cai na Comunidade Nacional.
   await clearTenantContextSlug()
 
-  redirect('/portal/comunidade')
+  return { ok: true, redirectTo: '/portal/comunidade' }
 }
 
 // ─── 3. Solicitar vínculo com uma torcida (sócio ou torcedor da torcida) ─────────
@@ -279,11 +287,19 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .transform((v) => v?.trim() || undefined),
   // Obrigatório só para SOCIO — exigência aplicada no `.superRefine` abaixo.
+  // Mesma regra de `AtualizarMembroLgeSchema` / `validarRg` + `normalizarRg`.
   rg: z
     .string()
-    .max(30)
+    .trim()
     .optional()
-    .transform((v) => v?.trim() || undefined),
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .superRefine((v, ctx) => {
+      if (!v) return
+      if (!validarRg(v)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'RG inválido' })
+      }
+    })
+    .transform((v) => (v ? (normalizarRg(v) ?? undefined) : undefined)),
   // Obrigatório só para SOCIO — exigência aplicada no `.superRefine` abaixo.
   cpf: z
     .string()
@@ -330,7 +346,8 @@ const solicitarVinculoSchema = z.object({
     .optional()
     .transform((v) => (v ? v.toUpperCase() : undefined))
     .refine((v) => v === undefined || /^[A-Z]{2}$/.test(v), 'UF inválida'),
-  // Documentos opcionais — nunca travam o cadastro (mesmo para SOCIO).
+  // Documentos de identidade/residência — obrigatoriedade depende de
+  // Tenant.exigirDocumentosCadastro (default true); checado após carregar o tenant.
   fotoDocumentoUrl: z.string().url().optional(),
   comprovanteResidenciaUrl: z.string().url().optional(),
   // Responsável legal — obrigatório só quando SOCIO é menor de idade.
@@ -739,10 +756,23 @@ export async function solicitarVinculo(
 
   const tenant = await db.tenant.findFirst({
     where: { id: data.tenantId, ativo: true },
-    select: { id: true, slug: true, nome: true },
+    select: { id: true, slug: true, nome: true, exigirDocumentosCadastro: true },
   })
   if (!tenant) {
     return { message: 'Torcida não encontrada.' }
+  }
+
+  if (data.tipo === 'SOCIO' && tenant.exigirDocumentosCadastro) {
+    const docErrors: Record<string, string[]> = {}
+    if (!data.fotoDocumentoUrl) {
+      docErrors.fotoDocumentoUrl = ['Envie a foto do RG']
+    }
+    if (!data.comprovanteResidenciaUrl) {
+      docErrors.comprovanteResidenciaUrl = ['Envie o comprovante de residência']
+    }
+    if (Object.keys(docErrors).length > 0) {
+      return { errors: docErrors }
+    }
   }
 
   // `nomePai`/`nomeMae` não viram coluna própria — concatenam em `filiacao`.
@@ -926,7 +956,8 @@ export async function solicitarVinculo(
     })
   }
 
-  // Conclui o onboarding (garante que o perfil exista).
+  // Conclui o onboarding (garante que o perfil exista) ANTES do fan-out /
+  // notificações — se o espelho falhar, o sócio já está na fila da unidade.
   await db.perfilTorcedor.upsert({
     where: { userId },
     create: { userId, onboardingConcluidoEm: new Date() },
@@ -946,81 +977,94 @@ export async function solicitarVinculo(
   // Avisa o solicitante do fluxo até a aprovação — só SOCIO fica PENDENTE
   // (TORCEDOR já nasce APROVADO, sem fila). Caso B: fan-out da pendência
   // para a Sede raiz (fila compartilhada; first-wins na decisão).
+  // Best-effort: falha aqui NÃO pode impedir a tela de sucesso — o vínculo
+  // canônico na unidade já foi gravado.
   if (statusInicial === 'PENDENTE') {
-    const membroOrigem: MembroParaEspelho | null = await db.saasMembro.findUnique({
-      where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
-      select: {
-        id: true,
-        userId: true,
-        tipo: true,
-        nome: true,
-        idade: true,
-        telefone: true,
-        cidade: true,
-        numeroAssociado: true,
-        anosSocio: true,
-        cep: true,
-        numero: true,
-        bloco: true,
-        complemento: true,
-        imagemProva: true,
-        rg: true,
-        cpf: true,
-        filiacao: true,
-        escolaridade: true,
-        profissao: true,
-        dataNascimento: true,
-        sexo: true,
-        estadoCivil: true,
-        nacionalidade: true,
-        logradouro: true,
-        bairro: true,
-        uf: true,
-        fotoDocumentoUrl: true,
-        comprovanteResidenciaUrl: true,
-        responsavelNome: true,
-        responsavelDocumento: true,
-        autorizacaoMenorAceitaEm: true,
-        termoResponsabilidadeAceitoEm: true,
-      },
-    })
-
-    let sedeRaizId: string | null = null
-    if (membroOrigem && data.tipo === 'SOCIO') {
-      const fanout = await db.$transaction(async (tx: Prisma.TransactionClient) =>
-        criarOuAtualizarPendenciaEspelhoNaSede(tx, {
-          tenantOrigemId: tenantDestino.id,
-          membro: membroOrigem,
-          atorId: userId,
-        }),
-      )
-      if (fanout.espelhoId && fanout.raizTenantId) {
-        sedeRaizId = fanout.raizTenantId
-      }
-    }
-
-    await notificarNovoMembroPendente({
-      tenantId: tenantDestino.id,
-      tenantNome: tenantDestino.nome,
-      solicitanteUserId: userId,
-      solicitanteNome: data.nome,
-      tipoVinculo: data.tipo,
-    })
-
-    if (sedeRaizId) {
-      const sedeNome: { nome: string } | null = await db.tenant.findFirst({
-        where: { id: sedeRaizId },
-        select: { nome: true },
+    try {
+      const membroOrigem: MembroParaEspelho | null = await db.saasMembro.findUnique({
+        where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
+        select: {
+          id: true,
+          userId: true,
+          tipo: true,
+          nome: true,
+          idade: true,
+          telefone: true,
+          cidade: true,
+          numeroAssociado: true,
+          anosSocio: true,
+          cep: true,
+          numero: true,
+          bloco: true,
+          complemento: true,
+          imagemProva: true,
+          rg: true,
+          cpf: true,
+          filiacao: true,
+          escolaridade: true,
+          profissao: true,
+          dataNascimento: true,
+          sexo: true,
+          estadoCivil: true,
+          nacionalidade: true,
+          logradouro: true,
+          bairro: true,
+          uf: true,
+          fotoDocumentoUrl: true,
+          comprovanteResidenciaUrl: true,
+          responsavelNome: true,
+          responsavelDocumento: true,
+          autorizacaoMenorAceitaEm: true,
+          termoResponsabilidadeAceitoEm: true,
+        },
       })
+
+      let sedeRaizId: string | null = null
+      if (membroOrigem && data.tipo === 'SOCIO') {
+        const fanout = await db.$transaction(async (tx: Prisma.TransactionClient) =>
+          criarOuAtualizarPendenciaEspelhoNaSede(tx, {
+            tenantOrigemId: tenantDestino.id,
+            membro: membroOrigem,
+            atorId: userId,
+          }),
+        )
+        if (fanout.espelhoId && fanout.raizTenantId) {
+          sedeRaizId = fanout.raizTenantId
+        }
+      }
+
       await notificarNovoMembroPendente({
-        tenantId: sedeRaizId,
-        tenantNome: sedeNome?.nome ?? 'Sede',
+        tenantId: tenantDestino.id,
+        tenantNome: tenantDestino.nome,
         solicitanteUserId: userId,
         solicitanteNome: data.nome,
         tipoVinculo: data.tipo,
-        notificarSolicitante: false,
-        corpoAdmin: `${data.nome} solicitou ingresso como sócio em ${tenantDestino.nome}. A Sede também pode aprovar ou recusar.`,
       })
+
+      if (sedeRaizId) {
+        const sedeNome: { nome: string } | null = await db.tenant.findFirst({
+          where: { id: sedeRaizId },
+          select: { nome: true },
+        })
+        await notificarNovoMembroPendente({
+          tenantId: sedeRaizId,
+          tenantNome: sedeNome?.nome ?? 'Sede',
+          solicitanteUserId: userId,
+          solicitanteNome: data.nome,
+          tipoVinculo: data.tipo,
+          notificarSolicitante: false,
+          corpoAdmin: `${data.nome} solicitou ingresso como sócio em ${tenantDestino.nome}. A Sede também pode aprovar ou recusar.`,
+        })
+      }
+    } catch (err) {
+      if (isExpectedError(err)) {
+        console.warn(
+          '[solicitarVinculo] fan-out/notificação:',
+          err instanceof Error ? err.message : err,
+        )
+      } else {
+        console.error('[solicitarVinculo] fan-out/notificação falhou após vínculo gravado', err)
+      }
     }
   }
 
@@ -1030,6 +1074,8 @@ export async function solicitarVinculo(
   // só resolve tenant pra SOCIO APROVADO). Limpa explicitamente pra não
   // herdar um cookie de uma tentativa anterior.
   await clearTenantContextSlug()
-  redirect(`/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`)
-  return { ok: true }
+  return {
+    ok: true,
+    redirectTo: `/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`,
+  }
 }

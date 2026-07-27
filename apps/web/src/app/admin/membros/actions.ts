@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
+import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
@@ -16,7 +16,7 @@ import {
   sincronizarStatusEspelhoDaOrigem,
   validarNumeroAssociadoUnicoNaTorcida,
 } from '@/lib/membros-sede'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarSafe, emitNotificacaoPingCnDoSolicitante } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
@@ -528,10 +528,16 @@ export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) 
     tipo: 'MEMBRO_APROVADO',
     titulo: 'Sua solicitação foi aprovada',
     corpo: `Você agora é membro de ${tenantNotificarNome}.`,
-    link: '/portal/carteirinha',
+    // `/auth/contexto` grava cookie / redireciona ao subdomínio da torcida —
+    // o solicitante ainda está na CN e precisa trocar de contexto na hora.
+    link: '/auth/contexto',
   })
+  await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
-  invalidarBadgesAutorTenant(origem.tenantId)
+  invalidarCachesComunidadeFeed(origem.tenantId)
+  // Força recomputar contexto/caches compartilhados do portal (navbar + layout)
+  // para refletir imediatamente `membro.status: APROVADO` no hard refresh.
+  revalidatePath('/portal', 'layout')
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
@@ -735,9 +741,12 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
     corpo: motivoTrim
       ? motivoTrim
       : `Sua solicitação de ingresso em ${tenantNotificarNome} não foi aprovada.`,
-    link: '/portal/carteirinha',
+    link: '/portal/comunidade',
   })
+  await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
+  invalidarCachesComunidadeFeed(origem.tenantId)
+  revalidatePath('/portal', 'layout')
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
@@ -825,6 +834,10 @@ export async function reverterMembro(membroId: string) {
     }
   }
 
+  invalidarCachesComunidadeFeed(resultado.origemTenantId)
+  revalidatePath('/portal', 'layout')
+  revalidatePath('/portal/comunidade')
+  revalidatePath('/portal/carteirinha')
   revalidatePath('/admin/membros')
   revalidatePath('/portal/departamentos', 'layout')
 }

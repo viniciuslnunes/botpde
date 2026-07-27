@@ -354,6 +354,10 @@ model Tenant {
   /// Quanto detalhe o balanço público mostra (totais / categorias / lançamentos).
   balancoDetalheNivel BalancoDetalheNivel @default(COMPLETO) @map("balanco_detalhe_nivel")
 
+  /// Onboarding SOCIO: exige foto do RG e comprovante de residência (controle/registro).
+  /// Desligável em /admin/configuracoes → Cadastro de sócios.
+  exigirDocumentosCadastro Boolean @default(true) @map("exigir_documentos_cadastro")
+
 
   @@map("saas_tenants")
 

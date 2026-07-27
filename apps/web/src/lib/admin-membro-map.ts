@@ -1,5 +1,6 @@
 import { statusBadgeLabel } from '@/components/admin/ui'
 import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
+import { formatRg } from '@torcida/types'
 
 const TIPO_BADGE: Record<string, string> = {
   SOCIO: 'Sócio',
@@ -11,6 +12,10 @@ export function formatCpfAdmin(cpf: string | null | undefined): string | null {
   const d = cpf.replace(/\D/g, '')
   if (d.length !== 11) return cpf
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
+export function formatRgAdmin(rg: string | null | undefined): string | null {
+  return formatRg(rg) ?? (rg ? String(rg) : null)
 }
 
 export function formatDataLabelAdmin(d: Date | null | undefined): string | null {
@@ -159,7 +164,7 @@ export function mapToAdminMembroItem(
     sexo: isSocio ? membro.sexo : null,
     estadoCivil: isSocio ? membro.estadoCivil : null,
     nacionalidade: isSocio ? membro.nacionalidade : null,
-    rg: isSocio ? membro.rg : null,
+    rg: isSocio ? formatRgAdmin(membro.rg) : null,
     cpf: isSocio ? formatCpfAdmin(membro.cpf) : null,
     filiacao: isSocio ? membro.filiacao : null,
     escolaridade: isSocio ? membro.escolaridade : null,

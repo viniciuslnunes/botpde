@@ -31,7 +31,7 @@ export async function GET() {
 
     const [unreadMessages, inbox] = await Promise.all([
       contarMensagensNaoLidas(userId).catch((): number => 0),
-      getInboxNavbar(tenantId, userId, tiposInbox, 8),
+      getInboxNavbar(tenantId, userId, tiposInbox, 8, { portalComCn: true }),
     ])
 
     return NextResponse.json({

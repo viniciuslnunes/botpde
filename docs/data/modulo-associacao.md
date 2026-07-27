@@ -30,7 +30,7 @@ para `tipo: SOCIO` via `.superRefine` em `solicitarVinculoSchema`,
 |---|---|
 | `sexo`, `estadoCivil`, `nacionalidade` | Identificação — nunca obrigatórios (evitar fricção) |
 | `logradouro`, `bairro`, `uf` | Endereço completo — obrigatórios para SOCIO (junto de `cep`, `numero`, `bloco`, `complemento` já existentes) |
-| `fotoDocumentoUrl`, `comprovanteResidenciaUrl` | Documentos — sempre opcionais, mesmo para SOCIO (podem ser solicitados depois) |
+| `fotoDocumentoUrl`, `comprovanteResidenciaUrl` | Documentos — obrigatórios para SOCIO quando `Tenant.exigirDocumentosCadastro` (default `true`); desligável em `/admin/configuracoes?tab=cadastro` |
 | `responsavelNome`, `responsavelDocumento`, `autorizacaoMenorAceitaEm` | Responsável legal — obrigatórios só quando o SOCIO tem menos de 18 anos (calculado a partir de `dataNascimento`) |
 | `termoResponsabilidadeAceitoEm` | Timestamp do aceite do termo de responsabilidade — obrigatório para SOCIO |
 

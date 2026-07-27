@@ -16,11 +16,28 @@ export const TIPOS_QUE_EXIGEM_REFRESH: ReadonlySet<string> = new Set([
   'CANAL_APROVADO',
 ])
 
+/** Aprovação de sócio: sai da CN e entra na comunidade da torcida. */
+export const LINK_APOS_APROVACAO_MEMBRO = '/auth/contexto'
+
 const MAX_TOASTS_INDIVIDUAIS = 3
 const TOAST_DURATION_MS = 6000
 
 function truncar(texto: string, max = 90): string {
   return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto
+}
+
+function destinoAprovacaoMembro(n: NotificationItem): string {
+  return n.link?.trim() || LINK_APOS_APROVACAO_MEMBRO
+}
+
+/**
+ * Redireciona para `/auth/contexto` (grava cookie / subdomínio). Usa assign
+ * full-page — `router.push` em Route Handler não aplica Set-Cookie de forma
+ * confiável no App Router.
+ */
+export function redirecionarAposAprovacaoMembro(href: string): void {
+  if (typeof window === 'undefined') return
+  window.location.assign(href)
 }
 
 /**
@@ -52,6 +69,41 @@ export function criarVigiaDeNotificacoes(verTodasHref: string) {
     }
 
     if (novas.length === 0) return false
+
+    const aprovacao = novas.find((n) => n.tipo === 'MEMBRO_APROVADO')
+    if (aprovacao) {
+      const destino = destinoAprovacaoMembro(aprovacao)
+      toast.custom(
+        (id) => (
+          <button
+            type="button"
+            onClick={() => {
+              toast.dismiss(id)
+              redirecionarAposAprovacaoMembro(destino)
+            }}
+            className="flex w-full items-start gap-2.5 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 text-left shadow-lg"
+          >
+            <NotificationAvatar ator={aprovacao.ator} tipo={aprovacao.tipo} size="sm" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                {aprovacao.titulo}
+              </span>
+              {aprovacao.corpo && (
+                <span className="mt-0.5 block text-xs text-[rgb(var(--foreground-muted))]">
+                  {truncar(aprovacao.corpo)}
+                </span>
+              )}
+              <span className="mt-1 block text-xs font-medium text-[rgb(var(--color-primary-fg))]">
+                Abrindo a comunidade da torcida…
+              </span>
+            </span>
+          </button>
+        ),
+        { duration: TOAST_DURATION_MS },
+      )
+      redirecionarAposAprovacaoMembro(destino)
+      return false
+    }
 
     const precisaRefresh = novas.some((n) => TIPOS_QUE_EXIGEM_REFRESH.has(n.tipo))
 

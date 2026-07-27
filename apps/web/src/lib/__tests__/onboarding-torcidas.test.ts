@@ -59,6 +59,7 @@ describe('getTorcidasPorAfiliacao', () => {
         slug: 'estopim',
         logoUrl: null,
         corPrimaria: '#000',
+        exigirDocumentosCadastro: true,
         torcidaConhecidaId: null,
         torcidaConhecida: null,
         _count: { membros: 10 },
@@ -69,6 +70,7 @@ describe('getTorcidasPorAfiliacao', () => {
         slug: 'gavioes',
         logoUrl: 'https://res.cloudinary.com/demo/gavioes.png',
         corPrimaria: '#111',
+        exigirDocumentosCadastro: true,
         torcidaConhecidaId: null,
         torcidaConhecida: null,
         _count: { membros: 2 },
@@ -112,6 +114,7 @@ describe('getTorcidasPorAfiliacao', () => {
         slug: 'coringao-chopp',
         logoUrl: 'https://res.cloudinary.com/demo/chopp.png',
         corPrimaria: '#222',
+        exigirDocumentosCadastro: false,
         torcidaConhecidaId: null,
         torcidaConhecida: null,
         _count: { membros: 0 },
@@ -128,6 +131,7 @@ describe('getTorcidasPorAfiliacao', () => {
       torcedoresTotal: 0,
       torcedoresOnline: 0,
     })
+    expect(lista[0]?.exigirDocumentosCadastro).toBe(false)
   })
 
   it('inclui sede Caso B (tenant filho) na lista da mãe e omite o filho como torcida', async () => {
@@ -138,6 +142,7 @@ describe('getTorcidasPorAfiliacao', () => {
         slug: 'gavioes',
         logoUrl: 'https://res.cloudinary.com/demo/gavioes.png',
         corPrimaria: '#000',
+        exigirDocumentosCadastro: true,
         torcidaConhecidaId: null,
         torcidaConhecida: null,
         _count: { membros: 5 },
@@ -148,6 +153,7 @@ describe('getTorcidasPorAfiliacao', () => {
         slug: 'pde-praia-grande',
         logoUrl: null,
         corPrimaria: '#000',
+        exigirDocumentosCadastro: true,
         torcidaConhecidaId: null,
         torcidaConhecida: null,
         _count: { membros: 1 },

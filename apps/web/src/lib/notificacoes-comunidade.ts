@@ -5,6 +5,7 @@ import {
   TIPOS_NOTIFICACAO_ADMIN,
   TIPOS_NOTIFICACAO_SOCIAL,
 } from '@/lib/notificacoes-routing'
+import { whereInboxPortal } from '@/lib/notificacoes'
 
 export { TIPOS_NOTIFICACAO_ADMIN, TIPOS_NOTIFICACAO_SOCIAL }
 
@@ -103,12 +104,9 @@ export async function listarNotificacoesSociais(
   filtro: FiltroNotificacaoSocial = 'todas',
   limite = 40,
 ): Promise<NotificacaoSocialItem[]> {
+  const where = await whereInboxPortal(tenantId, userId, tiposDoFiltro(filtro))
   const rows: NotificacaoSocialItem[] = await db.notificacao.findMany({
-    where: {
-      tenantId,
-      userId,
-      tipo: { in: tiposDoFiltro(filtro) },
-    },
+    where,
     orderBy: { criadoEm: 'desc' },
     take: limite,
     select: {

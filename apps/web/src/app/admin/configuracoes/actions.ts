@@ -183,6 +183,34 @@ export async function salvarHierarquiaVisivel(formData: FormData) {
   invalidateHierarchyCache(tenant.id)
 }
 
+/** Onboarding SOCIO: exige (ou não) foto do RG e comprovante de residência. */
+export async function salvarExigirDocumentosCadastro(formData: FormData) {
+  const { session, tenant } = await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  await assertTenantOwner(session.user.id, tenant.id)
+
+  const exigir = formData.get('exigirDocumentosCadastro') === 'true'
+
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { exigirDocumentosCadastro: exigir },
+  })
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'TENANT_DOCUMENTOS_CADASTRO_ATUALIZADO',
+      entidade: 'Tenant',
+      entidadeId: tenant.id,
+      detalhes: { exigir },
+    },
+  })
+
+  revalidatePath('/admin/configuracoes')
+  revalidatePath('/onboarding')
+  invalidateTenantCache(tenant.slug)
+}
+
 // ── Canal oficial (mural da unidade na Comunidade) ────────────────────────────
 
 export async function salvarCanalOficial(formData: FormData) {
@@ -198,7 +226,7 @@ export async function salvarCanalOficial(formData: FormData) {
   })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Dados inválidos')
 
-  const { id: canalId } = await getOrCreateCanalOficial(tenant.id)
+  const { id: canalId } = await getOrCreateCanalOficial(tenant.id, session.user.id)
 
   await db.conversa.update({
     where: { id: canalId },

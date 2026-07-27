@@ -13,9 +13,11 @@ interface SeguimentoButtonsProps {
   userId: string
   status: SeguimentoStatus
   isSelf?: boolean
+  /** Labels curtos e `whitespace-nowrap` — para sidebars estreitas (ex.: Para seguir). */
+  compact?: boolean
 }
 
-export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsProps) {
+export function SeguimentoButtons({ userId, status, isSelf, compact = false }: SeguimentoButtonsProps) {
   const [pending, startTransition] = useTransition()
   const [menuOpen, setMenuOpen] = useState(false)
   const [localStatus, setLocalStatus] = useState(status)
@@ -27,6 +29,9 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
 
   if (isSelf) return null
 
+  const actionPad = compact ? 'px-2 py-1' : 'px-3 py-1.5'
+  const actionText = compact ? 'text-[11px]' : 'text-xs'
+
   return (
     <AnimatePresence mode="wait">
       {localStatus === 'APROVADO' ? (
@@ -36,7 +41,7 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.92 }}
           transition={springSnappy}
-          className="relative"
+          className="relative shrink-0"
         >
           <m.button
             type="button"
@@ -45,7 +50,7 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
             onClick={() => setMenuOpen((v) => !v)}
             whileTap={{ scale: 0.96 }}
             transition={springSnappy}
-            className="inline-flex items-center gap-1 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60"
+            className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg border border-[rgb(var(--border))] ${actionPad} ${actionText} font-semibold text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-60`}
           >
             Seguindo
             <ChevronDown className="h-3.5 w-3.5" />
@@ -99,9 +104,10 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
           animate="show"
           exit="hidden"
           transition={springSnappy}
-          className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+          title="Solicitação pendente"
+          className={`inline-flex shrink-0 whitespace-nowrap rounded-full bg-amber-100 ${compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200`}
         >
-          Solicitação pendente
+          {compact ? 'Pendente' : 'Solicitação pendente'}
         </m.span>
       ) : (
         <m.button
@@ -126,7 +132,7 @@ export function SeguimentoButtons({ userId, status, isSelf }: SeguimentoButtonsP
           }
           whileTap={{ scale: 0.94 }}
           transition={springSnappy}
-          className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className={`shrink-0 whitespace-nowrap rounded-lg bg-[rgb(var(--primary))] ${actionPad} ${actionText} font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60`}
         >
           Seguir
         </m.button>

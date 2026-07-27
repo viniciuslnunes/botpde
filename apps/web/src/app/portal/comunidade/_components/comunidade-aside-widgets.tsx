@@ -110,21 +110,24 @@ export async function ComunidadeAsideWidgets({
                   >
                     <Avatar nome={autor.nome} avatarUrl={autor.avatarUrl} size="sm" />
                   </Link>
-                  <Link
-                    href={`/portal/comunidade/perfil/${autor.id}`}
-                    className="min-w-0 flex-1 cursor-pointer truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline"
-                  >
-                    {autor.nome ?? 'Membro'}
-                  </Link>
-                  {'seguidores' in autor && autor.seguidores > 0 && (
-                    <span className="text-[10px] text-[rgb(var(--foreground-muted))]">
-                      {autor.seguidores} seg.
-                    </span>
-                  )}
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/portal/comunidade/perfil/${autor.id}`}
+                      className="block cursor-pointer truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline"
+                    >
+                      {autor.nome ?? 'Membro'}
+                    </Link>
+                    {'seguidores' in autor && autor.seguidores > 0 && (
+                      <p className="truncate text-[10px] text-[rgb(var(--foreground-muted))]">
+                        {autor.seguidores} seguidor{autor.seguidores === 1 ? '' : 'es'}
+                      </p>
+                    )}
+                  </div>
                   <SeguimentoButtons
                     userId={autor.id}
                     status={null}
                     isSelf={autor.id === currentUserId}
+                    compact
                   />
                 </div>
               ))}

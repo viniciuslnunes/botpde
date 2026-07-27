@@ -1,18 +1,21 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
+import { getActiveTenant } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Settings, MessageSquare, Flag, Scale, Network, Radio } from 'lucide-react'
+import { isExpectedError } from '@/lib/expected-error'
+import { Settings, MessageSquare, Flag, Scale, Network, Radio, IdCard } from 'lucide-react'
 import {
   PerfilTenantForm,
   DiscordForm,
   AfiliacaoForm,
   BalancoVisivelForm,
   HierarquiaVisivelForm,
+  DocumentosCadastroForm,
   CanalOficialForm,
 } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { ConfigTabHashSync } from '@/components/admin/config-tab-hash-sync'
 import { AdminTabs, adminTabIds } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
@@ -25,8 +28,11 @@ export default async function ConfiguracoesPage({
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!tenant || !session?.user?.id) redirect('/')
+  const session = await auth()
+  if (!session?.user?.id) redirect('/')
+
+  const tenant = await getActiveTenant(session.user.id, session.user.email)
+  if (!tenant) redirect('/')
 
   interface AfiliacaoOption {
     id: string
@@ -49,33 +55,6 @@ export default async function ConfiguracoesPage({
       select: { id: true, nome: true },
     }),
   ])
-
-  // Só resolve/cria o canal oficial para quem de fato vê a seção — evita que
-  // qualquer visita de admin sem SETTINGS_MANAGE (gate real da action) crie o
-  // canal como efeito colateral do carregamento da página.
-  const canalOficial: {
-    nome: string | null
-    descricao: string | null
-    avatarUrl: string | null
-    visibilidadeCanal: string
-    somenteAdminPublica: boolean
-    publica: boolean
-  } | null = isOwner
-    ? await (async () => {
-        const { id: canalOficialId } = await getOrCreateCanalOficial(tenant.id)
-        return db.conversa.findUnique({
-          where: { id: canalOficialId },
-          select: {
-            nome: true,
-            descricao: true,
-            avatarUrl: true,
-            visibilidadeCanal: true,
-            somenteAdminPublica: true,
-            publica: true,
-          },
-        })
-      })()
-    : null
 
   const sections = [
     {
@@ -114,6 +93,13 @@ export default async function ConfiguracoesPage({
       ownerOnly: true,
     },
     {
+      id: 'cadastro',
+      icon: IdCard,
+      title: 'Cadastro de sócios',
+      description: 'Obrigatoriedade de documentos (RG e residência) no onboarding',
+      ownerOnly: true,
+    },
+    {
       id: 'canal-oficial',
       icon: Radio,
       title: 'Canal oficial',
@@ -129,6 +115,49 @@ export default async function ConfiguracoesPage({
   const Icon = activeSection.icon
   const blocked = activeSection.ownerOnly && !isOwner
 
+  type CanalOficialConfig = {
+    nome: string | null
+    descricao: string | null
+    avatarUrl: string | null
+    visibilidadeCanal: string
+    somenteAdminPublica: boolean
+    publica: boolean
+  }
+
+  let canalOficial: CanalOficialConfig | null = null
+  let canalOficialError: string | null = null
+
+  // Só resolve/cria na tab "Canal oficial" (owner) — evita efeito colateral e
+  // falha de provisionamento derrubando outras seções da página.
+  if (isOwner && activeSection.id === 'canal-oficial' && !blocked) {
+    try {
+      const { id: canalOficialId } = await getOrCreateCanalOficial(
+        tenant.id,
+        session.user.id,
+      )
+      canalOficial = await db.conversa.findUnique({
+        where: { id: canalOficialId },
+        select: {
+          nome: true,
+          descricao: true,
+          avatarUrl: true,
+          visibilidadeCanal: true,
+          somenteAdminPublica: true,
+          publica: true,
+        },
+      })
+      if (!canalOficial) {
+        canalOficialError =
+          'Canal oficial não encontrado após provisionamento. Tente recarregar ou contate o suporte.'
+      }
+    } catch (err: unknown) {
+      canalOficialError =
+        err instanceof Error && isExpectedError(err)
+          ? err.message
+          : 'Não foi possível carregar o canal oficial. Tente recarregar a página.'
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
@@ -143,6 +172,7 @@ export default async function ConfiguracoesPage({
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
+          <ConfigTabHashSync tabIds={sections.map((section) => section.id)} />
           <AdminTabs
             tabs={sections.map((section) => {
               const TabIcon = section.icon
@@ -210,15 +240,24 @@ export default async function ConfiguracoesPage({
                     key={String(tenant.hierarquiaVisivelParaFilhos)}
                     visivel={tenant.hierarquiaVisivelParaFilhos}
                   />
-                ) : activeSection.id === 'canal-oficial' && canalOficial ? (
-                  <CanalOficialForm
-                    nome={canalOficial.nome ?? tenant.nome}
-                    descricao={canalOficial.descricao}
-                    avatarUrl={canalOficial.avatarUrl}
-                    visibilidadeCanal={canalOficial.visibilidadeCanal}
-                    somenteAdminPublica={canalOficial.somenteAdminPublica}
-                    publica={canalOficial.publica}
+                ) : activeSection.id === 'cadastro' ? (
+                  <DocumentosCadastroForm
+                    key={String(tenant.exigirDocumentosCadastro)}
+                    exigir={tenant.exigirDocumentosCadastro}
                   />
+                ) : activeSection.id === 'canal-oficial' ? (
+                  canalOficialError ? (
+                    <p className="text-sm text-red-600 dark:text-red-400">{canalOficialError}</p>
+                  ) : canalOficial ? (
+                    <CanalOficialForm
+                      nome={canalOficial.nome ?? tenant.nome}
+                      descricao={canalOficial.descricao}
+                      avatarUrl={canalOficial.avatarUrl}
+                      visibilidadeCanal={canalOficial.visibilidadeCanal}
+                      somenteAdminPublica={canalOficial.somenteAdminPublica}
+                      publica={canalOficial.publica}
+                    />
+                  ) : null
                 ) : null}
               </div>
             </div>

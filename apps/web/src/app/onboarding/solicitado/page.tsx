@@ -4,6 +4,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { buildPortalUrl, getActiveTenant } from '@/lib/tenant'
+import { SolicitacaoResumoCard } from '@/components/onboarding/solicitacao-resumo-card'
 
 export default async function SolicitacaoEnviadaPage({
   searchParams,
@@ -19,9 +20,40 @@ export default async function SolicitacaoEnviadaPage({
   const torcida = slug
     ? await db.tenant.findFirst({
         where: { slug, ativo: true },
-        select: { nome: true, slug: true },
+        select: { id: true, nome: true, slug: true },
       })
     : null
+
+  const solicitacao = await db.saasMembro.findFirst({
+    where: {
+      userId: session.user.id,
+      tipo: 'SOCIO',
+      ...(torcida ? { tenantId: torcida.id } : {}),
+    },
+    orderBy: { atualizadoEm: 'desc' },
+    select: {
+      nome: true,
+      tipo: true,
+      telefone: true,
+      cidade: true,
+      dataNascimento: true,
+      rg: true,
+      cpf: true,
+      logradouro: true,
+      numero: true,
+      bloco: true,
+      complemento: true,
+      bairro: true,
+      cep: true,
+      uf: true,
+      responsavelNome: true,
+      responsavelDocumento: true,
+      imagemProva: true,
+      fotoDocumentoUrl: true,
+      comprovanteResidenciaUrl: true,
+      status: true,
+    },
+  })
 
   const portalUrl = torcida ? buildPortalUrl(torcida.slug) : '/portal/comunidade'
   const portalExterno = portalUrl.startsWith('http')
@@ -50,6 +82,38 @@ export default async function SolicitacaoEnviadaPage({
           pela diretoria dessa torcida.
         </p>
       )}
+
+      {solicitacao?.status === 'PENDENTE' ? (
+        <div className="mx-auto mt-8 w-full max-w-4xl text-left">
+          <SolicitacaoResumoCard
+            data={{
+              nome: solicitacao.nome,
+              tipo: solicitacao.tipo === 'SOCIO' ? 'Sócio' : 'Torcedor',
+              telefone: solicitacao.telefone,
+              cidade: solicitacao.cidade,
+              dataNascimentoLabel: solicitacao.dataNascimento
+                ? new Date(solicitacao.dataNascimento).toLocaleDateString('pt-BR')
+                : null,
+              rg: solicitacao.rg,
+              cpf: solicitacao.cpf,
+              logradouro: solicitacao.logradouro,
+              numero: solicitacao.numero,
+              bloco: solicitacao.bloco,
+              complemento: solicitacao.complemento,
+              bairro: solicitacao.bairro,
+              cep: solicitacao.cep,
+              uf: solicitacao.uf,
+              responsavelNome: solicitacao.responsavelNome,
+              responsavelDocumento: solicitacao.responsavelDocumento,
+              imagemProva: solicitacao.imagemProva,
+              fotoDocumentoUrl: solicitacao.fotoDocumentoUrl,
+              comprovanteResidenciaUrl: solicitacao.comprovanteResidenciaUrl,
+            }}
+            titulo="Solicitação registrada"
+            descricao="Os anexos do onboarding foram persistidos e já estão vinculados a esta solicitação."
+          />
+        </div>
+      ) : null}
 
       <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
         {portalExterno ? (

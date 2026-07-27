@@ -377,6 +377,91 @@ const NOTIFICACAO_INBOX_SELECT = {
 } as const
 
 /**
+ * Decisões de admissão gravadas no tenant da torcida — o solicitante ainda
+ * está na Comunidade Nacional (tenant sintético) e precisa vê-las no sino.
+ */
+export const TIPOS_DECISAO_ADMISSAO: readonly TipoNotificacao[] = [
+  'MEMBRO_APROVADO',
+  'MEMBRO_REPROVADO',
+]
+
+type NotificacaoWhere = {
+  userId: string
+  tipo: { in: TipoNotificacao[] }
+  tenantId?: string
+  OR?: Array<
+    | { tenantId: string }
+    | {
+        tipo: { in: TipoNotificacao[] }
+        tenant: { afiliacaoId: string; sintetico: false; ativo: true }
+      }
+  >
+}
+
+/**
+ * Where do sino do portal. Na CN (tenant sintético), inclui MEMBRO_APROVADO /
+ * MEMBRO_REPROVADO do clube — a notificação canônica vive no tenant da torcida,
+ * mas o solicitante assina SSE/inbox da CN até o redirect pós-aprovação.
+ */
+export async function whereInboxPortal(
+  tenantId: string,
+  userId: string,
+  tipos: TipoNotificacao[],
+): Promise<NotificacaoWhere> {
+  const base: NotificacaoWhere = { userId, tipo: { in: tipos } }
+  const tenant: { sintetico: boolean; afiliacaoId: string | null } | null =
+    await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { sintetico: true, afiliacaoId: true },
+    })
+  if (!tenant?.sintetico || !tenant.afiliacaoId) {
+    return { ...base, tenantId }
+  }
+  const tiposAdmissao = tipos.filter((t): t is TipoNotificacao =>
+    (TIPOS_DECISAO_ADMISSAO as readonly string[]).includes(t),
+  )
+  if (tiposAdmissao.length === 0) {
+    return { ...base, tenantId }
+  }
+  return {
+    ...base,
+    OR: [
+      { tenantId },
+      {
+        tipo: { in: tiposAdmissao },
+        tenant: {
+          afiliacaoId: tenant.afiliacaoId,
+          sintetico: false,
+          ativo: true,
+        },
+      },
+    ],
+  }
+}
+
+/**
+ * Ping extra na CN após criar MEMBRO_APROVADO/REPROVADO no tenant da torcida.
+ * `criarNotificacao` já pinga a torcida; o solicitante PENDENTE assina SSE da CN
+ * (`resolveTenantIdPortalComunidade`), então precisa deste canal também.
+ */
+export async function emitNotificacaoPingCnDoSolicitante(
+  tenantTorcidaId: string,
+  userId: string,
+): Promise<void> {
+  const tenant: { afiliacaoId: string | null; sintetico: boolean } | null =
+    await db.tenant.findUnique({
+      where: { id: tenantTorcidaId },
+      select: { afiliacaoId: true, sintetico: true },
+    })
+  if (!tenant?.afiliacaoId || tenant.sintetico) return
+  const { getOrCreateComunidadeNacionalTenant } = await import('@/lib/comunidade-contexto')
+  const sintetico = await getOrCreateComunidadeNacionalTenant(tenant.afiliacaoId)
+  if (sintetico.id !== tenantTorcidaId) {
+    emitNotificacaoPing(sintetico.id, userId)
+  }
+}
+
+/**
  * Lista recentes + contagem de não lidas (+ badges por menu, quando solicitado)
  * num único round-trip ao banco. Usado pelas APIs de navbar (portal e admin).
  */
@@ -385,7 +470,7 @@ export async function getInboxNavbar(
   userId: string,
   tipos: TipoNotificacao[],
   limite = 8,
-  opts?: { withMenuBadges?: boolean },
+  opts?: { withMenuBadges?: boolean; portalComCn?: boolean },
 ): Promise<{
   notifications: NotificacaoInboxItem[]
   unreadCount: number
@@ -395,7 +480,9 @@ export async function getInboxNavbar(
     return { notifications: [], unreadCount: 0, menuBadges: {} }
   }
 
-  const baseWhere = { tenantId, userId, tipo: { in: tipos } }
+  const baseWhere = opts?.portalComCn
+    ? await whereInboxPortal(tenantId, userId, tipos)
+    : { tenantId, userId, tipo: { in: tipos } }
   const withMenuBadges = opts?.withMenuBadges === true
 
   if (!withMenuBadges) {
