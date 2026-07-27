@@ -556,7 +556,7 @@ export function AfiliacaoPedidoCard({
                   ) : (
                     <Check className="h-3.5 w-3.5" />
                   )}
-                  Aprovar e criar unidade
+                  Aprovar e promover a portal
                 </button>
               </form>
               <button

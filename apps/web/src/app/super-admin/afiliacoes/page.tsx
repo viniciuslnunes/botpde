@@ -121,7 +121,7 @@ export default async function AfiliacoesSuperAdminPage() {
     <div className="flex min-h-full flex-col">
       <AdminPageHeader
         title="Afiliações de unidades"
-        description="Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui. Ao aprovar, a unidade é criada sob a torcida. Presidente/Vice também decidem no console da torcida."
+        description="Solicitações de cadastro de subsedes e PDEs — vindas do onboarding ou registradas aqui. Ao aprovar, a unidade é criada e promovida a portal próprio. Presidente/Vice também decidem no console da torcida."
         icon={<Handshake className="h-5 w-5" />}
       />
       <div className="app-container min-w-0 flex-1 py-5 sm:py-8">

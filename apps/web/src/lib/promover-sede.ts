@@ -70,6 +70,7 @@ export async function promoverSedeParaTenant(params: {
       sedeId: true,
       responsavelUserId: true,
       canalConversaId: true,
+      fotoUrl: true,
     },
   })
 
@@ -126,6 +127,8 @@ export async function promoverSedeParaTenant(params: {
         plano: 'FREE',
         corPrimaria: tenantMae.corPrimaria,
         afiliacaoId: tenantMae.afiliacaoId,
+        // Foto da unidade vira logo do portal — senão o header herda o da mãe.
+        ...(sede.fotoUrl ? { logoUrl: sede.fotoUrl } : {}),
       },
     })
 
@@ -144,6 +147,15 @@ export async function promoverSedeParaTenant(params: {
       await tx.sede.updateMany({
         where: { id: { in: filhos.map((f) => f.id) } },
         data: { tenantId: novoTenant.id },
+      })
+    }
+
+    // Canal oficial da unidade: garante avatar = foto da unidade (canais
+    // criados antes do fix nascem sem avatarUrl e caíam no logo da mãe).
+    if (sede.canalConversaId && sede.fotoUrl) {
+      await tx.conversa.updateMany({
+        where: { id: sede.canalConversaId, OR: [{ avatarUrl: null }, { avatarUrl: '' }] },
+        data: { avatarUrl: sede.fotoUrl },
       })
     }
 

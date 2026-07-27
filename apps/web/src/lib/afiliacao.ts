@@ -8,8 +8,8 @@ import type { Prisma } from '@torcida/db'
  * (vínculo formal) e provisiona o canal oficial da unidade. Roda dentro da
  * transação do chamador (flip de status + criação atômicos).
  *
- * NÃO cria tenant nem transfere owner — dar portal com acesso admin à liderança
- * local é um passo à parte (transferência de propriedade / promoção A→B).
+ * A promoção a portal próprio (Caso A→B) roda **depois** desta transação, em
+ * `aprovarSolicitacao` via `promoverSedeParaTenant`. Aqui só materializa a Sede.
  */
 
 export interface UnidadeCriada {
@@ -89,6 +89,8 @@ export async function criarUnidadeDaSolicitacao(
   // Canal oficial da unidade — Conversa no tenant da torcida (leitura por
   // participação). Espelha Departamento.canalConversa; ponteiro em Sede.canalConversaId.
   // ADMIN do canal é a liderança local (solicitante), não o aprovador.
+  // avatarUrl = foto da unidade (não o logo da torcida-mãe — fallback de
+  // canal oficial sem avatar usaria a sede raiz da mãe).
   const canal: { id: string } = await tx.conversa.create({
     data: {
       tipo: 'CANAL',
@@ -100,6 +102,7 @@ export async function criarUnidadeDaSolicitacao(
       visibilidadeCanal: 'TENANT',
       somenteAdminPublica: false,
       publica: false,
+      avatarUrl: solicitacao.fotoUrl,
       criadoPorId: atorId,
       membros: { create: { userId: liderancaUserId ?? atorId, papel: 'ADMIN' } },
     },
