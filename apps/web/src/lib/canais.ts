@@ -93,8 +93,11 @@ export async function podeVerCanal(
 
 /**
  * Fallback de avatar dos canais oficiais: quando `Conversa.avatarUrl` é nulo,
- * usa `Sede.fotoUrl` da sede raiz do tenant e, se também nulo, `Tenant.logoUrl`.
- * Batch por tenantId para evitar N+1 em listagens.
+ * 1) `Sede.fotoUrl` da unidade ligada ao canal (`canalConversaId`) — preferido
+ * 2) `Sede.fotoUrl` da sede raiz do tenant do canal
+ * 3) `Tenant.logoUrl`
+ * Batch por tenantId para evitar N+1 em listagens. Sem (1), canais de
+ * SUBSEDE/PDE no tenant da mãe herdavam o logo da torcida (sede raiz).
  */
 async function resolveFallbackAvatarsCanalOficial(
   tenantIds: string[],
@@ -144,9 +147,12 @@ async function resolveFallbackAvatarsCanalOficial(
 function resolveAvatarCanalOficial(
   row: { tenantId: string; avatarUrl: string | null; canalOficial: boolean },
   fallbackMap: Map<string, string | null>,
+  /** Foto da `Sede` ligada ao canal (unidade), se houver. */
+  sedeFotoUrl?: string | null,
 ): string | null {
   if (row.avatarUrl) return row.avatarUrl
   if (!row.canalOficial) return null
+  if (sedeFotoUrl) return sedeFotoUrl
   return fallbackMap.get(row.tenantId) ?? null
 }
 
@@ -206,13 +212,18 @@ export async function ensureCanalOficialParaSede(opts: {
   criadoPorId: string
   /** Se true, cria o ator como ADMIN (fluxo de afiliação aprovada). Default false. */
   atorComoAdmin?: boolean
+  /** Foto da unidade → `Conversa.avatarUrl` (evita herdar logo da torcida-mãe). */
+  avatarUrl?: string | null
 }): Promise<{ id: string; criadoAgora: boolean }> {
-  const sede: { id: string; canalConversaId: string | null } | null = await db.sede.findUnique({
-    where: { id: opts.sedeId },
-    select: { id: true, canalConversaId: true },
-  })
+  const sede: { id: string; canalConversaId: string | null; fotoUrl: string | null } | null =
+    await db.sede.findUnique({
+      where: { id: opts.sedeId },
+      select: { id: true, canalConversaId: true, fotoUrl: true },
+    })
   if (!sede) throw new ExpectedError('Unidade não encontrada.')
   if (sede.canalConversaId) return { id: sede.canalConversaId, criadoAgora: false }
+
+  const avatarUrl = opts.avatarUrl ?? sede.fotoUrl ?? null
 
   const canal: { id: string } = await db.conversa.create({
     data: {
@@ -220,6 +231,7 @@ export async function ensureCanalOficialParaSede(opts: {
       tenantId: opts.tenantId,
       nome: opts.nome,
       ...CANAL_OFICIAL_DEFAULTS,
+      avatarUrl,
       criadoPorId: opts.criadoPorId,
       ...(opts.atorComoAdmin
         ? {
@@ -569,6 +581,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     estado: string | null
     lat: number | null
     lng: number | null
+    fotoUrl: string | null
   }
 
   // Visibilidade por canal em paralelo — getTenantRelation é dedupado por
@@ -593,6 +606,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
             estado: true,
             lat: true,
             lng: true,
+            fotoUrl: true,
           },
         }),
   ])
@@ -613,7 +627,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
       tenantId: row.tenantId,
       nome: row.nome,
       descricao: row.descricao,
-      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
+      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
       visibilidadeCanal: row.visibilidadeCanal,
@@ -737,6 +751,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
     estado: string | null
     lat: number | null
     lng: number | null
+    fotoUrl: string | null
   }> =
     rows.length === 0
       ? []
@@ -749,6 +764,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
             estado: true,
             lat: true,
             lng: true,
+            fotoUrl: true,
           },
         })
   const sedeMap = new Map(
@@ -763,7 +779,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
       tenantId: row.tenantId,
       nome: row.nome,
       descricao: row.descricao,
-      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
+      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
       visibilidadeCanal: row.visibilidadeCanal,
@@ -876,9 +892,10 @@ export async function getCanalPorId(
     estado: string | null
     lat: number | null
     lng: number | null
+    fotoUrl: string | null
   } | null = await db.sede.findFirst({
     where: { canalConversaId: row.id },
-    select: { tipo: true, cidade: true, estado: true, lat: true, lng: true },
+    select: { tipo: true, cidade: true, estado: true, lat: true, lng: true, fotoUrl: true },
   })
 
   return {
@@ -886,7 +903,7 @@ export async function getCanalPorId(
     tenantId: row.tenantId,
     nome: row.nome,
     descricao: row.descricao,
-    avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
+    avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
     institucional: row.institucional,
     canalOficial: row.canalOficial,
     visibilidadeCanal: row.visibilidadeCanal,
@@ -1176,10 +1193,11 @@ export async function buscarCanaisEUnidades(
   ])
 
   // Visibilidade dos canais e busca de sedes das unidades são independentes.
-  const [canaisVisiveis, sedes, fallbackAvatars]: [
+  const [canaisVisiveis, sedes, fallbackAvatars, sedesPorCanal]: [
     Array<(typeof canalRows)[number] | null>,
     Array<{ tenantId: string | null; tipo: string; cidade: string | null }>,
     Map<string, string | null>,
+    Array<{ canalConversaId: string | null; fotoUrl: string | null }>,
   ] = await Promise.all([
     Promise.all(
       canalRows.map(async (row) => {
@@ -1194,7 +1212,19 @@ export async function buscarCanaisEUnidades(
     resolveFallbackAvatarsCanalOficial(
       canalRows.filter((row) => row.canalOficial && !row.avatarUrl).map((row) => row.tenantId),
     ),
+    canalRows.length === 0
+      ? Promise.resolve([] as Array<{ canalConversaId: string | null; fotoUrl: string | null }>)
+      : db.sede.findMany({
+          where: { canalConversaId: { in: canalRows.map((r) => r.id) } },
+          select: { canalConversaId: true, fotoUrl: true },
+        }),
   ])
+
+  const sedeFotoPorCanal = new Map(
+    sedesPorCanal
+      .filter((s): s is { canalConversaId: string; fotoUrl: string | null } => !!s.canalConversaId)
+      .map((s) => [s.canalConversaId, s.fotoUrl]),
+  )
 
   const canais: CanalItem[] = []
   for (const row of canaisVisiveis) {
@@ -1205,7 +1235,7 @@ export async function buscarCanaisEUnidades(
       tenantId: row.tenantId,
       nome: row.nome,
       descricao: row.descricao,
-      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars),
+      avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sedeFotoPorCanal.get(row.id)),
       institucional: row.institucional,
       canalOficial: row.canalOficial,
       visibilidadeCanal: row.visibilidadeCanal,

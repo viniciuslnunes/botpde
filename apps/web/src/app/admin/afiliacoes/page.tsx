@@ -68,7 +68,7 @@ export default async function AfiliacoesPage() {
       <AdminPageHeader
         icon={<ClipboardCheck className="h-5 w-5" />}
         title="Solicitações de afiliação"
-        description="Revise foto, mapa, provas e contato de cada pedido — o Presidente aprova e a unidade é criada."
+        description="Revise foto, mapa, provas e contato de cada pedido — o Presidente aprova e a unidade ganha portal próprio."
       />
 
       <div className="app-container min-w-0 flex-1 py-5 sm:py-8">

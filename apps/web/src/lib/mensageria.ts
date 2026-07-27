@@ -89,6 +89,26 @@ export function serializeConversasInbox(conversas: ConversaInboxItem[]): InboxIt
   }))
 }
 
+/**
+ * Canais oficiais sem `avatarUrl` herdam a foto da unidade (`Sede.fotoUrl`
+ * via `canalConversaId`) — mesmo critério da listagem de canais da comunidade.
+ */
+async function resolveAvatarCanalPorSede(
+  conversaIds: string[],
+): Promise<Map<string, string>> {
+  if (conversaIds.length === 0) return new Map()
+  const sedes: Array<{ canalConversaId: string | null; fotoUrl: string | null }> =
+    await db.sede.findMany({
+      where: { canalConversaId: { in: conversaIds }, fotoUrl: { not: null } },
+      select: { canalConversaId: true, fotoUrl: true },
+    })
+  const map = new Map<string, string>()
+  for (const s of sedes) {
+    if (s.canalConversaId && s.fotoUrl) map.set(s.canalConversaId, s.fotoUrl)
+  }
+  return map
+}
+
 /** Formato JSON da mensagem nas APIs (datas ISO, conteúdo removido zerado). */
 export function serializeMensagem(m: MensagemItem) {
   return {
@@ -745,8 +765,11 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
   const dmIds = rows
     .filter((row) => row.conversa.tipo === 'DIRETA')
     .map((row) => row.conversa.id)
+  const canalSemAvatarIds = rows
+    .filter((row) => row.conversa.tipo === 'CANAL' && !row.conversa.avatarUrl)
+    .map((row) => row.conversa.id)
 
-  const [naoLidasMap, outrosDm] = await Promise.all([
+  const [naoLidasMap, outrosDm, avatarCanalPorSede] = await Promise.all([
     contarNaoLidasPorConversa(userId, { conversaIds }),
     dmIds.length === 0
       ? Promise.resolve(
@@ -764,6 +787,7 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
             user: { select: { id: true, nome: true, avatarUrl: true } },
           },
         }),
+    resolveAvatarCanalPorSede(canalSemAvatarIds),
   ])
 
   const outroPorConversa = new Map<string, AutorLite>()
@@ -771,6 +795,19 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
   for (const row of outrosDm) {
     outroPorConversa.set(row.conversaId, row.user)
     outroStatusPorConversa.set(row.conversaId, row.status)
+  }
+
+  // Persiste avatar herdado da unidade — canais criados antes do fix ficam
+  // sem avatarUrl e a thread/inbox caíam na inicial. Best-effort, sem await.
+  if (avatarCanalPorSede.size > 0) {
+    void Promise.all(
+      [...avatarCanalPorSede.entries()].map(([id, url]) =>
+        db.conversa.updateMany({
+          where: { id, OR: [{ avatarUrl: null }, { avatarUrl: '' }] },
+          data: { avatarUrl: url },
+        }),
+      ),
+    ).catch(() => undefined)
   }
 
   return rows.map((row) => {
@@ -786,7 +823,8 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
       id: row.conversa.id,
       tipo: row.conversa.tipo,
       nome: row.conversa.nome,
-      avatarUrl: row.conversa.avatarUrl,
+      avatarUrl:
+        row.conversa.avatarUrl ?? avatarCanalPorSede.get(row.conversa.id) ?? null,
       atualizadoEm: row.conversa.atualizadoEm,
       meuPapel: row.papel,
       meuStatus: row.status,

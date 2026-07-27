@@ -21,7 +21,8 @@ import { criarUnidadeDaSolicitacao } from '@/lib/afiliacao'
 /**
  * Server Actions da SOLICITAÇÃO de unidade (afiliação de subsede/PDE — proposta
  * §9). A solicitação nasce no onboarding; aqui o super-admin ou o Presidente
- * (owner) da torcida-alvo revisam, editam e decidem. Aprovar cria a Sede.
+ * (owner) da torcida-alvo revisam, editam e decidem. Aprovar cria a Sede e
+ * promove a portal próprio (Caso A→B via `promoverSedeParaTenant`).
  * Toda mutação grava AuditLog (entidade `SolicitacaoUnidade`).
  */
 
@@ -203,9 +204,33 @@ export async function aprovarSolicitacao(
       },
     })
 
+    // Portal próprio (Caso A→B) no mesmo gesto de aprovação — sem passo manual
+    // "Promover a portal". Se falhar, a Sede já existe (APROVADA) e o botão
+    // manual no super-admin permanece como recuperação.
+    const { promoverSedeParaTenant } = await import('@/lib/promover-sede')
+    const promocao = await promoverSedeParaTenant({
+      sedeId: criada.sedeId,
+      tenantMaeId: solicitacao.tenantId,
+      atorId: ator.userId,
+    })
+
     invalidateHierarchyCache(solicitacao.tenantId)
+    if (promocao.ok) {
+      invalidateHierarchyCache(promocao.novoTenantId)
+    }
     revalidar()
-    return { success: true, message: `Unidade "${solicitacao.nome}" criada e vinculada.` }
+
+    if (!promocao.ok) {
+      return {
+        success: true,
+        message: `Unidade "${solicitacao.nome}" criada, mas a promoção a portal falhou: ${promocao.error}. Use "Promover a portal" manualmente.`,
+      }
+    }
+
+    return {
+      success: true,
+      message: `Unidade "${solicitacao.nome}" aprovada com portal próprio (${promocao.novoSlug}).`,
+    }
   } catch (error) {
     return erroState(error)
   }

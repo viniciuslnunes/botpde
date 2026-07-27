@@ -392,6 +392,14 @@ export async function editarSede(
     responsavelUserId: resp.userId,
   })
 
+  // Foto da unidade ↔ avatar do canal oficial (header/card da comunidade).
+  if (existing.canalConversaId && 'fotoUrl' in rest) {
+    await db.conversa.update({
+      where: { id: existing.canalConversaId },
+      data: { avatarUrl: typeof rest.fotoUrl === 'string' ? rest.fotoUrl : null },
+    })
+  }
+
   await db.auditLog.create({
     data: {
       tenantId: tenant.id,
@@ -457,9 +465,9 @@ export async function salvarFotoSede(
 
   const url = parsed.data?.trim() ? parsed.data.trim() : null
 
-  const existing: { id: string } | null = await db.sede.findFirst({
+  const existing: { id: string; canalConversaId: string | null } | null = await db.sede.findFirst({
     where: { id: sedeId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, canalConversaId: true },
   })
   if (!existing) return { ok: false, message: 'Sede não encontrada.' }
 
@@ -467,6 +475,14 @@ export async function salvarFotoSede(
     where: { id: sedeId },
     data: { fotoUrl: url },
   })
+
+  // Mantém o avatar do canal oficial alinhado à foto da unidade (header + card).
+  if (existing.canalConversaId) {
+    await db.conversa.update({
+      where: { id: existing.canalConversaId },
+      data: { avatarUrl: url },
+    })
+  }
 
   await db.auditLog.create({
     data: {
@@ -482,6 +498,7 @@ export async function salvarFotoSede(
   revalidatePath('/admin/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
   revalidatePath('/portal/sedes')
+  revalidatePath('/portal/comunidade/canais')
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
 

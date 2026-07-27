@@ -87,6 +87,8 @@ export async function promoverUnidadeAPortal(
       tenantId: string | null
       cidade: string | null
       sedeId: string | null
+      fotoUrl: string | null
+      canalConversaId: string | null
       tenant: { corPrimaria: string } | null
     } | null = await db.sede.findUnique({
       where: { id: parsed.data.sedeId },
@@ -97,6 +99,8 @@ export async function promoverUnidadeAPortal(
         tenantId: true,
         cidade: true,
         sedeId: true,
+        fotoUrl: true,
+        canalConversaId: true,
         tenant: { select: { corPrimaria: true } },
       },
     })
@@ -140,6 +144,7 @@ export async function promoverUnidadeAPortal(
         nome: sede.nome,
         plano: 'FREE',
         corPrimaria: sede.tenant?.corPrimaria ?? '#2563eb',
+        ...(sede.fotoUrl ? { logoUrl: sede.fotoUrl } : {}),
       },
       select: { id: true, slug: true },
     })
@@ -160,6 +165,13 @@ export async function promoverUnidadeAPortal(
     await bootstrapAcessoTenant(db, novoTenant.id, { incluirVice: false })
 
     await db.sede.update({ where: { id: sede.id }, data: { tenantId: novoTenant.id } })
+
+    if (sede.canalConversaId && sede.fotoUrl) {
+      await db.conversa.updateMany({
+        where: { id: sede.canalConversaId, OR: [{ avatarUrl: null }, { avatarUrl: '' }] },
+        data: { avatarUrl: sede.fotoUrl },
+      })
+    }
 
     if (ownerUserId) {
       const ownerRole: { id: string } | null = await db.role.findFirst({
