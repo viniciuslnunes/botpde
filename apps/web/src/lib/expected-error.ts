@@ -8,9 +8,13 @@
  * falhas inesperadas — essas DEVEM chegar ao Sentry.
  */
 export class ExpectedError extends Error {
-  constructor(message: string) {
+  /** Campo do formulário quando o erro deve ir em `errors[field]` (não só `message`). */
+  readonly field?: string
+
+  constructor(message: string, opts?: { field?: string }) {
     super(message)
     this.name = 'ExpectedError'
+    this.field = opts?.field
   }
 }
 

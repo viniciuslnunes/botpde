@@ -33,19 +33,24 @@ function sameDocumentPath(url: URL): boolean {
 }
 
 export function NavigationGuard() {
-  const { isDirty, confirmDiscard } = useUnsavedChangesContext()
+  const { isDirty, confirmDiscard, isUnloadAllowed } = useUnsavedChangesContext()
   const router = useRouter()
   const pathname = usePathname()
   const confirmingRef = useRef(false)
   const dirtyRef = useRef(isDirty)
+  const isUnloadAllowedRef = useRef(isUnloadAllowed)
 
   useEffect(() => {
     dirtyRef.current = isDirty
   }, [isDirty])
 
   useEffect(() => {
+    isUnloadAllowedRef.current = isUnloadAllowed
+  }, [isUnloadAllowed])
+
+  useEffect(() => {
     function onBeforeUnload(event: BeforeUnloadEvent) {
-      if (!dirtyRef.current) return
+      if (isUnloadAllowedRef.current() || !dirtyRef.current) return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -55,7 +60,7 @@ export function NavigationGuard() {
 
   useEffect(() => {
     async function onClick(event: MouseEvent) {
-      if (!dirtyRef.current || confirmingRef.current) return
+      if (isUnloadAllowedRef.current() || !dirtyRef.current || confirmingRef.current) return
       if (isModifiedClick(event) || event.defaultPrevented) return
 
       const target = event.target

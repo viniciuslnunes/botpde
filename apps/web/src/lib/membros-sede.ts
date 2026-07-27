@@ -1,4 +1,4 @@
-import { type Prisma } from '@torcida/db'
+import { Prisma } from '@torcida/db'
 import { ExpectedError } from '@/lib/expected-error'
 import {
   getAncestorTenantIds,
@@ -112,6 +112,34 @@ function dadosCadastraisEspelho(membro: MembroParaEspelho) {
   }
 }
 
+/**
+ * `SaasMembro` tem `@@unique([tenantId, cpf])`. Espelho na Sede copia o CPF da
+ * origem — se outro userId já usa o mesmo CPF na raiz, o upsert vira P2002 (500).
+ */
+async function assertCpfLivreNoTenant(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  userId: string,
+  cpf: string | null | undefined,
+): Promise<void> {
+  const cpfNorm = cpf?.trim() || null
+  if (!cpfNorm) return
+
+  const conflito: { id: string } | null = await tx.saasMembro.findFirst({
+    where: {
+      tenantId,
+      cpf: cpfNorm,
+      userId: { not: userId },
+    },
+    select: { id: true },
+  })
+  if (conflito) {
+    throw new ExpectedError(
+      'Este CPF já está cadastrado na Sede por outro associado. Ajuste o cadastro antes de aprovar.',
+    )
+  }
+}
+
 export type PendenciaEspelhoResultado = {
   /** Tenant da sede raiz; null se origem já é raiz ou não houve fan-out. */
   raizTenantId: string | null
@@ -183,6 +211,8 @@ export async function criarOuAtualizarPendenciaEspelhoNaSede(
       'Já existe um espelho ativo deste associado na Sede a partir de outra unidade.',
     )
   }
+
+  await assertCpfLivreNoTenant(tx, raizId, membro.userId, membro.cpf)
 
   const dadosEspelho = {
     ...dadosCadastraisEspelho(membro),
@@ -338,6 +368,93 @@ export async function encontrarConflitoNumeroAssociado(
   return conflito
 }
 
+type DbOrTxIdentidade = {
+  saasMembro: {
+    findFirst: Prisma.TransactionClient['saasMembro']['findFirst']
+  }
+  $queryRaw: Prisma.TransactionClient['$queryRaw']
+}
+
+type ConflitoIdentidadeOpts = {
+  tenantOrigemId: string
+  userId: string
+  excludeMembroId?: string
+}
+
+/** CPF único na lineage (espelhos ignorados; mesmo userId ok). */
+export async function encontrarConflitoCpf(
+  client: DbOrTxIdentidade,
+  opts: ConflitoIdentidadeOpts & { cpf: string },
+): Promise<{ id: string } | null> {
+  const cpf = opts.cpf.trim()
+  if (!cpf) return null
+
+  const lineage: string[] = await getTorcidaLineageTenantIds(opts.tenantOrigemId)
+  const conflito: { id: string } | null = await client.saasMembro.findFirst({
+    where: {
+      tenantId: { in: lineage },
+      cpf,
+      espelhado: false,
+      desligadoEm: null,
+      userId: { not: opts.userId },
+      ...(opts.excludeMembroId ? { id: { not: opts.excludeMembroId } } : {}),
+    },
+    select: { id: true },
+  })
+  return conflito
+}
+
+/** RG único na lineage (valor já normalizado). */
+export async function encontrarConflitoRg(
+  client: DbOrTxIdentidade,
+  opts: ConflitoIdentidadeOpts & { rg: string },
+): Promise<{ id: string } | null> {
+  const rg = opts.rg.trim().toUpperCase()
+  if (!rg) return null
+
+  const lineage: string[] = await getTorcidaLineageTenantIds(opts.tenantOrigemId)
+  const conflito: { id: string } | null = await client.saasMembro.findFirst({
+    where: {
+      tenantId: { in: lineage },
+      rg: { equals: rg, mode: 'insensitive' },
+      espelhado: false,
+      desligadoEm: null,
+      userId: { not: opts.userId },
+      ...(opts.excludeMembroId ? { id: { not: opts.excludeMembroId } } : {}),
+    },
+    select: { id: true },
+  })
+  return conflito
+}
+
+/**
+ * Telefone único na lineage — compara só dígitos (máscaras diferentes batem).
+ * `telefoneDigits` já normalizado (10–11 dígitos).
+ */
+export async function encontrarConflitoTelefone(
+  client: DbOrTxIdentidade,
+  opts: ConflitoIdentidadeOpts & { telefoneDigits: string },
+): Promise<{ id: string } | null> {
+  const digits = opts.telefoneDigits.trim()
+  if (!digits) return null
+
+  const lineage: string[] = await getTorcidaLineageTenantIds(opts.tenantOrigemId)
+  if (lineage.length === 0) return null
+
+  const rows: Array<{ id: string }> = await client.$queryRaw`
+    SELECT m.id
+    FROM saas_membros m
+    WHERE m.tenant_id IN (${Prisma.join(lineage)})
+      AND m.espelhado = false
+      AND m.desligado_em IS NULL
+      AND m.user_id <> ${opts.userId}
+      ${opts.excludeMembroId ? Prisma.sql`AND m.id <> ${opts.excludeMembroId}` : Prisma.empty}
+      AND regexp_replace(coalesce(m.telefone, ''), '[^0-9]', '', 'g') = ${digits}
+    LIMIT 1
+  `
+  return rows[0] ?? null
+}
+
 export async function validarNumeroAssociadoUnicoNaTorcida(
   tx: Prisma.TransactionClient,
   tenantOrigemId: string,
@@ -426,6 +543,8 @@ export async function sincronizarSocioNaSedeRaiz(
       'Já existe um espelho ativo deste associado na Sede a partir de outra unidade.',
     )
   }
+
+  await assertCpfLivreNoTenant(tx, raizId, membro.userId, membro.cpf)
 
   const agora = new Date()
   const dadosEspelho = {

@@ -26,6 +26,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const settleRef = useRef<((value: boolean) => void) | null>(null)
   const dialogIdRef = useRef<string | null>(null)
   const suppressUpsertRef = useRef(false)
+  const allowUnloadRef = useRef(false)
   const pathname = usePathname()
   const pathnameRef = useRef(pathname)
 
@@ -104,6 +105,15 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     return promise
   }, [open, close])
 
+  /** Síncrono: o próximo `beforeunload` não bloqueia (redirect pós-salvar). */
+  const allowUnload = useCallback(() => {
+    allowUnloadRef.current = true
+    suppressUpsertRef.current = true
+    setEntries((prev) => (prev.length === 0 ? prev : []))
+  }, [])
+
+  const isUnloadAllowed = useCallback(() => allowUnloadRef.current, [])
+
   // Só quando a rota de fato muda (navegação concluída): limpa órfãos.
   useEffect(() => {
     if (pathnameRef.current === pathname) return
@@ -120,6 +130,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     setEntries((prev) => (prev.length === 0 ? prev : []))
     // Libera novos formulários da próxima página.
     suppressUpsertRef.current = false
+    allowUnloadRef.current = false
   }, [pathname, close])
 
   const value = useMemo<UnsavedChangesContextValue>(
@@ -129,8 +140,10 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       remove,
       isDirty: entries.length > 0,
       confirmDiscard,
+      allowUnload,
+      isUnloadAllowed,
     }),
-    [entries, upsert, remove, confirmDiscard],
+    [entries, upsert, remove, confirmDiscard, allowUnload, isUnloadAllowed],
   )
 
   return (

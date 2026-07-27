@@ -19,7 +19,10 @@ import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
+  encontrarConflitoCpf,
   encontrarConflitoNumeroAssociado,
+  encontrarConflitoRg,
+  encontrarConflitoTelefone,
   lockNumeroAssociadoDaTorcida,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
@@ -28,10 +31,13 @@ import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
   isDepartamentoLegado,
+  maskTelefone,
   normalizarCpf,
   normalizarRg,
+  normalizarTelefone,
   validarCpfDigitos,
   validarRg,
+  validarTelefoneBr,
   parseDataCompetencia,
   PERMISSIONS,
 } from '@torcida/types'
@@ -220,7 +226,25 @@ const solicitarVinculoSchema = z.object({
     .max(20)
     .optional()
     .transform((v) => v?.trim() || undefined)
-    .refine((v) => v === undefined || /^\(\d{2}\) \d{4,5}-\d{4}$/.test(v), 'Telefone inválido'),
+    .superRefine((v, ctx) => {
+      if (!v) return
+      if (!validarTelefoneBr(v)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Telefone inválido' })
+      }
+    })
+    .transform((v) => (v ? maskTelefone(v) || undefined : undefined)),
+  // Contato da conta — obrigatório para SOCIO; unicidade global em User.email.
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v.toLowerCase() : undefined))
+    .superRefine((v, ctx) => {
+      if (!v) return
+      if (!z.string().email().safeParse(v).success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'E-mail inválido' })
+      }
+    }),
   cidade: z
     .string()
     .max(60)
@@ -443,6 +467,20 @@ const solicitarVinculoSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['cpf'],
       message: 'Informe seu CPF',
+    })
+  }
+  if (!data.telefone) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['telefone'],
+      message: 'Informe seu telefone',
+    })
+  }
+  if (!data.email) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['email'],
+      message: 'Informe seu e-mail',
     })
   }
   let nascimento: Date | null = null
@@ -927,21 +965,102 @@ export async function solicitarVinculo(
       return { message: 'Você já é membro aprovado desta torcida.' }
     }
 
-    // Sócio: lock + unicidade de nº na mesma transaction do create/update —
-    // impede race e garante que o número nunca entre duplicado na lineage.
+    // E-mail: formato já no Zod; conta com e-mail deve confirmar o mesmo;
+    // conta sem e-mail (OAuth) grava o informado se estiver livre.
+    if (data.tipo === 'SOCIO' && data.email) {
+      const emailNorm = data.email.trim().toLowerCase()
+      const sessionEmail = session.user.email?.trim().toLowerCase() ?? null
+      if (sessionEmail) {
+        if (sessionEmail !== emailNorm) {
+          return {
+            errors: {
+              email: [
+                'Use o e-mail da sua conta. Para alterá-lo, ajuste o perfil depois do cadastro.',
+              ],
+            },
+          }
+        }
+      } else {
+        const emailEmUso: { id: string } | null = await db.user.findFirst({
+          where: {
+            email: { equals: emailNorm, mode: 'insensitive' },
+            id: { not: userId },
+          },
+          select: { id: true },
+        })
+        if (emailEmUso) {
+          return { errors: { email: ['Este e-mail já está em uso por outra conta.'] } }
+        }
+        await db.user.update({
+          where: { id: userId },
+          data: { email: emailNorm },
+        })
+      }
+    }
+
+    // Sócio: lock + unicidade de nº/CPF/RG/telefone na mesma transaction —
+    // impede race e garante que identidade nunca entre duplicada na lineage.
     try {
       await db.$transaction(async (tx: Prisma.TransactionClient) => {
-        if (data.tipo === 'SOCIO' && data.numeroAssociado) {
+        if (data.tipo === 'SOCIO') {
           await lockNumeroAssociadoDaTorcida(tx, tenantDestino.id)
-          const conflitoNumero = await encontrarConflitoNumeroAssociado(tx, {
-            tenantOrigemId: tenantDestino.id,
-            userId,
-            numeroAssociado: data.numeroAssociado,
-          })
-          if (conflitoNumero) {
-            throw new ExpectedError(
-              `Número de associado ${data.numeroAssociado} já está em uso nesta torcida.`,
-            )
+
+          if (data.numeroAssociado) {
+            const conflitoNumero = await encontrarConflitoNumeroAssociado(tx, {
+              tenantOrigemId: tenantDestino.id,
+              userId,
+              numeroAssociado: data.numeroAssociado,
+              excludeMembroId: existing?.id,
+            })
+            if (conflitoNumero) {
+              throw new ExpectedError(
+                `Número de associado ${data.numeroAssociado} já está em uso nesta torcida.`,
+                { field: 'numeroAssociado' },
+              )
+            }
+          }
+
+          if (data.cpf) {
+            const conflitoCpf = await encontrarConflitoCpf(tx, {
+              tenantOrigemId: tenantDestino.id,
+              userId,
+              cpf: data.cpf,
+              excludeMembroId: existing?.id,
+            })
+            if (conflitoCpf) {
+              throw new ExpectedError('Este CPF já está cadastrado nesta torcida.', {
+                field: 'cpf',
+              })
+            }
+          }
+
+          if (data.rg) {
+            const conflitoRg = await encontrarConflitoRg(tx, {
+              tenantOrigemId: tenantDestino.id,
+              userId,
+              rg: data.rg,
+              excludeMembroId: existing?.id,
+            })
+            if (conflitoRg) {
+              throw new ExpectedError('Este RG já está cadastrado nesta torcida.', {
+                field: 'rg',
+              })
+            }
+          }
+
+          const telDigits = data.telefone ? normalizarTelefone(data.telefone) : null
+          if (telDigits) {
+            const conflitoTel = await encontrarConflitoTelefone(tx, {
+              tenantOrigemId: tenantDestino.id,
+              userId,
+              telefoneDigits: telDigits,
+              excludeMembroId: existing?.id,
+            })
+            if (conflitoTel) {
+              throw new ExpectedError('Este telefone já está cadastrado nesta torcida.', {
+                field: 'telefone',
+              })
+            }
           }
         }
 
@@ -999,7 +1118,22 @@ export async function solicitarVinculo(
       })
     } catch (err) {
       if (isExpectedError(err)) {
-        return { errors: { numeroAssociado: [err.message] } }
+        const field = err.field ?? 'numeroAssociado'
+        return { errors: { [field]: [err.message] } }
+      }
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = err.meta?.target
+        const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
+        if (targetStr.toLowerCase().includes('cpf')) {
+          return { errors: { cpf: ['Este CPF já está cadastrado nesta torcida.'] } }
+        }
+        if (targetStr.toLowerCase().includes('email')) {
+          return { errors: { email: ['Este e-mail já está em uso por outra conta.'] } }
+        }
+        return {
+          message:
+            'Não foi possível concluir: dados duplicados (CPF, e-mail ou vínculo). Confira o cadastro.',
+        }
       }
       throw err
     }

@@ -204,7 +204,8 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
   - Estimativa web: inscritos digitais (IBOPE Top 50) ou “até 10 mil torcedores ou menos”.
   - Plataforma: sócios e torcedores (total + online, ponto verde).
   - Busca por prefixo (`startsWith`) em nome/apelido; dedup `saoMesmoClube`.
-- Passo sócio coleta: nome, nº associado, idade, telefone, unidade/sede, imagem-prova,
+- Passo sócio coleta: nome, nº associado, idade, telefone, e-mail, CPF, RG, unidade/sede, imagem-prova;
+  telefone/e-mail/CPF/RG são obrigatórios e únicos (lineage da torcida; e-mail único global em `User`).
   **departamento pretendido** (lista `Departamento` do tenant) — grava
   `SaasMembro.departamentoId` **sem** membership até aprovação da diretoria.
   Ver `docs/data/modulo-departamentos.md` § preferência ≠ membership.

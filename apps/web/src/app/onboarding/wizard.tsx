@@ -23,7 +23,7 @@ import {
 import {
   NOME_UF,
 } from '@/lib/regioes-brasil'
-import { isDepartamentoLegado, maskRg, normalizarCpf, validarCpfDigitos, validarRg } from '@torcida/types'
+import { isDepartamentoLegado, maskRg, maskTelefone, normalizarCpf, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
 import {
   salvarClubeRegiao,
   concluirComoTorcedor,
@@ -51,7 +51,7 @@ import type {
   SedeOnboarding,
   RegiaoOnboarding,
 } from '@/lib/onboarding'
-import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { useUnsavedChanges, useUnsavedChangesContext } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { useVisibleInterval } from '@/lib/use-visible-interval'
 
@@ -106,6 +106,7 @@ type Props = {
   regioes: RegiaoOnboarding[]
   ufs: string[]
   nomeInicial: string
+  emailInicial: string
   userId: string
 }
 
@@ -114,8 +115,10 @@ export function OnboardingWizard({
   regioes,
   ufs,
   nomeInicial,
+  emailInicial,
   userId,
 }: Props) {
+  const { allowUnload } = useUnsavedChangesContext()
   const [passo, setPasso] = useState<Passo>('clube')
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
@@ -365,6 +368,7 @@ export function OnboardingWizard({
     startTransition(async () => {
       const res = await concluirComoTorcedor()
       if (res?.redirectTo) {
+        allowUnload()
         window.location.assign(res.redirectTo)
         return
       }
@@ -522,6 +526,7 @@ export function OnboardingWizard({
                 clube={clube}
                 torcida={torcida}
                 nomeInicial={nomeInicial}
+                emailInicial={emailInicial}
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
                 userId={userId}
                 unidadeId={unidadeId}
@@ -1635,19 +1640,6 @@ function ListaUnidades({
 
 // ─── Passo 5: Vínculo (solicitação de sócio; atalho torcedor da torcida) ─────
 
-/** Máscara progressiva de telefone BR: (XX) XXXX-XXXX ou (XX) XXXXX-XXXX. */
-function maskTelefone(raw: string): string {
-  const digitos = raw.replace(/\D/g, '').slice(0, 11)
-  if (digitos.length === 0) return ''
-  if (digitos.length <= 2) return `(${digitos}`
-  const ddd = digitos.slice(0, 2)
-  const resto = digitos.slice(2)
-  // 11 dígitos → celular (5+4); até 10 → fixo (4+4), formatando o que já foi digitado.
-  const corte = digitos.length > 10 ? 5 : 4
-  if (resto.length <= corte) return `(${ddd}) ${resto}`
-  return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`
-}
-
 /** Máscara progressiva de CEP: 00000-000. */
 function maskCep(raw: string): string {
   const digitos = raw.replace(/\D/g, '').slice(0, 8)
@@ -1690,6 +1682,7 @@ function PassoVinculo({
   clube,
   torcida,
   nomeInicial,
+  emailInicial,
   regiao,
   unidadeId,
   unidadeNaoListada,
@@ -1702,6 +1695,7 @@ function PassoVinculo({
   clube: AfiliacaoOnboarding | null
   torcida: TorcidaOnboarding
   nomeInicial: string
+  emailInicial: string
   regiao: string | undefined
   unidadeId: string | null
   unidadeNaoListada: boolean
@@ -1711,6 +1705,7 @@ function PassoVinculo({
   onVoltar: () => void
   onErro: (m: string | null) => void
 }) {
+  const { allowUnload } = useUnsavedChangesContext()
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
   const regiaoInicial = parseRegiaoLabel(regiao)
@@ -1719,6 +1714,7 @@ function PassoVinculo({
   const [nome, setNome] = useState(nomeInicial)
   const [idade, setIdade] = useState('')
   const [telefone, setTelefone] = useState('')
+  const [email, setEmail] = useState(emailInicial)
   const [cep, setCep] = useState('')
   const [numero, setNumero] = useState('')
   const [bloco, setBloco] = useState('')
@@ -1863,6 +1859,7 @@ function PassoVinculo({
         nome: string
         idade: string
         telefone: string
+        email: string
         cep: string
         numero: string
         bloco: string
@@ -1894,6 +1891,8 @@ function PassoVinculo({
       if (typeof saved.nome === 'string') setNome(saved.nome)
       if (typeof saved.idade === 'string') setIdade(saved.idade)
       if (typeof saved.telefone === 'string') setTelefone(saved.telefone)
+      if (typeof saved.email === 'string' && saved.email.trim()) setEmail(saved.email)
+      else if (emailInicial) setEmail(emailInicial)
       if (typeof saved.cep === 'string') setCep(saved.cep)
       if (typeof saved.numero === 'string') setNumero(saved.numero)
       if (typeof saved.bloco === 'string') setBloco(saved.bloco)
@@ -1959,6 +1958,7 @@ function PassoVinculo({
         nome,
         idade,
         telefone,
+        email,
         cep,
         numero,
         bloco,
@@ -2003,6 +2003,7 @@ function PassoVinculo({
     nome,
     idade,
     telefone,
+    email,
     cep,
     numero,
     bloco,
@@ -2078,6 +2079,12 @@ function PassoVinculo({
         const cpfNorm = normalizarCpf(cpf)
         if (!cpfNorm || !validarCpfDigitos(cpfNorm)) errosLocais.cpf = ['CPF inválido']
       }
+      if (!telefone) errosLocais.telefone = ['Informe seu telefone.']
+      else if (!validarTelefoneBr(telefone)) errosLocais.telefone = ['Telefone inválido']
+      if (!email.trim()) errosLocais.email = ['Informe seu e-mail.']
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        errosLocais.email = ['E-mail inválido']
+      }
       if (!dataNascimento) {
         errosLocais.dataNascimento = ['Informe sua data de nascimento.']
       }
@@ -2113,6 +2120,7 @@ function PassoVinculo({
           nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
           idade: idade || undefined,
           telefone: telefone || undefined,
+          email: email.trim() || undefined,
           cidade: regiaoEfetiva || undefined,
           cep: cep || undefined,
           numero: numero || undefined,
@@ -2145,6 +2153,8 @@ function PassoVinculo({
         if (res?.redirectTo) {
           // Se concluiu o vínculo, limpa o rascunho local para não “puxar” valores antigos.
           window.sessionStorage.removeItem(vinculoDraftKey)
+          // Evita o diálogo nativo "Sair do site?" no redirect pós-envio.
+          allowUnload()
           window.location.assign(res.redirectTo)
           return
         }
@@ -2354,16 +2364,43 @@ function PassoVinculo({
                 onChange={(e) => setDataNascimento(e.target.value)}
               />
             </Campo>
-            <Campo name="telefone" label="Telefone / WhatsApp" erros={errosCampo.telefone}>
+            <Campo
+              name="telefone"
+              label="Telefone / WhatsApp"
+              obrigatorio
+              erros={errosCampo.telefone}
+            >
               <Input
                 type="tel"
                 maxLength={16}
                 value={telefone}
                 onChange={(e) => setTelefone(maskTelefone(e.target.value))}
                 placeholder="(11) 99999-9999"
+                autoComplete="tel"
               />
             </Campo>
           </div>
+
+          <Campo name="email" label="E-mail" obrigatorio erros={errosCampo.email}>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              autoComplete="email"
+              readOnly={Boolean(emailInicial.trim())}
+              className={
+                emailInicial.trim()
+                  ? 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]'
+                  : undefined
+              }
+            />
+            {emailInicial.trim() ? (
+              <p className="mt-1 text-[11px] text-[rgb(var(--foreground-muted))]">
+                E-mail da sua conta — não pode ser de outro cadastro.
+              </p>
+            ) : null}
+          </Campo>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Campo name="sexo" label="Sexo" erros={errosCampo.sexo}>

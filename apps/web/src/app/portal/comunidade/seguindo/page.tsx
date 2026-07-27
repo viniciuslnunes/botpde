@@ -26,10 +26,11 @@ export default async function SeguindoPage() {
   if (!session?.user?.id) redirect('/entrar')
   if (!tenant) redirect('/portal')
 
+  // Sem filtro por tenantContextoId: esse campo é o contexto do SEGUIDOR
+  // (ex.: CN do torcedor), não o tenant do perfil do sócio que recebe o pedido.
   const pendentes: SeguimentoPendenteRow[] = await db.seguimento.findMany({
     where: {
       seguidoId: session.user.id,
-      tenantContextoId: tenant.id,
       status: 'PENDENTE',
     },
     orderBy: { criadoEm: 'desc' },

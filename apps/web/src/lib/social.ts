@@ -39,6 +39,23 @@ export async function getPerfilMembroForPortal(
   }
 }
 
+/**
+ * Privacidade efetiva do ALVO para decidir PENDENTE vs APROVADO ao seguir.
+ * Usa o tenant do perfil visitado (mesmo critério da página de perfil) —
+ * nunca o tenant/contexto do seguidor (CN de torcedor global quebrava isso).
+ * Fail-closed: sem tenant do alvo → exige aprovação.
+ */
+export async function getPerfilPrivadoEfetivoDoAlvo(
+  alvoId: string,
+  viewerId: string,
+): Promise<{ perfilPrivado: boolean; tenantIdAlvo: string | null }> {
+  const { resolvePerfilTenantForUser } = await import('./resolve-perfil-tenant')
+  const tenantAlvo = await resolvePerfilTenantForUser(alvoId, viewerId)
+  if (!tenantAlvo) return { perfilPrivado: true, tenantIdAlvo: null }
+  const { perfilPrivado } = await getPerfilMembroForPortal(alvoId, tenantAlvo.id)
+  return { perfilPrivado, tenantIdAlvo: tenantAlvo.id }
+}
+
 /** Sócios aprovados entram com perfil privado (torcedores permanecem públicos). */
 export async function privatizarPerfilAoAprovarSocio(
   userId: string,

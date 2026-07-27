@@ -75,6 +75,45 @@ export function validarRg(raw) {
 }
 
 /**
+ * Telefone BR só com dígitos (DDD + número). Aceita 10 (fixo) ou 11 (celular).
+ * @param {string | undefined | null} raw
+ */
+export function normalizarTelefone(raw) {
+  if (!raw) return null
+  const digits = String(raw).replace(/\D/g, '')
+  if (digits.length < 10 || digits.length > 11) return null
+  // DDD 11–99; rejeita 00 e começo inválido.
+  const ddd = Number(digits.slice(0, 2))
+  if (ddd < 11) return null
+  return digits
+}
+
+/**
+ * Valida telefone BR (máscara ou só dígitos).
+ * @param {string | undefined | null} raw
+ */
+export function validarTelefoneBr(raw) {
+  return normalizarTelefone(raw) != null
+}
+
+/**
+ * Máscara progressiva: `(XX) XXXX-XXXX` ou `(XX) XXXXX-XXXX`.
+ * @param {string | undefined | null} raw
+ */
+export function maskTelefone(raw) {
+  const digitos = String(raw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 11)
+  if (digitos.length === 0) return ''
+  if (digitos.length <= 2) return `(${digitos}`
+  const ddd = digitos.slice(0, 2)
+  const resto = digitos.slice(2)
+  const corte = digitos.length > 10 ? 5 : 4
+  if (resto.length <= corte) return `(${ddd}) ${resto}`
+  return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`
+}
+
+/**
  * Máscara progressiva de RG (formato SP): `00.000.000-0` — verificador pode ser `X`.
  * @param {string | undefined | null} raw
  */

@@ -11,10 +11,13 @@ import {
   DesligarMembroSchema,
   formatRg,
   maskRg,
+  maskTelefone,
   normalizarCpf,
   normalizarRg,
+  normalizarTelefone,
   validarCpfDigitos,
   validarRg,
+  validarTelefoneBr,
 } from '@torcida/types'
 import { montarPayloadQr, parsePayloadQr } from '@/lib/carteirinha-qr'
 
@@ -31,6 +34,18 @@ describe('associacao — CPF', () => {
   it('normalizarCpf extrai 11 dígitos', () => {
     expect(normalizarCpf('529.982.247-25')).toBe('52998224725')
     expect(normalizarCpf('')).toBeNull()
+  })
+})
+
+describe('associacao — telefone', () => {
+  it('normalizarTelefone aceita fixo e celular mascarados', () => {
+    expect(normalizarTelefone('(11) 98888-7777')).toBe('11988887777')
+    expect(normalizarTelefone('(11) 3333-4444')).toBe('1133334444')
+    expect(normalizarTelefone('11988887777')).toBe('11988887777')
+    expect(normalizarTelefone('123')).toBeNull()
+    expect(validarTelefoneBr('(11) 98888-7777')).toBe(true)
+    expect(validarTelefoneBr('00')).toBe(false)
+    expect(maskTelefone('11988887777')).toBe('(11) 98888-7777')
   })
 })
 

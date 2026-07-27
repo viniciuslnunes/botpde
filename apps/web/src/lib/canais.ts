@@ -342,7 +342,7 @@ export async function getOrCreateCanalOficial(
     where: { id: tenantId },
     select: { nome: true },
   })
-  if (!tenant) throw new Error('Unidade não encontrada.')
+  if (!tenant) throw new ExpectedError('Unidade não encontrada.')
 
   const liderancaId = await resolverCriadoPorId(tenantId, null)
   const criadoPorId = liderancaId ?? fallbackCriadoPorId ?? null

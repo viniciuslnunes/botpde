@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { invalidarCachesComunidadeFeed } from '@/lib/comunidade-cache'
-import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
+import { db, syncMembershipFromRoles, Prisma } from '@torcida/db'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { ExpectedError, isExpectedError } from '@/lib/expected-error'
@@ -38,6 +38,30 @@ function erroSolicitacaoJaAnalisada(
   const quem = aprovadoPorNome?.trim() || 'outro administrador'
   const quando = aprovadoEm ? ` em ${aprovadoEm.toLocaleString('pt-BR')}` : ''
   return new ExpectedError(`Esta solicitação já foi analisada por ${quem}${quando}.`)
+}
+
+/** Converte unique violation do Prisma em mensagem de UI (evita 500 genérico). */
+function erroDecisaoPorUnique(err: unknown): { error: string } | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
+    return null
+  }
+  const target = err.meta?.target
+  const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
+  if (targetStr.toLowerCase().includes('cpf')) {
+    return {
+      error:
+        'Este CPF já está cadastrado na Sede por outro associado. Ajuste o cadastro antes de aprovar.',
+    }
+  }
+  return {
+    error:
+      'Não foi possível concluir a decisão por conflito de dados (CPF ou vínculo duplicado). Verifique o cadastro.',
+  }
+}
+
+function mapearErroDecisaoMembro(err: unknown): { error: string } | null {
+  if (isExpectedError(err)) return { error: err.message }
+  return erroDecisaoPorUnique(err)
 }
 
 type MembroDecisaoSelect = {
@@ -549,7 +573,8 @@ export async function aprovarMembro(
   revalidatePath('/portal/carteirinha')
   revalidatePath(`/portal/comunidade/perfil/${origem.userId}`)
   } catch (err) {
-    if (isExpectedError(err)) return { error: err.message }
+    const mapped = mapearErroDecisaoMembro(err)
+    if (mapped) return mapped
     throw err
   }
 }
@@ -764,7 +789,8 @@ export async function reprovarMembro(
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/carteirinha')
   } catch (err) {
-    if (isExpectedError(err)) return { error: err.message }
+    const mapped = mapearErroDecisaoMembro(err)
+    if (mapped) return mapped
     throw err
   }
 }
@@ -858,7 +884,8 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
   revalidatePath('/admin/membros')
   revalidatePath('/portal/departamentos', 'layout')
   } catch (err) {
-    if (isExpectedError(err)) return { error: err.message }
+    const mapped = mapearErroDecisaoMembro(err)
+    if (mapped) return mapped
     throw err
   }
 }

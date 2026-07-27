@@ -16,7 +16,13 @@ import { PERMISSIONS, editarPostSchema, visibilidadePostSchema, reacaoTipoSchema
 import { notificarMencoesDoPost, sincronizarHashtagsDoPost } from '@/lib/comunidade-publish'
 import { linkPostComunidade } from '@/lib/comunidade-social'
 import { extrairMencoes } from '@/lib/comunidade-social'
-import { canFollowUser, getOrCreatePerfilMembro, getPerfilMembroForPortal, getSeguimentoStatus } from '@/lib/social'
+import {
+  canFollowUser,
+  getOrCreatePerfilMembro,
+  getPerfilMembroForPortal,
+  getPerfilPrivadoEfetivoDoAlvo,
+  getSeguimentoStatus,
+} from '@/lib/social'
 import { resolveTenantIdPortalComunidade } from '@/lib/comunidade-contexto'
 import { getAvatarAtualDoUsuario, resolverPerfilPrivadoEfetivo } from '@/lib/perfil-social'
 import { criarNotificacao, notificarSafe } from '@/lib/notificacoes'
@@ -687,11 +693,13 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
     )
   }
 
-  // Decisão depende só da privacidade efetiva do ALVO (mesma regra usada no
-  // resto da Comunidade — sócio sem registro explícito é privado por padrão,
-  // torcedor é público por padrão): perfil não-privado segue instantâneo,
-  // independente do ator ter tenant ativo ou ser torcedor global.
-  const { perfilPrivado } = await getPerfilMembroForPortal(userId, tenantContextoId)
+  // Privacidade do ALVO no tenant do perfil dele — não no contexto do
+  // seguidor. Torcedor global (CN) lia o sócio no tenant errado e tratava
+  // perfil privado como público → APROVADO sem aprovação.
+  const { perfilPrivado, tenantIdAlvo } = await getPerfilPrivadoEfetivoDoAlvo(
+    userId,
+    session.user.id,
+  )
   const statusInicial = perfilPrivado ? 'PENDENTE' : 'APROVADO'
 
   await db.seguimento.upsert({
@@ -712,7 +720,8 @@ export async function solicitarSeguir(userId: string): Promise<SeguimentoResulta
   if (statusInicial === 'PENDENTE') {
     await criarNotificacao({
       userId,
-      tenantId: tenantContextoId,
+      // Inbox do seguido: tenant do perfil dele (não a CN do seguidor).
+      tenantId: tenantIdAlvo ?? tenantContextoId,
       tipo: 'SEGUIMENTO_PENDENTE',
       titulo: 'Nova solicitação para seguir',
       corpo: `${session.user.name ?? 'Um membro'} quer seguir você.`,
@@ -752,12 +761,10 @@ export async function aprovarSeguimento(seguimentoId: string): Promise<void> {
   const { session, tenant } = await getSessionAndPortalTenant()
   if (!session?.user?.id) throw new Error('Não autenticado')
 
-  // Destinatário torcedor global (sem tenant ativo): busca só por seguidoId —
-  // não há tenant do destinatário para comparar com tenantContextoId.
+  // Ownership por seguidoId basta: tenantContextoId é o contexto do SEGUIDOR
+  // (pode ser CN / TO aliada) e não bate com o tenant ativo do destinatário.
   const seguimento = await db.seguimento.findFirst({
-    where: tenant
-      ? { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id }
-      : { id: seguimentoId, seguidoId: session.user.id },
+    where: { id: seguimentoId, seguidoId: session.user.id, status: 'PENDENTE' },
     select: { id: true, seguidorId: true, tenantContextoId: true },
   })
   if (!seguimento) throw new Error('Solicitação não encontrada')
@@ -798,9 +805,7 @@ export async function rejeitarSeguimento(seguimentoId: string): Promise<void> {
   if (!session?.user?.id) throw new Error('Não autenticado')
 
   const seguimento = await db.seguimento.findFirst({
-    where: tenant
-      ? { id: seguimentoId, seguidoId: session.user.id, tenantContextoId: tenant.id }
-      : { id: seguimentoId, seguidoId: session.user.id },
+    where: { id: seguimentoId, seguidoId: session.user.id, status: 'PENDENTE' },
     select: { id: true, seguidorId: true, tenantContextoId: true },
   })
   if (!seguimento) throw new Error('Solicitação não encontrada')
