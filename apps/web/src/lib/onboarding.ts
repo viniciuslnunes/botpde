@@ -13,6 +13,7 @@ import {
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
 import { formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
+import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
 
@@ -145,6 +146,8 @@ export type SedeOnboarding = {
   estado: string | null
   endereco: string | null
   sedePaiId: string | null
+  /** Tenant dono da sede (mãe ou filho Caso B). */
+  tenantId: string | null
   lat: number | null
   lng: number | null
   fotoUrl: string | null
@@ -152,6 +155,77 @@ export type SedeOnboarding = {
   streetViewPitch: number | null
   streetViewFov: number | null
 }
+
+const SEDE_ONBOARDING_SELECT = {
+  id: true,
+  nome: true,
+  tipo: true,
+  cidade: true,
+  estado: true,
+  endereco: true,
+  sedeId: true,
+  tenantId: true,
+  lat: true,
+  lng: true,
+  fotoUrl: true,
+  streetViewHeading: true,
+  streetViewPitch: true,
+  streetViewFov: true,
+} as const
+
+type SedeOnboardingRow = {
+  id: string
+  nome: string
+  tipo: string
+  cidade: string | null
+  estado: string | null
+  endereco: string | null
+  sedeId: string | null
+  tenantId: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
+  streetViewHeading: number | null
+  streetViewPitch: number | null
+  streetViewFov: number | null
+}
+
+function mapSedeOnboarding(s: SedeOnboardingRow): SedeOnboarding {
+  return {
+    id: s.id,
+    nome: s.nome,
+    tipo: s.tipo as SedeOnboarding['tipo'],
+    cidade: s.cidade,
+    estado: s.estado,
+    endereco: s.endereco,
+    sedePaiId: s.sedeId,
+    tenantId: s.tenantId,
+    lat: s.lat,
+    lng: s.lng,
+    fotoUrl: s.fotoUrl,
+    streetViewHeading: s.streetViewHeading,
+    streetViewPitch: s.streetViewPitch,
+    streetViewFov: s.streetViewFov,
+  }
+}
+
+/**
+ * Unidades da torcida no onboarding: sedes do tenant (Caso A) + sedes dos
+ * tenants-filho promovidos (Caso B). Sem isso, PDE aprovado e promovido some
+ * da lista do passo Unidade.
+ */
+export const getSedesDaTorcidaOnboarding = cache(
+  async (tenantId: string): Promise<SedeOnboarding[]> => {
+    const descendentes = await getDescendantTenantIds(tenantId)
+    const tenantIds = [tenantId, ...descendentes]
+    const sedes: SedeOnboardingRow[] = await db.sede.findMany({
+      where: { tenantId: { in: tenantIds }, ativa: true },
+      select: SEDE_ONBOARDING_SELECT,
+      orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
+    })
+    return sedes.map(mapSedeOnboarding)
+  },
+)
 
 export type TorcidaOnboarding = {
   id: string
@@ -375,6 +449,8 @@ async function carregarAfiliacoesParaOnboarding(
 
 /**
  * Torcidas (Tenants ativos) vinculadas a um clube, com contagem de membros aprovados.
+ * Unidades = worktree (Caso A + Caso B). Tenants-filho promovidos não aparecem
+ * como torcida separada no passo Torcida.
  */
 export const getTorcidasPorAfiliacao = cache(
   async (afiliacaoId: string): Promise<TorcidaOnboarding[]> => {
@@ -399,21 +475,6 @@ export const getTorcidasPorAfiliacao = cache(
       if (afiliacaoIds.length === 0) afiliacaoIds = [afiliacaoId]
     }
 
-    type SedeRow = {
-      id: string
-      nome: string
-      tipo: string
-      cidade: string | null
-      estado: string | null
-      endereco: string | null
-      sedeId: string | null
-      lat: number | null
-      lng: number | null
-      fotoUrl: string | null
-      streetViewHeading: number | null
-      streetViewPitch: number | null
-      streetViewFov: number | null
-    }
     type TenantComContagem = {
       id: string
       nome: string
@@ -423,7 +484,6 @@ export const getTorcidasPorAfiliacao = cache(
       torcidaConhecidaId: string | null
       torcidaConhecida: { logoUrl: string | null; titulo: string | null } | null
       _count: { membros: number }
-      sedes: SedeRow[]
     }
     const tenants: TenantComContagem[] = await db.tenant.findMany({
       where: { afiliacaoId: { in: afiliacaoIds }, ativo: true, sintetico: false },
@@ -436,25 +496,6 @@ export const getTorcidasPorAfiliacao = cache(
         torcidaConhecidaId: true,
         torcidaConhecida: { select: { logoUrl: true, titulo: true } },
         _count: { select: { membros: { where: { status: 'APROVADO' } } } },
-        sedes: {
-          where: { ativa: true },
-          select: {
-            id: true,
-            nome: true,
-            tipo: true,
-            cidade: true,
-            estado: true,
-            endereco: true,
-            sedeId: true,
-            lat: true,
-            lng: true,
-            fotoUrl: true,
-            streetViewHeading: true,
-            streetViewPitch: true,
-            streetViewFov: true,
-          },
-          orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
-        },
       },
       orderBy: { nome: 'asc' },
     })
@@ -468,9 +509,30 @@ export const getTorcidasPorAfiliacao = cache(
       return true
     })
 
-    const statsMap = await calcularStatsTorcidasOnboarding(unicos.map((t) => t.id))
+    // Caso B: PDE/subsede com portal próprio tem ancestral — não listar como TO.
+    const ancestralFlags = await Promise.all(
+      unicos.map(async (t) => {
+        const ancestrais = await getAncestorTenantIds(t.id)
+        return { id: t.id, temAncestral: ancestrais.length > 0 }
+      }),
+    )
+    const idsFilho = new Set(
+      ancestralFlags.filter((f) => f.temAncestral).map((f) => f.id),
+    )
+    const raizes = unicos.filter((t) => !idsFilho.has(t.id))
 
-    return unicos
+    const [statsMap, sedesPorRaiz] = await Promise.all([
+      calcularStatsTorcidasOnboarding(raizes.map((t) => t.id)),
+      Promise.all(
+        raizes.map(async (t) => ({
+          tenantId: t.id,
+          sedes: await getSedesDaTorcidaOnboarding(t.id),
+        })),
+      ),
+    ])
+    const sedesMap = new Map(sedesPorRaiz.map((r) => [r.tenantId, r.sedes]))
+
+    return raizes
       .map((t: TenantComContagem) => ({
         id: t.id,
         nome: formatNomeTorcida(t.torcidaConhecida?.titulo ?? t.nome),
@@ -478,21 +540,7 @@ export const getTorcidasPorAfiliacao = cache(
         logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
         corPrimaria: t.corPrimaria,
         membrosAprovados: t._count.membros,
-        sedes: t.sedes.map((s) => ({
-          id: s.id,
-          nome: s.nome,
-          tipo: s.tipo as SedeOnboarding['tipo'],
-          cidade: s.cidade,
-          estado: s.estado,
-          endereco: s.endereco,
-          sedePaiId: s.sedeId,
-          lat: s.lat,
-          lng: s.lng,
-          fotoUrl: s.fotoUrl,
-          streetViewHeading: s.streetViewHeading,
-          streetViewPitch: s.streetViewPitch,
-          streetViewFov: s.streetViewFov,
-        })),
+        sedes: sedesMap.get(t.id) ?? [],
         stats: statsMap.get(t.id) ?? STATS_TORCIDA_VAZIAS,
         acessivelNoHost: torcidaAcessivelNoHost(t.slug),
       }))

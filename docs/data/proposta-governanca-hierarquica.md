@@ -26,6 +26,14 @@
   **editar/interferir diretamente** na operação da unidade. Leitura total +
   mutação zero. (Pode mudar no futuro; por ora é regra dura — é o que justifica o
   sistema de permissionamento complexo.)
+  - **Exceção pontual (2026-07-27) — admissão de sócio Caso B.** Quando um sócio
+    solicita ingresso numa afiliada com tenant próprio, a Sede recebe um **gêmeo
+    PENDENTE** (`SaasMembro.espelhado`) em `/admin/membros`. Quem tiver
+    `MEMBERS_APPROVE` / `MEMBERS_REJECT` na Sede **pode aprovar ou recusar** essa
+    pendência (first-wins com a unidade). Efeitos canônicos (Role `member`,
+    canais, departamento) correm no tenant da **origem**; ambas as linhas ficam
+    analisadas com o mesmo `aprovadoPor*` + AuditLog nos dois tenants. Demais
+    mutações em espelho (LGE, desligar, sede, carteirinha) continuam bloqueadas.
 - **R2 — Sem gestão de baixo para cima.** Subsede/PDE **não** pode gerir a Sede.
 - **R3 — Hierarquia completa é opt-in.** Uma subsede/PDE só enxerga a hierarquia
   completa da Sede se o **Presidente habilitar** isso nas configurações. Padrão:

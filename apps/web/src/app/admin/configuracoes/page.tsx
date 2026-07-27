@@ -144,11 +144,15 @@ export default async function ConfiguracoesPage({
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
           <AdminTabs
-            tabs={sections.map((section) => ({
-              id: section.id,
-              label: section.title,
-              icon: section.icon,
-            }))}
+            tabs={sections.map((section) => {
+              const TabIcon = section.icon
+              return {
+                id: section.id,
+                label: section.title,
+                // JSX (não o componente) — funções Lucide não serializam Server→Client.
+                icon: <TabIcon className="h-4 w-4 shrink-0" aria-hidden />,
+              }
+            })}
             basePath="/admin/configuracoes"
             activeId={activeSection.id}
             paramKey={CONFIG_TAB_PARAM}

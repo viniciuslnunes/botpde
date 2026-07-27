@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
@@ -33,6 +33,7 @@ import {
   buscarDepartamentos,
   buscarCidadesDaUf,
   registrarInteresseUnidade,
+  buscarSedesDaTorcida,
 } from './actions'
 import { ComboboxCidade } from './combobox-cidade'
 import { agruparSedesPorRegiao, normalizarTexto, type SedeOnboardingComDistancia } from '@/lib/onboarding-unidade'
@@ -52,6 +53,7 @@ import type {
 } from '@/lib/onboarding'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
+import { useVisibleInterval } from '@/lib/use-visible-interval'
 
 type Passo = 'clube' | 'regiao' | 'torcida' | 'unidade' | 'vinculo' | 'concluindo'
 
@@ -398,6 +400,9 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 onConfirmar={confirmarUnidade}
                 onVoltar={voltarHistorico}
                 onErro={setErro}
+                onSedesAtualizadas={(sedes) => {
+                  setTorcida((atual) => (atual ? { ...atual, sedes } : atual))
+                }}
               />
             </m.div>
           )}
@@ -877,6 +882,7 @@ function PassoUnidade({
   onConfirmar,
   onVoltar,
   onErro,
+  onSedesAtualizadas,
 }: {
   torcida: TorcidaOnboarding
   uf: string
@@ -887,9 +893,11 @@ function PassoUnidade({
   onConfirmar: (sedeId: string | null, naoListada: boolean) => void
   onVoltar: () => void
   onErro: (m: string | null) => void
+  onSedesAtualizadas: (sedes: SedeOnboarding[]) => void
 }) {
   const [selecionada, setSelecionada] = useState<string | null>(null)
   const [modoNaoListada, setModoNaoListada] = useState(false)
+  const [novidadeDetectada, setNovidadeDetectada] = useState(false)
   const [nomeUnidade, setNomeUnidade] = useState('')
   const [tipoUnidade, setTipoUnidade] = useState<'SUBSEDE' | 'PONTO_ENCONTRO'>('PONTO_ENCONTRO')
   const [cidadeUnidade, setCidadeUnidade] = useState(cidade)
@@ -910,6 +918,7 @@ function PassoUnidade({
   const [provasUrls, setProvasUrls] = useState<string[]>([])
   const [errosUnidade, setErrosUnidade] = useState<Record<string, string[]>>({})
   const [enviando, startEnvio] = useTransition()
+  const idsSedesRef = useRef(new Set(torcida.sedes.map((s) => s.id)))
   const cropProva = useCroppedImageUpload({
     aspect: 4 / 3,
     purpose: 'cadastro',
@@ -945,6 +954,43 @@ function PassoUnidade({
     torcida.sedes.some((s) => s.lat == null || s.lng == null),
   )
 
+  const pollSedesRef = useRef<() => void>(() => {})
+  pollSedesRef.current = () => {
+    void (async () => {
+      const sedes = await buscarSedesDaTorcida(torcida.id)
+      const idsNovos = new Set(sedes.map((s) => s.id))
+      const mudou =
+        idsNovos.size !== idsSedesRef.current.size ||
+        [...idsNovos].some((id) => !idsSedesRef.current.has(id))
+      if (!mudou) return
+      idsSedesRef.current = idsNovos
+      onSedesAtualizadas(sedes)
+      setSedesResolvidas(sedes)
+      setNovidadeDetectada(true)
+      if (sedes.length > 0) {
+        setModoNaoListada(false)
+      }
+      const precisaEnrich = sedes.some((s) => s.lat == null || s.lng == null)
+      if (precisaEnrich) {
+        setGeoSedesPend(true)
+        const enrichidas = await enrichSedesComCoordenadas(sedes)
+        setSedesResolvidas(enrichidas)
+        setGeoSedesPend(false)
+      } else {
+        setGeoSedesPend(false)
+      }
+    })()
+  }
+
+  // Polling: detecta PDE/subsede aprovada enquanto o usuário espera no passo.
+  const pollSedesTick = useCallback(() => {
+    pollSedesRef.current()
+  }, [])
+  useEffect(() => {
+    pollSedesTick()
+  }, [pollSedesTick])
+  useVisibleInterval(pollSedesTick, 3000, true)
+
   // Garante coords da região do usuário (cidade/UF) para calcular km.
   useEffect(() => {
     if (localizacao) {
@@ -972,6 +1018,7 @@ function PassoUnidade({
   // Banco ainda pode estar sem lat/lng — geocodifica endereço/cidade no cliente.
   useEffect(() => {
     let ativo = true
+    idsSedesRef.current = new Set(torcida.sedes.map((s) => s.id))
     setSedesResolvidas(torcida.sedes)
     const precisaEnrich = torcida.sedes.some((s) => s.lat == null || s.lng == null)
     if (!precisaEnrich) {
@@ -1119,6 +1166,11 @@ function PassoUnidade({
           <span className="inline-flex items-center gap-1.5 text-[11px] text-[rgb(var(--foreground-muted))]">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
             Calculando distâncias…
+          </span>
+        ) : null}
+        {novidadeDetectada ? (
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[11px] font-medium text-[rgb(var(--color-primary-fg))]">
+            Nova unidade disponível — escolha abaixo
           </span>
         ) : null}
       </div>
@@ -1664,11 +1716,12 @@ function PassoVinculo({
 
   useEffect(() => {
     if (modo !== 'socio' || departamentos !== null) return
+    const tenantDepsId = unidadeSelecionada?.tenantId ?? torcida.id
     startTransition(async () => {
-      const deps = await buscarDepartamentos(torcida.id)
+      const deps = await buscarDepartamentos(tenantDepsId)
       setDepartamentos(deps)
     })
-  }, [modo, departamentos, torcida.id])
+  }, [modo, departamentos, torcida.id, unidadeSelecionada?.tenantId])
 
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)

@@ -120,6 +120,7 @@ function revalidar(): void {
   revalidatePath('/admin/afiliacoes')
   revalidatePath('/admin/torcida')
   revalidatePath('/super-admin/afiliacoes')
+  revalidatePath('/onboarding')
 }
 
 function erroState(error: unknown): SolicitacaoActionState {

@@ -615,7 +615,12 @@ export async function assertPodeEnviarNaConversa(
   }
 
   if (membro.status === 'PENDENTE') {
-    throw new Error('Aprove ou recuse a solicitação antes de responder.')
+    // DIRETA: destinatário precisa aprovar/recusar. CANAL/GRUPO: quem pediu
+    // entrada aguarda decisão do admin — mensagem distinta evita confusão.
+    if (membro.conversa.tipo === 'DIRETA') {
+      throw new Error('Aprove ou recuse a solicitação antes de responder.')
+    }
+    throw new Error('Aguarde a aprovação do pedido de entrada antes de enviar mensagens.')
   }
 
   return { membro, conversaTipo: membro.conversa.tipo }
@@ -817,8 +822,10 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
         ? (outroStatusPorConversa.get(row.conversa.id) ?? 'ATIVO')
         : 'ATIVO'
     const solicitacaoRecebida = row.conversa.tipo === 'DIRETA' && row.status === 'PENDENTE'
+    // DM: remetente aguarda o outro. Canal/grupo: meu status PENDENTE = pedido de entrada.
     const aguardandoAprovacao =
-      row.conversa.tipo === 'DIRETA' && row.status === 'ATIVO' && outroStatus === 'PENDENTE'
+      (row.conversa.tipo === 'DIRETA' && row.status === 'ATIVO' && outroStatus === 'PENDENTE') ||
+      (row.conversa.tipo !== 'DIRETA' && row.status === 'PENDENTE')
     return {
       id: row.conversa.id,
       tipo: row.conversa.tipo,

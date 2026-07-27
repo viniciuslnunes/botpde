@@ -1,20 +1,27 @@
 'use server'
 
 import { auth } from '@/lib/auth'
-import { db } from '@torcida/db'
+import { db, type Prisma } from '@torcida/db'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import {
   getAfiliacoesParaOnboarding,
   getTorcidasPorAfiliacao,
+  getSedesDaTorcidaOnboarding,
   getDepartamentosDoTenant,
   UFS_BRASIL,
   type AfiliacaoOnboarding,
   type TorcidaOnboarding,
   type DepartamentoOnboarding,
+  type SedeOnboarding,
 } from '@/lib/onboarding'
+import { getDescendantTenantIds } from '@/lib/hierarquia'
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
+import {
+  criarOuAtualizarPendenciaEspelhoNaSede,
+  type MembroParaEspelho,
+} from '@/lib/membros-sede'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
@@ -41,6 +48,14 @@ export async function buscarTorcidas(afiliacaoId: string): Promise<TorcidaOnboar
   if (!session?.user?.id) return []
   if (!z.string().uuid().safeParse(afiliacaoId).success) return []
   return getTorcidasPorAfiliacao(afiliacaoId)
+}
+
+/** Unidades da torcida (Caso A + Caso B) — usado no polling do passo Unidade. */
+export async function buscarSedesDaTorcida(tenantId: string): Promise<SedeOnboarding[]> {
+  const session = await auth()
+  if (!session?.user?.id) return []
+  if (!z.string().uuid().safeParse(tenantId).success) return []
+  return getSedesDaTorcidaOnboarding(tenantId)
 }
 
 export async function buscarCidadesDaUf(uf: string): Promise<string[]> {
@@ -785,18 +800,17 @@ export async function solicitarVinculo(
     departamentoId: null as string | null,
   }
 
-  // Vínculo territorial: 1 sede → usa direto; várias → exige seleção válida.
-  const sedesDoTenant: { id: string }[] = await db.sede.findMany({
-    where: { tenantId: tenant.id, ativa: true },
-    select: { id: true },
-  })
+  // Vínculo territorial: worktree (Caso A + Caso B). Se a sede for de um
+  // tenant-filho promovido, o SaasMembro nasce lá (origem canônica da fila
+  // compartilhada) — o espelho na Sede é criado depois via fan-out.
+  const sedesWorktree = await getSedesDaTorcidaOnboarding(tenant.id)
   let sedeId: string | undefined
-  if (sedesDoTenant.length === 1) {
-    sedeId = sedesDoTenant[0].id
-  } else if (sedesDoTenant.length > 1) {
+  if (sedesWorktree.length === 1) {
+    sedeId = sedesWorktree[0].id
+  } else if (sedesWorktree.length > 1) {
     if (data.unidadeNaoListada) {
       sedeId = undefined
-    } else if (!data.sedeId || !sedesDoTenant.some((s) => s.id === data.sedeId)) {
+    } else if (!data.sedeId || !sedesWorktree.some((s) => s.id === data.sedeId)) {
       return { errors: { sedeId: ['Selecione sua unidade'] } }
     } else {
       sedeId = data.sedeId
@@ -804,13 +818,40 @@ export async function solicitarVinculo(
   }
   dadosMembro.sedeId = sedeId
 
-  // Valida departamento (se informado) pertence ao tenant. Preferência apenas —
+  let tenantDestino = tenant
+  if (sedeId) {
+    const sedeEscolhida: { tenantId: string | null; ativa: boolean } | null =
+      await db.sede.findUnique({
+        where: { id: sedeId },
+        select: { tenantId: true, ativa: true },
+      })
+    if (!sedeEscolhida?.ativa || !sedeEscolhida.tenantId) {
+      return { errors: { sedeId: ['Unidade inválida ou inativa'] } }
+    }
+    if (sedeEscolhida.tenantId !== tenant.id) {
+      const descendentes = await getDescendantTenantIds(tenant.id)
+      if (!descendentes.includes(sedeEscolhida.tenantId)) {
+        return { errors: { sedeId: ['Unidade não pertence a esta torcida'] } }
+      }
+      const filho: { id: string; slug: string; nome: string } | null =
+        await db.tenant.findFirst({
+          where: { id: sedeEscolhida.tenantId, ativo: true },
+          select: { id: true, slug: true, nome: true },
+        })
+      if (!filho) {
+        return { errors: { sedeId: ['Portal da unidade indisponível'] } }
+      }
+      tenantDestino = filho
+    }
+  }
+
+  // Valida departamento (se informado) no tenant do vínculo. Preferência apenas —
   // não cria membership até o admin aprovar (aprovarMembro).
   let departamentoId: string | null = null
   if (data.tipo === 'SOCIO' && data.departamentoId) {
     const dep: { id: string; slug: string; nome: string } | null =
       await db.departamento.findFirst({
-        where: { id: data.departamentoId, tenantId: tenant.id },
+        where: { id: data.departamentoId, tenantId: tenantDestino.id },
         select: { id: true, slug: true, nome: true },
       })
     if (!dep || isDepartamentoLegado(dep)) {
@@ -827,7 +868,7 @@ export async function solicitarVinculo(
   const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
   const existing = await db.saasMembro.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId } },
+    where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
     select: { id: true, status: true },
   })
 
@@ -857,7 +898,7 @@ export async function solicitarVinculo(
       })
       await db.auditLog.create({
         data: {
-          tenantId: tenant.id,
+          tenantId: tenantDestino.id,
           atorId: userId,
           acao: 'RECADASTRO_SOLICITADO',
           entidade: 'SaasMembro',
@@ -868,7 +909,7 @@ export async function solicitarVinculo(
   } else {
     const novo = await db.saasMembro.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: tenantDestino.id,
         userId,
         ...dadosMembro,
         status: statusInicial,
@@ -876,7 +917,7 @@ export async function solicitarVinculo(
     })
     await db.auditLog.create({
       data: {
-        tenantId: tenant.id,
+        tenantId: tenantDestino.id,
         atorId: userId,
         acao: 'CADASTRO_SOLICITADO',
         entidade: 'SaasMembro',
@@ -896,22 +937,91 @@ export async function solicitarVinculo(
   // Criamos (ou reforçamos) PerfilMembro para não depender de interações futuras.
   if (data.tipo === 'TORCEDOR') {
     await db.perfilMembro.upsert({
-      where: { userId_tenantId: { userId, tenantId: tenant.id } },
-      create: { userId, tenantId: tenant.id, perfilPrivado: false },
+      where: { userId_tenantId: { userId, tenantId: tenantDestino.id } },
+      create: { userId, tenantId: tenantDestino.id, perfilPrivado: false },
       update: { perfilPrivado: false },
     })
   }
 
   // Avisa o solicitante do fluxo até a aprovação — só SOCIO fica PENDENTE
-  // (TORCEDOR já nasce APROVADO, sem fila).
+  // (TORCEDOR já nasce APROVADO, sem fila). Caso B: fan-out da pendência
+  // para a Sede raiz (fila compartilhada; first-wins na decisão).
   if (statusInicial === 'PENDENTE') {
+    const membroOrigem: MembroParaEspelho | null = await db.saasMembro.findUnique({
+      where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
+      select: {
+        id: true,
+        userId: true,
+        tipo: true,
+        nome: true,
+        idade: true,
+        telefone: true,
+        cidade: true,
+        numeroAssociado: true,
+        anosSocio: true,
+        cep: true,
+        numero: true,
+        bloco: true,
+        complemento: true,
+        imagemProva: true,
+        rg: true,
+        cpf: true,
+        filiacao: true,
+        escolaridade: true,
+        profissao: true,
+        dataNascimento: true,
+        sexo: true,
+        estadoCivil: true,
+        nacionalidade: true,
+        logradouro: true,
+        bairro: true,
+        uf: true,
+        fotoDocumentoUrl: true,
+        comprovanteResidenciaUrl: true,
+        responsavelNome: true,
+        responsavelDocumento: true,
+        autorizacaoMenorAceitaEm: true,
+        termoResponsabilidadeAceitoEm: true,
+      },
+    })
+
+    let sedeRaizId: string | null = null
+    if (membroOrigem && data.tipo === 'SOCIO') {
+      const fanout = await db.$transaction(async (tx: Prisma.TransactionClient) =>
+        criarOuAtualizarPendenciaEspelhoNaSede(tx, {
+          tenantOrigemId: tenantDestino.id,
+          membro: membroOrigem,
+          atorId: userId,
+        }),
+      )
+      if (fanout.espelhoId && fanout.raizTenantId) {
+        sedeRaizId = fanout.raizTenantId
+      }
+    }
+
     await notificarNovoMembroPendente({
-      tenantId: tenant.id,
-      tenantNome: tenant.nome,
+      tenantId: tenantDestino.id,
+      tenantNome: tenantDestino.nome,
       solicitanteUserId: userId,
       solicitanteNome: data.nome,
       tipoVinculo: data.tipo,
     })
+
+    if (sedeRaizId) {
+      const sedeNome: { nome: string } | null = await db.tenant.findFirst({
+        where: { id: sedeRaizId },
+        select: { nome: true },
+      })
+      await notificarNovoMembroPendente({
+        tenantId: sedeRaizId,
+        tenantNome: sedeNome?.nome ?? 'Sede',
+        solicitanteUserId: userId,
+        solicitanteNome: data.nome,
+        tipoVinculo: data.tipo,
+        notificarSolicitante: false,
+        corpoAdmin: `${data.nome} solicitou ingresso como sócio em ${tenantDestino.nome}. A Sede também pode aprovar ou recusar.`,
+      })
+    }
   }
 
   // Nunca fixa cookie de torcida aqui — SOCIO recém-solicitado ainda está
@@ -920,6 +1030,6 @@ export async function solicitarVinculo(
   // só resolve tenant pra SOCIO APROVADO). Limpa explicitamente pra não
   // herdar um cookie de uma tentativa anterior.
   await clearTenantContextSlug()
-  redirect(`/onboarding/solicitado?torcida=${encodeURIComponent(tenant.slug)}`)
+  redirect(`/onboarding/solicitado?torcida=${encodeURIComponent(tenantDestino.slug)}`)
   return { ok: true }
 }

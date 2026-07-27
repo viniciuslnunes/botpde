@@ -561,17 +561,27 @@ function TabOperacao({ membro }: { membro: AdminMembroItem }) {
           label="Espelho"
           value={
             membro.espelhado
-              ? membro.aprovadoNaUnidadeNome?.trim()
-                ? `Aprovado via ${membro.aprovadoNaUnidadeNome.trim()}`
-                : 'Espelho da Sede'
+              ? membro.status === 'PENDENTE'
+                ? membro.aprovadoNaUnidadeNome?.trim()
+                  ? `Solicitação via ${membro.aprovadoNaUnidadeNome.trim()}`
+                  : 'Espelho da Sede (pendente)'
+                : membro.aprovadoNaUnidadeNome?.trim()
+                  ? `Vínculo via ${membro.aprovadoNaUnidadeNome.trim()}`
+                  : 'Espelho da Sede'
               : 'Cadastro orgânico'
           }
         />
         <Campo label="Atualizado em" value={membro.atualizadoEmLabel} />
       </Secao>
       <Secao titulo="Histórico operacional">
-        <Campo label="Aprovado por" value={membro.aprovadoPorNome} />
-        <Campo label="Aprovado em" value={membro.aprovadoEmLabel} />
+        <Campo
+          label={membro.status === 'REPROVADO' ? 'Analisado por' : 'Aprovado por'}
+          value={membro.aprovadoPorNome}
+        />
+        <Campo
+          label={membro.status === 'REPROVADO' ? 'Analisado em' : 'Aprovado em'}
+          value={membro.aprovadoEmLabel}
+        />
         <Campo label="Desligado em" value={membro.desligadoEmLabel} />
         <Campo label="Motivo do desligamento" value={membro.desligadoMotivo} />
         <Campo
@@ -715,9 +725,19 @@ export function MembroDetalheModal({
                       )}
                       {membro.espelhado && (
                         <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                          {membro.aprovadoNaUnidadeNome?.trim()
-                            ? `Aprovado via ${membro.aprovadoNaUnidadeNome.trim()}`
-                            : 'Espelho da Sede'}
+                          {membro.status === 'PENDENTE'
+                            ? membro.aprovadoNaUnidadeNome?.trim()
+                              ? `Solicitação via ${membro.aprovadoNaUnidadeNome.trim()}`
+                              : 'Espelho da Sede'
+                            : membro.aprovadoPorNome?.trim()
+                              ? `Analisada por ${membro.aprovadoPorNome.trim()}${
+                                  membro.aprovadoEmLabel?.trim()
+                                    ? ` em ${membro.aprovadoEmLabel.trim()}`
+                                    : ''
+                                }`
+                              : membro.aprovadoNaUnidadeNome?.trim()
+                                ? `Aprovado via ${membro.aprovadoNaUnidadeNome.trim()}`
+                                : 'Espelho da Sede'}
                         </span>
                       )}
                     </div>
@@ -808,6 +828,8 @@ export function MembroDetalheModal({
                 departamentoNome={membro.departamentoNome}
                 espelhado={membro.espelhado}
                 aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
+                aprovadoPorNome={membro.aprovadoPorNome}
+                aprovadoEmLabel={membro.aprovadoEmLabel}
               />
             </div>
           </m.div>

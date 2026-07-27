@@ -970,17 +970,23 @@ model SaasMembro {
 
 
 
-  /// true = esta linha é um ESPELHO gerado pela aprovação em outra unidade da
+  /// true = esta linha é um ESPELHO gerado a partir de outra unidade da
 
-  /// mesma torcida (Caso B). false = linha orgânica. Espelhos nunca são
+  /// mesma torcida (Caso B). false = linha orgânica. Em PENDENTE, a Sede
 
-  /// mutáveis diretamente pela Sede — só leitura.
+  /// pode aprovar/recusar (exceção pontual à R1 — fila compartilhada /
+
+  /// first-wins). Demais mutações (LGE, desligar, sede, carteirinha) só
+
+  /// na origem.
 
   espelhado Boolean @default(false) @map("espelhado")
 
 
 
-  /// Só no espelho: tenantId da Subsede/PDE que aprovou originalmente.
+  /// Só no espelho: tenantId da Subsede/PDE de origem do vínculo
+
+  /// (unidade onde o sócio solicitou ingresso).
 
   aprovadoNaUnidadeTenantId String? @map("aprovado_na_unidade_tenant_id")
 

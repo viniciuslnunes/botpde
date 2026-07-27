@@ -52,6 +52,8 @@ export default async function MembroDetalhePage({ params }: Props) {
     sedeId: string | null
     espelhado: boolean
     aprovadoNaUnidadeTenantId: string | null
+    aprovadoPorNome: string | null
+    aprovadoEm: Date | null
     planoAssociacao: { nome: string } | null
     departamento: { id: string; nome: string } | null
     user: { email: string | null }
@@ -86,6 +88,8 @@ export default async function MembroDetalhePage({ params }: Props) {
         sedeId: true,
         espelhado: true,
         aprovadoNaUnidadeTenantId: true,
+        aprovadoPorNome: true,
+        aprovadoEm: true,
         planoAssociacao: { select: { nome: true } },
         departamento: { select: { id: true, nome: true } },
         user: { select: { email: true } },
@@ -113,6 +117,9 @@ export default async function MembroDetalhePage({ params }: Props) {
       })
     : null
   const aprovadoNaUnidadeNome = unidadeOrigem?.nome ?? null
+  const aprovadoEmLabel = membro.aprovadoEm
+    ? new Date(membro.aprovadoEm).toLocaleDateString('pt-BR')
+    : null
 
   const isSuperAdmin = isSuperAdminEmail(session.user.email)
   const effective = calculateEffectivePermissions(perms.rolePermissions, perms.overrides)
@@ -144,9 +151,17 @@ export default async function MembroDetalhePage({ params }: Props) {
                 <StatusBadge dominio="membro" status={membro.status} />
                 {membro.espelhado && (
                   <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                    {aprovadoNaUnidadeNome
-                      ? `Aprovado via ${aprovadoNaUnidadeNome}`
-                      : 'Espelho da Sede'}
+                    {membro.status === 'PENDENTE'
+                      ? aprovadoNaUnidadeNome
+                        ? `Solicitação via ${aprovadoNaUnidadeNome}`
+                        : 'Espelho da Sede'
+                      : membro.aprovadoPorNome
+                        ? `Analisada por ${membro.aprovadoPorNome}${
+                            aprovadoEmLabel ? ` em ${aprovadoEmLabel}` : ''
+                          }`
+                        : aprovadoNaUnidadeNome
+                          ? `Aprovado via ${aprovadoNaUnidadeNome}`
+                          : 'Espelho da Sede'}
                   </span>
                 )}
               </div>
@@ -175,6 +190,8 @@ export default async function MembroDetalhePage({ params }: Props) {
             departamentoNome={membro.departamento?.nome}
             espelhado={membro.espelhado}
             aprovadoNaUnidadeNome={aprovadoNaUnidadeNome}
+            aprovadoPorNome={membro.aprovadoPorNome}
+            aprovadoEmLabel={aprovadoEmLabel}
           />
         </div>
       </MotionReveal>

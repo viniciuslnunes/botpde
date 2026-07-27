@@ -24,7 +24,7 @@ import { LogoImage } from '@/components/media/logo-image'
 import { useAdminNavbarContext, markAdminNavbarNotificationRead } from '@/lib/use-admin-navbar-context'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
-import type { TorcidaOpcao } from '@/lib/torcida-labels'
+import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 
 interface AdminMenuItem {
   id: string
@@ -38,6 +38,7 @@ interface AdminShellProps {
   tenantNome: string
   tenantCor: string
   tenantSlug: string
+  tenantId: string
   tenantLogoUrl: string | null
   /** JSON de tema visual (Tenant.design). */
   tenantDesign?: unknown
@@ -46,6 +47,8 @@ interface AdminShellProps {
   items: AdminMenuItem[]
   isSuperAdmin?: boolean
   torcidas?: TorcidaOpcao[]
+  clubes?: ClubeOpcao[]
+  unidades?: UnidadeOpcao[]
   /** Vínculos de sócio APROVADO do usuário comum (não super-admin) em mais de uma torcida. */
   vinculos?: TorcidaOpcao[]
   notifications?: NotificationItem[]
@@ -226,6 +229,7 @@ export function AdminShell({
   tenantNome,
   tenantCor,
   tenantSlug,
+  tenantId,
   tenantLogoUrl,
   tenantDesign,
   userName,
@@ -233,6 +237,8 @@ export function AdminShell({
   items,
   isSuperAdmin = false,
   torcidas = [],
+  clubes = [],
+  unidades = [],
   vinculos = [],
   notifications = [],
   operatorBanner,
@@ -273,10 +279,13 @@ export function AdminShell({
         {!immersivePdv && (
           <AdminSidebar
             tenantSlug={tenantSlug}
+            tenantId={tenantId}
             items={items}
             badges={menuBadges}
             isSuperAdmin={isSuperAdmin}
             torcidas={torcidas}
+            clubes={clubes}
+            unidades={unidades}
             vinculos={vinculos}
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}

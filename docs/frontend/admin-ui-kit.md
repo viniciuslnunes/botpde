@@ -24,7 +24,7 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `TableShell` | Card + `<table>` (children = thead/tbody do módulo), slot de filtros, empty via `MotionEmptyState` | **Não** é DataTable declarativa — cada módulo mantém suas linhas |
 | `TablePagination` | ← Anterior / Próxima → (`page`, `totalPages`, `buildHref`) | Server-safe; use com `buildAdminHref` de `apps/web/src/lib/admin-href.ts` |
 | `InsightSection` | Seção de insights (título + grid) com `MotionRevealOnce` | Usada nos hubs e em `/admin/relatorios` |
-| `AdminTabs` | Barra de tabs (`tabs`, `basePath`, `activeId`, `paramKey?`, `extraParams?`) | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
+| `AdminTabs` | Barra de tabs (`tabs`, `basePath`, `activeId`, `paramKey?`, `extraParams?`); `icon` é `ReactNode` (ex. `<Users className="h-4 w-4" />`), **nunca** o componente Lucide — funções não serializam Server→Client | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
 
 **Quando usar `AdminTabs` vs. filtro simples**: tabs são para **seções de
 conteúdo mutuamente exclusivas** (um form ou bloco por vez — ex.: settings,

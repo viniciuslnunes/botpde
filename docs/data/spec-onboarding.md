@@ -215,6 +215,10 @@ direcional** (`` `${actor}:${target}` ``) antes de introduzir a relação `rival
 - Server Actions com `assertPermission` nas mutações administrativas + `AuditLog`.
 - **Admin `/admin/membros`:** coluna Departamento + diálogo “Aprovar e incluir em X?”
   (ou **Sem área**). Reprovar/reverter limpa membership de área.
+- **Caso B (tenant próprio da afiliada):** pedido de sócio fan-out para a Sede
+  (`espelhado` PENDENTE). Sede e unidade compartilham a fila; first-wins;
+  rastro em `aprovadoPor*` + AuditLog. Ver `docs/data/modulo-associacao.md`
+  § fila compartilhada e exceção R1 em `proposta-governanca-hierarquica.md`.
 
 ## 5. Base de clubes (seed) + escudos + estimativa de torcedores
 

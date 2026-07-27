@@ -219,6 +219,8 @@ export function AdminMembrosTable({
                       departamentoNome={membro.departamentoNome}
                       espelhado={membro.espelhado}
                       aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
+                      aprovadoPorNome={membro.aprovadoPorNome}
+                      aprovadoEmLabel={membro.aprovadoEmLabel}
                     />
                   </td>
                 </m.tr>

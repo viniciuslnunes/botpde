@@ -7,10 +7,13 @@ import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { ExpectedError } from '@/lib/expected-error'
 import {
+  assertOrigemDescendenteDaSede,
   desligarEspelhoDaOrigem,
+  lockDecisaoAdmissaoTorcida,
   lockNumeroAssociadoDaTorcida,
   propagarLgeParaEspelho,
   sincronizarSocioNaSedeRaiz,
+  sincronizarStatusEspelhoDaOrigem,
   validarNumeroAssociadoUnicoNaTorcida,
 } from '@/lib/membros-sede'
 import { notificarSafe } from '@/lib/notificacoes'
@@ -28,6 +31,122 @@ import {
 const ERRO_ESPELHO_MUTACAO =
   'Este registro é um espelho da Sede. Altere na unidade de origem.'
 
+function erroSolicitacaoJaAnalisada(
+  aprovadoPorNome: string | null,
+  aprovadoEm: Date | null,
+): ExpectedError {
+  const quem = aprovadoPorNome?.trim() || 'outro administrador'
+  const quando = aprovadoEm ? ` em ${aprovadoEm.toLocaleString('pt-BR')}` : ''
+  return new ExpectedError(`Esta solicitação já foi analisada por ${quem}${quando}.`)
+}
+
+type MembroDecisaoSelect = {
+  id: string
+  tenantId: string
+  userId: string
+  tipo: string
+  nome: string
+  status: string
+  espelhado: boolean
+  membroOrigemId: string | null
+  aprovadoNaUnidadeTenantId: string | null
+  numeroAssociado: string | null
+  departamentoId: string | null
+  sedeId: string | null
+  aprovadoPorNome: string | null
+  aprovadoEm: Date | null
+  idade: number | null
+  telefone: string | null
+  cidade: string | null
+  anosSocio: number | null
+  cep: string | null
+  numero: string | null
+  bloco: string | null
+  complemento: string | null
+  imagemProva: string | null
+  rg: string | null
+  cpf: string | null
+  filiacao: string | null
+  escolaridade: string | null
+  profissao: string | null
+  dataNascimento: Date | null
+  sexo: string | null
+  estadoCivil: string | null
+  nacionalidade: string | null
+  logradouro: string | null
+  bairro: string | null
+  uf: string | null
+  fotoDocumentoUrl: string | null
+  comprovanteResidenciaUrl: string | null
+  responsavelNome: string | null
+  responsavelDocumento: string | null
+  autorizacaoMenorAceitaEm: Date | null
+  termoResponsabilidadeAceitoEm: Date | null
+}
+
+const membroDecisaoSelect = {
+  id: true,
+  tenantId: true,
+  userId: true,
+  tipo: true,
+  nome: true,
+  status: true,
+  espelhado: true,
+  membroOrigemId: true,
+  aprovadoNaUnidadeTenantId: true,
+  numeroAssociado: true,
+  departamentoId: true,
+  sedeId: true,
+  aprovadoPorNome: true,
+  aprovadoEm: true,
+  idade: true,
+  telefone: true,
+  cidade: true,
+  anosSocio: true,
+  cep: true,
+  numero: true,
+  bloco: true,
+  complemento: true,
+  imagemProva: true,
+  rg: true,
+  cpf: true,
+  filiacao: true,
+  escolaridade: true,
+  profissao: true,
+  dataNascimento: true,
+  sexo: true,
+  estadoCivil: true,
+  nacionalidade: true,
+  logradouro: true,
+  bairro: true,
+  uf: true,
+  fotoDocumentoUrl: true,
+  comprovanteResidenciaUrl: true,
+  responsavelNome: true,
+  responsavelDocumento: true,
+  autorizacaoMenorAceitaEm: true,
+  termoResponsabilidadeAceitoEm: true,
+} as const
+
+async function marcarSolicitacoesLidas(
+  atorUserId: string,
+  solicitanteUserId: string,
+  tenantIds: string[],
+): Promise<void> {
+  for (const tenantId of tenantIds) {
+    const { count } = await db.notificacao.updateMany({
+      where: {
+        userId: atorUserId,
+        tenantId,
+        atorId: solicitanteUserId,
+        tipo: 'MEMBRO_SOLICITADO',
+        lida: false,
+      },
+      data: { lida: true },
+    })
+    if (count > 0) emitNotificacaoPing(tenantId, atorUserId)
+  }
+}
 /**
  * Concede acesso básico ao portal quando um membro é aprovado:
  * Role de sistema 'member' (se ainda não tiver).
@@ -140,191 +259,482 @@ export type AprovarMembroOpts = {
 export async function aprovarMembro(membroId: string, opts?: AprovarMembroOpts) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
   const incluirDepartamento = opts?.incluirDepartamento !== false
+  const aprovadoPorNome = session.user.name ?? 'Admin'
+  const aprovadoPorId = session.user.id
 
-  const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existente: { id: string; espelhado: boolean; tipo: string; userId: string; numeroAssociado: string | null } | null =
-      await tx.saasMembro.findFirst({
+  type ResultadoAprovacao = {
+    origem: MembroDecisaoSelect
+    espelhoId: string | null
+    decididoEmTenantId: string
+    tenantNotificarId: string
+    tenantNotificarNome: string
+  }
+
+  const resultado: ResultadoAprovacao = await db.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
         where: { id: membroId, tenantId: tenant.id },
-        select: {
-          id: true,
-          espelhado: true,
-          tipo: true,
-          userId: true,
-          numeroAssociado: true,
-        },
+        select: membroDecisaoSelect,
       })
-    if (!existente) throw new ExpectedError('Membro não encontrado.')
-    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+      if (!existente) throw new ExpectedError('Membro não encontrado.')
 
-    if (existente.tipo === 'SOCIO' && existente.numeroAssociado) {
-      await lockNumeroAssociadoDaTorcida(tx, tenant.id)
-      await validarNumeroAssociadoUnicoNaTorcida(
-        tx,
-        tenant.id,
-        existente.userId,
-        existente.numeroAssociado,
-        existente.id,
-      )
-    }
+      // ── Sede decide sobre espelho PENDENTE (exceção R1) ───────────────────
+      if (existente.espelhado) {
+        if (existente.status !== 'PENDENTE') {
+          throw erroSolicitacaoJaAnalisada(existente.aprovadoPorNome, existente.aprovadoEm)
+        }
+        if (!existente.membroOrigemId) {
+          throw new ExpectedError('Espelho sem origem vinculada.')
+        }
 
-    const atualizado = await tx.saasMembro.update({
-      where: { id: membroId, tenantId: tenant.id },
-      data: {
-        status: 'APROVADO',
-        aprovadoPorId: session.user.id,
-        aprovadoPorNome: session.user.name ?? 'Admin',
-        aprovadoEm: new Date(),
-      },
-    })
+        const origem: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: existente.membroOrigemId },
+          select: membroDecisaoSelect,
+        })
+        if (!origem) throw new ExpectedError('Membro de origem não encontrado.')
+        if (origem.espelhado) throw new ExpectedError('Origem inválida.')
 
-    await concederAcessoBasico(tenant.id, atualizado.userId, tx)
+        await assertOrigemDescendenteDaSede(tenant.id, origem.tenantId)
+        await lockDecisaoAdmissaoTorcida(tx, origem.tenantId)
 
-    if (atualizado.tipo === 'SOCIO') {
-      await privatizarPerfilAoAprovarSocio(atualizado.userId, tenant.id, tx)
-      if (incluirDepartamento && atualizado.departamentoId) {
-        await aplicarDepartamentoPreferido(
-          tenant.id,
-          atualizado.userId,
-          atualizado.departamentoId,
+        const origemFresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: origem.id },
+          select: membroDecisaoSelect,
+        })
+        const espelhoFresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: existente.id },
+          select: membroDecisaoSelect,
+        })
+        if (!origemFresh || !espelhoFresh) throw new ExpectedError('Membro não encontrado.')
+        if (origemFresh.status !== 'PENDENTE' || espelhoFresh.status !== 'PENDENTE') {
+          throw erroSolicitacaoJaAnalisada(
+            origemFresh.status !== 'PENDENTE'
+              ? origemFresh.aprovadoPorNome
+              : espelhoFresh.aprovadoPorNome,
+            origemFresh.status !== 'PENDENTE' ? origemFresh.aprovadoEm : espelhoFresh.aprovadoEm,
+          )
+        }
+
+        if (origemFresh.tipo === 'SOCIO' && origemFresh.numeroAssociado) {
+          await lockNumeroAssociadoDaTorcida(tx, origemFresh.tenantId)
+          await validarNumeroAssociadoUnicoNaTorcida(
+            tx,
+            origemFresh.tenantId,
+            origemFresh.userId,
+            origemFresh.numeroAssociado,
+            origemFresh.id,
+          )
+        }
+
+        const agora = new Date()
+        const origemAtualizada = await tx.saasMembro.update({
+          where: { id: origemFresh.id },
+          data: {
+            status: 'APROVADO',
+            aprovadoPorId,
+            aprovadoPorNome,
+            aprovadoEm: agora,
+          },
+          select: membroDecisaoSelect,
+        })
+
+        await concederAcessoBasico(origemFresh.tenantId, origemAtualizada.userId, tx)
+
+        if (origemAtualizada.tipo === 'SOCIO') {
+          await privatizarPerfilAoAprovarSocio(
+            origemAtualizada.userId,
+            origemFresh.tenantId,
+            tx,
+          )
+          if (incluirDepartamento && origemAtualizada.departamentoId) {
+            await aplicarDepartamentoPreferido(
+              origemFresh.tenantId,
+              origemAtualizada.userId,
+              origemAtualizada.departamentoId,
+              tx,
+            )
+          }
+          await sincronizarSocioNaSedeRaiz(tx, {
+            tenantOrigemId: origemFresh.tenantId,
+            membro: origemAtualizada,
+            aprovadoPorUserId: aprovadoPorId,
+            aprovadoPorNome,
+          })
+        }
+
+        const unidadeTenant: { nome: string } | null = await tx.tenant.findFirst({
+          where: { id: origemFresh.tenantId },
+          select: { nome: true },
+        })
+
+        return {
+          origem: origemAtualizada,
+          espelhoId: existente.id,
+          decididoEmTenantId: tenant.id,
+          tenantNotificarId: origemFresh.tenantId,
+          tenantNotificarNome: unidadeTenant?.nome ?? tenant.nome,
+        }
+      }
+
+      // ── Unidade (origem) decide ───────────────────────────────────────────
+      if (existente.status !== 'PENDENTE' && existente.status !== 'REPROVADO') {
+        throw erroSolicitacaoJaAnalisada(existente.aprovadoPorNome, existente.aprovadoEm)
+      }
+
+      await lockDecisaoAdmissaoTorcida(tx, tenant.id)
+
+      const fresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+        where: { id: existente.id },
+        select: membroDecisaoSelect,
+      })
+      if (!fresh) throw new ExpectedError('Membro não encontrado.')
+      if (fresh.status === 'APROVADO') {
+        throw erroSolicitacaoJaAnalisada(fresh.aprovadoPorNome, fresh.aprovadoEm)
+      }
+
+      if (fresh.tipo === 'SOCIO' && fresh.numeroAssociado) {
+        await lockNumeroAssociadoDaTorcida(tx, tenant.id)
+        await validarNumeroAssociadoUnicoNaTorcida(
           tx,
+          tenant.id,
+          fresh.userId,
+          fresh.numeroAssociado,
+          fresh.id,
         )
       }
-      await sincronizarSocioNaSedeRaiz(tx, {
-        tenantOrigemId: tenant.id,
-        membro: atualizado,
-        aprovadoPorUserId: session.user.id,
-        aprovadoPorNome: session.user.name ?? 'Admin',
+
+      const atualizado = await tx.saasMembro.update({
+        where: { id: membroId, tenantId: tenant.id },
+        data: {
+          status: 'APROVADO',
+          aprovadoPorId,
+          aprovadoPorNome,
+          aprovadoEm: new Date(),
+        },
+        select: membroDecisaoSelect,
       })
-    }
 
-    return atualizado
-  })
+      await concederAcessoBasico(tenant.id, atualizado.userId, tx)
 
-  invalidatePermissionsCache(membro.userId, tenant.id)
+      let espelhoId: string | null = null
+      if (atualizado.tipo === 'SOCIO') {
+        await privatizarPerfilAoAprovarSocio(atualizado.userId, tenant.id, tx)
+        if (incluirDepartamento && atualizado.departamentoId) {
+          await aplicarDepartamentoPreferido(
+            tenant.id,
+            atualizado.userId,
+            atualizado.departamentoId,
+            tx,
+          )
+        }
+        await sincronizarSocioNaSedeRaiz(tx, {
+          tenantOrigemId: tenant.id,
+          membro: atualizado,
+          aprovadoPorUserId: aprovadoPorId,
+          aprovadoPorNome,
+        })
+        const espelho: { id: string } | null = await tx.saasMembro.findUnique({
+          where: { membroOrigemId: atualizado.id },
+          select: { id: true },
+        })
+        espelhoId = espelho?.id ?? null
+      }
 
-  const { count: solicitacoesLidas } = await db.notificacao.updateMany({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      atorId: membro.userId,
-      tipo: 'MEMBRO_SOLICITADO',
-      lida: false,
+      return {
+        origem: atualizado,
+        espelhoId,
+        decididoEmTenantId: tenant.id,
+        tenantNotificarId: tenant.id,
+        tenantNotificarNome: tenant.nome,
+      }
     },
-    data: { lida: true },
-  })
-  if (solicitacoesLidas > 0) emitNotificacaoPing(tenant.id, session.user.id)
+  )
 
-  // Auto-vínculo de canais (governança hierárquica, Fase 2): SÓ o canal da
-  // própria unidade (SaasMembro.sedeId) + o canal principal (mural oficial
-  // da torcida) — nunca todas as unidades. Demais canais permanecem privados
-  // (entrada via pedirEntradaCanal/decidirPedidoCanal/adicionarMembroCanal).
-  // SEMPRE aqui (aprovação) — nunca em GET/solicitação (anti-padrão write-on-GET).
+  const { origem, espelhoId, decididoEmTenantId, tenantNotificarId, tenantNotificarNome } =
+    resultado
+
+  invalidatePermissionsCache(origem.userId, origem.tenantId)
+
+  const tenantIdsNotif = [origem.tenantId]
+  if (espelhoId) {
+    const espelhoTenant: { tenantId: string } | null = await db.saasMembro.findFirst({
+      where: { id: espelhoId },
+      select: { tenantId: true },
+    })
+    if (espelhoTenant && !tenantIdsNotif.includes(espelhoTenant.tenantId)) {
+      tenantIdsNotif.push(espelhoTenant.tenantId)
+    }
+  }
+  await marcarSolicitacoesLidas(aprovadoPorId, origem.userId, tenantIdsNotif)
+
   await vincularMembroCanaisAposAprovacao({
-    tenantId: tenant.id,
-    userId: membro.userId,
-    sedeId: membro.sedeId,
-    fallbackCriadoPorId: session.user.id,
+    tenantId: origem.tenantId,
+    userId: origem.userId,
+    sedeId: origem.sedeId,
+    fallbackCriadoPorId: aprovadoPorId,
   })
+
+  const detalhesAudit = {
+    departamentoId: origem.departamentoId,
+    incluirDepartamento,
+    membroOrigemId: origem.id,
+    espelhoId,
+    decididoEmTenantId,
+  }
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
+      tenantId: origem.tenantId,
+      atorId: aprovadoPorId,
       acao: 'MEMBRO_APROVADO',
       entidade: 'SaasMembro',
-      entidadeId: membroId,
-      detalhes:
-        membro.departamentoId != null
-          ? {
-              departamentoId: membro.departamentoId,
-              incluirDepartamento,
-            }
-          : undefined,
+      entidadeId: origem.id,
+      detalhes: detalhesAudit,
     },
   })
+  if (espelhoId && decididoEmTenantId !== origem.tenantId) {
+    await db.auditLog.create({
+      data: {
+        tenantId: decididoEmTenantId,
+        atorId: aprovadoPorId,
+        acao: 'MEMBRO_APROVADO',
+        entidade: 'SaasMembro',
+        entidadeId: espelhoId,
+        detalhes: detalhesAudit,
+      },
+    })
+  } else if (espelhoId) {
+    const espelhoRow: { tenantId: string } | null = await db.saasMembro.findFirst({
+      where: { id: espelhoId },
+      select: { tenantId: true },
+    })
+    if (espelhoRow && espelhoRow.tenantId !== origem.tenantId) {
+      await db.auditLog.create({
+        data: {
+          tenantId: espelhoRow.tenantId,
+          atorId: aprovadoPorId,
+          acao: 'MEMBRO_APROVADO',
+          entidade: 'SaasMembro',
+          entidadeId: espelhoId,
+          detalhes: detalhesAudit,
+        },
+      })
+    }
+  }
 
   await notificarSafe({
-    userId: membro.userId,
-    tenantId: tenant.id,
+    userId: origem.userId,
+    tenantId: tenantNotificarId,
     tipo: 'MEMBRO_APROVADO',
     titulo: 'Sua solicitação foi aprovada',
-    corpo: `Você agora é membro de ${tenant.nome}.`,
+    corpo: `Você agora é membro de ${tenantNotificarNome}.`,
     link: '/portal/carteirinha',
   })
 
-  invalidarBadgesAutorTenant(tenant.id)
+  invalidarBadgesAutorTenant(origem.tenantId)
   revalidatePath('/admin/membros')
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
-  revalidatePath(`/portal/comunidade/perfil/${membro.userId}`)
+  revalidatePath(`/portal/comunidade/perfil/${origem.userId}`)
 }
 
 export async function reprovarMembro(membroId: string, motivo?: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
+  const aprovadoPorNome = session.user.name ?? 'Admin'
+  const aprovadoPorId = session.user.id
+  const motivoTrim = motivo?.trim() || null
 
-  const membro = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existente: { id: string; espelhado: boolean } | null = await tx.saasMembro.findFirst({
-      where: { id: membroId, tenantId: tenant.id },
-      select: { id: true, espelhado: true },
-    })
-    if (!existente) throw new ExpectedError('Membro não encontrado.')
-    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+  type ResultadoReprovacao = {
+    origem: MembroDecisaoSelect
+    espelhoId: string | null
+    decididoEmTenantId: string
+    tenantNotificarId: string
+    tenantNotificarNome: string
+  }
 
-    const atualizado = await tx.saasMembro.update({
-      where: { id: membroId, tenantId: tenant.id },
-      data: {
+  const resultado: ResultadoReprovacao = await db.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+        where: { id: membroId, tenantId: tenant.id },
+        select: membroDecisaoSelect,
+      })
+      if (!existente) throw new ExpectedError('Membro não encontrado.')
+
+      if (existente.espelhado) {
+        if (existente.status !== 'PENDENTE') {
+          throw erroSolicitacaoJaAnalisada(existente.aprovadoPorNome, existente.aprovadoEm)
+        }
+        if (!existente.membroOrigemId) {
+          throw new ExpectedError('Espelho sem origem vinculada.')
+        }
+
+        const origem: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: existente.membroOrigemId },
+          select: membroDecisaoSelect,
+        })
+        if (!origem) throw new ExpectedError('Membro de origem não encontrado.')
+
+        await assertOrigemDescendenteDaSede(tenant.id, origem.tenantId)
+        await lockDecisaoAdmissaoTorcida(tx, origem.tenantId)
+
+        const origemFresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: origem.id },
+          select: membroDecisaoSelect,
+        })
+        const espelhoFresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+          where: { id: existente.id },
+          select: membroDecisaoSelect,
+        })
+        if (!origemFresh || !espelhoFresh) throw new ExpectedError('Membro não encontrado.')
+        if (origemFresh.status !== 'PENDENTE' || espelhoFresh.status !== 'PENDENTE') {
+          throw erroSolicitacaoJaAnalisada(
+            origemFresh.status !== 'PENDENTE'
+              ? origemFresh.aprovadoPorNome
+              : espelhoFresh.aprovadoPorNome,
+            origemFresh.status !== 'PENDENTE' ? origemFresh.aprovadoEm : espelhoFresh.aprovadoEm,
+          )
+        }
+
+        const agora = new Date()
+        const origemAtualizada = await tx.saasMembro.update({
+          where: { id: origemFresh.id },
+          data: {
+            status: 'REPROVADO',
+            aprovadoPorId,
+            aprovadoPorNome,
+            aprovadoEm: agora,
+          },
+          select: membroDecisaoSelect,
+        })
+
+        await limparMembershipDepartamentos(origemFresh.tenantId, origemAtualizada.userId, tx)
+        await sincronizarStatusEspelhoDaOrigem(tx, {
+          membroOrigemId: origemAtualizada.id,
+          status: 'REPROVADO',
+          aprovadoPorId,
+          aprovadoPorNome,
+          aprovadoEm: agora,
+          desligadoMotivo: motivoTrim || 'Reprovado pela Sede',
+        })
+
+        const unidadeTenant: { nome: string } | null = await tx.tenant.findFirst({
+          where: { id: origemFresh.tenantId },
+          select: { nome: true },
+        })
+
+        return {
+          origem: origemAtualizada,
+          espelhoId: existente.id,
+          decididoEmTenantId: tenant.id,
+          tenantNotificarId: origemFresh.tenantId,
+          tenantNotificarNome: unidadeTenant?.nome ?? tenant.nome,
+        }
+      }
+
+      await lockDecisaoAdmissaoTorcida(tx, tenant.id)
+
+      const fresh: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+        where: { id: existente.id },
+        select: membroDecisaoSelect,
+      })
+      if (!fresh) throw new ExpectedError('Membro não encontrado.')
+      if (fresh.status !== 'PENDENTE') {
+        throw erroSolicitacaoJaAnalisada(fresh.aprovadoPorNome, fresh.aprovadoEm)
+      }
+
+      const agora = new Date()
+      const atualizado = await tx.saasMembro.update({
+        where: { id: membroId, tenantId: tenant.id },
+        data: {
+          status: 'REPROVADO',
+          aprovadoPorId,
+          aprovadoPorNome,
+          aprovadoEm: agora,
+        },
+        select: membroDecisaoSelect,
+      })
+
+      await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+      const espelhoId = await sincronizarStatusEspelhoDaOrigem(tx, {
+        membroOrigemId: atualizado.id,
         status: 'REPROVADO',
-        aprovadoPorId: session.user.id,
-        aprovadoPorNome: session.user.name ?? 'Admin',
-        aprovadoEm: new Date(),
-      },
-    })
+        aprovadoPorId,
+        aprovadoPorNome,
+        aprovadoEm: agora,
+        desligadoMotivo: motivoTrim || 'Reprovado na unidade de origem',
+      })
 
-    // Preferência do onboarding NÃO vira equipe; limpa qualquer membership
-    // órfã (ex.: bug antigo que upsertava UserDepartamento no cadastro).
-    await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
-    await desligarEspelhoDaOrigem(
-      tx,
-      atualizado.id,
-      motivo?.trim() || 'Reprovado na unidade de origem',
-    )
-
-    return atualizado
-  })
-
-  const { count: solicitacoesLidas } = await db.notificacao.updateMany({
-    where: {
-      userId: session.user.id,
-      tenantId: tenant.id,
-      atorId: membro.userId,
-      tipo: 'MEMBRO_SOLICITADO',
-      lida: false,
+      return {
+        origem: atualizado,
+        espelhoId,
+        decididoEmTenantId: tenant.id,
+        tenantNotificarId: tenant.id,
+        tenantNotificarNome: tenant.nome,
+      }
     },
-    data: { lida: true },
-  })
-  if (solicitacoesLidas > 0) emitNotificacaoPing(tenant.id, session.user.id)
+  )
+
+  const { origem, espelhoId, decididoEmTenantId, tenantNotificarId, tenantNotificarNome } =
+    resultado
+
+  const tenantIdsNotif = [origem.tenantId]
+  if (espelhoId) {
+    const espelhoTenant: { tenantId: string } | null = await db.saasMembro.findFirst({
+      where: { id: espelhoId },
+      select: { tenantId: true },
+    })
+    if (espelhoTenant && !tenantIdsNotif.includes(espelhoTenant.tenantId)) {
+      tenantIdsNotif.push(espelhoTenant.tenantId)
+    }
+  }
+  await marcarSolicitacoesLidas(aprovadoPorId, origem.userId, tenantIdsNotif)
+
+  const detalhesAudit = {
+    motivo: motivoTrim,
+    membroOrigemId: origem.id,
+    espelhoId,
+    decididoEmTenantId,
+  }
 
   await db.auditLog.create({
     data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
+      tenantId: origem.tenantId,
+      atorId: aprovadoPorId,
       acao: 'MEMBRO_REPROVADO',
       entidade: 'SaasMembro',
-      entidadeId: membroId,
-      detalhes: motivo ? { motivo } : undefined,
+      entidadeId: origem.id,
+      detalhes: detalhesAudit,
     },
   })
+  if (espelhoId) {
+    const espelhoRow: { tenantId: string } | null = await db.saasMembro.findFirst({
+      where: { id: espelhoId },
+      select: { tenantId: true },
+    })
+    if (espelhoRow && espelhoRow.tenantId !== origem.tenantId) {
+      await db.auditLog.create({
+        data: {
+          tenantId: espelhoRow.tenantId,
+          atorId: aprovadoPorId,
+          acao: 'MEMBRO_REPROVADO',
+          entidade: 'SaasMembro',
+          entidadeId: espelhoId,
+          detalhes: detalhesAudit,
+        },
+      })
+    }
+  }
 
   await notificarSafe({
-    userId: membro.userId,
-    tenantId: tenant.id,
+    userId: origem.userId,
+    tenantId: tenantNotificarId,
     tipo: 'MEMBRO_REPROVADO',
     titulo: 'Sua solicitação foi reprovada',
-    corpo: motivo?.trim()
-      ? motivo.trim()
-      : `Sua solicitação de ingresso em ${tenant.nome} não foi aprovada.`,
+    corpo: motivoTrim
+      ? motivoTrim
+      : `Sua solicitação de ingresso em ${tenantNotificarNome} não foi aprovada.`,
     link: '/portal/carteirinha',
   })
 
@@ -337,31 +747,46 @@ export async function reprovarMembro(membroId: string, motivo?: string) {
 export async function reverterMembro(membroId: string) {
   // Reverte aprovação/reprovação para pendente — reaproveita MEMBERS_APPROVE
   // (não existe permissão dedicada para "reverter"; é a mesma decisão de
-  // aprovação sendo desfeita).
+  // aprovação sendo desfeita). Espelho só é revertível pela origem.
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existente: { id: string; espelhado: boolean } | null = await tx.saasMembro.findFirst({
-      where: { id: membroId, tenantId: tenant.id },
-      select: { id: true, espelhado: true },
-    })
-    if (!existente) throw new ExpectedError('Membro não encontrado.')
-    if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
+  const resultado: { origemId: string; origemTenantId: string; espelhoId: string | null } =
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const existente: MembroDecisaoSelect | null = await tx.saasMembro.findFirst({
+        where: { id: membroId, tenantId: tenant.id },
+        select: membroDecisaoSelect,
+      })
+      if (!existente) throw new ExpectedError('Membro não encontrado.')
+      if (existente.espelhado) throw new ExpectedError(ERRO_ESPELHO_MUTACAO)
 
-    const atualizado = await tx.saasMembro.update({
-      where: { id: membroId, tenantId: tenant.id },
-      data: {
+      await lockDecisaoAdmissaoTorcida(tx, tenant.id)
+
+      const atualizado = await tx.saasMembro.update({
+        where: { id: membroId, tenantId: tenant.id },
+        data: {
+          status: 'PENDENTE',
+          aprovadoPorId: null,
+          aprovadoPorNome: null,
+          aprovadoEm: null,
+        },
+        select: membroDecisaoSelect,
+      })
+
+      await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
+      const espelhoId = await sincronizarStatusEspelhoDaOrigem(tx, {
+        membroOrigemId: atualizado.id,
         status: 'PENDENTE',
         aprovadoPorId: null,
         aprovadoPorNome: null,
         aprovadoEm: null,
-      },
-    })
+      })
 
-    // Pendente não herda departamento — remove membership concedida na aprovação.
-    await limparMembershipDepartamentos(tenant.id, atualizado.userId, tx)
-    await desligarEspelhoDaOrigem(tx, atualizado.id, 'Revertido para pendente')
-  })
+      return {
+        origemId: atualizado.id,
+        origemTenantId: tenant.id,
+        espelhoId,
+      }
+    })
 
   await db.auditLog.create({
     data: {
@@ -369,9 +794,36 @@ export async function reverterMembro(membroId: string) {
       atorId: session.user.id,
       acao: 'MEMBRO_REVERTIDO_PENDENTE',
       entidade: 'SaasMembro',
-      entidadeId: membroId,
+      entidadeId: resultado.origemId,
+      detalhes: {
+        membroOrigemId: resultado.origemId,
+        espelhoId: resultado.espelhoId,
+        decididoEmTenantId: tenant.id,
+      },
     },
   })
+  if (resultado.espelhoId) {
+    const espelhoRow: { tenantId: string } | null = await db.saasMembro.findFirst({
+      where: { id: resultado.espelhoId },
+      select: { tenantId: true },
+    })
+    if (espelhoRow && espelhoRow.tenantId !== tenant.id) {
+      await db.auditLog.create({
+        data: {
+          tenantId: espelhoRow.tenantId,
+          atorId: session.user.id,
+          acao: 'MEMBRO_REVERTIDO_PENDENTE',
+          entidade: 'SaasMembro',
+          entidadeId: resultado.espelhoId,
+          detalhes: {
+            membroOrigemId: resultado.origemId,
+            espelhoId: resultado.espelhoId,
+            decididoEmTenantId: tenant.id,
+          },
+        },
+      })
+    }
+  }
 
   revalidatePath('/admin/membros')
   revalidatePath('/portal/departamentos', 'layout')

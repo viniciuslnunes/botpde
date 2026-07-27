@@ -1,7 +1,7 @@
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
-import { Users, UserCheck, UserX, Clock, type LucideIcon } from 'lucide-react'
+import { Users, UserCheck, UserX, Clock } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { tenantsAreRivais } from '@/lib/hierarquia'
@@ -342,11 +342,37 @@ export default async function MembrosPage({
   const count: Record<string, number> = { PENDENTE: 0, APROVADO: 0, REPROVADO: 0 }
   for (const c of contagens) count[c.status] = c._count
 
-  const tabs: { status: StatusFilter; label: string; icon: LucideIcon; count?: number }[] = [
-    { status: 'TODOS', label: 'Todos', icon: Users, count: Object.values(count).reduce((a, b) => a + b, 0) },
-    { status: 'PENDENTE', label: 'Pendentes', icon: Clock, count: count.PENDENTE },
-    { status: 'APROVADO', label: 'Aprovados', icon: UserCheck, count: count.APROVADO },
-    { status: 'REPROVADO', label: 'Reprovados', icon: UserX, count: count.REPROVADO },
+  const tabIconClass = 'h-4 w-4 shrink-0'
+  const tabs: {
+    status: StatusFilter
+    label: string
+    icon: ReactNode
+    count?: number
+  }[] = [
+    {
+      status: 'TODOS',
+      label: 'Todos',
+      icon: <Users className={tabIconClass} aria-hidden />,
+      count: Object.values(count).reduce((a, b) => a + b, 0),
+    },
+    {
+      status: 'PENDENTE',
+      label: 'Pendentes',
+      icon: <Clock className={tabIconClass} aria-hidden />,
+      count: count.PENDENTE,
+    },
+    {
+      status: 'APROVADO',
+      label: 'Aprovados',
+      icon: <UserCheck className={tabIconClass} aria-hidden />,
+      count: count.APROVADO,
+    },
+    {
+      status: 'REPROVADO',
+      label: 'Reprovados',
+      icon: <UserX className={tabIconClass} aria-hidden />,
+      count: count.REPROVADO,
+    },
   ]
 
   function buildHref(overrides: Record<string, string | undefined>) {

@@ -34,6 +34,25 @@ para `tipo: SOCIO` via `.superRefine` em `solicitarVinculoSchema`,
 | `responsavelNome`, `responsavelDocumento`, `autorizacaoMenorAceitaEm` | Responsável legal — obrigatórios só quando o SOCIO tem menos de 18 anos (calculado a partir de `dataNascimento`) |
 | `termoResponsabilidadeAceitoEm` | Timestamp do aceite do termo de responsabilidade — obrigatório para SOCIO |
 
+## Fila compartilhada de admissão (Caso B, 2026-07-27)
+
+Quando o sócio solicita vínculo numa **Subsede/PDE com tenant próprio** (Caso B):
+
+1. `solicitarVinculo` cria `SaasMembro` `PENDENTE` na unidade (origem canônica).
+2. `criarOuAtualizarPendenciaEspelhoNaSede` cria/atualiza gêmeo `PENDENTE` +
+   `espelhado: true` na Sede raiz (`membroOrigemId`, `aprovadoNaUnidadeTenantId`).
+3. Admins com `MEMBERS_APPROVE`/`MEMBERS_REJECT` são notificados **nos dois** tenants.
+4. **First-wins:** unidade ou Sede decide; advisory lock
+   `admissao-socio-torcida:{raiz}` + checagem de status; a outra fila passa a
+   APROVADO/REPROVADO com o mesmo `aprovadoPorId`/`Nome`/`Em`.
+5. Efeitos (Role `member`, canais, departamento preferido) sempre no tenant da
+   **origem**. AuditLog nos dois tenants. Reverter para pendente só na origem
+   (reabre o espelho como `PENDENTE`).
+
+Exceção pontual à R1 da governança hierárquica — ver
+`docs/data/proposta-governanca-hierarquica.md` §1. Caso A (unidade leve no
+mesmo tenant) não muda: fila única da Sede.
+
 `rg`/`cpf`/`dataNascimento`/`logradouro`/`bairro`/`uf` passam a ser
 obrigatórios para SOCIO no próprio onboarding (antes só eram exigidos depois,
 pelo admin). `nomePai`/`nomeMae` coletados no formulário **não** viram coluna

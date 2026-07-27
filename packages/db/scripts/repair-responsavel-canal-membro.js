@@ -34,7 +34,8 @@ for (const s of sedes) {
       papel: 'ADMIN',
       status: 'ATIVO',
     },
-    update: { papel: 'ADMIN', saiuEm: null },
+    // Pedido de entrada prévio deixa status PENDENTE — promover ao vincular.
+    update: { papel: 'ADMIN', saiuEm: null, status: 'ATIVO' },
   })
 
   console.log(`Vinculado responsável ${s.responsavelUserId} ao canal da unidade "${s.nome}" (${s.id})`)

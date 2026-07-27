@@ -59,8 +59,9 @@ for (const { userId, tenantId } of pares.values()) {
   for (const conversaId of canalIds) {
     await db.membroConversa.upsert({
       where: { conversaId_userId: { conversaId, userId } },
-      create: { conversaId, userId, papel: 'MEMBRO' },
-      update: { saiuEm: null },
+      create: { conversaId, userId, papel: 'MEMBRO', status: 'ATIVO' },
+      // Pedido de entrada prévio deixa status PENDENTE — promover ao vincular.
+      update: { saiuEm: null, status: 'ATIVO' },
     })
   }
   vinculados++

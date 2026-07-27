@@ -284,7 +284,8 @@ export async function vincularResponsavelAoCanalDaSede(opts: {
       papel: 'ADMIN',
       status: 'ATIVO',
     },
-    update: { papel: 'ADMIN', saiuEm: null },
+    // Pedido de entrada prévio deixa status PENDENTE — promover ao vincular.
+    update: { papel: 'ADMIN', saiuEm: null, status: 'ATIVO' },
   })
 }
 
@@ -419,8 +420,9 @@ export async function vincularMembroCanaisAposAprovacao(opts: {
   for (const conversaId of canalIds) {
     await db.membroConversa.upsert({
       where: { conversaId_userId: { conversaId, userId: opts.userId } },
-      create: { conversaId, userId: opts.userId, papel: 'MEMBRO' },
-      update: { saiuEm: null },
+      create: { conversaId, userId: opts.userId, papel: 'MEMBRO', status: 'ATIVO' },
+      // Pedido de entrada prévio deixa status PENDENTE — promover ao vincular.
+      update: { saiuEm: null, status: 'ATIVO' },
     })
   }
 }

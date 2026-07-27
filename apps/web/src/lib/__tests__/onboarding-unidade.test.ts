@@ -9,6 +9,7 @@ import type { SedeOnboarding } from '@/lib/onboarding'
 const base = {
   endereco: null,
   sedePaiId: null,
+  tenantId: 't-mae',
   lat: null,
   lng: null,
   fotoUrl: null,

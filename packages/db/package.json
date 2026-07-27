@@ -43,6 +43,7 @@
     "db:repair-canal-oficial-duplicado": "node scripts/repair-canal-oficial-duplicado.js",
     "db:repair-responsavel-canal-membro": "node scripts/repair-responsavel-canal-membro.js",
     "db:repair-lideranca-canal-membro": "node scripts/repair-lideranca-canal-membro.js",
+    "db:repair-canal-membro-pendente-aprovado": "node scripts/repair-canal-membro-pendente-aprovado.js",
     "db:ensure-canais-oficiais-unidades": "node scripts/ensure-canais-oficiais-unidades.js",
     "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
     "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",

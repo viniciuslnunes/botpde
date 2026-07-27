@@ -37,9 +37,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { groupAdminMenuBySecao } from '@torcida/types'
-import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { TorcidaContextSwitcher } from '@/components/torcida-context-switcher'
-import type { TorcidaOpcao } from '@/lib/torcida-labels'
+import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /** Ícone por id do item de menu (ADMIN_MENU vem de @torcida/types, sem depender de React). */
@@ -86,12 +86,15 @@ interface AdminMenuItem {
 
 interface AdminSidebarProps {
   tenantSlug: string
+  tenantId: string
   /** Itens já filtrados pelas permissões efetivas do usuário (ver ADMIN_MENU/filterMenuByPermissions) */
   items: AdminMenuItem[]
   /** Contagens de notificações não lidas por id de menu. */
   badges?: Record<string, number>
   isSuperAdmin?: boolean
   torcidas?: TorcidaOpcao[]
+  clubes?: ClubeOpcao[]
+  unidades?: UnidadeOpcao[]
   /** Vínculos de sócio APROVADO do usuário comum (não super-admin) em mais de uma torcida. */
   vinculos?: TorcidaOpcao[]
   mobileOpen?: boolean
@@ -196,20 +199,26 @@ function NavSections({
 
 function SidebarBody({
   tenantSlug,
+  tenantId,
   items,
   badges,
   pathname,
   isSuperAdmin,
   torcidas,
+  clubes,
+  unidades,
   vinculos,
   onNavigate,
 }: {
   tenantSlug: string
+  tenantId: string
   items: AdminMenuItem[]
   badges: Record<string, number>
   pathname: string
   isSuperAdmin: boolean
   torcidas: TorcidaOpcao[]
+  clubes: ClubeOpcao[]
+  unidades: UnidadeOpcao[]
   vinculos: TorcidaOpcao[]
   onNavigate?: () => void
 }) {
@@ -217,10 +226,12 @@ function SidebarBody({
     <>
       {isSuperAdmin && torcidas.length > 0 && (
         <div className="border-b border-[rgb(var(--border))] px-4 py-3">
-          <TenantSwitcher
+          <AdminSuperContextSwitchers
+            clubes={clubes}
             torcidas={torcidas}
+            unidades={unidades}
             torcidaAtualSlug={tenantSlug}
-            destino="admin"
+            tenantAtualId={tenantId}
             variant="admin"
           />
         </div>
@@ -264,10 +275,13 @@ function SidebarBody({
 
 export function AdminSidebar({
   tenantSlug,
+  tenantId,
   items,
   badges = {},
   isSuperAdmin = false,
   torcidas = [],
+  clubes = [],
+  unidades = [],
   vinculos = [],
   mobileOpen = false,
   onMobileClose,
@@ -304,11 +318,14 @@ export function AdminSidebar({
             <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
               <SidebarBody
                 tenantSlug={tenantSlug}
+                tenantId={tenantId}
                 items={items}
                 badges={badges}
                 pathname={pathname}
                 isSuperAdmin={isSuperAdmin}
                 torcidas={torcidas}
+                clubes={clubes}
+                unidades={unidades}
                 vinculos={vinculos}
                 onNavigate={onMobileClose}
               />
@@ -328,11 +345,14 @@ export function AdminSidebar({
       <aside className="relative z-[60] hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
         <SidebarBody
           tenantSlug={tenantSlug}
+          tenantId={tenantId}
           items={items}
           badges={badges}
           pathname={pathname}
           isSuperAdmin={isSuperAdmin}
           torcidas={torcidas}
+          clubes={clubes}
+          unidades={unidades}
           vinculos={vinculos}
         />
       </aside>

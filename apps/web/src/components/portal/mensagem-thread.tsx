@@ -791,7 +791,9 @@ export function MensagemThread({
 
       {conversa.aguardandoAprovacao && (
         <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-4 py-3 text-xs text-[rgb(var(--foreground-muted))]">
-          Sua solicitação foi enviada. Aguarde {tituloConversa(conversa)} aprovar para continuar a conversa.
+          {conversa.tipo === 'DIRETA'
+            ? `Sua solicitação foi enviada. Aguarde ${tituloConversa(conversa)} aprovar para continuar a conversa.`
+            : 'Seu pedido de entrada foi enviado. Aguarde a aprovação para enviar mensagens neste canal.'}
         </div>
       )}
 

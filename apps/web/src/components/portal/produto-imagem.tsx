@@ -16,8 +16,10 @@ const VARIANT: Record<
     icon: 'h-12 w-12',
   },
   admin: {
-    wrapper: 'h-40 w-full bg-[rgb(var(--background-subtle))]',
-    img: 'h-full w-full object-contain',
+    wrapper: 'h-40 w-full overflow-hidden bg-[rgb(var(--background-subtle))]',
+    // Mesmo enquadramento do portal (`ProdutoCardImagem`): preenche o frame
+    // sem letterbox; foco um pouco acima do centro (fotos de produto).
+    img: 'h-full w-full object-cover object-[center_18%]',
     icon: 'h-10 w-10',
   },
   detail: {

@@ -3,11 +3,18 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
-import { isSuperAdminEmail, listarTorcidasParaSelecao, listarTorcidasParaTransferencia } from '@/lib/tenant-context'
-import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import {
+  isSuperAdminEmail,
+  listarClubesParaSelecao,
+  listarTorcidasParaSelecao,
+  listarTorcidasParaTransferencia,
+} from '@/lib/tenant-context'
+import { listarUnidadesParaSelecao } from '@/lib/admin-context-unidades'
+import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import { ArrowRight, Building2, FileSearch, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
+import type { UnidadeOpcao } from '@/lib/torcida-labels'
 import { TransferirOwnerPainel } from './transferir-owner-painel'
 import { TorcidasListaCliente } from './torcidas-lista-cliente'
 
@@ -20,12 +27,17 @@ export default async function TorcidasPage() {
     redirect('/')
   }
 
-  const [torcidas, torcidasTransferencia, tenantAtual, totalTenants] = await Promise.all([
+  const [torcidas, clubes, torcidasTransferencia, tenantAtual, totalTenants] = await Promise.all([
     listarTorcidasParaSelecao(),
+    listarClubesParaSelecao(),
     listarTorcidasParaTransferencia(),
     getTenantFromHost(),
     db.tenant.count({ where: { ativo: true, sintetico: false } }),
   ])
+
+  const unidades: UnidadeOpcao[] = tenantAtual
+    ? await listarUnidadesParaSelecao(tenantAtual.id)
+    : []
 
   const semProvisionamento = totalTenants <= 5
 
@@ -44,12 +56,15 @@ export default async function TorcidasPage() {
           <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
             {tenantAtual
               ? `Ativa agora: ${tenantAtual.nome}`
-              : 'Nenhuma selecionada — escolha para abrir o admin.'}
+              : 'Nenhuma selecionada — escolha clube e torcida para abrir o admin.'}
           </p>
           <div className="mt-4">
-            <TenantSwitcher
+            <AdminSuperContextSwitchers
+              clubes={clubes}
               torcidas={torcidas}
+              unidades={unidades}
               torcidaAtualSlug={tenantAtual?.slug ?? null}
+              tenantAtualId={tenantAtual?.id ?? null}
               destino="admin"
               variant="admin"
             />

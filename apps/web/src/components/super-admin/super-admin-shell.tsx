@@ -7,9 +7,9 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { LogOut, Menu, Shield, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { TenantSwitcher } from '@/components/admin/tenant-switcher'
+import { AdminSuperContextSwitchers } from '@/components/admin/admin-super-context-switchers'
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
-import type { TorcidaOpcao } from '@/lib/torcida-labels'
+import type { ClubeOpcao, TorcidaOpcao, UnidadeOpcao } from '@/lib/torcida-labels'
 
 interface SuperAdminBadges {
   afiliacoes: number
@@ -20,7 +20,10 @@ interface SuperAdminShellProps {
   userName: string | null
   userEmail: string | null
   torcidaAtualSlug: string | null
+  tenantAtualId: string | null
   torcidas: TorcidaOpcao[]
+  clubes: ClubeOpcao[]
+  unidades: UnidadeOpcao[]
   badges?: SuperAdminBadges
   children: React.ReactNode
 }
@@ -158,13 +161,19 @@ function SuperAdminSidebar({
   mobileOpen,
   onMobileClose,
   torcidaAtualSlug,
+  tenantAtualId,
   torcidas,
+  clubes,
+  unidades,
   badges,
 }: {
   mobileOpen: boolean
   onMobileClose: () => void
   torcidaAtualSlug: string | null
+  tenantAtualId: string | null
   torcidas: TorcidaOpcao[]
+  clubes: ClubeOpcao[]
+  unidades: UnidadeOpcao[]
   badges?: SuperAdminBadges
 }) {
   const [mounted, setMounted] = useState(false)
@@ -184,9 +193,12 @@ function SuperAdminSidebar({
 
   const switcher = torcidas.length > 0 && (
     <div className="border-t border-[rgb(var(--border))] px-4 py-3">
-      <TenantSwitcher
+      <AdminSuperContextSwitchers
+        clubes={clubes}
         torcidas={torcidas}
+        unidades={unidades}
         torcidaAtualSlug={torcidaAtualSlug}
+        tenantAtualId={tenantAtualId}
         destino="admin"
         variant="admin"
       />
@@ -228,7 +240,10 @@ export function SuperAdminShell({
   userName,
   userEmail,
   torcidaAtualSlug,
+  tenantAtualId,
   torcidas,
+  clubes,
+  unidades,
   badges,
   children,
 }: SuperAdminShellProps) {
@@ -253,7 +268,10 @@ export function SuperAdminShell({
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
           torcidaAtualSlug={torcidaAtualSlug}
+          tenantAtualId={tenantAtualId}
           torcidas={torcidas}
+          clubes={clubes}
+          unidades={unidades}
           badges={badges}
         />
 

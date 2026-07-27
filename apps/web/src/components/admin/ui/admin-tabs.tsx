@@ -1,9 +1,8 @@
 'use client'
 
-import { useRef, type KeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { m } from 'motion/react'
-import type { LucideIcon } from 'lucide-react'
 import { springSnappy } from '@/lib/motion-presets'
 import { buildAdminHref } from '@/lib/admin-href'
 
@@ -14,7 +13,11 @@ export interface AdminTabItem {
   count?: number
   /** Classe de cor do badge quando a tab NÃO está ativa (ex.: pendências em amber). */
   countClass?: string
-  icon?: LucideIcon
+  /**
+   * Ícone como ReactNode (ex.: `<Users className="h-4 w-4" />`).
+   * Não passe o componente Lucide (`Users`) — funções não serializam Server→Client.
+   */
+  icon?: ReactNode
 }
 
 export interface AdminTabsProps {
@@ -79,7 +82,6 @@ export function AdminTabs({
     >
       {tabs.map((tab, index) => {
         const active = tab.id === activeId
-        const Icon = tab.icon
         const showCount = tab.count !== undefined && (tab.count > 0 || active)
         const { tabId, panelId } = adminTabIds(paramKey, tab.id)
         const href = buildAdminHref(basePath, { ...extraParams, [paramKey]: tab.id })
@@ -103,7 +105,7 @@ export function AdminTabs({
                   : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
+              {tab.icon}
               {tab.label}
               {showCount && (
                 <span

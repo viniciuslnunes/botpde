@@ -8,11 +8,12 @@ import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
   labelClubeComUf,
   labelTorcidaComClube,
+  type ClubeOpcao,
   type TorcidaOpcao,
   type TorcidaTransferencia,
 } from '@/lib/torcida-labels'
 
-export type { TorcidaOpcao, TorcidaTransferencia }
+export type { ClubeOpcao, TorcidaOpcao, TorcidaTransferencia }
 export { labelClubeComUf, labelTorcidaComClube }
 
 /** Cookie httpOnly — torcida ativa quando não há subdomínio (single-tenant ou apex). */
@@ -140,6 +141,7 @@ type TorcidaRowComAfiliacao = {
   slug: string
   nome: string
   corPrimaria: string
+  afiliacaoId: string | null
   afiliacao: { nome: string; apelido: string | null; estado: string | null } | null
 }
 
@@ -149,6 +151,7 @@ function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
     slug: row.slug,
     nome: formatNomeTorcida(row.nome),
     corPrimaria: row.corPrimaria,
+    afiliacaoId: row.afiliacaoId,
     clubeNome: row.afiliacao
       ? (row.afiliacao.apelido ?? row.afiliacao.nome)
       : null,
@@ -161,10 +164,12 @@ const TORCIDA_SELECAO_SELECT = {
   slug: true,
   nome: true,
   corPrimaria: true,
+  afiliacaoId: true,
   afiliacao: { select: { nome: true, apelido: true, estado: true } },
 } as const
 
 export const TORCIDAS_SELECAO_CACHE_TAG = 'torcidas-para-selecao'
+export const CLUBES_SELECAO_CACHE_TAG = 'clubes-para-selecao'
 
 async function fetchTorcidasParaSelecao(): Promise<TorcidaOpcao[]> {
   const rows: TorcidaRowComAfiliacao[] = await db.tenant.findMany({
@@ -185,9 +190,43 @@ export const listarTorcidasParaSelecao = cache(async function listarTorcidasPara
   })()
 })
 
+type ClubeRow = {
+  id: string
+  nome: string
+  apelido: string | null
+  estado: string | null
+}
+
+async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
+  const rows: ClubeRow[] = await db.afiliacao.findMany({
+    where: {
+      tenants: { some: { ativo: true, sintetico: false } },
+    },
+    select: { id: true, nome: true, apelido: true, estado: true },
+    orderBy: { nome: 'asc' },
+  })
+  return rows.map((r) => ({
+    id: r.id,
+    nome: r.nome,
+    apelido: r.apelido,
+    estado: r.estado,
+  }))
+}
+
+/** Clubes com ≥1 torcida ativa — filtro do switcher em cascata (cache 5 min). */
+export const listarClubesParaSelecao = cache(async function listarClubesParaSelecao(): Promise<
+  ClubeOpcao[]
+> {
+  return unstable_cache(fetchClubesParaSelecao, ['clubes-para-selecao'], {
+    revalidate: 300,
+    tags: [CLUBES_SELECAO_CACHE_TAG, TORCIDAS_SELECAO_CACHE_TAG],
+  })()
+})
+
 /** Invalida o cache da lista após criar/ativar/desativar tenants. */
 export function invalidateTorcidasSelecaoCache(): void {
   revalidateTag(TORCIDAS_SELECAO_CACHE_TAG, 'max')
+  revalidateTag(CLUBES_SELECAO_CACHE_TAG, 'max')
 }
 
 /**

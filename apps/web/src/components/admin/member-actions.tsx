@@ -9,10 +9,12 @@ interface MemberActionsProps {
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
   /** Departamento pretendido no onboarding (sócio); exibido no diálogo de aprovação. */
   departamentoNome?: string | null
-  /** Espelho na Sede — só leitura; ações ficam na unidade de origem. */
+  /** Espelho na Sede — PENDENTE pode ser decidido pela Sede (exceção R1); demais só leitura. */
   espelhado?: boolean
-  /** Nome da unidade que aprovou o sócio original. */
+  /** Nome da unidade de origem (Caso B). */
   aprovadoNaUnidadeNome?: string | null
+  aprovadoPorNome?: string | null
+  aprovadoEmLabel?: string | null
 }
 
 export function MemberActions({
@@ -21,15 +23,24 @@ export function MemberActions({
   departamentoNome,
   espelhado,
   aprovadoNaUnidadeNome,
+  aprovadoPorNome,
+  aprovadoEmLabel,
 }: MemberActionsProps) {
   const confirmAction = useConfirmAction()
   const depto = departamentoNome?.trim() || null
+  const via = aprovadoNaUnidadeNome?.trim()
+  const quem = aprovadoPorNome?.trim()
+  const quando = aprovadoEmLabel?.trim()
 
-  if (espelhado) {
-    const via = aprovadoNaUnidadeNome?.trim()
+  // Espelho já decidido: só leitura + rastro de quem analisou.
+  if (espelhado && status !== 'PENDENTE') {
     return (
       <span className="text-xs text-[rgb(var(--foreground-muted))]">
-        {via ? `Aprovado via ${via}` : 'Espelho da Sede'}
+        {quem
+          ? `Analisada por ${quem}${quando ? ` em ${quando}` : ''}`
+          : via
+            ? `Aprovado via ${via}`
+            : 'Espelho da Sede'}
       </span>
     )
   }
@@ -42,7 +53,9 @@ export function MemberActions({
         ? `A pessoa entra na torcida e na equipe de ${depto}. A preferência veio do onboarding.`
         : depto
           ? `A pessoa entra na torcida sem entrar na equipe de ${depto}. Você pode incluir depois em Departamentos.`
-          : 'A pessoa passa a ter acesso conforme o status de sócio/torcedor aprovado.',
+          : espelhado && via
+            ? `Solicitação via ${via}. Quem decidir primeiro (Sede ou unidade) encerra a análise nos dois lados.`
+            : 'A pessoa passa a ter acesso conforme o status de sócio/torcedor aprovado.',
       labelConfirmar: comArea ? 'Aprovar e incluir' : 'Aprovar',
       variante: 'success',
       cancelled: 'Aprovação cancelada.',
@@ -54,7 +67,10 @@ export function MemberActions({
   async function handleReprovar() {
     await confirmAction({
       titulo: 'Reprovar este membro?',
-      descricao: 'A solicitação será marcada como reprovada.',
+      descricao:
+        espelhado && via
+          ? `Solicitação via ${via}. A reprovação encerra a análise na Sede e na unidade.`
+          : 'A solicitação será marcada como reprovada.',
       labelConfirmar: 'Reprovar',
       variante: 'destructive',
       cancelled: 'Reprovação cancelada.',
@@ -79,6 +95,11 @@ export function MemberActions({
   if (status === 'PENDENTE') {
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+        {espelhado && via && (
+          <span className="mr-auto text-xs text-[rgb(var(--foreground-muted))] sm:mr-2">
+            Via {via}
+          </span>
+        )}
         <button
           onClick={() => void handleAprovar(true)}
           aria-label="Aprovar"

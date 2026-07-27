@@ -16,10 +16,12 @@ import {
 } from '@torcida/types'
 import {
   isSuperAdminEmail,
+  listarClubesParaSelecao,
   listarTorcidasParaSelecao,
   listarVinculosAprovadosDoUsuario,
   usuarioPrecisaNickname,
 } from '@/lib/tenant-context'
+import { listarUnidadesParaSelecao } from '@/lib/admin-context-unidades'
 import { listarNotificacoesRecentes } from '@/lib/notificacoes'
 import { TIPOS_NOTIFICACAO_ADMIN } from '@/lib/notificacoes-comunidade'
 import { getAvatarAtualDoUsuario, getNomeAtualDoUsuario } from '@/lib/perfil-social'
@@ -88,7 +90,13 @@ export default async function AdminLayout({
       ...('exact' in item && item.exact ? { exact: true as const } : {}),
     }))
 
-  const torcidas = isSuperAdmin ? await listarTorcidasParaSelecao() : []
+  const [torcidas, clubes, unidades] = isSuperAdmin
+    ? await Promise.all([
+        listarTorcidasParaSelecao(),
+        listarClubesParaSelecao(),
+        listarUnidadesParaSelecao(tenant.id),
+      ])
+    : [[], [], []]
   const vinculos = isSuperAdmin ? [] : await listarVinculosAprovadosDoUsuario(session.user.id)
   const notifications = await listarNotificacoesRecentes(
     tenant.id,
@@ -107,6 +115,7 @@ export default async function AdminLayout({
       tenantNome={tenant.nome}
       tenantCor={tenant.corPrimaria}
       tenantSlug={tenant.slug}
+      tenantId={tenant.id}
       tenantLogoUrl={tenantLogoUrl}
       tenantDesign={tenant.design}
       userName={userName ?? session.user.name ?? null}
@@ -114,6 +123,8 @@ export default async function AdminLayout({
       items={menuItems}
       isSuperAdmin={isSuperAdmin}
       torcidas={torcidas}
+      clubes={clubes}
+      unidades={unidades}
       vinculos={vinculos}
       notifications={notifications}
       operatorBanner={

@@ -225,29 +225,50 @@ export async function notificarNovoMembroPendente(params: {
   solicitanteUserId: string
   solicitanteNome: string
   tipoVinculo: 'SOCIO' | 'TORCEDOR'
+  /** Default true. Use false ao fan-out para a Sede (não duplicar aviso ao solicitante). */
+  notificarSolicitante?: boolean
+  /** Texto do corpo para admins; default menciona tenantNome. */
+  corpoAdmin?: string
 }): Promise<void> {
-  const { tenantId, tenantNome, solicitanteUserId, solicitanteNome, tipoVinculo } = params
+  const {
+    tenantId,
+    tenantNome,
+    solicitanteUserId,
+    solicitanteNome,
+    tipoVinculo,
+    notificarSolicitante = true,
+    corpoAdmin,
+  } = params
   const label = tipoVinculo === 'SOCIO' ? 'sócio' : 'torcedor'
 
-  await Promise.all([
+  const tasks: Promise<unknown>[] = [
     notificarAdminsPorPermissao([PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW], {
       tenantId,
       tipo: 'MEMBRO_SOLICITADO',
       titulo: `Nova solicitação de ${label}`,
-      corpo: `${solicitanteNome} solicitou ingresso como ${label} em ${tenantNome}.`,
+      corpo:
+        corpoAdmin ??
+        `${solicitanteNome} solicitou ingresso como ${label} em ${tenantNome}.`,
       link: '/admin/membros?status=PENDENTE',
       atorId: solicitanteUserId,
       excetoUserId: solicitanteUserId,
     }),
-    notificarSafe({
-      userId: solicitanteUserId,
-      tenantId,
-      tipo: 'MEMBRO_SOLICITADO',
-      titulo: 'Solicitação enviada',
-      corpo: `Sua solicitação para ${tenantNome} está em análise pela diretoria.`,
-      link: '/portal/comunidade',
-    }),
-  ])
+  ]
+
+  if (notificarSolicitante) {
+    tasks.push(
+      notificarSafe({
+        userId: solicitanteUserId,
+        tenantId,
+        tipo: 'MEMBRO_SOLICITADO',
+        titulo: 'Solicitação enviada',
+        corpo: `Sua solicitação para ${tenantNome} está em análise pela diretoria.`,
+        link: '/portal/comunidade',
+      }),
+    )
+  }
+
+  await Promise.all(tasks)
 }
 
 /**
