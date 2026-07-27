@@ -39,13 +39,13 @@ export default async function OnboardingPage() {
 
   return (
     <Suspense fallback={<OnboardingSkeleton />}>
-      <OnboardingWizardLoader nomeInicial={session.user.name ?? ''} />
+      <OnboardingWizardLoader nomeInicial={session.user.name ?? ''} userId={userId} />
     </Suspense>
   )
 }
 
 /** Catálogo pesado em Suspense — shell/gates resolvem antes; skeleton cobre o fetch. */
-async function OnboardingWizardLoader({ nomeInicial }: { nomeInicial: string }) {
+async function OnboardingWizardLoader({ nomeInicial, userId }: { nomeInicial: string; userId: string }) {
   const [afiliacoesIniciais, regioes] = await Promise.all([
     getAfiliacoesParaOnboarding(),
     getRegioesOnboarding(),
@@ -57,6 +57,7 @@ async function OnboardingWizardLoader({ nomeInicial }: { nomeInicial: string }) 
       regioes={regioes}
       ufs={UFS_BRASIL}
       nomeInicial={nomeInicial}
+      userId={userId}
     />
   )
 }

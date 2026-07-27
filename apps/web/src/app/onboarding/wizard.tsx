@@ -106,9 +106,16 @@ type Props = {
   regioes: RegiaoOnboarding[]
   ufs: string[]
   nomeInicial: string
+  userId: string
 }
 
-export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial }: Props) {
+export function OnboardingWizard({
+  afiliacoesIniciais,
+  regioes,
+  ufs,
+  nomeInicial,
+  userId,
+}: Props) {
   const [passo, setPasso] = useState<Passo>('clube')
   const [slideDir, setSlideDir] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
@@ -130,6 +137,9 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   passoRef.current = passo
   clubeRef.current = clube
   torcidaRef.current = torcida
+
+  const wizardDraftKey = useMemo(() => `onboarding:wizard-draft:${userId}`, [userId])
+  const [wizardDraftRestored, setWizardDraftRestored] = useState(false)
 
   /** Garante que o passo do histórico não pule dados ainda não escolhidos. */
   function passoAlcancavel(alvo: Passo): Passo {
@@ -167,7 +177,57 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
   }
 
   useEffect(() => {
-    window.history.replaceState(mergeHistoryState('clube'), '', urlDoPasso('clube'))
+    let initialPasso: Passo = 'clube'
+    let initialVinculoModo: 'escolha' | 'socio' = 'escolha'
+
+    try {
+      const raw = window.sessionStorage.getItem(wizardDraftKey)
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<{
+          passo: Passo
+          vinculoModo: 'escolha' | 'socio'
+          clube: AfiliacaoOnboarding | null
+          uf: string
+          cidade: string
+          torcida: TorcidaOnboarding | null
+          unidadeId: string | null
+          unidadeNaoListada: boolean
+        }>
+
+        const savedPasso = saved.passo
+        initialPasso =
+          savedPasso === 'concluindo'
+            ? 'concluindo'
+            : isPassoHistorico(savedPasso)
+              ? (savedPasso as Passo)
+              : 'clube'
+
+        initialVinculoModo = saved.vinculoModo ?? 'escolha'
+
+        // Sanitiza passos que dependem de pré-seleções.
+        if (initialPasso === 'torcida' && !saved.clube) initialPasso = 'clube'
+        if (initialPasso === 'unidade' && !saved.torcida) initialPasso = 'torcida'
+        if (initialPasso === 'vinculo' && !saved.torcida) initialPasso = 'torcida'
+
+        if (saved.clube) setClube(saved.clube)
+        if (typeof saved.uf === 'string') setUf(saved.uf)
+        if (typeof saved.cidade === 'string') setCidade(saved.cidade)
+        if (saved.torcida) setTorcida(saved.torcida)
+        if (typeof saved.unidadeId === 'string' || saved.unidadeId === null) setUnidadeId(saved.unidadeId ?? null)
+        if (typeof saved.unidadeNaoListada === 'boolean') setUnidadeNaoListada(saved.unidadeNaoListada)
+        if (initialPasso === 'vinculo') setVinculoModo(initialVinculoModo)
+        setPasso(initialPasso)
+      }
+    } catch {
+      // Ignora draft inválido/corrompido e volta ao comportamento padrão.
+    } finally {
+      window.history.replaceState(
+        mergeHistoryState(initialPasso, initialVinculoModo),
+        '',
+        urlDoPasso(initialPasso, initialVinculoModo),
+      )
+      setWizardDraftRestored(true)
+    }
 
     function onPopState(event: PopStateEvent) {
       const state = event.state as OnboardingHistoryState | null
@@ -191,6 +251,39 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
     return () => window.removeEventListener('popstate', onPopState)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync de histórico só no mount
   }, [])
+
+  useEffect(() => {
+    if (!wizardDraftRestored) return
+    if (typeof window === 'undefined') return
+
+    if (passo === 'concluindo') {
+      window.sessionStorage.removeItem(wizardDraftKey)
+      return
+    }
+
+    const saveDraft = () => {
+      const draft = {
+        passo,
+        vinculoModo: passo === 'vinculo' ? vinculoModo : undefined,
+        clube,
+        uf,
+        cidade,
+        torcida,
+        unidadeId,
+        unidadeNaoListada,
+      } satisfies Record<string, unknown>
+
+      window.sessionStorage.setItem(wizardDraftKey, JSON.stringify(draft))
+    }
+
+    const timeout = window.setTimeout(saveDraft, 250)
+
+    return () => {
+      window.clearTimeout(timeout)
+      // Flush ao desmontar (voltar/refresh) para não perder seleções recentes.
+      saveDraft()
+    }
+  }, [wizardDraftRestored, wizardDraftKey, passo, vinculoModo, clube, uf, cidade, torcida, unidadeId, unidadeNaoListada])
 
   const indiceAtual = PASSOS_VISIVEIS.findIndex((p) => p.key === passo)
 
@@ -427,6 +520,7 @@ export function OnboardingWizard({ afiliacoesIniciais, regioes, ufs, nomeInicial
                 torcida={torcida}
                 nomeInicial={nomeInicial}
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
+                userId={userId}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
                 modo={vinculoModo}
@@ -1596,6 +1690,7 @@ function PassoVinculo({
   regiao,
   unidadeId,
   unidadeNaoListada,
+  userId,
   modo,
   onAbrirSocio,
   onVoltar,
@@ -1607,6 +1702,7 @@ function PassoVinculo({
   regiao: string | undefined
   unidadeId: string | null
   unidadeNaoListada: boolean
+  userId: string
   modo: 'escolha' | 'socio'
   onAbrirSocio: () => void
   onVoltar: () => void
@@ -1742,6 +1838,101 @@ function PassoVinculo({
 
   const nomeClube = clube?.apelido?.trim() || clube?.nome || 'seu clube'
 
+  const vinculoDraftKey = useMemo(
+    () => `onboarding:vinculo-draft:${userId}:${torcida.id}`,
+    [userId, torcida.id],
+  )
+  const [draftRestored, setDraftRestored] = useState(false)
+
+  useEffect(() => {
+    // Restore (só uma vez por mount) para não “apagar” o que já foi digitado.
+    if (draftRestored) return
+    if (typeof window === 'undefined') return
+
+    try {
+      const raw = window.sessionStorage.getItem(vinculoDraftKey)
+      if (!raw) {
+        setDraftRestored(true)
+        return
+      }
+
+      const saved = JSON.parse(raw) as Partial<{
+        nome: string
+        idade: string
+        telefone: string
+        cep: string
+        numero: string
+        bloco: string
+        complemento: string
+        numeroAssociado: string
+        anosSocio: string
+        departamentoId: string
+        imagemProva?: string
+        dataNascimento: string
+        sexo: string
+        estadoCivil: string
+        nacionalidade: string
+        rg: string
+        cpf: string
+        nomePai: string
+        nomeMae: string
+        profissao: string
+        logradouro: string
+        bairro: string
+        ufEndereco: string
+        cidadeEndereco: string
+        fotoDocumentoUrl?: string
+        comprovanteResidenciaUrl?: string
+        responsavelNome: string
+        responsavelDocumento: string
+        termoAceito: boolean
+      }>
+
+      if (typeof saved.nome === 'string') setNome(saved.nome)
+      if (typeof saved.idade === 'string') setIdade(saved.idade)
+      if (typeof saved.telefone === 'string') setTelefone(saved.telefone)
+      if (typeof saved.cep === 'string') setCep(saved.cep)
+      if (typeof saved.numero === 'string') setNumero(saved.numero)
+      if (typeof saved.bloco === 'string') setBloco(saved.bloco)
+      if (typeof saved.complemento === 'string') setComplemento(saved.complemento)
+      if (typeof saved.numeroAssociado === 'string') setNumeroAssociado(saved.numeroAssociado)
+      if (typeof saved.anosSocio === 'string') setAnosSocio(saved.anosSocio)
+      if (typeof saved.departamentoId === 'string') setDepartamentoId(saved.departamentoId)
+      if (typeof saved.imagemProva === 'string' || saved.imagemProva === undefined)
+        setImagemProva(saved.imagemProva)
+
+      if (typeof saved.dataNascimento === 'string') setDataNascimento(saved.dataNascimento)
+      if (typeof saved.sexo === 'string') setSexo(saved.sexo)
+      if (typeof saved.estadoCivil === 'string') setEstadoCivil(saved.estadoCivil)
+      if (typeof saved.nacionalidade === 'string') setNacionalidade(saved.nacionalidade)
+      if (typeof saved.rg === 'string') setRg(saved.rg)
+      if (typeof saved.cpf === 'string') setCpf(saved.cpf)
+      if (typeof saved.nomePai === 'string') setNomePai(saved.nomePai)
+      if (typeof saved.nomeMae === 'string') setNomeMae(saved.nomeMae)
+      if (typeof saved.profissao === 'string') setProfissao(saved.profissao)
+      if (typeof saved.logradouro === 'string') setLogradouro(saved.logradouro)
+      if (typeof saved.bairro === 'string') setBairro(saved.bairro)
+      if (typeof saved.ufEndereco === 'string') setUfEndereco(saved.ufEndereco)
+      if (typeof saved.cidadeEndereco === 'string') setCidadeEndereco(saved.cidadeEndereco)
+      if (typeof saved.fotoDocumentoUrl === 'string' || saved.fotoDocumentoUrl === undefined)
+        setFotoDocumentoUrl(saved.fotoDocumentoUrl)
+      if (
+        typeof saved.comprovanteResidenciaUrl === 'string' ||
+        saved.comprovanteResidenciaUrl === undefined
+      )
+        setComprovanteResidenciaUrl(saved.comprovanteResidenciaUrl)
+      if (typeof saved.responsavelNome === 'string') setResponsavelNome(saved.responsavelNome)
+      if (typeof saved.responsavelDocumento === 'string')
+        setResponsavelDocumento(saved.responsavelDocumento)
+      if (typeof saved.termoAceito === 'boolean') setTermoAceito(saved.termoAceito)
+    } catch {
+      // Se a sessão estiver corrompida, segue com os defaults.
+    } finally {
+      setDraftRestored(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ok: depende só da chave
+  }, [vinculoDraftKey])
+
   function abrirSocio() {
     onErro(null)
     onAbrirSocio()
@@ -1755,6 +1946,87 @@ function PassoVinculo({
       setDepartamentos(deps)
     })
   }, [modo, departamentos, torcida.id, unidadeSelecionada?.tenantId])
+
+  useEffect(() => {
+    if (!draftRestored) return
+    if (typeof window === 'undefined') return
+
+    const saveDraft = () => {
+      const draft = {
+        nome,
+        idade,
+        telefone,
+        cep,
+        numero,
+        bloco,
+        complemento,
+        numeroAssociado,
+        anosSocio,
+        departamentoId,
+        imagemProva,
+        dataNascimento,
+        sexo,
+        estadoCivil,
+        nacionalidade,
+        rg,
+        cpf,
+        nomePai,
+        nomeMae,
+        profissao,
+        logradouro,
+        bairro,
+        ufEndereco,
+        cidadeEndereco,
+        fotoDocumentoUrl,
+        comprovanteResidenciaUrl,
+        responsavelNome,
+        responsavelDocumento,
+        termoAceito,
+      } satisfies Record<string, unknown>
+
+      window.sessionStorage.setItem(vinculoDraftKey, JSON.stringify(draft))
+    }
+
+    const timeout = window.setTimeout(saveDraft, 250)
+
+    return () => {
+      window.clearTimeout(timeout)
+      // Flush ao desmontar (voltar de passo / refresh) para não perder os últimos caracteres.
+      saveDraft()
+    }
+  }, [
+    draftRestored,
+    vinculoDraftKey,
+    nome,
+    idade,
+    telefone,
+    cep,
+    numero,
+    bloco,
+    complemento,
+    numeroAssociado,
+    anosSocio,
+    departamentoId,
+    imagemProva,
+    dataNascimento,
+    sexo,
+    estadoCivil,
+    nacionalidade,
+    rg,
+    cpf,
+    nomePai,
+    nomeMae,
+    profissao,
+    logradouro,
+    bairro,
+    ufEndereco,
+    cidadeEndereco,
+    fotoDocumentoUrl,
+    comprovanteResidenciaUrl,
+    responsavelNome,
+    responsavelDocumento,
+    termoAceito,
+  ])
 
   function enviar(tipo: 'SOCIO' | 'TORCEDOR') {
     onErro(null)
@@ -1859,6 +2131,8 @@ function PassoVinculo({
           termoResponsabilidadeAceito: tipo === 'SOCIO' ? termoAceito : undefined,
         })
         if (res?.redirectTo) {
+          // Se concluiu o vínculo, limpa o rascunho local para não “puxar” valores antigos.
+          window.sessionStorage.removeItem(vinculoDraftKey)
           window.location.assign(res.redirectTo)
           return
         }
