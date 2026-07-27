@@ -4,7 +4,7 @@ import { Suspense, useState, type ReactNode } from 'react'
 import { m, useReducedMotion } from 'motion/react'
 import { ComunidadeSearchBar } from './comunidade-search-bar'
 import { ComunidadeFeedTabs } from './comunidade-feed-tabs'
-import { useScrollChromeVisibility } from '@/lib/use-scroll-chrome-visibility'
+import { useScrollChromeVisibilityShared } from '@/lib/scroll-chrome-context'
 import { springSnappy } from '@/lib/motion-presets'
 
 /**
@@ -12,7 +12,7 @@ import { springSnappy } from '@/lib/motion-presets'
  * reaparece no scroll pra cima (e no topo). Permanece se a busca estiver em foco.
  */
 export function ComunidadeStickySearchChrome({ children }: { children?: ReactNode }) {
-  const scrollVisible = useScrollChromeVisibility()
+  const scrollVisible = useScrollChromeVisibilityShared()
   const reduceMotion = useReducedMotion()
   const [focusLocked, setFocusLocked] = useState(false)
   const visible = focusLocked || scrollVisible
@@ -30,7 +30,11 @@ export function ComunidadeStickySearchChrome({ children }: { children?: ReactNod
               y: reduceMotion ? 0 : -8,
             }
       }
-      transition={reduceMotion ? { duration: 0 } : springSnappy}
+      transition={
+        reduceMotion
+          ? { duration: 0 }
+          : { ...springSnappy, height: { type: 'tween', duration: 0.18, ease: 'easeOut' } }
+      }
       style={{ pointerEvents: visible ? 'auto' : 'none', overflow: visible ? 'visible' : 'hidden' }}
       aria-hidden={!visible}
       onFocusCapture={() => setFocusLocked(true)}

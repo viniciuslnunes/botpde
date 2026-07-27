@@ -5,6 +5,7 @@ import { ComunidadeRouteTransition } from './_components/comunidade-route-transi
 import { ComunidadeLayoutChrome } from './_components/comunidade-layout-chrome'
 import { ComunidadeEscopoNavbarOverride } from './_components/comunidade-escopo-navbar-override'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
+import { ScrollChromeVisibilityProvider } from '@/lib/scroll-chrome-context'
 import { resolverContextoComunidade, type AfiliacaoComunidade } from '@/lib/comunidade-contexto'
 import { getSugestoesCanaisParaAside, getSugestoesCanaisPublicosParaAside } from '@/lib/canais'
 import type { SugestaoCanalAside } from '@/lib/canais-shared'
@@ -96,24 +97,26 @@ export default async function ComunidadeLayout({
         />
       </Suspense>
       <div className="pb-28 lg:pb-0">
-        <ComunidadeLayoutChrome
-          currentUserId={currentUser.id}
-          tenantId={tenantId}
-          tenantSinteticoId={tenantSinteticoId}
-          podeEscopoTorcida={podeEscopoTorcida}
-          salasTorcida={salasTorcida}
-          canaisTorcida={canaisTorcida}
-          salasNacional={salasNacional}
-          canaisNacional={canaisNacional}
-          modoComunidade={modoComunidade}
-        >
-          <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
-        </ComunidadeLayoutChrome>
-        {currentUser.id && (
-          <Suspense fallback={null}>
-            <ComunidadeDock currentUser={currentUser} />
-          </Suspense>
-        )}
+        <ScrollChromeVisibilityProvider>
+          <ComunidadeLayoutChrome
+            currentUserId={currentUser.id}
+            tenantId={tenantId}
+            tenantSinteticoId={tenantSinteticoId}
+            podeEscopoTorcida={podeEscopoTorcida}
+            salasTorcida={salasTorcida}
+            canaisTorcida={canaisTorcida}
+            salasNacional={salasNacional}
+            canaisNacional={canaisNacional}
+            modoComunidade={modoComunidade}
+          >
+            <ComunidadeRouteTransition>{children}</ComunidadeRouteTransition>
+          </ComunidadeLayoutChrome>
+          {currentUser.id && (
+            <Suspense fallback={null}>
+              <ComunidadeDock currentUser={currentUser} />
+            </Suspense>
+          )}
+        </ScrollChromeVisibilityProvider>
       </div>
     </ComunidadeQueryProvider>
   )

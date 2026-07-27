@@ -185,8 +185,15 @@ function Slide({
 
 function MediaCarousel({ slides, caption }: { slides: MediaAttachment[]; caption?: string | null }) {
   const trackRef = useRef<HTMLDivElement>(null)
+  const scrollRafRef = useRef<number | undefined>(undefined)
   const [index, setIndex] = useState(0)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== undefined) window.cancelAnimationFrame(scrollRafRef.current)
+    }
+  }, [])
 
   const imageUrls = slides.filter((s) => s.type === 'image').map((s) => s.url)
 
@@ -225,10 +232,17 @@ function MediaCarousel({ slides, caption }: { slides: MediaAttachment[]; caption
     setIndex(clamped)
   }
 
+  // Throttle via rAF: o evento nativo de scroll do carrossel dispara a
+  // 60-120Hz durante o swipe; setState por evento travava o gesto (mesma
+  // causa corrigida em use-feed-pull-refresh.ts).
   function onScroll() {
-    const track = trackRef.current
-    if (!track) return
-    setIndex(Math.round(track.scrollLeft / track.clientWidth))
+    if (scrollRafRef.current !== undefined) return
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = undefined
+      const track = trackRef.current
+      if (!track) return
+      setIndex(Math.round(track.scrollLeft / track.clientWidth))
+    })
   }
 
   return (
@@ -483,12 +497,17 @@ function SocialEmbed({ url }: { url: string }) {
   useEffect(() => {
     const host = hostRef.current
     if (!host || !activated) return
-    const check = () => {
-      if (host.querySelector('iframe')) setHasFrame(true)
+    const mo = new MutationObserver(() => {
+      if (host.querySelector('iframe')) {
+        setHasFrame(true)
+        mo.disconnect()
+      }
+    })
+    if (host.querySelector('iframe')) {
+      setHasFrame(true)
+    } else {
+      mo.observe(host, { childList: true, subtree: true })
     }
-    check()
-    const mo = new MutationObserver(check)
-    mo.observe(host, { childList: true, subtree: true })
     return () => mo.disconnect()
   }, [activated, url])
 

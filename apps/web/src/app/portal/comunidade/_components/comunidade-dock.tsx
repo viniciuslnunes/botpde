@@ -8,7 +8,7 @@ import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { Home, Search, Video, Plus } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
-import { useScrollChromeVisibility } from '@/lib/use-scroll-chrome-visibility'
+import { useScrollChromeVisibilityShared } from '@/lib/scroll-chrome-context'
 
 interface ComunidadeDockProps {
   currentUser: { id: string; nome: string | null; avatarUrl: string | null }
@@ -24,7 +24,7 @@ export function ComunidadeDock({ currentUser }: ComunidadeDockProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
-  const chromeVisible = useScrollChromeVisibility()
+  const chromeVisible = useScrollChromeVisibilityShared()
   const reduceMotion = useReducedMotion()
   const sufixoNacional = searchParams.get('escopo') === 'nacional' ? '?escopo=nacional' : ''
 

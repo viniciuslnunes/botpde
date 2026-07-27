@@ -579,7 +579,6 @@ export function PostEngagement({
                     key={c.id}
                     custom={i}
                     variants={menuItemStagger}
-                    layout
                     className="flex items-start gap-2"
                   >
                     <Avatar nome={c.autor.nome} avatarUrl={c.autor.avatarUrl} size="xs" />

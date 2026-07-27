@@ -32,13 +32,25 @@ export function useFeedPullRefresh(onRefresh: () => Promise<void>) {
   }, [onRefresh])
 
   useEffect(() => {
+    let rafId: number | undefined
+    let pendingDistance: number | null = null
+
     function canPull(): boolean {
       return window.scrollY <= 8 && !refreshLock.current
     }
 
+    // Throttle setState via rAF: touchmove/wheel disparam a 60-120Hz e um
+    // setState síncrono por evento, no momento em que o usuário começa a
+    // rolar, competia com o reflow do chrome sticky e travava o scroll.
     function setDistance(value: number) {
       pullDistanceRef.current = value
-      setPullDistance(value)
+      pendingDistance = value
+      if (rafId !== undefined) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = undefined
+        if (pendingDistance !== null) setPullDistance(pendingDistance)
+        pendingDistance = null
+      })
     }
 
     function onTouchStart(e: TouchEvent) {
@@ -101,6 +113,7 @@ export function useFeedPullRefresh(onRefresh: () => Promise<void>) {
       window.removeEventListener('touchmove', onTouchMove)
       window.removeEventListener('touchend', onTouchEnd)
       window.removeEventListener('wheel', onWheel)
+      if (rafId !== undefined) window.cancelAnimationFrame(rafId)
     }
   }, [triggerRefresh])
 

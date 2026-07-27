@@ -28,17 +28,27 @@ export function useScrollChromeVisibility(options: Options = {}): boolean {
     let lastY = window.scrollY
     let ticking = false
     let idleTimer: number | undefined
+    let lastFlipAt = 0
+    // Evita oscilar (e reanimar) a cada micro-reversão de direção em scroll
+    // não-monotônico (comum em touch/trackpad) — sem isso, cada pequeno
+    // "solavanco" refaz a animação de altura do chrome sticky, forçando
+    // reflow do feed abaixo em sequência e travando o scroll.
+    const minFlipIntervalMs = 250
 
-    function applyVisibility(y: number, delta: number) {
+    function applyVisibility(y: number, delta: number, now: number) {
       if (y <= topRevealPx) {
+        lastFlipAt = now
         setVisible(true)
         return
       }
+      if (now - lastFlipAt < minFlipIntervalMs) return
       if (delta < -thresholdPx) {
+        lastFlipAt = now
         setVisible(true)
         return
       }
       if (delta > thresholdPx) {
+        lastFlipAt = now
         setVisible(false)
       }
     }
@@ -57,7 +67,7 @@ export function useScrollChromeVisibility(options: Options = {}): boolean {
       window.requestAnimationFrame(() => {
         const y = window.scrollY
         const delta = y - lastY
-        applyVisibility(y, delta)
+        applyVisibility(y, delta, performance.now())
         lastY = y
         ticking = false
         scheduleIdleHide(y)

@@ -31,6 +31,14 @@ import {
 const ERRO_ESPELHO_MUTACAO =
   'Este registro é um espelho da Sede. Altere na unidade de origem.'
 
+/**
+ * Decisão de admissão faz muitas idas ao banco em série (advisory locks,
+ * espelho, `syncMembershipFromRoles` quando há departamento) — acima do
+ * default de 5s do Prisma sob a latência do Postgres do Railway, causando
+ * "Transaction API error: Transaction not found" (P2028-like) em produção.
+ */
+const TRANSACAO_DECISAO_MEMBRO_OPTS = { timeout: 20_000, maxWait: 10_000 }
+
 function erroSolicitacaoJaAnalisada(
   aprovadoPorNome: string | null,
   aprovadoEm: Date | null,
@@ -476,6 +484,7 @@ export async function aprovarMembro(
         tenantNotificarNome: tenant.nome,
       }
     },
+    TRANSACAO_DECISAO_MEMBRO_OPTS,
   )
 
   const { origem, espelhoId, decididoEmTenantId, tenantNotificarId, tenantNotificarNome } =
@@ -717,6 +726,7 @@ export async function reprovarMembro(
         tenantNotificarNome: tenant.nome,
       }
     },
+    TRANSACAO_DECISAO_MEMBRO_OPTS,
   )
 
   const { origem, espelhoId, decididoEmTenantId, tenantNotificarId, tenantNotificarNome } =
@@ -838,7 +848,7 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
         origemTenantId: tenant.id,
         espelhoId,
       }
-    })
+    }, TRANSACAO_DECISAO_MEMBRO_OPTS)
 
   await db.auditLog.create({
     data: {
