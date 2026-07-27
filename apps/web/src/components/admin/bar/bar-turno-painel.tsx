@@ -129,9 +129,11 @@ export function BarTurnoPainel({
   }
 
   return (
+    // @container: em `compact` o painel mora na sidebar do PDV (~15rem úteis).
+    // Com `sm:grid-cols-3` as três caixas ficavam com ~75px e o valor vazava.
     <div
       className={[
-        'space-y-3 rounded-2xl border border-[rgb(var(--color-success)_/_0.35)] bg-[rgb(var(--surface))]',
+        '@container space-y-3 rounded-2xl border border-[rgb(var(--color-success)_/_0.35)] bg-[rgb(var(--surface))]',
         compact ? 'p-4' : 'p-5',
       ].join(' ')}
     >
@@ -158,7 +160,7 @@ export function BarTurnoPainel({
       </div>
 
       {resumo && (
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="@[15rem]:grid-cols-2 @[26rem]:grid-cols-3 grid gap-2">
           <div className="rounded-xl bg-[rgb(var(--background-subtle))] px-3 py-2">
             <p className="text-xs text-[rgb(var(--foreground-muted))]">Vendido (pago)</p>
             <p className="text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]">
@@ -186,7 +188,7 @@ export function BarTurnoPainel({
       {fechando && podeGerir && (
         <div className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] p-3">
           <p className="text-sm font-medium text-[rgb(var(--foreground))]">Fechamento de caixa</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="@[22rem]:grid-cols-2 grid gap-3">
             <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Dinheiro contado (R$)
               <input

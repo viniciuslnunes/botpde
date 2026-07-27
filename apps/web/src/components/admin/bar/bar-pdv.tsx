@@ -584,8 +584,11 @@ export function BarPdv({
     })
   }
 
+  // @container: a comanda é renderizada tanto no aside (19–28rem) quanto no
+  // bottom sheet mobile. Breakpoint de viewport aqui mentia — `sm:grid-cols-2`
+  // valia num aside de 19rem e espremia os campos.
   const sidebar = (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@container flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 pb-3">
         <div>
           <h2 className="text-lg font-semibold text-[rgb(var(--foreground))]">Venda atual</h2>
@@ -673,7 +676,7 @@ export function BarPdv({
           <span>{opcoesAbertas || desconto > 0 || observacao ? '−' : '+'}</span>
         </button>
         {(opcoesAbertas || desconto > 0 || observacao) && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="@[22rem]:grid-cols-2 grid grid-cols-1 gap-2">
             <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Desconto (R$)
               <input
@@ -738,7 +741,7 @@ export function BarPdv({
         </div>
 
         {metodo === 'FIADO' && podeGerir && (
-          <div className="grid grid-cols-1 gap-2 rounded-2xl border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.06)] p-3 sm:grid-cols-2">
+          <div className="@[22rem]:grid-cols-2 grid grid-cols-1 gap-2 rounded-2xl border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.06)] p-3">
             <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
               Devedor *
               <select
@@ -822,7 +825,7 @@ export function BarPdv({
     <aside
       className={[
         'relative hidden shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-[width] duration-300 ease-out lg:flex',
-        turnoSidebarAberto ? 'w-[19rem] xl:w-[21rem]' : 'w-14',
+        turnoSidebarAberto ? 'w-[19rem] 2xl:w-[21rem]' : 'w-14',
       ].join(' ')}
     >
       {turnoSidebarAberto ? (
@@ -1126,7 +1129,9 @@ export function BarPdv({
         </section>
       )}
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+      {/* A comanda só chega a 28rem em telas ≥1536px: em notebook ela roubava
+          448px do cardápio e sobrava largura para uma coluna de produtos. */}
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
         <section className="flex min-h-0 flex-col overflow-hidden border-[rgb(var(--border))] lg:border-r">
           <div className="shrink-0 space-y-2.5 px-4 py-3">
             <div className="relative">
@@ -1183,11 +1188,14 @@ export function BarPdv({
                 className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-[rgb(var(--border))] py-16 text-center"
               />
             ) : (
+              // Colunas por largura real do painel, não por viewport: as duas sidebars
+              // (turno + comanda) comem 600–800px, então `xl:grid-cols-3` produzia cards
+              // de ~230px — estreitos demais para o Stepper (132px) e o preço.
               <m.div
                 variants={staggerContainer}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                className="grid grid-cols-[repeat(auto-fill,minmax(min(17rem,100%),1fr))] gap-3"
               >
                 {filtrados.map((p) => {
                   const noCarrinho = cart.find((l) => l.produtoId === p.id)?.quantidade ?? 0
@@ -1208,7 +1216,7 @@ export function BarPdv({
                         if (!semMais && !pending) setQtdProduto(p, 1)
                       }}
                       className={[
-                        'flex min-w-0 gap-3 overflow-hidden rounded-3xl border p-3 text-left transition-colors',
+                        'flex min-w-0 flex-col gap-3 overflow-hidden rounded-3xl border p-3 text-left transition-colors',
                         esgotado
                           ? 'cursor-not-allowed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] opacity-50'
                           : noCarrinho > 0
@@ -1216,79 +1224,84 @@ export function BarPdv({
                             : 'cursor-pointer border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:border-[rgb(var(--color-primary)_/_0.35)]',
                       ].join(' ')}
                     >
-                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[rgb(var(--background-subtle))] sm:h-24 sm:w-24">
-                        <ProdutoImagem
-                          src={p.imagemUrl}
-                          alt={p.nome}
-                          variant="thumb"
-                          className="!h-full !w-full !rounded-2xl"
-                        />
-                        {noCarrinho > 0 && (
-                          <span className="absolute -right-1 -top-1 flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-xs font-bold text-[rgb(var(--color-primary-fg))] shadow">
-                            {noCarrinho}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                            {p.categoria?.nome ?? 'Geral'}
-                          </p>
-                          <p className="shrink-0 text-base font-bold tabular-nums text-[rgb(var(--color-primary-fg))]">
-                            {formatarPreco(p.preco)}
-                          </p>
-                        </div>
-                        <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))]">
-                          {p.nome}
-                        </p>
-                        <p
-                          className={[
-                            'mt-1 text-xs font-medium',
-                            esgotado
-                              ? 'text-[rgb(var(--color-danger-fg))]'
-                              : estoqueBaixo
-                                ? 'text-[rgb(var(--color-warning-fg))]'
-                                : 'text-[rgb(var(--foreground-muted))]',
-                          ].join(' ')}
-                        >
-                          {esgotado
-                            ? 'Esgotado'
-                            : estoqueBaixo
-                              ? `Baixo · ${p.estoque} un.`
-                              : `${p.estoque} un.`}
-                        </p>
-                        <div
-                          className="mt-auto flex items-center justify-between gap-2 pt-2"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          role="presentation"
-                        >
-                          {esgotado ? (
-                            <span className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
-                              Indisponível
-                            </span>
-                          ) : (
-                            <Stepper
-                              size="lg"
-                              label={p.nome}
-                              value={noCarrinho}
-                              onMinus={() => setQtdProduto(p, -1)}
-                              onPlus={() => setQtdProduto(p, 1)}
-                              minusDisabled={noCarrinho <= 0 || pending}
-                              plusDisabled={semMais || noCarrinho >= 99 || pending}
-                            />
-                          )}
+                      <div className="flex min-w-0 gap-3">
+                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[rgb(var(--background-subtle))] sm:h-24 sm:w-24">
+                          <ProdutoImagem
+                            src={p.imagemUrl}
+                            alt={p.nome}
+                            variant="thumb"
+                            className="!h-full !w-full !rounded-2xl"
+                          />
                           {noCarrinho > 0 && (
-                            <button
-                              type="button"
-                              aria-label={`Remover ${p.nome}`}
-                              onClick={() => removerLinha(p.id)}
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.1)]"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <span className="absolute -right-1 -top-1 flex h-7 min-w-7 items-center justify-center rounded-full bg-[rgb(var(--primary))] px-1.5 text-xs font-bold text-[rgb(var(--color-primary-fg))] shadow">
+                              {noCarrinho}
+                            </span>
                           )}
                         </div>
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+                              {p.categoria?.nome ?? 'Geral'}
+                            </p>
+                            <p className="shrink-0 text-base font-bold tabular-nums text-[rgb(var(--color-primary-fg))]">
+                              {formatarPreco(p.preco)}
+                            </p>
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-[rgb(var(--foreground))]">
+                            {p.nome}
+                          </p>
+                          <p
+                            className={[
+                              'mt-1 text-xs font-medium',
+                              esgotado
+                                ? 'text-[rgb(var(--color-danger-fg))]'
+                                : estoqueBaixo
+                                  ? 'text-[rgb(var(--color-warning-fg))]'
+                                  : 'text-[rgb(var(--foreground-muted))]',
+                            ].join(' ')}
+                          >
+                            {esgotado
+                              ? 'Esgotado'
+                              : estoqueBaixo
+                                ? `Baixo · ${p.estoque} un.`
+                                : `${p.estoque} un.`}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Ações ocupam a largura inteira do card: dentro da coluna de texto
+                          elas dividiam espaço com a imagem e o Stepper (132px fixos)
+                          estourava a borda em telas de notebook. */}
+                      <div
+                        className="mt-auto flex items-center justify-between gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="presentation"
+                      >
+                        {esgotado ? (
+                          <span className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
+                            Indisponível
+                          </span>
+                        ) : (
+                          <Stepper
+                            size="lg"
+                            label={p.nome}
+                            value={noCarrinho}
+                            onMinus={() => setQtdProduto(p, -1)}
+                            onPlus={() => setQtdProduto(p, 1)}
+                            minusDisabled={noCarrinho <= 0 || pending}
+                            plusDisabled={semMais || noCarrinho >= 99 || pending}
+                          />
+                        )}
+                        {noCarrinho > 0 && (
+                          <button
+                            type="button"
+                            aria-label={`Remover ${p.nome}`}
+                            onClick={() => removerLinha(p.id)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[rgb(var(--color-danger-fg))] hover:bg-[rgb(var(--color-danger)_/_0.1)]"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </m.div>
                   )
