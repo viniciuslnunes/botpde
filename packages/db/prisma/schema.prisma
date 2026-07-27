@@ -340,6 +340,10 @@ model Tenant {
 
   barCaixaTurnos          BarCaixaTurno[]
 
+  barFornecedores         BarFornecedor[]
+
+  barFiados               BarFiado[]
+
   solicitacoesUnidade     SolicitacaoUnidade[]     @relation("TenantSolicitacoesUnidade")
 
 
@@ -521,6 +525,12 @@ model User {
 
   barCaixaTurnosAbertos        BarCaixaTurno[]        @relation("BarCaixaTurnoAbertoPor")
   barCaixaTurnosFechados       BarCaixaTurno[]        @relation("BarCaixaTurnoFechadoPor")
+
+  barVendasEstornadas          BarVenda[]             @relation("BarVendaEstornadoPor")
+
+  barFiadosDevidos             BarFiado[]             @relation("BarFiadoDevedor")
+
+  barFiadosCriados             BarFiado[]             @relation("BarFiadoCriadoPor")
 
   solicitacoesUnidadeFeitas    SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeSolicitante")
 
@@ -1001,6 +1011,8 @@ model SaasMembro {
   user      User                 @relation(fields: [userId], references: [id])
 
   cobrancas CobrancaAssociacao[]
+
+  barFiados BarFiado[]
 
 
 
@@ -1506,6 +1518,8 @@ model Sede {
   barMovimentacoesEstoque BarMovimentacaoEstoque[]
 
   barCaixaTurnos          BarCaixaTurno[]
+
+  barFiados               BarFiado[]
 
 
   @@index([tenantId])
@@ -3381,6 +3395,14 @@ enum TipoNotificacao {
 
   BAR_VENDA_ESTORNADA
 
+  BAR_ESTOQUE_BAIXO
+
+  BAR_FIADO_VENCIDO
+
+  BAR_TURNO_DIVERGENCIA
+
+  BAR_ESTORNO_ANOMALO
+
   PATRIMONIO_RESPONSAVEL_DEFINIDO
 
   PEDIDO_RECEBIDO
@@ -4525,6 +4547,14 @@ model BarVenda {
 
 
 
+  /// Rastreabilidade do estorno (Feature 5 — auditoria de estornos anômalos).
+  estornadoPorId String?   @map("estornado_por_id")
+  estornadoPor   User?     @relation("BarVendaEstornadoPor", fields: [estornadoPorId], references: [id], onDelete: SetNull)
+  estornadoEm    DateTime? @map("estornado_em")
+  motivoEstorno  String?   @map("motivo_estorno")
+
+
+
   criadoEm DateTime @default(now()) @map("criado_em")
 
 
@@ -4532,6 +4562,8 @@ model BarVenda {
   itens         BarVendaItem[]
 
   movimentacoes BarMovimentacaoEstoque[]
+
+  fiado         BarFiado?
 
 
 
@@ -4588,6 +4620,44 @@ model BarVendaItem {
 
 
 
+model BarFornecedor {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+
+
+  nome        String
+
+  contato     String?
+
+  documento   String?
+
+  observacao  String?
+
+  ativo       Boolean @default(true)
+
+
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  movimentacoes BarMovimentacaoEstoque[]
+
+
+
+  @@index([tenantId, ativo])
+
+  @@map("saas_bar_fornecedores")
+
+}
+
+
+
 model BarMovimentacaoEstoque {
 
   id       String @id @default(uuid())
@@ -4628,6 +4698,14 @@ model BarMovimentacaoEstoque {
 
 
 
+  /// Fornecedor da compra de insumo (só relevante para ENTRADA).
+
+  fornecedorId String?        @map("fornecedor_id")
+
+  fornecedor   BarFornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+
+
+
   /// Lançamento de despesa no livro-caixa quando a entrada tem custo.
 
   financeiroLancamentoId String? @map("financeiro_lancamento_id")
@@ -4661,6 +4739,8 @@ enum MetodoPagamentoBar {
   CARTAO_DEBITO
 
   CARTAO_CREDITO
+
+  FIADO
 
 }
 
@@ -4713,10 +4793,109 @@ model BarCaixaTurno {
   dinheiroContado Decimal? @map("dinheiro_contado") @db.Decimal(10, 2)
   observacao      String?
 
+  /// Dinheiro esperado calculado no fechamento (base para a diferença/alerta).
+  dinheiroEsperado Decimal? @map("dinheiro_esperado") @db.Decimal(10, 2)
+  /// diferenca = dinheiroContado - dinheiroEsperado (pode ser negativa).
+  diferenca        Decimal? @db.Decimal(10, 2)
+  /// true quando |diferenca| ultrapassa o limiar de divergência (Feature 3).
+  divergenciaAlta  Boolean  @default(false) @map("divergencia_alta")
+
   criadoEm DateTime @default(now()) @map("criado_em")
 
   vendas BarVenda[]
 
   @@index([tenantId, sedeId, fechadoEm])
   @@map("saas_bar_caixa_turnos")
+}
+
+
+
+/// Venda a fiado (crédito) vinculada a um membro — quitação gera o lançamento
+/// no livro-caixa só quando o débito é pago (ver docs/data/modulo-bar.md).
+model BarFiado {
+
+  id       String @id @default(uuid())
+
+  tenantId String @map("tenant_id")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+
+
+  sedeId String @map("sede_id")
+
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+
+
+  vendaId String   @unique @map("venda_id")
+
+  venda   BarVenda @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+
+
+  /// Devedor (usuário da conta do membro).
+
+  userId String @map("user_id")
+
+  user   User   @relation("BarFiadoDevedor", fields: [userId], references: [id], onDelete: Cascade)
+
+
+
+  membroId String?     @map("membro_id")
+
+  membro   SaasMembro? @relation(fields: [membroId], references: [id], onDelete: SetNull)
+
+
+
+  valor      Decimal        @db.Decimal(10, 2)
+
+  vencimento DateTime
+
+  status     StatusFiadoBar @default(PENDENTE)
+
+
+
+  pagoEm                   DateTime?           @map("pago_em")
+
+  metodoPagamentoQuitacao  MetodoPagamentoBar? @map("metodo_pagamento_quitacao")
+
+
+
+  financeiroLancamentoId String? @unique @map("financeiro_lancamento_id")
+
+
+
+  criadoPorId String? @map("criado_por_id")
+
+  criadoPor   User?   @relation("BarFiadoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+
+
+  @@index([tenantId, sedeId, status, vencimento])
+
+  @@index([userId])
+
+  @@index([membroId])
+
+  @@map("saas_bar_fiados")
+
+}
+
+
+
+enum StatusFiadoBar {
+
+  PENDENTE
+
+  PAGA
+
+  CANCELADA
+
+  VENCIDA
+
 }

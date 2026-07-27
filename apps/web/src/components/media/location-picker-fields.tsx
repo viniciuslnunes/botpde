@@ -40,6 +40,8 @@ type Props = {
   enableStreetViewPhoto?: boolean
   onStreetViewPhoto?: (url: string) => void
   onCoordsChange?: (coords: { lat: number; lng: number }) => void
+  /** Notifica o link colado (mesmo sem coords ainda) — útil p/ fallback no submit. */
+  onMapsLinkChange?: (url: string) => void
   /** Se false, não renderiza inputs name=lat/lng (caller controla). Default true. */
   renderHiddenInputs?: boolean
   className?: string
@@ -58,6 +60,7 @@ export function LocationPickerFields({
   enableStreetViewPhoto = false,
   onStreetViewPhoto,
   onCoordsChange,
+  onMapsLinkChange,
   renderHiddenInputs = true,
   className,
 }: Props) {
@@ -147,13 +150,20 @@ export function LocationPickerFields({
       return
     }
     setLinkStatus('loading')
-    const result = await resolverCoordsDeLinkMaps(raw)
-    if (!result.ok) {
+    try {
+      const result = await resolverCoordsDeLinkMaps(raw)
+      if (!result.ok) {
+        setLinkStatus('error')
+        toast.error(result.message)
+        return
+      }
+      aplicarCoords({ lat: result.lat, lng: result.lng }, 'link')
+    } catch {
       setLinkStatus('error')
-      toast.error(result.message)
-      return
+      toast.error(
+        'Não foi possível resolver o link do Maps. Use o link completo, Buscar no mapa ou o pin.',
+      )
     }
-    aplicarCoords({ lat: result.lat, lng: result.lng }, 'link')
   }
 
   async function buscarNoMapa() {
@@ -199,6 +209,8 @@ export function LocationPickerFields({
   return (
     <div className={['space-y-3', className].filter(Boolean).join(' ')}>
       {crop.dialog}
+      {/* Fallback no submit: create server-side resolve se lat/lng ainda vazios. */}
+      <input type="hidden" name="mapsUrl" value={mapsLink} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -237,6 +249,7 @@ export function LocationPickerFields({
               value={mapsLink}
               onChange={(e) => {
                 setMapsLink(e.target.value)
+                onMapsLinkChange?.(e.target.value)
                 setLinkStatus('idle')
               }}
               placeholder="https://maps.app.goo.gl/… ou maps.google.com/…"

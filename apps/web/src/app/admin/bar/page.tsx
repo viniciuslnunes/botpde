@@ -1,7 +1,18 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { AlertTriangle, Beer, Boxes, CupSoda, ReceiptText, Store } from 'lucide-react'
+import {
+  AlertTriangle,
+  Beer,
+  Boxes,
+  CupSoda,
+  HandCoins,
+  ReceiptText,
+  Store,
+  Truck,
+  Undo2,
+} from 'lucide-react'
+import { db } from '@torcida/db'
 import { PERMISSIONS } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
 import {
@@ -135,11 +146,12 @@ export default async function AdminBarPage() {
 
   const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
 
-  const [resumoHoje, estoqueBaixo, resumoTurno, margemHoje]: [
+  const [resumoHoje, estoqueBaixo, resumoTurno, margemHoje, fiadosPendentes]: [
     BarVendasResumo,
     BarProdutoLite[],
     Awaited<ReturnType<typeof resumirTurnoBar>> | null,
     BarMargemResumo | null,
+    number,
   ] = await Promise.all([
     resumirVendasBar(tenant.id, unidade.id, { desde: inicioDoDia }),
     listarEstoqueBaixo(tenant.id, unidade.id),
@@ -147,6 +159,11 @@ export default async function AdminBarPage() {
     podeVerMargem
       ? resumirMargemBar(tenant.id, unidade.id, { desde: inicioDoDia })
       : Promise.resolve(null),
+    podeGerir
+      ? db.barFiado.count({
+          where: { tenantId: tenant.id, sedeId: unidade.id, status: { in: ['PENDENTE', 'VENCIDA'] } },
+        })
+      : Promise.resolve(0),
   ])
 
   return (
@@ -314,6 +331,12 @@ export default async function AdminBarPage() {
               >
                 <Boxes className="h-4 w-4" /> Estoque
               </Link>
+              <Link
+                href="/admin/bar/fornecedores"
+                className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <Truck className="h-4 w-4" /> Fornecedores
+              </Link>
             </>
           )}
           <Link
@@ -322,6 +345,27 @@ export default async function AdminBarPage() {
           >
             <ReceiptText className="h-4 w-4" /> Vendas
           </Link>
+          {podeGerir && (
+            <>
+              <Link
+                href="/admin/bar/fiado"
+                className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <HandCoins className="h-4 w-4" /> Fiado
+                {fiadosPendentes > 0 && (
+                  <span className="rounded-full bg-[rgb(var(--color-warning)_/_0.16)] px-2 py-0.5 text-xs font-semibold text-[rgb(var(--color-warning-fg))]">
+                    {fiadosPendentes}
+                  </span>
+                )}
+              </Link>
+              <Link
+                href="/admin/bar/estornos"
+                className="flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium hover:bg-[rgb(var(--background-subtle))]"
+              >
+                <Undo2 className="h-4 w-4" /> Estornos
+              </Link>
+            </>
+          )}
         </div>
       </MotionReveal>
     </div>

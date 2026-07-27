@@ -1,8 +1,9 @@
 'use client'
 
 import { useActionState, useId, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { m } from 'motion/react'
-import { Boxes } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Boxes, Settings2 } from 'lucide-react'
 import { FieldError } from '@torcida/ui'
 import { registrarAjusteEstoqueBar, registrarCompraBar } from '@/app/admin/bar/actions'
 import type { BarActionState } from '@/app/admin/bar/actions'
@@ -21,6 +22,7 @@ const COMPRA_LABELS = {
   quantidade: 'Quantidade',
   custoTotal: 'Custo total',
   motivo: 'Motivo',
+  fornecedorId: 'Fornecedor',
 } as const
 
 function formatarPreco(valor: number) {
@@ -33,7 +35,13 @@ function estoqueBaixo(p: BarProdutoSerializado): boolean {
 
 // ── Registrar compra (entrada de estoque + DESPESA no livro-caixa) ───────────
 
-export function RegistrarCompraBarForm({ produtos }: { produtos: BarProdutoSerializado[] }) {
+export function RegistrarCompraBarForm({
+  produtos,
+  fornecedores = [],
+}: {
+  produtos: BarProdutoSerializado[]
+  fornecedores?: { id: string; nome: string }[]
+}) {
   const [state, action, pending] = useActionState(registrarCompraBar, initialState)
   const [open, setOpen] = useState(false)
   const formId = useId()
@@ -140,14 +148,40 @@ export function RegistrarCompraBarForm({ produtos }: { produtos: BarProdutoSeria
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Motivo</label>
-              <input
-                name="motivo"
-                placeholder="Ex.: reposição para o jogo de domingo"
-                className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
-              />
-              <FieldError errors={state.fieldErrors?.motivo} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-[rgb(var(--foreground))]">
+                  Fornecedor
+                </label>
+                <select
+                  name="fornecedorId"
+                  defaultValue=""
+                  className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                >
+                  <option value="">Sem fornecedor</option>
+                  {fornecedores.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
+                    </option>
+                  ))}
+                </select>
+                <FieldError errors={state.fieldErrors?.fornecedorId} />
+                <Link
+                  href="/admin/bar/fornecedores"
+                  className="mt-1 inline-block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
+                >
+                  Gerenciar fornecedores
+                </Link>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[rgb(var(--foreground))]">Motivo</label>
+                <input
+                  name="motivo"
+                  placeholder="Ex.: reposição para o jogo de domingo"
+                  className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm"
+                />
+                <FieldError errors={state.fieldErrors?.motivo} />
+              </div>
             </div>
 
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
@@ -330,5 +364,80 @@ export function BarEstoqueTabela({ produtos }: { produtos: BarProdutoSerializado
         )
       })}
     </m.ul>
+  )
+}
+
+// ── Movimentações recentes ───────────────────────────────────────────────────
+
+export type BarMovimentacaoEstoqueItem = {
+  id: string
+  produtoNome: string
+  tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE'
+  quantidade: number
+  custoTotal: number | null
+  motivo: string | null
+  criadoEmLabel: string
+  fornecedorNome: string | null
+  operadorNome: string | null
+}
+
+const TIPO_MOV_LABEL: Record<BarMovimentacaoEstoqueItem['tipo'], string> = {
+  ENTRADA: 'Entrada',
+  SAIDA: 'Saída',
+  AJUSTE: 'Ajuste',
+}
+
+function IconeMovimentacao({ tipo }: { tipo: BarMovimentacaoEstoqueItem['tipo'] }) {
+  if (tipo === 'ENTRADA') {
+    return <ArrowUpCircle className="h-4 w-4 text-[rgb(var(--color-success-fg))]" />
+  }
+  if (tipo === 'SAIDA') {
+    return <ArrowDownCircle className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
+  }
+  return <Settings2 className="h-4 w-4 text-[rgb(var(--color-warning-fg))]" />
+}
+
+export function BarMovimentacoesEstoqueLista({
+  movimentacoes,
+}: {
+  movimentacoes: BarMovimentacaoEstoqueItem[]
+}) {
+  if (movimentacoes.length === 0) {
+    return (
+      <MotionEmptyState
+        title="Nenhuma movimentação de estoque ainda"
+        description="Compras, vendas e ajustes aparecem aqui."
+        className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[rgb(var(--border))] py-10 text-center"
+      />
+    )
+  }
+
+  return (
+    <ul className="divide-y divide-[rgb(var(--border))] rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+      {movimentacoes.map((m) => (
+        <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+          <IconeMovimentacao tipo={m.tipo} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-[rgb(var(--foreground))]">
+              {TIPO_MOV_LABEL[m.tipo]} · {m.produtoNome}
+            </p>
+            <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
+              {m.criadoEmLabel}
+              {m.fornecedorNome ? ` · Fornecedor: ${m.fornecedorNome}` : ''}
+              {m.motivo ? ` · ${m.motivo}` : ''}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm font-semibold tabular-nums text-[rgb(var(--foreground))]">
+              {m.tipo === 'SAIDA' ? '−' : '+'}
+              {m.quantidade} un.
+            </p>
+            {m.custoTotal != null && (
+              <p className="text-xs text-[rgb(var(--foreground-muted))]">{formatarPreco(m.custoTotal)}</p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

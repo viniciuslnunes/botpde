@@ -13,11 +13,18 @@ import {
 } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { AdminTabs, adminTabIds } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Configurações — Admin' }
 
-export default async function ConfiguracoesPage() {
+const CONFIG_TAB_PARAM = 'tab'
+
+export default async function ConfiguracoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
   if (!tenant || !session?.user?.id) redirect('/')
 
@@ -115,6 +122,13 @@ export default async function ConfiguracoesPage() {
     },
   ]
 
+  const params = await searchParams
+  const activeSection =
+    sections.find((section) => section.id === params.tab) ?? sections[0]!
+  const { tabId, panelId } = adminTabIds(CONFIG_TAB_PARAM, activeSection.id)
+  const Icon = activeSection.icon
+  const blocked = activeSection.ownerOnly && !isOwner
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
@@ -129,76 +143,82 @@ export default async function ConfiguracoesPage() {
 
       <div className="flex-1 overflow-auto py-6">
         <div className="app-container space-y-6">
-          {sections.map((section, sectionIndex) => {
-            const Icon = section.icon
-            const blocked = section.ownerOnly && !isOwner
+          <AdminTabs
+            tabs={sections.map((section) => ({
+              id: section.id,
+              label: section.title,
+              icon: section.icon,
+            }))}
+            basePath="/admin/configuracoes"
+            activeId={activeSection.id}
+            paramKey={CONFIG_TAB_PARAM}
+          />
 
-            return (
-              <MotionReveal key={section.id} index={sectionIndex}>
-              <div
-                id={section.id}
-                className={[
-                  'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))] scroll-mt-6',
-                  'border-[rgb(var(--border))]',
-                  blocked ? 'opacity-60' : '',
-                ].join(' ')}
-              >
-                <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
-                    <Icon className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-[rgb(var(--foreground))]">{section.title}</h2>
-                      {section.ownerOnly && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                          Somente owner
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
-                      {section.description}
-                    </p>
-                  </div>
+          <MotionReveal key={activeSection.id}>
+            <div
+              id={panelId}
+              role="tabpanel"
+              aria-labelledby={tabId}
+              className={[
+                'overflow-hidden rounded-2xl border bg-[rgb(var(--surface))]',
+                'border-[rgb(var(--border))]',
+                blocked ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
+                  <Icon className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
                 </div>
-
-                <div className="px-6 py-5">
-                  {blocked ? (
-                    <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                      Apenas o owner da torcida pode alterar esta configuração.
-                    </p>
-                  ) : section.id === 'perfil' ? (
-                    <PerfilTenantForm nome={tenant.nome} />
-                  ) : section.id === 'discord' ? (
-                    <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
-                  ) : section.id === 'afiliacao' ? (
-                    <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
-                  ) : section.id === 'balanco' ? (
-                    <BalancoVisivelForm
-                      key={`${tenant.balancoFinanceiroVisivel}-${tenant.balancoDetalheNivel}`}
-                      visivel={tenant.balancoFinanceiroVisivel}
-                      detalheNivel={tenant.balancoDetalheNivel}
-                    />
-                  ) : section.id === 'hierarquia' ? (
-                    <HierarquiaVisivelForm
-                      key={String(tenant.hierarquiaVisivelParaFilhos)}
-                      visivel={tenant.hierarquiaVisivelParaFilhos}
-                    />
-                  ) : section.id === 'canal-oficial' && canalOficial ? (
-                    <CanalOficialForm
-                      nome={canalOficial.nome ?? tenant.nome}
-                      descricao={canalOficial.descricao}
-                      avatarUrl={canalOficial.avatarUrl}
-                      visibilidadeCanal={canalOficial.visibilidadeCanal}
-                      somenteAdminPublica={canalOficial.somenteAdminPublica}
-                      publica={canalOficial.publica}
-                    />
-                  ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-[rgb(var(--foreground))]">{activeSection.title}</h2>
+                    {activeSection.ownerOnly && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                        Somente owner
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">
+                    {activeSection.description}
+                  </p>
                 </div>
               </div>
-              </MotionReveal>
-            )
-          })}
+
+              <div className="px-6 py-5">
+                {blocked ? (
+                  <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                    Apenas o owner da torcida pode alterar esta configuração.
+                  </p>
+                ) : activeSection.id === 'perfil' ? (
+                  <PerfilTenantForm nome={tenant.nome} />
+                ) : activeSection.id === 'discord' ? (
+                  <DiscordForm discordGuildId={tenant.discordGuildId ?? null} />
+                ) : activeSection.id === 'afiliacao' ? (
+                  <AfiliacaoForm afiliacaoId={tenant.afiliacaoId ?? null} afiliacoes={afiliacoes} />
+                ) : activeSection.id === 'balanco' ? (
+                  <BalancoVisivelForm
+                    key={`${tenant.balancoFinanceiroVisivel}-${tenant.balancoDetalheNivel}`}
+                    visivel={tenant.balancoFinanceiroVisivel}
+                    detalheNivel={tenant.balancoDetalheNivel}
+                  />
+                ) : activeSection.id === 'hierarquia' ? (
+                  <HierarquiaVisivelForm
+                    key={String(tenant.hierarquiaVisivelParaFilhos)}
+                    visivel={tenant.hierarquiaVisivelParaFilhos}
+                  />
+                ) : activeSection.id === 'canal-oficial' && canalOficial ? (
+                  <CanalOficialForm
+                    nome={canalOficial.nome ?? tenant.nome}
+                    descricao={canalOficial.descricao}
+                    avatarUrl={canalOficial.avatarUrl}
+                    visibilidadeCanal={canalOficial.visibilidadeCanal}
+                    somenteAdminPublica={canalOficial.somenteAdminPublica}
+                    publica={canalOficial.publica}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </MotionReveal>
 
           <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]">
             <div className="flex items-start gap-4 border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-6 py-4">

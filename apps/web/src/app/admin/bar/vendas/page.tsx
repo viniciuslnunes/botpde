@@ -95,12 +95,15 @@ export default async function AdminBarVendasPage({
     id: v.id,
     criadoEmLabel: formatarData(v.criadoEm),
     operadorNome: v.operador.nome ?? '—',
+    metodoPagamento: v.metodoPagamento,
     metodoLabel: METODO_PAGAMENTO_BAR_LABEL[v.metodoPagamento] ?? v.metodoPagamento,
     status: v.status,
     statusLabel: STATUS_VENDA_BAR_LABEL[v.status] ?? v.status,
     totalLabel: formatarPreco(v.total),
     descontoLabel: v.desconto > 0 ? formatarPreco(v.desconto) : null,
     observacao: v.observacao,
+    podeEstornar:
+      v.metodoPagamento !== 'FIADO' || v.fiadoStatus === 'PAGA',
     itens: v.itens.map((item) => ({
       id: item.id,
       label: `${item.produtoNome} × ${item.quantidade}`,

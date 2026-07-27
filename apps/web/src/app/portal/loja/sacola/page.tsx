@@ -1,5 +1,4 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import Link from 'next/link'
@@ -11,13 +10,16 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Sacola' }
 
 export default async function SacolaPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!tenant) redirect('/')
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
   const rows = await db.saasCarrinhoItem.findMany({
     where: { userId: session.user.id },
-    include: { produto: { select: { id: true, nome: true, preco: true, imagensUrl: true, ativo: true } } },
+    include: {
+      produto: {
+        select: { id: true, nome: true, preco: true, imagensUrl: true, ativo: true, tenantId: true },
+      },
+    },
     orderBy: { criadoEm: 'desc' },
   })
 

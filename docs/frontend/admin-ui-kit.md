@@ -24,6 +24,27 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `TableShell` | Card + `<table>` (children = thead/tbody do módulo), slot de filtros, empty via `MotionEmptyState` | **Não** é DataTable declarativa — cada módulo mantém suas linhas |
 | `TablePagination` | ← Anterior / Próxima → (`page`, `totalPages`, `buildHref`) | Server-safe; use com `buildAdminHref` de `apps/web/src/lib/admin-href.ts` |
 | `InsightSection` | Seção de insights (título + grid) com `MotionRevealOnce` | Usada nos hubs e em `/admin/relatorios` |
+| `AdminTabs` | Barra de tabs (`tabs`, `basePath`, `activeId`, `paramKey?`, `extraParams?`) | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
+
+**Quando usar `AdminTabs` vs. filtro simples**: tabs são para **seções de
+conteúdo mutuamente exclusivas** (um form ou bloco por vez — ex.: settings,
+status de uma listagem). Filtros que se **combinam** com paginação/busca (ex.:
+tipo + unidade + ordenação numa tabela) continuam sendo `searchParams` simples
+em um `<form>`, sem essa UI.
+
+### Backlog de tabs (candidatos não migrados)
+
+Levantados na auditoria que originou o `AdminTabs` (2026-07-27) — próximos
+candidatos a ganhar tabs, priorizados por quantidade de seções empilhadas:
+
+- `admin/bar` — turno + PDV + vendas do dia + margem/CMV + insights 30d +
+  estoque baixo.
+- `admin/eventos` — filtro de tipo + toggle lista/semana/mês + insights +
+  histórico.
+- `admin/cobrancas` — insights + filtro de status + form de criar + tabela.
+- `admin/financeiro` — resumo + insights + filtros + form de lançamento +
+  lista.
+- `admin/loja` — insights + form de criar produto + grid ativos/inativos.
 
 ## Charts — `apps/web/src/components/admin/charts/`
 

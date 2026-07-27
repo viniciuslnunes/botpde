@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock, Lock, Unlock } from 'lucide-react'
+import { LIMIAR_DIVERGENCIA_ABS, LIMIAR_DIVERGENCIA_PCT } from '@torcida/types'
 import { toast } from '@torcida/ui'
 import { abrirTurnoBar, fecharTurnoBar } from '@/app/admin/bar/actions'
 
@@ -42,11 +43,25 @@ export function BarTurnoPainel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [fechando, setFechando] = useState(false)
-  const [dinheiroContado, setDinheiroContado] = useState(
-    resumo ? String(resumo.dinheiroEsperado) : '0',
-  )
+  // Deixa em branco de propósito: o operador deve digitar a contagem real do
+  // caixa, não aceitar um valor pré-preenchido igual ao esperado (mascararia
+  // divergência).
+  const [dinheiroContado, setDinheiroContado] = useState('')
   const [sangria, setSangria] = useState('0')
   const [observacao, setObservacao] = useState('')
+
+  const diferenca = useMemo(() => {
+    if (!resumo || dinheiroContado.trim() === '') return null
+    const contado = Number(dinheiroContado)
+    if (Number.isNaN(contado)) return null
+    const sangriaNum = Number(sangria) || 0
+    return Math.round((contado - resumo.dinheiroEsperado + sangriaNum) * 100) / 100
+  }, [resumo, dinheiroContado, sangria])
+
+  const divergenciaAlta =
+    resumo && diferenca != null
+      ? Math.abs(diferenca) > Math.max(LIMIAR_DIVERGENCIA_ABS, resumo.dinheiroEsperado * LIMIAR_DIVERGENCIA_PCT)
+      : false
 
   function abrir() {
     startTransition(async () => {
@@ -180,6 +195,8 @@ export function BarTurnoPainel({
                 step="0.01"
                 value={dinheiroContado}
                 onChange={(e) => setDinheiroContado(e.target.value)}
+                placeholder="Conte o caixa e digite aqui"
+                required
                 className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
               />
             </label>
@@ -206,10 +223,31 @@ export function BarTurnoPainel({
               className="mt-1 w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))]"
             />
           </label>
+
+          {diferenca != null && (
+            <p
+              className={[
+                'rounded-lg px-3 py-2 text-xs font-medium',
+                divergenciaAlta
+                  ? 'bg-[rgb(var(--color-danger)_/_0.1)] text-[rgb(var(--color-danger-fg))]'
+                  : diferenca !== 0
+                    ? 'bg-[rgb(var(--color-warning)_/_0.12)] text-[rgb(var(--color-warning-fg))]'
+                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+              ].join(' ')}
+            >
+              Diferença: {formatarPreco(diferenca)}
+              {divergenciaAlta
+                ? ' — divergência alta, será sinalizada para os gestores.'
+                : diferenca === 0
+                  ? ' — caixa bateu certinho.'
+                  : ' — dentro do esperado.'}
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || dinheiroContado.trim() === ''}
               onClick={fechar}
               className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >

@@ -6,7 +6,7 @@ import { LojaCarrossel } from '@/components/portal/loja-ui'
 import { LojaCategoriaChips, LojaPaginacao } from '@/components/portal/loja-catalogo-motion'
 import { LojaFiltros } from '@/components/portal/loja-filtros'
 import { toLojaProdutoCard } from '@/lib/loja-serialize'
-import { estoqueTotal, formatNomeTorcida, percentualDesconto, ordenarTamanhos } from '@torcida/types'
+import { estoqueTotal, percentualDesconto, ordenarTamanhos } from '@torcida/types'
 
 const PAGE_SIZE = 48
 
@@ -26,11 +26,10 @@ type SearchParams = {
 
 interface LojaCatalogoSectionProps {
   tenantId: string
-  tenantIds: string[]
   searchParams: SearchParams
 }
 
-function buildLojaPageUrl(sp: SearchParams, page: number): string {
+function buildLojaPageUrl(tenantId: string, sp: SearchParams, page: number): string {
   const params = new URLSearchParams()
   if (sp.q?.trim()) params.set('q', sp.q.trim())
   if (sp.categoria?.trim()) params.set('categoria', sp.categoria.trim())
@@ -40,22 +39,22 @@ function buildLojaPageUrl(sp: SearchParams, page: number): string {
   if (sp.precoMax?.trim()) params.set('precoMax', sp.precoMax.trim())
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
-  return qs ? `/portal/loja?${qs}` : '/portal/loja'
+  const base = `/portal/loja/${tenantId}`
+  return qs ? `${base}?${qs}` : base
 }
 
 export async function LojaCatalogoSection({
   tenantId,
-  tenantIds,
   searchParams: sp,
 }: LojaCatalogoSectionProps) {
   const where: Prisma.SaasProdutoWhereInput = {
-    tenantId: { in: tenantIds },
+    tenantId,
     ativo: true,
   }
 
   if (sp.q?.trim()) where.nome = { contains: sp.q.trim(), mode: 'insensitive' }
   if (sp.categoria?.trim()) {
-    where.categoria = { slug: sp.categoria.trim(), tenantId: { in: tenantIds } }
+    where.categoria = { slug: sp.categoria.trim(), tenantId }
   }
   if (sp.tamanho?.trim()) where.tamanhos = { has: sp.tamanho.trim().toUpperCase() }
   if (sp.precoMin || sp.precoMax) {
@@ -90,31 +89,28 @@ export async function LojaCatalogoSection({
         skip,
         take: PAGE_SIZE,
         include: {
-          tenant: { select: { nome: true } },
           categoria: { select: { nome: true, slug: true } },
         },
       }),
       db.saasProduto.count({ where }),
       db.saasCategoria.findMany({
-        where: { tenantId: { in: tenantIds } },
+        where: { tenantId },
         orderBy: { ordem: 'asc' },
         select: { slug: true, nome: true },
       }),
       db.saasProduto.findMany({
-        where: { tenantId: { in: tenantIds }, ativo: true, destaque: true },
+        where: { tenantId, ativo: true, destaque: true },
         take: 8,
         orderBy: { ordem: 'asc' },
       }),
-      tenantIds.length > 0
-        ? db.$queryRaw<{ tamanho: string }[]>`
+      db.$queryRaw<{ tamanho: string }[]>`
           SELECT DISTINCT unnest(tamanhos) AS tamanho
           FROM saas_produtos
-          WHERE tenant_id IN (${Prisma.join(tenantIds)})
+          WHERE tenant_id = ${tenantId}
             AND ativo = true
-        `
-        : Promise.resolve([]),
+        `,
       db.saasProduto.aggregate({
-        where: { tenantId: { in: tenantIds }, ativo: true },
+        where: { tenantId, ativo: true },
         _min: { preco: true },
         _max: { preco: true },
       }),
@@ -137,8 +133,7 @@ export async function LojaCatalogoSection({
     return {
       id: p.id,
       nome: p.nome,
-      href: `/portal/loja/${p.id}`,
-      tenantBadge: p.tenantId !== tenantId ? formatNomeTorcida(p.tenant.nome) : null,
+      href: `/portal/loja/${tenantId}/${p.id}`,
       precoLabel: formatarPreco(p.preco),
       precoOriginalLabel:
         p.precoOriginal && Number(p.precoOriginal) > Number(p.preco)
@@ -152,15 +147,15 @@ export async function LojaCatalogoSection({
 
   return (
     <>
-      <LojaCarrossel produtos={destaques.map((p: DestaqueLite) => toLojaProdutoCard(p))} />
+      <LojaCarrossel produtos={destaques.map((p: DestaqueLite) => toLojaProdutoCard(p, tenantId))} />
 
       <LojaCategoriaChips
         chips={[
-          { slug: 'todos', nome: 'Todos', href: '/portal/loja', active: !sp.categoria },
+          { slug: 'todos', nome: 'Todos', href: `/portal/loja/${tenantId}`, active: !sp.categoria },
           ...categorias.map((c: CategoriaLite) => ({
             slug: c.slug,
             nome: c.nome,
-            href: `/portal/loja?categoria=${c.slug}`,
+            href: `/portal/loja/${tenantId}?categoria=${c.slug}`,
             active: sp.categoria === c.slug,
           })),
         ]}
@@ -180,8 +175,8 @@ export async function LojaCatalogoSection({
           <LojaPaginacao
             page={page}
             totalPages={totalPages}
-            prevHref={page > 1 ? buildLojaPageUrl(sp, page - 1) : null}
-            nextHref={page < totalPages ? buildLojaPageUrl(sp, page + 1) : null}
+            prevHref={page > 1 ? buildLojaPageUrl(tenantId, sp, page - 1) : null}
+            nextHref={page < totalPages ? buildLojaPageUrl(tenantId, sp, page + 1) : null}
           />
         </div>
       </div>

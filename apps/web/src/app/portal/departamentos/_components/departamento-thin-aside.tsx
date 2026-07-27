@@ -172,7 +172,7 @@ export async function DepartamentoThinAside({
                   Destaque no catálogo
                 </p>
                 <Link
-                  href={`/portal/loja/${produtoDestaque.id}`}
+                  href={`/portal/loja/${tenantId}/${produtoDestaque.id}`}
                   className="mt-1 block text-sm font-medium text-[rgb(var(--foreground))] hover:underline"
                 >
                   {produtoDestaque.nome}

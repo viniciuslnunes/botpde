@@ -1,12 +1,11 @@
 import { db } from '@torcida/db'
-import { getTenantFromHost } from '@/lib/tenant'
-import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { ArrowLeft } from 'lucide-react'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { LojaPedidosList, type PedidoListItem } from '@/components/portal/loja-pedidos-list'
+import { formatNomeTorcida } from '@torcida/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Meus Pedidos' }
@@ -39,6 +38,7 @@ function serializarPedido(pedido: {
   total: unknown
   modalidadeEntrega: string
   criadoEm: Date
+  tenant: { nome: string }
   itens: {
     id: string
     produtoNome: string
@@ -66,19 +66,21 @@ function serializarPedido(pedido: {
       label: `${item.produtoNome}${item.tamanho ? ` · ${item.tamanho}` : ''} × ${item.quantidade}`,
     })),
     imagemUrl: firstProdutoImagemUrl(primeiraImagem as string[] | null | undefined),
+    lojaNome: formatNomeTorcida(pedido.tenant.nome),
   }
 }
 
 export default async function MeusPedidosPage() {
-  const [session, tenant] = await Promise.all([auth(), getTenantFromHost()])
-  if (!tenant) redirect('/')
+  const session = await auth()
   if (!session?.user?.id) redirect('/entrar')
 
-  const ancestrais = await getAncestorTenantIds(tenant.id)
   const pedidos = await db.saasPedido.findMany({
-    where: { tenantId: { in: [tenant.id, ...ancestrais] }, userId: session.user.id },
+    where: { userId: session.user.id },
     orderBy: { criadoEm: 'desc' },
-    include: { itens: { include: { produto: { select: { imagensUrl: true } } } } },
+    include: {
+      tenant: { select: { nome: true } },
+      itens: { include: { produto: { select: { imagensUrl: true } } } },
+    },
   })
 
   const ativos = pedidos

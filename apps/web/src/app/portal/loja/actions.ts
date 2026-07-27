@@ -3,8 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import type { Prisma } from '@torcida/db'
-import { getActiveTenant } from '@/lib/tenant'
-import { getVisibleTenantIds } from '@/lib/hierarquia'
+import { tenantsPermitidosLoja } from '@/lib/loja-lojas'
 import { notificarAdminsPorPermissao } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
@@ -30,25 +29,18 @@ export type ActionState = {
 async function assertAuth() {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Você precisa estar logado.')
-  const tenant = await getActiveTenant(session.user.id, session.user.email)
-  if (!tenant) throw new Error('Tenant não encontrado.')
-  return { session, tenant, userId: session.user.id }
+  return { session, userId: session.user.id }
 }
 
-async function assertProdutoVisivel(
-  produtoId: string,
-  tenantId: string,
-  visibleTenantIds?: Set<string>,
-) {
+async function assertProdutoVisivel(produtoId: string, userId: string) {
   const produto = await db.saasProduto.findFirst({
     where: { id: produtoId, ativo: true },
     select: { tenantId: true },
   })
   if (!produto) throw new Error('Produto não encontrado ou inativo.')
-  if (produto.tenantId === tenantId) return produto.tenantId
 
-  const visible = visibleTenantIds ?? new Set(await getVisibleTenantIds(tenantId, 'loja'))
-  if (!visible.has(produto.tenantId)) {
+  const permitidos = await tenantsPermitidosLoja(userId)
+  if (!permitidos.has(produto.tenantId)) {
     throw new Error('Produto não encontrado ou inativo.')
   }
   return produto.tenantId
@@ -59,14 +51,14 @@ export async function adicionarAoCarrinho(
   formData: FormData,
 ): Promise<ActionState> {
   try {
-    const { userId, tenant } = await assertAuth()
+    const { userId } = await assertAuth()
     const parsed = CarrinhoItemSchema.safeParse(Object.fromEntries(formData))
     if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
 
     const { produtoId, quantidade } = parsed.data
     const tamanhoChave = chaveTamanho(parsed.data.tamanho)
 
-    const produtoTenantId = await assertProdutoVisivel(produtoId, tenant.id)
+    const produtoTenantId = await assertProdutoVisivel(produtoId, userId)
 
     const produto = await db.saasProduto.findFirst({
       where: { id: produtoId, ativo: true },
@@ -178,7 +170,7 @@ export async function finalizarPedido(
   formData: FormData,
 ): Promise<ActionState> {
   try {
-    const { userId, tenant } = await assertAuth()
+    const { userId } = await assertAuth()
 
     const raw: Record<string, FormDataEntryValue> = Object.fromEntries(formData)
     if (typeof raw.enderecoEntrega === 'string') {
@@ -211,12 +203,12 @@ export async function finalizarPedido(
 
     if (itensCarrinho.length === 0) return { error: 'Sua sacola está vazia.' }
 
-    const visibleLojaIds = new Set(await getVisibleTenantIds(tenant.id, 'loja'))
+    const permitidos = await tenantsPermitidosLoja(userId)
 
     for (const item of itensCarrinho) {
       if (!item.produto.ativo)
         return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
-      if (item.produto.tenantId !== tenant.id && !visibleLojaIds.has(item.produto.tenantId)) {
+      if (!permitidos.has(item.produto.tenantId)) {
         return { error: `Produto "${item.produto.nome}" não está mais disponível.` }
       }
     }

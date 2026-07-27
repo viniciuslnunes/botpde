@@ -1,7 +1,6 @@
 import { db } from '@torcida/db'
-import { MotionReveal } from '@/components/motion/motion-reveal'
-import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { AfiliacaoPedidoCard, type SolicitacaoView } from './afiliacao-pedido-card'
+import { AfiliacaoPedidosClient } from './afiliacao-pedidos-client'
+import type { SolicitacaoView } from './afiliacao-pedido-card'
 
 interface SolicitacaoRow {
   id: string
@@ -11,19 +10,30 @@ interface SolicitacaoRow {
   cidade: string
   estado: string
   endereco: string | null
-  contatoNome: string
+  regiao: string | null
+  cep: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
+  contatoNome: string | null
   contatoEmail: string | null
   contatoTelefone: string | null
   vinculo: string | null
+  observacao: string | null
   provasUrls: string[]
   motivo: string | null
   criadoEm: Date
+  solicitadoPor: {
+    nome: string | null
+    email: string | null
+    avatarUrl: string | null
+  } | null
 }
 
 /**
  * Fila de solicitações de afiliação (proposta §9). Gate na página
  * (AFFILIATION_MANAGE). Decidir (aprovar/recusar/editar) só owner/super-admin
- * (`podeDecidir`). Mostra pendentes + as recém-aprovadas.
+ * (`podeDecidir`). Inclui pendentes, aprovadas e recusadas para revisão.
  */
 export async function AfiliacaoPedidos({
   tenantId,
@@ -35,8 +45,12 @@ export async function AfiliacaoPedidos({
   let rows: SolicitacaoRow[]
   try {
     rows = await db.solicitacaoUnidade.findMany({
-      where: { tenantId, status: { in: ['PENDENTE', 'APROVADA'] } },
+      where: {
+        tenantId,
+        status: { in: ['PENDENTE', 'APROVADA', 'RECUSADA'] },
+      },
       orderBy: [{ status: 'asc' }, { criadoEm: 'desc' }],
+      take: 100,
       select: {
         id: true,
         status: true,
@@ -45,13 +59,22 @@ export async function AfiliacaoPedidos({
         cidade: true,
         estado: true,
         endereco: true,
+        regiao: true,
+        cep: true,
+        lat: true,
+        lng: true,
+        fotoUrl: true,
         contatoNome: true,
         contatoEmail: true,
         contatoTelefone: true,
         vinculo: true,
+        observacao: true,
         provasUrls: true,
         motivo: true,
         criadoEm: true,
+        solicitadoPor: {
+          select: { nome: true, email: true, avatarUrl: true },
+        },
       },
     })
   } catch {
@@ -72,33 +95,27 @@ export async function AfiliacaoPedidos({
       cidade: r.cidade,
       estado: r.estado,
       endereco: r.endereco,
+      regiao: r.regiao,
+      cep: r.cep,
+      lat: r.lat,
+      lng: r.lng,
+      fotoUrl: r.fotoUrl,
       contatoNome: r.contatoNome,
       contatoEmail: r.contatoEmail,
       contatoTelefone: r.contatoTelefone,
       vinculo: r.vinculo,
+      observacao: r.observacao,
       provasUrls: r.provasUrls,
       motivo: r.motivo,
       criadoEm: r.criadoEm.toISOString(),
+      solicitadoPor: r.solicitadoPor
+        ? {
+            nome: r.solicitadoPor.nome,
+            email: r.solicitadoPor.email,
+            image: r.solicitadoPor.avatarUrl,
+          }
+        : null,
     }))
 
-  if (pedidos.length === 0) {
-    return (
-      <MotionReveal>
-        <MotionEmptyState
-          title="Nenhuma solicitação no momento"
-          description="Subsedes e PDEs que pedem cadastro pelo onboarding aparecem aqui para a decisão do Presidente."
-        />
-      </MotionReveal>
-    )
-  }
-
-  return (
-    <MotionReveal>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {pedidos.map((pedido) => (
-          <AfiliacaoPedidoCard key={pedido.id} pedido={pedido} podeDecidir={podeDecidir} />
-        ))}
-      </div>
-    </MotionReveal>
-  )
+  return <AfiliacaoPedidosClient pedidos={pedidos} podeDecidir={podeDecidir} />
 }

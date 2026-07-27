@@ -67,6 +67,7 @@ export type BarVendaSerializada = {
   pixCopiaCola: string | null
   gatewayProvider: string | null
   operador: { id: string; nome: string | null }
+  fiadoStatus: string | null
   itens: BarVendaItemSerializado[]
 }
 
@@ -83,6 +84,7 @@ export function serializeVendaBar(v: {
   pixCopiaCola?: string | null
   gatewayProvider?: string | null
   operador: { id: string; nome: string | null }
+  fiado?: { status: string } | null
   itens: Array<{
     id: string
     produtoId: string | null
@@ -105,6 +107,7 @@ export function serializeVendaBar(v: {
     pixCopiaCola: v.pixCopiaCola ?? null,
     gatewayProvider: v.gatewayProvider ?? null,
     operador: v.operador,
+    fiadoStatus: v.fiado?.status ?? null,
     itens: v.itens.map((item) => ({
       id: item.id,
       produtoId: item.produtoId,

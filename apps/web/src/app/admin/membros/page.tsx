@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
-import { Users, UserCheck, UserX, Clock } from 'lucide-react'
+import { Users, UserCheck, UserX, Clock, type LucideIcon } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { tenantsAreRivais } from '@/lib/hierarquia'
@@ -14,13 +14,20 @@ import {
   type FunilMensalPonto,
 } from '@/lib/membros-insights'
 import {
+  AdminTabs,
   InsightSection,
   StatCard,
-  statusBadgeLabel,
   TablePagination,
 } from '@/components/admin/ui'
 import { DonutChart, MiniBarChart } from '@/components/admin/charts'
-import { AdminMembrosTable, AdminMembrosTabs } from './admin-membros-client'
+import {
+  nextSortDir,
+  parseDirParam,
+  parseSortParam,
+  type SortDir,
+} from '@/lib/admin-list-sort'
+import { mapToAdminMembroItem } from '@/lib/admin-membro-map'
+import { AdminMembrosTable } from './admin-membros-client'
 import { ExportarLgeButton } from './exportar-lge-button'
 import type { Metadata } from 'next'
 
@@ -28,9 +35,26 @@ export const metadata: Metadata = { title: 'Membros — Admin' }
 
 type StatusFilter = 'PENDENTE' | 'APROVADO' | 'REPROVADO' | 'TODOS'
 
-const TIPO_BADGE: Record<string, string> = {
-  SOCIO: 'Sócio',
-  TORCEDOR: 'Torcedor',
+const MEMBROS_SORT_COLS = [
+  'nome',
+  'tipo',
+  'departamento',
+  'sede',
+  'cidade',
+  'status',
+  'criadoEm',
+] as const
+
+type MembroSortCol = (typeof MEMBROS_SORT_COLS)[number]
+
+const MEMBRO_SORT_DEFAULT_DIR: Partial<Record<MembroSortCol, SortDir>> = {
+  criadoEm: 'desc',
+  nome: 'asc',
+  tipo: 'asc',
+  departamento: 'asc',
+  sede: 'asc',
+  cidade: 'asc',
+  status: 'asc',
 }
 
 async function MembrosInsights({ tenantId }: { tenantId: string }) {
@@ -105,7 +129,15 @@ async function MembrosInsights({ tenantId }: { tenantId: string }) {
 export default async function MembrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; pagina?: string; sede?: string }>
+  searchParams: Promise<{
+    status?: string
+    q?: string
+    pagina?: string
+    sede?: string
+    tipo?: string
+    sort?: string
+    dir?: string
+  }>
 }) {
   // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
   // esconder o link no menu não basta, a URL direta precisa ser bloqueada.
@@ -120,12 +152,20 @@ export default async function MembrosPage({
   const statusFiltro = (params.status as StatusFilter) ?? 'TODOS'
   const busca = params.q ?? ''
   const sedeFiltro = params.sede ?? ''
+  const tipoFiltro =
+    params.tipo === 'SOCIO' || params.tipo === 'TORCEDOR' ? params.tipo : ''
+  const sort = parseSortParam(params.sort, MEMBROS_SORT_COLS, 'criadoEm') as MembroSortCol
+  const dir = parseDirParam(
+    params.dir,
+    MEMBRO_SORT_DEFAULT_DIR[sort] ?? 'desc',
+  )
   const pagina = Math.max(1, parseInt(params.pagina ?? '1', 10))
   const porPagina = 20
 
   const where = {
     tenantId: tenant.id,
     ...(statusFiltro !== 'TODOS' ? { status: statusFiltro } : {}),
+    ...(tipoFiltro ? { tipo: tipoFiltro } : {}),
     ...(sedeFiltro === 'nenhuma'
       ? { sedeId: null }
       : sedeFiltro
@@ -138,10 +178,18 @@ export default async function MembrosPage({
             { cidade: { contains: busca, mode: 'insensitive' as const } },
             { telefone: { contains: busca } },
             { discordTag: { contains: busca, mode: 'insensitive' as const } },
+            { numeroAssociado: { contains: busca } },
           ],
         }
       : {}),
   }
+
+  const orderBy =
+    sort === 'departamento'
+      ? { departamento: { nome: dir } }
+      : sort === 'sede'
+        ? { sede: { nome: dir } }
+        : { [sort]: dir }
 
   const [membros, total, contagens, sedes] = await Promise.all([
     db.saasMembro.findMany({
@@ -151,7 +199,7 @@ export default async function MembrosPage({
         departamento: { select: { id: true, nome: true } },
         sede: { select: { id: true, nome: true, tipo: true } },
       },
-      orderBy: { criadoEm: 'desc' },
+      orderBy,
       skip: (pagina - 1) * porPagina,
       take: porPagina,
     }),
@@ -294,7 +342,7 @@ export default async function MembrosPage({
   const count: Record<string, number> = { PENDENTE: 0, APROVADO: 0, REPROVADO: 0 }
   for (const c of contagens) count[c.status] = c._count
 
-  const tabs: { status: StatusFilter; label: string; icon: React.ElementType; count?: number }[] = [
+  const tabs: { status: StatusFilter; label: string; icon: LucideIcon; count?: number }[] = [
     { status: 'TODOS', label: 'Todos', icon: Users, count: Object.values(count).reduce((a, b) => a + b, 0) },
     { status: 'PENDENTE', label: 'Pendentes', icon: Clock, count: count.PENDENTE },
     { status: 'APROVADO', label: 'Aprovados', icon: UserCheck, count: count.APROVADO },
@@ -303,18 +351,41 @@ export default async function MembrosPage({
 
   function buildHref(overrides: Record<string, string | undefined>) {
     const p = new URLSearchParams()
-    const merged = {
+    const merged: Record<string, string | undefined> = {
       status: statusFiltro,
-      q: busca,
-      sede: sedeFiltro,
+      q: busca || undefined,
+      sede: sedeFiltro || undefined,
+      tipo: tipoFiltro || undefined,
+      sort,
+      dir,
       pagina: String(pagina),
       ...overrides,
     }
-    for (const [k, v] of Object.entries(merged)) {
-      if (v && v !== 'TODOS' && v !== '' && v !== '1') p.set(k, v)
+    if (merged.status && merged.status !== 'TODOS') p.set('status', merged.status)
+    if (merged.q) p.set('q', merged.q)
+    if (merged.sede) p.set('sede', merged.sede)
+    if (merged.tipo) p.set('tipo', merged.tipo)
+    const sortVal = merged.sort || 'criadoEm'
+    const dirVal = merged.dir || 'desc'
+    if (!(sortVal === 'criadoEm' && dirVal === 'desc')) {
+      p.set('sort', sortVal)
+      p.set('dir', dirVal)
     }
-    return `/admin/membros${p.toString() ? '?' + p.toString() : ''}`
+    if (merged.pagina && merged.pagina !== '1') p.set('pagina', merged.pagina)
+    const qs = p.toString()
+    return `/admin/membros${qs ? `?${qs}` : ''}`
   }
+
+  function sortHref(column: string) {
+    const col = column as MembroSortCol
+    const defaultDir = MEMBRO_SORT_DEFAULT_DIR[col] ?? 'asc'
+    const nextDir = nextSortDir(col, sort, dir, defaultDir)
+    return buildHref({ sort: col, dir: nextDir, pagina: '1' })
+  }
+
+  const sortHrefs: Record<string, string> = Object.fromEntries(
+    MEMBROS_SORT_COLS.map((col) => [col, sortHref(col)]),
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -333,32 +404,54 @@ export default async function MembrosPage({
             </div>
           </div>
 
-        <AdminMembrosTabs
+        <AdminTabs
           tabs={tabs.map((tab) => ({
-            status: tab.status,
+            id: tab.status,
             label: tab.label,
-            href: buildHref({ status: tab.status, pagina: '1' }),
-            active: statusFiltro === tab.status,
+            icon: tab.icon,
             count: tab.count,
             countClass:
-              tab.status === 'PENDENTE' && statusFiltro !== tab.status
+              tab.status === 'PENDENTE'
                 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                 : undefined,
           }))}
+          basePath="/admin/membros"
+          activeId={statusFiltro}
+          paramKey="status"
+          extraParams={{
+            q: busca || undefined,
+            sede: sedeFiltro || undefined,
+            tipo: tipoFiltro || undefined,
+            sort: sort !== 'criadoEm' ? sort : undefined,
+            dir: sort !== 'criadoEm' || dir !== 'desc' ? dir : undefined,
+          }}
         />
 
-        {/* Busca + filtro unidade */}
-        <form method="GET" action="/admin/membros" className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        {/* Busca + filtros */}
+        <form method="GET" action="/admin/membros" className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {statusFiltro !== 'TODOS' && (
             <input type="hidden" name="status" value={statusFiltro} />
+          )}
+          {sort !== 'criadoEm' && <input type="hidden" name="sort" value={sort} />}
+          {(sort !== 'criadoEm' || dir !== 'desc') && (
+            <input type="hidden" name="dir" value={dir} />
           )}
           <input
             type="search"
             name="q"
             defaultValue={busca}
-            placeholder="Buscar por nome, cidade, telefone ou Discord..."
-            className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+            placeholder="Buscar por nome, nº, cidade, telefone ou Discord…"
+            className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)] sm:min-w-[14rem]"
           />
+          <select
+            name="tipo"
+            defaultValue={tipoFiltro}
+            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-40"
+          >
+            <option value="">Todos os tipos</option>
+            <option value="SOCIO">Sócios</option>
+            <option value="TORCEDOR">Torcedores</option>
+          </select>
           <select
             name="sede"
             defaultValue={sedeFiltro}
@@ -386,53 +479,80 @@ export default async function MembrosPage({
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
         <AdminMembrosTable
-          membros={membros.map((membro: (typeof membros)[number]) => {
-            const isSocio = membro.tipo === 'SOCIO'
-            const fmtData = (d: Date | null | undefined) =>
-              d ? new Date(d).toLocaleDateString('pt-BR') : null
-            return {
-              id: membro.id,
-              nome: membro.nome,
-              discordTag: membro.discordTag,
-              discordId: membro.discordId,
-              email: membro.user.email,
-              tipo: TIPO_BADGE[membro.tipo] ?? membro.tipo,
-              cidade: membro.cidade,
-              status: membro.status as 'PENDENTE' | 'APROVADO' | 'REPROVADO',
-              statusLabel: statusBadgeLabel('membro', membro.status),
-              criadoEmLabel: new Date(membro.criadoEm).toLocaleDateString('pt-BR'),
-              atualizadoEmLabel: fmtData(membro.atualizadoEm),
-              avatarUrl: membro.user.avatarUrl,
-              inicial: membro.nome.charAt(0).toUpperCase(),
-              telefone: membro.telefone,
-              idade: membro.idade,
-              departamentoNome: membro.departamento?.nome ?? null,
-              sedeNome: membro.sede?.nome ?? null,
-              // Prova de vínculo só existe/importa para sócio (dado RESTRITO).
-              imagemProva: isSocio ? membro.imagemProva : null,
-              numeroAssociado: isSocio ? membro.numeroAssociado : null,
-              anosSocio: isSocio ? membro.anosSocio : null,
-              cep: isSocio ? membro.cep : null,
-              numero: isSocio ? membro.numero : null,
-              bloco: isSocio ? membro.bloco : null,
-              complemento: isSocio ? membro.complemento : null,
-              adimplente: membro.adimplente,
-              aprovadoPorNome: membro.aprovadoPorNome,
-              aprovadoEmLabel: fmtData(membro.aprovadoEm),
-              desligadoEmLabel: fmtData(membro.desligadoEm),
-              desligadoMotivo: membro.desligadoMotivo,
-              alertaRivalSocio: isSocio && userIdsComRivalSocio.has(membro.userId),
-              reprovacoesOutraTorcida: isSocio
-                ? reprovacoesOutraTorcidaPorUser.get(membro.userId)
-                : undefined,
-              tentativas: tentativasPorMembro.get(membro.id) ?? 1,
-              ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
-              espelhado: membro.espelhado,
-              aprovadoNaUnidadeNome: membro.aprovadoNaUnidadeTenantId
-                ? (nomeUnidadePorId.get(membro.aprovadoNaUnidadeTenantId) ?? null)
-                : null,
-            }
-          })}
+          sort={sort}
+          dir={dir}
+          sortHrefs={sortHrefs}
+          membros={membros.map((membro: (typeof membros)[number]) =>
+            mapToAdminMembroItem(
+              {
+                id: membro.id,
+                userId: membro.userId,
+                nome: membro.nome,
+                tipo: membro.tipo,
+                status: membro.status,
+                cidade: membro.cidade,
+                telefone: membro.telefone,
+                idade: membro.idade,
+                discordTag: membro.discordTag,
+                discordId: membro.discordId,
+                numeroAssociado: membro.numeroAssociado,
+                anosSocio: membro.anosSocio,
+                imagemProva: membro.imagemProva,
+                cep: membro.cep,
+                numero: membro.numero,
+                bloco: membro.bloco,
+                complemento: membro.complemento,
+                dataNascimento: membro.dataNascimento,
+                sexo: membro.sexo,
+                estadoCivil: membro.estadoCivil,
+                nacionalidade: membro.nacionalidade,
+                rg: membro.rg,
+                cpf: membro.cpf,
+                filiacao: membro.filiacao,
+                escolaridade: membro.escolaridade,
+                profissao: membro.profissao,
+                logradouro: membro.logradouro,
+                bairro: membro.bairro,
+                uf: membro.uf,
+                fotoDocumentoUrl: membro.fotoDocumentoUrl,
+                comprovanteResidenciaUrl: membro.comprovanteResidenciaUrl,
+                responsavelNome: membro.responsavelNome,
+                responsavelDocumento: membro.responsavelDocumento,
+                autorizacaoMenorAceitaEm: membro.autorizacaoMenorAceitaEm,
+                termoResponsabilidadeAceitoEm: membro.termoResponsabilidadeAceitoEm,
+                adimplente: membro.adimplente,
+                aprovadoPorNome: membro.aprovadoPorNome,
+                aprovadoEm: membro.aprovadoEm,
+                desligadoEm: membro.desligadoEm,
+                desligadoMotivo: membro.desligadoMotivo,
+                criadoEm: membro.criadoEm,
+                atualizadoEm: membro.atualizadoEm,
+                espelhado: membro.espelhado,
+                aprovadoNaUnidadeTenantId: membro.aprovadoNaUnidadeTenantId,
+                user: {
+                  email: membro.user.email,
+                  avatarUrl: membro.user.avatarUrl,
+                },
+                departamento: membro.departamento
+                  ? { nome: membro.departamento.nome }
+                  : null,
+                sede: membro.sede ? { nome: membro.sede.nome } : null,
+              },
+              {
+                aprovadoNaUnidadeNome: membro.aprovadoNaUnidadeTenantId
+                  ? (nomeUnidadePorId.get(membro.aprovadoNaUnidadeTenantId) ?? null)
+                  : null,
+                alertaRivalSocio:
+                  membro.tipo === 'SOCIO' && userIdsComRivalSocio.has(membro.userId),
+                reprovacoesOutraTorcida:
+                  membro.tipo === 'SOCIO'
+                    ? reprovacoesOutraTorcidaPorUser.get(membro.userId)
+                    : undefined,
+                tentativas: tentativasPorMembro.get(membro.id) ?? 1,
+                ultimoMotivoReprovacao: motivoReprovacaoPorMembro.get(membro.id),
+              },
+            ),
+          )}
         />
 
         <TablePagination

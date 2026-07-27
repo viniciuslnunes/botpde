@@ -3,14 +3,18 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db, Prisma } from '@torcida/db'
-import type { MetodoPagamentoBar, StatusVendaBar } from '@torcida/db'
+import type { MetodoPagamentoBar, StatusFiadoBar, StatusVendaBar } from '@torcida/db'
 import {
+  CancelarFiadoBarSchema,
   CategoriaBarSchema,
   CompraBarSchema,
+  CriarFornecedorBarSchema,
+  EditarFornecedorBarSchema,
   EstornarVendaBarSchema,
   FecharTurnoBarSchema,
   PERMISSIONS,
   ProdutoBarSchema,
+  QuitarFiadoBarSchema,
   VendaBarSchema,
   recalcularCustoMedio,
   resumirVenda,
@@ -18,10 +22,14 @@ import {
   slugify,
 } from '@torcida/types'
 import { assertAnyPermission, assertPermission } from '@/lib/authz'
-import { notificarSafe } from '@/lib/notificacoes'
+import { notificarSafe, notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
   confirmarVendaBarPaga,
   getTurnoAbertoBar,
+  JANELA_ESTORNOS_ANOMALO_DIAS,
+  LIMIAR_DIVERGENCIA_ABS,
+  LIMIAR_DIVERGENCIA_PCT,
+  LIMIAR_ESTORNOS_ANOMALO,
   resolveUnidadeBar,
   resumirTurnoBar,
 } from '@/lib/bar'
@@ -54,6 +62,9 @@ function revalidateBar() {
   revalidatePath('/admin/bar/produtos')
   revalidatePath('/admin/bar/estoque')
   revalidatePath('/admin/bar/vendas')
+  revalidatePath('/admin/bar/fornecedores')
+  revalidatePath('/admin/bar/fiado')
+  revalidatePath('/admin/bar/estornos')
   revalidatePath('/portal/bar')
 }
 
@@ -352,6 +363,122 @@ export async function excluirCategoriaBar(id: string): Promise<BarActionState> {
   }
 }
 
+// ── Fornecedores de insumo (BAR_MANAGE) ──────────────────────────────────────
+
+export async function criarFornecedorBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const parsed = CriarFornecedorBarSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+
+    const d = parsed.data
+    const created: { id: string } = await db.barFornecedor.create({
+      data: {
+        tenantId: tenant.id,
+        nome: d.nome,
+        contato: d.contato ?? null,
+        documento: d.documento ?? null,
+        observacao: d.observacao ?? null,
+      },
+      select: { id: true },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_FORNECEDOR_CRIADO',
+        entidade: 'BarFornecedor',
+        entidadeId: created.id,
+        detalhes: { nome: d.nome, contato: d.contato ?? null },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao criar fornecedor' }
+  }
+}
+
+export async function editarFornecedorBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const parsed = EditarFornecedorBarSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+
+    const d = parsed.data
+    const existente: { id: string } | null = await db.barFornecedor.findFirst({
+      where: { id: d.id, tenantId: tenant.id },
+      select: { id: true },
+    })
+    if (!existente) return { error: 'Fornecedor não encontrado' }
+
+    await db.barFornecedor.update({
+      where: { id: existente.id },
+      data: {
+        nome: d.nome,
+        contato: d.contato ?? null,
+        documento: d.documento ?? null,
+        observacao: d.observacao ?? null,
+        ...(d.ativo !== undefined ? { ativo: d.ativo } : {}),
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_FORNECEDOR_EDITADO',
+        entidade: 'BarFornecedor',
+        entidadeId: existente.id,
+        detalhes: { nome: d.nome, contato: d.contato ?? null },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao editar fornecedor' }
+  }
+}
+
+export async function alternarAtivoFornecedorBar(id: string): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const existente: { id: string; ativo: boolean } | null = await db.barFornecedor.findFirst({
+      where: { id, tenantId: tenant.id },
+      select: { id: true, ativo: true },
+    })
+    if (!existente) return { error: 'Fornecedor não encontrado' }
+
+    const ativo = !existente.ativo
+    await db.barFornecedor.update({ where: { id: existente.id }, data: { ativo } })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_FORNECEDOR_ATIVO_ALTERADO',
+        entidade: 'BarFornecedor',
+        entidadeId: existente.id,
+        detalhes: { ativo },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao alterar fornecedor' }
+  }
+}
+
 // ── Compra / reposição de insumo (BAR_MANAGE) ────────────────────────────────
 
 export async function registrarCompraBar(
@@ -364,7 +491,7 @@ export async function registrarCompraBar(
     const parsed = CompraBarSchema.safeParse(Object.fromEntries(formData))
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
 
-    const { produtoId, quantidade, custoTotal, motivo } = parsed.data
+    const { produtoId, quantidade, custoTotal, motivo, fornecedorId } = parsed.data
 
     const compraId: string = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       const produto: {
@@ -377,6 +504,14 @@ export async function registrarCompraBar(
         select: { id: true, nome: true, estoque: true, custoMedio: true },
       })
       if (!produto) throw new Error('Produto não encontrado')
+
+      if (fornecedorId) {
+        const fornecedor: { id: string } | null = await tx.barFornecedor.findFirst({
+          where: { id: fornecedorId, tenantId: tenant.id },
+          select: { id: true },
+        })
+        if (!fornecedor) throw new Error('Fornecedor inválido')
+      }
 
       const novoCusto = recalcularCustoMedio({
         estoqueAtual: produto.estoque,
@@ -413,6 +548,7 @@ export async function registrarCompraBar(
           quantidade,
           custoTotal,
           motivo: motivo ?? null,
+          fornecedorId: fornecedorId ?? null,
           financeiroLancamentoId: lancamento.id,
           operadorId: session.user.id,
         },
@@ -428,7 +564,7 @@ export async function registrarCompraBar(
         acao: 'BAR_COMPRA_REGISTRADA',
         entidade: 'BarMovimentacaoEstoque',
         entidadeId: compraId,
-        detalhes: { produtoId, quantidade, custoTotal, motivo: motivo ?? null },
+        detalhes: { produtoId, quantidade, custoTotal, motivo: motivo ?? null, fornecedorId: fornecedorId ?? null },
       },
     })
 
@@ -466,7 +602,22 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0]?.message ?? 'Dados inválidos' }
     }
-    const { itens, metodoPagamento, desconto, observacao } = parsed.data
+    const { itens, metodoPagamento, desconto, observacao, membroId, vencimento } = parsed.data
+
+    // Conceder fiado é decisão de gestor — exige BAR_MANAGE mesmo quando o
+    // operador de caixa (BAR_OPERATE) tem acesso normal ao PDV.
+    const isFiado = metodoPagamento === 'FIADO'
+    if (isFiado) {
+      await assertPermission(PERMISSIONS.BAR_MANAGE)
+    }
+    let vencimentoFiado: Date | null = null
+    if (isFiado) {
+      const data = new Date(vencimento!)
+      if (Number.isNaN(data.getTime())) {
+        return { success: false, error: 'Vencimento do fiado inválido' }
+      }
+      vencimentoFiado = data
+    }
 
     const turno = await getTurnoAbertoBar(tenant.id, unidade.id)
     if (!turno) {
@@ -488,9 +639,19 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
       total: number
       status: StatusVendaBar
       qtdItens: number
+      fiadoId: string | null
     }
 
     const criada: VendaCriada = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      let membroDevedor: { id: string; userId: string } | null = null
+      if (isFiado) {
+        membroDevedor = await tx.saasMembro.findFirst({
+          where: { id: membroId!, tenantId: tenant.id, sedeId: unidade.id, status: 'APROVADO' },
+          select: { id: true, userId: true },
+        })
+        if (!membroDevedor) throw new Error('Membro devedor inválido para esta unidade')
+      }
+
       type ProdutoRow = {
         id: string
         nome: string
@@ -543,8 +704,10 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
       const descricaoVenda =
         resumoItens.length > 0 ? `Venda do bar — ${resumoItens}`.slice(0, 240) : 'Venda do bar'
 
+      // Fiado: baixa estoque e fecha a venda como PAGA (concluída para fins de
+      // estoque/relatório), mas a receita só entra no livro-caixa na quitação.
       let financeiroLancamentoId: string | null = null
-      if (pago) {
+      if (pago && !isFiado) {
         const lanc: { id: string } = await tx.financeiroLancamento.create({
           data: {
             tenantId: tenant.id,
@@ -599,11 +762,31 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
         })
       }
 
+      let fiadoId: string | null = null
+      if (isFiado && membroDevedor) {
+        const fiado: { id: string } = await tx.barFiado.create({
+          data: {
+            tenantId: tenant.id,
+            sedeId: unidade.id,
+            vendaId: venda.id,
+            userId: membroDevedor.userId,
+            membroId: membroDevedor.id,
+            valor: resumo.total,
+            vencimento: vencimentoFiado!,
+            status: 'PENDENTE',
+            criadoPorId: session.user.id,
+          },
+          select: { id: true },
+        })
+        fiadoId = fiado.id
+      }
+
       return {
         vendaId: venda.id,
         total: resumo.total,
         status: (pago ? 'PAGA' : 'PENDENTE') as StatusVendaBar,
         qtdItens: linhas.length,
+        fiadoId,
       }
     })
 
@@ -663,8 +846,21 @@ export async function registrarVendaBar(input: unknown): Promise<RegistrarVendaB
       },
     })
 
+    if (criada.fiadoId) {
+      await db.auditLog.create({
+        data: {
+          tenantId: tenant.id,
+          atorId: session.user.id,
+          acao: 'BAR_FIADO_REGISTRADO',
+          entidade: 'BarFiado',
+          entidadeId: criada.fiadoId,
+          detalhes: { vendaId: criada.vendaId, membroId, valor: criada.total, vencimento },
+        },
+      })
+    }
+
     revalidateBar()
-    if (criada.status === 'PAGA') revalidateFinanceiro()
+    if (criada.status === 'PAGA' && !isFiado) revalidateFinanceiro()
 
     if (pix) return { success: true, vendaId: criada.vendaId, pago: false, pix }
     return { success: true, vendaId: criada.vendaId, pago: true }
@@ -838,6 +1034,165 @@ export async function cancelarVendaBar(vendaId: string): Promise<BarActionState>
   }
 }
 
+// ── Fiado: quitação e cancelamento (BAR_MANAGE) ──────────────────────────────
+
+export async function quitarFiadoBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+    const parsed = QuitarFiadoBarSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+
+    type FiadoRow = {
+      id: string
+      vendaId: string
+      valor: Prisma.Decimal
+      status: StatusFiadoBar
+      venda: { id: string; itens: Array<{ produtoNome: string; quantidade: number }> }
+    }
+    const fiado: FiadoRow | null = await db.barFiado.findFirst({
+      where: { id: parsed.data.fiadoId, tenantId: tenant.id, sedeId: unidade.id },
+      select: {
+        id: true,
+        vendaId: true,
+        valor: true,
+        status: true,
+        venda: { select: { id: true, itens: { select: { produtoNome: true, quantidade: true } } } },
+      },
+    })
+    if (!fiado) return { error: 'Fiado não encontrado' }
+    if (fiado.status !== 'PENDENTE' && fiado.status !== 'VENCIDA') {
+      return { error: 'Este fiado já foi quitado ou cancelado' }
+    }
+
+    const resumoItens = fiado.venda.itens.map((i) => `${i.produtoNome} ×${i.quantidade}`).join(', ')
+    const descricaoVenda =
+      resumoItens.length > 0 ? `Venda do bar — ${resumoItens}`.slice(0, 240) : 'Venda do bar'
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const lanc: { id: string } = await tx.financeiroLancamento.create({
+        data: {
+          tenantId: tenant.id,
+          tipo: 'RECEITA',
+          categoria: 'BAR',
+          valor: fiado.valor,
+          descricao: descricaoVenda,
+          data: new Date(),
+          observacao: `Quitação de fiado — venda ${fiado.vendaId}`,
+          criadoPorId: session.user.id!,
+        },
+        select: { id: true },
+      })
+
+      await tx.barFiado.update({
+        where: { id: fiado.id },
+        data: {
+          status: 'PAGA',
+          pagoEm: new Date(),
+          metodoPagamentoQuitacao: parsed.data.metodoPagamento as MetodoPagamentoBar,
+          financeiroLancamentoId: lanc.id,
+        },
+      })
+      await tx.barVenda.update({
+        where: { id: fiado.vendaId },
+        data: { financeiroLancamentoId: lanc.id },
+      })
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_FIADO_QUITADO',
+        entidade: 'BarFiado',
+        entidadeId: fiado.id,
+        detalhes: {
+          vendaId: fiado.vendaId,
+          valor: Number(fiado.valor),
+          metodoPagamento: parsed.data.metodoPagamento,
+        },
+      },
+    })
+
+    revalidateBar()
+    revalidateFinanceiro()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao quitar fiado' }
+  }
+}
+
+export async function cancelarFiadoBar(
+  _prev: BarActionState,
+  formData: FormData,
+): Promise<BarActionState> {
+  try {
+    const { session, tenant } = await assertPermission(PERMISSIONS.BAR_MANAGE)
+    const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
+    const parsed = CancelarFiadoBarSchema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+
+    type FiadoRow = { id: string; vendaId: string; valor: Prisma.Decimal; status: StatusFiadoBar }
+    const fiado: FiadoRow | null = await db.barFiado.findFirst({
+      where: { id: parsed.data.fiadoId, tenantId: tenant.id, sedeId: unidade.id },
+      select: { id: true, vendaId: true, valor: true, status: true },
+    })
+    if (!fiado) return { error: 'Fiado não encontrado' }
+    if (fiado.status !== 'PENDENTE' && fiado.status !== 'VENCIDA') {
+      return { error: 'Só é possível cancelar fiados pendentes ou vencidos' }
+    }
+
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const itens: { produtoId: string | null; quantidade: number }[] =
+        await tx.barVendaItem.findMany({
+          where: { vendaId: fiado.vendaId },
+          select: { produtoId: true, quantidade: true },
+        })
+      for (const item of itens) {
+        if (!item.produtoId) continue
+        await tx.barProduto.update({
+          where: { id: item.produtoId },
+          data: { estoque: { increment: item.quantidade } },
+        })
+        await tx.barMovimentacaoEstoque.create({
+          data: {
+            tenantId: tenant.id,
+            sedeId: unidade.id,
+            produtoId: item.produtoId,
+            tipo: 'AJUSTE',
+            quantidade: item.quantidade,
+            motivo: `Cancelamento de fiado — ${parsed.data.motivo}`,
+            vendaId: fiado.vendaId,
+            operadorId: session.user.id,
+          },
+        })
+      }
+
+      await tx.barVenda.update({ where: { id: fiado.vendaId }, data: { status: 'CANCELADA' } })
+      await tx.barFiado.update({ where: { id: fiado.id }, data: { status: 'CANCELADA' } })
+    })
+
+    await db.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'BAR_FIADO_CANCELADO',
+        entidade: 'BarFiado',
+        entidadeId: fiado.id,
+        detalhes: { vendaId: fiado.vendaId, valor: Number(fiado.valor), motivo: parsed.data.motivo },
+      },
+    })
+
+    revalidateBar()
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Erro ao cancelar fiado' }
+  }
+}
+
 // ── Ajuste manual de estoque (BAR_MANAGE) ────────────────────────────────────
 
 export async function registrarAjusteEstoqueBar(
@@ -958,6 +1313,12 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
       }
     }
 
+    const diferenca = round2(
+      parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria,
+    )
+    const divergenciaAlta =
+      Math.abs(diferenca) > Math.max(LIMIAR_DIVERGENCIA_ABS, resumo.dinheiroEsperado * LIMIAR_DIVERGENCIA_PCT)
+
     await db.barCaixaTurno.update({
       where: { id: turno.id },
       data: {
@@ -966,12 +1327,11 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
         dinheiroContado: parsed.data.dinheiroContado,
         sangria: parsed.data.sangria,
         observacao: parsed.data.observacao ?? null,
+        dinheiroEsperado: resumo.dinheiroEsperado,
+        diferenca,
+        divergenciaAlta,
       },
     })
-
-    const diferenca = round2(
-      parsed.data.dinheiroContado - resumo.dinheiroEsperado + parsed.data.sangria,
-    )
 
     await db.auditLog.create({
       data: {
@@ -986,11 +1346,24 @@ export async function fecharTurnoBar(input: unknown): Promise<BarActionState> {
           dinheiroEsperado: resumo.dinheiroEsperado,
           sangria: parsed.data.sangria,
           diferenca,
+          divergenciaAlta,
           totalPago: resumo.totalPago,
           quantidadePaga: resumo.quantidadePaga,
         },
       },
     })
+
+    if (divergenciaAlta) {
+      await notificarUsuariosComPermissao(PERMISSIONS.BAR_MANAGE, {
+        tenantId: tenant.id,
+        tipo: 'BAR_TURNO_DIVERGENCIA',
+        titulo: 'Divergência de caixa no fechamento de turno',
+        corpo: `${unidade.nome}: diferença de R$ ${diferenca.toFixed(2)} no fechamento do turno.`,
+        link: '/admin/bar',
+        atorId: session.user.id,
+        excetoUserId: session.user.id,
+      })
+    }
 
     revalidateBar()
     return { success: true }
@@ -1014,11 +1387,13 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
     type VendaRow = {
       id: string
       status: StatusVendaBar
+      metodoPagamento: MetodoPagamentoBar
       total: Prisma.Decimal
       sedeId: string
       operadorId: string | null
       financeiroLancamentoId: string | null
       financeiroEstornoLancamentoId: string | null
+      fiado: { id: string; status: StatusFiadoBar } | null
       itens: Array<{ produtoId: string | null; produtoNome: string; quantidade: number }>
     }
 
@@ -1027,11 +1402,13 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
       select: {
         id: true,
         status: true,
+        metodoPagamento: true,
         total: true,
         sedeId: true,
         operadorId: true,
         financeiroLancamentoId: true,
         financeiroEstornoLancamentoId: true,
+        fiado: { select: { id: true, status: true } },
         itens: { select: { produtoId: true, produtoNome: true, quantidade: true } },
       },
     })
@@ -1041,15 +1418,32 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
       return { error: 'Só é possível estornar vendas pagas' }
     }
 
+    // Fiado em aberto não gera RECEITA — cancelar via cancelarFiadoBar (sem DESPESA espelho).
+    if (venda.metodoPagamento === 'FIADO') {
+      const fiadoStatus = venda.fiado?.status
+      if (!venda.fiado || fiadoStatus === 'PENDENTE' || fiadoStatus === 'VENCIDA') {
+        return {
+          error:
+            'Fiado em aberto: cancele em Bar → Fiado. Estorno só após quitação (com RECEITA no caixa).',
+        }
+      }
+      if (fiadoStatus === 'CANCELADA') {
+        return { error: 'Fiado já cancelado' }
+      }
+    }
+
     const resumoItens = venda.itens.map((i) => `${i.produtoNome} ×${i.quantidade}`).join(', ')
     const descricaoEstorno =
       resumoItens.length > 0
         ? `Estorno bar — ${resumoItens}`.slice(0, 240)
         : 'Estorno de venda do bar'
 
+    // Só espelha DESPESA se houve RECEITA (fiado quitado ou venda paga normal).
+    const deveEspelharDespesa = Boolean(venda.financeiroLancamentoId)
+
     await db.$transaction(async (tx: Prisma.TransactionClient) => {
       let estornoId = venda.financeiroEstornoLancamentoId
-      if (!estornoId) {
+      if (!estornoId && deveEspelharDespesa) {
         const lanc: { id: string } = await tx.financeiroLancamento.create({
           data: {
             tenantId: tenant.id,
@@ -1090,7 +1484,10 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
         where: { id: venda.id },
         data: {
           status: 'ESTORNADA',
-          financeiroEstornoLancamentoId: estornoId,
+          ...(estornoId ? { financeiroEstornoLancamentoId: estornoId } : {}),
+          estornadoPorId: session.user.id,
+          estornadoEm: new Date(),
+          motivoEstorno: parsed.data.motivo,
         },
       })
     })
@@ -1120,6 +1517,32 @@ export async function estornarVendaBar(input: unknown): Promise<BarActionState> 
         link: '/admin/bar',
         atorId: session.user.id,
       })
+    }
+
+    // Auditoria de estornos anômalos: conta estornos do operador ORIGINAL da
+    // venda (não de quem estornou agora) na mesma unidade, dentro da janela.
+    if (venda.operadorId) {
+      const desde = new Date(Date.now() - JANELA_ESTORNOS_ANOMALO_DIAS * 24 * 60 * 60 * 1000)
+      const totalEstornos = await db.barVenda.count({
+        where: {
+          tenantId: tenant.id,
+          sedeId: unidade.id,
+          operadorId: venda.operadorId,
+          status: 'ESTORNADA',
+          estornadoEm: { gte: desde },
+        },
+      })
+      if (totalEstornos >= LIMIAR_ESTORNOS_ANOMALO) {
+        await notificarUsuariosComPermissao(PERMISSIONS.BAR_MANAGE, {
+          tenantId: tenant.id,
+          tipo: 'BAR_ESTORNO_ANOMALO',
+          titulo: 'Padrão anômalo de estornos detectado',
+          corpo: `${totalEstornos} vendas estornadas do mesmo operador em ${unidade.nome} nos últimos ${JANELA_ESTORNOS_ANOMALO_DIAS} dias.`,
+          link: '/admin/bar',
+          atorId: session.user.id,
+          excetoUserId: session.user.id,
+        })
+      }
     }
 
     revalidateBar()

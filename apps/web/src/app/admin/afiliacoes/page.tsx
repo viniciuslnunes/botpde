@@ -16,12 +16,14 @@ export const metadata: Metadata = { title: 'Solicitações de afiliação — Ad
 
 function PedidosSkeleton() {
   return (
-    <div className="animate-pulse space-y-3">
-      <div className="h-4 w-64 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
-        <div className="h-40 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+    <div className="animate-pulse space-y-4">
+      <div className="flex gap-2 border-b border-[rgb(var(--border))] pb-2">
+        <div className="h-8 w-24 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
+        <div className="h-8 w-24 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
+        <div className="h-8 w-24 rounded-lg bg-[rgb(var(--border)_/_0.45)]" />
       </div>
+      <div className="h-56 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+      <div className="h-56 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
     </div>
   )
 }
@@ -66,7 +68,7 @@ export default async function AfiliacoesPage() {
       <AdminPageHeader
         icon={<ClipboardCheck className="h-5 w-5" />}
         title="Solicitações de afiliação"
-        description="Subsedes e PDEs pedindo vínculo — o Presidente aprova e a unidade é criada."
+        description="Revise foto, mapa, provas e contato de cada pedido — o Presidente aprova e a unidade é criada."
       />
 
       <div className="app-container min-w-0 flex-1 py-5 sm:py-8">

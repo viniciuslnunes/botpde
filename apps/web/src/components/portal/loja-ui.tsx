@@ -48,7 +48,7 @@ export function LojaCarrossel({ produtos }: { produtos: LojaProdutoCard[] }) {
         {produtos.map((p) => (
           <m.div key={p.id} variants={staggerItem} whileTap={{ scale: 0.97 }} transition={springSnappy} className="snap-start shrink-0">
             <Link
-              href={`/portal/loja/${p.id}`}
+              href={p.href}
               className="block w-44 overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-shadow hover:shadow-md sm:w-56"
             >
             <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />

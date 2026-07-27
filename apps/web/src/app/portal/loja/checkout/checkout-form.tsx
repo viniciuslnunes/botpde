@@ -16,7 +16,17 @@ function formatarPreco(preco: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(preco)
 }
 
-export function CheckoutForm({ itens, subtotal }: { itens: CheckoutItemSerializado[]; subtotal: number }) {
+export type CupomDisponivel = { codigo: string; lojaNome: string; texto: string }
+
+export function CheckoutForm({
+  itens,
+  subtotal,
+  cuponsDisponiveis,
+}: {
+  itens: CheckoutItemSerializado[]
+  subtotal: number
+  cuponsDisponiveis: CupomDisponivel[]
+}) {
   const [state, action, pending] = useActionState(finalizarPedido, {})
   const [modalidade, setModalidade] = useState<'RETIRADA' | 'ENVIO'>('RETIRADA')
   const [cupom, setCupom] = useState('')
@@ -69,10 +79,17 @@ export function CheckoutForm({ itens, subtotal }: { itens: CheckoutItemSerializa
                 data-unsaved-label="Cupom"
                 value={cupom}
                 onChange={(e) => setCupom(e.target.value)}
-                placeholder="Ex.: EUSOUGAVIAO"
+                placeholder="Código do cupom"
                 className="w-full rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm uppercase"
               />
-              <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">10% na primeira compra com EUSOUGAVIAO</p>
+              {cuponsDisponiveis.length > 0 && (
+                <p className="mt-1 text-xs text-[rgb(var(--foreground-muted))]">
+                  Disponível:{' '}
+                  {cuponsDisponiveis
+                    .map((c) => `${c.codigo} (${c.texto}${c.lojaNome ? ` · ${c.lojaNome}` : ''})`)
+                    .join(' · ')}
+                </p>
+              )}
             </div>
 
             <div>

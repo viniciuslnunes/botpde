@@ -5,21 +5,26 @@ export type LojaProdutoCard = {
   preco: number
   precoOriginal?: number | null
   imagensUrl: string[]
+  href: string
 }
 
-export function toLojaProdutoCard(p: {
-  id: string
-  nome: string
-  preco: unknown
-  precoOriginal?: unknown | null
-  imagensUrl: string[]
-}): LojaProdutoCard {
+export function toLojaProdutoCard(
+  p: {
+    id: string
+    nome: string
+    preco: unknown
+    precoOriginal?: unknown | null
+    imagensUrl: string[]
+  },
+  tenantId: string,
+): LojaProdutoCard {
   return {
     id: p.id,
     nome: p.nome,
     preco: Number(p.preco),
     precoOriginal: p.precoOriginal != null ? Number(p.precoOriginal) : null,
     imagensUrl: p.imagensUrl ?? [],
+    href: `/portal/loja/${tenantId}/${p.id}`,
   }
 }
 
@@ -33,6 +38,7 @@ export type SacolaItemSerializado = {
     preco: number
     imagensUrl: string[]
     ativo: boolean
+    tenantId: string
   }
 }
 
@@ -70,6 +76,7 @@ export function toSacolaItem(item: {
     preco: unknown
     imagensUrl: string[]
     ativo: boolean
+    tenantId: string
   }
 }): SacolaItemSerializado {
   return {
@@ -82,6 +89,7 @@ export function toSacolaItem(item: {
       preco: Number(item.produto.preco),
       imagensUrl: item.produto.imagensUrl ?? [],
       ativo: item.produto.ativo,
+      tenantId: item.produto.tenantId,
     },
   }
 }

@@ -17,6 +17,7 @@ export interface PedidoListItem {
   meta: string
   itens: { id: string; label: string }[]
   imagemUrl: string | null
+  lojaNome: string
 }
 
 interface LojaPedidosListProps {
@@ -42,6 +43,7 @@ function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
               {pedido.statusLabel}
             </span>
           </div>
+          <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">{pedido.lojaNome}</p>
           <ul className="mt-2 space-y-1 text-sm text-[rgb(var(--foreground-muted))]">
             {pedido.itens.map((item) => (
               <li key={item.id}>{item.label}</li>

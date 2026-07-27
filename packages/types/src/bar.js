@@ -6,7 +6,10 @@ import { z } from 'zod'
  */
 
 /** Métodos de pagamento aceitos no balcão (espelha enum MetodoPagamentoBar). */
-export const METODO_PAGAMENTO_BAR = ['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO']
+export const METODO_PAGAMENTO_BAR = ['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO', 'FIADO']
+
+/** Métodos aceitos na quitação de um fiado (não inclui FIADO). */
+export const METODO_PAGAMENTO_QUITACAO_FIADO_BAR = ['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO']
 
 /** @type {Record<string, string>} */
 export const METODO_PAGAMENTO_BAR_LABEL = {
@@ -14,6 +17,15 @@ export const METODO_PAGAMENTO_BAR_LABEL = {
   DINHEIRO: 'Dinheiro',
   CARTAO_DEBITO: 'Cartão de débito',
   CARTAO_CREDITO: 'Cartão de crédito',
+  FIADO: 'Fiado',
+}
+
+/** @type {Record<string, string>} */
+export const STATUS_FIADO_BAR_LABEL = {
+  PENDENTE: 'Pendente',
+  PAGA: 'Paga',
+  CANCELADA: 'Cancelada',
+  VENCIDA: 'Vencida',
 }
 
 /** @type {Record<string, string>} */
@@ -27,7 +39,19 @@ export const STATUS_VENDA_BAR_LABEL = {
 /** Limite de vendas por página nas listagens do Bar. */
 export const BAR_PAGE_SIZE = 40
 
-export const MetodoPagamentoBarSchema = z.enum(['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO'])
+/**
+ * Divergência absoluta (R$) a partir da qual o fechamento de turno vira alerta.
+ * Vive aqui (não em `apps/web/src/lib/bar.ts`, que é `server-only`) para poder
+ * ser importada por client components (painel de fechamento de turno).
+ */
+export const LIMIAR_DIVERGENCIA_ABS = 20
+/** Divergência percentual (sobre o dinheiro esperado) que também caracteriza alerta. */
+export const LIMIAR_DIVERGENCIA_PCT = 0.05
+
+export const MetodoPagamentoBarSchema = z.enum(['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO', 'FIADO'])
+
+/** Métodos válidos para quitar um fiado (exclui FIADO). */
+export const MetodoPagamentoQuitacaoFiadoBarSchema = z.enum(['PIX', 'DINHEIRO', 'CARTAO_DEBITO', 'CARTAO_CREDITO'])
 
 export const ProdutoBarSchema = z.object({
   nome: z.string().trim().min(2, 'Nome muito curto').max(120, 'Nome muito longo'),
@@ -77,6 +101,11 @@ export const CompraBarSchema = z.object({
     .max(200, 'Motivo muito longo')
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
+  fornecedorId: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined))
+    .refine((v) => v === undefined || z.string().uuid().safeParse(v).success, 'Fornecedor inválido'),
 })
 
 export const ItemVendaBarSchema = z.object({
@@ -84,17 +113,38 @@ export const ItemVendaBarSchema = z.object({
   quantidade: z.coerce.number().int('Quantidade deve ser inteira').min(1, 'Quantidade mínima é 1').max(99, 'Quantidade máxima é 99'),
 })
 
-export const VendaBarSchema = z.object({
-  itens: z.array(ItemVendaBarSchema).min(1, 'Adicione pelo menos um item'),
-  metodoPagamento: MetodoPagamentoBarSchema,
-  desconto: z.coerce.number().min(0, 'Desconto não pode ser negativo').default(0),
-  observacao: z
-    .string()
-    .trim()
-    .max(200, 'Observação muito longa')
-    .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
-})
+export const VendaBarSchema = z
+  .object({
+    itens: z.array(ItemVendaBarSchema).min(1, 'Adicione pelo menos um item'),
+    metodoPagamento: MetodoPagamentoBarSchema,
+    desconto: z.coerce.number().min(0, 'Desconto não pode ser negativo').default(0),
+    observacao: z
+      .string()
+      .trim()
+      .max(200, 'Observação muito longa')
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined)),
+    membroId: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined))
+      .refine((v) => v === undefined || z.string().uuid().safeParse(v).success, 'Membro inválido'),
+    vencimento: z
+      .string()
+      .optional()
+      .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
+  })
+  // Venda a FIADO exige um devedor (membro) e uma data de vencimento — não é
+  // uma venda anônima/à vista como os demais métodos.
+  .superRefine((data, ctx) => {
+    if (data.metodoPagamento !== 'FIADO') return
+    if (!data.membroId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Selecione o membro devedor', path: ['membroId'] })
+    }
+    if (!data.vencimento) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Informe o vencimento do fiado', path: ['vencimento'] })
+    }
+  })
 
 /** Fechamento de turno de caixa do bar. */
 export const FecharTurnoBarSchema = z.object({
@@ -123,6 +173,51 @@ export const EstornarVendaBarSchema = z.object({
     .trim()
     .min(3, 'Informe o motivo (mín. 3 caracteres)')
     .max(200, 'Motivo muito longo'),
+})
+
+/** Quitação de um fiado pendente/vencido — cria o lançamento no livro-caixa. */
+export const QuitarFiadoBarSchema = z.object({
+  fiadoId: z.string().uuid('Fiado inválido'),
+  metodoPagamento: MetodoPagamentoQuitacaoFiadoBarSchema,
+})
+
+/** Cancelamento de um fiado pendente (estorna o estoque como venda cancelada). */
+export const CancelarFiadoBarSchema = z.object({
+  fiadoId: z.string().uuid('Fiado inválido'),
+  motivo: z
+    .string()
+    .trim()
+    .min(3, 'Informe o motivo (mín. 3 caracteres)')
+    .max(200, 'Motivo muito longo'),
+})
+
+/** Cadastro de fornecedor de insumos do Bar. */
+export const CriarFornecedorBarSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome muito curto').max(120, 'Nome muito longo'),
+  contato: z
+    .string()
+    .trim()
+    .max(120, 'Contato muito longo')
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  documento: z
+    .string()
+    .trim()
+    .max(30, 'Documento muito longo')
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  observacao: z
+    .string()
+    .trim()
+    .max(300, 'Observação muito longa')
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+})
+
+/** Edição de fornecedor de insumos do Bar. */
+export const EditarFornecedorBarSchema = CriarFornecedorBarSchema.extend({
+  id: z.string().uuid('Fornecedor inválido'),
+  ativo: z.coerce.boolean().optional(),
 })
 
 /**

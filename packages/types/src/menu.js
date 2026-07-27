@@ -100,6 +100,27 @@ export const ADMIN_MENU = /** @type {const} */ ([
     secao: 'bar',
   },
   {
+    id: 'bar-fornecedores',
+    label: 'Fornecedores',
+    href: '/admin/bar/fornecedores',
+    permissao: PERMISSIONS.BAR_MANAGE,
+    secao: 'bar',
+  },
+  {
+    id: 'bar-fiado',
+    label: 'Fiado',
+    href: '/admin/bar/fiado',
+    permissao: PERMISSIONS.BAR_MANAGE,
+    secao: 'bar',
+  },
+  {
+    id: 'bar-estornos',
+    label: 'Estornos',
+    href: '/admin/bar/estornos',
+    permissao: PERMISSIONS.BAR_MANAGE,
+    secao: 'bar',
+  },
+  {
     id: 'comunidade',
     label: 'Visão geral',
     href: '/admin/comunidade',

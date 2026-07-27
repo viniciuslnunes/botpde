@@ -3,14 +3,23 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
-import { listarProdutosBar, resolveUnidadeBar } from '@/lib/bar'
-import type { BarProdutoLite } from '@/lib/bar'
+import { listarFornecedoresBar, listarMovimentacoesEstoqueBar, listarProdutosBar, resolveUnidadeBar } from '@/lib/bar'
+import type { BarFornecedorLite, BarMovimentacaoEstoqueLite, BarProdutoLite } from '@/lib/bar'
 import { serializeProdutoBar } from '@/lib/bar-serialize'
-import { BarEstoqueTabela, RegistrarCompraBarForm } from '@/components/admin/bar/bar-estoque'
+import {
+  BarEstoqueTabela,
+  BarMovimentacoesEstoqueLista,
+  RegistrarCompraBarForm,
+  type BarMovimentacaoEstoqueItem,
+} from '@/components/admin/bar/bar-estoque'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Estoque — Bar Admin' }
+
+function formatarData(data: Date) {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data)
+}
 
 export default async function AdminBarEstoquePage() {
   let session: Awaited<ReturnType<typeof assertPermission>>['session']
@@ -22,11 +31,31 @@ export default async function AdminBarEstoquePage() {
   }
 
   const unidade = await resolveUnidadeBar(tenant.id, session.user.id!)
-  const produtos: BarProdutoLite[] = await listarProdutosBar(tenant.id, unidade.id)
+  const [produtos, fornecedores, movimentacoes]: [
+    BarProdutoLite[],
+    BarFornecedorLite[],
+    BarMovimentacaoEstoqueLite[],
+  ] = await Promise.all([
+    listarProdutosBar(tenant.id, unidade.id),
+    listarFornecedoresBar(tenant.id, { apenasAtivos: true }),
+    listarMovimentacoesEstoqueBar(tenant.id, unidade.id),
+  ])
   const serializados = produtos.map(serializeProdutoBar)
   const baixos = serializados.filter(
     (p) => p.ativo && p.estoqueMinimo != null && p.estoque <= p.estoqueMinimo,
   ).length
+
+  const movimentacoesItens: BarMovimentacaoEstoqueItem[] = movimentacoes.map((m) => ({
+    id: m.id,
+    produtoNome: m.produtoNome,
+    tipo: m.tipo,
+    quantidade: m.quantidade,
+    custoTotal: m.custoTotal != null ? Number(m.custoTotal) : null,
+    motivo: m.motivo,
+    criadoEmLabel: formatarData(m.criadoEm),
+    fornecedorNome: m.fornecedor?.nome ?? null,
+    operadorNome: m.operador?.nome ?? null,
+  }))
 
   return (
     <div className="app-container space-y-6 py-8">
@@ -51,10 +80,17 @@ export default async function AdminBarEstoquePage() {
       </MotionReveal>
 
       <MotionReveal index={1}>
-        <RegistrarCompraBarForm produtos={serializados} />
+        <RegistrarCompraBarForm produtos={serializados} fornecedores={fornecedores} />
       </MotionReveal>
 
       <BarEstoqueTabela produtos={serializados} />
+
+      <MotionReveal index={2}>
+        <section className="space-y-3">
+          <h2 className="font-semibold text-[rgb(var(--foreground))]">Movimentações recentes</h2>
+          <BarMovimentacoesEstoqueLista movimentacoes={movimentacoesItens} />
+        </section>
+      </MotionReveal>
     </div>
   )
 }

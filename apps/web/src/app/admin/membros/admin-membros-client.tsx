@@ -2,14 +2,14 @@
 
 import { useCallback, useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
 import { TriangleAlert, Users } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { StatusBadge } from '@/components/admin/ui'
+import { SortableTh, StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
-import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion-presets'
+import { staggerContainer, staggerItem } from '@/lib/motion-presets'
+import type { SortDir } from '@/lib/admin-list-sort'
 import { MembroDetalheModal } from './membro-detalhe-modal'
 import type { AdminMembroItem } from './admin-membro-item'
 
@@ -17,9 +17,17 @@ export type { AdminMembroItem } from './admin-membro-item'
 
 interface AdminMembrosTableProps {
   membros: AdminMembroItem[]
+  sort: string
+  dir: SortDir
+  sortHrefs: Record<string, string>
 }
 
-export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
+export function AdminMembrosTable({
+  membros,
+  sort,
+  dir,
+  sortHrefs,
+}: AdminMembrosTableProps) {
   const [selecionado, setSelecionado] = useState<AdminMembroItem | null>(null)
   const fecharDetalhe = useCallback(() => setSelecionado(null), [])
 
@@ -45,27 +53,62 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
         <table className="w-full min-w-0 text-sm md:min-w-[36rem] xl:min-w-[48rem]">
           <thead>
             <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-              <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:px-4">
-                Membro
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden sm:table-cell">
-                Tipo
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden md:table-cell">
-                Departamento
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden lg:table-cell">
-                Unidade
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden xl:table-cell">
-                Cidade
-              </th>
-              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:table-cell">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] hidden 2xl:table-cell">
-                Cadastro
-              </th>
+              <SortableTh
+                label="Membro"
+                column="nome"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.nome ?? '#'}
+                className="px-3 sm:px-4"
+              />
+              <SortableTh
+                label="Tipo"
+                column="tipo"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.tipo ?? '#'}
+                className="hidden sm:table-cell"
+              />
+              <SortableTh
+                label="Departamento"
+                column="departamento"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.departamento ?? '#'}
+                className="hidden md:table-cell"
+              />
+              <SortableTh
+                label="Unidade"
+                column="sede"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.sede ?? '#'}
+                className="hidden lg:table-cell"
+              />
+              <SortableTh
+                label="Cidade"
+                column="cidade"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.cidade ?? '#'}
+                className="hidden xl:table-cell"
+              />
+              <SortableTh
+                label="Status"
+                column="status"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.status ?? '#'}
+                className="hidden sm:table-cell"
+              />
+              <SortableTh
+                label="Cadastro"
+                column="criadoEm"
+                currentSort={sort}
+                currentDir={dir}
+                href={sortHrefs.criadoEm ?? '#'}
+                className="hidden 2xl:table-cell"
+              />
               <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:px-4">
                 Ações
               </th>
@@ -187,48 +230,5 @@ export function AdminMembrosTable({ membros }: AdminMembrosTableProps) {
 
       <MembroDetalheModal membro={selecionado} onClose={fecharDetalhe} />
     </>
-  )
-}
-
-interface AdminMembrosTab {
-  status: string
-  label: string
-  href: string
-  active: boolean
-  count?: number
-  countClass?: string
-}
-
-export function AdminMembrosTabs({ tabs }: { tabs: AdminMembrosTab[] }) {
-  return (
-    <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
-      {tabs.map((tab) => (
-        <m.div key={tab.status} className="shrink-0" whileTap={{ scale: 0.97 }} transition={springSnappy}>
-          <Link
-            href={tab.href}
-            className={[
-              'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors',
-              tab.active
-                ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-            ].join(' ')}
-          >
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span
-                className={[
-                  'rounded-full px-1.5 py-0.5 text-xs font-semibold',
-                  tab.active
-                    ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                    : tab.countClass ?? 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                ].join(' ')}
-              >
-                {tab.count}
-              </span>
-            )}
-          </Link>
-        </m.div>
-      ))}
-    </div>
   )
 }

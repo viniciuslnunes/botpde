@@ -41,25 +41,43 @@ Menu admin: item "Loja" exige `STORE_MANAGE`; item "Pedidos (Loja)" exige `STORE
 
 Portal: exige sessão logada; **não** usa permissão RBAC — qualquer associado autenticado compra.
 
-## Visibilidade cross-tenant
+## Visibilidade cross-tenant (portal): lojas por unidade (2026-07-27)
 
-Recurso **`loja: PUBLICO`** em `packages/types/src/visibility.js` — produtos de tenants
-ancestrais cascadeiam para subsedes/PDEs (mesma direção de eventos/comunidade).
+O portal **não usa mais** `getVisibleTenantIds('loja')`/`resolveVisibility` — critério
+agora é membership real: `tenantsPermitidosLoja(userId)` em `apps/web/src/lib/loja-lojas.ts`
+une os tenants onde o usuário é `SaasMembro` `APROVADO`/`SOCIO`
+(`listarVinculosAprovadosDoUsuario`) com a torcida **raiz** de cada vínculo
+(`getAncestorTenantIds`, último elemento da cadeia) — a loja da torcida principal está
+sempre disponível.
 
-- Catálogo: `getVisibleTenantIds(tenant.id, 'loja')` em `/portal/loja/page.tsx`
-- Sacola/checkout: `resolveVisibility` antes de adicionar/comprar produto de outro tenant
+- `/portal/loja` lista as lojas do sócio (`listLojasDoSocio`), uma por tenant permitido;
+  card marcado `principal: true` quando é a torcida raiz.
+- `/portal/loja/[tenantId]` é o catálogo de UM tenant — `tenantsPermitidosLoja` valida
+  acesso, senão `notFound()`.
+- Sacola/checkout: `assertProdutoVisivel(produtoId, userId)` em
+  `apps/web/src/app/portal/loja/actions.ts` checa `tenantsPermitidosLoja`.
 - Pedido gravado no **tenant DONO do produto** (quem tem estoque e cumpre)
 - Checkout com itens de tenants diferentes → N pedidos com mesmo `grupoCheckoutId`
+
+**Limitação conhecida — "loja por unidade" só existe quando a unidade é tenant
+próprio** (Sede/Subsede/PDE com `Tenant` dedicado, Caso B). Unidades Caso A (Sede
+filha sem tenant próprio, ex.: Subsede que roda dentro do tenant da Sede-mãe)
+continuam compartilhando o catálogo/estoque do tenant-mãe — `SaasMembro` é único por
+`(tenantId, userId)`, não há campo de unidade dentro do tenant para segmentar produtos.
 
 ## Fluxo portal
 
 ```
-/portal/loja → catálogo (filtros, carrossel destaques)
-/portal/loja/[id] → detalhe + adicionar à sacola
-/portal/loja/sacola → revisar itens
+/portal/loja → listagem de lojas do sócio (uma por tenant com membership)
+/portal/loja/[tenantId] → catálogo de uma loja (filtros, carrossel destaques)
+/portal/loja/[tenantId]/[produtoId] → detalhe + adicionar à sacola
+/portal/loja/sacola → sacola global (todas as lojas do usuário)
 /portal/loja/checkout → cupom + retirada/envio → finalizarPedido
-/portal/loja/pedidos → histórico (multi-item)
+/portal/loja/pedidos → histórico global (multi-item, multi-loja; exibe nome da loja)
 ```
+
+Sacola, checkout e pedidos são **globais por `userId`**, sem filtro de tenant — o
+usuário pode ter itens/pedidos de mais de uma loja simultaneamente.
 
 Server actions: `apps/web/src/app/portal/loja/actions.ts`
 

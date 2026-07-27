@@ -13,6 +13,7 @@ import {
   Clock,
   Copy,
   CreditCard,
+  HandCoins,
   Loader2,
   Minus,
   PanelLeftClose,
@@ -79,6 +80,7 @@ function formatarTempoRelativo(iso: string) {
 function MetodoIcon({ metodo }: { metodo: Metodo }) {
   if (metodo === 'PIX') return <QrCode className="h-4 w-4" />
   if (metodo === 'DINHEIRO') return <Banknote className="h-4 w-4" />
+  if (metodo === 'FIADO') return <HandCoins className="h-4 w-4" />
   return <CreditCard className="h-4 w-4" />
 }
 
@@ -177,6 +179,13 @@ function setTurnoSidebarStored(value: boolean) {
   turnoSidebarListeners.forEach((l) => l())
 }
 
+/** Data padrão de vencimento do fiado: hoje + 7 dias, em `yyyy-mm-dd` para `<input type="date">`. */
+function vencimentoFiadoPadrao(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  return d.toISOString().slice(0, 10)
+}
+
 export function BarPdv({
   produtos: produtosIniciais,
   categorias,
@@ -184,6 +193,8 @@ export function BarPdv({
   pendentesTotal: pendentesTotalInicial,
   unidadeNome,
   podeCancelar,
+  podeGerir = podeCancelar,
+  membrosFiado = [],
   turnoAberto = true,
   turnoPainel,
 }: {
@@ -193,6 +204,10 @@ export function BarPdv({
   pendentesTotal: number
   unidadeNome: string
   podeCancelar: boolean
+  /** Conceder fiado exige `bar:manage` (mesmo que operar o PDV só precise de `bar:operate`). */
+  podeGerir?: boolean
+  /** Membros aprovados da unidade — devedor do fiado (só carregado quando `podeGerir`). */
+  membrosFiado?: { id: string; nome: string }[]
   /** Sem turno aberto o PDV não registra novas vendas. */
   turnoAberto?: boolean
   /** Painel de turno (abrir/fechar caixa) exibido no menu lateral colapsável. */
@@ -206,6 +221,8 @@ export function BarPdv({
   const [busca, setBusca] = useState('')
   const [cart, setCart] = useState<CartLine[]>([])
   const [metodo, setMetodo] = useState<Metodo>('DINHEIRO')
+  const [membroIdFiado, setMembroIdFiado] = useState('')
+  const [vencimentoFiado, setVencimentoFiado] = useState(vencimentoFiadoPadrao)
   const [descontoStr, setDescontoStr] = useState('')
   const [observacao, setObservacao] = useState('')
   const [fase, setFase] = useState<Fase>('venda')
@@ -310,6 +327,8 @@ export function BarPdv({
     setDescontoStr('')
     setObservacao('')
     setErro(null)
+    setMembroIdFiado('')
+    setVencimentoFiado(vencimentoFiadoPadrao())
   }
 
   function aplicarBaixaLocal(linhas: CartLine[]) {
@@ -352,6 +371,20 @@ export function BarPdv({
       setErro('Adicione pelo menos um item')
       return
     }
+    if (metodo === 'FIADO') {
+      if (!podeGerir) {
+        setErro('Fiado requer permissão de gestor')
+        return
+      }
+      if (!membroIdFiado) {
+        setErro('Selecione o membro devedor do fiado')
+        return
+      }
+      if (!vencimentoFiado) {
+        setErro('Informe o vencimento do fiado')
+        return
+      }
+    }
     setErro(null)
     const snapshot = cart.map((l) => ({ ...l }))
     const totalPrevisto = resumo.total
@@ -362,6 +395,9 @@ export function BarPdv({
         metodoPagamento: metodo,
         desconto,
         observacao: observacao.trim() || undefined,
+        ...(metodo === 'FIADO'
+          ? { membroId: membroIdFiado, vencimento: vencimentoFiado }
+          : {}),
       })
 
       if (!result.success) {
@@ -396,6 +432,7 @@ export function BarPdv({
         pixCopiaCola: result.pix.copiaCola,
         gatewayProvider: result.pix.provider,
         operador: { id: '', nome: null },
+        fiadoStatus: null,
         itens: snapshot.map((l, i) => ({
           id: `local-${i}`,
           produtoId: l.produtoId,
@@ -669,24 +706,65 @@ export function BarPdv({
             Pagamento
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {(METODO_PAGAMENTO_BAR as readonly Metodo[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMetodo(m)}
-                className={[
-                  'flex min-h-11 items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-xs font-semibold transition-colors',
-                  metodo === m
-                    ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))] shadow-sm'
-                    : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.4)] hover:bg-[rgb(var(--background-subtle))]',
-                ].join(' ')}
-              >
-                <MetodoIcon metodo={m} />
-                {METODO_PAGAMENTO_BAR_LABEL[m]}
-              </button>
-            ))}
+            {(METODO_PAGAMENTO_BAR as readonly Metodo[]).map((m) => {
+              const bloqueado = m === 'FIADO' && !podeGerir
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={bloqueado}
+                  title={bloqueado ? 'Fiado requer permissão de gestor' : undefined}
+                  onClick={() => !bloqueado && setMetodo(m)}
+                  className={[
+                    'flex min-h-11 items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-xs font-semibold transition-colors',
+                    bloqueado
+                      ? 'cursor-not-allowed border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground-muted))] opacity-50'
+                      : metodo === m
+                        ? 'bg-[rgb(var(--primary))] text-[rgb(var(--color-primary-fg))] shadow-sm'
+                        : 'border border-[rgb(var(--border))] bg-[rgb(var(--background))] text-[rgb(var(--foreground))] hover:border-[rgb(var(--color-primary)_/_0.4)] hover:bg-[rgb(var(--background-subtle))]',
+                  ].join(' ')}
+                >
+                  <MetodoIcon metodo={m} />
+                  {METODO_PAGAMENTO_BAR_LABEL[m]}
+                </button>
+              )
+            })}
           </div>
+          {metodo === 'FIADO' && !podeGerir && (
+            <p className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]">
+              Fiado requer permissão de gestor.
+            </p>
+          )}
         </div>
+
+        {metodo === 'FIADO' && podeGerir && (
+          <div className="grid grid-cols-1 gap-2 rounded-2xl border border-[rgb(var(--color-warning)_/_0.35)] bg-[rgb(var(--color-warning)_/_0.06)] p-3 sm:grid-cols-2">
+            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Devedor *
+              <select
+                value={membroIdFiado}
+                onChange={(e) => setMembroIdFiado(e.target.value)}
+                className="mt-1 w-full rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm text-[rgb(var(--foreground))]"
+              >
+                <option value="">Selecione o membro</option>
+                {membrosFiado.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Vencimento *
+              <input
+                type="date"
+                value={vencimentoFiado}
+                onChange={(e) => setVencimentoFiado(e.target.value)}
+                className="mt-1 w-full rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2.5 text-sm text-[rgb(var(--foreground))]"
+              />
+            </label>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-3">
           <div className="flex justify-between text-sm text-[rgb(var(--foreground-muted))]">

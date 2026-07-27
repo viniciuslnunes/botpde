@@ -372,6 +372,11 @@ const criarManualSchema = z.object({
       return Number.isFinite(n) ? n : Number.NaN
     })
     .refine((n) => n === null || (n >= -180 && n <= 180), 'Longitude inválida'),
+  /** Link do Maps colado no picker — fallback se lat/lng não vieram no FormData. */
+  mapsUrl: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : null)),
   fotoUrl: z
     .string()
     .url()
@@ -401,6 +406,7 @@ export async function criarSolicitacaoManual(
     cep: String(formData.get('cep') ?? ''),
     lat: String(formData.get('lat') ?? ''),
     lng: String(formData.get('lng') ?? ''),
+    mapsUrl: String(formData.get('mapsUrl') ?? ''),
     fotoUrl: String(formData.get('fotoUrl') ?? ''),
   })
   if (!parsed.success) {
@@ -417,6 +423,19 @@ export async function criarSolicitacaoManual(
     })
     if (!tenant) throw new ExpectedError('Torcida não encontrada.')
 
+    let lat = parsed.data.lat
+    let lng = parsed.data.lng
+    // Fallback: link curto do Maps às vezes não resolve no client (auth/CORS).
+    // Super-admin pode expandir no servidor na hora do create.
+    if ((lat == null || lng == null) && parsed.data.mapsUrl) {
+      const { resolveCoordsFromGoogleMapsLink } = await import('@/lib/google-maps')
+      const coords = await resolveCoordsFromGoogleMapsLink(parsed.data.mapsUrl)
+      if (coords) {
+        lat = coords.lat
+        lng = coords.lng
+      }
+    }
+
     const s: { id: string } = await db.solicitacaoUnidade.create({
       data: {
         tenantId: tenant.id,
@@ -428,8 +447,8 @@ export async function criarSolicitacaoManual(
         contatoNome: parsed.data.contatoNome,
         contatoEmail: parsed.data.contatoEmail,
         cep: parsed.data.cep,
-        lat: parsed.data.lat,
-        lng: parsed.data.lng,
+        lat,
+        lng,
         fotoUrl: parsed.data.fotoUrl,
         // Quem faz o intake manual (super-admin) NÃO é a liderança local —
         // deixar null evita que ele vire responsável/ADMIN do canal ao aprovar.
@@ -445,7 +464,16 @@ export async function criarSolicitacaoManual(
         acao: 'SOLICITACAO_UNIDADE_REGISTRADA',
         entidade: 'SolicitacaoUnidade',
         entidadeId: s.id,
-        detalhes: { nome: parsed.data.nome, tipo: parsed.data.tipo, origem: 'super-admin' },
+        detalhes: {
+          nome: parsed.data.nome,
+          tipo: parsed.data.tipo,
+          origem: 'super-admin',
+          lat,
+          lng,
+          mapsUrlResolvido: Boolean(
+            parsed.data.mapsUrl && (parsed.data.lat == null || parsed.data.lng == null) && lat != null,
+          ),
+        },
       },
     })
 

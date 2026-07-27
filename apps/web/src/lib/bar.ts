@@ -2,15 +2,28 @@ import 'server-only'
 
 import { cache } from 'react'
 import { db } from '@torcida/db'
-import type { MetodoPagamentoBar, StatusVendaBar, TipoSede } from '@torcida/db'
+import type {
+  MetodoPagamentoBar,
+  StatusFiadoBar,
+  StatusVendaBar,
+  TipoMovEstoqueBar,
+  TipoSede,
+} from '@torcida/db'
 import { Prisma } from '@torcida/db'
-import { BAR_PAGE_SIZE } from '@torcida/types'
+import { BAR_PAGE_SIZE, LIMIAR_DIVERGENCIA_ABS, LIMIAR_DIVERGENCIA_PCT } from '@torcida/types'
 import {
   bucketSomaPorDia,
   resolverIntervaloPeriodo,
   type Periodo,
   type SerieTemporal,
 } from '@/lib/admin-insights'
+
+/** Reexportados de `@torcida/types` para manter os call sites existentes (`@/lib/bar`). */
+export { LIMIAR_DIVERGENCIA_ABS, LIMIAR_DIVERGENCIA_PCT }
+/** Quantidade de estornos do mesmo operador na janela abaixo que caracteriza anomalia. */
+export const LIMIAR_ESTORNOS_ANOMALO = 3
+/** Janela (em dias) considerada na contagem de estornos por operador. */
+export const JANELA_ESTORNOS_ANOMALO_DIAS = 30
 
 export type BarUnidadeLite = {
   id: string
@@ -63,6 +76,7 @@ export type BarVendaLite = {
   pixCopiaCola: string | null
   gatewayProvider: string | null
   operador: { id: string; nome: string | null }
+  fiado: { status: StatusFiadoBar } | null
   itens: BarVendaItemLite[]
 }
 
@@ -202,6 +216,7 @@ export const listarVendasBar = cache(async function listarVendasBar(
         pixCopiaCola: true,
         gatewayProvider: true,
         operador: { select: { id: true, nome: true } },
+        fiado: { select: { status: true } },
         itens: {
           select: {
             id: true,
@@ -590,3 +605,292 @@ export async function confirmarVendaBarPaga(input: {
 
   return { ok: true }
 }
+
+export type BarFornecedorLite = {
+  id: string
+  nome: string
+  contato: string | null
+  documento: string | null
+  observacao: string | null
+  ativo: boolean
+  criadoEm: Date
+}
+
+/** Fornecedores de insumo do tenant (usado no formulário de compra e no CRUD). */
+export const listarFornecedoresBar = cache(async function listarFornecedoresBar(
+  tenantId: string,
+  opts?: { apenasAtivos?: boolean },
+): Promise<BarFornecedorLite[]> {
+  const where: Prisma.BarFornecedorWhereInput = { tenantId }
+  if (opts?.apenasAtivos) where.ativo = true
+
+  const rows: BarFornecedorLite[] = await db.barFornecedor.findMany({
+    where,
+    orderBy: { nome: 'asc' },
+    select: {
+      id: true,
+      nome: true,
+      contato: true,
+      documento: true,
+      observacao: true,
+      ativo: true,
+      criadoEm: true,
+    },
+  })
+  return rows
+})
+
+export type BarMembroParaFiadoLite = {
+  id: string
+  membroId: string
+  nome: string
+  email: string | null
+}
+
+/** Membros aprovados da unidade — usado no `<select>` de devedor do fiado. */
+export const listarMembrosParaFiado = cache(async function listarMembrosParaFiado(
+  tenantId: string,
+  sedeId: string,
+): Promise<BarMembroParaFiadoLite[]> {
+  const rows: Array<{
+    id: string
+    userId: string
+    nome: string
+    user: { email: string | null }
+  }> = await db.saasMembro.findMany({
+    where: { tenantId, sedeId, status: 'APROVADO' },
+    orderBy: { nome: 'asc' },
+    select: {
+      id: true,
+      userId: true,
+      nome: true,
+      user: { select: { email: true } },
+    },
+  })
+
+  return rows.map((r) => ({ id: r.userId, membroId: r.id, nome: r.nome, email: r.user.email }))
+})
+
+export type BarMovimentacaoEstoqueLite = {
+  id: string
+  produtoId: string
+  produtoNome: string
+  tipo: TipoMovEstoqueBar
+  quantidade: number
+  custoTotal: Prisma.Decimal | null
+  motivo: string | null
+  criadoEm: Date
+  fornecedor: { id: string; nome: string } | null
+  operador: { id: string; nome: string | null } | null
+}
+
+/** Últimas movimentações de estoque da unidade (entrada/saída/ajuste), com fornecedor. */
+export const listarMovimentacoesEstoqueBar = cache(async function listarMovimentacoesEstoqueBar(
+  tenantId: string,
+  sedeId: string,
+  opts?: { take?: number },
+): Promise<BarMovimentacaoEstoqueLite[]> {
+  const rows: Array<{
+    id: string
+    tipo: TipoMovEstoqueBar
+    quantidade: number
+    custoTotal: Prisma.Decimal | null
+    motivo: string | null
+    criadoEm: Date
+    produto: { id: string; nome: string }
+    fornecedor: { id: string; nome: string } | null
+    operador: { id: string; nome: string | null } | null
+  }> = await db.barMovimentacaoEstoque.findMany({
+    where: { tenantId, sedeId },
+    orderBy: { criadoEm: 'desc' },
+    take: opts?.take ?? 20,
+    select: {
+      id: true,
+      tipo: true,
+      quantidade: true,
+      custoTotal: true,
+      motivo: true,
+      criadoEm: true,
+      produto: { select: { id: true, nome: true } },
+      fornecedor: { select: { id: true, nome: true } },
+      operador: { select: { id: true, nome: true } },
+    },
+  })
+
+  return rows.map((r) => ({
+    id: r.id,
+    produtoId: r.produto.id,
+    produtoNome: r.produto.nome,
+    tipo: r.tipo,
+    quantidade: r.quantidade,
+    custoTotal: r.custoTotal,
+    motivo: r.motivo,
+    criadoEm: r.criadoEm,
+    fornecedor: r.fornecedor,
+    operador: r.operador,
+  }))
+})
+
+export type BarFiadoLite = {
+  id: string
+  valor: Prisma.Decimal
+  vencimento: Date
+  status: StatusFiadoBar
+  pagoEm: Date | null
+  criadoEm: Date
+  devedorNome: string | null
+}
+
+/**
+ * Fiados da unidade, mais recentes primeiro. `PENDENTE`/`VENCIDA` primeiro
+ * (para a fila de cobrança), depois `PAGA`/`CANCELADA`.
+ */
+export const listarFiadosBar = cache(async function listarFiadosBar(
+  tenantId: string,
+  sedeId: string,
+): Promise<BarFiadoLite[]> {
+  const rows: Array<{
+    id: string
+    valor: Prisma.Decimal
+    vencimento: Date
+    status: StatusFiadoBar
+    pagoEm: Date | null
+    criadoEm: Date
+    membro: { nome: string } | null
+    user: { nome: string | null }
+  }> = await db.barFiado.findMany({
+    where: { tenantId, sedeId },
+    orderBy: { criadoEm: 'desc' },
+    select: {
+      id: true,
+      valor: true,
+      vencimento: true,
+      status: true,
+      pagoEm: true,
+      criadoEm: true,
+      membro: { select: { nome: true } },
+      user: { select: { nome: true } },
+    },
+  })
+
+  const prioridade: Record<StatusFiadoBar, number> = { VENCIDA: 0, PENDENTE: 1, PAGA: 2, CANCELADA: 3 }
+  return rows
+    .map((r) => ({
+      id: r.id,
+      valor: r.valor,
+      vencimento: r.vencimento,
+      status: r.status,
+      pagoEm: r.pagoEm,
+      criadoEm: r.criadoEm,
+      devedorNome: r.membro?.nome ?? r.user.nome,
+    }))
+    .sort((a, b) => prioridade[a.status] - prioridade[b.status])
+})
+
+export type BarEstornoLite = {
+  id: string
+  subtotal: Prisma.Decimal
+  desconto: Prisma.Decimal
+  total: Prisma.Decimal
+  metodoPagamento: MetodoPagamentoBar
+  criadoEm: Date
+  estornadoEm: Date | null
+  motivoEstorno: string | null
+  operador: { id: string; nome: string | null }
+  estornadoPor: { id: string; nome: string | null } | null
+  itens: BarVendaItemLite[]
+}
+
+export type BarEstornoAgregadoOperador = {
+  operadorId: string
+  operadorNome: string | null
+  quantidade: number
+  valorTotal: number
+}
+
+export type BarEstornoAgregadoProduto = {
+  produtoId: string | null
+  produtoNome: string
+  quantidade: number
+  valorTotal: number
+}
+
+export type BarEstornosResumo = {
+  vendas: BarEstornoLite[]
+  porOperador: BarEstornoAgregadoOperador[]
+  porProduto: BarEstornoAgregadoProduto[]
+}
+
+/** Estornos da unidade no período — lista bruta + agregações por operador/produto. */
+export const listarEstornosBar = cache(async function listarEstornosBar(
+  tenantId: string,
+  sedeId: string,
+  periodo: { de: Date; ate: Date },
+): Promise<BarEstornosResumo> {
+  const vendas: BarEstornoLite[] = await db.barVenda.findMany({
+    where: {
+      tenantId,
+      sedeId,
+      status: 'ESTORNADA',
+      estornadoEm: { gte: periodo.de, lte: periodo.ate },
+    },
+    orderBy: { estornadoEm: 'desc' },
+    select: {
+      id: true,
+      subtotal: true,
+      desconto: true,
+      total: true,
+      metodoPagamento: true,
+      criadoEm: true,
+      estornadoEm: true,
+      motivoEstorno: true,
+      operador: { select: { id: true, nome: true } },
+      estornadoPor: { select: { id: true, nome: true } },
+      itens: {
+        select: {
+          id: true,
+          produtoId: true,
+          produtoNome: true,
+          quantidade: true,
+          precoUnit: true,
+          total: true,
+        },
+      },
+    },
+  })
+
+  const porOperadorMap = new Map<string, BarEstornoAgregadoOperador>()
+  for (const venda of vendas) {
+    const atual = porOperadorMap.get(venda.operador.id) ?? {
+      operadorId: venda.operador.id,
+      operadorNome: venda.operador.nome,
+      quantidade: 0,
+      valorTotal: 0,
+    }
+    atual.quantidade += 1
+    atual.valorTotal = Math.round((atual.valorTotal + Number(venda.total)) * 100) / 100
+    porOperadorMap.set(venda.operador.id, atual)
+  }
+
+  const porProdutoMap = new Map<string, BarEstornoAgregadoProduto>()
+  for (const venda of vendas) {
+    for (const item of venda.itens) {
+      const chave = item.produtoId ?? `avulso:${item.produtoNome}`
+      const atual = porProdutoMap.get(chave) ?? {
+        produtoId: item.produtoId,
+        produtoNome: item.produtoNome,
+        quantidade: 0,
+        valorTotal: 0,
+      }
+      atual.quantidade += item.quantidade
+      atual.valorTotal = Math.round((atual.valorTotal + Number(item.total)) * 100) / 100
+      porProdutoMap.set(chave, atual)
+    }
+  }
+
+  return {
+    vendas,
+    porOperador: Array.from(porOperadorMap.values()).sort((a, b) => b.quantidade - a.quantidade),
+    porProduto: Array.from(porProdutoMap.values()).sort((a, b) => b.quantidade - a.quantidade),
+  }
+})

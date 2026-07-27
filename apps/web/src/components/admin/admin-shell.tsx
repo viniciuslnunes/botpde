@@ -289,7 +289,7 @@ export function AdminShell({
             immersivePdv ? 'h-full overflow-hidden' : 'overflow-auto',
           ].join(' ')}
         >
-          {!immersivePdv && operatorBanner}
+          {!immersivePdv ? operatorBanner : null}
           {children}
         </main>
       </div>

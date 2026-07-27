@@ -5,6 +5,8 @@ export interface AdminMembroItem {
   discordId?: string | null
   email?: string | null
   tipo: string
+  /** True quando o cadastro é SOCIO (não torcedor). */
+  isSocio: boolean
   cidade: string | null
   status: 'PENDENTE' | 'APROVADO' | 'REPROVADO'
   /** Label do status para usos em texto puro; o badge visual vem de `StatusBadge`. */
@@ -27,6 +29,26 @@ export interface AdminMembroItem {
   numero?: string | null
   bloco?: string | null
   complemento?: string | null
+  // ─── Cadastro completo / LGE (onboarding SOCIO) ───────────────────────────
+  dataNascimentoLabel?: string | null
+  sexo?: string | null
+  estadoCivil?: string | null
+  nacionalidade?: string | null
+  rg?: string | null
+  /** CPF formatado para exibição admin (dado RESTRITO). */
+  cpf?: string | null
+  filiacao?: string | null
+  escolaridade?: string | null
+  profissao?: string | null
+  logradouro?: string | null
+  bairro?: string | null
+  uf?: string | null
+  fotoDocumentoUrl?: string | null
+  comprovanteResidenciaUrl?: string | null
+  responsavelNome?: string | null
+  responsavelDocumento?: string | null
+  autorizacaoMenorAceitaLabel?: string | null
+  termoResponsabilidadeAceitoLabel?: string | null
   adimplente?: boolean
   aprovadoPorNome?: string | null
   aprovadoEmLabel?: string | null

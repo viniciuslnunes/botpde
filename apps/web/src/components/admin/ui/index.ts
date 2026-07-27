@@ -12,3 +12,5 @@ export {
 export { TableShell, type TableShellProps } from './table-shell'
 export { TablePagination, type TablePaginationProps } from './table-pagination'
 export { InsightSection, type InsightSectionProps } from './insight-section'
+export { SortableTh, type SortableThProps } from './sortable-th'
+export { AdminTabs, adminTabIds, type AdminTabItem, type AdminTabsProps } from './admin-tabs'

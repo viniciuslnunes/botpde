@@ -499,6 +499,10 @@ const interesseUnidadeSchema = z.object({
     .nullable()
     .optional()
     .refine((n) => n == null || (n >= -180 && n <= 180), 'Longitude inválida'),
+  mapsUrl: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined)),
   fotoUrl: z
     .string()
     .url()
@@ -551,6 +555,7 @@ export async function registrarInteresseUnidade(input: {
   cep?: string
   lat?: number | null
   lng?: number | null
+  mapsUrl?: string
   fotoUrl?: string
   contatoNome?: string
   contatoEmail?: string
@@ -577,6 +582,18 @@ export async function registrarInteresseUnidade(input: {
     return { message: 'Torcida não encontrada.' }
   }
 
+  let lat = parsed.data.lat ?? null
+  let lng = parsed.data.lng ?? null
+  // Fallback: link curto do Maps pode falhar no client; resolve no servidor.
+  if ((lat == null || lng == null) && parsed.data.mapsUrl) {
+    const { resolveCoordsFromGoogleMapsLink } = await import('@/lib/google-maps')
+    const coords = await resolveCoordsFromGoogleMapsLink(parsed.data.mapsUrl)
+    if (coords) {
+      lat = coords.lat
+      lng = coords.lng
+    }
+  }
+
   // Persiste a solicitação como fila gerenciável (super-admin / presidente).
   // O e-mail abaixo continua como notificação de conveniência.
   const solicitacao = await db.solicitacaoUnidade.create({
@@ -589,8 +606,8 @@ export async function registrarInteresseUnidade(input: {
       endereco: parsed.data.endereco,
       regiao: parsed.data.regiao ?? null,
       cep: parsed.data.cep,
-      lat: parsed.data.lat ?? null,
-      lng: parsed.data.lng ?? null,
+      lat,
+      lng,
       fotoUrl: parsed.data.fotoUrl ?? null,
       contatoNome: parsed.data.contatoNome,
       contatoEmail: parsed.data.contatoEmail ?? null,
@@ -655,8 +672,8 @@ export async function registrarInteresseUnidade(input: {
         estado: parsed.data.estado,
         endereco: parsed.data.endereco,
         cep: parsed.data.cep,
-        lat: parsed.data.lat ?? null,
-        lng: parsed.data.lng ?? null,
+        lat,
+        lng,
         fotoUrl: parsed.data.fotoUrl ?? null,
         contatoNome: parsed.data.contatoNome,
         contatoEmail: parsed.data.contatoEmail ?? null,

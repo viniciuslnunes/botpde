@@ -107,7 +107,7 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
               className="flex gap-4 overflow-hidden p-4"
             >
               <Link
-                href={`/portal/loja/${item.produto.id}`}
+                href={`/portal/loja/${item.produto.tenantId}/${item.produto.id}`}
                 className="h-24 w-24 shrink-0 overflow-hidden rounded-xl"
                 aria-label={item.produto.nome}
               >
@@ -122,7 +122,7 @@ export function SacolaItens({ itens: itensIniciais }: { itens: SacolaItemSeriali
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
-                      href={`/portal/loja/${item.produto.id}`}
+                      href={`/portal/loja/${item.produto.tenantId}/${item.produto.id}`}
                       className="font-semibold leading-snug hover:text-[rgb(var(--color-primary-fg))] line-clamp-2"
                     >
                       {item.produto.nome}

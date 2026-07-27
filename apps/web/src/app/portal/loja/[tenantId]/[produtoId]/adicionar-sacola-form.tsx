@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { adicionarAoCarrinho } from '../actions'
+import { adicionarAoCarrinho } from '../../actions'
 import { ShoppingBag, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { chaveTamanho } from '@torcida/types'

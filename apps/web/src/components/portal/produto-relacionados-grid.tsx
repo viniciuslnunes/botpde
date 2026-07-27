@@ -10,6 +10,7 @@ export interface ProdutoRelacionadoItem {
   nome: string
   precoLabel: string
   imagensUrl: string[]
+  href: string
 }
 
 export function ProdutoRelacionadosGrid({ produtos }: { produtos: ProdutoRelacionadoItem[] }) {
@@ -25,7 +26,7 @@ export function ProdutoRelacionadosGrid({ produtos }: { produtos: ProdutoRelacio
       {produtos.map((p) => (
         <m.div key={p.id} variants={staggerItem} whileTap={{ scale: 0.98 }} transition={springSnappy}>
           <Link
-            href={`/portal/loja/${p.id}`}
+            href={p.href}
             className="group block overflow-hidden rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] hover:shadow-md"
           >
             <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />

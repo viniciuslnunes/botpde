@@ -1,6 +1,6 @@
 'use server'
 
-import { assertAnyPermission, assertMembroAtivo } from '@/lib/authz'
+import { assertMembroAtivo } from '@/lib/authz'
 import { auth } from '@/lib/auth'
 import { getTenantFromHost } from '@/lib/tenant'
 import {
@@ -8,7 +8,6 @@ import {
   isGoogleMapsConfigured,
   resolveCoordsFromGoogleMapsLink,
 } from '@/lib/google-maps'
-import { PERMISSIONS } from '@torcida/types'
 
 export type ResolverMapsLinkResult =
   | { ok: true; lat: number; lng: number }
@@ -18,28 +17,43 @@ export type StreetViewCropResult =
   | { ok: true; dataUrl: string }
   | { ok: false; message: string }
 
-const MAPS_MUTATION_PERMS = [
-  PERMISSIONS.SEDES_MANAGE,
-  PERMISSIONS.EVENTS_CREATE,
-  PERMISSIONS.EVENTS_MANAGE,
-]
+/**
+ * Expandir link do Maps é leitura (geocode) — qualquer usuário autenticado.
+ * Antes exigia SEDES/EVENTS e quebrava onboarding + super-admin sem tenant.
+ */
+async function assertPodeResolverMapsLink(): Promise<ResolverMapsLinkResult | null> {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return { ok: false, message: 'Não autenticado.' }
+  }
+  return null
+}
 
 /** Resolve lat/lng a partir de link do Google Maps (completo ou curto). */
 export async function resolverCoordsDeLinkMaps(url: string): Promise<ResolverMapsLinkResult> {
-  await assertAnyPermission(MAPS_MUTATION_PERMS)
+  const authErr = await assertPodeResolverMapsLink()
+  if (authErr) return authErr
+
   const trimmed = url.trim()
   if (!trimmed) {
     return { ok: false, message: 'Cole um link do Google Maps.' }
   }
-  const coords = await resolveCoordsFromGoogleMapsLink(trimmed)
-  if (!coords) {
+  try {
+    const coords = await resolveCoordsFromGoogleMapsLink(trimmed)
+    if (!coords) {
+      return {
+        ok: false,
+        message:
+          'Não foi possível ler as coordenadas deste link. Abra o local no Maps, copie o link completo (ou use Buscar no mapa).',
+      }
+    }
+    return { ok: true, lat: coords.lat, lng: coords.lng }
+  } catch {
     return {
       ok: false,
-      message:
-        'Não foi possível ler as coordenadas deste link. Abra o local no Maps, copie o link completo (ou use Buscar no mapa).',
+      message: 'Falha ao expandir o link do Maps. Tente o link completo ou Buscar no mapa.',
     }
   }
-  return { ok: true, lat: coords.lat, lng: coords.lng }
 }
 
 /**

@@ -58,6 +58,16 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   BAR_CATEGORIA_CRIADA: 'Categoria do bar criada',
   BAR_CATEGORIA_EXCLUIDA: 'Categoria do bar excluída',
   BAR_BALANCO_ALTERADO: 'Visibilidade do balanço alterada',
+  BAR_ESTOQUE_AJUSTADO: 'Estoque do bar ajustado',
+  BAR_TURNO_ABERTO: 'Turno de caixa aberto',
+  BAR_TURNO_FECHADO: 'Turno de caixa fechado',
+  BAR_VENDA_ESTORNADA: 'Venda do bar estornada',
+  BAR_FORNECEDOR_CRIADO: 'Fornecedor do bar criado',
+  BAR_FORNECEDOR_EDITADO: 'Fornecedor do bar editado',
+  BAR_FORNECEDOR_ATIVO_ALTERADO: 'Status do fornecedor do bar alterado',
+  BAR_FIADO_REGISTRADO: 'Fiado do bar registrado',
+  BAR_FIADO_QUITADO: 'Fiado do bar quitado',
+  BAR_FIADO_CANCELADO: 'Fiado do bar cancelado',
 
   // Comunidade / moderação
   POST_CRIADO: 'Post criado',
@@ -151,6 +161,13 @@ export const AUDIT_ENTIDADE_LABEL: Record<string, string> = {
   UserRole: 'Acesso',
   ImportacaoBase: 'Importação',
   PerfilMembro: 'Perfil',
+  BarFornecedor: 'Fornecedor (Bar)',
+  BarFiado: 'Fiado (Bar)',
+  BarVenda: 'Venda (Bar)',
+  BarProduto: 'Produto (Bar)',
+  BarCategoria: 'Categoria (Bar)',
+  BarCaixaTurno: 'Turno de caixa (Bar)',
+  BarMovimentacaoEstoque: 'Movimentação de estoque (Bar)',
 }
 
 export function labelAcaoAuditoria(acao: string): string {

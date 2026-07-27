@@ -11,7 +11,6 @@ export interface LojaProdutoGridItem {
   id: string
   nome: string
   href: string
-  tenantBadge: string | null
   precoLabel: string
   precoOriginalLabel: string | null
   imagensUrl: string[]
@@ -58,11 +57,6 @@ export function LojaProdutoGridAnimated({
               <ProdutoCardImagem imagensUrl={p.imagensUrl} alt={p.nome} />
             </div>
             <div className="flex flex-1 flex-col p-4">
-              {p.tenantBadge && (
-                <span className="mb-1 inline-flex w-fit rounded-full bg-[rgb(var(--color-primary)_/_0.15)] px-2 py-0.5 text-xs font-medium text-[rgb(var(--color-primary-fg))]">
-                  {p.tenantBadge}
-                </span>
-              )}
               <h3 className="flex-1 font-semibold leading-snug line-clamp-2 group-hover:text-[rgb(var(--color-primary-fg))]">
                 {p.nome}
               </h3>

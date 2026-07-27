@@ -899,6 +899,7 @@ function PassoUnidade({
   const [buscandoCepUnidade, setBuscandoCepUnidade] = useState(false)
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
+  const [mapsUrlUnidade, setMapsUrlUnidade] = useState('')
   const [fotoUrlUnidade, setFotoUrlUnidade] = useState('')
   const formId = useId()
   const [contatoNome, setContatoNome] = useState('')
@@ -1056,6 +1057,7 @@ function PassoUnidade({
         cep: cepUnidade,
         lat,
         lng,
+        mapsUrl: mapsUrlUnidade || undefined,
         fotoUrl: fotoUrlUnidade || undefined,
         contatoNome,
         contatoEmail: contatoEmail || undefined,
@@ -1282,6 +1284,7 @@ function PassoUnidade({
                 setLat(coords.lat)
                 setLng(coords.lng)
               }}
+              onMapsLinkChange={setMapsUrlUnidade}
             />
 
             <div className="grid gap-3 sm:grid-cols-3">

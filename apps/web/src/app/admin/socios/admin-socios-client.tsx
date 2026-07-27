@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { m } from 'motion/react'
 import {
   AlertTriangle,
   Check,
@@ -19,20 +18,25 @@ import {
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { AdminTabs, SortableTh } from '@/components/admin/ui'
 import {
   emitirCarteirinha,
   renovarCarteirinha,
   revogarCarteirinha,
 } from '@/app/admin/socios/actions'
+import { MembroDetalheModal } from '@/app/admin/membros/membro-detalhe-modal'
+import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
 import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
-import { springSnappy } from '@/lib/motion-presets'
+import type { SortDir } from '@/lib/admin-list-sort'
 
 export interface SocioEmitidoItem {
   id: string
   userId: string
   numeroSocio: number
+  /** Nº do recrutamento (exibição); não o sequencial legado. */
+  numeroLabel: string
   nome: string
   validadeIso: string
   validadeLabel: string
@@ -40,12 +44,15 @@ export interface SocioEmitidoItem {
   avatarUrl: string | null
   vencida: boolean
   vencendo: boolean
+  /** Cadastro completo do SaasMembro (modal de detalhes). */
+  detalhe: AdminMembroItem | null
 }
 
 export interface MembroElegivelItem {
   userId: string
   membroId: string
   nome: string
+  numeroAssociado: string | null
   discordTag: string | null
   telefone: string | null
   cidade: string | null
@@ -53,6 +60,8 @@ export interface MembroElegivelItem {
   sedeNome: string | null
   departamentoNome: string | null
   aprovadoEmLabel: string | null
+  /** Presente na lista; null nas opções leves do modal de emissão. */
+  detalhe: AdminMembroItem | null
 }
 
 function getValidadePadrao() {
@@ -182,7 +191,7 @@ export function EmitirCarteirinhaModal({
   const q = filtro.trim().toLowerCase()
   const filtrados = q
     ? membrosElegiveis.filter((m) => {
-        const hay = [m.nome, m.cidade, m.discordTag, m.telefone]
+        const hay = [m.nome, m.cidade, m.discordTag, m.telefone, m.numeroAssociado]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()
@@ -237,6 +246,9 @@ export function EmitirCarteirinhaModal({
                 <span className="font-medium text-[rgb(var(--foreground))]">
                   {selecionado.nome}
                 </span>
+                {selecionado.numeroAssociado
+                  ? ` · nº ${selecionado.numeroAssociado}`
+                  : ''}
                 {selecionado.cidade ? ` · ${selecionado.cidade}` : ''}
               </p>
             )}
@@ -277,11 +289,15 @@ export function EmitirCarteirinhaModal({
                         <Avatar url={m.avatarUrl} nome={m.nome} size={28} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{m.nome}</span>
-                          {(m.cidade || m.telefone) && (
-                            <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
-                              {[m.cidade, m.telefone].filter(Boolean).join(' · ')}
-                            </span>
-                          )}
+                          <span className="block truncate text-xs text-[rgb(var(--foreground-muted))]">
+                            {[
+                              m.numeroAssociado ? `nº ${m.numeroAssociado}` : null,
+                              m.cidade,
+                              m.telefone,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
                         </span>
                         {active && <Check className="h-4 w-4 shrink-0" aria-hidden />}
                       </button>
@@ -425,7 +441,7 @@ function SocioActions({
   async function handleRevogar() {
     await confirmAction({
       titulo: 'Revogar esta carteirinha?',
-      descricao: `A carteirinha nº ${String(socio.numeroSocio).padStart(5, '0')} de ${socio.nome} será removida. O membro continua aprovado e volta à fila de emissão.`,
+      descricao: `A carteirinha nº ${socio.numeroLabel} de ${socio.nome} será removida. O membro continua aprovado e volta à fila de emissão.`,
       labelConfirmar: 'Revogar',
       variante: 'destructive',
       cancelled: 'Revogação cancelada.',
@@ -549,6 +565,13 @@ export function AdminSociosClient({
   contagens,
   statusFiltro,
   busca,
+  sedeFiltro,
+  sedes,
+  sort,
+  dir,
+  sortHrefs,
+  tabHrefs,
+  tabExtraParams,
   podeEmitir,
 }: {
   socios: SocioEmitidoItem[]
@@ -564,25 +587,30 @@ export function AdminSociosClient({
   }
   statusFiltro: string
   busca: string
+  sedeFiltro: string
+  sedes: { id: string; nome: string; tipo: string }[]
+  sort: string
+  dir: SortDir
+  sortHrefs: Record<string, string>
+  tabHrefs: Record<string, string>
+  /** Params (q/sede/sort/dir) a preservar ao trocar de tab via `AdminTabs`. */
+  tabExtraParams: Record<string, string | undefined>
   podeEmitir: boolean
 }) {
   const [emitOpen, setEmitOpen] = useState(false)
   const [emitUserId, setEmitUserId] = useState<string | null>(null)
+  const [selecionado, setSelecionado] = useState<AdminMembroItem | null>(null)
+  const fecharDetalhe = useCallback(() => setSelecionado(null), [])
 
   const isAguardando = statusFiltro === 'aguardando'
+
+  function abrirDetalhe(detalhe: AdminMembroItem | null | undefined) {
+    if (detalhe) setSelecionado(detalhe)
+  }
 
   function abrirEmit(userId?: string) {
     setEmitUserId(userId ?? null)
     setEmitOpen(true)
-  }
-
-  function tabsHref(status: string) {
-    const p = new URLSearchParams()
-    if (status && status !== 'todos') p.set('status', status)
-    if (busca) p.set('q', busca)
-    // troca de aba volta à página 1
-    const qs = p.toString()
-    return `/admin/socios${qs ? `?${qs}` : ''}`
   }
 
   const tabs = [
@@ -650,48 +678,31 @@ export function AdminSociosClient({
             )}
           </div>
 
-          <div className="app-scrollbar-none -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
-            {tabs.map((tab) => {
-              const active = statusFiltro === tab.key
-              const showCount =
-                tab.key === 'aguardando'
-                  ? tab.count > 0
-                  : tab.count > 0 || active
-              return (
-                <m.div key={tab.key} whileTap={{ scale: 0.97 }} transition={springSnappy}>
-                  <Link
-                    href={tabsHref(tab.key)}
-                    className={[
-                      'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                      active
-                        ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                        : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
-                    ].join(' ')}
-                  >
-                    {tab.label}
-                    {showCount && (
-                      <span
-                        className={[
-                          'rounded-full px-1.5 py-0.5 text-xs font-semibold',
-                          active
-                            ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                            : tab.countClass ??
-                              'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-                        ].join(' ')}
-                      >
-                        {tab.count}
-                      </span>
-                    )}
-                  </Link>
-                </m.div>
-              )
-            })}
+          <div className="mt-4">
+            <AdminTabs
+              tabs={tabs.map((tab) => ({
+                id: tab.key,
+                label: tab.label,
+                count: tab.count,
+                countClass: tab.countClass,
+              }))}
+              basePath="/admin/socios"
+              activeId={statusFiltro}
+              paramKey="status"
+              extraParams={tabExtraParams}
+            />
           </div>
 
-          <form method="GET" action="/admin/socios" className="mt-3">
+          <form
+            method="GET"
+            action="/admin/socios"
+            className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+          >
             {statusFiltro !== 'todos' && (
               <input type="hidden" name="status" value={statusFiltro} />
             )}
+            <input type="hidden" name="sort" value={sort} />
+            <input type="hidden" name="dir" value={dir} />
             <input
               type="search"
               name="q"
@@ -701,8 +712,27 @@ export function AdminSociosClient({
                   ? 'Buscar sócio aguardando por nome, cidade ou telefone…'
                   : 'Buscar carteirinha por nome ou número…'
               }
-              className="w-full rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)]"
+              className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)] sm:min-w-[14rem]"
             />
+            <select
+              name="sede"
+              defaultValue={sedeFiltro}
+              className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-56"
+            >
+              <option value="">Todas as unidades</option>
+              <option value="nenhuma">Sem unidade</option>
+              {sedes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
+            >
+              Filtrar
+            </button>
           </form>
         </div>
       </div>
@@ -746,7 +776,17 @@ export function AdminSociosClient({
                   {elegiveis.map((membro) => (
                     <li
                       key={membro.userId}
-                      className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+                      className="cursor-pointer rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                      onClick={() => abrirDetalhe(membro.detalhe)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          abrirDetalhe(membro.detalhe)
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Ver detalhes de ${membro.nome}`}
                     >
                       <div className="flex items-start gap-3">
                         <Avatar url={membro.avatarUrl} nome={membro.nome} />
@@ -755,7 +795,14 @@ export function AdminSociosClient({
                             {membro.nome}
                           </p>
                           <p className="mt-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-                            {[membro.sedeNome, membro.cidade, membro.telefone]
+                            {[
+                              membro.numeroAssociado
+                                ? `nº ${membro.numeroAssociado}`
+                                : null,
+                              membro.sedeNome,
+                              membro.cidade,
+                              membro.telefone,
+                            ]
                               .filter(Boolean)
                               .join(' · ') || '—'}
                           </p>
@@ -766,7 +813,11 @@ export function AdminSociosClient({
                           )}
                         </div>
                       </div>
-                      <div className="mt-3">
+                      <div
+                        className="mt-3"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         {podeEmitir ? (
                           <button
                             type="button"
@@ -790,18 +841,44 @@ export function AdminSociosClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                          Sócio
-                        </th>
-                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] md:table-cell">
-                          Unidade
-                        </th>
-                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] lg:table-cell">
-                          Cidade
-                        </th>
-                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] xl:table-cell">
-                          Aprovado em
-                        </th>
+                        <SortableTh
+                          label="Nº"
+                          column="numero"
+                          currentSort={sort}
+                          currentDir={dir}
+                          href={sortHrefs.numero ?? '#'}
+                        />
+                        <SortableTh
+                          label="Sócio"
+                          column="nome"
+                          currentSort={sort}
+                          currentDir={dir}
+                          href={sortHrefs.nome ?? '#'}
+                        />
+                        <SortableTh
+                          label="Unidade"
+                          column="sede"
+                          currentSort={sort}
+                          currentDir={dir}
+                          href={sortHrefs.sede ?? '#'}
+                          className="hidden md:table-cell"
+                        />
+                        <SortableTh
+                          label="Cidade"
+                          column="cidade"
+                          currentSort={sort}
+                          currentDir={dir}
+                          href={sortHrefs.cidade ?? '#'}
+                          className="hidden lg:table-cell"
+                        />
+                        <SortableTh
+                          label="Aprovado em"
+                          column="aprovadoEm"
+                          currentSort={sort}
+                          currentDir={dir}
+                          href={sortHrefs.aprovadoEm ?? '#'}
+                          className="hidden xl:table-cell"
+                        />
                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                           Ação
                         </th>
@@ -811,8 +888,23 @@ export function AdminSociosClient({
                       {elegiveis.map((membro) => (
                         <tr
                           key={membro.userId}
-                          className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                          className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                          onClick={() => abrirDetalhe(membro.detalhe)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              abrirDetalhe(membro.detalhe)
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Ver detalhes de ${membro.nome}`}
                         >
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
+                              {membro.numeroAssociado?.trim() || '—'}
+                            </span>
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar url={membro.avatarUrl} nome={membro.nome} />
@@ -843,7 +935,11 @@ export function AdminSociosClient({
                               {membro.aprovadoEmLabel ?? '—'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td
+                            className="px-4 py-3 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
                             {podeEmitir ? (
                               <EmitirLinhaButton
                                 membro={membro}
@@ -883,7 +979,7 @@ export function AdminSociosClient({
                     {contagens.aguardando !== 1 ? 's' : ''} aprovado
                     {contagens.aguardando !== 1 ? 's' : ''} sem carteirinha.{' '}
                     <Link
-                      href={tabsHref('aguardando')}
+                      href={tabHrefs.aguardando ?? '/admin/socios?status=aguardando'}
                       className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
                     >
                       Ver fila de emissão
@@ -901,14 +997,24 @@ export function AdminSociosClient({
                 {socios.map((socio) => (
                   <li
                     key={socio.id}
-                    className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3"
+                    className="cursor-pointer rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                    onClick={() => abrirDetalhe(socio.detalhe)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        abrirDetalhe(socio.detalhe)
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Ver detalhes de ${socio.nome}`}
                   >
                     <div className="flex items-start gap-3">
                       <Avatar url={socio.avatarUrl} nome={socio.nome} />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                           <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
-                            {String(socio.numeroSocio).padStart(5, '0')}
+                            {socio.numeroLabel}
                           </span>
                           <span className="font-medium text-[rgb(var(--foreground))]">
                             {socio.nome}
@@ -925,7 +1031,11 @@ export function AdminSociosClient({
                       </div>
                     </div>
                     {podeEmitir && (
-                      <div className="mt-3 border-t border-[rgb(var(--border))] pt-3">
+                      <div
+                        className="mt-3 border-t border-[rgb(var(--border))] pt-3"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         <SocioActions socio={socio} stacked />
                       </div>
                     )}
@@ -937,18 +1047,35 @@ export function AdminSociosClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                        Nº
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                        Nome
-                      </th>
-                      <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] lg:table-cell">
-                        Contato
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                        Validade
-                      </th>
+                      <SortableTh
+                        label="Nº"
+                        column="numero"
+                        currentSort={sort}
+                        currentDir={dir}
+                        href={sortHrefs.numero ?? '#'}
+                      />
+                      <SortableTh
+                        label="Nome"
+                        column="nome"
+                        currentSort={sort}
+                        currentDir={dir}
+                        href={sortHrefs.nome ?? '#'}
+                      />
+                      <SortableTh
+                        label="Contato"
+                        column="email"
+                        currentSort={sort}
+                        currentDir={dir}
+                        href={sortHrefs.email ?? '#'}
+                        className="hidden lg:table-cell"
+                      />
+                      <SortableTh
+                        label="Validade"
+                        column="validade"
+                        currentSort={sort}
+                        currentDir={dir}
+                        href={sortHrefs.validade ?? '#'}
+                      />
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                         Ações
                       </th>
@@ -958,11 +1085,21 @@ export function AdminSociosClient({
                     {socios.map((socio) => (
                       <tr
                         key={socio.id}
-                        className="transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                        className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
+                        onClick={() => abrirDetalhe(socio.detalhe)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            abrirDetalhe(socio.detalhe)
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Ver detalhes de ${socio.nome}`}
                       >
                         <td className="px-4 py-3">
                           <span className="font-mono text-sm font-bold text-[rgb(var(--foreground))]">
-                            {String(socio.numeroSocio).padStart(5, '0')}
+                            {socio.numeroLabel}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -981,7 +1118,11 @@ export function AdminSociosClient({
                         <td className="px-4 py-3">
                           <ValidadeStatus socio={socio} />
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
                           {podeEmitir ? (
                             <SocioActions socio={socio} />
                           ) : (
@@ -1009,6 +1150,8 @@ export function AdminSociosClient({
           initialUserId={emitUserId}
         />
       )}
+
+      <MembroDetalheModal membro={selecionado} onClose={fecharDetalhe} />
     </>
   )
 }

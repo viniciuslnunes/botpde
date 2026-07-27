@@ -19,7 +19,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { CriarSedeForm, ExcluirSedeButton, ToggleSedeButton } from '@/components/admin/sede-forms'
+import { CriarSedeForm, SedeAcoesMenu } from '@/components/admin/sede-forms'
 import { LogoImage } from '@/components/media/logo-image'
 import { geocodificarSedesSemCoords } from '@/app/admin/sedes/actions'
 import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
@@ -452,7 +452,6 @@ function SedeCard({
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:flex-col sm:items-stretch sm:self-center lg:flex-row">
-              <ToggleSedeButton sedeId={sede.id} ativa={sede.ativa} />
               <Link
                 href={`/admin/sedes/${sede.id}`}
                 className="inline-flex items-center justify-center gap-1 rounded-xl bg-[rgb(var(--color-primary)_/_0.12)] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.28)] transition-colors hover:bg-[rgb(var(--color-primary)_/_0.18)]"
@@ -460,13 +459,13 @@ function SedeCard({
                 Editar
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden />
               </Link>
-              {sede.podeExcluir && (
-                <ExcluirSedeButton
-                  sedeId={sede.id}
-                  sedeNome={sede.nome}
-                  destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
-                />
-              )}
+              <SedeAcoesMenu
+                sedeId={sede.id}
+                sedeNome={sede.nome}
+                ativa={sede.ativa}
+                podeExcluir={sede.podeExcluir}
+                destinos={sedesOption.filter((s) => s.tipo === 'SEDE' && s.id !== sede.id)}
+              />
             </div>
           </div>
         </div>

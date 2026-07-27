@@ -114,6 +114,26 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   DEPARTAMENTO_REMOVIDO: { escopo: 'social' },
   SEDE_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
   BAR_VENDA_ESTORNADA: { escopo: 'social' },
+  BAR_ESTOQUE_BAIXO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.BAR_MANAGE,
+    menuId: 'bar-estoque',
+  },
+  BAR_FIADO_VENCIDO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.BAR_MANAGE,
+    menuId: 'bar-fiado',
+  },
+  BAR_TURNO_DIVERGENCIA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.BAR_MANAGE,
+    menuId: 'bar-pdv',
+  },
+  BAR_ESTORNO_ANOMALO: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.BAR_MANAGE,
+    menuId: 'bar-estornos',
+  },
   PATRIMONIO_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
   PEDIDO_RECEBIDO: {
     escopo: 'admin',
