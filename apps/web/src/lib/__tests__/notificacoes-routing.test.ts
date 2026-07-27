@@ -59,9 +59,10 @@ function setupVazio() {
 }
 
 describe('TIPOS_NOTIFICACAO_ADMIN', () => {
-  it('inclui MEMBRO_SOLICITADO e DENUNCIA_NOVA', () => {
+  it('inclui MEMBRO_SOLICITADO, DENUNCIA_NOVA e SOLICITACAO_UNIDADE_CRIADA', () => {
     expect(TIPOS_NOTIFICACAO_ADMIN).toContain('MEMBRO_SOLICITADO')
     expect(TIPOS_NOTIFICACAO_ADMIN).toContain('DENUNCIA_NOVA')
+    expect(TIPOS_NOTIFICACAO_ADMIN).toContain('SOLICITACAO_UNIDADE_CRIADA')
   })
 })
 
@@ -71,6 +72,7 @@ describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
     expect(menuIdParaTipo('DENUNCIA_NOVA')).toBe('comunidade-moderacao')
     expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
     expect(menuIdParaTipo('COBRANCA_VENCIDA')).toBe('cobrancas')
+    expect(menuIdParaTipo('SOLICITACAO_UNIDADE_CRIADA')).toBe('afiliacoes')
     expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
     expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
   })

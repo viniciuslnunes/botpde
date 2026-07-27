@@ -9,6 +9,7 @@ import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import { ArrowRight, Building2, FileSearch, Settings, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 import { TransferirOwnerPainel } from './transferir-owner-painel'
+import { TorcidasListaCliente } from './torcidas-lista-cliente'
 
 export const metadata: Metadata = { title: 'Torcidas — Super Admin' }
 
@@ -115,17 +116,9 @@ export default async function TorcidasPage() {
           <Building2 className="h-4 w-4" />
           {totalTenants} torcida(s) ativa(s)
         </h2>
-        <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm text-[rgb(var(--foreground-muted))]">
-          {torcidas.map((t) => (
-            <li
-              key={t.id}
-              className="flex justify-between gap-2 rounded px-2 py-1 hover:bg-[rgb(var(--background-subtle))]"
-            >
-              <span className="truncate text-[rgb(var(--foreground))]">{t.nome}</span>
-              <span className="shrink-0 font-mono text-xs text-[rgb(var(--foreground-muted))]">{t.slug}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3">
+          <TorcidasListaCliente torcidas={torcidas} />
+        </div>
       </div>
 
       <details

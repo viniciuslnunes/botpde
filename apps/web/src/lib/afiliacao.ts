@@ -25,7 +25,11 @@ export interface SolicitacaoParaMaterializar {
   estado: string
   endereco: string | null
   contatoNome: string | null
+  /** E-mail informado da liderança — usado para vincular a conta quando não há solicitante (intake manual). */
+  contatoEmail: string | null
   cep: string | null
+  lat: number | null
+  lng: number | null
   fotoUrl: string | null
   /** Quem pediu o cadastro (onboarding) — vira responsável/liderança da unidade. */
   solicitadoPorId: string | null
@@ -45,7 +49,22 @@ export async function criarUnidadeDaSolicitacao(
   // Liderança local = quem solicitou (onboarding), não quem aprovou (Presidente/
   // super-admin) — sem isso a unidade nascia com o canal oficial vazio de
   // liderança e sem "responsável" definido, obrigando pedido manual de entrada.
-  const liderancaUserId = solicitacao.solicitadoPorId
+  let liderancaUserId = solicitacao.solicitadoPorId
+
+  // Intake manual (super-admin) não tem solicitante — se a liderança informou
+  // e-mail e já existe conta cadastrada, vincula por e-mail (mesmo efeito do
+  // solicitante do onboarding: responsável, ADMIN do canal e sócio da unidade).
+  let liderancaViaEmail = false
+  if (!liderancaUserId && solicitacao.contatoEmail) {
+    const userPorEmail: { id: string } | null = await tx.user.findFirst({
+      where: { email: { equals: solicitacao.contatoEmail, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (userPorEmail) {
+      liderancaUserId = userPorEmail.id
+      liderancaViaEmail = true
+    }
+  }
 
   const sede: { id: string } = await tx.sede.create({
     data: {
@@ -56,6 +75,8 @@ export async function criarUnidadeDaSolicitacao(
       estado: solicitacao.estado,
       endereco: solicitacao.endereco,
       cep: solicitacao.cep,
+      lat: solicitacao.lat,
+      lng: solicitacao.lng,
       fotoUrl: solicitacao.fotoUrl,
       sedeId: raiz?.id ?? null,
       ativa: true,
@@ -94,7 +115,22 @@ export async function criarUnidadeDaSolicitacao(
   // a dela — senão a contagem de membros da unidade (/admin/sedes) fica
   // zerada mesmo com o responsável definido (mesma causa do bug do FIEL
   // CUBATÃO em promoverUnidadeAPortal).
-  if (liderancaUserId) {
+  if (liderancaUserId && liderancaViaEmail) {
+    // Vínculo por e-mail (intake manual) — a liderança pode não ser sócia
+    // ainda; garante o registro já APROVADO para não ficar sem acesso.
+    await tx.saasMembro.upsert({
+      where: { tenantId_userId: { tenantId: solicitacao.tenantId, userId: liderancaUserId } },
+      update: { sedeId: sede.id },
+      create: {
+        tenantId: solicitacao.tenantId,
+        userId: liderancaUserId,
+        nome: solicitacao.contatoNome ?? 'Liderança',
+        tipo: 'SOCIO',
+        status: 'APROVADO',
+        sedeId: sede.id,
+      },
+    })
+  } else if (liderancaUserId) {
     await tx.saasMembro.updateMany({
       where: { tenantId: solicitacao.tenantId, userId: liderancaUserId },
       data: { sedeId: sede.id },

@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { SuperAdminShell } from '@/components/super-admin/super-admin-shell'
+import { SuperAdminMotionShell } from '@/components/motion/super-admin-motion-shell'
 import { getTenantFromHost } from '@/lib/tenant'
 import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
+import { contarPendentesSuperAdmin } from '@/lib/super-admin/pendentes-badges'
 
 /**
  * Layout do Super Admin (operador do SaaS).
@@ -24,9 +26,10 @@ export default async function SuperAdminLayout({
     redirect('/')
   }
 
-  const [torcidas, tenant] = await Promise.all([
+  const [torcidas, tenant, badges] = await Promise.all([
     listarTorcidasParaSelecao(),
     getTenantFromHost(),
+    contarPendentesSuperAdmin(),
   ])
 
   return (
@@ -35,8 +38,9 @@ export default async function SuperAdminLayout({
       userEmail={session.user.email}
       torcidaAtualSlug={tenant?.slug ?? null}
       torcidas={torcidas}
+      badges={badges}
     >
-      {children}
+      <SuperAdminMotionShell>{children}</SuperAdminMotionShell>
     </SuperAdminShell>
   )
 }

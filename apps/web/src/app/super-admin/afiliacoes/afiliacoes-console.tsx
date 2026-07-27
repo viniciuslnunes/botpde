@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
-import { Check, Handshake, ImagePlus, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
+import { useActionState, useEffect, useId, useRef, useState } from 'react'
+import { Check, Loader2, MapPin, Pencil, Phone, Rocket, X } from 'lucide-react'
+import { m, AnimatePresence } from 'motion/react'
 import { Badge, type BadgeVariant } from '@torcida/ui'
 import {
   aprovarSolicitacao,
@@ -11,7 +12,14 @@ import {
   type SolicitacaoActionState,
 } from '@/app/admin/afiliacoes/afiliacao-actions'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
+import { normalizarInicioEndereco } from '@/lib/endereco'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
+import { buildGoogleMapsUrl } from '@/lib/google-maps'
+import { springSnappy } from '@/lib/motion-presets'
+import { MotionTabBar } from '@/components/motion/motion-tab-bar'
+import { ImageCropDialog } from '@/components/admin/image-crop-dialog'
+import { ImageDropZone } from '@/components/media/image-drop-zone'
+import { LocationPickerFields } from '@/components/media/location-picker-fields'
 import { promoverUnidadeAPortal, type PromoverState } from './promover-actions'
 import { SearchableSelect, type ComboOption } from './searchable-select'
 
@@ -26,6 +34,8 @@ export interface SolicitacaoView {
   endereco: string | null
   contatoNome: string | null
   fotoUrl: string | null
+  lat: number | null
+  lng: number | null
   contatoEmail: string | null
   contatoTelefone: string | null
   vinculo: string | null
@@ -80,21 +90,30 @@ const CAMPOS_MANUAL_INICIAIS = {
   estado: '',
   endereco: '',
   contatoNome: '',
+  contatoEmail: '',
   cep: '',
 }
 
-function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
+function CriarManualForm({
+  torcidas,
+  onCriado,
+}: {
+  torcidas: TorcidaOption[]
+  onCriado?: () => void
+}) {
   const [state, action, pending] = useActionState<SolicitacaoActionState, FormData>(
     criarSolicitacaoManual,
     {},
   )
+  const formId = useId()
   const [tenantId, setTenantId] = useState<string | null>(null)
-  const [aberto, setAberto] = useState(false)
   const [campos, setCampos] = useState(CAMPOS_MANUAL_INICIAIS)
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [fotoUrl, setFotoUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [erroFoto, setErroFoto] = useState<string | null>(null)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
   const torcidaOptions: ComboOption[] = torcidas.map((t) => ({
     id: t.id,
@@ -110,8 +129,15 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
       setTenantId(null)
       setFotoUrl('')
       setErroFoto(null)
+      onCriado?.()
     }
-  }, [state.success])
+  }, [state.success, onCriado])
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    }
+  }, [])
 
   function setCampo(name: keyof typeof CAMPOS_MANUAL_INICIAIS, value: string) {
     setCampos((prev) => ({ ...prev, [name]: value }))
@@ -125,24 +151,62 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
     try {
       const endereco = await buscarEnderecoPorCep(value)
       if (!endereco) return
-      setCampos((prev) => ({
-        ...prev,
-        cidade: endereco.localidade || prev.cidade,
-        estado: endereco.uf || prev.estado,
-        endereco: prev.endereco.trim() ? prev.endereco : endereco.logradouro,
-      }))
+      setCampos((prev) => {
+        const atual = prev.endereco.trim()
+        const numero = atual.match(/,?\s*(\d+[A-Za-z]?.*)$/)
+        const mesmoLogradouro =
+          atual.length > 0 &&
+          Boolean(endereco.logradouro) &&
+          normalizarInicioEndereco(atual) === normalizarInicioEndereco(endereco.logradouro)
+        const novoEndereco = endereco.logradouro
+          ? mesmoLogradouro && numero
+            ? `${endereco.logradouro}, ${numero[1].replace(/^,\s*/, '')}`
+            : endereco.logradouro
+          : prev.endereco
+        return {
+          ...prev,
+          cidade: endereco.localidade || prev.cidade,
+          estado: endereco.uf || prev.estado,
+          endereco: novoEndereco,
+          cep: `${digitos.slice(0, 5)}-${digitos.slice(5)}`,
+        }
+      })
     } finally {
       setBuscandoCep(false)
     }
   }
 
-  async function onFotoChange(file: File | undefined) {
-    if (!file) return
+  function onImageFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setErroFoto('Selecione um arquivo de imagem.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErroFoto('Imagem muito grande. Máximo: 10MB.')
+      return
+    }
+    setErroFoto(null)
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    const url = URL.createObjectURL(file)
+    objectUrlRef.current = url
+    setCropSrc(url)
+  }
+
+  function closeCrop() {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    setCropSrc(null)
+  }
+
+  async function uploadCroppedFile(file: File) {
     setUploading(true)
     setErroFoto(null)
     try {
       const url = await uploadMediaToCloudinary(file, undefined, 'sede')
       setFotoUrl(url)
+      closeCrop()
     } catch (err) {
       setErroFoto(err instanceof Error ? err.message : 'Falha ao subir a foto.')
     } finally {
@@ -150,36 +214,15 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
     }
   }
 
-  if (!aberto) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-      >
-        <Handshake className="h-4 w-4" />
-        Registrar solicitação manualmente
-      </button>
-    )
-  }
-
   return (
     <form
+      id={formId}
       action={action}
       className="space-y-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
     >
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
-          Registrar solicitação (intake manual)
-        </h2>
-        <button
-          type="button"
-          onClick={() => setAberto(false)}
-          className="text-xs text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-        >
-          Fechar
-        </button>
-      </div>
+      <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">
+        Registrar solicitação (intake manual)
+      </h2>
 
       <input type="hidden" name="tenantId" value={tenantId ?? ''} />
       <input type="hidden" name="fotoUrl" value={fotoUrl} />
@@ -199,27 +242,32 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
           <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
             Foto da unidade (opcional)
           </label>
-          <div className="flex items-center gap-2">
-            {fotoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={fotoUrl} alt="" className="h-12 w-12 rounded object-cover" />
-            ) : null}
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]">
-              {uploading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ImagePlus className="h-3.5 w-3.5" />
-              )}
-              {fotoUrl ? 'Trocar foto' : 'Enviar foto'}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => void onFotoChange(e.target.files?.[0])}
-                disabled={uploading}
-              />
-            </label>
-          </div>
+          {cropSrc && (
+            <ImageCropDialog
+              src={cropSrc}
+              title="Ajustar e redimensionar foto"
+              aspect={1}
+              confirmLabel={uploading ? 'Enviando…' : 'Confirmar e enviar'}
+              onCancel={closeCrop}
+              onConfirm={uploadCroppedFile}
+            />
+          )}
+          <ImageDropZone
+            layout="split"
+            busy={uploading}
+            onFile={onImageFile}
+            formatsHint="JPEG, PNG, WebP ou GIF, até 10 MB — ajuste o enquadramento antes do envio"
+            file={
+              fotoUrl
+                ? {
+                    name: 'foto-unidade.jpg',
+                    status: uploading ? 'uploading' : 'done',
+                    previewUrl: fotoUrl,
+                  }
+                : null
+            }
+            onClear={fotoUrl ? () => setFotoUrl('') : undefined}
+          />
           {erroFoto && <p className="text-xs text-red-400">{erroFoto}</p>}
         </div>
         <Campo
@@ -238,7 +286,7 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            CEP (opcional) {buscandoCep ? '· buscando…' : ''}
+            CEP {buscandoCep ? '· buscando…' : ''}
           </label>
           <input
             name="cep"
@@ -266,11 +314,16 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
         />
         <Campo
           name="endereco"
-          label="Endereço (opcional)"
+          label="Endereço"
           placeholder="Rua, nº, bairro"
           value={campos.endereco}
           onChange={(v) => setCampo('endereco', v)}
           wide
+        />
+        <LocationPickerFields
+          key={state.success ? 'reset' : 'form'}
+          formId={formId}
+          className="sm:col-span-2"
         />
         <Campo
           name="contatoNome"
@@ -278,14 +331,21 @@ function CriarManualForm({ torcidas }: { torcidas: TorcidaOption[] }) {
           placeholder="Nome do responsável (opcional)"
           value={campos.contatoNome}
           onChange={(v) => setCampo('contatoNome', v)}
-          wide
+        />
+        <Campo
+          name="contatoEmail"
+          label="E-mail da liderança — opcional, vincula a conta se já existir"
+          placeholder="lideranca@email.com (opcional)"
+          type="email"
+          value={campos.contatoEmail}
+          onChange={(v) => setCampo('contatoEmail', v)}
         />
       </div>
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={pending || uploading || !tenantId}
+          disabled={pending || uploading || !tenantId || !campos.cep.trim() || !campos.endereco.trim()}
           className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold hover:opacity-90 disabled:opacity-40"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -303,6 +363,7 @@ function Campo({
   placeholder,
   maxLength,
   wide,
+  type = 'text',
   value,
   onChange,
 }: {
@@ -311,6 +372,7 @@ function Campo({
   placeholder: string
   maxLength?: number
   wide?: boolean
+  type?: string
   value: string
   onChange: (value: string) => void
 }) {
@@ -319,6 +381,7 @@ function Campo({
       <label className="text-xs font-medium text-[rgb(var(--foreground-muted))]">{label}</label>
       <input
         name={name}
+        type={type}
         placeholder={placeholder}
         maxLength={maxLength}
         value={value}
@@ -447,6 +510,25 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
                 {s.contatoTelefone ? ` · ${s.contatoTelefone}` : ''}
                 {s.contatoEmail ? ` · ${s.contatoEmail}` : ''}
               </span>
+              {s.lat != null && s.lng != null && (
+                <a
+                  href={
+                    buildGoogleMapsUrl({
+                      lat: s.lat,
+                      lng: s.lng,
+                      endereco: s.endereco ?? undefined,
+                      cidade: s.cidade,
+                      estado: s.estado,
+                    }) ?? undefined
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[rgb(var(--color-primary-fg))] hover:underline"
+                >
+                  <MapPin className="h-3 w-3" />
+                  Ver no mapa
+                </a>
+              )}
             </p>
             {s.vinculo && <ClampComTexto label="Credenciamento" texto={s.vinculo} />}
             {s.provasUrls.length > 0 && (
@@ -601,6 +683,76 @@ function SolicitacaoCard({ s }: { s: SolicitacaoView }) {
   )
 }
 
+type FiltroStatus = 'TODAS' | 'PENDENTE' | 'APROVADA' | 'RECUSADA'
+
+const FILTRO_LABEL: Record<FiltroStatus, string> = {
+  TODAS: 'Todas',
+  PENDENTE: 'Pendentes',
+  APROVADA: 'Aprovadas',
+  RECUSADA: 'Recusadas',
+}
+
+function GerenciarSolicitacoes({ solicitacoes }: { solicitacoes: SolicitacaoView[] }) {
+  const [filtro, setFiltro] = useState<FiltroStatus>('TODAS')
+
+  const filtros: { id: FiltroStatus; count: number }[] = (
+    ['TODAS', 'PENDENTE', 'APROVADA', 'RECUSADA'] as FiltroStatus[]
+  ).map((id) => ({
+    id,
+    count: id === 'TODAS' ? solicitacoes.length : solicitacoes.filter((s) => s.status === id).length,
+  }))
+
+  const solicitacoesFiltradas =
+    filtro === 'TODAS' ? solicitacoes : solicitacoes.filter((s) => s.status === filtro)
+
+  return (
+    <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Solicitações de unidade</h2>
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filtrar solicitações">
+          {filtros.map((f) => {
+            if (f.id !== 'TODAS' && f.count === 0) return null
+            const active = filtro === f.id
+            return (
+              <button
+                key={f.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFiltro(f.id)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? 'bg-[rgb(var(--color-primary))] text-white'
+                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]'
+                }`}
+              >
+                {FILTRO_LABEL[f.id]}
+                <span className={`ml-1 tabular-nums ${active ? 'text-white/80' : 'opacity-70'}`}>
+                  {f.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {solicitacoesFiltradas.length === 0 ? (
+        <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
+          {solicitacoes.length === 0
+            ? 'Nenhuma solicitação. Elas chegam do onboarding (“Solicitar cadastro de unidade”) ou pela aba Registrar.'
+            : 'Nenhuma solicitação neste filtro.'}
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {solicitacoesFiltradas.map((s) => (
+            <SolicitacaoCard key={s.id} s={s} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export function AfiliacoesConsole({
   solicitacoes,
   torcidas,
@@ -608,25 +760,44 @@ export function AfiliacoesConsole({
   solicitacoes: SolicitacaoView[]
   torcidas: TorcidaOption[]
 }) {
-  return (
-    <div className="space-y-6">
-      <CriarManualForm torcidas={torcidas} />
+  const [aba, setAba] = useState<'registrar' | 'gerenciar'>('gerenciar')
+  const pendentes = solicitacoes.filter((s) => s.status === 'PENDENTE').length
 
-      <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-        <h2 className="text-sm font-semibold text-[rgb(var(--foreground))]">Solicitações de unidade</h2>
-        {solicitacoes.length === 0 ? (
-          <p className="mt-2 text-sm text-[rgb(var(--foreground-muted))]">
-            Nenhuma solicitação. Elas chegam do onboarding (&quot;Solicitar cadastro de unidade&quot;)
-            ou pelo registro manual acima.
-          </p>
+  return (
+    <div className="space-y-4">
+      <MotionTabBar
+        items={[
+          { id: 'registrar', label: 'Registrar' },
+          { id: 'gerenciar', label: 'Solicitações', count: pendentes },
+        ]}
+        activeId={aba}
+        onTabChange={(id) => setAba(id as 'registrar' | 'gerenciar')}
+        layoutId="afiliacoes-tab-indicator"
+      />
+
+      <AnimatePresence mode="wait">
+        {aba === 'registrar' ? (
+          <m.div
+            key="registrar"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+          >
+            <CriarManualForm torcidas={torcidas} onCriado={() => setAba('gerenciar')} />
+          </m.div>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {solicitacoes.map((s) => (
-              <SolicitacaoCard key={s.id} s={s} />
-            ))}
-          </ul>
+          <m.div
+            key="gerenciar"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={springSnappy}
+          >
+            <GerenciarSolicitacoes solicitacoes={solicitacoes} />
+          </m.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   )
 }

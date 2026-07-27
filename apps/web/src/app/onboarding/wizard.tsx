@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
@@ -13,6 +13,8 @@ import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { Input, Select } from '@torcida/ui'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
 import { ImageDropZone } from '@/components/media/image-drop-zone'
+import { LocationPickerFields } from '@/components/media/location-picker-fields'
+import { normalizarInicioEndereco } from '@/lib/endereco'
 import {
   routePage,
   springGentle,
@@ -893,6 +895,12 @@ function PassoUnidade({
   const [cidadeUnidade, setCidadeUnidade] = useState(cidade)
   const [estadoUnidade, setEstadoUnidade] = useState(uf)
   const [enderecoUnidade, setEnderecoUnidade] = useState('')
+  const [cepUnidade, setCepUnidade] = useState('')
+  const [buscandoCepUnidade, setBuscandoCepUnidade] = useState(false)
+  const [lat, setLat] = useState<number | null>(null)
+  const [lng, setLng] = useState<number | null>(null)
+  const [fotoUrlUnidade, setFotoUrlUnidade] = useState('')
+  const formId = useId()
   const [contatoNome, setContatoNome] = useState('')
   const [contatoEmail, setContatoEmail] = useState('')
   const [contatoTelefone, setContatoTelefone] = useState('')
@@ -919,6 +927,16 @@ function PassoUnidade({
     },
   })
   const uploadProvaPend = cropProva.busy
+  const cropFotoUnidade = useCroppedImageUpload({
+    aspect: 1,
+    purpose: 'sede',
+    tenantId: torcida.id,
+    title: 'Ajustar foto da unidade',
+    confirmLabel: 'Confirmar e enviar',
+    onDone: ({ url }) => {
+      if (url) setFotoUrlUnidade(url)
+    },
+  })
   const [localizacaoEfetiva, setLocalizacaoEfetiva] = useState(localizacao)
   const [sedesResolvidas, setSedesResolvidas] = useState(torcida.sedes)
   const [geoRegiaoPend, setGeoRegiaoPend] = useState(() => !localizacao && Boolean(cidade.trim() && uf.trim()))
@@ -995,6 +1013,34 @@ function PassoUnidade({
     onConfirmar(selecionada, false)
   }
 
+  async function onCepChange(value: string) {
+    setCepUnidade(value)
+    const digitos = value.replace(/\D/g, '')
+    if (digitos.length !== 8) return
+    setBuscandoCepUnidade(true)
+    try {
+      const endereco = await buscarEnderecoPorCep(value)
+      if (!endereco) return
+      const atual = enderecoUnidade.trim()
+      const numero = atual.match(/,?\s*(\d+[A-Za-z]?.*)$/)
+      const mesmoLogradouro =
+        atual.length > 0 &&
+        Boolean(endereco.logradouro) &&
+        normalizarInicioEndereco(atual) === normalizarInicioEndereco(endereco.logradouro)
+      const novoEndereco = endereco.logradouro
+        ? mesmoLogradouro && numero
+          ? `${endereco.logradouro}, ${numero[1].replace(/^,\s*/, '')}`
+          : endereco.logradouro
+        : atual
+      setCidadeUnidade(endereco.localidade || cidadeUnidade)
+      setEstadoUnidade(endereco.uf || estadoUnidade)
+      setEnderecoUnidade(novoEndereco)
+      setCepUnidade(`${digitos.slice(0, 5)}-${digitos.slice(5)}`)
+    } finally {
+      setBuscandoCepUnidade(false)
+    }
+  }
+
   function avancarSemListagem() {
     onErro(null)
     setErrosUnidade({})
@@ -1007,6 +1053,10 @@ function PassoUnidade({
         cidade: cidadeUnidade,
         estado: estadoUnidade,
         endereco: enderecoUnidade || undefined,
+        cep: cepUnidade,
+        lat,
+        lng,
+        fotoUrl: fotoUrlUnidade || undefined,
         contatoNome,
         contatoEmail: contatoEmail || undefined,
         contatoTelefone: contatoTelefone || undefined,
@@ -1047,6 +1097,7 @@ function PassoUnidade({
   return (
     <div className="min-w-0 pb-20">
       {cropProva.dialog}
+      {cropFotoUnidade.dialog}
       <BotaoVoltar onClick={onVoltar} disabled={pending || enviando} />
       <h1 className="text-xl font-bold text-balance break-words text-[rgb(var(--foreground))] sm:text-2xl">
         Onde você participa na {torcida.nome}?
@@ -1132,7 +1183,11 @@ function PassoUnidade({
           </button>
         </div>
       ) : (
-        <div className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
+        <form
+          id={formId}
+          onSubmit={(e) => e.preventDefault()}
+          className="mt-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary-fg))]">
@@ -1179,9 +1234,24 @@ function PassoUnidade({
               </Campo>
             </div>
 
+            <Campo
+              label={`CEP${buscandoCepUnidade ? ' · buscando…' : ''}`}
+              obrigatorio
+              erros={errosUnidade.cep}
+            >
+              <Input
+                name="cep"
+                value={cepUnidade}
+                onChange={(e) => void onCepChange(e.target.value)}
+                placeholder="00000-000"
+                maxLength={9}
+              />
+            </Campo>
+
             <div className="grid gap-3 sm:grid-cols-[1fr_96px]">
               <Campo label="Cidade" obrigatorio erros={errosUnidade.cidade}>
                 <Input
+                  name="cidade"
                   value={cidadeUnidade}
                   onChange={(e) => setCidadeUnidade(e.target.value)}
                   placeholder="Ex: Praia Grande"
@@ -1189,6 +1259,7 @@ function PassoUnidade({
               </Campo>
               <Campo label="UF" obrigatorio erros={errosUnidade.estado}>
                 <Input
+                  name="estado"
                   value={estadoUnidade}
                   onChange={(e) => setEstadoUnidade(e.target.value.toUpperCase().slice(0, 2))}
                   placeholder="SP"
@@ -1196,13 +1267,22 @@ function PassoUnidade({
               </Campo>
             </div>
 
-            <Campo label="Endereço ou ponto de referência" erros={errosUnidade.endereco}>
+            <Campo label="Endereço ou ponto de referência" obrigatorio erros={errosUnidade.endereco}>
               <Input
+                name="endereco"
                 value={enderecoUnidade}
                 onChange={(e) => setEnderecoUnidade(e.target.value)}
                 placeholder="Rua, número, bairro ou local de encontro"
               />
             </Campo>
+
+            <LocationPickerFields
+              formId={formId}
+              onCoordsChange={(coords) => {
+                setLat(coords.lat)
+                setLng(coords.lng)
+              }}
+            />
 
             <div className="grid gap-3 sm:grid-cols-3">
               <Campo label="Seu nome" obrigatorio erros={errosUnidade.contatoNome}>
@@ -1247,6 +1327,25 @@ function PassoUnidade({
                 rows={2}
                 placeholder="Horários, redes sociais, contato da liderança…"
                 className="w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none transition-colors placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--color-primary))]"
+              />
+            </Campo>
+
+            <Campo label="Foto da unidade (opcional)">
+              <ImageDropZone
+                layout="split"
+                busy={cropFotoUnidade.busy}
+                onFile={(file) => file && cropFotoUnidade.open(file)}
+                formatsHint="JPEG, PNG, WebP ou GIF, até 10 MB — ajuste o enquadramento antes do envio"
+                file={
+                  fotoUrlUnidade
+                    ? {
+                        name: 'foto-unidade.jpg',
+                        status: cropFotoUnidade.busy ? 'uploading' : 'done',
+                        previewUrl: fotoUrlUnidade,
+                      }
+                    : null
+                }
+                onClear={fotoUrlUnidade ? () => setFotoUrlUnidade('') : undefined}
               />
             </Campo>
 
@@ -1297,11 +1396,16 @@ function PassoUnidade({
             <BotaoPrimario
               onClick={avancarSemListagem}
               pending={enviando}
-              disabled={uploadProvaPend}
+              disabled={
+                uploadProvaPend ||
+                cropFotoUnidade.busy ||
+                !cepUnidade.trim() ||
+                !enderecoUnidade.trim()
+              }
               label="Enviar para avaliação"
             />
           </div>
-        </div>
+        </form>
       )}
 
       {/* CTA sticky: Continuar permanece no viewport após a seleção */}

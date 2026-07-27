@@ -23,6 +23,8 @@ interface SolicitacaoRow {
   endereco: string | null
   contatoNome: string | null
   fotoUrl: string | null
+  lat: number | null
+  lng: number | null
   contatoEmail: string | null
   contatoTelefone: string | null
   vinculo: string | null
@@ -62,6 +64,8 @@ export default async function AfiliacoesSuperAdminPage() {
         endereco: true,
         contatoNome: true,
         cep: true,
+        lat: true,
+        lng: true,
         fotoUrl: true,
         contatoEmail: true,
         contatoTelefone: true,
@@ -93,6 +97,8 @@ export default async function AfiliacoesSuperAdminPage() {
     endereco: s.endereco,
     contatoNome: s.contatoNome,
     fotoUrl: s.fotoUrl,
+    lat: s.lat,
+    lng: s.lng,
     contatoEmail: s.contatoEmail,
     contatoTelefone: s.contatoTelefone,
     vinculo: s.vinculo,

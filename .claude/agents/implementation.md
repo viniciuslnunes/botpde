@@ -32,7 +32,10 @@ ou abstrações novas sem necessidade clara.
   (admin/loja/onboarding/design): `StickyPersistBar` com `locked={dirty||pending}`.
   Ao limpar dirty (salvar/descartar/reverter), a barra deve **sumir** — não
   alterar só o visual unlocked no call site; a regra vive em
-  `use-persist-bar-visibility.ts`. Ver `docs/frontend/motion.md`.
+  `use-persist-bar-visibility.ts`. Ver `docs/frontend/motion.md`. Telas/
+  componentes com múltiplos processos empilhados (criar+listar+editar+aprovar)
+  devem ser segregados em abas — ver `MotionTabBar` e `docs/frontend/motion.md`
+  §3/§7; diagnóstico de quando aplicar fica com o agente `ux-review`.
 - **Vocabulário do nicho**: nomes de entidades, labels e copy seguem
   `docs/knowledge/glossario.md` (caravana, sede, materiais, associado,
   desligamento; o time apoiado é `Afiliacao` — nunca "clube" genérico).

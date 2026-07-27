@@ -2,9 +2,9 @@
 
 Documentação de referência para animações com [Motion](https://motion.dev/) (pacote
 `motion` v12). Hoje o **`MotionShell`** está montado nos layouts de `/portal`
-(portal inteiro, incluindo Comunidade e Loja), `/admin`, `/onboarding` e
-`/video-sala`; este guia serve de base para manter o mesmo vocabulário em novas
-superfícies.
+(portal inteiro, incluindo Comunidade e Loja), `/admin`, `/onboarding`,
+`/video-sala` e `/super-admin`; este guia serve de base para manter o mesmo
+vocabulário em novas superfícies.
 
 ## Princípios
 
@@ -34,8 +34,9 @@ Arquivo: `apps/web/src/components/motion/motion-shell.tsx`
 
 - Envolve rotas que usam `m` / `AnimatePresence`.
 - Hoje: `apps/web/src/app/portal/layout.tsx` (portal inteiro),
-  `apps/web/src/app/admin/layout.tsx`, `apps/web/src/app/onboarding/layout.tsx` e
-  `apps/web/src/app/video-sala/[id]/layout.tsx`.
+  `apps/web/src/app/admin/layout.tsx`, `apps/web/src/app/onboarding/layout.tsx`,
+  `apps/web/src/app/video-sala/[id]/layout.tsx` e
+  `apps/web/src/app/super-admin/layout.tsx`.
 - **Para expandir:** montar no layout do novo módulo antes de usar `m` nele.
 
 ```tsx
@@ -434,6 +435,7 @@ Commits de referência na `main`:
 | Sedes | `SedesListAnimated`, `SedeDetailReveal`, `SedeLinksAnimated` | lista + detalhe |
 | Carteirinha | `CarteirinhaReveal` | card e detalhes |
 | Admin | `AdminMotionShell`, `AdminRouteTransition`, kit `components/admin/ui/` (`StatCard`/`KpiGrid`, `TableShell`, `InsightSection`) + charts `components/admin/charts/` (ver `docs/frontend/admin-ui-kit.md`), `AdminEventosList`, `AdminLojaProdutosGrid`, `ModeracaoDenunciasClient`, `AdminPedidosList`, `AdminMembrosTable` | dashboard, relatórios, eventos, loja, bar, financeiro, moderação, pedidos, membros, sedes, sócios, comunidade |
+| Super Admin | `SuperAdminMotionShell` + `MotionTabBar` | `/super-admin/afiliacoes` — abas "Registrar"/"Solicitações" |
 
 Arquivos genéricos novos:
 
@@ -446,6 +448,8 @@ components/motion/
   admin-motion-shell.tsx
   admin-route-transition.tsx
   admin-dashboard-kpis.tsx
+  motion-tab-bar.tsx                 # abas com indicador deslizante — genérico, fora da Comunidade
+  super-admin-motion-shell.tsx
 components/portal/
   eventos-list-animated.tsx
   evento-detail-motion.tsx

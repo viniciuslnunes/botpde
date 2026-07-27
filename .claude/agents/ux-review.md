@@ -70,6 +70,15 @@ comunicar validação real (não placeholder decorativo).
   visível. Detalhe: mapa se houver lat/lng; card da partida se vinculada;
   check-in QR com feedback de fila offline. Vocabulário: caravana/ensaio/jogo.
   Ver `docs/data/modulo-eventos.md`.
+- Acúmulo de processos numa tela só: quando uma tela/componente empilha
+  múltiplos CRUDs distintos sem segmentação visual (ex.: criar + listar +
+  editar + aprovar + promover na mesma tela), recomendar segregar em abas
+  usando o padrão já estabelecido — `MotionTabBar`
+  (`apps/web/src/components/motion/motion-tab-bar.tsx`) para navegação
+  principal com indicador `layoutId`, ou os chips estáticos de filtro
+  (`admin-sedes-manager.tsx`) quando for só filtro dentro de uma aba já
+  existente. Ver `docs/frontend/motion.md` §3 e §7. Exemplo já resolvido no
+  repo: `/super-admin/afiliacoes` (abas "Registrar"/"Solicitações").
 - **StickyPersistBar** (admin Design, loja, sedes, config, onboarding — **não**
   Comunidade): dirty → aparece; ao reverter ao baseline / Descartar / salvar →
   **some na hora**. Regressão: barra cinza com botões disabled e texto/atalho

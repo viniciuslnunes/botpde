@@ -1570,6 +1570,10 @@ model SolicitacaoUnidade {
 
   cep      String?
 
+  lat      Float?
+
+  lng      Float?
+
   fotoUrl  String? @map("foto_url")
 
 
@@ -3380,6 +3384,8 @@ enum TipoNotificacao {
   PATRIMONIO_RESPONSAVEL_DEFINIDO
 
   PEDIDO_RECEBIDO
+
+  SOLICITACAO_UNIDADE_CRIADA
 
 }
 

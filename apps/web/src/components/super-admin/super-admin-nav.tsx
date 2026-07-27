@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   PlusCircle,
   ScrollText,
+  ShieldAlert,
   UserCheck,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,13 +20,16 @@ export interface SuperAdminNavItem {
   icon: LucideIcon
   /** Rota exata — não faz match por prefixo (evita conflito com `/super-admin/torcidas` etc.). */
   exact?: boolean
+  /** Chave de contagem em `PendentesSuperAdmin` — item sem badge quando omitido. */
+  badgeKey?: 'afiliacoes' | 'moderacao'
 }
 
 export const SUPER_ADMIN_NAV_ITEMS: SuperAdminNavItem[] = [
   { href: '/super-admin', label: 'Visão geral', icon: LayoutDashboard, exact: true },
   { href: '/super-admin/torcidas', label: 'Torcidas', icon: Building2 },
-  { href: '/super-admin/afiliacoes', label: 'Afiliações', icon: Handshake },
+  { href: '/super-admin/afiliacoes', label: 'Afiliações', icon: Handshake, badgeKey: 'afiliacoes' },
   { href: '/super-admin/usuarios', label: 'Usuários', icon: UserCheck },
+  { href: '/super-admin/moderacao', label: 'Moderação', icon: ShieldAlert, badgeKey: 'moderacao' },
   { href: '/super-admin/auditoria', label: 'Auditoria', icon: ScrollText },
   {
     href: '/super-admin/relatorios/perfis-torcedores-privados',
@@ -35,13 +39,24 @@ export const SUPER_ADMIN_NAV_ITEMS: SuperAdminNavItem[] = [
   { href: '/super-admin/setup', label: 'Criar torcida', icon: PlusCircle },
 ]
 
-export function SuperAdminNav({ onNavigate }: { onNavigate?: () => void }) {
+function formatarContagem(n: number) {
+  return n > 9 ? '9+' : String(n)
+}
+
+export function SuperAdminNav({
+  onNavigate,
+  badges,
+}: {
+  onNavigate?: () => void
+  badges?: { afiliacoes: number; moderacao: number }
+}) {
   const pathname = usePathname()
 
   return (
     <nav className="space-y-0.5 px-3" aria-label="Menu super admin">
-      {SUPER_ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+      {SUPER_ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon, exact, badgeKey }) => {
         const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+        const contagem = badgeKey ? (badges?.[badgeKey] ?? 0) : 0
         return (
           <Link
             key={href}
@@ -62,7 +77,15 @@ export function SuperAdminNav({ onNavigate }: { onNavigate?: () => void }) {
                   : 'text-[rgb(var(--foreground-muted))]',
               ].join(' ')}
             />
-            {label}
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {contagem > 0 ? (
+              <span
+                className="min-w-4 shrink-0 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-4 text-white"
+                aria-label={`${contagem} pendente${contagem === 1 ? '' : 's'}`}
+              >
+                {formatarContagem(contagem)}
+              </span>
+            ) : null}
           </Link>
         )
       })}

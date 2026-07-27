@@ -16,11 +16,13 @@ import {
 import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
+import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
 import {
   isDepartamentoLegado,
   normalizarCpf,
   validarCpfDigitos,
   parseDataCompetencia,
+  PERMISSIONS,
 } from '@torcida/types'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
@@ -480,11 +482,29 @@ const interesseUnidadeSchema = z.object({
     .min(2, 'Informe a UF')
     .max(2, 'Use a sigla do estado')
     .transform((v) => v.trim().toUpperCase()),
-  endereco: z
+  endereco: z.string().trim().min(5, 'Informe o endereço completo').max(160),
+  cep: z
     .string()
-    .max(160)
+    .trim()
+    .transform((v) => v.replace(/\D/g, ''))
+    .refine((v) => v.length === 8, 'Informe um CEP válido (8 dígitos)')
+    .transform((v) => `${v.slice(0, 5)}-${v.slice(5)}`),
+  lat: z
+    .number()
+    .nullable()
     .optional()
-    .transform((v) => v?.trim() || undefined),
+    .refine((n) => n == null || (n >= -90 && n <= 90), 'Latitude inválida'),
+  lng: z
+    .number()
+    .nullable()
+    .optional()
+    .refine((n) => n == null || (n >= -180 && n <= 180), 'Longitude inválida'),
+  fotoUrl: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : null)),
   contatoNome: z
     .string()
     .min(3, 'Informe seu nome')
@@ -528,6 +548,10 @@ export async function registrarInteresseUnidade(input: {
   cidade?: string
   estado?: string
   endereco?: string
+  cep?: string
+  lat?: number | null
+  lng?: number | null
+  fotoUrl?: string
   contatoNome?: string
   contatoEmail?: string
   contatoTelefone?: string
@@ -562,8 +586,12 @@ export async function registrarInteresseUnidade(input: {
       tipo: parsed.data.tipoUnidade,
       cidade: parsed.data.cidade,
       estado: parsed.data.estado,
-      endereco: parsed.data.endereco ?? null,
+      endereco: parsed.data.endereco,
       regiao: parsed.data.regiao ?? null,
+      cep: parsed.data.cep,
+      lat: parsed.data.lat ?? null,
+      lng: parsed.data.lng ?? null,
+      fotoUrl: parsed.data.fotoUrl ?? null,
       contatoNome: parsed.data.contatoNome,
       contatoEmail: parsed.data.contatoEmail ?? null,
       contatoTelefone: parsed.data.contatoTelefone ?? null,
@@ -586,7 +614,8 @@ export async function registrarInteresseUnidade(input: {
     `Tipo: ${tipoLabel}`,
     `Região informada no onboarding: ${parsed.data.regiao ?? 'não informada'}`,
     `Local: ${parsed.data.cidade} - ${parsed.data.estado}`,
-    `Endereço: ${parsed.data.endereco ?? 'não informado'}`,
+    `Endereço: ${parsed.data.endereco}`,
+    `CEP: ${parsed.data.cep}`,
     '',
     `Contato para retorno:`,
     `Nome: ${parsed.data.contatoNome}`,
@@ -624,7 +653,11 @@ export async function registrarInteresseUnidade(input: {
         tipoUnidade: parsed.data.tipoUnidade,
         cidade: parsed.data.cidade,
         estado: parsed.data.estado,
-        endereco: parsed.data.endereco ?? null,
+        endereco: parsed.data.endereco,
+        cep: parsed.data.cep,
+        lat: parsed.data.lat ?? null,
+        lng: parsed.data.lng ?? null,
+        fotoUrl: parsed.data.fotoUrl ?? null,
         contatoNome: parsed.data.contatoNome,
         contatoEmail: parsed.data.contatoEmail ?? null,
         contatoTelefone: parsed.data.contatoTelefone ?? null,
@@ -635,6 +668,15 @@ export async function registrarInteresseUnidade(input: {
         origem: 'onboarding',
       },
     },
+  })
+
+  await notificarUsuariosComPermissao(PERMISSIONS.AFFILIATION_MANAGE, {
+    tenantId: tenant.id,
+    tipo: 'SOLICITACAO_UNIDADE_CRIADA',
+    titulo: `Nova solicitação de unidade: ${parsed.data.nomeUnidade}`,
+    corpo: `${parsed.data.contatoNome} solicitou cadastro de ${tipoLabel.toLowerCase()} via onboarding.`,
+    link: '/admin/afiliacoes',
+    atorId: session.user.id,
   })
 
   return { ok: true, emailHref }

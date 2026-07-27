@@ -11,15 +11,27 @@ import { TenantSwitcher } from '@/components/admin/tenant-switcher'
 import { SuperAdminNav } from '@/components/super-admin/super-admin-nav'
 import type { TorcidaOpcao } from '@/lib/torcida-labels'
 
+interface SuperAdminBadges {
+  afiliacoes: number
+  moderacao: number
+}
+
 interface SuperAdminShellProps {
   userName: string | null
   userEmail: string | null
   torcidaAtualSlug: string | null
   torcidas: TorcidaOpcao[]
+  badges?: SuperAdminBadges
   children: React.ReactNode
 }
 
-function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarBody({
+  onNavigate,
+  badges,
+}: {
+  onNavigate?: () => void
+  badges?: SuperAdminBadges
+}) {
   return (
     <>
       <div className="border-b border-[rgb(var(--border))] px-4 py-4">
@@ -31,7 +43,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
-        <SuperAdminNav onNavigate={onNavigate} />
+        <SuperAdminNav onNavigate={onNavigate} badges={badges} />
       </div>
 
       <div className="space-y-1 border-t border-[rgb(var(--border))] px-3 py-3 lg:hidden">
@@ -147,11 +159,13 @@ function SuperAdminSidebar({
   onMobileClose,
   torcidaAtualSlug,
   torcidas,
+  badges,
 }: {
   mobileOpen: boolean
   onMobileClose: () => void
   torcidaAtualSlug: string | null
   torcidas: TorcidaOpcao[]
+  badges?: SuperAdminBadges
 }) {
   const [mounted, setMounted] = useState(false)
 
@@ -190,7 +204,7 @@ function SuperAdminSidebar({
               onClick={onMobileClose}
             />
             <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-2xl">
-              <SidebarBody onNavigate={onMobileClose} />
+              <SidebarBody onNavigate={onMobileClose} badges={badges} />
               {switcher}
             </aside>
           </div>,
@@ -203,7 +217,7 @@ function SuperAdminSidebar({
       {mobileDrawer}
 
       <aside className="relative z-[60] hidden h-full w-64 shrink-0 flex-col border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] lg:flex">
-        <SidebarBody />
+        <SidebarBody badges={badges} />
         {switcher}
       </aside>
     </>
@@ -215,6 +229,7 @@ export function SuperAdminShell({
   userEmail,
   torcidaAtualSlug,
   torcidas,
+  badges,
   children,
 }: SuperAdminShellProps) {
   const pathname = usePathname()
@@ -239,6 +254,7 @@ export function SuperAdminShell({
           onMobileClose={() => setMobileOpen(false)}
           torcidaAtualSlug={torcidaAtualSlug}
           torcidas={torcidas}
+          badges={badges}
         />
 
         <main className="app-shell-bg min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>

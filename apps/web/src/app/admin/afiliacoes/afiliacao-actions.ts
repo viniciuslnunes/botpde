@@ -7,6 +7,8 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { assertAffiliationManage, assertTenantOwner } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
+import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { PERMISSIONS } from '@torcida/types'
 import { ExpectedError } from '@/lib/expected-error'
 import { invalidateHierarchyCache } from '@/lib/hierarquia'
 import {
@@ -73,7 +75,10 @@ interface SolicitacaoLite {
   estado: string
   endereco: string | null
   contatoNome: string | null
+  contatoEmail: string | null
   cep: string | null
+  lat: number | null
+  lng: number | null
   fotoUrl: string | null
   solicitadoPorId: string | null
 }
@@ -91,7 +96,10 @@ async function carregarSolicitacao(id: string): Promise<SolicitacaoLite> {
       estado: true,
       endereco: true,
       contatoNome: true,
+      contatoEmail: true,
       cep: true,
+      lat: true,
+      lng: true,
       fotoUrl: true,
       solicitadoPorId: true,
     },
@@ -163,7 +171,10 @@ export async function aprovarSolicitacao(
           estado: solicitacao.estado,
           endereco: solicitacao.endereco,
           contatoNome: solicitacao.contatoNome,
+          contatoEmail: solicitacao.contatoEmail,
           cep: solicitacao.cep,
+          lat: solicitacao.lat,
+          lng: solicitacao.lng,
           fotoUrl: solicitacao.fotoUrl,
           solicitadoPorId: solicitacao.solicitadoPorId,
         },
@@ -325,23 +336,42 @@ const criarManualSchema = z.object({
   tipo: z.enum(['SUBSEDE', 'PONTO_ENCONTRO'], { message: 'Escolha subsede ou PDE' }),
   cidade: z.string().trim().min(2, 'Informe a cidade').max(80),
   estado: z.string().trim().length(2, 'Use a sigla da UF').transform((v) => v.toUpperCase()),
-  endereco: z
-    .string()
-    .max(160)
-    .optional()
-    .transform((v) => (v && v.trim() ? v.trim() : null)),
+  endereco: z.string().trim().min(5, 'Informe o endereço completo').max(160),
   contatoNome: z
     .string()
     .max(100)
     .optional()
     .transform((v) => (v && v.trim() ? v.trim() : null)),
+  contatoEmail: z
+    .string()
+    .max(160)
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : null))
+    .refine((v) => v === null || z.string().email().safeParse(v).success, 'E-mail inválido'),
   cep: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ''))
+    .refine((v) => v.length === 8, 'Informe um CEP válido (8 dígitos)')
+    .transform((v) => `${v.slice(0, 5)}-${v.slice(5)}`),
+  lat: z
     .string()
     .optional()
     .transform((v) => {
-      const digitos = (v ?? '').replace(/\D/g, '')
-      return digitos.length === 8 ? digitos : null
-    }),
+      if (!v?.trim()) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : Number.NaN
+    })
+    .refine((n) => n === null || (n >= -90 && n <= 90), 'Latitude inválida'),
+  lng: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v?.trim()) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : Number.NaN
+    })
+    .refine((n) => n === null || (n >= -180 && n <= 180), 'Longitude inválida'),
   fotoUrl: z
     .string()
     .url()
@@ -367,7 +397,10 @@ export async function criarSolicitacaoManual(
     estado: String(formData.get('estado') ?? ''),
     endereco: String(formData.get('endereco') ?? ''),
     contatoNome: String(formData.get('contatoNome') ?? ''),
+    contatoEmail: String(formData.get('contatoEmail') ?? ''),
     cep: String(formData.get('cep') ?? ''),
+    lat: String(formData.get('lat') ?? ''),
+    lng: String(formData.get('lng') ?? ''),
     fotoUrl: String(formData.get('fotoUrl') ?? ''),
   })
   if (!parsed.success) {
@@ -393,7 +426,10 @@ export async function criarSolicitacaoManual(
         estado: parsed.data.estado,
         endereco: parsed.data.endereco,
         contatoNome: parsed.data.contatoNome,
+        contatoEmail: parsed.data.contatoEmail,
         cep: parsed.data.cep,
+        lat: parsed.data.lat,
+        lng: parsed.data.lng,
         fotoUrl: parsed.data.fotoUrl,
         // Quem faz o intake manual (super-admin) NÃO é a liderança local —
         // deixar null evita que ele vire responsável/ADMIN do canal ao aprovar.
@@ -411,6 +447,14 @@ export async function criarSolicitacaoManual(
         entidadeId: s.id,
         detalhes: { nome: parsed.data.nome, tipo: parsed.data.tipo, origem: 'super-admin' },
       },
+    })
+
+    await notificarUsuariosComPermissao(PERMISSIONS.AFFILIATION_MANAGE, {
+      tenantId: tenant.id,
+      tipo: 'SOLICITACAO_UNIDADE_CRIADA',
+      titulo: `Nova solicitação de unidade: ${parsed.data.nome}`,
+      corpo: `O suporte registrou uma solicitação de ${parsed.data.tipo === 'SUBSEDE' ? 'subsede' : 'ponto de encontro'} para revisão.`,
+      link: '/admin/afiliacoes',
     })
 
     revalidar()

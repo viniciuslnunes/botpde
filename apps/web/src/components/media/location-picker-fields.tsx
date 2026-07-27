@@ -338,13 +338,18 @@ export function LocationPickerFields({
         </div>
       </div>
 
-      {mapsConfigured && (
+      {mapsConfigured ? (
         <MapLocationPicker
           lat={hasCoords ? latN : null}
           lng={hasCoords ? lngN : null}
           onPick={(coords) => aplicarCoords(coords, 'map')}
           className="h-52 w-full"
         />
+      ) : (
+        <div className="flex h-52 w-full items-center justify-center rounded-xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]/40 px-4 text-center text-sm text-[rgb(var(--foreground-muted))]">
+          Google Maps não configurado. Informe latitude e longitude manualmente, ou peça
+          para o time habilitar NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+        </div>
       )}
 
       {enableStreetViewPhoto && mapsConfigured && hasCoords && streetViewPreview && (

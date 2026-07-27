@@ -120,6 +120,11 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
     permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
     menuId: 'loja-pedidos',
   },
+  SOLICITACAO_UNIDADE_CRIADA: {
+    escopo: 'admin',
+    permissaoAdmin: PERMISSIONS.AFFILIATION_MANAGE,
+    menuId: 'afiliacoes',
+  },
 }
 
 export { agregarBadgesPorMenu, menuIdParaTipo } from '@/lib/notificacoes-menu-badges'

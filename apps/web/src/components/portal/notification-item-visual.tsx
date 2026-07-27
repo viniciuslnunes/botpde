@@ -21,6 +21,7 @@ import {
   Users,
   Wallet,
   Calendar,
+  MapPin,
   type LucideIcon,
 } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -75,6 +76,7 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, LucideIcon> = {
   BAR_VENDA_ESTORNADA: PackageX,
   PATRIMONIO_RESPONSAVEL_DEFINIDO: UserCog,
   PEDIDO_RECEBIDO: PackageCheck,
+  SOLICITACAO_UNIDADE_CRIADA: MapPin,
 }
 
 export interface NotificacaoAtorInfo {

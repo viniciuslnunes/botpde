@@ -1,15 +1,11 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
-import type { Tenant } from '@torcida/db'
-import { Badge } from '@torcida/ui'
 import { superAdminEmails } from '@/lib/env'
 import { redirect } from 'next/navigation'
 import { SetupForm } from './setup-form'
-import { AtribuirOwnerButton } from './setup-form'
-import { TenantAtivoToggle } from './tenant-ativo-toggle'
-import { TenantPlanoSelect } from './tenant-plano-select'
+import { TenantsListaCliente } from './tenants-lista-cliente'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
-import { Building2, PlusCircle } from 'lucide-react'
+import { PlusCircle } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Setup — Criar Torcida' }
@@ -34,7 +30,7 @@ export default async function SetupPage() {
     }),
   ])
 
-  const souOwnerDe = new Set(minhasRoles.map((r: { tenantId: string }) => r.tenantId))
+  const souOwnerDe = new Set<string>(minhasRoles.map((r: { tenantId: string }) => r.tenantId))
 
   return (
     <div className="flex min-h-full flex-col">
@@ -51,31 +47,7 @@ export default async function SetupPage() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
               Torcidas existentes
             </h2>
-            <div className="space-y-2">
-              {tenants.map((t: Pick<Tenant, 'id' | 'slug' | 'nome' | 'plano' | 'ativo'>) => (
-                <div
-                  key={t.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-4 w-4 text-[rgb(var(--foreground-muted))]" />
-                    <div>
-                      <p className="text-sm font-medium text-[rgb(var(--foreground))]">{t.nome}</p>
-                      <p className="text-xs text-[rgb(var(--foreground-muted))]">slug: {t.slug}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TenantAtivoToggle tenantId={t.id} nome={t.nome} ativo={t.ativo} />
-                    <TenantPlanoSelect tenantId={t.id} plano={t.plano} />
-                    {souOwnerDe.has(t.id) ? (
-                      <Badge variant="info">owner ✓</Badge>
-                    ) : (
-                      <AtribuirOwnerButton tenantId={t.id} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TenantsListaCliente tenants={tenants} souOwnerDeIds={[...souOwnerDe]} />
           </div>
         )}
 

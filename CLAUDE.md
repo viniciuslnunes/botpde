@@ -151,4 +151,9 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Onboarding** — wizard `/onboarding`, escudos (`docs/data/escudos-afiliacoes.md`),
   estimativa torcedores/base digital (`docs/data/torcedores-estimados.md`,
   `docs/knowledge/futebol-dados-publicos.md`); stats em `onboarding-clube-stats.ts`.
+- **Super Admin** — operação da plataforma (`/super-admin`), fora do RBAC por
+  tenant (gate por allowlist de e-mail, `isSuperAdminEmail`): torcidas, plano,
+  afiliações, usuários, moderação e auditoria cross-tenant; ver
+  `docs/data/modulo-super-admin.md` (inclui pendência: LGPD só tem exportação,
+  exclusão de conta ainda não implementada).
 - `ARCHITECTURE.md` — decisões fechadas (§5) e itens em aberto (§6).
