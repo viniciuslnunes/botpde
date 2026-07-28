@@ -220,7 +220,7 @@ const solicitarVinculoSchema = z.object({
   idade: z
     .union([z.string(), z.number(), z.undefined()])
     .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
-    .pipe(z.number().min(10, 'Idade mínima: 10 anos').max(120, 'Idade inválida').optional()),
+    .pipe(z.number().min(6, 'Idade mínima: 6 anos').max(120, 'Idade inválida').optional()),
   telefone: z
     .string()
     .max(20)

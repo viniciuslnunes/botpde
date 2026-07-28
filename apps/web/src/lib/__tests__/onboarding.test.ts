@@ -16,7 +16,22 @@ const departamentoFindFirst = vi.hoisted(() => vi.fn())
 const userDepartamentoUpsert = vi.hoisted(() => vi.fn())
 const auditLogCreate = vi.hoisted(() => vi.fn())
 const perfilMembroUpsert = vi.hoisted(() => vi.fn())
-const transactionFn = vi.hoisted(() => vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn({})))
+// `tx` simula o Prisma.TransactionClient reusando os mesmos mocks de `db` —
+// as queries dentro de `$transaction` usam o mesmo shape de `saasMembro`/`auditLog`.
+const transactionFn = vi.hoisted(() =>
+  vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({
+      saasMembro: {
+        findFirst: membroFindFirst,
+        findUnique: membroFindUnique,
+        create: membroCreate,
+        update: membroUpdate,
+      },
+      auditLog: { create: auditLogCreate },
+      $executeRaw: vi.fn(async () => 0),
+    }),
+  ),
+)
 const authFn = vi.hoisted(() => vi.fn())
 const getDescendantTenantIdsFn = vi.hoisted(() => vi.fn(async () => [] as string[]))
 const getAncestorTenantIdsFn = vi.hoisted(() => vi.fn(async () => [] as string[]))
@@ -24,19 +39,36 @@ const criarPendenciaEspelhoFn = vi.hoisted(() =>
   vi.fn(async () => ({ raizTenantId: null, espelhoId: null, ignoradoJaMembroDireto: false })),
 )
 const notificarNovoMembroPendenteFn = vi.hoisted(() => vi.fn(async () => undefined))
+const userFindFirst = vi.hoisted(() => vi.fn(async () => null))
+const userUpdate = vi.hoisted(() => vi.fn(async () => ({})))
 
+const PrismaClientKnownRequestErrorMock = vi.hoisted(() => {
+  return class PrismaClientKnownRequestErrorMock extends Error {
+    code: string
+    meta?: Record<string, unknown>
+    constructor(message: string, opts: { code: string; meta?: Record<string, unknown> }) {
+      super(message)
+      this.code = opts.code
+      this.meta = opts.meta
+    }
+  }
+})
 vi.mock('@torcida/db', () => ({
   db: {
     perfilTorcedor: { findUnique: perfilFindUnique, upsert: perfilUpsert },
     perfilMembro: { upsert: perfilMembroUpsert },
     saasMembro: { findFirst: membroFindFirst, findUnique: membroFindUnique, create: membroCreate, update: membroUpdate },
     afiliacao: { findUnique: afiliacaoFindUnique },
+    user: { findFirst: userFindFirst, update: userUpdate },
     tenant: { findFirst: tenantFindFirst, findMany: tenantFindMany },
     sede: { findMany: sedeFindMany, findUnique: sedeFindUnique },
     departamento: { findFirst: departamentoFindFirst },
     userDepartamento: { upsert: userDepartamentoUpsert },
     auditLog: { create: auditLogCreate },
     $transaction: transactionFn,
+  },
+  Prisma: {
+    PrismaClientKnownRequestError: PrismaClientKnownRequestErrorMock,
   },
 }))
 vi.mock('@/lib/auth', () => ({ auth: authFn }))
@@ -58,6 +90,11 @@ vi.mock('@/lib/hierarquia', () => ({
 }))
 vi.mock('@/lib/membros-sede', () => ({
   criarOuAtualizarPendenciaEspelhoNaSede: criarPendenciaEspelhoFn,
+  lockNumeroAssociadoDaTorcida: vi.fn(async () => undefined),
+  encontrarConflitoNumeroAssociado: vi.fn(async () => null),
+  encontrarConflitoCpf: vi.fn(async () => null),
+  encontrarConflitoRg: vi.fn(async () => null),
+  encontrarConflitoTelefone: vi.fn(async () => null),
 }))
 // Validação de cidade contra o IBGE — mockada para não bater na rede.
 const cidadePertenceUfFn = vi.hoisted(() => vi.fn())
@@ -320,6 +357,8 @@ describe('solicitarVinculo — validação', () => {
       dataNascimento: '1990-01-01',
       termoResponsabilidadeAceito: true,
       comprovanteResidenciaUrl: PROVA_URL,
+      telefone: '(11) 98888-7777',
+      email: 'fulano@example.com',
     })
     expect(r.errors?.fotoDocumentoUrl).toBeTruthy()
     expect(membroCreate).not.toHaveBeenCalled()
@@ -411,6 +450,8 @@ describe('solicitarVinculo — validação', () => {
       termoResponsabilidadeAceito: true,
       fotoDocumentoUrl: PROVA_URL,
       comprovanteResidenciaUrl: PROVA_URL,
+      telefone: '(11) 98888-7777',
+      email: 'fulano@example.com',
     })
     expect(r.redirectTo).toContain('/onboarding/solicitado')
     expect(membroCreate).toHaveBeenCalledWith(

@@ -528,6 +528,8 @@ export function OnboardingWizard({
                 nomeInicial={nomeInicial}
                 emailInicial={emailInicial}
                 regiao={[cidade.trim(), uf].filter(Boolean).join(' - ') || undefined}
+                regiaoUf={uf}
+                regiaoCidade={cidade}
                 userId={userId}
                 unidadeId={unidadeId}
                 unidadeNaoListada={unidadeNaoListada}
@@ -1670,20 +1672,14 @@ function calcularIdadeDeInput(isoDate: string): number | null {
   return idade
 }
 
-/** Extrai cidade/UF de rótulos como `Praia Grande - SP` ou `Praia Grande/SP`. */
-function parseRegiaoLabel(regiao?: string): { cidade: string; uf: string } {
-  if (!regiao?.trim()) return { cidade: '', uf: '' }
-  const m = regiao.trim().match(/^(.+?)\s*[-/]\s*([A-Za-z]{2})$/)
-  if (m) return { cidade: m[1]!.trim(), uf: m[2]!.toUpperCase() }
-  return { cidade: regiao.trim(), uf: '' }
-}
-
 function PassoVinculo({
   clube,
   torcida,
   nomeInicial,
   emailInicial,
   regiao,
+  regiaoUf,
+  regiaoCidade,
   unidadeId,
   unidadeNaoListada,
   userId,
@@ -1697,6 +1693,8 @@ function PassoVinculo({
   nomeInicial: string
   emailInicial: string
   regiao: string | undefined
+  regiaoUf: string
+  regiaoCidade: string
   unidadeId: string | null
   unidadeNaoListada: boolean
   userId: string
@@ -1709,11 +1707,9 @@ function PassoVinculo({
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
   const [tabAtiva, setTabAtiva] = useState<TabFormularioSocio>('identificacao')
-  const regiaoInicial = parseRegiaoLabel(regiao)
 
   // Campos de sócio
   const [nome, setNome] = useState(nomeInicial)
-  const [idade, setIdade] = useState('')
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState(emailInicial)
   const [cep, setCep] = useState('')
@@ -1748,8 +1744,8 @@ function PassoVinculo({
   // ─── Endereço completo ──────────────────────────────────────────────────────
   const [logradouro, setLogradouro] = useState('')
   const [bairro, setBairro] = useState('')
-  const [ufEndereco, setUfEndereco] = useState(regiaoInicial.uf)
-  const [cidadeEndereco, setCidadeEndereco] = useState(regiaoInicial.cidade)
+  const [ufEndereco, setUfEndereco] = useState(regiaoUf)
+  const [cidadeEndereco, setCidadeEndereco] = useState(regiaoCidade)
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [erroCepLocal, setErroCepLocal] = useState<string | null>(null)
 
@@ -1858,7 +1854,6 @@ function PassoVinculo({
 
       const saved = JSON.parse(raw) as Partial<{
         nome: string
-        idade: string
         telefone: string
         email: string
         cep: string
@@ -1890,7 +1885,6 @@ function PassoVinculo({
       }>
 
       if (typeof saved.nome === 'string') setNome(saved.nome)
-      if (typeof saved.idade === 'string') setIdade(saved.idade)
       if (typeof saved.telefone === 'string') setTelefone(saved.telefone)
       if (typeof saved.email === 'string' && saved.email.trim()) setEmail(saved.email)
       else if (emailInicial) setEmail(emailInicial)
@@ -1957,7 +1951,6 @@ function PassoVinculo({
     const saveDraft = () => {
       const draft = {
         nome,
-        idade,
         telefone,
         email,
         cep,
@@ -2002,7 +1995,6 @@ function PassoVinculo({
     draftRestored,
     vinculoDraftKey,
     nome,
-    idade,
     telefone,
     email,
     cep,
@@ -2124,7 +2116,7 @@ function PassoVinculo({
           tenantId: torcida.id,
           tipo,
           nome: tipo === 'SOCIO' ? nome : nome || nomeInicial || 'Torcedor',
-          idade: idade || undefined,
+          idade: idadeCalculada !== null ? String(idadeCalculada) : undefined,
           telefone: telefone || undefined,
           email: email.trim() || undefined,
           cidade: regiaoEfetiva || undefined,
@@ -2663,16 +2655,6 @@ function PassoVinculo({
             </Campo>
           </div>
 
-          <Campo name="idade" label="Idade" erros={errosCampo.idade}>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={idade}
-              onChange={(e) => setIdade(e.target.value.replace(/\D/g, '').slice(0, 3))}
-              placeholder="Ex: 25"
-            />
-          </Campo>
-
           {departamentosSelecionaveis !== null && departamentosSelecionaveis.length > 0 && (
             <Campo
               name="departamentoId"
@@ -3006,7 +2988,6 @@ const CAMPO_TAB: Record<string, TabFormularioSocio> = {
   uf: 'endereco',
   numeroAssociado: 'endereco',
   anosSocio: 'endereco',
-  idade: 'endereco',
   departamentoId: 'endereco',
   imagemProva: 'documentos',
   fotoDocumentoUrl: 'documentos',
