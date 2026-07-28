@@ -42,6 +42,10 @@ Uma única permissão dedicada: **`MEETINGS_HOST: 'meetings:host'`** (grupo Comu
   enquete.
 - Helpers de autorização (`apps/web/src/lib/salas-api.ts`): `assertSalaMembro(salaId)` e
   `assertSalaAnfitriao(salaId)` (idem + exige ser o host).
+- **Super admin (2026-07-27)**: `assertSalaMembro` deixa super admin sem `SaasMembro` entrar/ver
+  qualquer sala de qualquer torcida (`isSuperAdminViewer: true` no contexto retornado), mas é
+  oversight só-leitura — mandar mensagem e votar checam essa flag e bloqueiam (403). Ver
+  `docs/data/modulo-super-admin.md` § Acesso a Salas/Feed.
 
 ## Visibilidade e privacidade
 

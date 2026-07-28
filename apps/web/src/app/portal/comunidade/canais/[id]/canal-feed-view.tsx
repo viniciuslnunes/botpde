@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { db } from '@torcida/db'
+import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 import {
   listCandidatosMembroCanal,
   listMembrosCanal,
@@ -74,7 +75,7 @@ export async function CanalFeedView({
       canal={canal}
       currentUser={currentUser}
       podePublicar={podePublicar}
-      corPrimaria={tenant?.corPrimaria ?? '#7c3aed'}
+      corPrimaria={tenant?.corPrimaria ?? COR_PRIMARIA_PLATAFORMA}
       membros={membros}
       podeGerenciarAdmins={podeGerenciarAdmins}
       podeGerenciarMembros={podeGerenciarMembros}

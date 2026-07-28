@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavbarBrandOverride } from '@/lib/navbar-brand-override'
+import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 
 const CANAL_DETALHE_RE = /^\/portal\/comunidade\/canais\/[^/]+$/
 
@@ -20,9 +21,12 @@ type AfiliacaoBrand = {
 export function ComunidadeEscopoNavbarOverride({
   afiliacao,
   podeEscopoTorcida,
+  corPrimaria,
 }: {
   afiliacao: AfiliacaoBrand | null
   podeEscopoTorcida: boolean
+  /** Cor do tenant sintético da Comunidade Nacional (paleta do clube). */
+  corPrimaria: string | null
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -42,7 +46,7 @@ export function ComunidadeEscopoNavbarOverride({
 
     setOverride({
       nome: afiliacao.apelido ?? afiliacao.nome,
-      corPrimaria: '#7c3aed',
+      corPrimaria: corPrimaria ?? COR_PRIMARIA_PLATAFORMA,
       logoUrl: afiliacao.escudoUrl,
     })
     return () => setOverride(null)
@@ -51,6 +55,7 @@ export function ComunidadeEscopoNavbarOverride({
     afiliacao?.nome,
     afiliacao?.apelido,
     afiliacao?.escudoUrl,
+    corPrimaria,
     setOverride,
     afiliacao,
   ])

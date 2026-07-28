@@ -263,7 +263,10 @@ export async function enviarMensagemSala(formData: FormData) {
   })
   if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Mensagem inválida')
 
-  const { session, sala } = await assertSalaMembro(parsed.data.salaId)
+  const { session, sala, isSuperAdminViewer } = await assertSalaMembro(parsed.data.salaId)
+  if (isSuperAdminViewer) {
+    throw new ExpectedError('Super admin tem acesso somente de visualização a esta sala.')
+  }
 
   await db.mensagemReuniao.create({
     data: {

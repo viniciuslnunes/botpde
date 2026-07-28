@@ -14,6 +14,7 @@ import { PortalMotionShell } from '@/components/motion/portal-motion-shell'
 import { TenantDesignBridge } from '@/components/tenant-design-bridge'
 import { getTenantFromHost } from '@/lib/tenant'
 import { NavbarBrandOverrideProvider } from '@/lib/navbar-brand-override'
+import { COR_PRIMARIA_PLATAFORMA } from '@torcida/types'
 
 export default async function PortalLayout({
   children,
@@ -56,19 +57,30 @@ export default async function PortalLayout({
         })
       : 0
 
+  // Modo nacional (torcedor global sem tenant real) herda a cor/design do
+  // tenant sintético da Comunidade Nacional do clube em vez do roxo de fábrica.
+  const corNacional = ctx?.modo === 'nacional' ? (ctx.tenantSintetico?.corPrimaria ?? COR_PRIMARIA_PLATAFORMA) : null
+
   const navbarTenant =
     ctx?.modo === 'torcida'
       ? { nome: ctx.tenant.nome, corPrimaria: ctx.tenant.corPrimaria, logoUrl: ctx.tenant.logoUrl }
       : ctx?.modo === 'nacional'
         ? {
             nome: ctx.afiliacao.apelido ?? ctx.afiliacao.nome,
-            corPrimaria: '#7c3aed',
+            corPrimaria: corNacional ?? COR_PRIMARIA_PLATAFORMA,
             logoUrl: ctx.afiliacao.escudoUrl,
           }
-        : { nome: 'Torcida', corPrimaria: '#7c3aed', logoUrl: null }
+        : { nome: 'Torcida', corPrimaria: COR_PRIMARIA_PLATAFORMA, logoUrl: null }
 
-  // Design completo só no modo torcida (tenant real).
+  // Design completo: tenant real no modo torcida, tenant sintético (paleta do
+  // clube) no modo nacional.
   const hostTenant = ctx?.modo === 'torcida' ? await getTenantFromHost() : null
+  const designBridgeProps =
+    ctx?.modo === 'torcida' && hostTenant
+      ? { corPrimaria: hostTenant.corPrimaria, design: hostTenant.design }
+      : ctx?.modo === 'nacional' && ctx.tenantSintetico
+        ? { corPrimaria: ctx.tenantSintetico.corPrimaria, design: ctx.tenantSintetico.design }
+        : null
 
   // Seletor de troca de torcida: só para quem tem vínculo aprovado em mais
   // de uma (super-admin não usa isso — ele já tem o switcher no admin).
@@ -81,8 +93,11 @@ export default async function PortalLayout({
 
   return (
     <div className="app-shell-bg min-h-screen">
-      {hostTenant ? (
-        <TenantDesignBridge corPrimaria={hostTenant.corPrimaria} design={hostTenant.design} />
+      {designBridgeProps ? (
+        <TenantDesignBridge
+          corPrimaria={designBridgeProps.corPrimaria}
+          design={designBridgeProps.design}
+        />
       ) : null}
       <NavbarBrandOverrideProvider>
         <PortalNavbar

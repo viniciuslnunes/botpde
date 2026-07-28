@@ -59,6 +59,27 @@ Referências: `torcidas/actions.ts` (`alternarAtivoTenantAction`,
 `alterarPlanoTenantAction`, `transferirOwnerAction`), `moderacao/actions.ts`
 (`resolverDenunciaSuperAdminAction` e pares).
 
+## Acesso a Salas/Feed de qualquer torcida (2026-07-27)
+
+Super admin entra em qualquer torcida (sede, subsede ou PDE) via
+`selecionarTorcidaAction`/`selecionarUnidadeAction`
+(`apps/web/src/app/admin/tenant-context-actions.ts`, cookie `torcida_ctx`) e
+`getActiveTenant` já tem bypass de vínculo (`apps/web/src/lib/tenant.ts:184`).
+A partir daí, dois pontos que checam `SaasMembro` (não permissão RBAC) também
+ganharam bypass de leitura para super admin, sem exigir associação real:
+
+- **Feed** — `podeVerFeedSocios` (`apps/web/src/lib/feed.ts`) libera posts
+  "Só torcida" (`TENANT`) para super admin mesmo sem `SaasMembro APROVADO`.
+  Puramente leitura: não afeta publicar/reagir/comentar (`assertMembroAtivo`
+  continua exigindo vínculo real para escrita).
+- **Salas** — `assertSalaMembro` (`apps/web/src/lib/salas-api.ts`) permite
+  super admin entrar/ver qualquer sala (mensagens, participantes, enquetes)
+  sem `SaasMembro`, marcando o contexto com `isSuperAdminViewer: true`. Os
+  chamadores de escrita (enviar mensagem, votar em enquete) checam essa flag
+  e bloqueiam com 403 — oversight é só leitura, não equivale a virar membro.
+  Criar/moderar mídia/encerrar sala já funcionavam via `assertPermission`
+  (RBAC tem bypass próprio) — não mudou.
+
 ## Pendências conhecidas
 
 - **LGPD — exclusão/anonimização de conta (fase 2)**: só existe exportação

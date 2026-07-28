@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { m } from 'motion/react'
 import { FileText, Lock, MapPin, Users } from 'lucide-react'
 import { Avatar } from '@/components/portal/avatar'
@@ -33,35 +33,42 @@ export function MembroSugestaoCard({
   membro: SugestaoMembroBusca
   index: number
 }) {
+  const router = useRouter()
   const perfilHref = `/portal/comunidade/perfil/${membro.id}`
 
   return (
     <m.article
       custom={index}
       variants={menuItemStagger}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-colors hover:border-[rgb(var(--color-primary)_/_0.4)] hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.06)]"
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(perfilHref)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          router.push(perfilHref)
+        }
+      }}
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] transition-colors hover:border-[rgb(var(--color-primary)_/_0.4)] hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.06)]"
     >
       <div className="flex flex-1 gap-3 p-4">
-        <Link href={perfilHref} className="shrink-0 self-start">
+        <div className="shrink-0 self-start">
           <Avatar nome={membro.nome} avatarUrl={membro.avatarUrl} size="lg" />
-        </Link>
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <Link
-                href={perfilHref}
-                className="line-clamp-1 text-sm font-semibold text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]"
-              >
+              <p className="line-clamp-1 text-sm font-semibold text-[rgb(var(--foreground))] group-hover:text-[rgb(var(--color-primary-fg))]">
                 {membro.nome ?? 'Membro'}
-              </Link>
+              </p>
               <p className="mt-0.5 line-clamp-2 text-xs text-[rgb(var(--foreground-muted))]">
                 {subtituloMembro(membro)}
               </p>
             </div>
 
             {membro.podeSeguir && (
-              <div className="shrink-0">
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                 <SeguimentoButtons userId={membro.id} status={membro.statusSeguimento} />
               </div>
             )}

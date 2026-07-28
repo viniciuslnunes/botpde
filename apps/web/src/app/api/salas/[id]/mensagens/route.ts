@@ -67,7 +67,13 @@ export async function POST(
 ) {
   try {
     const { id: salaId } = await context.params
-    const { session, tenant, sala } = await assertSalaMembro(salaId)
+    const { session, tenant, sala, isSuperAdminViewer } = await assertSalaMembro(salaId)
+    if (isSuperAdminViewer) {
+      return NextResponse.json(
+        { error: 'Super admin tem acesso somente de visualização a esta sala.' },
+        { status: 403 },
+      )
+    }
 
     const body: unknown = await request.json()
     const parsed = enviarSchema.safeParse(body)

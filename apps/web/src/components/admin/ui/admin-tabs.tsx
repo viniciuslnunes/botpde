@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { m } from 'motion/react'
 import { springSnappy } from '@/lib/motion-presets'
 import { buildAdminHref } from '@/lib/admin-href'
+import { adminTabIds } from './admin-tab-ids'
 
 export interface AdminTabItem {
   id: string
@@ -28,11 +29,6 @@ export interface AdminTabsProps {
   paramKey?: string
   /** Demais params da URL a preservar ao trocar de tab (paginação, busca, etc.). */
   extraParams?: Record<string, string | undefined>
-}
-
-/** Ids determinísticos para ligar cada tab ao seu `role="tabpanel"` via `aria-controls`. */
-export function adminTabIds(paramKey: string, id: string): { tabId: string; panelId: string } {
-  return { tabId: `${paramKey}-${id}-tab`, panelId: `${paramKey}-${id}-panel` }
 }
 
 /**

@@ -1,6 +1,12 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
 import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
+import {
+  COR_PRIMARIA_PLATAFORMA,
+  designFromPrimary,
+  isCorPadraoPlataforma,
+  paletaDoClube,
+} from '@torcida/types'
 
 export type AfiliacaoComunidade = {
   id: string
@@ -26,7 +32,7 @@ export type ContextoComunidadePortal =
       }
       afiliacao: AfiliacaoComunidade | null
       /** Container operacional da Comunidade Nacional do clube (get-or-create). */
-      tenantSintetico?: { id: string } | null
+      tenantSintetico?: TenantSintetico | null
       /** Sócio com tenant real — pode alternar para a aba "Minha torcida". */
       podeEscopoTorcida: boolean
     }
@@ -34,7 +40,7 @@ export type ContextoComunidadePortal =
       modo: 'nacional'
       tenant: null
       afiliacao: AfiliacaoComunidade
-      tenantSintetico?: { id: string } | null
+      tenantSintetico?: TenantSintetico | null
       podeEscopoTorcida: boolean
     }
 
@@ -113,6 +119,8 @@ export const resolverContextoComunidade = cache(
   },
 )
 
+export type TenantSintetico = { id: string; corPrimaria: string; design: unknown }
+
 /**
  * Get-or-create do tenant sintético da Comunidade Nacional do clube — container
  * de posts de torcedores globais (sem Sede/Role/SaasMembro). Unicidade garantida
@@ -120,7 +128,7 @@ export const resolverContextoComunidade = cache(
  */
 export async function getOrCreateComunidadeNacionalTenant(
   afiliacaoId: string,
-): Promise<{ id: string }> {
+): Promise<TenantSintetico> {
   const afiliacao: {
     nome: string
     apelido: string | null
@@ -134,32 +142,53 @@ export async function getOrCreateComunidadeNacionalTenant(
 
   const slugReservado = `${afiliacao.slug ?? afiliacaoId}-nacional`
 
-  const existente: { id: string } | null = await db.tenant.findFirst({
+  const existente: TenantSintetico | null = await db.tenant.findFirst({
     where: { slug: slugReservado },
-    select: { id: true },
+    select: { id: true, corPrimaria: true, design: true },
   })
-  if (existente) return existente
+  if (existente) {
+    // Backfill: tenants sintéticos criados antes da paleta do clube existir
+    // ficaram travados no roxo de fábrica sem design algum — corrige na hora.
+    if (isCorPadraoPlataforma(existente.corPrimaria) && !existente.design) {
+      const paletaBackfill = paletaDoClube(afiliacao.nome, afiliacao.apelido)
+      if (paletaBackfill) {
+        const corPrimaria = paletaBackfill.primary
+        const design = designFromPrimary(corPrimaria, paletaBackfill.secondary)
+        await db.tenant.update({ where: { id: existente.id }, data: { corPrimaria, design } })
+        return { id: existente.id, corPrimaria, design }
+      }
+    }
+    return existente
+  }
+
+  // Sem cor própria configurável ainda — herda a paleta curada do clube
+  // (torcida→escudo→clube, ver docs/data/modulo-design.md) em vez do roxo
+  // de fábrica da plataforma.
+  const paleta = paletaDoClube(afiliacao.nome, afiliacao.apelido)
+  const corPrimaria = paleta?.primary ?? COR_PRIMARIA_PLATAFORMA
+  const design = designFromPrimary(corPrimaria, paleta?.secondary ?? null)
 
   try {
-    const criado: { id: string } = await db.tenant.create({
+    const criado: TenantSintetico = await db.tenant.create({
       data: {
         nome: `${afiliacao.apelido ?? afiliacao.nome} — Comunidade Nacional`,
         slug: slugReservado,
         afiliacaoId,
         logoUrl: afiliacao.escudoUrl,
-        corPrimaria: '#7c3aed',
+        corPrimaria,
+        design,
         ativo: true,
         sintetico: true,
       },
-      select: { id: true },
+      select: { id: true, corPrimaria: true, design: true },
     })
     return criado
   } catch (error) {
     // Corrida rara: outro torcedor global criou o tenant no mesmo instante e o
     // create bateu no slug @unique — recupera o registro vencedor.
-    const vencedor: { id: string } | null = await db.tenant.findFirst({
+    const vencedor: TenantSintetico | null = await db.tenant.findFirst({
       where: { slug: slugReservado },
-      select: { id: true },
+      select: { id: true, corPrimaria: true, design: true },
     })
     if (vencedor) return vencedor
     throw error

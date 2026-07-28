@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink } from 'lucide-react'
+import { Shield, Search, ArrowLeft, ArrowRight, Check, Loader2, Mail, LocateFixed, MapPin, FileText, X, ExternalLink, User } from 'lucide-react'
 import { EscudoClube } from '@/components/onboarding/escudo-clube'
 import { MapaBrasilEstados } from '@/components/onboarding/mapa-brasil-estados'
 import { LinhaPlataforma } from '@/components/onboarding/onboarding-contagem-linhas'
@@ -1708,6 +1708,7 @@ function PassoVinculo({
   const { allowUnload } = useUnsavedChangesContext()
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
+  const [tabAtiva, setTabAtiva] = useState<TabFormularioSocio>('identificacao')
   const regiaoInicial = parseRegiaoLabel(regiao)
 
   // Campos de sócio
@@ -2038,7 +2039,12 @@ function PassoVinculo({
   ) {
     setErrosCampo(erros)
     onErro(mensagem)
-    // Espera o paint com ring/role=alert antes de rolar/focar.
+    // Se o primeiro erro estiver numa aba não-ativa, troca antes de rolar até ele.
+    const tabDoErro = TABS_FORMULARIO_SOCIO.find((tab) =>
+      Object.keys(erros).some((k) => (erros[k]?.length ?? 0) > 0 && CAMPO_TAB[k] === tab.id),
+    )
+    if (tabDoErro) setTabAtiva(tabDoErro.id)
+    // Espera o paint com ring/role=alert (e a troca de aba) antes de rolar/focar.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => revelarPrimeiroErroCampos(erros))
     })
@@ -2345,8 +2351,17 @@ function PassoVinculo({
           unidadeNaoListada={unidadeNaoListada}
         />
 
-        {/* ─── Identificação ────────────────────────────────────────────── */}
-        <SecaoFormulario titulo="Identificação">
+        {/* ─── Abas: Identificação / Endereço / Documentos ─────────────────── */}
+        <TabsFormularioSocio
+          ativa={tabAtiva}
+          onMudar={setTabAtiva}
+          erros={errosCampo}
+        />
+
+        <SecaoFormulario
+          titulo="Identificação"
+          oculta={tabAtiva !== 'identificacao'}
+        >
           <Campo name="nome" label="Nome completo" obrigatorio erros={errosCampo.nome}>
             <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" />
           </Campo>
@@ -2505,7 +2520,7 @@ function PassoVinculo({
         </SecaoFormulario>
 
         {/* ─── Endereço ──────────────────────────────────────────────────── */}
-        <SecaoFormulario titulo="Endereço">
+        <SecaoFormulario titulo="Endereço" oculta={tabAtiva !== 'endereco'}>
           {regiaoEfetiva && (
             <p className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3 text-sm text-[rgb(var(--foreground-muted))]">
               <span className="font-medium text-[rgb(var(--foreground))]">Região:</span>{' '}
@@ -2680,7 +2695,7 @@ function PassoVinculo({
         </SecaoFormulario>
 
         {/* ─── Documentos ────────────────────────────────────────────────── */}
-        <SecaoFormulario titulo="Documentos">
+        <SecaoFormulario titulo="Documentos" oculta={tabAtiva !== 'documentos'}>
           <div>
             <BlocoImagemProva
               imagemProva={imagemProva}
@@ -2940,15 +2955,113 @@ const TIPO_SEDE_LABEL: Record<string, string> = {
 /** Sub-seção visual do passo Vínculo (Identificação, Endereço, Documentos…). */
 function SecaoFormulario({
   titulo,
+  oculta,
   children,
 }: {
   titulo: string
+  /** Painel de aba não-ativa: fica desmontado (estado dos campos vive no wizard, não aqui). */
+  oculta?: boolean
   children: React.ReactNode
 }) {
+  if (oculta) return null
   return (
     <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
       <p className="text-sm font-semibold text-[rgb(var(--foreground))]">{titulo}</p>
       <div className="mt-3 space-y-4">{children}</div>
+    </div>
+  )
+}
+
+type TabFormularioSocio = 'identificacao' | 'endereco' | 'documentos'
+
+const TABS_FORMULARIO_SOCIO: { id: TabFormularioSocio; label: string; icon: typeof User }[] = [
+  { id: 'identificacao', label: 'Identificação', icon: User },
+  { id: 'endereco', label: 'Endereço', icon: MapPin },
+  { id: 'documentos', label: 'Documentos', icon: FileText },
+]
+
+/** Mapa campo → aba, usado para revelar a aba certa quando o submit falha. */
+const CAMPO_TAB: Record<string, TabFormularioSocio> = {
+  nome: 'identificacao',
+  dataNascimento: 'identificacao',
+  telefone: 'identificacao',
+  email: 'identificacao',
+  sexo: 'identificacao',
+  estadoCivil: 'identificacao',
+  nacionalidade: 'identificacao',
+  rg: 'identificacao',
+  cpf: 'identificacao',
+  nomePai: 'identificacao',
+  nomeMae: 'identificacao',
+  profissao: 'identificacao',
+  responsavelNome: 'identificacao',
+  responsavelDocumento: 'identificacao',
+  cep: 'endereco',
+  logradouro: 'endereco',
+  numero: 'endereco',
+  bloco: 'endereco',
+  complemento: 'endereco',
+  cidade: 'endereco',
+  bairro: 'endereco',
+  uf: 'endereco',
+  numeroAssociado: 'endereco',
+  anosSocio: 'endereco',
+  idade: 'endereco',
+  departamentoId: 'endereco',
+  imagemProva: 'documentos',
+  fotoDocumentoUrl: 'documentos',
+  comprovanteResidenciaUrl: 'documentos',
+}
+
+/** Navegação em abas do formulário de sócio — sinaliza abas com campo(s) com erro. */
+function TabsFormularioSocio({
+  ativa,
+  onMudar,
+  erros,
+}: {
+  ativa: TabFormularioSocio
+  onMudar: (tab: TabFormularioSocio) => void
+  erros: Record<string, string[]>
+}) {
+  const camposComErro = new Set(
+    Object.keys(erros).filter((k) => (erros[k]?.length ?? 0) > 0),
+  )
+  return (
+    <div
+      role="tablist"
+      aria-label="Seções do formulário"
+      className="flex gap-1 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1"
+    >
+      {TABS_FORMULARIO_SOCIO.map((tab) => {
+        const Icon = tab.icon
+        const temErro = Array.from(camposComErro).some((c) => CAMPO_TAB[c] === tab.id)
+        const ativaAgora = ativa === tab.id
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={ativaAgora}
+            onClick={() => onMudar(tab.id)}
+            className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-medium transition-colors ${
+              ativaAgora
+                ? 'bg-[rgb(var(--color-primary))] text-white'
+                : 'text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))]'
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{tab.label}</span>
+            {temErro && (
+              <span
+                aria-hidden
+                className={`absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${
+                  ativaAgora ? 'bg-white' : 'bg-red-500'
+                }`}
+              />
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }

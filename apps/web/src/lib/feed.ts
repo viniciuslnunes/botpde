@@ -17,6 +17,7 @@ import { getSeguimentoStatus } from './social'
 import type { TipoReacaoSocial } from './comunidade-social'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { garantirTimelineDaRedeDoViewer } from './feed-timeline'
+import { isSuperAdminEmail } from './tenant-context'
 import { formatNomeTorcida } from '@torcida/types'
 import { durableImageUrl, filterDurableImageUrls } from '@/lib/optimizable-image'
 import { compactOr } from '@/lib/prisma-filters'
@@ -1103,6 +1104,7 @@ export interface HashtagEmAlta {
 /**
  * Gate do feed de sócios: só vínculo APROVADO no tenant libera posts TENANT.
  * PENDENTE/REPROVADO/sem vínculo → só feed de torcedor (ver spec §3.1).
+ * Super admin (oversight cross-tenant, sem SaasMembro) sempre passa.
  */
 export const podeVerFeedSocios = cache(
   async (userId: string | undefined, tenantId: string): Promise<boolean> => {
@@ -1111,7 +1113,13 @@ export const podeVerFeedSocios = cache(
       where: { tenantId_userId: { tenantId, userId } },
       select: { status: true },
     })
-    return membro?.status === 'APROVADO'
+    if (membro?.status === 'APROVADO') return true
+
+    const user: { email: string | null } | null = await db.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    })
+    return isSuperAdminEmail(user?.email)
   },
 )
 

@@ -13,7 +13,13 @@ export async function POST(
 ) {
   try {
     const { id: salaId, enqueteId } = await context.params
-    const { session, tenant } = await assertSalaMembro(salaId)
+    const { session, tenant, isSuperAdminViewer } = await assertSalaMembro(salaId)
+    if (isSuperAdminViewer) {
+      return NextResponse.json(
+        { error: 'Super admin tem acesso somente de visualização a esta sala.' },
+        { status: 403 },
+      )
+    }
 
     const enquete = await db.enqueteReuniao.findFirst({
       where: { id: enqueteId, salaId, encerradaEm: null },

@@ -31,7 +31,7 @@ import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma } from '@torcida/types'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
@@ -428,6 +428,14 @@ function erroMencoesExcessivas(conteudo: string): string | null {
 const perfilSchema = z.object({
   bio: z.string().max(280, 'Bio deve ter no máximo 280 caracteres').optional(),
   perfilPrivado: z.boolean(),
+})
+
+const paletaExtraidaSchema = z.object({
+  afiliacaoId: z.string().min(1),
+  hexes: z
+    .array(z.string().regex(/^#[0-9a-fA-F]{6}$/))
+    .min(1)
+    .max(6),
 })
 
 const comentarioSchema = z.object({
@@ -878,6 +886,43 @@ export async function atualizarPerfilSocial(input: AtualizarPerfilSocialInput): 
   if (!session?.user?.id) throw new Error('Não autenticado')
   const { salvarPerfilSocial } = await import('@/lib/salvar-perfil-social')
   await salvarPerfilSocial(session.user.id, input)
+}
+
+/**
+ * Sincroniza (best-effort) a cor do tenant sintético da Comunidade Nacional
+ * com a paleta extraída do escudo do clube no client, para clubes fora do
+ * catálogo curado (`CLUBE_PALETAS`). Silenciosa e idempotente: só aplica se
+ * o tenant sintético ainda estiver no roxo de fábrica (nenhum torcedor já
+ * sincronizou nem há paleta curada aplicada).
+ */
+export async function sincronizarPaletaComunidadeNacional(
+  afiliacaoId: string,
+  hexes: string[],
+): Promise<void> {
+  const session = await auth()
+  if (!session?.user?.id) return
+
+  const parsed = paletaExtraidaSchema.safeParse({ afiliacaoId, hexes })
+  if (!parsed.success) return
+
+  const afiliacao: { slug: string | null } | null = await db.afiliacao.findUnique({
+    where: { id: parsed.data.afiliacaoId },
+    select: { slug: true },
+  })
+  if (!afiliacao) return
+
+  const slugReservado = `${afiliacao.slug ?? parsed.data.afiliacaoId}-nacional`
+  const tenant: { id: string; corPrimaria: string } | null = await db.tenant.findFirst({
+    where: { slug: slugReservado, sintetico: true },
+    select: { id: true, corPrimaria: true },
+  })
+  if (!tenant || !isCorPadraoPlataforma(tenant.corPrimaria)) return
+
+  const [primary, secondary] = parsed.data.hexes
+  await db.tenant.update({
+    where: { id: tenant.id },
+    data: { corPrimaria: primary, design: designFromPrimary(primary, secondary ?? null) },
+  })
 }
 
 /** @deprecated Use atualizarPerfilSocial */

@@ -4,6 +4,7 @@ import { ComunidadeDock } from './_components/comunidade-dock'
 import { ComunidadeRouteTransition } from './_components/comunidade-route-transition'
 import { ComunidadeLayoutChrome } from './_components/comunidade-layout-chrome'
 import { ComunidadeEscopoNavbarOverride } from './_components/comunidade-escopo-navbar-override'
+import { ComunidadeNacionalPaletaSync } from './_components/comunidade-nacional-paleta-sync'
 import { ComunidadeQueryProvider } from '@/components/portal/comunidade-query-provider'
 import { ScrollChromeVisibilityProvider } from '@/lib/scroll-chrome-context'
 import { resolverContextoComunidade, type AfiliacaoComunidade } from '@/lib/comunidade-contexto'
@@ -35,6 +36,7 @@ export default async function ComunidadeLayout({
   let canaisNacional: SugestaoCanalAside[] = []
   let tenantId: string | null = null
   let tenantSinteticoId: string | null = null
+  let tenantSinteticoCorPrimaria: string | null = null
   let afiliacaoId: string | null = null
   let afiliacao: AfiliacaoComunidade | null = null
 
@@ -45,6 +47,7 @@ export default async function ComunidadeLayout({
       afiliacaoId = ctx.afiliacao?.id ?? null
       podeEscopoTorcida = ctx.podeEscopoTorcida
       tenantSinteticoId = ctx.tenantSintetico?.id ?? null
+      tenantSinteticoCorPrimaria = ctx.tenantSintetico?.corPrimaria ?? null
       // Chrome (salas/chat) sempre que há contexto de comunidade — sócio sem
       // afiliação ainda vê o rail da torcida; torcedor exige clube.
       modoComunidade = ctx.modo === 'torcida' || Boolean(ctx.afiliacao)
@@ -94,8 +97,16 @@ export default async function ComunidadeLayout({
         <ComunidadeEscopoNavbarOverride
           afiliacao={afiliacao}
           podeEscopoTorcida={podeEscopoTorcida}
+          corPrimaria={tenantSinteticoCorPrimaria}
         />
       </Suspense>
+      {afiliacao && tenantSinteticoCorPrimaria ? (
+        <ComunidadeNacionalPaletaSync
+          afiliacaoId={afiliacao.id}
+          escudoUrl={afiliacao.escudoUrl}
+          corPrimariaAtual={tenantSinteticoCorPrimaria}
+        />
+      ) : null}
       <div className="pb-28 lg:pb-0">
         <ScrollChromeVisibilityProvider>
           <ComunidadeLayoutChrome

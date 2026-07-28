@@ -26,7 +26,7 @@ function ctxTorcida(): ContextoComunidadePortal {
       balancoFinanceiroVisivel: false,
     },
     afiliacao,
-    tenantSintetico: { id: 'syn-1' },
+    tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
     podeEscopoTorcida: true,
   }
 }
@@ -36,7 +36,7 @@ function ctxNacional(): ContextoComunidadePortal {
     modo: 'nacional',
     tenant: null,
     afiliacao,
-    tenantSintetico: { id: 'syn-1' },
+    tenantSintetico: { id: 'syn-1', corPrimaria: '#000', design: null },
     podeEscopoTorcida: false,
   }
 }
