@@ -59,7 +59,7 @@ export async function selecionarTorcidaAction(
 const unidadeSchema = z.discriminatedUnion('modo', [
   z.object({
     modo: z.literal('sede'),
-    sedeId: z.string().uuid(),
+    sedeId: z.string().min(1),
     tenantSlug: z.string().min(1),
   }),
   z.object({

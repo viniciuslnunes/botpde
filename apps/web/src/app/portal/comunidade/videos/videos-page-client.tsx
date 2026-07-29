@@ -39,7 +39,7 @@ export function VideosPageClient({ posts, tenantId, currentUser }: VideosPageCli
   if (posts.length === 0) {
     return (
       <MotionEmptyState
-        className="rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center"
+        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[rgb(var(--border))] px-4 py-14 text-center"
         icon={<Video className="mx-auto mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
         title="Nenhum vídeo publicado ainda"
         description={

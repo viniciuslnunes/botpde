@@ -47,7 +47,9 @@
     "db:ensure-canais-oficiais-unidades": "node scripts/ensure-canais-oficiais-unidades.js",
     "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
     "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",
-    "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js"
+    "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js",
+    "seed:corinthians-teste": "node scripts/seed-corinthians-teste.js",
+    "reset:corinthians-teste": "node scripts/reset-corinthians-teste.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"

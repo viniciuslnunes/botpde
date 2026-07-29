@@ -13,7 +13,8 @@ overlay** 2026-07-17: sem `revalidatePath` do feed em reação/comentário,
 `docs/data/modulo-eventos.md` + `ARCHITECTURE.md` §5.11; agente `performance`
 para auditorias novas. Investimento em infra (faixas A–D, ads, 1ª carga):
 `docs/ops/plano-investimento-infra.md` — agentes `performance` +
-`product-strategy`.
+`product-strategy`. Seed de dados de teste em volume (Corinthians, e futura
+escala nacional): `docs/ops/plano-teste-volume-dados.md`.
 
 ## O que é
 
