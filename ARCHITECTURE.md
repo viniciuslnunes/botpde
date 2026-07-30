@@ -911,6 +911,43 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
 - **Regras de receita**: loja = pedidos `CONFIRMADO`/`ENTREGUE`; bar = vendas
   `PAGA`; presença de eventos = `checkedInAt` (walk-in conta; no-show =
   `CONFIRMADO` sem check-in).
+- **Kit de listagem — contrato declarativo** (2026-07-30): Acessos renderizava
+  831 pessoas numa página só, com quatro dumps da torcida cruzados em memória
+  (O(n×m)); Membros e Sócios repetiam `parseSortParam`/`buildHref`/`where` à mão.
+  Fechado assim:
+  - **`ListagemSpec`** em `apps/web/src/lib/listagem/` (registro em `specs.ts`,
+    no espírito de `ADMIN_MODULOS`) descreve colunas, filtro por coluna, campos
+    de busca, sort/dir padrão e `camposProibidos`. Página nova não escreve parse
+    de param nem montagem de href: `parseListagemParams` + `construirHref*` +
+    `montarWhereListagem`/`montarOrderByListagem`/`montarPaginacao`.
+  - **Segurança no contrato**: `sort` restrito à coluna declarada, teto em
+    `porPagina`/`pagina`/valores por filtro, e campo sensível (CPF, RG, URL de
+    documento) barrado em filtro/busca/sort — a URL nunca vira canal de
+    consulta a dado LGE. Invariantes em `lib/__tests__/listagem.test.ts` rodam
+    sobre `LISTAGENS`, então listagem nova herda as travas.
+  - **Href vem do servidor**: opção de filtro é `<a>` com destino pronto (o
+    cliente só faz `router.replace`), então filtro e ordenação funcionam sem JS
+    e a serialização da URL existe em um lugar. `localStorage` só restaura a
+    última visão quando a URL está limpa — link compartilhado ganha da
+    preferência local.
+  - **Faceta ignora o próprio filtro** (`carregarFacetas` via `groupBy`): o
+    número na opção é quantos apareceriam se ela fosse marcada. Caminho de
+    relação não é facetável — o popover sai sem números em vez de mentir.
+  - **Escrita em GET eliminada**: `/admin/socios` alinhava `numeroSocio` legado
+    durante o GET da aba "emitidas" — refresh ou prefetch mutava o banco sem
+    auditoria. Virou a Server Action `sincronizarNumerosSocio`
+    (`MEMBERS_APPROVE`, advisory lock por torcida, `AuditLog`).
+  - **Índices** (exigem `db:push`): `SaasMembro [tenantId, status, criadoEm]`,
+    `[tenantId, criadoEm]`, `[tenantId, nome]`; `User [nome]`;
+    `UserDepartamento [tenantId]` — o unique dessa tabela começa por `userId`,
+    então "quem é desta torcida" varria a tabela; `SaasSocio [tenantId,
+    validade]`, `[tenantId, nome]`; `SaasPedido [tenantId, status, criadoEm]`,
+    `[tenantId, criadoEm]`.
+  - **Sócios = dois specs**: a aba `status` escolhe entre `SaasSocio` (emitidas)
+    e `SaasMembro` (aguardando) — sort, busca e colunas são disjuntos, então o
+    registro tem `LISTAGEM_SOCIOS_EMITIDAS` e `LISTAGEM_SOCIOS_AGUARDANDO`
+    compartilhando `basePath`. Filtro de unidade em emitidas é relação
+    (`user.membros.some.sedeId`), sem `userId: { in: [...] }` sem teto.
 
 - ~~**Item 16**~~ — ✅ Resolvido (2026-07-06): ver seção 5.3.
 - ~~**Auditoria de ações de super-admin (prioridade de segurança, 2026-07-07)**~~

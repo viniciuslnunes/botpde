@@ -252,6 +252,82 @@ tabs de rota. Decisões de escopo:
   form é compartilhado com a edição, e um modal quebraria a integração com
   `useTrackedForm`/`StickyPersistBar`.
 
+## Kit de listagem — paginação, filtro por coluna e busca (2026-07-30)
+
+Listagens grandes (Acessos com 831 pessoas em uma página, Membros, Sócios)
+repetiam o mesmo bloco: `parseSortParam`, `buildHref`, `sortHref`, `where`
+montado à mão, `POR_PAGINA` local e uma barra de `<select>`. Agora existe um
+**contrato declarativo** por listagem e componentes que o consomem.
+
+### Contrato — `apps/web/src/lib/listagem/`
+
+| Arquivo | Papel |
+|---|---|
+| `spec.ts` | `ListagemSpec`: colunas, filtro por coluna, campos de busca, sort/dir padrão, `porPaginaPadrao`, `camposProibidos`. Tetos: `POR_PAGINA_MAX`, `PAGINA_MAX`, `VALORES_POR_FILTRO_MAX` |
+| `specs.ts` | **Registro** das listagens (`LISTAGENS`) — fonte única, no mesmo espírito de `ADMIN_MODULOS` |
+| `params.ts` | `parseListagemParams` (Zod, hostile-safe) e os `construirHref*` — a serialização da URL existe em **um** lugar |
+| `query.ts` | `montarWhereListagem` / `montarOrderByListagem` / `montarPaginacao` / `resumirPaginacao` / `carregarFacetas` (server-only) |
+| `ui.ts` | Ponte spec → props serializáveis (`montarFiltroUI`, `montarChips`, `ocultosPreservados`, `paramsDoContrato`) |
+
+Componentes em `components/admin/ui/listagem/`: `ListagemToolbar` (busca
+reativa com debounce, contador, chips dos filtros ativos, "limpar tudo"),
+`ListagemTh` (ordenação + popover de filtro na própria coluna),
+`ListagemPaginacao` (primeira/anterior/janela/próxima/última + itens por
+página), `ListagemVazia`, `ListagemPersistencia`.
+
+### Decisões
+
+- **Servidor decide, cliente só navega**: as opções do popover são `<a>` com
+  href pronto do servidor. A lógica de toggle de filtro não é reimplementada no
+  cliente, e o filtro funciona sem JS.
+- **URL é a verdade; `localStorage` é conveniência.** `ListagemPersistencia`
+  restaura a última visão apenas quando a URL está limpa, uma vez por mount —
+  link compartilhado nunca é sobrescrito pelo estado de quem abre.
+- **Faceta ignora o próprio filtro**: o número ao lado de "Sócio" é quantos
+  apareceriam se a opção fosse marcada, não quantos há no resultado atual.
+  Facetas vêm de `groupBy`; caminho de relação não é facetável (o popover
+  simplesmente sai sem números).
+- **Segurança no contrato, não na página**: `sort` só aceita coluna declarada;
+  `porPagina` tem teto; `camposProibidos` barra campo sensível (CPF, RG, URLs de
+  documento) em filtro/busca/sort — e os testes de invariante
+  (`src/lib/__tests__/listagem.test.ts`, 44 casos) rodam sobre `LISTAGENS`, então
+  listagem nova ganha as travas de graça.
+- **Filtro de coluna escondida**: `filtrosCompactos` na `ListagemToolbar` repete
+  o filtro na barra exatamente nos breakpoints em que a coluna não está na
+  tabela — sem isso, filtro de coluna `hidden lg:table-cell` fica inalcançável
+  no mobile.
+- **Tabela de membros manteve a própria estrutura animada** (a decisão de
+  2026-07-22 segue): ela recebe os `<th>` prontos via prop `cabecalho` em vez de
+  virar `TableShell`.
+
+### Ganho medido no piloto
+
+`/admin/acessos?secao=pessoas` fazia quatro dumps da torcida (usuários, cargos,
+departamentos, gestores) e cruzava tudo em memória, O(n×m), serializando 831
+linhas com todos os cargos em cada uma. Passou a uma página de 25 linhas com
+`include` escopado por tenant; abrir o painel de uma pessoa resolve **aquele**
+usuário (`?usuario=`) em vez de carregar a lista inteira para editar um.
+
+`/admin/loja/pedidos` não tinha `take` — baixava todos os pedidos com itens e
+imagens. Agora pagina, busca por cliente/cupom e filtra status/data pelo kit.
+`/admin/socios` ganhou dois specs (`emitidas` × `aguardando`) porque a aba
+troca de modelo; o filtro de unidade em emitidas virou relação
+(`user.membros.some.sedeId`) em vez de materializar `userId[]` sem teto.
+
+Índices que sustentam a ordenação paginada (exigem `db:push`):
+`SaasMembro [tenantId, status, criadoEm]`, `[tenantId, criadoEm]`,
+`[tenantId, nome]`; `User [nome]`; `UserDepartamento [tenantId]`;
+`SaasSocio [tenantId, validade]`, `[tenantId, nome]`;
+`SaasPedido [tenantId, status, criadoEm]`, `[tenantId, criadoEm]`.
+
+### Escrita em GET removida
+
+`/admin/socios` alinhava o `numeroSocio` legado ao nº do recrutamento **durante
+o GET** da aba "emitidas": um refresh ou prefetch mutava o banco, sem auditoria.
+Virou a Server Action `sincronizarNumerosSocio` (permissão `MEMBERS_APPROVE`,
+advisory lock por torcida, `AuditLog` `SOCIO_NUMEROS_SINCRONIZADOS`), disparada
+por um aviso que só aparece quando a página exibida tem divergência.
+
 ## Ver também
 
 - Upload/crop de imagem e picker de localização:

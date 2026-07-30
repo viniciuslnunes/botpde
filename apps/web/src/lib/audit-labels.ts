@@ -27,6 +27,7 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   SOCIO_CARTEIRINHA_EMITIDA: 'Carteirinha emitida',
   SOCIO_CARTEIRINHA_RENOVADA: 'Carteirinha renovada',
   SOCIO_CARTEIRINHA_REVOGADA: 'Carteirinha revogada',
+  SOCIO_NUMEROS_SINCRONIZADOS: 'Números de carteirinha sincronizados',
 
   // Eventos / sedes
   EVENTO_CRIADO: 'Evento criado',

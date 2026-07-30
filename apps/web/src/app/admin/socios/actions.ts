@@ -194,6 +194,87 @@ export async function renovarCarteirinha(socioId: string, novaValidade: string) 
   revalidatePath('/admin/socios')
 }
 
+/**
+ * Alinha o `numeroSocio` de carteirinhas legadas (emitidas com sequencial MAX+1)
+ * ao nº informado no recrutamento, para a ordenação por número casar com o
+ * número exibido.
+ *
+ * Existe como ação explícita porque é uma escrita: rodava a cada abertura da
+ * lista, o que tornava um GET mutante — sem auditoria, sem consentimento e
+ * disparado por qualquer refresh ou prefetch.
+ */
+export async function sincronizarNumerosSocio(): Promise<{
+  corrigidas: number
+  conflitos: number
+}> {
+  const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
+
+  const carteirinhas: { id: string; userId: string; numeroSocio: number }[] =
+    await db.saasSocio.findMany({
+      where: { tenantId: tenant.id },
+      select: { id: true, userId: true, numeroSocio: true },
+    })
+  if (carteirinhas.length === 0) return { corrigidas: 0, conflitos: 0 }
+
+  const membros: { userId: string; numeroAssociado: string | null }[] =
+    await db.saasMembro.findMany({
+      where: { tenantId: tenant.id, userId: { in: carteirinhas.map((c) => c.userId) } },
+      select: { userId: true, numeroAssociado: true },
+    })
+  const numeroPorUser = new Map(
+    membros.map((m) => [m.userId, m.numeroAssociado?.trim() ?? '']),
+  )
+
+  const pendentes = carteirinhas.flatMap((c) => {
+    const raw = numeroPorUser.get(c.userId) ?? ''
+    if (!/^\d+$/.test(raw)) return []
+    const numero = parseInt(raw, 10)
+    if (numero === c.numeroSocio) return []
+    return [{ id: c.id, de: c.numeroSocio, para: numero }]
+  })
+  if (pendentes.length === 0) return { corrigidas: 0, conflitos: 0 }
+
+  let corrigidas = 0
+  let conflitos = 0
+  for (const pendente of pendentes) {
+    try {
+      // Lock por torcida: o nº é único por tenant, e emitir carteirinha usa o
+      // mesmo lock — sem ele, sync e emissão podem disputar o mesmo número.
+      await db.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`socio-num:${tenant.id}`}))`
+        await tx.saasSocio.update({
+          where: { id: pendente.id },
+          data: { numeroSocio: pendente.para },
+        })
+      })
+      corrigidas++
+    } catch (err: unknown) {
+      // Número já ocupado por outra carteirinha: a UI segue mostrando o nº do
+      // cadastro; resolver exige corrigir a duplicidade no recrutamento.
+      if (!isUniqueViolation(err)) throw err
+      conflitos++
+    }
+  }
+
+  await db.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      atorId: session.user.id,
+      acao: 'SOCIO_NUMEROS_SINCRONIZADOS',
+      entidade: 'SaasSocio',
+      entidadeId: tenant.id,
+      detalhes: {
+        corrigidas,
+        conflitos,
+        alteracoes: pendentes.slice(0, 50),
+      },
+    },
+  })
+
+  revalidatePath('/admin/socios')
+  return { corrigidas, conflitos }
+}
+
 export async function revogarCarteirinha(socioId: string) {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 

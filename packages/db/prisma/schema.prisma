@@ -541,6 +541,11 @@ model User {
   solicitacoesUnidadeDecididas SolicitacaoUnidade[]  @relation("SolicitacaoUnidadeDecisor")
 
 
+  // Controle de acesso lista pessoas por vínculo com a torcida ordenando por
+  // nome/e-mail: com o índice, a página vira varredura ordenada com LIMIT em vez
+  // de ordenar o resultado inteiro do semi-join.
+  @@index([nome])
+
   @@map("saas_users")
 
 }
@@ -780,6 +785,9 @@ model UserDepartamento {
   @@unique([userId, tenantId, departamentoId])
 
   @@index([departamentoId])
+
+  // O unique começa por userId, então "quem é desta torcida" não o aproveitava.
+  @@index([tenantId])
 
   @@map("saas_user_departamentos")
 
@@ -1060,7 +1068,14 @@ model SaasMembro {
 
   @@index([importacaoId])
 
-  @@index([tenantId, status])
+  // A listagem do admin sempre parte de tenantId + aba de situação e ordena por
+  // data de cadastro ou nome; sem o sufixo de ordenação o Postgres precisa
+  // ordenar a fatia inteira antes de aplicar o LIMIT da paginação.
+  @@index([tenantId, status, criadoEm])
+
+  @@index([tenantId, criadoEm])
+
+  @@index([tenantId, nome])
 
   @@index([tenantId, adimplente])
 
@@ -1211,6 +1226,12 @@ model SaasSocio {
   @@unique([tenantId, numeroSocio])
 
   @@unique([tenantId, userId])
+
+  // Abas Ativos/Vencendo/Vencidos filtram por validade; sem o índice a
+  // paginação ordena a torcida inteira antes do LIMIT.
+  @@index([tenantId, validade])
+
+  @@index([tenantId, nome])
 
   @@map("saas_socios")
 
@@ -2104,6 +2125,11 @@ model SaasPedido {
   @@index([userId])
 
   @@index([grupoCheckoutId])
+
+  // Listagem admin: filtro por status + ordenação por data (padrão).
+  @@index([tenantId, status, criadoEm])
+
+  @@index([tenantId, criadoEm])
 
   @@map("saas_pedidos")
 

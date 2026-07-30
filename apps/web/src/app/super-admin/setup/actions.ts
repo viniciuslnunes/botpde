@@ -9,6 +9,7 @@ import {
 import type { Prisma } from '@torcida/db'
 import { superAdminEmails } from '@/lib/env'
 import { invalidateTorcidasSelecaoCache } from '@/lib/tenant-context'
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { SYSTEM_ROLES, formatNomeTorcida, podeTerVice } from '@torcida/types'
@@ -165,6 +166,7 @@ export async function atribuirOwnerAction(_prev: SetupState, formData: FormData)
     })
   }
 
+  revalidatePath('/super-admin/setup')
   return { tenantId, tenantSlug: tenant.slug }
 }
 

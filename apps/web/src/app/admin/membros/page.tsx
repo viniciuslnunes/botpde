@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from 'react'
-import { db } from '@torcida/db'
+import { db, type Prisma } from '@torcida/db'
 import { redirect } from 'next/navigation'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
 import {
@@ -31,8 +31,10 @@ import {
   AdminChartPeriodFilter,
   AdminExpansionPanel,
   AdminTabs,
+  ListagemPaginacao,
+  ListagemTh,
+  ListagemToolbar,
   StatCard,
-  TablePagination,
   type AdminChartPeriod,
 } from '@/components/admin/ui'
 import { DonutChart, MiniBarChart } from '@/components/admin/charts'
@@ -42,11 +44,20 @@ import {
   type IntervaloAnalise,
 } from '@/lib/admin-insights'
 import {
-  nextSortDir,
-  parseDirParam,
-  parseSortParam,
-  type SortDir,
-} from '@/lib/admin-list-sort'
+  construirHrefListagem,
+  parseListagemParams,
+  serializarListagemParams,
+  type ListagemFacetas,
+} from '@/lib/listagem'
+import { LISTAGEM_MEMBROS } from '@/lib/listagem/specs'
+import {
+  carregarFacetas,
+  montarOrderByListagem,
+  montarPaginacao,
+  montarWhereListagem,
+  resumirPaginacao,
+} from '@/lib/listagem/query'
+import type { OpcoesDinamicas } from '@/lib/listagem/ui'
 import { mapToAdminMembroItem } from '@/lib/admin-membro-map'
 import { AdminMembrosTable } from './admin-membros-client'
 import { ExportarLgeButton } from './exportar-lge-button'
@@ -56,27 +67,30 @@ export const metadata: Metadata = { title: 'Membros — Admin' }
 
 type StatusFilter = StatusMembrosInsight
 
-const MEMBROS_SORT_COLS = [
-  'nome',
-  'tipo',
-  'departamento',
-  'sede',
-  'cidade',
-  'status',
-  'criadoEm',
-] as const
+const SPEC = LISTAGEM_MEMBROS
 
-type MembroSortCol = (typeof MEMBROS_SORT_COLS)[number]
-
-const MEMBRO_SORT_DEFAULT_DIR: Partial<Record<MembroSortCol, SortDir>> = {
-  criadoEm: 'desc',
-  nome: 'asc',
-  tipo: 'asc',
-  departamento: 'asc',
-  sede: 'asc',
-  cidade: 'asc',
-  status: 'asc',
+/** Classes de visibilidade responsiva por coluna — a tabela esconde as laterais. */
+const COLUNA_CLASSE: Record<string, string> = {
+  nome: 'px-3 sm:px-4',
+  tipo: 'hidden sm:table-cell',
+  departamento: 'hidden md:table-cell',
+  sede: 'hidden lg:table-cell',
+  cidade: 'hidden xl:table-cell',
+  status: 'hidden sm:table-cell',
+  criadoEm: 'hidden 2xl:table-cell',
 }
+
+/**
+ * Complemento de `COLUNA_CLASSE`: cada filtro reaparece na barra exatamente nos
+ * breakpoints em que a coluna dele não está na tabela.
+ */
+const FILTROS_COMPACTOS = [
+  { filtroId: 'tipo', classe: 'sm:hidden' },
+  { filtroId: 'departamento', classe: 'md:hidden' },
+  { filtroId: 'sede', classe: 'lg:hidden' },
+  { filtroId: 'cidade', classe: 'xl:hidden' },
+  { filtroId: 'criadoEm', classe: '2xl:hidden' },
+] as const
 
 const CATEGORIA_CURTA: Record<string, string> = {
   DADOS_INCORRETOS: 'Dados',
@@ -491,18 +505,7 @@ async function MembrosInsights({
 export default async function MembrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    status?: string
-    q?: string
-    pagina?: string
-    sede?: string
-    tipo?: string
-    sort?: string
-    dir?: string
-    periodoGrafico?: string
-    de?: string
-    ate?: string
-  }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
   // esconder o link no menu não basta, a URL direta precisa ser bloqueada.
@@ -514,18 +517,24 @@ export default async function MembrosPage({
   }
 
   const params = await searchParams
-  const statusFiltro = parseStatusFiltro(params.status)
-  const periodoGrafico = parsePeriodoGrafico(params.periodoGrafico)
+  const texto = (chave: string): string | undefined => {
+    const valor = params[chave]
+    return typeof valor === 'string' ? valor : undefined
+  }
+
+  const listagem = parseListagemParams(params, SPEC)
+  const statusFiltro = parseStatusFiltro(listagem.filtros.status?.[0])
+  const periodoGrafico = parsePeriodoGrafico(texto('periodoGrafico'))
   const hoje = new Date()
   const maxDate = dataIsoSp.format(hoje)
   const inicioPadrao = resolverIntervaloMeses(3).inicio
   const customStartPadrao = dataIsoSp.format(inicioPadrao)
   const customIntervaloInformado =
     periodoGrafico === 'custom'
-      ? resolverIntervaloCustomizado(params.de, params.ate)
+      ? resolverIntervaloCustomizado(texto('de'), texto('ate'))
       : null
-  const customStart = customIntervaloInformado ? params.de! : customStartPadrao
-  const customEnd = customIntervaloInformado ? params.ate! : maxDate
+  const customStart = customIntervaloInformado ? texto('de')! : customStartPadrao
+  const customEnd = customIntervaloInformado ? texto('ate')! : maxDate
   const intervalo =
     periodoGrafico === 'custom'
       ? (customIntervaloInformado ??
@@ -535,48 +544,19 @@ export default async function MembrosPage({
     periodoGrafico === 'custom'
       ? `de ${formatarDataCurta(customStart)} a ${formatarDataCurta(customEnd)}`
       : `últimos ${periodoGrafico === '9m' ? 9 : periodoGrafico === '6m' ? 6 : 3} meses`
-  const busca = params.q ?? ''
-  const sedeFiltro = params.sede ?? ''
-  const tipoFiltro =
-    params.tipo === 'SOCIO' || params.tipo === 'TORCEDOR' ? params.tipo : ''
-  const sort = parseSortParam(params.sort, MEMBROS_SORT_COLS, 'criadoEm') as MembroSortCol
-  const dir = parseDirParam(
-    params.dir,
-    MEMBRO_SORT_DEFAULT_DIR[sort] ?? 'desc',
-  )
-  const pagina = Math.max(1, parseInt(params.pagina ?? '1', 10))
-  const porPagina = 20
-
-  const where = {
-    tenantId: tenant.id,
-    ...(statusFiltro !== 'TODOS' ? { status: statusFiltro } : {}),
-    ...(tipoFiltro ? { tipo: tipoFiltro } : {}),
-    ...(sedeFiltro === 'nenhuma'
-      ? { sedeId: null }
-      : sedeFiltro
-        ? { sedeId: sedeFiltro }
-        : {}),
-    ...(busca
-      ? {
-          OR: [
-            { nome: { contains: busca, mode: 'insensitive' as const } },
-            { cidade: { contains: busca, mode: 'insensitive' as const } },
-            { telefone: { contains: busca } },
-            { discordTag: { contains: busca, mode: 'insensitive' as const } },
-            { numeroAssociado: { contains: busca } },
-          ],
-        }
-      : {}),
+  // Params que não pertencem ao contrato da listagem (período dos gráficos):
+  // viajam como `extras` para que trocar filtro não zere o recorte do insight.
+  const extrasDaRota: Record<string, string | undefined> = {
+    periodoGrafico: periodoGrafico === '3m' ? undefined : periodoGrafico,
+    de: periodoGrafico === 'custom' ? customStart : undefined,
+    ate: periodoGrafico === 'custom' ? customEnd : undefined,
   }
 
-  const orderBy =
-    sort === 'departamento'
-      ? { departamento: { nome: dir } }
-      : sort === 'sede'
-        ? { sede: { nome: dir } }
-        : { [sort]: dir }
+  const where: Prisma.SaasMembroWhereInput = montarWhereListagem(SPEC, listagem, {
+    escopo: { tenantId: tenant.id },
+  })
 
-  const [membros, total, contagens, sedes] = await Promise.all([
+  const [membros, total, contagens, sedes, departamentosOpts] = await Promise.all([
     db.saasMembro.findMany({
       where,
       include: {
@@ -584,9 +564,8 @@ export default async function MembrosPage({
         departamento: { select: { id: true, nome: true } },
         sede: { select: { id: true, nome: true, tipo: true } },
       },
-      orderBy,
-      skip: (pagina - 1) * porPagina,
-      take: porPagina,
+      orderBy: montarOrderByListagem(SPEC, listagem),
+      ...montarPaginacao(listagem),
     }),
     db.saasMembro.count({ where }),
     db.saasMembro.groupBy({
@@ -599,12 +578,56 @@ export default async function MembrosPage({
       orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
       select: { id: true, nome: true, tipo: true },
     }),
+    db.departamento.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+      select: { id: true, nome: true },
+    }),
   ])
 
   type SedeOpt = { id: string; nome: string; tipo: string }
   const sedesOpts: SedeOpt[] = sedes
+  const paginacao = resumirPaginacao(total, listagem)
 
-  const totalPaginas = Math.ceil(total / porPagina)
+  // Rótulos dos ids nos popovers e nos chips (a faceta só devolve o id).
+  const dinamicas: OpcoesDinamicas = {
+    sede: [
+      { valor: 'nenhuma', label: 'Sem unidade' },
+      ...sedesOpts.map((s) => ({ valor: s.id, label: s.nome })),
+    ],
+    departamento: [
+      { valor: 'sem', label: 'Sem área' },
+      ...departamentosOpts.map((d: { id: string; nome: string }) => ({
+        valor: d.id,
+        label: d.nome,
+      })),
+    ],
+  }
+
+  // Contagem por opção: cada faceta ignora o próprio filtro, então o número ao
+  // lado de "Sócio" mostra quantos apareceriam se a opção fosse marcada.
+  const facetas: ListagemFacetas = await carregarFacetas(
+    SPEC,
+    listagem,
+    { escopo: { tenantId: tenant.id } },
+    async (campo, whereFaceta) => {
+      const linhas = await db.saasMembro.groupBy({
+        by: [campo as 'tipo'],
+        where: whereFaceta as Prisma.SaasMembroWhereInput,
+        _count: { _all: true },
+      })
+      return linhas.map((linha: Record<string, unknown> & { _count: { _all: number } }) => ({
+        valor: (linha[campo] as string | null) ?? null,
+        count: linha._count._all,
+      }))
+    },
+    {
+      sede: Object.fromEntries(dinamicas.sede!.map((o) => [o.valor, o.label])),
+      departamento: Object.fromEntries(
+        dinamicas.departamento!.map((o) => [o.valor, o.label]),
+      ),
+    },
+  )
 
   // Alerta informativo: sócio (desta página) já aprovado como sócio em torcida
   // rival. Select mínimo — nunca trazer nome/prova de outro tenant; o client
@@ -762,60 +785,24 @@ export default async function MembrosPage({
     },
   ]
 
-  function buildHref(overrides: Record<string, string | undefined>) {
-    const p = new URLSearchParams()
-    const merged: Record<string, string | undefined> = {
-      status: statusFiltro,
-      q: busca || undefined,
-      sede: sedeFiltro || undefined,
-      tipo: tipoFiltro || undefined,
-      sort,
-      dir,
-      pagina: String(pagina),
-      periodoGrafico: periodoGrafico === '3m' ? undefined : periodoGrafico,
-      de: periodoGrafico === 'custom' ? customStart : undefined,
-      ate: periodoGrafico === 'custom' ? customEnd : undefined,
-      ...overrides,
-    }
-    if (merged.status && merged.status !== 'TODOS') p.set('status', merged.status)
-    if (merged.q) p.set('q', merged.q)
-    if (merged.sede) p.set('sede', merged.sede)
-    if (merged.tipo) p.set('tipo', merged.tipo)
-    if (merged.periodoGrafico) p.set('periodoGrafico', merged.periodoGrafico)
-    if (merged.periodoGrafico === 'custom' && merged.de && merged.ate) {
-      p.set('de', merged.de)
-      p.set('ate', merged.ate)
-    }
-    const sortVal = merged.sort || 'criadoEm'
-    const dirVal = merged.dir || 'desc'
-    if (!(sortVal === 'criadoEm' && dirVal === 'desc')) {
-      p.set('sort', sortVal)
-      p.set('dir', dirVal)
-    }
-    if (merged.pagina && merged.pagina !== '1') p.set('pagina', merged.pagina)
-    const qs = p.toString()
-    return `/admin/membros${qs ? `?${qs}` : ''}`
-  }
-
-  function sortHref(column: string) {
-    const col = column as MembroSortCol
-    const defaultDir = MEMBRO_SORT_DEFAULT_DIR[col] ?? 'asc'
-    const nextDir = nextSortDir(col, sort, dir, defaultDir)
-    return buildHref({ sort: col, dir: nextDir, pagina: '1' })
-  }
-
-  const sortHrefs: Record<string, string> = Object.fromEntries(
-    MEMBROS_SORT_COLS.map((col) => [col, sortHref(col)]),
+  // Trocar de aba de status volta para a primeira página: manter o offset
+  // mostraria uma fatia arbitrária de um resultado diferente.
+  const tabHrefs: Record<string, string> = Object.fromEntries(
+    tabs.map((tab) => [
+      tab.status,
+      construirHrefListagem(SPEC, listagem, {
+        pagina: 1,
+        filtros: { status: tab.status === 'TODOS' ? null : [tab.status] },
+        extras: extrasDaRota,
+      }),
+    ]),
   )
-  const periodExtraParams: Record<string, string | undefined> = {
-    status: statusFiltro !== 'TODOS' ? statusFiltro : undefined,
-    q: busca || undefined,
-    sede: sedeFiltro || undefined,
-    tipo: tipoFiltro || undefined,
-    sort: sort !== 'criadoEm' ? sort : undefined,
-    dir: sort !== 'criadoEm' || dir !== 'desc' ? dir : undefined,
-    pagina: pagina !== 1 ? String(pagina) : undefined,
-  }
+
+  // O filtro de período dos gráficos precisa carregar o estado da listagem
+  // inteiro, senão mudar o recorte do insight apagaria busca e filtros.
+  const periodExtraParams: Record<string, string | undefined> = Object.fromEntries(
+    serializarListagemParams(SPEC, listagem).entries(),
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -825,8 +812,10 @@ export default async function MembrosPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Membros</h1>
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                {total} {total === 1 ? 'resultado' : 'resultados'}
+              <p className="text-sm tabular-nums text-[rgb(var(--foreground-muted))]">
+                {paginacao.total === 0
+                  ? 'Nenhum resultado'
+                  : `${paginacao.faixa.de}–${paginacao.faixa.ate} de ${paginacao.total}`}
               </p>
             </div>
             <div className="shrink-0">
@@ -840,80 +829,28 @@ export default async function MembrosPage({
             label: tab.label,
             icon: tab.icon,
             count: tab.count,
+            href: tabHrefs[tab.status],
             countClass:
               tab.status === 'PENDENTE'
                 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                 : undefined,
           }))}
-          basePath="/admin/membros"
           activeId={statusFiltro}
           paramKey="status"
-          extraParams={{
-            q: busca || undefined,
-            sede: sedeFiltro || undefined,
-            tipo: tipoFiltro || undefined,
-            sort: sort !== 'criadoEm' ? sort : undefined,
-            dir: sort !== 'criadoEm' || dir !== 'desc' ? dir : undefined,
-            periodoGrafico: periodoGrafico === '3m' ? undefined : periodoGrafico,
-            de: periodoGrafico === 'custom' ? customStart : undefined,
-            ate: periodoGrafico === 'custom' ? customEnd : undefined,
-          }}
         />
 
-        {/* Busca + filtros */}
-        <form method="GET" action="/admin/membros" className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {statusFiltro !== 'TODOS' && (
-            <input type="hidden" name="status" value={statusFiltro} />
-          )}
-          {sort !== 'criadoEm' && <input type="hidden" name="sort" value={sort} />}
-          {(sort !== 'criadoEm' || dir !== 'desc') && (
-            <input type="hidden" name="dir" value={dir} />
-          )}
-          {periodoGrafico !== '3m' && (
-            <input type="hidden" name="periodoGrafico" value={periodoGrafico} />
-          )}
-          {periodoGrafico === 'custom' && (
-            <>
-              <input type="hidden" name="de" value={customStart} />
-              <input type="hidden" name="ate" value={customEnd} />
-            </>
-          )}
-          <input
-            type="search"
-            name="q"
-            defaultValue={busca}
-            placeholder="Buscar por nome, nº, cidade, telefone ou Discord…"
-            className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none transition-colors focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)] sm:min-w-[14rem]"
+        <div className="mt-3">
+          <ListagemToolbar
+            spec={SPEC}
+            params={listagem}
+            paginacao={paginacao}
+            facetas={facetas}
+            dinamicas={dinamicas}
+            extras={extrasDaRota}
+            escopoChave={tenant.id}
+            filtrosCompactos={FILTROS_COMPACTOS}
           />
-          <select
-            name="tipo"
-            defaultValue={tipoFiltro}
-            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-40"
-          >
-            <option value="">Todos os tipos</option>
-            <option value="SOCIO">Sócios</option>
-            <option value="TORCEDOR">Torcedores</option>
-          </select>
-          <select
-            name="sede"
-            defaultValue={sedeFiltro}
-            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-56"
-          >
-            <option value="">Todas as unidades</option>
-            <option value="nenhuma">Sem unidade</option>
-            {sedesOpts.map((s: SedeOpt) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-          >
-            Filtrar
-          </button>
-        </form>
+        </div>
         </div>
       </div>
 
@@ -949,9 +886,20 @@ export default async function MembrosPage({
         </div>
 
         <AdminMembrosTable
-          sort={sort}
-          dir={dir}
-          sortHrefs={sortHrefs}
+          cabecalho={SPEC.colunas.map((coluna) => (
+            <ListagemTh
+              key={coluna.id}
+              spec={SPEC}
+              params={listagem}
+              coluna={coluna}
+              facetas={facetas}
+              dinamicas={dinamicas}
+              extras={extrasDaRota}
+              className={COLUNA_CLASSE[coluna.id] ?? ''}
+            />
+          ))}
+          spec={SPEC}
+          params={listagem}
           membros={membros.map((membro: (typeof membros)[number]) =>
             mapToAdminMembroItem(
               {
@@ -1031,10 +979,11 @@ export default async function MembrosPage({
           )}
         />
 
-        <TablePagination
-          page={pagina}
-          totalPages={totalPaginas}
-          buildHref={(p) => buildHref({ pagina: String(p) })}
+        <ListagemPaginacao
+          spec={SPEC}
+          params={listagem}
+          paginacao={paginacao}
+          extras={extrasDaRota}
         />
         </div>
       </div>

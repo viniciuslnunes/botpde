@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -18,7 +18,7 @@ import {
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { AdminTabs, SortableTh } from '@/components/admin/ui'
+import { AdminTabs } from '@/components/admin/ui'
 import {
   emitirCarteirinha,
   renovarCarteirinha,
@@ -29,7 +29,6 @@ import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
 import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { useTrackedForm, useUnsavedChangesContext } from '@/lib/unsaved-changes'
-import type { SortDir } from '@/lib/admin-list-sort'
 
 export interface SocioEmitidoItem {
   id: string
@@ -564,15 +563,12 @@ export function AdminSociosClient({
   elegiveisModal,
   contagens,
   statusFiltro,
-  busca,
-  sedeFiltro,
-  sedes,
-  sort,
-  dir,
-  sortHrefs,
   tabHrefs,
-  tabExtraParams,
   podeEmitir,
+  toolbar,
+  cabecalho,
+  paginacao,
+  temFiltroAtivo,
 }: {
   socios: SocioEmitidoItem[]
   elegiveis: MembroElegivelItem[]
@@ -586,16 +582,12 @@ export function AdminSociosClient({
     aguardando: number
   }
   statusFiltro: string
-  busca: string
-  sedeFiltro: string
-  sedes: { id: string; nome: string; tipo: string }[]
-  sort: string
-  dir: SortDir
-  sortHrefs: Record<string, string>
   tabHrefs: Record<string, string>
-  /** Params (q/sede/sort/dir) a preservar ao trocar de tab via `AdminTabs`. */
-  tabExtraParams: Record<string, string | undefined>
   podeEmitir: boolean
+  toolbar: ReactNode
+  cabecalho: ReactNode
+  paginacao: ReactNode
+  temFiltroAtivo: boolean
 }) {
   const [emitOpen, setEmitOpen] = useState(false)
   const [emitUserId, setEmitUserId] = useState<string | null>(null)
@@ -685,55 +677,14 @@ export function AdminSociosClient({
                 label: tab.label,
                 count: tab.count,
                 countClass: tab.countClass,
+                href: tabHrefs[tab.key],
               }))}
-              basePath="/admin/socios"
               activeId={statusFiltro}
               paramKey="status"
-              extraParams={tabExtraParams}
             />
           </div>
 
-          <form
-            method="GET"
-            action="/admin/socios"
-            className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
-          >
-            {statusFiltro !== 'todos' && (
-              <input type="hidden" name="status" value={statusFiltro} />
-            )}
-            <input type="hidden" name="sort" value={sort} />
-            <input type="hidden" name="dir" value={dir} />
-            <input
-              type="search"
-              name="q"
-              defaultValue={busca}
-              placeholder={
-                isAguardando
-                  ? 'Buscar sócio aguardando por nome, cidade ou telefone…'
-                  : 'Buscar carteirinha por nome ou número…'
-              }
-              className="w-full flex-1 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-4 py-2 text-sm text-[rgb(var(--foreground))] placeholder-[rgb(var(--foreground-muted))] outline-none focus:border-[rgb(var(--primary))] focus:ring-1 focus:ring-[rgb(var(--primary)_/_0.3)] sm:min-w-[14rem]"
-            />
-            <select
-              name="sede"
-              defaultValue={sedeFiltro}
-              className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] sm:w-56"
-            >
-              <option value="">Todas as unidades</option>
-              <option value="nenhuma">Sem unidade</option>
-              {sedes.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              className="rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] hover:bg-[rgb(var(--background-subtle))]"
-            >
-              Filtrar
-            </button>
-          </form>
+          <div className="mt-3">{toolbar}</div>
         </div>
       </div>
 
@@ -743,20 +694,20 @@ export function AdminSociosClient({
             elegiveis.length === 0 ? (
               <MotionEmptyState
                 icon={
-                  busca ? (
+                  temFiltroAtivo ? (
                     <Users className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
                   ) : (
                     <CheckCircle2 className="mb-3 h-10 w-10 text-green-500" />
                   )
                 }
                 title={
-                  busca
+                  temFiltroAtivo
                     ? 'Nenhum sócio encontrado'
                     : 'Ninguém aguardando emissão'
                 }
                 description={
-                  busca
-                    ? 'Tente outro termo de busca.'
+                  temFiltroAtivo
+                    ? 'Tente outro termo de busca ou limpe os filtros.'
                     : contagens.emitidas > 0
                       ? 'Todos os sócios aprovados já têm carteirinha.'
                       : 'Quando um sócio for aprovado em Membros, ele aparece aqui para emissão.'
@@ -841,44 +792,7 @@ export function AdminSociosClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                        <SortableTh
-                          label="Nº"
-                          column="numero"
-                          currentSort={sort}
-                          currentDir={dir}
-                          href={sortHrefs.numero ?? '#'}
-                        />
-                        <SortableTh
-                          label="Sócio"
-                          column="nome"
-                          currentSort={sort}
-                          currentDir={dir}
-                          href={sortHrefs.nome ?? '#'}
-                        />
-                        <SortableTh
-                          label="Unidade"
-                          column="sede"
-                          currentSort={sort}
-                          currentDir={dir}
-                          href={sortHrefs.sede ?? '#'}
-                          className="hidden md:table-cell"
-                        />
-                        <SortableTh
-                          label="Cidade"
-                          column="cidade"
-                          currentSort={sort}
-                          currentDir={dir}
-                          href={sortHrefs.cidade ?? '#'}
-                          className="hidden lg:table-cell"
-                        />
-                        <SortableTh
-                          label="Aprovado em"
-                          column="aprovadoEm"
-                          currentSort={sort}
-                          currentDir={dir}
-                          href={sortHrefs.aprovadoEm ?? '#'}
-                          className="hidden xl:table-cell"
-                        />
+                        {cabecalho}
                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                           Ação
                         </th>
@@ -964,15 +878,15 @@ export function AdminSociosClient({
                 <CreditCard className="mb-3 h-10 w-10 text-[rgb(var(--foreground-muted))]" />
               }
               title={
-                busca
+                temFiltroAtivo
                   ? 'Nenhuma carteirinha encontrada'
                   : statusFiltro === 'todos'
                     ? 'Nenhuma carteirinha emitida'
                     : 'Nenhuma carteirinha nesta categoria'
               }
               description={
-                busca ? (
-                  'Tente outro nome ou número.'
+                temFiltroAtivo ? (
+                  'Tente outro nome ou número, ou limpe os filtros.'
                 ) : contagens.aguardando > 0 ? (
                   <span>
                     Há {contagens.aguardando} sócio
@@ -1047,35 +961,7 @@ export function AdminSociosClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-                      <SortableTh
-                        label="Nº"
-                        column="numero"
-                        currentSort={sort}
-                        currentDir={dir}
-                        href={sortHrefs.numero ?? '#'}
-                      />
-                      <SortableTh
-                        label="Nome"
-                        column="nome"
-                        currentSort={sort}
-                        currentDir={dir}
-                        href={sortHrefs.nome ?? '#'}
-                      />
-                      <SortableTh
-                        label="Contato"
-                        column="email"
-                        currentSort={sort}
-                        currentDir={dir}
-                        href={sortHrefs.email ?? '#'}
-                        className="hidden lg:table-cell"
-                      />
-                      <SortableTh
-                        label="Validade"
-                        column="validade"
-                        currentSort={sort}
-                        currentDir={dir}
-                        href={sortHrefs.validade ?? '#'}
-                      />
+                      {cabecalho}
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                         Ações
                       </th>
@@ -1138,6 +1024,8 @@ export function AdminSociosClient({
               </div>
             </MotionReveal>
           )}
+
+          {paginacao}
         </div>
       </div>
 

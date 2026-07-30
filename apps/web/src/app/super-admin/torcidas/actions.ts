@@ -261,6 +261,7 @@ export async function alterarPlanoTenantAction(
   })
 
   revalidatePath('/super-admin/setup')
+  revalidatePath('/super-admin/torcidas')
 
   return {
     success: true,

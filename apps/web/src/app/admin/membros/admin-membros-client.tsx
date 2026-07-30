@@ -1,15 +1,21 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { AnimatePresence, m } from 'motion/react'
-import { TriangleAlert, Users } from 'lucide-react'
+import { FilterX, TriangleAlert, Users } from 'lucide-react'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-import { SortableTh, StatusBadge } from '@/components/admin/ui'
+import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
 import { staggerContainer, staggerItem } from '@/lib/motion-presets'
-import type { SortDir } from '@/lib/admin-list-sort'
+import {
+  construirHrefLimparFiltros,
+  temFiltroAtivo,
+  type ListagemParams,
+  type ListagemSpec,
+} from '@/lib/listagem'
 import { MembroDetalheModal } from './membro-detalhe-modal'
 import type { AdminMembroItem } from './admin-membro-item'
 
@@ -17,16 +23,20 @@ export type { AdminMembroItem } from './admin-membro-item'
 
 interface AdminMembrosTableProps {
   membros: AdminMembroItem[]
-  sort: string
-  dir: SortDir
-  sortHrefs: Record<string, string>
+  /**
+   * `<th>` da tabela, montados no servidor (`ListagemTh`) — a ordenação e o
+   * popover de filtro por coluna não precisam hidratar para funcionar.
+   */
+  cabecalho: ReactNode
+  spec: ListagemSpec
+  params: ListagemParams
 }
 
 export function AdminMembrosTable({
   membros,
-  sort,
-  dir,
-  sortHrefs,
+  cabecalho,
+  spec,
+  params,
 }: AdminMembrosTableProps) {
   // Guarda o id, não o objeto: quando a decisão revalida a lista, o card
   // aberto reflete o novo status/reprovação em vez de mostrar dado velho.
@@ -37,11 +47,37 @@ export function AdminMembrosTable({
   const fecharDetalhe = useCallback(() => setSelecionadoId(null), [])
 
   if (membros.length === 0) {
+    // Distingue "não há cadastro" de "há, mas nenhum passa pelo filtro" — no
+    // segundo caso o caminho de volta precisa estar na tela.
+    const filtrando = temFiltroAtivo(params)
     return (
       <MotionEmptyState
-        icon={<Users className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />}
-        title="Nenhum membro encontrado"
-        description="Tente ajustar os filtros de busca ou aguarde novos candidatos."
+        icon={
+          filtrando ? (
+            <FilterX className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
+          ) : (
+            <Users className="mb-4 h-12 w-12 text-[rgb(var(--foreground-muted))]" />
+          )
+        }
+        title={
+          filtrando ? 'Nenhum resultado para estes filtros' : 'Nenhum membro cadastrado'
+        }
+        description={
+          filtrando ? (
+            <>
+              Os cadastros existem, mas nenhum passa pelos filtros atuais.{' '}
+              <Link
+                href={construirHrefLimparFiltros(spec, params)}
+                className="font-medium text-[rgb(var(--color-primary-fg))] underline-offset-2 hover:underline"
+              >
+                Limpar filtros
+              </Link>
+              .
+            </>
+          ) : (
+            'Aguarde novos candidatos ou importe uma base existente.'
+          )
+        }
         className="flex flex-col items-center justify-center py-20 text-center"
       />
     )
@@ -58,62 +94,7 @@ export function AdminMembrosTable({
         <table className="w-full min-w-0 text-sm md:min-w-[36rem] xl:min-w-[48rem]">
           <thead>
             <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))]">
-              <SortableTh
-                label="Membro"
-                column="nome"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.nome ?? '#'}
-                className="px-3 sm:px-4"
-              />
-              <SortableTh
-                label="Tipo"
-                column="tipo"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.tipo ?? '#'}
-                className="hidden sm:table-cell"
-              />
-              <SortableTh
-                label="Departamento"
-                column="departamento"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.departamento ?? '#'}
-                className="hidden md:table-cell"
-              />
-              <SortableTh
-                label="Unidade"
-                column="sede"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.sede ?? '#'}
-                className="hidden lg:table-cell"
-              />
-              <SortableTh
-                label="Cidade"
-                column="cidade"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.cidade ?? '#'}
-                className="hidden xl:table-cell"
-              />
-              <SortableTh
-                label="Status"
-                column="status"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.status ?? '#'}
-                className="hidden sm:table-cell"
-              />
-              <SortableTh
-                label="Cadastro"
-                column="criadoEm"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortHrefs.criadoEm ?? '#'}
-                className="hidden 2xl:table-cell"
-              />
+              {cabecalho}
               <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))] sm:px-4">
                 Ações
               </th>

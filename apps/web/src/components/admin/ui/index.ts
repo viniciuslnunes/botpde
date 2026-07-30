@@ -35,3 +35,25 @@ export {
   type AdminChartPeriod,
   type AdminChartPeriodFilterProps,
 } from './admin-chart-period-filter'
+// Listagem paginada com filtro por coluna — ver `@/lib/listagem`.
+export {
+  ListagemToolbar,
+  ListagemTh,
+  ListagemPaginacao,
+  ListagemVazia,
+  ListagemBusca,
+  ListagemForm,
+  ListagemColunaFiltro,
+  ListagemChipFiltro,
+  ListagemPersistencia,
+  useListagemFormPendente,
+  type ListagemToolbarProps,
+  type ListagemThProps,
+  type ListagemPaginacaoProps,
+  type ListagemVaziaProps,
+  type ListagemBuscaProps,
+  type ListagemFormProps,
+  type ListagemColunaFiltroProps,
+  type ListagemFiltroOpcaoUI,
+  type ListagemPersistenciaProps,
+} from './listagem'

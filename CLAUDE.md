@@ -119,6 +119,17 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
  aponta para ela.
  Seções de uma única rota usam `AdminTabs` por query param; form de criar não
  fica empilhado (disclosure ou `AdminCreateDisclosure`).
+ **Listagens (2026-07-30):** listagem admin com volume declara um
+ `ListagemSpec` em `apps/web/src/lib/listagem/specs.ts` (colunas, filtro por
+ coluna, busca, sort padrão, `camposProibidos`) e a página usa
+ `parseListagemParams` + `montarWhereListagem`/`montarOrderByListagem`/
+ `montarPaginacao` + `ListagemToolbar`/`ListagemTh`/`ListagemPaginacao` — nunca
+ `buildHref`/`parseSortParam` à mão, nunca `findMany` sem `take`. `sort` só
+ aceita coluna declarada e campo sensível é barrado por invariante
+ (`lib/__tests__/listagem.test.ts`). GET **não** escreve no banco: correção de
+ dado legado é Server Action com `assertPermission` + `AuditLog` (caso
+ `sincronizarNumerosSocio`). Guia: `docs/frontend/admin-ui-kit.md` § kit de
+ listagem.
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.
@@ -170,8 +181,10 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `Partida` global por `Afiliacao`; série/waitlist/mapa/QR offline; ver
   `docs/data/modulo-eventos.md` e `ARCHITECTURE.md` §5.11. Fontes de jogos:
   `docs/knowledge/futebol-dados-publicos.md` (Google Sports ≠ API gratuita).
-- **Sofascore Widgets** — embeds oficiais por clube na comunidade (display only;
-  não sync de `Partida`): `packages/types/src/sofascore-widgets.js`; ver
+- **Sofascore Widgets** — embeds oficiais na comunidade (display only; não sync
+  de `Partida`): por clube (`SOFASCORE_WIDGETS`) e classificação nacional por
+  divisão A/B/C/D (`SOFASCORE_COMPETICOES` + `Afiliacao.serie`). Repair de série:
+  `pnpm --filter @torcida/db db:repair-series-afiliacoes`. Ver
   `docs/data/modulo-sofascore-widgets.md`.
 - **Comunidade** — feed social, timeline, busca: `apps/web/src/lib/feed.ts`,
   `feed-timeline.ts`, `comunidade-busca.ts`; engajamento (reação/comentário CN):
