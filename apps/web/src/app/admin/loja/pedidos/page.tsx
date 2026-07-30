@@ -1,10 +1,8 @@
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { firstProdutoImagemUrl } from '@/lib/produto-imagem'
 import { assertStoreView } from '@/lib/authz'
-import { ArrowLeft } from 'lucide-react'
 import { AdminPedidosFiltros, AdminPedidosList } from './admin-pedidos-list'
 import type { Metadata } from 'next'
 
@@ -83,16 +81,9 @@ export default async function AdminPedidosPage({
   }))
 
   return (
-    <div className="app-container space-y-6 py-8">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
-          <ArrowLeft className="h-4 w-4" /> Loja
-        </Link>
-        <h1 className="text-xl font-bold">Pedidos</h1>
-      </div>
-
+    <>
       <AdminPedidosFiltros options={filtroOptions} />
       <AdminPedidosList pedidos={pedidosSerializados} />
-    </div>
+    </>
   )
 }

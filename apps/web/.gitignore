@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Relatório da auditoria funcional (gerado por audit:dados)
+auditoria-dados-reais.txt
+auditoria-fluxos.txt
+auditoria-fluxos-avancados.txt
+auditoria-hierarquia.txt

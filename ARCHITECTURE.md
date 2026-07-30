@@ -807,6 +807,50 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
   `admin/configuracoes` (seções de settings) e `admin/socios` (barra de status).
   Uso: seções de conteúdo mutuamente exclusivas — não para filtros que se
   combinam com paginação/busca. Guia: `docs/frontend/admin-ui-kit.md`.
+- **Tabs de rota — o hub vira shell do módulo** (2026-07-29): módulo com
+  sub-rotas (Bar, Loja) tinha navegação duplicada — seção longa no menu lateral
+  **mais** fileira de botões no hub, que no Bar sequer estava no menu. Agora o
+  `layout.tsx` do segmento monta `AdminPageHeader` + `AdminModuleTabs` (tab =
+  rota, ativa resolvida pelo `usePathname()`; `matchPaths` cobre rotas que não
+  aparecem na barra) e o menu guarda **uma** entrada por módulo. Página
+  imersiva de tela cheia fica fora do shell via route group — PDV em
+  `admin/bar/pdv`, resto em `admin/bar/(modulo)/` (a URL não muda). Deep links
+  antigos continuam válidos.
+  - Hub de módulo não acumula mais insights: Bar e Loja ganharam a etapa
+    `desempenho`, e o form de criar deixou de ficar empilhado no meio da página
+    (disclosure próprio ou `AdminCreateDisclosure`).
+- **Registro único de módulos + badge por rota** (2026-07-30): a wave 1 deixou a
+  mesma verdade copiada em quatro arquivos (`menu.js`, layout do módulo,
+  `notificacoes-menu-badges.ts`, `notificacoes-routing.ts`) — foi o que quase
+  apagou quatro badges em silêncio ao encolher o menu do Bar. Fechado assim:
+  - **`ADMIN_MODULOS`** em `packages/types/src/menu.js` é a fonte única de
+    módulo → etapas (id, label, href, `permissao`, `matchPaths`). Ícone e
+    contagem **não** entram: componente React não atravessa Server→Client. O
+    layout monta a barra com `montarTabsModulo(moduloId, permissoes, enfeites)`
+    (`apps/web/src/lib/admin-modulos.tsx`).
+  - **Tab filtrada por permissão**: `tabsPermitidasDoModulo` esconde a etapa que
+    o usuário não pode abrir, e `primeiraTabPermitida` dá o destino de quem não
+    tem a etapa raiz — `store:view_orders` cai em Pedidos, `news:curate` cai em
+    Notícias, em vez de ser expulso para `/admin`. Continua **não** sendo
+    controle de acesso: cada rota-tab mantém seu `assertPermission`.
+  - **Badge resolve por rota, não por id de menu**: `ROTA_POR_TIPO` guarda a
+    rota onde a pendência se resolve e `resolverMenuIdDeRota` casa o prefixo
+    mais longo em `ADMIN_MENU`. Promover uma rota a tab passa a **subir** o
+    badge para a entrada do módulo em vez de zerá-lo. Invariantes cobertos em
+    `lib/__tests__/admin-modulos.test.ts` (rota existe, uma entrada de menu por
+    módulo, raiz = primeira tab, teto de 6 etapas) e em
+    `notificacoes-routing.test.ts` (nenhuma rota de badge órfã).
+  - **Regra de corte**: tab = etapa do mesmo módulo, mesma entidade-raiz,
+    deep-linkável, alternância frequente. Não viram tab: tela imersiva (PDV),
+    detalhe de item (`[id]`), criação (disclosure) e leitura cross-módulo
+    (Relatórios). Passou de ~6 tabs, são dois módulos.
+  - **Módulos convertidos**: Comunidade (`Visão geral · Comunicados · Mural ·
+    Moderação · Notícias`, menu 5→1) e Financeiro (`Lançamentos · Evolução ·
+    Cobranças · Planos`, menu 3→1). `/admin/cobrancas` e
+    `/admin/planos-associacao` viraram `permanentRedirect` preservando query —
+    **obrigatório**, porque `Notificacao.link` já gravado no banco aponta para
+    a URL antiga (`/admin/cobrancas?status=VENCIDA`). `?tab=evolucao` do
+    Financeiro também redireciona para a rota nova.
 - **Charts SVG próprios** (zero dependência) em `components/admin/charts/`
   (`Sparkline`, `MiniBarChart` c/ série dupla, `DonutChart`, `TrendDelta`).
   Fronteira RSC→client: props só primitivas (nunca `Decimal`/`Date`); funções
@@ -921,3 +965,85 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
   nunca libera; corrigir junto. Fases: 1=MVP hub+perfil+gating de feed;
   2=rivalidade+departamento; 3=enriquecimento por API. Validação prévia pelos
   agentes `data-model` e `rbac` antes de codar via `implementation`.
+
+## 7. Auditoria funcional — achados abertos (2026-07-29)
+
+Rodada de validação ponta a ponta sobre os lotes de teste em volume, com o
+código de produção exercitado contra o banco (`pnpm --filter @torcida/web
+audit:dados`) e com as Server Actions executadas de verdade (`audit:fluxos`,
+sessão simulada). Lista completa, impacto e método em
+`docs/ops/auditoria-funcional-2026-07.md`. Correções **pendentes**:
+
+1. **Cargos de sistema desatualizados em 562/565 torcidas** — `owner`/`vice`
+   sem `bar:operate`, `bar:manage`, `members:dismiss`, `members:export_lge`,
+   `affiliation:manage`. O módulo Bar está inacessível ao Presidente em
+   praticamente toda torcida pré-existente. Cargo de sistema resolve pelo
+   array gravado no `Role`, então permissão nova só chega via
+   `db:repair-system-roles`. **Decisão em aberto**: rodar o repair no deploy,
+   ou fazer cargo de sistema resolver pela constante em runtime (elimina a
+   classe de bug). **Confirmado em fluxo real**: o Presidente de
+   `torcida-fiel-macabra-sp` recebe "Sem permissão" ao chamar `abrirTurnoBar()`.
+2. **`listarComentariosPost` não respeita rivalidade** — comentário de post
+   `PUBLICO` é legível por qualquer autenticado, sem escopo de tenant,
+   contra `resolveVisibility(rival, PUBLICO) === false`. Decidir se a
+   exceção é intencional (e documentá-la em `visibility.js`) ou se o gate
+   precisa do escopo de tenants.
+3. **`podeVerPost` tem nome de gate completo mas não checa hierarquia nem
+   rivalidade** — só privacidade de perfil. Seguro hoje porque o único
+   chamador filtra tenants antes; renomear ou passar o escopo.
+4. **`alcanceNacional` em post `INSTITUCIONAL` é inerte** — o feed nacional
+   filtra `tipo: MEMBRO`. Bloquear no composer ou passar a incluir.
+5. **1 `MembroConversa` órfão** em canal privado de
+   `torcida-organizada-remista-pa` — nenhum script de repair cobre o caso.
+6. **`roles:manage` escala privilégio** (rodada 3, 2026-07-30) — `criarRole`
+   não limita as permissões concedidas ao conjunto efetivo de quem cria.
+   Provado em fluxo: ator sem `settings:manage` criou cargo com
+   `settings:manage`, vestiu, e passou a ter. Na prática `roles:manage`
+   equivale a owner, e delegar "gestão de acessos" delega tudo.
+   `salvarAcessoUsuario` grava overrides com a mesma lacuna. **Decisão em
+   aberto**: documentar como intencional, restringir ao conjunto do ator, ou
+   separar a permissão de conceder permissões sensíveis.
+7. **Override negado não rege o feed público** (alerta) — com
+   `community:post` negado, `assertAutorPublicacaoPost` cai no caminho de
+   torcedor (`podePublicarComoTorcedorFeed`). Confirmar se é intencional e
+   documentar em `permissions.js`.
+8. **`promoverSedeParaTenant` estoura a transação** (rodada 4, 2026-07-30) —
+   `lib/promover-sede.ts:122` faz ~40 round-trips sequenciais numa interactive
+   transaction **sem `timeout`** (default 5 s do Prisma); só o seed canônico
+   (10 deptos + 22 perfis, em série) mediu 5,86 s contra o banco remoto. A
+   promoção faz rollback inteiro. O orçamento é o RTT, não a lógica — passa
+   co-localizado, cai em rede distante. Mesma classe de `03d62a8`. Fix:
+   `{ timeout: 30_000 }` ou tirar o seed canônico da transação.
+9. **Relação de tenant parte de um nó arbitrário da árvore** (rodada 4,
+   **latente**) — `getTenantRelationImpl` (`lib/hierarquia.ts:305`) escolhe a
+   sede do ator com `findFirst({ where: { tenantId } })`, sem preferir
+   `tipo: 'SEDE'` e **sem `orderBy`**, ao contrário das funções irmãs
+   (`getAncestorTenantIdsImpl`, `getDescendantTenantIdsImpl`,
+   `getTenantHierarquia`). Em torcida com várias unidades a varredura começa
+   no meio da árvore: a Sede mãe perde a relação de ancestral sobre a própria
+   filha (financeiro/membros/sócios/pedidos/patrimônio viram `unrelated`).
+   Sem `orderBy`, a ordem do Postgres não é estável — o mesmo tenant passa
+   numa execução e falha na seguinte. Provado por contraste em
+   `docs/ops/auditoria-funcional-2026-07.md` §Achado 9.
+10. **Super admin no `/portal` resolve tenant só por cookie** (2026-07-30,
+    **UX/diagnóstico**) — `getActiveTenant` (`lib/tenant.ts:186`) pula toda a
+    resolução por vínculo quando `isSuperAdminEmail(email)`, caindo direto em
+    `torcida_ctx` → `TENANT_SLUG` do deploy. Quem administra a plataforma tem
+    `SaasMembro` APROVADO/SOCIO na própria torcida, mas nunca é levado a ela:
+    basta abrir uma das ~569 torcidas no `/super-admin` para o cookie ficar
+    apontando para outra, e todo link direto do portal (`/portal/eventos/<id>`,
+    pedido, evento, membro) passa a devolver **404 mudo** — o id existe, só não
+    naquele tenant. O `notFound()` não distingue "não existe" de "existe em
+    outro contexto". Sintoma reproduzido com `agenda-demo-caravana-01`
+    (tenant `pde-gavioes-fiel`). **Decisão em aberto**: (a) fazer o vínculo do
+    super admin valer como fallback antes do `TENANT_SLUG`, (b) mostrar no
+    portal qual torcida está ativa quando o contexto veio de cookie de super
+    admin, ou (c) diferenciar a resposta quando a entidade existe em outro
+    tenant. A opção (a) resolve a classe toda; (b) é o mínimo para o 404
+    deixar de ser mudo.
+
+Rodada 3 (`audit:fluxos-avancados`) cobriu, todas **conformes**: capacidade /
+lista de espera / promoção automática / check-in de Eventos; estorno, fiado e
+fechamento de caixa do Bar com o espelho no livro-caixa; imutabilidade dos
+cargos de sistema; ciclo de vida do convite de grupo e a regra do último
+administrador.

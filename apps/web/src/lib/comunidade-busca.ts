@@ -17,7 +17,7 @@ import {
 } from './feed'
 import { enriquecerPostsComBadges } from './autor-badges'
 import { buscarCanaisEUnidades, type CanalItem, type UnidadeBuscaItem } from './canais'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
 
 /**
  * Expressão SQL que remove acentos comuns pt-BR sem exigir extensão `unaccent`.
@@ -357,7 +357,7 @@ export async function getSugestoesMembrosParaBusca(
   const viewerSedeId = viewerMembro?.sedeId ?? null
   const excluirIds = [...new Set([userId, ...seguindo.map((s) => s.seguidoId), ...bloqueadosIds])]
   const nomeClube =
-    tenantMeta?.afiliacao?.apelido || tenantMeta?.afiliacao?.nome || 'Comunidade nacional'
+    nomeExibicaoAfiliacao(tenantMeta?.afiliacao) || 'Comunidade nacional'
 
   const [rows, perfisTorcedor]: [
     SugestaoMembroBuscaRaw[],
@@ -656,7 +656,7 @@ export async function buscarMembrosComunidade(
     })
     if (tenantMeta?.afiliacaoId) {
       const nomeClube =
-        tenantMeta.afiliacao?.apelido || tenantMeta.afiliacao?.nome || 'Comunidade nacional'
+        nomeExibicaoAfiliacao(tenantMeta.afiliacao) || 'Comunidade nacional'
       const restantes = limites.membrosOut - candidatos.length
       const termoLike = `%${termo}%`
       const torcedorIds = await db.$queryRaw<Array<{ userId: string }>>`

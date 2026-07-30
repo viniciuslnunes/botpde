@@ -4,7 +4,8 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CadastroForm } from '@/components/portal/cadastro-form'
-import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { labelCategoriaReprovacao, labelPontoReprovacao } from '@torcida/types'
 import type { Metadata } from 'next'
 import { SolicitacaoResumoCard } from '@/components/onboarding/solicitacao-resumo-card'
 
@@ -41,6 +42,11 @@ export default async function CadastroPage() {
             imagemProva: true,
             fotoDocumentoUrl: true,
             comprovanteResidenciaUrl: true,
+            reprovadoMotivo: true,
+            reprovadoCategoria: true,
+            reprovadoPontos: true,
+            reprovadoPermiteReenvio: true,
+            reprovadoEm: true,
           },
         })
       : null,
@@ -132,6 +138,91 @@ export default async function CadastroPage() {
 
   const jaCadastrado = membro?.status === 'REPROVADO'
   const nomeInicial = membro?.nome ?? session.user.name ?? ''
+  const reenvioBloqueado = jaCadastrado && membro?.reprovadoPermiteReenvio === false
+  const laudo: {
+    motivo: string
+    categoria: string | null
+    pontos: string[]
+    emLabel: string | null
+  } | null =
+    jaCadastrado && membro?.reprovadoMotivo
+      ? {
+          motivo: membro.reprovadoMotivo,
+          categoria: labelCategoriaReprovacao(membro.reprovadoCategoria),
+          pontos: membro.reprovadoPontos ?? [],
+          emLabel: membro.reprovadoEm
+            ? new Date(membro.reprovadoEm).toLocaleDateString('pt-BR')
+            : null,
+        }
+      : null
+
+  const cardLaudo = laudo ? (
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900 dark:bg-red-950">
+      <div className="flex items-start gap-3">
+        <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+        <div className="min-w-0 space-y-2">
+          <div>
+            <h2 className="font-semibold text-red-900 dark:text-red-100">
+              {laudo.categoria ?? 'Cadastro reprovado'}
+            </h2>
+            <p className="mt-1 whitespace-pre-line break-words text-sm text-red-800 dark:text-red-200">
+              {laudo.motivo}
+            </p>
+          </div>
+          {laudo.pontos.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+                Corrija estes pontos
+              </p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {laudo.pontos.map((ponto) => (
+                  <li
+                    key={ponto}
+                    className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-100"
+                  >
+                    {labelPontoReprovacao(ponto)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {laudo.emLabel && (
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Análise concluída em {laudo.emLabel}.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  if (reenvioBloqueado) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link
+            href="/portal/comunidade"
+            className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao portal
+          </Link>
+          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+            Cadastro reprovado
+          </h1>
+          <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+            A diretoria encerrou esta análise e o reenvio pelo portal está bloqueado.
+          </p>
+        </div>
+        {cardLaudo}
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5 text-sm text-[rgb(var(--foreground-muted))]">
+          Para reabrir a análise, fale com a diretoria
+          {tenant ? ` da ${tenant.nome}` : ''}. Só um administrador pode devolver sua
+          solicitação para a fila.
+        </div>
+      </div>
+    )
+  }
 
   return (
       <div className="space-y-6">
@@ -150,10 +241,12 @@ export default async function CadastroPage() {
         </h1>
         <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
           {jaCadastrado
-            ? 'Seu cadastro anterior foi reprovado. Corrija suas informações e envie novamente.'
+            ? 'Seu cadastro anterior foi reprovado. Corrija os pontos apontados e envie novamente.'
             : `Preencha o formulário para solicitar sua filiação${tenant ? ` à ${tenant.nome}` : ''}.`}
         </p>
       </div>
+
+      {cardLaudo}
 
       {/* O que você ganha */}
       {!jaCadastrado && (

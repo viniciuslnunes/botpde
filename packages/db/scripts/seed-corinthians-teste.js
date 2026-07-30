@@ -18,8 +18,15 @@
  * Idempotente por unidade territorial: se já existir gente de teste numa
  * Sede/Subsede/PDE, a unidade é pulada.
  *
+ * Após provisionar canais oficiais (Fase 4), a Fase 4b espelha a regra de
+ * `vincularMembroCanaisAposAprovacao`: todo APROVADO entra no canal da
+ * unidade e no da SEDE (`db:repair-aprovado-canal-membro`). Sem isso o
+ * volume de teste mentiria sobre a regra de negócio.
+ *
  * Uso:
  *   pnpm --filter @torcida/db seed:corinthians-teste
+ *   pnpm --filter @torcida/db seed:corinthians-teste -- --so-canais
+ *   pnpm --filter @torcida/db seed:corinthians-teste -- --so-historico
  */
 import crypto from 'node:crypto'
 import { db } from '../src/index.js'
@@ -97,6 +104,60 @@ function gerarRg(n) {
   const base = String(800000000 + n).padStart(9, '0')
   return `${base.slice(0, 2)}.${base.slice(2, 5)}.${base.slice(5, 8)}-${base.slice(8, 9)}`
 }
+
+/**
+ * Laudos de reprovação sintéticos. `categoria`/`pontos` usam o catálogo de
+ * `@torcida/types` (CATEGORIAS_REPROVACAO / PONTOS_REPROVACAO) — é o que faz o
+ * card de detalhes pintar a etapa certa de vermelho.
+ */
+const LAUDOS_SOCIO = [
+  {
+    categoria: 'DOCUMENTACAO',
+    pontos: ['documento', 'residencia'],
+    motivo:
+      'A foto do documento está cortada nas bordas e o comprovante de residência tem mais de 90 dias. Reenvie os dois legíveis e dentro da validade.',
+  },
+  {
+    categoria: 'DADOS_INCORRETOS',
+    pontos: ['cpf', 'nascimento'],
+    motivo:
+      'O CPF informado não confere com o RG enviado e a data de nascimento está com dia e mês trocados. Corrija os dois campos antes de reenviar.',
+  },
+  {
+    categoria: 'VINCULO_NAO_COMPROVADO',
+    pontos: ['prova'],
+    motivo:
+      'O comprovante de vínculo é uma foto de arquibancada, que não prova associação. Envie carteirinha, recibo de mensalidade ou declaração da unidade.',
+  },
+  {
+    categoria: 'DADOS_INCORRETOS',
+    pontos: ['telefone', 'cep', 'numero'],
+    motivo:
+      'Telefone com um dígito faltando, CEP não localizado e número da residência em branco. Revise o endereço completo.',
+  },
+  {
+    categoria: 'DUPLICIDADE',
+    pontos: [],
+    motivo:
+      'Já existe um cadastro ativo com este CPF nesta torcida. Procure a secretaria para unificar os registros antes de abrir outro.',
+    permiteReenvio: false,
+  },
+]
+
+const LAUDOS_TORCEDOR = [
+  {
+    categoria: 'DADOS_INCORRETOS',
+    pontos: ['nome', 'telefone'],
+    motivo:
+      'Nome incompleto (só o primeiro nome) e telefone sem DDD. Preencha o nome completo e um número válido para contato.',
+  },
+  {
+    categoria: 'FORA_DE_PERFIL',
+    pontos: [],
+    motivo:
+      'A unidade escolhida não atende a região informada no cadastro. Refaça a solicitação selecionando o ponto de encontro correto.',
+  },
+]
 
 async function createManyBatched(model, rows, label, batchSize = 500) {
   let criados = 0
@@ -208,12 +269,18 @@ async function carregarContexto() {
     }
     if (!autorInstitucionalId) throw new Error(`Tenant '${tenant.slug}' sem nenhum usuário para autoria institucional.`)
 
+    const autor = await db.user.findUnique({
+      where: { id: autorInstitucionalId },
+      select: { nome: true },
+    })
+
     contexto.push({
       id: tenant.id,
       slug: tenant.slug,
       nome: tenant.nome,
       sedes,
       ownerUserId: autorInstitucionalId,
+      ownerUserNome: autor?.nome?.trim() || 'Diretoria',
       memberRoleId: memberRole.id,
       adminRoleId: adminRole.id,
     })
@@ -227,6 +294,7 @@ async function seedPessoas(contexto, resumo) {
   const usersRows = []
   const membrosRows = []
   const roleRows = []
+  const auditRows = []
 
   for (const tenant of contexto) {
     resumo.porTorcida[tenant.slug] ??= { users: 0, saasMembro: 0, posts: 0, eventos: 0, salas: 0, pedidos: 0 }
@@ -252,30 +320,81 @@ async function seedPessoas(contexto, resumo) {
         const tipo = pickPonderado([['SOCIO', 60], ['TORCEDOR', 40]])
         const status = pickPonderado([['APROVADO', 85], ['PENDENTE', 10], ['REPROVADO', 5]])
         const aprovado = status === 'APROVADO'
+        const membroId = crypto.randomUUID()
+
+        // Linha do tempo: solicitou, depois a diretoria decidiu. Sem isso a aba
+        // Histórico do card fica vazia e o laudo de reprovação não existe.
+        const solicitadoEm = new Date(Date.now() - (3 + Math.floor(Math.random() * 60)) * 86400_000)
+        const decididoEm = new Date(solicitadoEm.getTime() + (1 + Math.floor(Math.random() * 3)) * 86400_000)
+        const analisado = status !== 'PENDENTE'
+        const laudo =
+          status === 'REPROVADO' ? pick(tipo === 'SOCIO' ? LAUDOS_SOCIO : LAUDOS_TORCEDOR) : null
 
         usersRows.push({
           id: userId,
           email,
           nome,
           nickname,
-          criadoEm: new Date(),
+          criadoEm: solicitadoEm,
         })
 
         membrosRows.push({
-          id: crypto.randomUUID(),
+          id: membroId,
           tenantId: tenant.id,
           userId,
           tipo,
           nome,
           status,
+          criadoEm: solicitadoEm,
           cidade: unidade.cidade ?? null,
           telefone: `119${String(10000000 + n).slice(0, 8)}`,
           cpf: gerarCpf(n),
           rg: gerarRg(n),
           sedeId: unidade.id,
-          aprovadoPorNome: aprovado ? 'Seed de teste' : null,
-          aprovadoEm: aprovado ? new Date() : null,
+          aprovadoPorId: analisado ? tenant.ownerUserId : null,
+          aprovadoPorNome: analisado ? tenant.ownerUserNome : null,
+          aprovadoEm: analisado ? decididoEm : null,
+          ...(laudo
+            ? {
+                reprovadoEm: decididoEm,
+                reprovadoPorId: tenant.ownerUserId,
+                reprovadoPorNome: tenant.ownerUserNome,
+                reprovadoCategoria: laudo.categoria,
+                reprovadoMotivo: laudo.motivo,
+                reprovadoPontos: laudo.pontos,
+                reprovadoPermiteReenvio: laudo.permiteReenvio !== false,
+              }
+            : {}),
         })
+
+        auditRows.push({
+          id: crypto.randomUUID(),
+          tenantId: tenant.id,
+          atorId: userId,
+          acao: 'CADASTRO_SOLICITADO',
+          entidade: 'SaasMembro',
+          entidadeId: membroId,
+          criadoEm: solicitadoEm,
+        })
+        if (analisado) {
+          auditRows.push({
+            id: crypto.randomUUID(),
+            tenantId: tenant.id,
+            atorId: tenant.ownerUserId,
+            acao: aprovado ? 'MEMBRO_APROVADO' : 'MEMBRO_REPROVADO',
+            entidade: 'SaasMembro',
+            entidadeId: membroId,
+            criadoEm: decididoEm,
+            detalhes: laudo
+              ? {
+                  categoria: laudo.categoria,
+                  motivo: laudo.motivo,
+                  pontos: laudo.pontos,
+                  permiteReenvio: laudo.permiteReenvio !== false,
+                }
+              : undefined,
+          })
+        }
 
         if (aprovado) {
           const cargo = pickPonderado([['member', 90], ['admin', 8], ['none', 2]])
@@ -297,10 +416,108 @@ async function seedPessoas(contexto, resumo) {
   await createManyBatched('user', usersRows, 'Users (por unidade)')
   await createManyBatched('saasMembro', membrosRows, 'SaasMembro')
   await createManyBatched('userRole', roleRows, 'UserRole')
+  await createManyBatched('auditLog', auditRows, 'AuditLog (solicitação + decisão)')
 
   resumo.totais.users += usersRows.length
   resumo.totais.saasMembro += membrosRows.length
   resumo.totais.userRole += roleRows.length
+  resumo.totais.auditLog += auditRows.length
+}
+
+// ── Fase 2b: laudo de reprovação + histórico em quem já foi semeado ──────
+/**
+ * A Fase 1+2 pula unidade já semeada, então lotes criados antes do laudo de
+ * reprovação existir ficariam sem motivo e com a aba Histórico vazia. Esta
+ * fase completa só o que falta, e só em usuário sintético.
+ */
+async function backfillHistoricoMembrosTeste(contexto, resumo) {
+  const auditRows = []
+  let laudosGravados = 0
+
+  for (const tenant of contexto) {
+    const membros = await db.saasMembro.findMany({
+      where: { tenantId: tenant.id, user: { email: { endsWith: `@${DOMINIO_TESTE}` } } },
+      select: { id: true, userId: true, tipo: true, status: true, criadoEm: true, aprovadoEm: true, reprovadoMotivo: true },
+    })
+    if (membros.length === 0) continue
+
+    const comAudit = await db.auditLog.findMany({
+      where: { tenantId: tenant.id, entidade: 'SaasMembro', entidadeId: { in: membros.map((m) => m.id) } },
+      select: { entidadeId: true, acao: true },
+    })
+    const jaTem = new Set(comAudit.map((a) => `${a.entidadeId}:${a.acao}`))
+
+    for (const membro of membros) {
+      const solicitadoEm = membro.criadoEm ?? new Date()
+      const decididoEm = membro.aprovadoEm ?? new Date(solicitadoEm.getTime() + 86400_000)
+      const aprovado = membro.status === 'APROVADO'
+      const analisado = membro.status !== 'PENDENTE'
+
+      if (membro.status === 'REPROVADO' && !membro.reprovadoMotivo) {
+        const laudo = pick(membro.tipo === 'SOCIO' ? LAUDOS_SOCIO : LAUDOS_TORCEDOR)
+        await db.saasMembro.update({
+          where: { id: membro.id },
+          data: {
+            reprovadoEm: decididoEm,
+            reprovadoPorId: tenant.ownerUserId,
+            reprovadoPorNome: tenant.ownerUserNome,
+            reprovadoCategoria: laudo.categoria,
+            reprovadoMotivo: laudo.motivo,
+            reprovadoPontos: laudo.pontos,
+            reprovadoPermiteReenvio: laudo.permiteReenvio !== false,
+            aprovadoPorNome: tenant.ownerUserNome,
+            aprovadoEm: decididoEm,
+          },
+        })
+        laudosGravados += 1
+        if (!jaTem.has(`${membro.id}:MEMBRO_REPROVADO`)) {
+          auditRows.push({
+            id: crypto.randomUUID(),
+            tenantId: tenant.id,
+            atorId: tenant.ownerUserId,
+            acao: 'MEMBRO_REPROVADO',
+            entidade: 'SaasMembro',
+            entidadeId: membro.id,
+            criadoEm: decididoEm,
+            detalhes: {
+              categoria: laudo.categoria,
+              motivo: laudo.motivo,
+              pontos: laudo.pontos,
+              permiteReenvio: laudo.permiteReenvio !== false,
+            },
+          })
+        }
+      }
+
+      if (!jaTem.has(`${membro.id}:CADASTRO_SOLICITADO`)) {
+        auditRows.push({
+          id: crypto.randomUUID(),
+          tenantId: tenant.id,
+          atorId: membro.userId,
+          acao: 'CADASTRO_SOLICITADO',
+          entidade: 'SaasMembro',
+          entidadeId: membro.id,
+          criadoEm: solicitadoEm,
+        })
+      }
+      if (analisado && aprovado && !jaTem.has(`${membro.id}:MEMBRO_APROVADO`)) {
+        auditRows.push({
+          id: crypto.randomUUID(),
+          tenantId: tenant.id,
+          atorId: tenant.ownerUserId,
+          acao: 'MEMBRO_APROVADO',
+          entidade: 'SaasMembro',
+          entidadeId: membro.id,
+          criadoEm: decididoEm,
+        })
+      }
+    }
+  }
+
+  if (laudosGravados > 0) console.log(`  ✅ Laudo de reprovação preenchido em ${laudosGravados} membro(s) que estavam sem motivo`)
+  await createManyBatched('auditLog', auditRows, 'AuditLog (backfill de histórico)')
+  resumo.totais.auditLog += auditRows.length
+  if (laudosGravados === 0 && auditRows.length === 0) console.log('  ↔  Nada a completar — laudos e histórico já presentes')
 }
 
 // ── Fase 3: torcedores 100% globais (Comunidade Nacional) ────────────────
@@ -348,6 +565,24 @@ async function garantirCanaisOficiais() {
   const scriptPath = resolve(__dir, 'ensure-canais-oficiais-unidades.js')
   console.log('  → rodando ensure-canais-oficiais-unidades.js...')
   execFileSync('node', [scriptPath], { stdio: 'inherit' })
+}
+
+/**
+ * Espelha `vincularMembroCanaisAposAprovacao` nos tenants do lote — a Fase 1+2
+ * grava APROVADO via createMany (sem passar por `aprovarMembro`), então sem
+ * esta fase o card de canais fica com 1–4 membros enquanto há centenas de
+ * aprovados. Idempotente; também cobre lotes já semeados.
+ */
+async function vincularAprovadosCanaisOficiais(contexto) {
+  const { execFileSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const { dirname, resolve } = await import('node:path')
+  const __dir = dirname(fileURLToPath(import.meta.url))
+  const scriptPath = resolve(__dir, 'repair-aprovado-canal-membro.js')
+  for (const tenant of contexto) {
+    console.log(`  → repair-aprovado-canal-membro --tenant=${tenant.slug}`)
+    execFileSync('node', [scriptPath, `--tenant=${tenant.slug}`], { stdio: 'inherit' })
+  }
 }
 
 // ── Fase 5: grupo público "Bate-papo geral" por torcida ──────────────────
@@ -656,21 +891,47 @@ async function main() {
 
   const resumo = {
     totais: {
-      users: 0, saasMembro: 0, userRole: 0, perfilTorcedor: 0,
+      users: 0, saasMembro: 0, userRole: 0, auditLog: 0, perfilTorcedor: 0,
       conversas: 0, membroConversa: 0, posts: 0, reacoes: 0, comentarios: 0,
       eventos: 0, eventoRsvp: 0, salas: 0, participantesReuniao: 0, pedidos: 0,
     },
     porTorcida: {},
   }
 
+  // `--so-historico`: completa laudo/histórico de quem já foi semeado sem
+  // gerar volume novo. Útil depois de uma mudança de schema como a reprovação
+  // com justificativa.
+  if (process.argv.includes('--so-historico')) {
+    console.log('── Fase 2b (isolada): laudo de reprovação + histórico ──')
+    await backfillHistoricoMembrosTeste(contexto, resumo)
+    console.log(`\n🎉 Backfill concluído. AuditLog inseridos: ${resumo.totais.auditLog}\n`)
+    return
+  }
+
+  // `--so-canais`: só garante oficiais + vínculo APROVADO→canais (unidade+SEDE).
+  if (process.argv.includes('--so-canais')) {
+    console.log('── Fase 4 (isolada): canais oficiais das unidades ──')
+    await garantirCanaisOficiais()
+    console.log('\n── Fase 4b (isolada): APROVADO → canal unidade + SEDE ──')
+    await vincularAprovadosCanaisOficiais(contexto)
+    console.log('\n🎉 Backfill de canais concluído.\n')
+    return
+  }
+
   console.log('── Fase 1+2: pessoas por unidade + cargos ──')
   await seedPessoas(contexto, resumo)
+
+  console.log('\n── Fase 2b: laudo de reprovação + histórico (lotes antigos) ──')
+  await backfillHistoricoMembrosTeste(contexto, resumo)
 
   console.log('\n── Fase 3: torcedores globais (Comunidade Nacional) ──')
   await seedTorcedoresGlobais(afiliacao, resumo)
 
   console.log('\n── Fase 4: canais oficiais das unidades ──')
   await garantirCanaisOficiais()
+
+  console.log('\n── Fase 4b: APROVADO → canal unidade + SEDE ──')
+  await vincularAprovadosCanaisOficiais(contexto)
 
   console.log('\n── Fase 5: grupos públicos por torcida ──')
   await seedGruposPublicos(contexto, resumo)

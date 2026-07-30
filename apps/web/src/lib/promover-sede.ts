@@ -223,7 +223,9 @@ export async function promoverSedeParaTenant(params: {
       }
       await tx.saasMembro.update({
         where: { id: m.id },
-        data: { tenantId: novoTenant.id },
+        // Preferência aponta para Departamento do tenant mãe e não pode
+        // atravessar a promoção da unidade.
+        data: { tenantId: novoTenant.id, departamentoId: null },
       })
       membrosMigrados += 1
     }
@@ -245,7 +247,7 @@ export async function promoverSedeParaTenant(params: {
       where: {
         tenantId_userId: { tenantId: novoTenant.id, userId: ownerUserId },
       },
-      update: { status: 'APROVADO' },
+      update: { status: 'APROVADO', departamentoId: null },
       create: {
         tenantId: novoTenant.id,
         userId: ownerUserId,

@@ -1,6 +1,19 @@
 import { db } from '@torcida/db'
+import { herdarDadosSedeNaSolicitacao } from '@/lib/afiliacao-unidade'
 import { AfiliacaoPedidosClient } from './afiliacao-pedidos-client'
 import type { SolicitacaoView } from './afiliacao-pedido-card'
+
+interface SedeLiveRow {
+  nome: string
+  tipo: string
+  cidade: string | null
+  estado: string | null
+  endereco: string | null
+  cep: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
+}
 
 interface SolicitacaoRow {
   id: string
@@ -28,6 +41,7 @@ interface SolicitacaoRow {
     email: string | null
     avatarUrl: string | null
   } | null
+  sede: SedeLiveRow | null
 }
 
 /**
@@ -75,6 +89,20 @@ export async function AfiliacaoPedidos({
         solicitadoPor: {
           select: { nome: true, email: true, avatarUrl: true },
         },
+        // APROVADA: exibir dados vivos da Sede (edições em /admin/sedes).
+        sede: {
+          select: {
+            nome: true,
+            tipo: true,
+            cidade: true,
+            estado: true,
+            endereco: true,
+            cep: true,
+            lat: true,
+            lng: true,
+            fotoUrl: true,
+          },
+        },
       },
     })
   } catch {
@@ -87,35 +115,52 @@ export async function AfiliacaoPedidos({
 
   const pedidos: SolicitacaoView[] = rows
     .filter((r): r is SolicitacaoRow & { tipo: 'SUBSEDE' | 'PONTO_ENCONTRO' } => r.tipo !== 'SEDE')
-    .map((r) => ({
-      id: r.id,
-      status: r.status,
-      nome: r.nome,
-      tipo: r.tipo,
-      cidade: r.cidade,
-      estado: r.estado,
-      endereco: r.endereco,
-      regiao: r.regiao,
-      cep: r.cep,
-      lat: r.lat,
-      lng: r.lng,
-      fotoUrl: r.fotoUrl,
-      contatoNome: r.contatoNome,
-      contatoEmail: r.contatoEmail,
-      contatoTelefone: r.contatoTelefone,
-      vinculo: r.vinculo,
-      observacao: r.observacao,
-      provasUrls: r.provasUrls,
-      motivo: r.motivo,
-      criadoEm: r.criadoEm.toISOString(),
-      solicitadoPor: r.solicitadoPor
-        ? {
-            nome: r.solicitadoPor.nome,
-            email: r.solicitadoPor.email,
-            image: r.solicitadoPor.avatarUrl,
-          }
-        : null,
-    }))
+    .map((r) => {
+      const locais = herdarDadosSedeNaSolicitacao(
+        {
+          nome: r.nome,
+          tipo: r.tipo,
+          cidade: r.cidade,
+          estado: r.estado,
+          endereco: r.endereco,
+          cep: r.cep,
+          lat: r.lat,
+          lng: r.lng,
+          fotoUrl: r.fotoUrl,
+        },
+        r.status,
+        r.sede,
+      )
+      return {
+        id: r.id,
+        status: r.status,
+        nome: locais.nome,
+        tipo: locais.tipo,
+        cidade: locais.cidade,
+        estado: locais.estado,
+        endereco: locais.endereco,
+        regiao: r.regiao,
+        cep: locais.cep,
+        lat: locais.lat,
+        lng: locais.lng,
+        fotoUrl: locais.fotoUrl,
+        contatoNome: r.contatoNome,
+        contatoEmail: r.contatoEmail,
+        contatoTelefone: r.contatoTelefone,
+        vinculo: r.vinculo,
+        observacao: r.observacao,
+        provasUrls: r.provasUrls,
+        motivo: r.motivo,
+        criadoEm: r.criadoEm.toISOString(),
+        solicitadoPor: r.solicitadoPor
+          ? {
+              nome: r.solicitadoPor.nome,
+              email: r.solicitadoPor.email,
+              image: r.solicitadoPor.avatarUrl,
+            }
+          : null,
+      }
+    })
 
   return <AfiliacaoPedidosClient pedidos={pedidos} podeDecidir={podeDecidir} />
 }

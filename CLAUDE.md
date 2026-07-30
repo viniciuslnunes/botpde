@@ -48,6 +48,11 @@ pnpm --filter @torcida/db db:enable-pg-trgm  # extensão + índices busca Comuni
 pnpm --filter @torcida/db seed:loja-gavioes  # catálogo demo Gaviões (tenant pde-gavioes-fiel)
 pnpm --filter @torcida/db seed:torcedores-estimados  # IBOPE Top 50 + teto 10 mil (offline)
 pnpm --filter @torcida/db coleta:ibope-ranking -- --validate  # cobertura Top 50
+pnpm --filter @torcida/db audit:regras       # invariantes de negócio + matriz de relações
+pnpm --filter @torcida/web audit:dados       # auditoria funcional (código real × banco semeado)
+pnpm --filter @torcida/web audit:fluxos      # fluxos ponta a ponta (Server Actions reais; muta e reverte)
+pnpm --filter @torcida/web audit:fluxos-avancados  # regras ainda não cobertas (eventos, bar, RBAC, grupos)
+pnpm --filter @torcida/web audit:hierarquia  # Sede→Subsede→PDE (promover, excluir, reatribuir)
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
@@ -57,6 +62,12 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
 - **Autorização**: toda Server Action de mutação chama `assertPermission(PERMISSION)`
   (`apps/web/src/lib/authz.ts`). É o **único** critério do admin — nunca por nome de
   cargo, nunca só no cliente. Permissões em `packages/types/src/permissions.js`.
+  **Permissão nova exige `db:repair-system-roles`**: cargo de sistema resolve pelo
+  array gravado no `Role`, não pela constante do código — sem o repair, torcidas
+  existentes ficam sem a capacidade nova, em silêncio (aconteceu com o módulo Bar;
+  ver `docs/ops/auditoria-funcional-2026-07.md` §Achado 1). Se só os arrays
+  estão defasados: `db:repair-system-roles -- --permissions-only` (sem
+  syncMembership por usuário).
 - **Auditoria**: toda mutação administrativa grava `AuditLog` (ator, ação, entidade, id, detalhes).
 - **Validação**: `Zod safeParse` antes de qualquer operação de banco.
 - **Multi-tenant**: `tenantId` nunca omitido nas queries de dados SaaS. Referências
@@ -83,12 +94,25 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   `docs/frontend/motion.md`. Novas UIs client seguem os padrões documentados (`MotionShell`,
   `m`, `MotionReveal`, `MotionEmptyState`). Shell já montado em portal/admin/onboarding.
 - **Área admin (2026-07-22):** páginas admin novas usam o kit de
-  `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
-  `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts
-  SVG de `components/admin/charts/` — nunca reimplementar header/stat/badge/
-  paginação inline. Insights/relatórios: `lib/admin-insights.ts` (bucketing JS
-  fuso SP) + `/admin/relatorios` (gate `reports:view`). Guia:
-  `docs/frontend/admin-ui-kit.md`; decisões: `ARCHITECTURE.md` §5.12.
+ `apps/web/src/components/admin/ui/` (`AdminPageHeader`, `StatCard`/`KpiGrid`,
+ `StatusBadge`, `TableShell`, `TablePagination`, `InsightSection`) e os charts
+ SVG de `components/admin/charts/` — nunca reimplementar header/stat/badge/
+ paginação inline. Insights/relatórios: `lib/admin-insights.ts` (bucketing JS
+ fuso SP) + `/admin/relatorios` (gate `reports:view`). Guia:
+ `docs/frontend/admin-ui-kit.md`; decisões: `ARCHITECTURE.md` §5.12.
+ **Tabs (2026-07-30):** módulo com sub-rotas declara suas etapas em
+ `ADMIN_MODULOS` (`packages/types/src/menu.js`) — fonte única — e o
+ `layout.tsx` do segmento monta o shell com `montarTabsModulo` +
+ `AdminModuleTabs` (tab = rota; ícone/contagem só no layout; imersivo como o
+ PDV fica fora via route group). O menu lateral guarda **uma** entrada por
+ módulo. Etapa com permissão própria é filtrada por `tabsPermitidasDoModulo`, e
+ quem não pode ver a raiz entra por `primeiraTabPermitida` (nunca expulsar para
+ `/admin`). Badge de notificação aponta para a **rota** (`ROTA_POR_TIPO` +
+ `rota` em `POLITICA_POR_TIPO`), nunca para id de menu — assim ele sobe para o
+ módulo em vez de sumir em silêncio. Mover rota de módulo exige
+ `permanentRedirect` na antiga: `Notificacao.link` já gravado aponta para ela.
+ Seções de uma única rota usam `AdminTabs` por query param; form de criar não
+ fica empilhado (disclosure ou `AdminCreateDisclosure`).
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não
   obrigatório (ex.: LiveKit em Salas/Meet), faça o gate com uma função `isXConfigured()`
   e degrade graciosamente em vez de quebrar. Ver `apps/web/src/lib/livekit.ts`.
@@ -119,6 +143,12 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
   **Preferência ≠ membership (2026-07-17):** onboarding grava
   `SaasMembro.departamentoId`; equipe só após `aprovarMembro` (ou Sem área).
   Repair: `db:repair-departamento-orfaos`.
+- **Membros / admissão** — fila `/admin/membros`, reprovação com laudo obrigatório
+ (categoria + justificativa + etapas erradas, `CATEGORIAS_REPROVACAO`/
+ `PONTOS_REPROVACAO` em `packages/types/src/schemas/membro.js`) e aba de
+ histórico com diff campo a campo (`historico-actions.ts`,
+ `lib/membro-audit-diff.ts`); ver `docs/data/modulo-associacao.md`
+ §reprovação com laudo e §histórico do cadastro.
 - **Financeiro** — livro-caixa (`FinanceiroLancamento`): `docs/data/modulo-financeiro.md`;
   portal `/portal/financeiro`, admin `/admin/financeiro`.
 - **Bar** — PDV do bar da sede (`/admin/bar`): catálogo, estoque, venda rápida com

@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { db } from '@torcida/db'
+import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
 
 export type ScopeType = 'TORCIDA' | 'CLUBE'
 
@@ -71,9 +72,9 @@ export const listarTorcidasParaSelecaoRelatorios = cache(async function listarTo
   return rows.map((r) => ({
     id: r.id,
     slug: r.slug,
-    nome: r.nome,
+    nome: formatNomeTorcida(r.nome),
     afiliacaoId: r.afiliacaoId ?? null,
-    clubeNome: r.afiliacao ? (r.afiliacao.apelido ?? r.afiliacao.nome) : null,
+    clubeNome: r.afiliacao ? nomeExibicaoAfiliacao(r.afiliacao) || null : null,
     clubeUf: r.afiliacao?.estado ?? null,
   }))
 })
@@ -81,11 +82,15 @@ export const listarTorcidasParaSelecaoRelatorios = cache(async function listarTo
 export const listarAfiliacoesParaRelatorios = cache(async function listarAfiliacoesParaRelatorios(): Promise<
   AfiliacaoOpcao[]
 > {
-  const rows = await db.afiliacao.findMany({
+  const rows: AfiliacaoOpcao[] = await db.afiliacao.findMany({
     orderBy: { nome: 'asc' },
     select: { id: true, nome: true, apelido: true },
   })
-  return rows
+  return rows.map((r: AfiliacaoOpcao) => ({
+    id: r.id,
+    nome: formatNomeAfiliacao(r.nome),
+    apelido: r.apelido ? formatNomeAfiliacao(r.apelido) : null,
+  }))
 })
 
 async function obterResumoPrivacidadePorTenant(tenantId: string): Promise<ResumoPrivacidade> {
@@ -120,7 +125,7 @@ async function obterResumoPrivacidadePorTenant(tenantId: string): Promise<Resumo
   return {
     tenantId,
     tenantSlug: tenant.slug,
-    tenantNome: tenant.nome,
+    tenantNome: formatNomeTorcida(tenant.nome),
     totalTorcedoresAprovados,
     torcedoresComPerfilMarcadoPrivado,
     torcedoresPublicosEfetivos: Math.max(0, totalTorcedoresAprovados - torcedoresComPerfilMarcadoPrivado),
@@ -204,7 +209,7 @@ export async function getTorcedoresPrivadosPorTenant(opts: {
       return {
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
-        tenantNome: tenant.nome,
+        tenantNome: formatNomeTorcida(tenant.nome),
         userId: r.userId,
         userEmail: r.user.email,
         userNome: r.user.nome,

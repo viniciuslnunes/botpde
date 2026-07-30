@@ -19,11 +19,18 @@ export interface AdminTabItem {
    * Não passe o componente Lucide (`Users`) — funções não serializam Server→Client.
    */
   icon?: ReactNode
+  /**
+   * Destino explícito da tab. Quando presente, substitui o href montado a
+   * partir de `basePath`/`paramKey` — é o modo usado por `AdminModuleTabs`,
+   * em que cada tab é uma rota do módulo.
+   */
+  href?: string
 }
 
 export interface AdminTabsProps {
   tabs: AdminTabItem[]
-  basePath: string
+  /** Base do href por query param; dispensável quando toda tab traz `href`. */
+  basePath?: string
   activeId: string
   /** Nome do query param que carrega a tab ativa — default `'tab'`. */
   paramKey?: string
@@ -39,7 +46,7 @@ export interface AdminTabsProps {
  */
 export function AdminTabs({
   tabs,
-  basePath,
+  basePath = '',
   activeId,
   paramKey = 'tab',
   extraParams,
@@ -80,7 +87,7 @@ export function AdminTabs({
         const active = tab.id === activeId
         const showCount = tab.count !== undefined && (tab.count > 0 || active)
         const { tabId, panelId } = adminTabIds(paramKey, tab.id)
-        const href = buildAdminHref(basePath, { ...extraParams, [paramKey]: tab.id })
+        const href = tab.href ?? buildAdminHref(basePath, { ...extraParams, [paramKey]: tab.id })
 
         return (
           <m.div key={tab.id} className="shrink-0" whileTap={{ scale: 0.97 }} transition={springSnappy}>

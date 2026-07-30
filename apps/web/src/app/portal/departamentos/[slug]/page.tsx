@@ -224,23 +224,30 @@ export default async function DepartamentoHomePage({
     }),
   ])
 
-  // Equipe: só exibe quem não está PENDENTE/REPROVADO. Membership órfã
-  // (bug antigo) some da UI aqui; limpeza no banco via
+  // Equipe: somente vínculo canônico de sócio aprovado e ativo. Membership
+  // órfã (bug antigo) some da UI aqui; limpeza no banco via
   // `pnpm --filter @torcida/db db:repair-departamento-orfaos`.
   const userIdsEquipe = [
     ...new Set([...membrosRaw, ...gestoresRaw].map((r) => r.userId)),
   ]
-  const membrosStatus: { userId: string; status: string }[] =
+  const membrosElegiveis: { userId: string }[] =
     userIdsEquipe.length > 0
       ? await db.saasMembro.findMany({
-          where: { tenantId: tenant.id, userId: { in: userIdsEquipe } },
-          select: { userId: true, status: true },
+          where: {
+            tenantId: tenant.id,
+            userId: { in: userIdsEquipe },
+            tipo: 'SOCIO',
+            status: 'APROVADO',
+            desligadoEm: null,
+            espelhado: false,
+            membroOrigemId: null,
+          },
+          select: { userId: true },
         })
       : []
-  const statusPorUser = new Map(membrosStatus.map((m) => [m.userId, m.status]))
+  const userIdsElegiveis = new Set(membrosElegiveis.map((m) => m.userId))
   function naEquipeVisivel(userId: string): boolean {
-    const st = statusPorUser.get(userId)
-    return st !== 'PENDENTE' && st !== 'REPROVADO'
+    return userIdsElegiveis.has(userId)
   }
 
   const gestorSet = new Set(

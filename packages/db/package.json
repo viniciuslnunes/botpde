@@ -10,6 +10,7 @@
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
     "db:repair-system-roles": "node scripts/repair-system-role-permissions.js",
+    "test:repair-system-roles": "node scripts/test-repair-system-role-permissions.js",
     "db:repair-departamento-orfaos": "node scripts/repair-departamento-orfaos.js",
     "db:seed-test-data": "node scripts/seed-dados-teste.js",
     "seed:agenda-demo": "node scripts/seed-agenda-demo.js",
@@ -44,12 +45,17 @@
     "db:repair-responsavel-canal-membro": "node scripts/repair-responsavel-canal-membro.js",
     "db:repair-lideranca-canal-membro": "node scripts/repair-lideranca-canal-membro.js",
     "db:repair-canal-membro-pendente-aprovado": "node scripts/repair-canal-membro-pendente-aprovado.js",
+    "db:repair-aprovado-canal-membro": "node scripts/repair-aprovado-canal-membro.js",
     "db:ensure-canais-oficiais-unidades": "node scripts/ensure-canais-oficiais-unidades.js",
     "db:ensure-canais-oficiais-torcidas": "node scripts/ensure-canais-oficiais-torcidas.js",
     "db:ensure-canais-oficiais": "node scripts/ensure-canais-oficiais-torcidas.js && node scripts/ensure-canais-oficiais-unidades.js",
     "db:enable-pg-trgm": "node scripts/enable-pg-trgm.js",
+    "audit:regras": "node scripts/audit-regras-negocio.js",
     "seed:corinthians-teste": "node scripts/seed-corinthians-teste.js",
-    "reset:corinthians-teste": "node scripts/reset-corinthians-teste.js"
+    "seed:corinthians-teste-modulos": "node scripts/seed-corinthians-teste-modulos.js",
+    "reset:corinthians-teste": "node scripts/reset-corinthians-teste.js",
+    "seed:nacional-teste": "node scripts/seed-nacional-teste.js",
+    "reset:nacional-teste": "node scripts/reset-nacional-teste.js"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1"

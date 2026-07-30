@@ -3,7 +3,7 @@ import { getTenantFromHost, getUserPermissionsInTenant } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
 import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
-import { MessageCircleWarning, ShieldAlert } from 'lucide-react'
+import { MessageCircleWarning } from 'lucide-react'
 import {
   resolverDenuncia,
   descartarDenuncia,
@@ -94,16 +94,10 @@ export default async function ModeracaoComunidadePage() {
   ])
 
   return (
-    <div className="app-container space-y-6 py-6">
-      <div className="flex items-start gap-3">
-        <ShieldAlert className="mt-0.5 h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-        <div>
-          <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Moderação da comunidade</h1>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            Revise denúncias pendentes de posts e decida entre resolver ou descartar.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Revise denúncias pendentes de posts e mensagens e decida entre resolver ou descartar.
+      </p>
 
       {podeModerarPosts && (
         <ModeracaoDenunciasClient

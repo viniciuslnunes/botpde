@@ -14,4 +14,23 @@ export { TablePagination, type TablePaginationProps } from './table-pagination'
 export { InsightSection, type InsightSectionProps } from './insight-section'
 export { SortableTh, type SortableThProps } from './sortable-th'
 export { AdminTabs, type AdminTabItem, type AdminTabsProps } from './admin-tabs'
+export {
+  AdminModuleTabs,
+  resolveAdminModuleTab,
+  type AdminModuleTabItem,
+  type AdminModuleTabsProps,
+} from './admin-module-tabs'
 export { adminTabIds } from './admin-tab-ids'
+export {
+  AdminCreateDisclosure,
+  type AdminCreateDisclosureProps,
+} from './admin-create-disclosure'
+export {
+  AdminExpansionPanel,
+  type AdminExpansionPanelProps,
+} from './admin-expansion-panel'
+export {
+  AdminChartPeriodFilter,
+  type AdminChartPeriod,
+  type AdminChartPeriodFilterProps,
+} from './admin-chart-period-filter'

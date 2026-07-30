@@ -15,7 +15,12 @@ import {
   type SedeOnboarding,
 } from '@/lib/onboarding'
 import { getDescendantTenantIds } from '@/lib/hierarquia'
-import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
+import {
+  listarMunicipiosPorUf,
+  cidadePertenceUf,
+  buscarMunicipiosBrasil,
+  type MunicipioBrasil,
+} from '@/lib/municipios-ibge'
 import { clearTenantContextSlug } from '@/lib/tenant-context'
 import {
   criarOuAtualizarPendenciaEspelhoNaSede,
@@ -24,11 +29,14 @@ import {
   encontrarConflitoRg,
   encontrarConflitoTelefone,
   lockNumeroAssociadoDaTorcida,
+  REPROVACAO_LIMPA,
   type MembroParaEspelho,
 } from '@/lib/membros-sede'
+import { diffCamposMembro, MEMBRO_DIFF_SELECT } from '@/lib/membro-audit-diff'
 import { ExpectedError, isExpectedError } from '@/lib/expected-error'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { notificarUsuariosComPermissao } from '@/lib/notificacoes'
+import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import {
   isDepartamentoLegado,
   maskTelefone,
@@ -40,6 +48,7 @@ import {
   validarTelefoneBr,
   parseDataCompetencia,
   PERMISSIONS,
+  formatNomeTorcida,
 } from '@torcida/types'
 
 // ─── Leituras auxiliares (chamadas pelo wizard entre passos) ────────────────────
@@ -74,6 +83,17 @@ export async function buscarCidadesDaUf(uf: string): Promise<string[]> {
   const ufUpper = uf.toUpperCase()
   if (!UFS_BRASIL.includes(ufUpper)) return []
   return listarMunicipiosPorUf(ufUpper)
+}
+
+const buscaRegiaoSchema = z.string().trim().min(2).max(60)
+
+/** Busca nacional cidade+UF para o combobox do passo Região. */
+export async function buscarRegioesPorTexto(query: string): Promise<MunicipioBrasil[]> {
+  const session = await auth()
+  if (!session?.user?.id) return []
+  const parsed = buscaRegiaoSchema.safeParse(query)
+  if (!parsed.success) return []
+  return buscarMunicipiosBrasil(parsed.data)
 }
 
 export async function buscarDepartamentos(
@@ -956,13 +976,41 @@ export async function solicitarVinculo(
     // Nacional do clube. Só SOCIO passa pela fila de aprovação do admin.
     const statusInicial = data.tipo === 'SOCIO' ? 'PENDENTE' : 'APROVADO'
 
-    const existing: { id: string; status: string } | null = await db.saasMembro.findUnique({
+    const existing:
+      | ({
+          id: string
+          status: string
+          reprovadoPermiteReenvio: boolean
+          sedeId: string | null
+        } & Record<string, unknown>)
+      | null = await db.saasMembro.findUnique({
       where: { tenantId_userId: { tenantId: tenantDestino.id, userId } },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        reprovadoPermiteReenvio: true,
+        ...MEMBRO_DIFF_SELECT,
+      },
     })
 
     if (existing?.status === 'APROVADO') {
+      // Também cura tentativas anteriores em que o vínculo foi persistido,
+      // mas o provisionamento dos canais falhou depois da transação.
+      await vincularMembroCanaisAposAprovacao({
+        tenantId: tenantDestino.id,
+        userId,
+        sedeId: existing.sedeId,
+        fallbackCriadoPorId: userId,
+      })
       return { message: 'Você já é membro aprovado desta torcida.' }
+    }
+
+    // Reprovação definitiva: só um admin revertendo para PENDENTE reabre a fila.
+    if (existing?.status === 'REPROVADO' && !existing.reprovadoPermiteReenvio) {
+      return {
+        message:
+          'A diretoria encerrou a análise do seu cadastro nesta torcida e o reenvio está bloqueado. Fale com a torcida antes de tentar de novo.',
+      }
     }
 
     // E-mail: formato já no Zod; conta com e-mail deve confirmar o mesmo;
@@ -1083,6 +1131,7 @@ export async function solicitarVinculo(
                 aprovadoPorId: null,
                 aprovadoPorNome: null,
                 aprovadoEm: null,
+                ...REPROVACAO_LIMPA,
               },
             })
             await tx.auditLog.create({
@@ -1092,6 +1141,9 @@ export async function solicitarVinculo(
                 acao: 'RECADASTRO_SOLICITADO',
                 entidade: 'SaasMembro',
                 entidadeId: existing.id,
+                // O histórico do card mostra o que o solicitante corrigiu
+                // depois da reprovação, não só que houve reenvio.
+                detalhes: { alteracoes: diffCamposMembro(existing, dadosMembro) },
               },
             })
           }
@@ -1153,6 +1205,12 @@ export async function solicitarVinculo(
         where: { userId_tenantId: { userId, tenantId: tenantDestino.id } },
         create: { userId, tenantId: tenantDestino.id, perfilPrivado: false },
         update: { perfilPrivado: false },
+      })
+      await vincularMembroCanaisAposAprovacao({
+        tenantId: tenantDestino.id,
+        userId,
+        sedeId: dadosMembro.sedeId ?? null,
+        fallbackCriadoPorId: userId,
       })
     }
 
@@ -1217,7 +1275,7 @@ export async function solicitarVinculo(
 
         await notificarNovoMembroPendente({
           tenantId: tenantDestino.id,
-          tenantNome: tenantDestino.nome,
+          tenantNome: formatNomeTorcida(tenantDestino.nome),
           solicitanteUserId: userId,
           solicitanteNome: data.nome,
           tipoVinculo: data.tipo,
@@ -1230,12 +1288,12 @@ export async function solicitarVinculo(
           })
           await notificarNovoMembroPendente({
             tenantId: sedeRaizId,
-            tenantNome: sedeNome?.nome ?? 'Sede',
+            tenantNome: formatNomeTorcida(sedeNome?.nome ?? 'Sede'),
             solicitanteUserId: userId,
             solicitanteNome: data.nome,
             tipoVinculo: data.tipo,
             notificarSolicitante: false,
-            corpoAdmin: `${data.nome} solicitou ingresso como sócio em ${tenantDestino.nome}. A Sede também pode aprovar ou recusar.`,
+            corpoAdmin: `${data.nome} solicitou ingresso como sócio em ${formatNomeTorcida(tenantDestino.nome)}. A Sede também pode aprovar ou recusar.`,
           })
         }
       } catch (err) {

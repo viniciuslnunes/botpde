@@ -90,7 +90,7 @@ describe('buildCoIrmaRecomendacoes', () => {
     expect(items[0]?.tipo).toBe('CO_IRMA')
     expect(items[0]?.confianca).toBe('ALTA')
     expect(items[0]?.podePropor).toBe(false)
-    expect(items[0]?.fonte).toBe('Mesmo time (Corinthians)')
+    expect(items[0]?.fonte).toBe('Mesmo time (CORINTHIANS)')
     expect(items[0]?.observacao).toBeNull()
     expect(items[0]?.tenantSugeridoLogoUrl).toBe('https://example.com/camisa12.png')
   })

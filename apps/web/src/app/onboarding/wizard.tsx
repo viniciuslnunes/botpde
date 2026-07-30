@@ -20,9 +20,6 @@ import {
   springGentle,
   springSnappy,
 } from '@/lib/motion-presets'
-import {
-  NOME_UF,
-} from '@/lib/regioes-brasil'
 import { isDepartamentoLegado, maskRg, maskTelefone, normalizarCpf, validarCpfDigitos, validarRg, validarTelefoneBr } from '@torcida/types'
 import {
   salvarClubeRegiao,
@@ -35,7 +32,7 @@ import {
   registrarInteresseUnidade,
   buscarSedesDaTorcida,
 } from './actions'
-import { ComboboxCidade } from './combobox-cidade'
+import { ComboboxRegiao } from './combobox-regiao'
 import { agruparSedesPorRegiao, normalizarTexto, type SedeOnboardingComDistancia } from '@/lib/onboarding-unidade'
 import {
   buildGoogleMapsUrl,
@@ -104,7 +101,6 @@ function mergeHistoryState(
 type Props = {
   afiliacoesIniciais: AfiliacaoOnboarding[]
   regioes: RegiaoOnboarding[]
-  ufs: string[]
   nomeInicial: string
   emailInicial: string
   userId: string
@@ -113,7 +109,6 @@ type Props = {
 export function OnboardingWizard({
   afiliacoesIniciais,
   regioes,
-  ufs,
   nomeInicial,
   emailInicial,
   userId,
@@ -436,17 +431,11 @@ export function OnboardingWizard({
             >
               <PassoRegiao
                 clube={clube}
-                ufs={ufs}
                 uf={uf}
                 cidade={cidade}
-                onUf={(v) => {
-                  // Trocar de estado invalida a cidade (só vale seleção da lista da UF).
-                  setUf(v)
-                  setCidade('')
-                  setLocalizacaoPrecisa(null)
-                }}
-                onCidade={(v) => {
-                  setCidade(v)
+                onRegiao={(cidadeSel, ufSel) => {
+                  setUf(ufSel)
+                  setCidade(cidadeSel)
                   setLocalizacaoPrecisa(null)
                 }}
                 onLocalizacao={(regiao) => {
@@ -700,42 +689,45 @@ function PassoClube({
 
 function PassoRegiao({
   clube,
-  ufs,
   uf,
   cidade,
-  onUf,
-  onCidade,
+  onRegiao,
   onLocalizacao,
   pending,
   onVoltar,
   onContinuar,
 }: {
   clube: AfiliacaoOnboarding | null
-  ufs: string[]
   uf: string
   cidade: string
-  onUf: (v: string) => void
-  onCidade: (v: string) => void
+  onRegiao: (cidade: string, uf: string) => void
   onLocalizacao: (regiao: GoogleMapsRegion) => void
   pending: boolean
   onVoltar: () => void
   onContinuar: () => void
 }) {
+  const beneficioId = useId()
   const [localizando, setLocalizando] = useState(false)
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null)
+  const [localizacaoDetectada, setLocalizacaoDetectada] = useState(false)
   const geocodeSeq = useRef(0)
 
-  function selecionarCidade(cidadeSel: string) {
-    onCidade(cidadeSel)
-    if (!cidadeSel.trim() || !uf) return
+  const valueRegiao = uf && cidade ? { cidade, uf } : null
+
+  function selecionarRegiao(m: { cidade: string; uf: string }) {
+    setLocalizacaoDetectada(false)
+    setErroLocalizacao(null)
+    onRegiao(m.cidade, m.uf)
+    if (!m.cidade.trim() || !m.uf) return
     const seq = ++geocodeSeq.current
-    void forwardGeocodeRegion(cidadeSel, uf).then((regiao) => {
+    void forwardGeocodeRegion(m.cidade, m.uf).then((regiao) => {
       if (seq !== geocodeSeq.current || !regiao) return
       onLocalizacao(regiao)
     })
   }
 
   function usarLocalizacao() {
+    setLocalizacaoDetectada(false)
     setErroLocalizacao(null)
     if (!navigator.geolocation) {
       setErroLocalizacao('Seu navegador não permite detectar localização automaticamente.')
@@ -761,10 +753,12 @@ function PassoRegiao({
         setLocalizando(false)
         if (nomeCanonico) {
           onLocalizacao({ ...regiao, cidade: nomeCanonico })
+          setLocalizacaoDetectada(true)
         } else {
-          onUf(regiao.estado)
+          setLocalizacaoDetectada(false)
+          onRegiao('', regiao.estado)
           setErroLocalizacao(
-            `Detectamos ${regiao.estado}, mas não conseguimos confirmar sua cidade automaticamente — selecione na lista abaixo.`,
+            `Detectamos ${regiao.estado}, mas não conseguimos confirmar sua cidade automaticamente — busque sua cidade no campo acima.`,
           )
         }
       },
@@ -780,76 +774,64 @@ function PassoRegiao({
     <div>
       <BotaoVoltar onClick={onVoltar} disabled={pending} />
       <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">De onde você torce?</h1>
-      <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
+      <p className="mt-1 max-w-prose text-sm text-[rgb(var(--foreground-muted))]">
         Sua região ajuda a conectar você a torcedores e eventos por perto
         {clube ? ` do ${clube.apelido || clube.nome}` : ''}.
       </p>
 
-      <div className="mt-5 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--background-subtle))] text-[rgb(var(--color-primary-fg))]">
-              <MapPin className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[rgb(var(--foreground))]">
-                Recomendações por proximidade
-              </p>
-              <p className="mt-0.5 max-w-xl text-xs text-[rgb(var(--foreground-muted))]">
-                Use sua localização ou escolha a cidade para priorizar subsedes e pontos de
-                encontro próximos, com distância em km.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={usarLocalizacao}
-            disabled={pending || localizando}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgb(var(--border))] px-4 py-2 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+      <div className="mt-6 max-w-md">
+        <label
+          htmlFor="regiao"
+          className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]"
+        >
+          Sua cidade
+        </label>
+        <ComboboxRegiao
+          id="regiao"
+          value={valueRegiao}
+          onSelecionar={selecionarRegiao}
+          disabled={pending || localizando}
+          aria-describedby={beneficioId}
+        />
+        <p
+          id={beneficioId}
+          className="mt-1.5 text-xs text-[rgb(var(--foreground-muted))]"
+        >
+          Prioriza subsedes e pontos de encontro próximos, com distância em km.
+        </p>
+
+        <button
+          type="button"
+          onClick={usarLocalizacao}
+          disabled={pending || localizando}
+          className="mt-3 inline-flex items-center gap-2 rounded-lg px-1 py-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+        >
+          {localizando ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+          )}
+          {localizando ? 'Localizando...' : 'Usar minha localização'}
+        </button>
+
+        {localizacaoDetectada && uf && cidade && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[rgb(var(--color-success-fg))]"
           >
-            {localizando ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LocateFixed className="h-4 w-4" />
-            )}
-            {localizando ? 'Localizando...' : 'Usar minha localização'}
-          </button>
-        </div>
+            <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Detectado pela sua localização
+          </p>
+        )}
         {erroLocalizacao && (
-          <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{erroLocalizacao}</p>
+          <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+            {erroLocalizacao}
+          </p>
         )}
       </div>
 
-      <div className="mt-6 space-y-4">
-        <div>
-          <label htmlFor="uf" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Estado
-          </label>
-          <Select
-            id="uf"
-            value={uf}
-            onChange={(e) => {
-              geocodeSeq.current += 1
-              onUf(e.target.value)
-            }}
-          >
-            <option value="">Selecione o estado</option>
-            {ufs.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <label htmlFor="cidade" className="mb-1.5 block text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Cidade
-          </label>
-          <ComboboxCidade uf={uf} value={cidade} onChange={selecionarCidade} disabled={pending} />
-        </div>
-      </div>
-
-      <div className="mt-8">
+      <div className="mt-8 max-w-md">
         <BotaoPrimario
           onClick={onContinuar}
           pending={pending}
@@ -1707,6 +1689,7 @@ function PassoVinculo({
   const [pending, startTransition] = useTransition()
   const [errosCampo, setErrosCampo] = useState<Record<string, string[]>>({})
   const [tabAtiva, setTabAtiva] = useState<TabFormularioSocio>('identificacao')
+  const abasRef = useRef<HTMLDivElement | null>(null)
 
   // Campos de sócio
   const [nome, setNome] = useState(nomeInicial)
@@ -2025,6 +2008,84 @@ function PassoVinculo({
     termoAceito,
   ])
 
+  /**
+   * Validação local do vínculo de sócio. Pura (só lê estado) — roda no render para
+   * liberar o "Próximo" de cada aba e no submit, com as mesmas regras do Zod da action.
+   */
+  function validarCamposSocio(): Record<string, string[]> {
+    const erros: Record<string, string[]> = {}
+
+    // Identificação
+    if (!nome.trim()) erros.nome = ['Informe seu nome completo.']
+    else if (nome.trim().length < 3) erros.nome = ['Nome muito curto.']
+    if (!dataNascimento) erros.dataNascimento = ['Informe sua data de nascimento.']
+    else if (idadeCalculada === null || idadeCalculada < 0) {
+      erros.dataNascimento = ['Data de nascimento inválida']
+    } else if (idadeCalculada < 6) erros.dataNascimento = ['Idade mínima: 6 anos']
+    if (!telefone) erros.telefone = ['Informe seu telefone.']
+    else if (!validarTelefoneBr(telefone)) erros.telefone = ['Telefone inválido']
+    if (!email.trim()) erros.email = ['Informe seu e-mail.']
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      erros.email = ['E-mail inválido']
+    }
+    if (!rg) erros.rg = ['Informe seu RG.']
+    else if (!validarRg(rg)) erros.rg = ['RG inválido']
+    if (!cpf) erros.cpf = ['Informe seu CPF.']
+    else {
+      const cpfNorm = normalizarCpf(cpf)
+      if (!cpfNorm || !validarCpfDigitos(cpfNorm)) erros.cpf = ['CPF inválido']
+    }
+    if (ehMenorDeIdade) {
+      if (!responsavelNome) {
+        erros.responsavelNome = ['Informe o nome do responsável legal.']
+      }
+      if (!responsavelDocumento) {
+        erros.responsavelDocumento = ['Informe o documento do responsável.']
+      }
+    }
+
+    // Endereço + dados de associado
+    if (!cep) erros.cep = ['Informe seu CEP.']
+    else if (cep.replace(/\D/g, '').length !== 8) {
+      erros.cep = ['Informe um CEP com 8 dígitos']
+    }
+    if (!logradouro) erros.logradouro = ['Informe o logradouro.']
+    if (!cidadeEndereco) erros.cidade = ['Informe a cidade.']
+    if (!bairro) erros.bairro = ['Informe o bairro.']
+    if (!ufEndereco) erros.uf = ['Informe o estado (UF).']
+    if (!numeroAssociado) {
+      erros.numeroAssociado = ['Informe seu número de associado.']
+    }
+    if (!anosSocio) {
+      erros.anosSocio = ['Informe há quantos anos é sócio da torcida.']
+    } else {
+      const anos = Number(anosSocio)
+      if (!Number.isFinite(anos) || anos < 0 || anos > 100) {
+        erros.anosSocio = ['Informe um número de anos entre 0 e 100.']
+      }
+    }
+
+    // Documentos + termo
+    if (!imagemProva) {
+      erros.imagemProva = [
+        'Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.',
+      ]
+    }
+    if (documentosObrigatorios && !fotoDocumentoUrl) {
+      erros.fotoDocumentoUrl = ['Envie a foto do RG.']
+    }
+    if (documentosObrigatorios && !comprovanteResidenciaUrl) {
+      erros.comprovanteResidenciaUrl = ['Envie o comprovante de residência.']
+    }
+    if (!termoAceito) {
+      erros.termoResponsabilidadeAceito = [
+        'É necessário aceitar o termo de responsabilidade.',
+      ]
+    }
+
+    return erros
+  }
+
   function aplicarErrosERevelar(
     erros: Record<string, string[]>,
     mensagem = 'Confira os campos destacados.',
@@ -2051,60 +2112,7 @@ function PassoVinculo({
     }
     // Só o vínculo de sócio exige comprovação e os dados de associado — torcedor entra direto.
     if (tipo === 'SOCIO') {
-      const errosLocais: Record<string, string[]> = {}
-      if (!imagemProva) {
-        errosLocais.imagemProva = [
-          'Envie uma foto da carteirinha ou comprovante de vínculo com a torcida.',
-        ]
-      }
-      if (!numeroAssociado) {
-        errosLocais.numeroAssociado = ['Informe seu número de associado.']
-      }
-      if (!anosSocio) {
-        errosLocais.anosSocio = ['Informe há quantos anos é sócio da torcida.']
-      }
-      if (!cep) {
-        errosLocais.cep = ['Informe seu CEP.']
-      }
-      if (!logradouro) errosLocais.logradouro = ['Informe o logradouro.']
-      if (!bairro) errosLocais.bairro = ['Informe o bairro.']
-      if (!ufEndereco) errosLocais.uf = ['Informe o estado (UF).']
-      if (!cidadeEndereco) errosLocais.cidade = ['Informe a cidade.']
-      if (!rg) errosLocais.rg = ['Informe seu RG.']
-      else if (!validarRg(rg)) errosLocais.rg = ['RG inválido']
-      if (!cpf) errosLocais.cpf = ['Informe seu CPF.']
-      else {
-        const cpfNorm = normalizarCpf(cpf)
-        if (!cpfNorm || !validarCpfDigitos(cpfNorm)) errosLocais.cpf = ['CPF inválido']
-      }
-      if (!telefone) errosLocais.telefone = ['Informe seu telefone.']
-      else if (!validarTelefoneBr(telefone)) errosLocais.telefone = ['Telefone inválido']
-      if (!email.trim()) errosLocais.email = ['Informe seu e-mail.']
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        errosLocais.email = ['E-mail inválido']
-      }
-      if (!dataNascimento) {
-        errosLocais.dataNascimento = ['Informe sua data de nascimento.']
-      }
-      if (documentosObrigatorios && !fotoDocumentoUrl) {
-        errosLocais.fotoDocumentoUrl = ['Envie a foto do RG.']
-      }
-      if (documentosObrigatorios && !comprovanteResidenciaUrl) {
-        errosLocais.comprovanteResidenciaUrl = ['Envie o comprovante de residência.']
-      }
-      if (ehMenorDeIdade) {
-        if (!responsavelNome) {
-          errosLocais.responsavelNome = ['Informe o nome do responsável legal.']
-        }
-        if (!responsavelDocumento) {
-          errosLocais.responsavelDocumento = ['Informe o documento do responsável.']
-        }
-      }
-      if (!termoAceito) {
-        errosLocais.termoResponsabilidadeAceito = [
-          'É necessário aceitar o termo de responsabilidade.',
-        ]
-      }
+      const errosLocais = validarCamposSocio()
       if (Object.keys(errosLocais).length > 0) {
         aplicarErrosERevelar(errosLocais)
         return
@@ -2179,6 +2187,43 @@ function PassoVinculo({
     }
     onErro(null)
     cropComprovante.open(file)
+  }
+
+  // ─── Fluxo guiado das abas (Identificação → Endereço → Documentos) ───────────
+  const errosValidacao = modo === 'socio' ? validarCamposSocio() : {}
+  const abasCompletas = new Set(
+    TABS_FORMULARIO_SOCIO.filter(
+      (tab) => Object.keys(filtrarErrosDaAba(errosValidacao, tab.id)).length === 0,
+    ).map((tab) => tab.id),
+  )
+  const abasPendentes = TABS_FORMULARIO_SOCIO.filter((tab) => !abasCompletas.has(tab.id))
+  const indiceAbaAtiva = TABS_FORMULARIO_SOCIO.findIndex((tab) => tab.id === tabAtiva)
+  const abaAnterior = indiceAbaAtiva > 0 ? TABS_FORMULARIO_SOCIO[indiceAbaAtiva - 1] : undefined
+  const abaSeguinte = TABS_FORMULARIO_SOCIO[indiceAbaAtiva + 1]
+  const formularioCompleto = abasPendentes.length === 0
+
+  function irParaAba(tab: TabFormularioSocio) {
+    onErro(null)
+    setTabAtiva(tab)
+    // Volta ao topo do formulário: a aba nova monta abaixo das tabs, fora da viewport.
+    requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      abasRef.current?.scrollIntoView({
+        behavior: reduceMotion ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  function avancarAba() {
+    if (!abaSeguinte) return
+    // O botão já fica desabilitado quando a aba tem pendência; aqui é a rede de segurança.
+    const errosDaAba = filtrarErrosDaAba(validarCamposSocio(), tabAtiva)
+    if (Object.keys(errosDaAba).length > 0) {
+      aplicarErrosERevelar(errosDaAba)
+      return
+    }
+    irParaAba(abaSeguinte.id)
   }
 
   const conteudo =
@@ -2344,11 +2389,14 @@ function PassoVinculo({
         />
 
         {/* ─── Abas: Identificação / Endereço / Documentos ─────────────────── */}
-        <TabsFormularioSocio
-          ativa={tabAtiva}
-          onMudar={setTabAtiva}
-          erros={errosCampo}
-        />
+        <div ref={abasRef} className="scroll-mt-6">
+          <TabsFormularioSocio
+            ativa={tabAtiva}
+            onMudar={setTabAtiva}
+            erros={errosCampo}
+            completas={abasCompletas}
+          />
+        </div>
 
         <SecaoFormulario
           titulo="Identificação"
@@ -2510,6 +2558,42 @@ function PassoVinculo({
             />
           </Campo>
         </SecaoFormulario>
+
+        {/* ─── Autorização do responsável (só menor de idade) ───────────────── */}
+        {ehMenorDeIdade && tabAtiva === 'identificacao' && (
+          <SecaoFormulario titulo="Autorização do responsável">
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              Por ser menor de idade, é necessária a autorização de um responsável legal
+              para participar de atividades e caravanas da torcida.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo
+                name="responsavelNome"
+                label="Nome do responsável"
+                obrigatorio
+                erros={errosCampo.responsavelNome}
+              >
+                <Input
+                  value={responsavelNome}
+                  onChange={(e) => setResponsavelNome(e.target.value)}
+                  placeholder="Nome completo"
+                />
+              </Campo>
+              <Campo
+                name="responsavelDocumento"
+                label="Documento do responsável"
+                obrigatorio
+                erros={errosCampo.responsavelDocumento}
+              >
+                <Input
+                  value={responsavelDocumento}
+                  onChange={(e) => setResponsavelDocumento(e.target.value)}
+                  placeholder="RG ou CPF"
+                />
+              </Campo>
+            </div>
+          </SecaoFormulario>
+        )}
 
         {/* ─── Endereço ──────────────────────────────────────────────────── */}
         <SecaoFormulario titulo="Endereço" oculta={tabAtiva !== 'endereco'}>
@@ -2792,102 +2876,81 @@ function PassoVinculo({
           </div>
         </SecaoFormulario>
 
-        {/* ─── Autorização do responsável (só menor de idade) ───────────────── */}
-        {ehMenorDeIdade && (
-          <SecaoFormulario titulo="Autorização do responsável">
-            <p className="text-xs text-[rgb(var(--foreground-muted))]">
-              Por ser menor de idade, é necessária a autorização de um responsável legal
-              para participar de atividades e caravanas da torcida.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Campo
-                name="responsavelNome"
-                label="Nome do responsável"
-                obrigatorio
-                erros={errosCampo.responsavelNome}
-              >
-                <Input
-                  value={responsavelNome}
-                  onChange={(e) => setResponsavelNome(e.target.value)}
-                  placeholder="Nome completo"
-                />
-              </Campo>
-              <Campo
-                name="responsavelDocumento"
-                label="Documento do responsável"
-                obrigatorio
-                erros={errosCampo.responsavelDocumento}
-              >
-                <Input
-                  value={responsavelDocumento}
-                  onChange={(e) => setResponsavelDocumento(e.target.value)}
-                  placeholder="RG ou CPF"
-                />
-              </Campo>
-            </div>
-          </SecaoFormulario>
+        {/* ─── Termo de responsabilidade (fecha a última aba) ─────────────── */}
+        {tabAtiva === 'documentos' && (
+          <div
+            data-campo="termoResponsabilidadeAceito"
+            className={
+              errosCampo.termoResponsabilidadeAceito?.[0]
+                ? 'rounded-xl bg-red-500/[0.04] p-1 ring-2 ring-red-500/45'
+                : undefined
+            }
+          >
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
+              <input
+                type="checkbox"
+                checked={termoAceito}
+                onChange={(e) => {
+                  setTermoAceito(e.target.checked)
+                  if (errosCampo.termoResponsabilidadeAceito) {
+                    setErrosCampo((prev) => {
+                      const next = { ...prev }
+                      delete next.termoResponsabilidadeAceito
+                      return next
+                    })
+                  }
+                }}
+                className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
+              />
+              <span className="min-w-0 text-sm text-[rgb(var(--foreground))]">
+                Declaro que serei responsável pelos meus atos ao usar os símbolos da torcida em
+                jogos e eventos, e concordo em receber comunicações da torcida.
+              </span>
+            </label>
+            {errosCampo.termoResponsabilidadeAceito?.[0] && (
+              <p role="alert" className="mt-1 px-1 text-xs text-red-600 dark:text-red-400">
+                {errosCampo.termoResponsabilidadeAceito[0]}
+              </p>
+            )}
+          </div>
         )}
-
-        {/* ─── Termo de responsabilidade ─────────────────────────────────── */}
-        <div
-          data-campo="termoResponsabilidadeAceito"
-          className={
-            errosCampo.termoResponsabilidadeAceito?.[0]
-              ? 'rounded-xl bg-red-500/[0.04] p-1 ring-2 ring-red-500/45'
-              : undefined
-          }
-        >
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-            <input
-              type="checkbox"
-              checked={termoAceito}
-              onChange={(e) => {
-                setTermoAceito(e.target.checked)
-                if (errosCampo.termoResponsabilidadeAceito) {
-                  setErrosCampo((prev) => {
-                    const next = { ...prev }
-                    delete next.termoResponsabilidadeAceito
-                    return next
-                  })
-                }
-              }}
-              className="mt-1 h-4 w-4 rounded border-[rgb(var(--border))] text-[rgb(var(--color-primary-fg))]"
-            />
-            <span className="min-w-0 text-sm text-[rgb(var(--foreground))]">
-              Declaro que serei responsável pelos meus atos ao usar os símbolos da torcida em
-              jogos e eventos, e concordo em receber comunicações da torcida.
-            </span>
-          </label>
-          {errosCampo.termoResponsabilidadeAceito?.[0] && (
-            <p role="alert" className="mt-1 px-1 text-xs text-red-600 dark:text-red-400">
-              {errosCampo.termoResponsabilidadeAceito[0]}
-            </p>
-          )}
-        </div>
       </div>
 
       <div className="mt-8 space-y-3">
-        <BotaoPrimario
-          onClick={() => enviar('SOCIO')}
-          pending={pending || uploadDocsPend}
-          disabled={
-            !imagemProva ||
-            !numeroAssociado ||
-            !anosSocio ||
-            !cep ||
-            !logradouro ||
-            !bairro ||
-            !ufEndereco ||
-            !rg ||
-            !cpf ||
-            !dataNascimento ||
-            (documentosObrigatorios && !fotoDocumentoUrl) ||
-            (documentosObrigatorios && !comprovanteResidenciaUrl) ||
-            (ehMenorDeIdade && (!responsavelNome || !responsavelDocumento)) ||
-            !termoAceito
-          }
-          label="Enviar solicitação"
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {abaAnterior ? (
+            <BotaoAbaAnterior
+              label={abaAnterior.label}
+              onClick={() => irParaAba(abaAnterior.id)}
+              disabled={pending}
+            />
+          ) : (
+            <span />
+          )}
+          {abaSeguinte ? (
+            <BotaoPrimario
+              onClick={avancarAba}
+              disabled={!abasCompletas.has(tabAtiva)}
+              label={`Próximo: ${abaSeguinte.label}`}
+            />
+          ) : (
+            <BotaoPrimario
+              onClick={() => enviar('SOCIO')}
+              pending={pending || uploadDocsPend}
+              disabled={!formularioCompleto}
+              label="Enviar solicitação"
+            />
+          )}
+        </div>
+        {!abasCompletas.has(tabAtiva) ? (
+          <p className="text-right text-xs text-[rgb(var(--foreground-muted))]">
+            Preencha os campos obrigatórios desta aba para continuar.
+          </p>
+        ) : !abaSeguinte && !formularioCompleto ? (
+          <p className="text-right text-xs text-[rgb(var(--foreground-muted))]">
+            Falta preencher: {abasPendentes.map((tab) => tab.label).join(', ')}.
+          </p>
+        ) : null}
         <p className="text-center text-sm text-[rgb(var(--foreground-muted))]">
           Não é sócio da organizada?{' '}
           <button
@@ -2992,17 +3055,32 @@ const CAMPO_TAB: Record<string, TabFormularioSocio> = {
   imagemProva: 'documentos',
   fotoDocumentoUrl: 'documentos',
   comprovanteResidenciaUrl: 'documentos',
+  termoResponsabilidadeAceito: 'documentos',
 }
 
-/** Navegação em abas do formulário de sócio — sinaliza abas com campo(s) com erro. */
+/** Recorta um mapa de erros só com os campos que pertencem a uma aba. */
+function filtrarErrosDaAba(
+  erros: Record<string, string[]>,
+  tab: TabFormularioSocio,
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const [campo, mensagens] of Object.entries(erros)) {
+    if ((mensagens?.length ?? 0) > 0 && CAMPO_TAB[campo] === tab) out[campo] = mensagens
+  }
+  return out
+}
+
+/** Navegação em abas do formulário de sócio — sinaliza aba concluída e aba com erro. */
 function TabsFormularioSocio({
   ativa,
   onMudar,
   erros,
+  completas,
 }: {
   ativa: TabFormularioSocio
   onMudar: (tab: TabFormularioSocio) => void
   erros: Record<string, string[]>
+  completas: Set<TabFormularioSocio>
 }) {
   const camposComErro = new Set(
     Object.keys(erros).filter((k) => (erros[k]?.length ?? 0) > 0),
@@ -3015,7 +3093,10 @@ function TabsFormularioSocio({
     >
       {TABS_FORMULARIO_SOCIO.map((tab) => {
         const Icon = tab.icon
+        // Erro tem prioridade sobre o check: erro da action (CPF/RG duplicado) passa
+        // pela validação local, e é ele que precisa aparecer.
         const temErro = Array.from(camposComErro).some((c) => CAMPO_TAB[c] === tab.id)
+        const completa = !temErro && completas.has(tab.id)
         const ativaAgora = ativa === tab.id
         return (
           <button
@@ -3040,6 +3121,15 @@ function TabsFormularioSocio({
                 }`}
               />
             )}
+            {completa && (
+              <Check
+                aria-hidden
+                className={`absolute right-1 top-1 h-3 w-3 ${
+                  ativaAgora ? 'text-white' : 'text-[rgb(var(--color-primary-fg))]'
+                }`}
+              />
+            )}
+            {completa && <span className="sr-only">— concluída</span>}
           </button>
         )
       })}
@@ -3161,6 +3251,29 @@ function BotaoVoltar({
       onClick={onClick}
       disabled={disabled}
       className="mb-4 inline-flex cursor-pointer items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      {label}
+    </button>
+  )
+}
+
+/** Volta uma aba do formulário de sócio (secundário — não sai do passo). */
+function BotaoAbaAnterior({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <ArrowLeft className="h-4 w-4" />
       {label}

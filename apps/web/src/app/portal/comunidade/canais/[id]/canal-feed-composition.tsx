@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import {
   entrarCanal,
   pedirEntradaCanal,
@@ -151,24 +152,28 @@ export function CanalFeedComposition({
       ? `${canal.cidade} · ${canal.estado}`
       : canal.cidade ?? canal.estado
   const tipoLabel = canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null
+  const tenantNome = formatNomeTorcida(canal.tenantNome)
+  const canalNome = canal.canalOficial
+    ? formatNomeTorcida(canal.nome ?? tenantNome)
+    : (canal.nome ?? 'Canal')
 
   return (
     <div className="space-y-4">
       <CanalNavbarOverride
         brand={{
-          nome: canal.nome ?? canal.tenantNome,
+          nome: canalNome,
           corPrimaria,
           logoUrl: canal.avatarUrl,
         }}
       />
 
       <header className="card-soft flex items-center gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">
-        <Avatar nome={canal.nome ?? canal.tenantNome} avatarUrl={canal.avatarUrl} size="sm" fit="contain" />
+        <Avatar nome={canalNome} avatarUrl={canal.avatarUrl} size="sm" fit="contain" />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <h1 className="truncate text-sm font-bold text-[rgb(var(--foreground))]">
-              {canal.nome ?? 'Canal'}
+              {canalNome}
             </h1>
             <span className="inline-flex shrink-0 rounded-full bg-[rgb(var(--primary)_/_0.12)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[rgb(var(--color-primary-fg))]">
               {canal.canalOficial ? 'Oficial' : 'Temático'}
@@ -202,7 +207,7 @@ export function CanalFeedComposition({
             ) : (
               <>
                 {' · '}
-                {canal.tenantNome}
+                {tenantNome}
               </>
             )}
           </p>

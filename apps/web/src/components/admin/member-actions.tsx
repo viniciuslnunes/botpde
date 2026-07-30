@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { Check, X, RotateCcw } from 'lucide-react'
 import { aprovarMembro, reprovarMembro, reverterMembro } from '@/app/admin/membros/actions'
 import { useConfirmAction } from '@/lib/confirm-action'
+import { ReprovarMembroDialog } from './reprovar-membro-dialog'
 
 interface MemberActionsProps {
   membroId: string
@@ -15,6 +17,11 @@ interface MemberActionsProps {
   aprovadoNaUnidadeNome?: string | null
   aprovadoPorNome?: string | null
   aprovadoEmLabel?: string | null
+  /** Contexto do diálogo de reprovação (quando quem chama tem o cadastro em mãos). */
+  nomeMembro?: string | null
+  isSocio?: boolean
+  /** Etapas obrigatórias já detectadas como incompletas; vêm pré-marcadas. */
+  pontosIncompletos?: string[]
 }
 
 export function MemberActions({
@@ -25,8 +32,12 @@ export function MemberActions({
   aprovadoNaUnidadeNome,
   aprovadoPorNome,
   aprovadoEmLabel,
+  nomeMembro,
+  isSocio,
+  pontosIncompletos,
 }: MemberActionsProps) {
   const confirmAction = useConfirmAction()
+  const [reprovarAberto, setReprovarAberto] = useState(false)
   const depto = departamentoNome?.trim() || null
   const via = aprovadoNaUnidadeNome?.trim()
   const quem = aprovadoPorNome?.trim()
@@ -64,21 +75,6 @@ export function MemberActions({
     })
   }
 
-  async function handleReprovar() {
-    await confirmAction({
-      titulo: 'Reprovar este membro?',
-      descricao:
-        espelhado && via
-          ? `Solicitação via ${via}. A reprovação encerra a análise na Sede e na unidade.`
-          : 'A solicitação será marcada como reprovada.',
-      labelConfirmar: 'Reprovar',
-      variante: 'destructive',
-      cancelled: 'Reprovação cancelada.',
-      run: () => reprovarMembro(membroId),
-      success: 'Membro reprovado.',
-    })
-  }
-
   async function handleReverter() {
     await confirmAction({
       titulo: 'Reverter para pendente?',
@@ -91,6 +87,23 @@ export function MemberActions({
       success: 'Membro movido para pendente.',
     })
   }
+
+  const dialogoReprovar = (
+    <ReprovarMembroDialog
+      key={reprovarAberto ? 'reprovar-aberto' : 'reprovar-fechado'}
+      aberto={reprovarAberto}
+      nomeMembro={nomeMembro}
+      isSocio={isSocio}
+      pontosSugeridos={pontosIncompletos}
+      avisoEspelho={
+        espelhado && via
+          ? `Solicitação via ${via}. A reprovação encerra a análise na Sede e na unidade.`
+          : null
+      }
+      onFechar={() => setReprovarAberto(false)}
+      reprovar={(input) => reprovarMembro(membroId, input)}
+    />
+  )
 
   if (status === 'PENDENTE') {
     return (
@@ -119,13 +132,15 @@ export function MemberActions({
           </button>
         )}
         <button
-          onClick={() => void handleReprovar()}
+          type="button"
+          onClick={() => setReprovarAberto(true)}
           aria-label="Reprovar"
           className="btn-danger-soft app-action flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:px-3"
         >
           <X className="h-3.5 w-3.5" />
           <span className="max-sm:sr-only">Reprovar</span>
         </button>
+        {dialogoReprovar}
       </div>
     )
   }

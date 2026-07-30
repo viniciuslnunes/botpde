@@ -1,6 +1,6 @@
 import { db } from '@torcida/db'
 import type { ConfiancaRecomendacao, StatusAlianca } from '@torcida/db'
-import { formatNomeTorcida } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 
 /** @deprecated Prefer findAliancaEntreTenants — pares de aliança não são canônicos por UUID. */
 export function normalizeTenantPair(a: string, b: string): [string, string] {
@@ -228,15 +228,16 @@ export function buildCoIrmaRecomendacoes(
   agora: Date = new Date(),
 ): RecomendacaoAliancaListItem[] {
   return coirmas.map((c) => {
-    const clube = c.afiliacaoNome ?? 'mesmo time'
+    const nome = formatNomeTorcida(c.nome)
+    const clube = c.afiliacaoNome ? formatNomeAfiliacao(c.afiliacaoNome) : 'mesmo time'
     return {
       id: `co-irma:${tenantId}:${c.id}`,
       tenantId,
       tenantSugeridoId: c.id,
       tenantSugeridoSlug: c.slug,
-      tenantSugeridoNome: c.nome,
+      tenantSugeridoNome: nome,
       tenantSugeridoLogoUrl: c.logoUrl,
-      nomeSugerido: c.nome,
+      nomeSugerido: nome,
       confianca: 'ALTA' as const,
       fonte: `Mesmo time (${clube})`,
       observacao: null,
@@ -364,9 +365,9 @@ export async function listRecomendacoesForTenant(
         tenantId: item.tenantId,
         tenantSugeridoId,
         tenantSugeridoSlug: suggested?.slug ?? null,
-        tenantSugeridoNome: suggested?.nome ?? item.nomeSugerido,
+        tenantSugeridoNome: formatNomeTorcida(suggested?.nome ?? item.nomeSugerido),
         tenantSugeridoLogoUrl: suggested?.logoUrl ?? null,
-        nomeSugerido: item.nomeSugerido,
+        nomeSugerido: formatNomeTorcida(item.nomeSugerido),
         confianca,
         fonte: item.fonte,
         observacao: item.observacao,

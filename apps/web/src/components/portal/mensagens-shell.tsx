@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, m } from 'motion/react'
 import { MessageSquarePlus, MessagesSquare, Search, Users, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import {
   tituloConversa,
   type ContatoDto,
@@ -544,7 +545,7 @@ function NovaConversaModal({
                     {contatoDm.nome ?? 'Membro'}
                   </p>
                   <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">
-                    {contatoDm.tenantNome}
+                    {formatNomeTorcida(contatoDm.tenantNome)}
                   </p>
                 </div>
               </div>
@@ -674,7 +675,7 @@ function NovaConversaModal({
                 </span>
                 {!c.mesmoTenant && (
                   <span className="shrink-0 rounded-full bg-[rgb(var(--background-subtle))] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                    {c.tenantNome}
+                    {formatNomeTorcida(c.tenantNome)}
                   </span>
                 )}
               </m.button>

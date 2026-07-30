@@ -22,6 +22,10 @@ import {
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')
+const BuscarCandidatosSchema = z.object({
+  departamentoId: IdSchema,
+  query: z.string().trim().min(2),
+})
 
 export type ActionState = { ok?: boolean; error?: string }
 
@@ -145,23 +149,26 @@ export async function buscarCandidatosArea(
   departamentoId: string,
   query: string,
 ): Promise<Array<{ id: string; nome: string | null; email: string; nickname: string | null }>> {
-  const q = query.trim()
-  if (q.length < 2) return []
+  const entrada = BuscarCandidatosSchema.safeParse({ departamentoId, query })
+  if (!entrada.success) return []
+  const q = entrada.data.query
+  let tenantId: string
 
   try {
-    await assertPodeGerirArea(departamentoId)
+    const { tenant } = await assertPodeGerirArea(entrada.data.departamentoId)
+    tenantId = tenant.id
   } catch {
     return []
   }
 
   const depto: { id: string; tenantId: string } | null = await db.departamento.findFirst({
-    where: { id: departamentoId },
+    where: { id: entrada.data.departamentoId, tenantId },
     select: { id: true, tenantId: true },
   })
   if (!depto) return []
 
   const jaNoDepto: Array<{ userId: string }> = await db.userDepartamento.findMany({
-    where: { departamentoId, tenantId: depto.tenantId },
+    where: { departamentoId: depto.id, tenantId: depto.tenantId },
     select: { userId: true },
   })
   const excluir = new Set(jaNoDepto.map((m) => m.userId))
@@ -171,7 +178,11 @@ export async function buscarCandidatosArea(
   }> = await db.saasMembro.findMany({
     where: {
       tenantId: depto.tenantId,
+      tipo: 'SOCIO',
       status: 'APROVADO',
+      desligadoEm: null,
+      espelhado: false,
+      membroOrigemId: null,
       user: {
         OR: [
           { nome: { contains: q, mode: 'insensitive' } },

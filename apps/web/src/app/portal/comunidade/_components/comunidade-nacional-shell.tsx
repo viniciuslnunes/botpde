@@ -7,15 +7,12 @@ import type { SolicitacaoSocioPendente } from '@/lib/onboarding'
 import { Clock, ListOrdered, Users } from 'lucide-react'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { LogoImage } from '@/components/media/logo-image'
+import { FeedComposerSkeleton } from '@/components/portal/feed-skeletons'
 import { getOrCreateComunidadeNacionalTenant } from '@/lib/comunidade-contexto'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
-  {
-    loading: () => (
-      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-    ),
-  },
+  { loading: () => <FeedComposerSkeleton /> },
 )
 
 type Props = {

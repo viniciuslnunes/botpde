@@ -1,15 +1,12 @@
 import dynamic from 'next/dynamic'
 import { db } from '@torcida/db'
 import { getComposerContext } from './composer-context'
+import { FeedComposerSkeleton } from '@/components/portal/feed-skeletons'
 import type { EventoComposerItem } from '@/lib/eventos'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
-  {
-    loading: () => (
-      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-    ),
-  },
+  { loading: () => <FeedComposerSkeleton /> },
 )
 
 export async function ComunidadeComposerSection({

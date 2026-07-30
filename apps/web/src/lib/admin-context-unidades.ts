@@ -1,4 +1,5 @@
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { getAncestorTenantIds, getTorcidaWorktree } from '@/lib/hierarquia'
 import type { UnidadeOpcao } from '@/lib/torcida-labels'
 
@@ -23,7 +24,7 @@ export async function listarUnidadesParaSelecao(tenantId: string): Promise<Unida
         sedeId: null,
         tenantId: rootTenantId,
         tenantSlug: root.slug,
-        nome: root.nome,
+        nome: formatNomeTorcida(root.nome),
         tipo: 'SEDE',
         cidade: null,
         depth: 0,
@@ -48,7 +49,8 @@ export async function listarUnidadesParaSelecao(tenantId: string): Promise<Unida
       sedeId: n.sedeId,
       tenantId: n.tenantId,
       tenantSlug: slug,
-      nome: n.nome,
+      // Worktree mistura Sede.nome (unidade física) e Tenant.nome (portal).
+      nome: n.origem === 'tenant' ? formatNomeTorcida(n.nome) : n.nome,
       tipo: n.tipo,
       cidade: n.cidade,
       depth: n.depth,

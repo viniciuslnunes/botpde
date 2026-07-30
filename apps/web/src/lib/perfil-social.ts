@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { db } from '@torcida/db'
+import { formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
 import { getSeguimentoStatus } from './social'
 import { tagAvatarUsuario, tagNomeUsuario } from './avatar-cache'
 
@@ -136,9 +137,14 @@ export function resolverTituloPerfilSocial(args: {
   afiliacaoNome: string | null
 }): string {
   if (args.tipoMembro === 'TORCEDOR') {
-    return args.afiliacaoApelido ?? args.afiliacaoNome ?? args.tenantNome
+    return (
+      nomeExibicaoAfiliacao({
+        apelido: args.afiliacaoApelido,
+        nome: args.afiliacaoNome,
+      }) || formatNomeTorcida(args.tenantNome)
+    )
   }
-  return args.tenantNome
+  return formatNomeTorcida(args.tenantNome)
 }
 
 /** Versão síncrona para testes e uso interno. */

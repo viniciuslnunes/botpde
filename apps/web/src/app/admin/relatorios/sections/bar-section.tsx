@@ -9,6 +9,7 @@ import {
   type BarVendasComparativo,
 } from '@/lib/bar'
 import {
+  diasDoPeriodo,
   PERIODO_LABEL,
   resolverIntervaloPeriodo,
   type Periodo,
@@ -17,8 +18,6 @@ import {
 import { InsightSection, StatCard } from '@/components/admin/ui'
 import { MiniBarChart, Sparkline } from '@/components/admin/charts'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
-
-const DIAS_POR_PERIODO: Record<Periodo, number> = { '30d': 30, '90d': 90, '12m': 365 }
 
 export async function BarSection({ tenantId, periodo }: { tenantId: string; periodo: Periodo }) {
   const { inicio } = resolverIntervaloPeriodo(periodo)
@@ -30,7 +29,7 @@ export async function BarSection({ tenantId, periodo }: { tenantId: string; peri
     BarMargemResumo,
   ] = await Promise.all([
     compararVendasBarPeriodo(tenantId, periodo),
-    resumirVendasBarPorDia(tenantId, DIAS_POR_PERIODO[periodo]),
+    resumirVendasBarPorDia(tenantId, diasDoPeriodo(periodo)),
     listarMaisVendidosBar(tenantId, periodo),
     resumirMargemBar(tenantId, undefined, { desde: inicio }),
   ])

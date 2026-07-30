@@ -12,7 +12,7 @@ import {
   type StatsTorcidaOnboarding,
 } from '@/lib/onboarding-torcida-stats'
 import { TOOLTIP_ESTIMATIVA_INDISPONIVEL } from '@/lib/format-contagem'
-import { formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida, isDepartamentoLegado } from '@torcida/types'
 import { getAncestorTenantIds, getDescendantTenantIds } from '@/lib/hierarquia'
 
 export type { StatsClubeOnboarding, StatsTorcidaOnboarding }
@@ -412,8 +412,8 @@ async function carregarAfiliacoesParaOnboarding(
 
   const baseRows = unicas.map((afiliacao) => ({
     id: afiliacao.id,
-    nome: afiliacao.nome,
-    apelido: afiliacao.apelido,
+    nome: formatNomeAfiliacao(afiliacao.nome),
+    apelido: afiliacao.apelido ? formatNomeAfiliacao(afiliacao.apelido) : null,
     escudoUrl: afiliacao.escudoUrl,
     cidade: afiliacao.cidade,
     estado: afiliacao.estado,

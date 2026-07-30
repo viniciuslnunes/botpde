@@ -226,6 +226,7 @@ export async function criarOuAtualizarPendenciaEspelhoNaSede(
     aprovadoPorId: null,
     aprovadoPorNome: null,
     aprovadoEm: null,
+    ...REPROVACAO_LIMPA,
   }
 
   const espelho: { id: string } = await tx.saasMembro.upsert({
@@ -272,6 +273,8 @@ export async function sincronizarStatusEspelhoDaOrigem(
     aprovadoPorNome: string | null
     aprovadoEm: Date | null
     desligadoMotivo?: string | null
+    /** Só em REPROVADO: espelha a justificativa e as etapas apontadas. */
+    reprovacao?: DadosReprovacaoEspelho | null
   },
 ): Promise<string | null> {
   const espelho: { id: string } | null = await tx.saasMembro.findUnique({
@@ -287,6 +290,9 @@ export async function sincronizarStatusEspelhoDaOrigem(
       aprovadoPorId: opts.aprovadoPorId,
       aprovadoPorNome: opts.aprovadoPorNome,
       aprovadoEm: opts.aprovadoEm,
+      ...(opts.status === 'REPROVADO' && opts.reprovacao
+        ? opts.reprovacao
+        : REPROVACAO_LIMPA),
       ...(opts.status === 'PENDENTE'
         ? {
             desligadoEm: null,
@@ -299,6 +305,39 @@ export async function sincronizarStatusEspelhoDaOrigem(
     },
   })
   return espelho.id
+}
+
+export type DadosReprovacaoEspelho = {
+  reprovadoEm: Date
+  reprovadoPorId: string
+  reprovadoPorNome: string
+  reprovadoCategoria: string
+  reprovadoMotivo: string
+  reprovadoPontos: string[]
+  reprovadoPermiteReenvio: boolean
+}
+
+/**
+ * Zera o rastro de reprovação. Sair de REPROVADO (aprovação, reversão ou
+ * reenvio do solicitante) precisa apagar o motivo — senão o card continua
+ * pintando de vermelho etapas já corrigidas.
+ */
+export const REPROVACAO_LIMPA: {
+  reprovadoEm: null
+  reprovadoPorId: null
+  reprovadoPorNome: null
+  reprovadoCategoria: null
+  reprovadoMotivo: null
+  reprovadoPontos: string[]
+  reprovadoPermiteReenvio: boolean
+} = {
+  reprovadoEm: null,
+  reprovadoPorId: null,
+  reprovadoPorNome: null,
+  reprovadoCategoria: null,
+  reprovadoMotivo: null,
+  reprovadoPontos: [],
+  reprovadoPermiteReenvio: true,
 }
 
 /** Confirma que o tenant da origem é afiliado (descendente) da sede atual. */
@@ -559,6 +598,7 @@ export async function sincronizarSocioNaSedeRaiz(
     aprovadoPorId: aprovadoPorUserId,
     aprovadoPorNome,
     aprovadoEm: agora,
+    ...REPROVACAO_LIMPA,
   }
 
   const espelho: { id: string } = await tx.saasMembro.upsert({

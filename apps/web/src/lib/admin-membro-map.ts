@@ -1,6 +1,9 @@
 import { statusBadgeLabel } from '@/components/admin/ui'
-import type { AdminMembroItem } from '@/app/admin/membros/admin-membro-item'
-import { formatRg } from '@torcida/types'
+import type {
+  AdminMembroItem,
+  MembroReprovacaoDetalhe,
+} from '@/app/admin/membros/admin-membro-item'
+import { formatRg, labelCategoriaReprovacao } from '@torcida/types'
 
 const TIPO_BADGE: Record<string, string> = {
   SOCIO: 'Sócio',
@@ -62,6 +65,12 @@ export const membroDetalheSelect = {
   adimplente: true,
   aprovadoPorNome: true,
   aprovadoEm: true,
+  reprovadoEm: true,
+  reprovadoPorNome: true,
+  reprovadoCategoria: true,
+  reprovadoMotivo: true,
+  reprovadoPontos: true,
+  reprovadoPermiteReenvio: true,
   desligadoEm: true,
   desligadoMotivo: true,
   criadoEm: true,
@@ -112,6 +121,12 @@ export type MembroDetalheRow = {
   adimplente: boolean
   aprovadoPorNome: string | null
   aprovadoEm: Date | null
+  reprovadoEm: Date | null
+  reprovadoPorNome: string | null
+  reprovadoCategoria: string | null
+  reprovadoMotivo: string | null
+  reprovadoPontos: string[]
+  reprovadoPermiteReenvio: boolean
   desligadoEm: Date | null
   desligadoMotivo: string | null
   criadoEm: Date
@@ -134,6 +149,20 @@ export function mapToAdminMembroItem(
   },
 ): AdminMembroItem {
   const isSocio = membro.tipo === 'SOCIO'
+  // Só existe reprovação "viva" enquanto o cadastro está REPROVADO — aprovar,
+  // reverter ou reenviar limpa os campos no banco, e o card deixa de pintar.
+  const reprovacao: MembroReprovacaoDetalhe | null =
+    membro.status === 'REPROVADO' && membro.reprovadoMotivo
+      ? {
+          motivo: membro.reprovadoMotivo,
+          categoriaId: membro.reprovadoCategoria,
+          categoriaLabel: labelCategoriaReprovacao(membro.reprovadoCategoria),
+          pontos: membro.reprovadoPontos ?? [],
+          emLabel: formatDataLabelAdmin(membro.reprovadoEm),
+          porNome: membro.reprovadoPorNome,
+          permiteReenvio: membro.reprovadoPermiteReenvio,
+        }
+      : null
   return {
     id: membro.id,
     nome: membro.nome,
@@ -187,6 +216,7 @@ export function mapToAdminMembroItem(
     aprovadoEmLabel: formatDataLabelAdmin(membro.aprovadoEm),
     desligadoEmLabel: formatDataLabelAdmin(membro.desligadoEm),
     desligadoMotivo: membro.desligadoMotivo,
+    reprovacao,
     alertaRivalSocio: opts?.alertaRivalSocio,
     reprovacoesOutraTorcida: opts?.reprovacoesOutraTorcida,
     tentativas: opts?.tentativas,

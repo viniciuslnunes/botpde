@@ -7,7 +7,7 @@ import { PERMISSIONS } from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { AdminPageHeader } from '@/components/admin/ui'
 import { buildAdminHref } from '@/lib/admin-href'
-import { PERIODO_LABEL, PERIODOS, type Periodo } from '@/lib/admin-insights'
+import { PERIODO_LABEL, PERIODO_PADRAO, PERIODOS, type Periodo } from '@/lib/admin-insights'
 import { AssociacaoSection } from './sections/associacao-section'
 import { BarSection } from './sections/bar-section'
 import { ComunidadeSection } from './sections/comunidade-section'
@@ -42,7 +42,8 @@ export default async function RelatoriosPage({ searchParams }: Props) {
   }
 
   const sp = await searchParams
-  const periodo: Periodo = sp.periodo === '90d' || sp.periodo === '12m' ? sp.periodo : '30d'
+  const periodo: Periodo =
+    sp.periodo === '30d' || sp.periodo === '12m' ? sp.periodo : PERIODO_PADRAO
 
   return (
     <div className="flex min-h-full flex-col">
@@ -60,7 +61,7 @@ export default async function RelatoriosPage({ searchParams }: Props) {
               <Link
                 key={p}
                 href={buildAdminHref('/admin/relatorios', {
-                  periodo: p === '30d' ? undefined : p,
+                  periodo: p === PERIODO_PADRAO ? undefined : p,
                 })}
                 aria-current={ativo ? 'page' : undefined}
                 className={[

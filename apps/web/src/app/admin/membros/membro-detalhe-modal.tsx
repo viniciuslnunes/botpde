@@ -12,7 +12,9 @@ import {
   ImageOff,
   TriangleAlert,
   X,
+  XCircle,
 } from 'lucide-react'
+import { labelPontoReprovacao, PONTOS_REPROVACAO } from '@torcida/types'
 import { canOptimizeImageUrl } from '@/lib/optimizable-image'
 import { StatusBadge } from '@/components/admin/ui'
 import { MemberActions } from '@/components/admin/member-actions'
@@ -22,22 +24,64 @@ import {
   springGentle,
   springSnappy,
 } from '@/lib/motion-presets'
+import { TabHistorico } from './membro-historico-tab'
 import type { AdminMembroItem } from './admin-membro-item'
 
-type TabId = 'resumo' | 'cadastro' | 'documentos' | 'associacao' | 'operacao'
+type TabId =
+  | 'resumo'
+  | 'reprovacao'
+  | 'cadastro'
+  | 'documentos'
+  | 'associacao'
+  | 'operacao'
+  | 'historico'
 
-function Campo({ label, value }: { label: string; value: ReactNode }) {
+/** Aba onde cada ponto do catálogo é exibido — usada para o badge vermelho. */
+const TAB_DO_PONTO: Record<string, string> = Object.fromEntries(
+  (PONTOS_REPROVACAO as { id: string; tab: string }[]).map((p) => [p.id, p.tab]),
+)
+
+function Campo({
+  label,
+  value,
+  reprovado,
+}: {
+  label: string
+  value: ReactNode
+  /** Ponto apontado na reprovação: rótulo e valor destacados em vermelho. */
+  reprovado?: boolean
+}) {
   const vazio =
     value === null ||
     value === undefined ||
     value === '' ||
     (typeof value === 'string' && value.trim() === '')
   return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+    <div
+      className={
+        reprovado
+          ? 'min-w-0 rounded-lg border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/50'
+          : 'min-w-0'
+      }
+    >
+      <dt
+        className={[
+          'flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide',
+          reprovado
+            ? 'text-red-700 dark:text-red-300'
+            : 'text-[rgb(var(--foreground-muted))]',
+        ].join(' ')}
+      >
+        {reprovado && <XCircle className="h-3 w-3 shrink-0" aria-hidden />}
         {label}
+        {reprovado && <span className="sr-only">— apontado na reprovação</span>}
       </dt>
-      <dd className="mt-0.5 break-words text-sm text-[rgb(var(--foreground))]">
+      <dd
+        className={[
+          'mt-0.5 break-words text-sm',
+          reprovado ? 'text-red-900 dark:text-red-100' : 'text-[rgb(var(--foreground))]',
+        ].join(' ')}
+      >
         {vazio ? (
           <span className="text-[rgb(var(--foreground-muted))]">—</span>
         ) : (
@@ -127,7 +171,19 @@ function preenchido(v: unknown): boolean {
   return true
 }
 
-type CheckItem = { id: string; label: string; ok: boolean; obrigatorio: boolean }
+type CheckItem = {
+  id: string
+  label: string
+  ok: boolean
+  obrigatorio: boolean
+  /** Apontado como errado na reprovação — vence o `ok` na hora de renderizar. */
+  reprovado?: boolean
+}
+
+function marcarReprovados(itens: CheckItem[], reprovados: Set<string>): CheckItem[] {
+  if (reprovados.size === 0) return itens
+  return itens.map((i) => (reprovados.has(i.id) ? { ...i, reprovado: true } : i))
+}
 
 function checklistCadastro(m: AdminMembroItem): CheckItem[] {
   if (!m.isSocio) return []
@@ -136,7 +192,12 @@ function checklistCadastro(m: AdminMembroItem): CheckItem[] {
     preenchido(m.responsavelNome) ||
     preenchido(m.autorizacaoMenorAceitaLabel)
   return [
-    { id: 'numero', label: 'Nº de associado', ok: preenchido(m.numeroAssociado), obrigatorio: true },
+    {
+      id: 'numeroAssociado',
+      label: 'Nº de associado',
+      ok: preenchido(m.numeroAssociado),
+      obrigatorio: true,
+    },
     { id: 'cpf', label: 'CPF', ok: preenchido(m.cpf), obrigatorio: true },
     { id: 'rg', label: 'RG', ok: preenchido(m.rg), obrigatorio: true },
     {
@@ -184,7 +245,7 @@ function checklistDocumentos(m: AdminMembroItem): CheckItem[] {
   if (!m.isSocio) return []
   return [
     {
-      id: 'vinculo',
+      id: 'prova',
       label: 'Comprovante de vínculo',
       ok: preenchido(m.imagemProva),
       obrigatorio: true,
@@ -204,27 +265,41 @@ function checklistDocumentos(m: AdminMembroItem): CheckItem[] {
   ]
 }
 
-function Checklist({ itens }: { itens: CheckItem[] }) {
+function Checklist({ itens, titulo }: { itens: CheckItem[]; titulo?: string }) {
   if (itens.length === 0) return null
   const faltando = itens.filter((i) => i.obrigatorio && !i.ok)
+  const reprovados = itens.filter((i) => i.reprovado)
   return (
     <div className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle)_/_0.55)] p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Completude do cadastro
+          {titulo ?? 'Completude do cadastro'}
         </p>
         <p className="text-xs text-[rgb(var(--foreground-muted))]">
           {itens.filter((i) => i.ok).length}/{itens.length}
           {faltando.length > 0 ? ` · ${faltando.length} obrigatório(s) faltando` : ' · completo'}
+          {reprovados.length > 0 ? (
+            <span className="font-medium text-red-600 dark:text-red-400">
+              {' '}
+              · {reprovados.length} reprovado(s)
+            </span>
+          ) : null}
         </p>
       </div>
       <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {itens.map((item) => (
           <li
             key={item.id}
-            className="flex items-start gap-2 text-sm text-[rgb(var(--foreground))]"
+            className={[
+              'flex items-start gap-2 rounded-md text-sm',
+              item.reprovado
+                ? 'bg-red-50 px-1.5 py-0.5 font-medium text-red-800 dark:bg-red-950/60 dark:text-red-200'
+                : 'text-[rgb(var(--foreground))]',
+            ].join(' ')}
           >
-            {item.ok ? (
+            {item.reprovado ? (
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            ) : item.ok ? (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--color-success-fg))]" />
             ) : (
               <Circle
@@ -236,9 +311,15 @@ function Checklist({ itens }: { itens: CheckItem[] }) {
                 ].join(' ')}
               />
             )}
-            <span className={item.ok ? '' : 'text-[rgb(var(--foreground-muted))]'}>
+            <span
+              className={
+                item.reprovado ? '' : item.ok ? '' : 'text-[rgb(var(--foreground-muted))]'
+              }
+            >
               {item.label}
-              {!item.obrigatorio && !item.ok ? (
+              {item.reprovado ? (
+                <span className="text-[11px] font-normal"> · reprovado</span>
+              ) : !item.obrigatorio && !item.ok ? (
                 <span className="text-[11px]"> · opcional</span>
               ) : null}
             </span>
@@ -258,6 +339,97 @@ function EmptyTab({ titulo, descricao }: { titulo: string; descricao: string }) 
   )
 }
 
+function TabReprovacao({
+  membro,
+  onGo,
+}: {
+  membro: AdminMembroItem
+  onGo: (tab: TabId) => void
+}) {
+  const rep = membro.reprovacao
+  if (!rep) {
+    const legado = membro.status === 'REPROVADO'
+    return (
+      <EmptyTab
+        titulo={legado ? 'Reprovação sem laudo' : 'Sem reprovação registrada'}
+        descricao={
+          legado
+            ? membro.ultimoMotivoReprovacao
+              ? `Reprovação anterior à justificativa obrigatória. Motivo registrado na época: “${membro.ultimoMotivoReprovacao}”. Reverta para pendente e analise de novo para gerar o laudo completo.`
+              : 'Esta solicitação foi reprovada antes da justificativa passar a ser obrigatória, então não há laudo. Reverta para pendente e analise de novo para registrar o motivo.'
+            : 'Esta aba aparece quando a solicitação é reprovada com justificativa.'
+        }
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/50">
+        <div className="flex items-start gap-2.5">
+          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+              {rep.categoriaLabel ?? 'Solicitação reprovada'}
+            </p>
+            <p className="whitespace-pre-line break-words text-sm text-red-900 dark:text-red-100">
+              {rep.motivo}
+            </p>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Reprovado por {rep.porNome ?? 'administrador'}
+              {rep.emLabel ? ` em ${rep.emLabel}` : ''}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <section className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Etapas apontadas
+        </h3>
+        {rep.pontos.length === 0 ? (
+          <p className="text-sm text-[rgb(var(--foreground-muted))]">
+            Nenhum campo específico foi apontado — a recusa é sobre a solicitação como um
+            todo.
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {rep.pontos.map((ponto) => (
+              <li key={ponto}>
+                <button
+                  type="button"
+                  onClick={() => onGo((TAB_DO_PONTO[ponto] ?? 'cadastro') as TabId)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 transition-colors hover:bg-red-200 dark:bg-red-950 dark:text-red-200 dark:hover:bg-red-900"
+                >
+                  <XCircle className="h-3.5 w-3.5 shrink-0" />
+                  {labelPontoReprovacao(ponto)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Secao titulo="Consequência">
+        <Campo
+          label="Reenvio pelo associado"
+          value={
+            rep.permiteReenvio
+              ? 'Liberado — pode corrigir e voltar à fila'
+              : 'Bloqueado — só volta à fila se um admin reverter'
+          }
+        />
+        <Campo label="Notificação enviada" value="Sim, com a justificativa acima" />
+      </Secao>
+
+      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+        Para liberar uma nova análise sem esperar o reenvio, use <strong>Reverter</strong> no
+        rodapé — isso apaga este registro de reprovação e devolve o cadastro à fila.
+      </p>
+    </div>
+  )
+}
+
 function TabResumo({
   membro,
   checks,
@@ -270,8 +442,35 @@ function TabResumo({
   onGo: (tab: TabId) => void
 }) {
   const obrigFaltando = checks.filter((c) => c.obrigatorio && !c.ok)
+  const rep = membro.reprovacao
   return (
     <div className="space-y-5">
+      {rep && (
+        <button
+          type="button"
+          onClick={() => onGo('reprovacao')}
+          className="w-full rounded-xl border border-red-300 bg-red-50 p-3 text-left transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:hover:bg-red-950"
+        >
+          <span className="flex items-start gap-2">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-red-900 dark:text-red-100">
+                Reprovado — {rep.categoriaLabel ?? 'ver detalhes'}
+              </span>
+              <span className="mt-0.5 line-clamp-2 block text-xs text-red-800 dark:text-red-200">
+                {rep.motivo}
+              </span>
+              {rep.pontos.length > 0 && (
+                <span className="mt-1 block text-xs font-medium text-red-700 dark:text-red-300">
+                  {rep.pontos.length} etapa(s) apontada(s) ·{' '}
+                  {rep.pontos.map((p) => labelPontoReprovacao(p)).join(', ')}
+                </span>
+              )}
+            </span>
+          </span>
+        </button>
+      )}
+
       {(membro.alertaRivalSocio ||
         !!membro.reprovacoesOutraTorcida ||
         (membro.tentativas !== undefined && membro.tentativas > 1) ||
@@ -370,17 +569,21 @@ function TabResumo({
   )
 }
 
-function TabCadastro({ membro }: { membro: AdminMembroItem }) {
+function TabCadastro({ membro, rep }: { membro: AdminMembroItem; rep: Set<string> }) {
   return (
     <div className="space-y-6">
       <Secao titulo="Contato e identificação">
-        <Campo label="Nome" value={membro.nome} />
-        <Campo label="E-mail" value={membro.email} />
-        <Campo label="Telefone" value={membro.telefone} />
+        <Campo label="Nome" value={membro.nome} reprovado={rep.has('nome')} />
+        <Campo label="E-mail" value={membro.email} reprovado={rep.has('email')} />
+        <Campo label="Telefone" value={membro.telefone} reprovado={rep.has('telefone')} />
         <Campo label="Idade" value={membro.idade} />
         {membro.isSocio && (
           <>
-            <Campo label="Data de nascimento" value={membro.dataNascimentoLabel} />
+            <Campo
+              label="Data de nascimento"
+              value={membro.dataNascimentoLabel}
+              reprovado={rep.has('nascimento')}
+            />
             <Campo label="Sexo" value={membro.sexo} />
             <Campo label="Estado civil" value={membro.estadoCivil} />
             <Campo label="Nacionalidade" value={membro.nacionalidade} />
@@ -393,30 +596,44 @@ function TabCadastro({ membro }: { membro: AdminMembroItem }) {
       {membro.isSocio ? (
         <>
           <Secao titulo="Documentos (LGE)">
-            <Campo label="CPF" value={membro.cpf} />
-            <Campo label="RG" value={membro.rg} />
-            <Campo label="Filiação" value={membro.filiacao} />
+            <Campo label="CPF" value={membro.cpf} reprovado={rep.has('cpf')} />
+            <Campo label="RG" value={membro.rg} reprovado={rep.has('rg')} />
+            <Campo label="Filiação" value={membro.filiacao} reprovado={rep.has('filiacao')} />
             <Campo label="Profissão" value={membro.profissao} />
             <Campo label="Escolaridade" value={membro.escolaridade} />
           </Secao>
 
           <Secao titulo="Endereço">
-            <Campo label="Logradouro" value={membro.logradouro} />
-            <Campo label="Número" value={membro.numero} />
+            <Campo
+              label="Logradouro"
+              value={membro.logradouro}
+              reprovado={rep.has('logradouro')}
+            />
+            <Campo label="Número" value={membro.numero} reprovado={rep.has('numero')} />
             <Campo label="Bloco" value={membro.bloco} />
             <Campo label="Complemento" value={membro.complemento} />
-            <Campo label="Bairro" value={membro.bairro} />
-            <Campo label="CEP" value={membro.cep} />
-            <Campo label="Cidade" value={membro.cidade} />
-            <Campo label="UF" value={membro.uf} />
+            <Campo label="Bairro" value={membro.bairro} reprovado={rep.has('bairro')} />
+            <Campo label="CEP" value={membro.cep} reprovado={rep.has('cep')} />
+            <Campo label="Cidade" value={membro.cidade} reprovado={rep.has('cidade')} />
+            <Campo label="UF" value={membro.uf} reprovado={rep.has('uf')} />
           </Secao>
 
           {(membro.responsavelNome ||
             membro.responsavelDocumento ||
-            membro.autorizacaoMenorAceitaLabel) && (
+            membro.autorizacaoMenorAceitaLabel ||
+            rep.has('resp-nome') ||
+            rep.has('resp-doc')) && (
             <Secao titulo="Responsável legal (menor de idade)">
-              <Campo label="Nome do responsável" value={membro.responsavelNome} />
-              <Campo label="Documento do responsável" value={membro.responsavelDocumento} />
+              <Campo
+                label="Nome do responsável"
+                value={membro.responsavelNome}
+                reprovado={rep.has('resp-nome')}
+              />
+              <Campo
+                label="Documento do responsável"
+                value={membro.responsavelDocumento}
+                reprovado={rep.has('resp-doc')}
+              />
               <Campo label="Autorização aceita em" value={membro.autorizacaoMenorAceitaLabel} />
             </Secao>
           )}
@@ -489,7 +706,7 @@ function TabDocumentos({
   )
 }
 
-function TabAssociacao({ membro }: { membro: AdminMembroItem }) {
+function TabAssociacao({ membro, rep }: { membro: AdminMembroItem; rep: Set<string> }) {
   if (!membro.isSocio) {
     return (
       <EmptyTab
@@ -501,7 +718,11 @@ function TabAssociacao({ membro }: { membro: AdminMembroItem }) {
   return (
     <div className="space-y-6">
       <Secao titulo="Associação">
-        <Campo label="Nº de associado" value={membro.numeroAssociado} />
+        <Campo
+          label="Nº de associado"
+          value={membro.numeroAssociado}
+          reprovado={rep.has('numeroAssociado')}
+        />
         <Campo
           label="Anos como sócio"
           value={
@@ -527,13 +748,14 @@ function TabAssociacao({ membro }: { membro: AdminMembroItem }) {
               ? `Aceito em ${membro.termoResponsabilidadeAceitoLabel}`
               : null
           }
+          reprovado={rep.has('termo')}
         />
       </Secao>
       <p className="text-xs text-[rgb(var(--foreground-muted))]">
         Plano, cobranças e validade da carteirinha entram nesta aba na próxima iteração.
         Por enquanto use{' '}
         <Link
-          href="/admin/cobrancas"
+          href="/admin/financeiro/cobrancas"
           className="font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
         >
           Cobranças
@@ -551,12 +773,16 @@ function TabAssociacao({ membro }: { membro: AdminMembroItem }) {
   )
 }
 
-function TabOperacao({ membro }: { membro: AdminMembroItem }) {
+function TabOperacao({ membro, rep }: { membro: AdminMembroItem; rep: Set<string> }) {
   return (
     <div className="space-y-6">
       <Secao titulo="Vínculo na torcida">
-        <Campo label="Unidade" value={membro.sedeNome} />
-        <Campo label="Departamento pretendido" value={membro.departamentoNome} />
+        <Campo label="Unidade" value={membro.sedeNome} reprovado={rep.has('unidade')} />
+        <Campo
+          label="Departamento pretendido"
+          value={membro.departamentoNome}
+          reprovado={rep.has('departamento')}
+        />
         <Campo
           label="Espelho"
           value={
@@ -588,7 +814,10 @@ function TabOperacao({ membro }: { membro: AdminMembroItem }) {
           label="Tentativas de cadastro"
           value={membro.tentativas != null ? String(membro.tentativas) : null}
         />
-        <Campo label="Último motivo de reprovação" value={membro.ultimoMotivoReprovacao} />
+        <Campo
+          label="Último motivo de reprovação"
+          value={membro.reprovacao?.motivo ?? membro.ultimoMotivoReprovacao}
+        />
       </Secao>
     </div>
   )
@@ -603,10 +832,17 @@ export function MembroDetalheModal({
 }) {
   const [tab, setTab] = useState<TabId>('resumo')
 
-  useEffect(() => {
-    if (!membro) return
-    setTab('resumo')
-  }, [membro?.id])
+  // Estado derivado de props (padrão do React: ajuste durante o render, não em
+  // efeito). Trocar de membro volta ao Resumo; uma reprovação que acabou de
+  // acontecer com o card aberto leva direto ao laudo.
+  const temReprovacao = !!membro?.reprovacao
+  const [contexto, setContexto] = useState({ id: membro?.id, temReprovacao })
+  if (contexto.id !== membro?.id || contexto.temReprovacao !== temReprovacao) {
+    const trocouMembro = contexto.id !== membro?.id
+    setContexto({ id: membro?.id, temReprovacao })
+    if (!trocouMembro && temReprovacao) setTab('reprovacao')
+    else if (trocouMembro) setTab('resumo')
+  }
 
   useEffect(() => {
     if (!membro) return
@@ -622,35 +858,55 @@ export function MembroDetalheModal({
     }
   }, [membro, onClose])
 
-  const checks = membro ? checklistCadastro(membro) : []
-  const docs = membro ? checklistDocumentos(membro) : []
+  const pontosReprovados = new Set(membro?.reprovacao?.pontos ?? [])
+  const checks = membro ? marcarReprovados(checklistCadastro(membro), pontosReprovados) : []
+  const docs = membro ? marcarReprovados(checklistDocumentos(membro), pontosReprovados) : []
   const docsPendentes = docs.filter((d) => !d.ok).length
   const cadastroPendente = checks.filter((c) => c.obrigatorio && !c.ok).length
+  const reprovadosNaTab = (alvo: TabId) =>
+    [...pontosReprovados].filter((p) => TAB_DO_PONTO[p] === alvo).length
 
   const tabs: {
     id: TabId
     label: string
     badge?: number
+    /** Badge de reprovação (vermelho) tem prioridade sobre o de pendência. */
+    badgeReprovado?: number
     hide?: boolean
   }[] = [
     { id: 'resumo', label: 'Resumo' },
     {
+      id: 'reprovacao',
+      label: 'Reprovação',
+      // Reprovados antigos (antes da justificativa obrigatória) não têm laudo;
+      // a aba continua visível para explicar a ausência em vez de sumir.
+      hide: !membro?.reprovacao && membro?.status !== 'REPROVADO',
+    },
+    {
       id: 'cadastro',
       label: 'Cadastro',
       badge: membro?.isSocio && cadastroPendente > 0 ? cadastroPendente : undefined,
+      badgeReprovado: reprovadosNaTab('cadastro') || undefined,
     },
     {
       id: 'documentos',
       label: 'Documentos',
       badge: membro?.isSocio && docsPendentes > 0 ? docsPendentes : undefined,
+      badgeReprovado: reprovadosNaTab('documentos') || undefined,
       hide: membro ? !membro.isSocio : false,
     },
     {
       id: 'associacao',
       label: 'Associação',
+      badgeReprovado: reprovadosNaTab('associacao') || undefined,
       hide: membro ? !membro.isSocio : false,
     },
-    { id: 'operacao', label: 'Operação' },
+    {
+      id: 'operacao',
+      label: 'Operação',
+      badgeReprovado: reprovadosNaTab('operacao') || undefined,
+    },
+    { id: 'historico', label: 'Histórico' },
   ]
 
   return (
@@ -676,7 +932,7 @@ export function MembroDetalheModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`membro-detalhe-titulo-${membro.id}`}
-            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
+            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Cabeçalho sticky */}
@@ -754,7 +1010,7 @@ export function MembroDetalheModal({
               </div>
 
               <div
-                className="app-scrollbar-none flex gap-1 overflow-x-auto px-4 pb-3 sm:px-5"
+                className="app-scrollbar-none flex gap-1 overflow-x-auto px-4 pb-3 sm:flex-wrap sm:overflow-x-visible sm:px-5"
                 role="tablist"
                 aria-label="Seções do cadastro"
               >
@@ -762,6 +1018,7 @@ export function MembroDetalheModal({
                   .filter((t) => !t.hide)
                   .map((item) => {
                     const active = tab === item.id
+                    const critica = item.id === 'reprovacao' || !!item.badgeReprovado
                     return (
                       <m.button
                         key={item.id}
@@ -772,14 +1029,25 @@ export function MembroDetalheModal({
                         transition={springSnappy}
                         onClick={() => setTab(item.id)}
                         className={[
-                          'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                          'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors',
                           active
-                            ? 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
-                            : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
+                            ? critica
+                              ? 'bg-red-100 font-semibold text-red-800 ring-1 ring-inset ring-red-400 dark:bg-red-950 dark:text-red-200 dark:ring-red-800'
+                              : 'bg-[rgb(var(--color-primary)_/_0.14)] font-semibold text-[rgb(var(--color-primary-fg))] ring-1 ring-inset ring-[rgb(var(--color-primary)_/_0.4)]'
+                            : critica
+                              ? 'font-semibold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/60'
+                              : 'font-medium text-[rgb(var(--foreground-muted))] hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]',
                         ].join(' ')}
                       >
+                        {item.id === 'reprovacao' && (
+                          <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )}
                         {item.label}
-                        {item.badge != null && item.badge > 0 && (
+                        {item.badgeReprovado ? (
+                          <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                            {item.badgeReprovado}
+                          </span>
+                        ) : item.badge != null && item.badge > 0 ? (
                           <span
                             className={[
                               'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
@@ -790,7 +1058,7 @@ export function MembroDetalheModal({
                           >
                             {item.badge}
                           </span>
-                        )}
+                        ) : null}
                       </m.button>
                     )
                   })}
@@ -807,10 +1075,12 @@ export function MembroDetalheModal({
                   onGo={setTab}
                 />
               )}
-              {tab === 'cadastro' && <TabCadastro membro={membro} />}
+              {tab === 'reprovacao' && <TabReprovacao membro={membro} onGo={setTab} />}
+              {tab === 'cadastro' && <TabCadastro membro={membro} rep={pontosReprovados} />}
               {tab === 'documentos' && <TabDocumentos membro={membro} docs={docs} />}
-              {tab === 'associacao' && <TabAssociacao membro={membro} />}
-              {tab === 'operacao' && <TabOperacao membro={membro} />}
+              {tab === 'associacao' && <TabAssociacao membro={membro} rep={pontosReprovados} />}
+              {tab === 'operacao' && <TabOperacao membro={membro} rep={pontosReprovados} />}
+              {tab === 'historico' && <TabHistorico key={membro.id} membroId={membro.id} />}
             </div>
 
             {/* Rodapé */}
@@ -830,6 +1100,13 @@ export function MembroDetalheModal({
                 aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
                 aprovadoPorNome={membro.aprovadoPorNome}
                 aprovadoEmLabel={membro.aprovadoEmLabel}
+                nomeMembro={membro.nome}
+                isSocio={membro.isSocio}
+                pontosIncompletos={[
+                  ...new Set(
+                    [...checks, ...docs].filter((c) => c.obrigatorio && !c.ok).map((c) => c.id),
+                  ),
+                ]}
               />
             </div>
           </m.div>

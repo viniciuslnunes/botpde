@@ -39,7 +39,8 @@ function inicial(nome: string | null): string {
 export function Avatar({ nome, avatarUrl, size = 'md', className, fit = 'cover' }: AvatarProps) {
   const base = `inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold ${SIZES[size]}`
   const px = PIXELS[size]
-  const objectFit = fit === 'contain' ? 'object-contain bg-[rgb(var(--background-subtle))]' : 'object-cover'
+  // contain (logos PNG): sem fundo — transparência deve aparecer como no header.
+  const objectFit = fit === 'contain' ? 'object-contain' : 'object-cover'
   // Não pedir anexo Discord expirado — cai na inicial sem 404 no console.
   const src = durableImageUrl(avatarUrl)
 

@@ -36,7 +36,7 @@ export async function AssociacaoSection({ tenantId }: { tenantId: string }) {
             value={formatarMoedaBRL(inadimplencia.mrrAtual)}
             tone="success"
             delta={{ atual: inadimplencia.mrrAtual, anterior: inadimplencia.mrrAnterior }}
-            href="/admin/cobrancas"
+            href="/admin/financeiro/cobrancas"
           />
           <StatCard
             label="Valor em atraso"
@@ -50,13 +50,13 @@ export async function AssociacaoSection({ tenantId }: { tenantId: string }) {
                 : undefined
             }
             badgeTone="danger"
-            href="/admin/cobrancas?status=VENCIDA"
+            href="/admin/financeiro/cobrancas?status=VENCIDA"
           />
           <StatCard
             label="Cobranças em atraso"
             value={inadimplencia.quantidadeEmAtraso}
             tone={inadimplencia.quantidadeEmAtraso > 0 ? 'warning' : 'default'}
-            href="/admin/cobrancas?status=VENCIDA"
+            href="/admin/financeiro/cobrancas?status=VENCIDA"
           />
 
           {inadimplencia.valorEmAtraso > 0 ? (

@@ -1,4 +1,5 @@
 import { db } from '@torcida/db'
+import { formatNomeAfiliacao } from '@torcida/types'
 import { getActiveTenant } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -53,7 +54,9 @@ export default async function ConfiguracoesPage({
     db.afiliacao.findMany({
       orderBy: { nome: 'asc' },
       select: { id: true, nome: true },
-    }),
+    }).then((rows: AfiliacaoOption[]) =>
+      rows.map((a: AfiliacaoOption) => ({ id: a.id, nome: formatNomeAfiliacao(a.nome) })),
+    ),
   ])
 
   const sections = [

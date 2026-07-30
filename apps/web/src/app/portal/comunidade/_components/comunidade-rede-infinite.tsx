@@ -6,6 +6,8 @@ import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
+import { FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
+import { FeedLoadMore } from './feed-load-more'
 import { Users } from 'lucide-react'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
@@ -50,6 +52,7 @@ export function ComunidadeRedeInfinite({
     posts,
     pageInfo,
     loadingMore,
+    loadingInicial,
     error,
     loadMore,
     refreshCurrentPage,
@@ -63,7 +66,8 @@ export function ComunidadeRedeInfinite({
     initialCursor,
   })
 
-  const windowing = useFeedWindow(posts.length)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const windowing = useFeedWindow(posts.length, { listRef })
 
   const refreshDebounceRef = useRef<number | null>(null)
 
@@ -95,6 +99,19 @@ export function ComunidadeRedeInfinite({
     return () => window.removeEventListener(COMUNIDADE_POST_EXCLUIDO_EVENT, onPostExcluido)
   }, [removePost])
 
+  // Mesma marcação nos dois modos (só muda o posicionamento) — as alturas
+  // medidas em fluxo normal continuam válidas quando a virtualização liga.
+  const renderizaveis = useMemo(
+    () =>
+      windowing.enabled && windowing.virtualItems
+        ? windowing.virtualItems.map((item) => ({
+            index: item.index,
+            offset: item.start - windowing.scrollMargin,
+          }))
+        : posts.map((_, index) => ({ index, offset: null })),
+    [posts, windowing.enabled, windowing.virtualItems, windowing.scrollMargin],
+  )
+
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -114,44 +131,51 @@ export function ComunidadeRedeInfinite({
     return () => obs.disconnect()
   }, [loadMoreWithDeeplink])
 
-  if (posts.length === 0) {
-    return (
-      <MotionEmptyState
-        icon={<Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
-        title="Sua rede ainda está vazia"
-        description={
-          <>
-            Siga outros membros ou publique algo para ver atividade aqui.{' '}
-            <Link
-              href="/portal/comunidade/busca"
-              className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
-            >
-              Buscar membros
-            </Link>
-          </>
-        }
-      />
-    )
-  }
-
+  // Um único retorno: o rodapé é dono da sentinela do observer e precisa ficar
+  // montado em todos os estados, senão a paginação não volta depois do vazio.
   return (
     <>
-      <section className="space-y-4">
-        {windowing.enabled && windowing.virtualItems ? (
-          <div className="relative w-full" style={{ height: windowing.totalSize }}>
-            {windowing.virtualItems.map((item) => {
-              const post = posts[item.index]
+      <section>
+        {posts.length === 0 && loadingInicial ? (
+          <div role="status" aria-live="polite" aria-busy>
+            <span className="sr-only">Carregando a atividade da sua rede…</span>
+            <FeedPostSkeletonList count={3} label="Carregando sua rede…" />
+          </div>
+        ) : posts.length === 0 && !error ? (
+          <MotionEmptyState
+            icon={<Users className="mb-3 h-9 w-9 text-[rgb(var(--foreground-muted))]" />}
+            title="Sua rede ainda está vazia"
+            description={
+              <>
+                Siga outros membros ou publique algo para ver atividade aqui.{' '}
+                <Link
+                  href="/portal/comunidade/busca"
+                  className="mt-4 inline-block rounded-full bg-[rgb(var(--primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgb(var(--primary)_/_0.3)] transition-opacity hover:opacity-90"
+                >
+                  Buscar membros
+                </Link>
+              </>
+            }
+          />
+        ) : (
+          <div
+            ref={listRef}
+            className="relative w-full"
+            style={windowing.enabled ? { height: windowing.totalSize } : undefined}
+          >
+            {renderizaveis.map(({ index, offset }) => {
+              const post = posts[index]
               if (!post) return null
               return (
                 <div
                   key={post.id}
-                  data-index={item.index}
+                  data-index={index}
                   ref={windowing.measureElement}
-                  className="absolute left-0 top-0 w-full pb-4"
-                  style={{ transform: `translateY(${item.start}px)` }}
+                  className={offset === null ? 'w-full pb-4' : 'absolute left-0 top-0 w-full pb-4'}
+                  style={offset === null ? undefined : { transform: `translateY(${offset}px)` }}
                 >
-                  <MotionReveal index={item.index}>
-                    <div className="feed-post-window">
+                  <MotionReveal index={index}>
+                    <div className={windowing.postClassName}>
                       <FeedPostCard
                         post={post}
                         currentUser={currentUser}
@@ -168,39 +192,17 @@ export function ComunidadeRedeInfinite({
               )
             })}
           </div>
-        ) : (
-          posts.map((post, index) => (
-            <MotionReveal key={post.id} index={index}>
-              <div className="feed-post-window">
-                <FeedPostCard
-                  post={post}
-                  currentUser={currentUser}
-                  salvo={salvoSet.has(post.id)}
-                  showTenantBadge={deveExibirBadgeTorcidaNoFeed({
-                    postTenantId: post.tenantId,
-                    viewerTenantId: tenantId,
-                    visibilidade: post.visibilidade,
-                  })}
-                />
-              </div>
-            </MotionReveal>
-          ))
         )}
       </section>
 
-      {error && (
-        <div className="pt-3 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          {error}
-        </div>
-      )}
-
-      {pageInfo.hasMore ? (
-        <div ref={sentinelRef} className="flex justify-center pt-2">
-          {loadingMore && (
-            <div className="h-10 w-40 animate-pulse rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-          )}
-        </div>
-      ) : null}
+      <FeedLoadMore
+        sentinelRef={sentinelRef}
+        hasMore={pageInfo.hasMore}
+        loading={loadingMore}
+        error={error}
+        onRetry={() => void loadMoreWithDeeplink()}
+        temConteudo={posts.length > 0}
+      />
     </>
   )
 }

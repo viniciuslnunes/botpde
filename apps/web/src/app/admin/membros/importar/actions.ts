@@ -6,6 +6,7 @@ import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, ImportacaoLoteSchema } from '@torcida/types'
 import { dedupKey, mockSource, type MembroImportInput } from '@/lib/importacao'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
+import { vincularMembroCanaisAposAprovacao } from '@/lib/canais'
 import { z } from 'zod'
 
 /**
@@ -33,6 +34,25 @@ const ImportarMockSchema = z.object({
 /** Erro de linha registrado em ImportacaoMembros.erros (Json). */
 type ErroLinha = { linha: number; motivo: string }
 
+type VinculoAprovado = { linha: number; userId: string; sedeId: string | null }
+
+const CONCORRENCIA_VINCULOS_CANAIS = 8
+
+async function executarComConcorrenciaLimitada<T>(
+  itens: T[],
+  limite: number,
+  executar: (item: T) => Promise<void>,
+): Promise<void> {
+  let proximo = 0
+  const workers = Array.from({ length: Math.min(limite, itens.length) }, async () => {
+    while (proximo < itens.length) {
+      const indice = proximo++
+      await executar(itens[indice])
+    }
+  })
+  await Promise.all(workers)
+}
+
 async function processarLote(
   tenantId: string,
   importacaoId: string,
@@ -41,6 +61,7 @@ async function processarLote(
   let importados = 0
   let duplicados = 0
   const erros: ErroLinha[] = []
+  const vinculosAprovados = new Map<string, VinculoAprovado>()
   // Dedup intra-lote: duas linhas com a mesma identidade no mesmo arquivo
   const vistos = new Set<string>()
 
@@ -73,11 +94,19 @@ async function processarLote(
 
       // Já é membro deste tenant → duplicado (não sobrescreve, só conta)
       if (userId) {
-        const membroExistente: { id: string } | null = await db.saasMembro.findUnique({
+        const membroExistente: { id: string; status: string; sedeId: string | null } | null =
+          await db.saasMembro.findUnique({
           where: { tenantId_userId: { tenantId, userId } },
-          select: { id: true },
+          select: { id: true, status: true, sedeId: true },
         })
         if (membroExistente) {
+          if (membroExistente.status === 'APROVADO') {
+            vinculosAprovados.set(userId, {
+              linha: i + 1,
+              userId,
+              sedeId: membroExistente.sedeId,
+            })
+          }
           duplicados++
           continue
         }
@@ -118,11 +147,35 @@ async function processarLote(
       if (input.tipo === 'SOCIO') {
         await privatizarPerfilAoAprovarSocio(userId, tenantId)
       }
+      vinculosAprovados.set(userId, { linha: i + 1, userId, sedeId: null })
       importados++
     } catch (e) {
       erros.push({ linha: i + 1, motivo: e instanceof Error ? e.message : 'Erro desconhecido' })
     }
   }
+
+  // O lote pode chegar a 500 linhas. Provisionar depois das escritas mantém o
+  // fluxo idempotente e limita pressão no pool; reimportar também cura membros
+  // APROVADOS que já existiam, sem duplicar MembroConversa (helper usa upsert).
+  await executarComConcorrenciaLimitada(
+    [...vinculosAprovados.values()],
+    CONCORRENCIA_VINCULOS_CANAIS,
+    async (vinculo) => {
+      try {
+        await vincularMembroCanaisAposAprovacao({
+          tenantId,
+          userId: vinculo.userId,
+          sedeId: vinculo.sedeId,
+          fallbackCriadoPorId: vinculo.userId,
+        })
+      } catch (error) {
+        erros.push({
+          linha: vinculo.linha,
+          motivo: `Vínculo nos canais oficiais: ${error instanceof Error ? error.message : 'erro desconhecido'}`,
+        })
+      }
+    },
+  )
 
   return { importados, duplicados, erros }
 }

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   bucketPorDia,
+  bucketPorIntervaloMes,
   bucketPorMes,
   bucketSomaPorDia,
   calcularDelta,
   chaveMesSP,
+  resolverIntervaloCustomizado,
+  resolverIntervaloMeses,
   resolverIntervaloPeriodo,
   ultimosMesesSP,
 } from '../admin-insights'
@@ -23,6 +26,34 @@ describe('resolverIntervaloPeriodo', () => {
   it('12m cobre 365 dias', () => {
     const { inicio, fim } = resolverIntervaloPeriodo('12m')
     expect(fim.getTime() - inicio.getTime()).toBe(365 * DIA_MS)
+  })
+})
+
+describe('intervalos mensais dos gráficos', () => {
+  it('3 meses começa no primeiro dia e inclui exatamente três meses calendário', () => {
+    const intervalo = resolverIntervaloMeses(3)
+    const serie = bucketPorIntervaloMes([], intervalo.inicio, intervalo.fim)
+
+    expect(serie).toHaveLength(3)
+    expect(intervalo.fimAnterior.getTime()).toBe(intervalo.inicio.getTime() - 1)
+  })
+
+  it('aceita range customizado e cria buckets históricos inclusivos', () => {
+    const intervalo = resolverIntervaloCustomizado('2026-01-15', '2026-03-10')
+    expect(intervalo).not.toBeNull()
+
+    const serie = bucketPorIntervaloMes(
+      [{ data: new Date('2026-02-20T12:00:00-03:00'), valor: 2 }],
+      intervalo!.inicio,
+      intervalo!.fim,
+    )
+    expect(serie.map((p) => p.rotulo)).toEqual(['jan/26', 'fev/26', 'mar/26'])
+    expect(serie.map((p) => p.valor)).toEqual([0, 2, 0])
+  })
+
+  it('rejeita datas inexistentes e ranges invertidos', () => {
+    expect(resolverIntervaloCustomizado('2026-02-30', '2026-03-10')).toBeNull()
+    expect(resolverIntervaloCustomizado('2026-04-01', '2026-03-10')).toBeNull()
   })
 })
 

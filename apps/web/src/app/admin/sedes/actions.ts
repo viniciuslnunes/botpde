@@ -21,6 +21,55 @@ import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
 
 const emptyToNull = (v: string | undefined) => (v?.trim() ? v.trim() : null)
 
+/**
+ * Espelha nome/local/foto da Sede na SolicitacaoUnidade vinculada (se houver).
+ * A UI de afiliações também lê a Sede ao vivo; isto evita snapshot defasado em
+ * relatórios/consultas diretas às colunas da solicitação.
+ */
+async function sincronizarSolicitacaoDaSede(
+  sedeId: string,
+  dados: {
+    nome?: string
+    tipo?: TipoSede
+    cidade?: string | null
+    estado?: string | null
+    endereco?: string | null
+    cep?: string | null
+    lat?: number | null
+    lng?: number | null
+    fotoUrl?: string | null
+  },
+): Promise<void> {
+  const data: {
+    nome?: string
+    tipo?: 'SUBSEDE' | 'PONTO_ENCONTRO'
+    cidade?: string
+    estado?: string
+    endereco?: string | null
+    cep?: string | null
+    lat?: number | null
+    lng?: number | null
+    fotoUrl?: string | null
+  } = {}
+
+  if (dados.nome !== undefined) data.nome = dados.nome
+  if (dados.tipo === 'SUBSEDE' || dados.tipo === 'PONTO_ENCONTRO') data.tipo = dados.tipo
+  if (dados.cidade != null && dados.cidade.trim()) data.cidade = dados.cidade
+  if (dados.estado != null && dados.estado.trim()) data.estado = dados.estado
+  if (dados.endereco !== undefined) data.endereco = dados.endereco
+  if (dados.cep !== undefined) data.cep = dados.cep
+  if (dados.lat !== undefined) data.lat = dados.lat
+  if (dados.lng !== undefined) data.lng = dados.lng
+  if (dados.fotoUrl !== undefined) data.fotoUrl = dados.fotoUrl
+
+  if (Object.keys(data).length === 0) return
+
+  await db.solicitacaoUnidade.updateMany({
+    where: { sedeId },
+    data,
+  })
+}
+
 const sedeSchema = z.object({
   nome: z.string().min(3, 'Nome muito curto').max(100),
   tipo: z.enum(['SEDE', 'SUBSEDE', 'PONTO_ENCONTRO']),
@@ -386,6 +435,19 @@ export async function editarSede(
     },
   })
 
+  // Mantém o snapshot da solicitação alinhado à Sede (aba /admin/afiliacoes).
+  await sincronizarSolicitacaoDaSede(sedeId, {
+    nome,
+    tipo: tipoFinal,
+    cidade: rest.cidade ?? null,
+    estado: rest.estado ?? null,
+    endereco: rest.endereco ?? null,
+    cep: rest.cep ?? null,
+    lat: rest.lat ?? null,
+    lng: rest.lng ?? null,
+    fotoUrl: rest.fotoUrl ?? null,
+  })
+
   await vincularResponsavelAoCanalDaSede({
     sedeId,
     canalConversaId: existing.canalConversaId,
@@ -430,6 +492,8 @@ export async function editarSede(
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
   revalidatePath(`/admin/sedes/${sedeId}`)
+  revalidatePath('/admin/afiliacoes')
+  revalidatePath('/super-admin/afiliacoes')
   // Header admin/portal usa Sede.fotoUrl da raiz como logo (resolveTenantLogoUrl)
   // — sem revalidar os layouts, a foto nova só aparece depois que o router
   // cache do cliente expira sozinho.
@@ -476,6 +540,8 @@ export async function salvarFotoSede(
     data: { fotoUrl: url },
   })
 
+  await sincronizarSolicitacaoDaSede(sedeId, { fotoUrl: url })
+
   // Mantém o avatar do canal oficial alinhado à foto da unidade (header + card).
   if (existing.canalConversaId) {
     await db.conversa.update({
@@ -499,6 +565,8 @@ export async function salvarFotoSede(
   revalidatePath(`/admin/sedes/${sedeId}`)
   revalidatePath('/portal/sedes')
   revalidatePath('/portal/comunidade/canais')
+  revalidatePath('/admin/afiliacoes')
+  revalidatePath('/super-admin/afiliacoes')
   revalidatePath('/admin', 'layout')
   revalidatePath('/portal', 'layout')
 
@@ -601,6 +669,7 @@ export async function geocodificarSedesSemCoords(): Promise<GeocodeLoteResult> {
       where: { id: sede.id },
       data: { lat: coords.lat, lng: coords.lng },
     })
+    await sincronizarSolicitacaoDaSede(sede.id, { lat: coords.lat, lng: coords.lng })
     atualizadas += 1
   }
 
@@ -622,6 +691,8 @@ export async function geocodificarSedesSemCoords(): Promise<GeocodeLoteResult> {
 
   revalidatePath('/admin/sedes')
   revalidatePath('/portal/sedes')
+  revalidatePath('/admin/afiliacoes')
+  revalidatePath('/super-admin/afiliacoes')
 
   return {
     ok: true,

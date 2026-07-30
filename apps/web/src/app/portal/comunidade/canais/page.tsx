@@ -10,7 +10,12 @@ import {
 } from '@/lib/canais'
 import { CanaisClient } from './canais-client'
 import { ComunidadePageHeader } from '../_components/comunidade-page-header'
-import { PERMISSIONS, calculateEffectivePermissions, hasPermission } from '@torcida/types'
+import {
+  PERMISSIONS,
+  calculateEffectivePermissions,
+  formatNomeAfiliacao,
+  hasPermission,
+} from '@torcida/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Canais — Comunidade' }
@@ -31,7 +36,7 @@ export default async function CanaisPage({
   const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
-    const nomeClube = ctx.afiliacao.apelido || ctx.afiliacao.nome
+    const nomeClube = formatNomeAfiliacao(ctx.afiliacao.apelido || ctx.afiliacao.nome)
     const canais = await listCanaisPublicosPorAfiliacao(ctx.afiliacao.id, session.user.id)
 
     return (

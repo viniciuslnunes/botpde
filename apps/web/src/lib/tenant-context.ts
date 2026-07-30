@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { revalidateTag, unstable_cache } from 'next/cache'
 import { cookies } from 'next/headers'
 import { db } from '@torcida/db'
-import { formatNomeTorcida, SYSTEM_ROLES } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao, SYSTEM_ROLES } from '@torcida/types'
 import { env, isProd, superAdminEmails } from '@/lib/env'
 import { sharedCookieOptions } from '@/lib/session-cookie'
 import {
@@ -152,9 +152,7 @@ function mapTorcidaOpcao(row: TorcidaRowComAfiliacao): TorcidaOpcao {
     nome: formatNomeTorcida(row.nome),
     corPrimaria: row.corPrimaria,
     afiliacaoId: row.afiliacaoId,
-    clubeNome: row.afiliacao
-      ? (row.afiliacao.apelido ?? row.afiliacao.nome)
-      : null,
+    clubeNome: row.afiliacao ? nomeExibicaoAfiliacao(row.afiliacao) || null : null,
     clubeUf: row.afiliacao?.estado ?? null,
   }
 }
@@ -207,8 +205,8 @@ async function fetchClubesParaSelecao(): Promise<ClubeOpcao[]> {
   })
   return rows.map((r) => ({
     id: r.id,
-    nome: r.nome,
-    apelido: r.apelido,
+    nome: formatNomeAfiliacao(r.nome),
+    apelido: r.apelido ? formatNomeAfiliacao(r.apelido) : null,
     estado: r.estado,
   }))
 }

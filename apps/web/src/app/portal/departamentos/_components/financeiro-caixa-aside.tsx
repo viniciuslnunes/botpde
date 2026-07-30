@@ -181,7 +181,7 @@ export async function FinanceiroCaixaAside({
         )}
         {isGestor && (
           <Link
-            href="/admin/planos-associacao"
+            href="/admin/financeiro/planos"
             prefetch={false}
             className="mt-3 block text-xs font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
           >

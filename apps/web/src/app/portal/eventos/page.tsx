@@ -101,6 +101,40 @@ function ListaFallback() {
   )
 }
 
+function CalendarioFallback() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.75)]">
+      <div className="flex items-end justify-between border-b border-[rgb(var(--border))] px-4 py-4 sm:px-5">
+        <div className="space-y-2">
+          <div className="h-3 w-10 animate-pulse rounded bg-[rgb(var(--border))]" />
+          <div className="h-7 w-40 animate-pulse rounded bg-[rgb(var(--border))]" />
+        </div>
+        <div className="flex gap-1.5">
+          <div className="h-9 w-9 animate-pulse rounded-xl bg-[rgb(var(--border))]" />
+          <div className="h-9 w-16 animate-pulse rounded-xl bg-[rgb(var(--border))]" />
+          <div className="h-9 w-9 animate-pulse rounded-xl bg-[rgb(var(--border))]" />
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-12">
+        <div className="p-3 sm:p-4 lg:col-span-8">
+          <div className="grid grid-cols-7 gap-1.5">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div
+                key={i}
+                className="min-h-[64px] animate-pulse rounded-xl bg-[rgb(var(--border)_/_0.45)] sm:min-h-[76px]"
+              />
+            ))}
+          </div>
+        </div>
+        <div className="hidden space-y-3 border-l border-[rgb(var(--border))] p-5 lg:col-span-4 lg:block">
+          <div className="h-4 w-32 animate-pulse rounded bg-[rgb(var(--border))]" />
+          <div className="h-24 animate-pulse rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+          <div className="h-24 animate-pulse rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+        </div>
+      </div>
+    </div>
+  )
+}
 type Props = {
   searchParams: Promise<{ tipo?: string; q?: string; vista?: string; data?: string }>
 }
@@ -182,15 +216,19 @@ export default async function EventosPage({ searchParams }: Props) {
       </div>
 
       <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface)_/_0.92)] p-3 backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5 text-xs">
+        <div
+          className="flex flex-wrap gap-1.5 text-xs"
+          role="group"
+          aria-label="Filtrar por tipo"
+        >
           <Link
             href={hrefFiltro({ tipo: '' })}
             prefetch={false}
             className={[
-              'rounded-lg px-2.5 py-1.5 font-medium',
+              'rounded-lg px-3 py-1.5 font-medium transition-colors',
               !tipoFiltro
                 ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
+                : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
             ].join(' ')}
           >
             Todos
@@ -201,10 +239,10 @@ export default async function EventosPage({ searchParams }: Props) {
               href={hrefFiltro({ tipo: t })}
               prefetch={false}
               className={[
-                'rounded-lg px-2.5 py-1.5 font-medium',
+                'rounded-lg px-3 py-1.5 font-medium transition-colors',
                 tipoFiltro === t
                   ? 'bg-[rgb(var(--color-primary))] text-[rgb(var(--color-primary-on))]'
-                  : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]',
+                  : 'border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
               ].join(' ')}
             >
               {TIPO_EVENTO_LABEL[t]}
@@ -232,7 +270,7 @@ export default async function EventosPage({ searchParams }: Props) {
                 href={hrefFiltro({ vista: id === 'mes' ? '' : id })}
                 prefetch={false}
                 className={[
-                  'rounded-md px-2.5 py-1.5 font-medium transition-colors',
+                  'rounded-md px-3 py-1.5 font-medium transition-colors',
                   vista === id
                     ? 'bg-[rgb(var(--surface))] text-[rgb(var(--foreground))] shadow-sm'
                     : 'text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]',
@@ -245,7 +283,7 @@ export default async function EventosPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <Suspense fallback={<ListaFallback />}>
+      <Suspense fallback={vista === 'lista' ? <ListaFallback /> : <CalendarioFallback />}>
         <AgendaConteudo
           vista={vista}
           tipoFiltro={tipoFiltro}
@@ -316,6 +354,7 @@ async function AgendaConteudo({
         dataRefIso={dataRef}
         basePath="/portal/eventos"
         tipoFiltro={tipoFiltro}
+        q={q}
       />
     )
   }

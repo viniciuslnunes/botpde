@@ -19,8 +19,12 @@ type PoliticaRoteamento = {
   permissaoAdmin?: string
   /** Permissões alternativas (OR) para destinatários administrativos. */
   permissoesAdminOr?: string[]
-  /** Id do item em ADMIN_MENU para badge no sidebar (só tipos operacionais). */
-  menuId?: string
+  /**
+   * Rota onde o gestor resolve a pendência — vira badge no sidebar, na entrada
+   * de menu que hoje contém essa rota (ver `resolverMenuIdDeRota`).
+   * Só tipos operacionais.
+   */
+  rota?: string
 }
 
 /**
@@ -53,55 +57,55 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   MEMBRO_SOLICITADO: {
     escopo: 'hibrido',
     permissoesAdminOr: [PERMISSIONS.MEMBERS_APPROVE, PERMISSIONS.MEMBERS_VIEW],
-    menuId: 'membros',
+    rota: '/admin/membros',
   },
   COBRANCA_PENDENTE: { escopo: 'hibrido' },
   COBRANCA_VENCIDA: {
     escopo: 'hibrido',
     permissaoAdmin: PERMISSIONS.FINANCE_MANAGE,
-    menuId: 'cobrancas',
+    rota: '/admin/financeiro/cobrancas',
   },
   EVENTO_LEMBRETE: { escopo: 'hibrido' },
   EVENTO_RSVP: {
     escopo: 'hibrido',
     permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
-    menuId: 'eventos',
+    rota: '/admin/eventos',
   },
   EVENTO_DIA_GESTOR: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.EVENTS_MANAGE,
-    menuId: 'eventos',
+    rota: '/admin/eventos',
   },
   DENUNCIA_NOVA: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.COMMUNITY_MODERATE, PERMISSIONS.MESSAGES_MODERATE],
-    menuId: 'comunidade-moderacao',
+    rota: '/admin/comunidade/moderacao',
   },
   DENUNCIA_RESOLVIDA: { escopo: 'social' },
   ALIANCA_PROPOSTA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    menuId: 'aliancas',
+    rota: '/admin/aliancas',
   },
   ALIANCA_ACEITA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    menuId: 'aliancas',
+    rota: '/admin/aliancas',
   },
   ALIANCA_REJEITADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    menuId: 'aliancas',
+    rota: '/admin/aliancas',
   },
   ALIANCA_ENCERRADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    menuId: 'aliancas',
+    rota: '/admin/aliancas',
   },
   ALIANCA_CANCELADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.ALLIANCES_MANAGE,
-    menuId: 'aliancas',
+    rota: '/admin/aliancas',
   },
   PEDIDO_CONFIRMADO: { escopo: 'social' },
   PEDIDO_CANCELADO: { escopo: 'social' },
@@ -117,33 +121,33 @@ export const POLITICA_POR_TIPO: Record<TipoNotificacao, PoliticaRoteamento> = {
   BAR_ESTOQUE_BAIXO: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
-    menuId: 'bar-estoque',
+    rota: '/admin/bar/estoque',
   },
   BAR_FIADO_VENCIDO: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
-    menuId: 'bar-fiado',
+    rota: '/admin/bar/fiado',
   },
   BAR_TURNO_DIVERGENCIA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
-    menuId: 'bar-pdv',
+    rota: '/admin/bar/pdv',
   },
   BAR_ESTORNO_ANOMALO: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.BAR_MANAGE,
-    menuId: 'bar-estornos',
+    rota: '/admin/bar/estornos',
   },
   PATRIMONIO_RESPONSAVEL_DEFINIDO: { escopo: 'social' },
   PEDIDO_RECEBIDO: {
     escopo: 'admin',
     permissoesAdminOr: [PERMISSIONS.STORE_VIEW_ORDERS, PERMISSIONS.STORE_MANAGE],
-    menuId: 'loja-pedidos',
+    rota: '/admin/loja/pedidos',
   },
   SOLICITACAO_UNIDADE_CRIADA: {
     escopo: 'admin',
     permissaoAdmin: PERMISSIONS.AFFILIATION_MANAGE,
-    menuId: 'afiliacoes',
+    rota: '/admin/afiliacoes',
   },
 }
 

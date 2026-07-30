@@ -1,21 +1,37 @@
+import {
+  FeedComposerSkeleton,
+  FeedPostSkeletonList,
+  FeedStoriesSkeleton,
+  Skeleton,
+} from '@/components/portal/feed-skeletons'
+
+/**
+ * A grade tem que ser a mesma da `page.tsx` (rail esq. + conteúdo). O rail
+ * direito de salas/chat vive no `ComunidadeLayoutChrome`, que já envolve este
+ * fallback e reserva as 20rem da coluna — repeti-la aqui esmagaria o feed e
+ * abriria um vão morto ao lado do rail real.
+ */
 export default function ComunidadeLoading() {
   return (
-    <div className="grid animate-pulse gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy
+      className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]"
+    >
+      <span className="sr-only">Carregando a comunidade…</span>
+
       <aside className="hidden space-y-4 lg:block">
-        <div className="h-20 rounded-2xl bg-[rgb(var(--border))]" />
-        <div className="h-32 rounded-2xl bg-[rgb(var(--border))]" />
+        <Skeleton className="h-20 rounded-2xl" />
+        <Skeleton className="h-32 rounded-2xl" soft />
       </aside>
-      <main className="space-y-4">
-        <div className="h-24 rounded-2xl bg-[rgb(var(--border))]" />
-        <div className="h-16 rounded-2xl bg-[rgb(var(--border))]" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-36 rounded-2xl bg-[rgb(var(--border))]" />
-        ))}
+
+      <main className="min-w-0 space-y-4">
+        <Skeleton className="h-11 rounded-xl" soft />
+        <FeedStoriesSkeleton />
+        <FeedComposerSkeleton />
+        <FeedPostSkeletonList count={3} />
       </main>
-      <aside className="hidden space-y-4 xl:block">
-        <div className="h-40 rounded-2xl bg-[rgb(var(--border))]" />
-        <div className="h-56 rounded-2xl bg-[rgb(var(--border))]" />
-      </aside>
     </div>
   )
 }

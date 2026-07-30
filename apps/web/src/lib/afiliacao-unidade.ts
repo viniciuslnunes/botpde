@@ -51,3 +51,59 @@ export const STATUS_SOLICITACAO_LABEL: Record<StatusSolicitacaoUnidade, string> 
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }
+
+/**
+ * Campos locais gravados no snapshot da solicitação — após APROVADA a fonte
+ * de verdade passa a ser a `Sede` vinculada (edições em /admin/sedes).
+ */
+export interface LocaisSolicitacao {
+  nome: string
+  tipo: 'SUBSEDE' | 'PONTO_ENCONTRO'
+  cidade: string
+  estado: string
+  endereco: string | null
+  cep: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
+}
+
+export interface SedeLiveParaSolicitacao {
+  nome: string
+  tipo: string
+  cidade: string | null
+  estado: string | null
+  endereco: string | null
+  cep: string | null
+  lat: number | null
+  lng: number | null
+  fotoUrl: string | null
+}
+
+/**
+ * Para APROVADA + `sedeId`, herda nome/endereço/coords/foto da Sede ao vivo.
+ * PENDENTE/RECUSADA (ou sem sede) mantêm o snapshot do pedido.
+ */
+export function herdarDadosSedeNaSolicitacao<T extends LocaisSolicitacao>(
+  solicitacao: T,
+  status: StatusSolicitacaoUnidade,
+  sede: SedeLiveParaSolicitacao | null | undefined,
+): T {
+  if (status !== 'APROVADA' || !sede) return solicitacao
+
+  const tipo =
+    sede.tipo === 'SUBSEDE' || sede.tipo === 'PONTO_ENCONTRO' ? sede.tipo : solicitacao.tipo
+
+  return {
+    ...solicitacao,
+    nome: sede.nome,
+    tipo,
+    cidade: sede.cidade?.trim() ? sede.cidade : solicitacao.cidade,
+    estado: sede.estado?.trim() ? sede.estado : solicitacao.estado,
+    endereco: sede.endereco,
+    cep: sede.cep,
+    lat: sede.lat,
+    lng: sede.lng,
+    fotoUrl: sede.fotoUrl,
+  }
+}

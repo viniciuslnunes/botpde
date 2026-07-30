@@ -31,13 +31,14 @@ import { notificarDenunciaPost } from '@/lib/notificacoes-routing'
 import { excedeuLimiteEngajamento, registrarAcaoEngajamento } from '@/lib/engagement-rate-limit'
 import type { PostPublicadoPreview } from '@/lib/feed-live-refresh'
 import { chave, getBadgesPorAutorTenant, getTorcidaRealDoAutor } from '@/lib/autor-badges'
-import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma } from '@torcida/types'
+import { formatNomeTorcida, designFromPrimary, isCorPadraoPlataforma, nomeExibicaoAfiliacao } from '@torcida/types'
 import { getEscopoEventosVisiveis } from '@/lib/eventos'
 import { getPostPorId, podeVerFeedSocios, resolveVisibleTenantIdsForFeed } from '@/lib/feed'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { calcularExpiraStory } from '@/lib/stories'
 import {
   getCanalPorId,
+  assertElegibilidadeMembroCanal,
   inscreverCanal,
   podePublicarNoCanal,
   podeGerenciarPedidosCanal,
@@ -650,7 +651,7 @@ export async function publicarPostNacional(
         autorId: session.user.id,
         autorNome: session.user.name ?? null,
         autorAvatar: avatarPreviewDaSessao(session),
-        tenantNome: afiliacao?.apelido ?? afiliacao?.nome ?? 'Comunidade',
+        tenantNome: nomeExibicaoAfiliacao(afiliacao) || 'Comunidade',
         tenantSintetico: true,
         torcidaPreferidaId: ativo && !ativo.sintetico ? ativo.id : undefined,
       }),
@@ -1031,14 +1032,12 @@ export interface ComentarioPostItem {
 }
 
 export async function listarComentariosPost(postId: string): Promise<ComentarioPostItem[]> {
-  // Leitura de comentários: gate é a visibilidade do PRÓPRIO POST (PUBLICO/
-  // TENANT/PRIVADO), não a privacidade de perfil do autor — comentário de post
-  // PUBLICO é legível por qualquer autenticado, mesmo torcedor global (sem
-  // tenant) e mesmo que o autor tenha perfilPrivado=true. Não reusa podeVerPost
-  // (feed.ts) porque essa função também exige podeVerConteudoSocial (privacidade
-  // de perfil), regra que nunca existiu pra leitura de comentário.
+  // Aplica primeiro o mesmo alcance de tenant do feed/permalink. Dentro desse
+  // alcance vale a escada do post; privacidade de perfil não participa do gate.
   const session = await auth()
   if (!session?.user?.id) throw new Error('Não autenticado')
+  const parsed = z.string().uuid().safeParse(postId)
+  if (!parsed.success) throw new ExpectedError('Post não encontrado')
 
   const post: {
     id: string
@@ -1047,13 +1046,26 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     visibilidade: 'PUBLICO' | 'TENANT' | 'PRIVADO'
     oculto: boolean
   } | null = await db.post.findUnique({
-    where: { id: postId },
+    where: { id: parsed.data },
     select: { id: true, autorId: true, tenantId: true, visibilidade: true, oculto: true },
   })
   if (!post || post.oculto) throw new Error('Post não encontrado')
 
   const viewerId = session.user.id
-  let podeVer = viewerId === post.autorId || post.visibilidade === 'PUBLICO'
+  const ehAutor = viewerId === post.autorId
+  let tenantNoAlcance = ehAutor
+  if (!tenantNoAlcance) {
+    const viewerTenantId = await resolveTenantIdPortalComunidade(viewerId, session.user.email)
+    if (viewerTenantId === post.tenantId) {
+      tenantNoAlcance = true
+    } else if (viewerTenantId) {
+      const tenantIdsVisiveis = await resolveVisibleTenantIdsForFeed(viewerTenantId, viewerId)
+      tenantNoAlcance = tenantIdsVisiveis.includes(post.tenantId)
+    }
+  }
+  if (!tenantNoAlcance) throw new Error('Post não encontrado')
+
+  let podeVer = ehAutor || post.visibilidade === 'PUBLICO'
   if (!podeVer && post.visibilidade === 'TENANT') {
     podeVer = await podeVerFeedSocios(viewerId, post.tenantId)
   }
@@ -1068,7 +1080,7 @@ export async function listarComentariosPost(postId: string): Promise<ComentarioP
     criadoEm: Date
     autor: { id: string; nome: string | null; avatarUrl: string | null }
   }> = await db.comentario.findMany({
-    where: { postId },
+    where: { postId: parsed.data },
     orderBy: { criadoEm: 'asc' },
     take: 100,
     include: { autor: { select: { id: true, nome: true, avatarUrl: true } } },
@@ -2774,22 +2786,28 @@ async function permissoesEfetivas(userId: string, tenantId: string): Promise<str
  * torcidas do mesmo time sem vínculo entre si).
  */
 export async function entrarCanal(conversaId: string): Promise<void> {
+  const parsed = pedirEntradaCanalSchema.safeParse({ conversaId })
+  if (!parsed.success) throw new ExpectedError(parsed.error.issues[0]?.message ?? 'Canal inválido')
+
+  let contexto: { session: Session; tenantId: string } | null = null
   try {
     const { session, tenant } = await assertPermission(PERMISSIONS.MESSAGES_SEND)
     await assertMembroAtivo(tenant.id, session.user.id)
+    contexto = { session, tenantId: tenant.id }
+  } catch {
+    // Sem tenant ativo/membro ativo: tenta o contexto da Comunidade Nacional.
+  }
 
-    const canal = await getCanalPorId(conversaId, tenant.id, session.user.id)
+  if (contexto) {
+    const canal = await getCanalPorId(parsed.data.conversaId, contexto.tenantId, contexto.session.user.id)
     if (canal) {
       if (!canal.publica) throw new Error('Este canal não aceita novos inscritos.')
-      await inscreverCanal(conversaId, session.user.id)
+      await inscreverCanal(parsed.data.conversaId, contexto.session.user.id)
       revalidatePath('/portal/comunidade/canais')
-      revalidatePath(linkCanalComunidade(conversaId))
+      revalidatePath(linkCanalComunidade(parsed.data.conversaId))
       revalidatePath('/portal/mensagens')
       return
     }
-  } catch {
-    // Sem tenant ativo, sem membro ativo, ou canal fora da relação do tenant
-    // — tenta o caminho da Comunidade Nacional abaixo.
   }
 
   const { session, afiliacaoId } = await assertComunidadeNacional()
@@ -2800,7 +2818,7 @@ export async function entrarCanal(conversaId: string): Promise<void> {
     publica: boolean
     tenant: { afiliacaoId: string | null; sintetico: boolean }
   } | null = await db.conversa.findFirst({
-    where: { id: conversaId, tipo: 'CANAL' },
+    where: { id: parsed.data.conversaId, tipo: 'CANAL' },
     select: {
       id: true,
       visibilidadeCanal: true,
@@ -2819,10 +2837,10 @@ export async function entrarCanal(conversaId: string): Promise<void> {
   }
   if (!canalNacional.publica) throw new Error('Este canal não aceita novos inscritos.')
 
-  await inscreverCanal(conversaId, session.user.id)
+  await inscreverCanal(parsed.data.conversaId, session.user.id)
 
   revalidatePath('/portal/comunidade/canais')
-  revalidatePath(linkCanalComunidade(conversaId))
+  revalidatePath(linkCanalComunidade(parsed.data.conversaId))
 }
 
 /**
@@ -3204,6 +3222,7 @@ export async function pedirEntradaCanal(conversaId: string): Promise<void> {
 
   const canal = canalRow
   if (canal.publica) throw new Error('Este canal é aberto — use Entrar.')
+  await assertElegibilidadeMembroCanal(canal.id, session.user.id, 'PENDENTE')
 
   const existente: { status: string; saiuEm: Date | null } | null =
     await db.membroConversa.findUnique({
@@ -3297,6 +3316,10 @@ export async function decidirPedidoCanal(
     select: { id: true },
   })
   if (!pedido) throw new Error('Pedido não encontrado.')
+
+  if (parsed.data.aprovar) {
+    await assertElegibilidadeMembroCanal(canal.id, parsed.data.userId, 'ATIVO')
+  }
 
   const { count: pedidosLidos } = await db.notificacao.updateMany({
     where: {
@@ -3428,11 +3451,7 @@ export async function adicionarMembroCanal(conversaId: string, userId: string): 
   const podeAdicionar = await podeGerenciarPedidosCanal(canal, tenant.id, efetivas)
   if (!podeAdicionar) throw new Error('Sem permissão para adicionar membros a este canal.')
 
-  const alvo: { id: string; status: string } | null = await db.saasMembro.findFirst({
-    where: { tenantId: canal.tenantId, userId: parsed.data.userId, status: 'APROVADO' },
-    select: { id: true, status: true },
-  })
-  if (!alvo) throw new Error('Torcedor não encontrado ou não aprovado nesta torcida.')
+  await assertElegibilidadeMembroCanal(canal.id, parsed.data.userId, 'ATIVO')
 
   await db.membroConversa.upsert({
     where: { conversaId_userId: { conversaId: canal.id, userId: parsed.data.userId } },

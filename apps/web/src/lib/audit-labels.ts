@@ -12,6 +12,11 @@ export const AUDIT_ACAO_LABEL: Record<string, string> = {
   MEMBRO_REPROVADO: 'Membro reprovado',
   MEMBRO_REVERTIDO: 'Aprovação revertida',
   MEMBRO_REVERTIDO_PENDENTE: 'Membro revertido a pendente',
+  MEMBRO_LGE_ATUALIZADO: 'Cadastro LGE atualizado',
+  MEMBRO_DESLIGADO: 'Membro desligado',
+  MEMBRO_SEDE_REATRIBUIDA: 'Unidade do membro alterada',
+  MEMBRO_PENDENCIA_ESPELHO_SEDE: 'Solicitação espelhada na Sede',
+  MEMBRO_SINCRONIZACAO_IGNORADA_JA_MEMBRO_DIRETO: 'Espelho ignorado (já é membro direto)',
   MEMBROS_IMPORTADOS: 'Base de membros importada',
   IMPORTACAO_DESFEITA: 'Importação desfeita',
 

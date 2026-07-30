@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@torcida/db'
 import { listMembrosConversa, MAX_MEMBROS_GRUPO, podeConvidarParaGrupoChat } from '@/lib/mensageria'
-import { isConversaGrupoLike } from '@/lib/canais'
+import { assertElegibilidadeMembroCanal, isConversaGrupoLike } from '@/lib/canais'
 import { assertConversaAccess } from '@/lib/mensageria-api'
 
 const adicionarSchema = z.object({
@@ -85,6 +85,9 @@ export async function POST(
         },
         { status: 403 },
       )
+    }
+    if (conversa.tipo === 'CANAL') {
+      await assertElegibilidadeMembroCanal(conversaId, novoId, 'ATIVO')
     }
 
     // Reativa quem já saiu ou cria participação nova

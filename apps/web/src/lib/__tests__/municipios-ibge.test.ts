@@ -11,12 +11,29 @@ vi.mock('@/lib/onboarding', () => ({
   UFS_BRASIL: ['SP', 'PR', 'RJ'],
 }))
 
-import { listarMunicipiosPorUf, cidadePertenceUf } from '@/lib/municipios-ibge'
+import {
+  listarMunicipiosPorUf,
+  cidadePertenceUf,
+  buscarMunicipiosBrasil,
+} from '@/lib/municipios-ibge'
 
 function mockFetchOk(nomes: string[]) {
   return vi.fn().mockResolvedValue({
     ok: true,
     json: async () => nomes.map((nome) => ({ nome })),
+  })
+}
+
+/** Responde por UF no path da URL (mock do índice nacional). */
+function mockFetchPorUf(mapa: Record<string, string[]>) {
+  return vi.fn().mockImplementation(async (url: string) => {
+    const match = /\/estados\/([A-Z]{2})\//.exec(url)
+    const uf = match?.[1] ?? ''
+    const nomes = mapa[uf] ?? []
+    return {
+      ok: true,
+      json: async () => nomes.map((nome) => ({ nome })),
+    }
   })
 }
 
@@ -83,5 +100,54 @@ describe('cidadePertenceUf', () => {
   it('retorna null quando a UF é inválida', async () => {
     vi.stubGlobal('fetch', vi.fn())
     expect(await cidadePertenceUf('Santos', 'ZZ')).toBeNull()
+  })
+})
+
+describe('buscarMunicipiosBrasil', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    vi.stubGlobal(
+      'fetch',
+      mockFetchPorUf({
+        SP: ['Santos', 'São Paulo', 'São Vicente'],
+        PR: ['Curitiba', 'São José dos Pinhais'],
+        RJ: ['Rio de Janeiro', 'São Gonçalo'],
+      }),
+    )
+  })
+
+  it('ranqueia match exato antes de prefixo e contém', async () => {
+    const r = await buscarMunicipiosBrasil('sao')
+    expect(r.every((m) => /são/i.test(m.cidade))).toBe(true)
+    expect(r[0]?.cidade).toMatch(/^São/)
+  })
+
+  it('prioriza match exato', async () => {
+    const r = await buscarMunicipiosBrasil('Santos')
+    expect(r[0]).toEqual({ cidade: 'Santos', uf: 'SP' })
+  })
+
+  it('descarta query com menos de 2 caracteres', async () => {
+    expect(await buscarMunicipiosBrasil('s')).toEqual([])
+  })
+
+  it('inclui a UF em cada resultado', async () => {
+    const r = await buscarMunicipiosBrasil('Curitiba')
+    expect(r).toContainEqual({ cidade: 'Curitiba', uf: 'PR' })
+  })
+
+  it('coloca a capital antes de homônimos do mesmo tier', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetchPorUf({
+        // Alfabeticamente "São Bernardo" viria antes — só a regra de capital inverte.
+        SP: ['São Bernardo do Campo', 'São Caetano do Sul', 'São Paulo'],
+        PR: [],
+        RJ: [],
+      }),
+    )
+
+    const r = await buscarMunicipiosBrasil('sao')
+    expect(r[0]).toEqual({ cidade: 'São Paulo', uf: 'SP' })
   })
 })

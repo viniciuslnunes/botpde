@@ -71,6 +71,7 @@ export default async function AdminBarPdvPage() {
       podeGerir={podeGerir}
       membrosFiado={membrosFiado.map((m) => ({ id: m.membroId, nome: m.nome }))}
       turnoAberto={Boolean(turno)}
+      turnoResumo={resumoTurno}
       turnoPainel={
         <BarTurnoPainel
           compact

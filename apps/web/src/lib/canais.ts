@@ -35,6 +35,12 @@ import {
   type VisibilidadeCanal,
 } from './canais-shared'
 
+/** Canal oficial representa uma unidade da torcida; seu nome é sempre visualizado em caixa alta. */
+function formatNomeCanal(nome: string | null, canalOficial: boolean): string | null {
+  if (!nome || !canalOficial) return nome
+  return formatNomeTorcida(nome)
+}
+
 export type {
   CanalItem,
   CandidatoMembroCanalItem,
@@ -89,6 +95,57 @@ export async function podeVerCanal(
   ])
 
   return decidePodeVerCanal({ relation, visibilidade, isSocio })
+}
+
+export type NivelElegibilidadeCanal = 'PENDENTE' | 'ATIVO'
+
+/**
+ * Gate único para materializar roster. Descoberta cross-tenant não concede
+ * participação: canal real exige vínculo local; ativação exige vínculo ativo.
+ */
+export async function assertElegibilidadeMembroCanal(
+  conversaId: string,
+  userId: string,
+  nivel: NivelElegibilidadeCanal,
+): Promise<void> {
+  const conversa: {
+    tipo: string
+    comunidade: boolean
+    tenantId: string
+    tenant: { sintetico: boolean }
+  } | null = await db.conversa.findUnique({
+    where: { id: conversaId },
+    select: {
+      tipo: true,
+      comunidade: true,
+      tenantId: true,
+      tenant: { select: { sintetico: true } },
+    },
+  })
+  if (!conversa) throw new ExpectedError('Canal não encontrado.')
+  if (conversa.tipo === 'DIRETA' || conversa.comunidade || conversa.tenant.sintetico) return
+
+  const membro: { status: string; tipo: string; desligadoEm: Date | null } | null =
+    await db.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId: conversa.tenantId, userId } },
+    select: { status: true, tipo: true, desligadoEm: true },
+    })
+  if (!membro) {
+    throw new ExpectedError('Você precisa ter vínculo com a torcida deste canal para participar.')
+  }
+  if (nivel === 'PENDENTE') return
+  if (membro.status !== 'APROVADO' || membro.desligadoEm) {
+    throw new ExpectedError('O vínculo com a torcida deste canal ainda não foi aprovado.')
+  }
+  if (membro.tipo === 'SOCIO') {
+    const socio: { validade: Date } | null = await db.saasSocio.findUnique({
+      where: { tenantId_userId: { tenantId: conversa.tenantId, userId } },
+      select: { validade: true },
+    })
+    if (socio && socio.validade < new Date()) {
+      throw new ExpectedError('Sua carteirinha nesta torcida está vencida.')
+    }
+  }
 }
 
 /**
@@ -274,6 +331,7 @@ export async function vincularResponsavelAoCanalDaSede(opts: {
   responsavelUserId: string | null
 }): Promise<void> {
   if (!opts.canalConversaId || !opts.responsavelUserId) return
+  await assertElegibilidadeMembroCanal(opts.canalConversaId, opts.responsavelUserId, 'ATIVO')
   await db.membroConversa.upsert({
     where: {
       conversaId_userId: { conversaId: opts.canalConversaId, userId: opts.responsavelUserId },
@@ -418,6 +476,7 @@ export async function vincularMembroCanaisAposAprovacao(opts: {
   }
 
   for (const conversaId of canalIds) {
+    await assertElegibilidadeMembroCanal(conversaId, opts.userId, 'ATIVO')
     await db.membroConversa.upsert({
       where: { conversaId_userId: { conversaId, userId: opts.userId } },
       create: { conversaId, userId: opts.userId, papel: 'MEMBRO', status: 'ATIVO' },
@@ -507,6 +566,7 @@ export async function inscreverCanal(
   conversaId: string,
   userId: string,
 ): Promise<void> {
+  await assertElegibilidadeMembroCanal(conversaId, userId, 'ATIVO')
   await db.membroConversa.upsert({
     where: { conversaId_userId: { conversaId, userId } },
     create: { conversaId, userId, papel: 'MEMBRO', status: 'ATIVO' },
@@ -627,7 +687,7 @@ export const listCanaisVisiveis = cache(async function listCanaisVisiveis(
     result.push({
       id: row.id,
       tenantId: row.tenantId,
-      nome: row.nome,
+      nome: formatNomeCanal(row.nome, row.canalOficial),
       descricao: row.descricao,
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
@@ -779,7 +839,7 @@ export const listCanaisPublicosPorAfiliacao = cache(async function listCanaisPub
     return {
       id: row.id,
       tenantId: row.tenantId,
-      nome: row.nome,
+      nome: formatNomeCanal(row.nome, row.canalOficial),
       descricao: row.descricao,
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
       institucional: row.institucional,
@@ -903,7 +963,7 @@ export async function getCanalPorId(
   return {
     id: row.id,
     tenantId: row.tenantId,
-    nome: row.nome,
+    nome: formatNomeCanal(row.nome, row.canalOficial),
     descricao: row.descricao,
     avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sede?.fotoUrl),
     institucional: row.institucional,
@@ -1235,7 +1295,7 @@ export async function buscarCanaisEUnidades(
     canais.push({
       id: row.id,
       tenantId: row.tenantId,
-      nome: row.nome,
+      nome: formatNomeCanal(row.nome, row.canalOficial),
       descricao: row.descricao,
       avatarUrl: resolveAvatarCanalOficial(row, fallbackAvatars, sedeFotoPorCanal.get(row.id)),
       institucional: row.institucional,

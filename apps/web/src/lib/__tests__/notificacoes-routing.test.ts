@@ -46,8 +46,9 @@ import {
   POLITICA_POR_TIPO,
   TIPOS_NOTIFICACAO_ADMIN,
 } from '@/lib/notificacoes-routing'
+import { ROTA_POR_TIPO } from '@/lib/notificacoes-menu-badges'
 import type { TipoNotificacao } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
+import { PERMISSIONS, resolverMenuIdDeRota } from '@torcida/types'
 
 function setupVazio() {
   mocks.userRoleFindMany.mockResolvedValue([])
@@ -69,23 +70,39 @@ describe('TIPOS_NOTIFICACAO_ADMIN', () => {
 describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
   it('mapeia tipos operacionais para ids do ADMIN_MENU', () => {
     expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('membros')
-    expect(menuIdParaTipo('DENUNCIA_NOVA')).toBe('comunidade-moderacao')
     expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
-    expect(menuIdParaTipo('COBRANCA_VENCIDA')).toBe('cobrancas')
     expect(menuIdParaTipo('SOLICITACAO_UNIDADE_CRIADA')).toBe('afiliacoes')
     expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
     expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
   })
 
-  it('mantém POLITICA_POR_TIPO.menuId alinhado ao mapa de badges', () => {
+  // Regressão da wave 1: promover uma rota a tab de módulo tirava a entrada do
+  // ADMIN_MENU e o badge sumia em silêncio. Resolvendo por rota, ele sobe.
+  it('sobe o badge para a entrada do módulo quando a rota virou tab', () => {
+    expect(menuIdParaTipo('DENUNCIA_NOVA')).toBe('comunidade')
+    expect(menuIdParaTipo('COBRANCA_VENCIDA')).toBe('financeiro')
+    expect(menuIdParaTipo('PEDIDO_RECEBIDO')).toBe('loja')
+    expect(menuIdParaTipo('BAR_ESTOQUE_BAIXO')).toBe('bar')
+    expect(menuIdParaTipo('BAR_ESTORNO_ANOMALO')).toBe('bar')
+    // PDV segue fora do shell de tabs — tem entrada própria no menu.
+    expect(menuIdParaTipo('BAR_TURNO_DIVERGENCIA')).toBe('bar-pdv')
+  })
+
+  it('mantém POLITICA_POR_TIPO.rota alinhada ao mapa de badges', () => {
     for (const [tipo, politica] of Object.entries(POLITICA_POR_TIPO) as Array<
-      [TipoNotificacao, { menuId?: string }]
+      [TipoNotificacao, { rota?: string }]
     >) {
-      expect(menuIdParaTipo(tipo)).toBe(politica.menuId ?? null)
+      expect(ROTA_POR_TIPO[tipo] ?? null).toBe(politica.rota ?? null)
     }
   })
 
-  it('agrega contagens por menu e ignora tipos sem menuId', () => {
+  it('toda rota de badge cai em alguma entrada existente do menu', () => {
+    for (const [tipo, rota] of Object.entries(ROTA_POR_TIPO) as Array<[TipoNotificacao, string]>) {
+      expect(resolverMenuIdDeRota(rota), `rota órfã em ${tipo}: ${rota}`).not.toBeNull()
+    }
+  })
+
+  it('agrega contagens por menu e ignora tipos sem rota', () => {
     const badges = agregarBadgesPorMenu([
       { tipo: 'MEMBRO_SOLICITADO', _count: { tipo: 2 } },
       { tipo: 'ALIANCA_PROPOSTA', _count: { tipo: 1 } },

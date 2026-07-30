@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import { useConfirmAction } from '@/lib/confirm-action'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'
 import { FileDropOverlay, useFileDragOver } from '@/components/media/file-drop-overlay'
@@ -1600,7 +1601,7 @@ function PainelMembros({
                     </span>
                     {!c.mesmoTenant && (
                       <span className="truncate text-[10px] text-[rgb(var(--foreground-muted))]">
-                        {c.tenantNome}
+                        {formatNomeTorcida(c.tenantNome)}
                       </span>
                     )}
                   </m.button>

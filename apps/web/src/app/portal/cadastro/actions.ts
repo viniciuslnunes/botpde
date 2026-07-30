@@ -3,6 +3,8 @@
 import { auth } from '@/lib/auth'
 import { db } from '@torcida/db'
 import { getTenantFromHost } from '@/lib/tenant'
+import { diffCamposMembro } from '@/lib/membro-audit-diff'
+import { REPROVACAO_LIMPA } from '@/lib/membros-sede'
 import { notificarNovoMembroPendente } from '@/lib/notificacoes-routing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -91,9 +93,31 @@ export async function solicitarCadastro(
   }
 
   // Verifica se já existe um cadastro
-  const existing = await db.saasMembro.findUnique({
+  const existing: {
+    id: string
+    status: string
+    reprovadoPermiteReenvio: boolean
+    nome: string | null
+    tipo: string | null
+    idade: number | null
+    telefone: string | null
+    cidade: string | null
+    discordTag: string | null
+    sedeId: string | null
+  } | null = await db.saasMembro.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      reprovadoPermiteReenvio: true,
+      nome: true,
+      tipo: true,
+      idade: true,
+      telefone: true,
+      cidade: true,
+      discordTag: true,
+      sedeId: true,
+    },
   })
 
   if (existing) {
@@ -103,21 +127,32 @@ export async function solicitarCadastro(
     if (existing.status === 'PENDENTE') {
       return { message: 'Seu cadastro já está em análise.' }
     }
+    if (!existing.reprovadoPermiteReenvio) {
+      return {
+        message:
+          'A diretoria encerrou a análise deste cadastro e o reenvio está bloqueado. Fale com a torcida.',
+      }
+    }
     // REPROVADO — permite nova tentativa (atualiza o registro)
+    const novosDados = {
+      nome: data.nome,
+      tipo: data.tipo,
+      idade: data.idade,
+      telefone: data.telefone,
+      cidade: data.cidade,
+      discordTag: data.discordTag,
+      sedeId,
+    }
     await db.saasMembro.update({
       where: { id: existing.id },
       data: {
-        nome: data.nome,
-        tipo: data.tipo,
-        idade: data.idade,
-        telefone: data.telefone,
-        cidade: data.cidade,
-        discordTag: data.discordTag,
-        sedeId,
+        ...novosDados,
+        departamentoId: data.tipo === 'TORCEDOR' ? null : undefined,
         status: 'PENDENTE',
         aprovadoPorId: null,
         aprovadoPorNome: null,
         aprovadoEm: null,
+        ...REPROVACAO_LIMPA,
       },
     })
 
@@ -128,6 +163,9 @@ export async function solicitarCadastro(
         acao: 'RECADASTRO_SOLICITADO',
         entidade: 'SaasMembro',
         entidadeId: existing.id,
+        // O histórico do card precisa mostrar o que o solicitante corrigiu
+        // após a reprovação, não só que houve reenvio.
+        detalhes: { alteracoes: diffCamposMembro(existing, novosDados) },
       },
     })
   } else {

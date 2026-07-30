@@ -2,7 +2,9 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Handshake } from 'lucide-react'
 import { db } from '@torcida/db'
+import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
+import { herdarDadosSedeNaSolicitacao } from '@/lib/afiliacao-unidade'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
 import {
@@ -21,6 +23,7 @@ interface SolicitacaoRow {
   cidade: string
   estado: string
   endereco: string | null
+  cep: string | null
   contatoNome: string | null
   fotoUrl: string | null
   lat: number | null
@@ -34,7 +37,19 @@ interface SolicitacaoRow {
   criadoEm: Date
   tenantId: string
   tenant: { nome: string }
-  sede: { id: string; tenantId: string | null } | null
+  sede: {
+    id: string
+    tenantId: string | null
+    nome: string
+    tipo: string
+    cidade: string | null
+    estado: string | null
+    endereco: string | null
+    cep: string | null
+    lat: number | null
+    lng: number | null
+    fotoUrl: string | null
+  } | null
 }
 
 interface TorcidaRow {
@@ -76,7 +91,21 @@ export default async function AfiliacoesSuperAdminPage() {
         criadoEm: true,
         tenantId: true,
         tenant: { select: { nome: true } },
-        sede: { select: { id: true, tenantId: true } },
+        sede: {
+          select: {
+            id: true,
+            tenantId: true,
+            nome: true,
+            tipo: true,
+            cidade: true,
+            estado: true,
+            endereco: true,
+            cep: true,
+            lat: true,
+            lng: true,
+            fotoUrl: true,
+          },
+        },
       },
     }),
     db.tenant.findMany({
@@ -86,35 +115,54 @@ export default async function AfiliacoesSuperAdminPage() {
     }),
   ])
 
-  const solicitacoes: SolicitacaoView[] = solicitacoesRows.map((s) => ({
-    id: s.id,
-    status: s.status,
-    torcidaNome: s.tenant.nome,
-    nome: s.nome,
-    tipo: s.tipo as 'SUBSEDE' | 'PONTO_ENCONTRO',
-    cidade: s.cidade,
-    estado: s.estado,
-    endereco: s.endereco,
-    contatoNome: s.contatoNome,
-    fotoUrl: s.fotoUrl,
-    lat: s.lat,
-    lng: s.lng,
-    contatoEmail: s.contatoEmail,
-    contatoTelefone: s.contatoTelefone,
-    vinculo: s.vinculo,
-    observacao: s.observacao,
-    provasUrls: s.provasUrls,
-    motivo: s.motivo,
-    criadoEm: s.criadoEm.toISOString(),
-    sedeId: s.sede?.id ?? null,
-    // Já promovida = a Sede criada tem tenant próprio (≠ tenant da torcida).
-    promovida: Boolean(s.sede && s.sede.tenantId && s.sede.tenantId !== s.tenantId),
-  }))
+  const solicitacoes: SolicitacaoView[] = solicitacoesRows.map((s) => {
+    const tipoSnap =
+      s.tipo === 'SUBSEDE' || s.tipo === 'PONTO_ENCONTRO' ? s.tipo : ('PONTO_ENCONTRO' as const)
+    const locais = herdarDadosSedeNaSolicitacao(
+      {
+        nome: s.nome,
+        tipo: tipoSnap,
+        cidade: s.cidade,
+        estado: s.estado,
+        endereco: s.endereco,
+        cep: s.cep,
+        lat: s.lat,
+        lng: s.lng,
+        fotoUrl: s.fotoUrl,
+      },
+      s.status,
+      s.sede,
+    )
+    return {
+      id: s.id,
+      status: s.status,
+      torcidaNome: formatNomeTorcida(s.tenant.nome),
+      nome: locais.nome,
+      tipo: locais.tipo,
+      cidade: locais.cidade,
+      estado: locais.estado,
+      endereco: locais.endereco,
+      contatoNome: s.contatoNome,
+      fotoUrl: locais.fotoUrl,
+      lat: locais.lat,
+      lng: locais.lng,
+      contatoEmail: s.contatoEmail,
+      contatoTelefone: s.contatoTelefone,
+      vinculo: s.vinculo,
+      observacao: s.observacao,
+      provasUrls: s.provasUrls,
+      motivo: s.motivo,
+      criadoEm: s.criadoEm.toISOString(),
+      sedeId: s.sede?.id ?? null,
+      // Já promovida = a Sede criada tem tenant próprio (≠ tenant da torcida).
+      promovida: Boolean(s.sede && s.sede.tenantId && s.sede.tenantId !== s.tenantId),
+    }
+  })
 
   const torcidas: TorcidaOption[] = torcidasRows.map((t) => ({
     id: t.id,
-    nome: t.nome,
-    clubeNome: t.afiliacao?.nome ?? null,
+    nome: formatNomeTorcida(t.nome),
+    clubeNome: t.afiliacao?.nome ? formatNomeAfiliacao(t.afiliacao.nome) : null,
   }))
 
   return (

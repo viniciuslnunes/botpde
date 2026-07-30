@@ -48,7 +48,7 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
   const estoque = (produto.estoque ?? {}) as Record<string, number>
 
   return (
-    <div className="app-container space-y-8 py-8">
+    <>
       <MotionReveal>
         <div className="flex items-center gap-3">
           <Link href="/admin/loja" className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]">
@@ -106,6 +106,6 @@ export default async function EditarProdutoPage({ params }: { params: Promise<{ 
         </div>
         </MotionReveal>
       )}
-    </div>
+    </>
   )
 }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft, Beer, CalendarDays, Lock, MapPin, ShieldCheck, Users, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
-import { formatarMoedaBRL, formatDataCompetenciaInput } from '@torcida/types'
+import { formatarMoedaBRL, formatDataCompetenciaInput, formatNomeTorcida } from '@torcida/types'
 import { assertPresidentePodeLerUnidade } from '@/lib/authz'
 import { listarEventosDaUnidade, type EventoUnidadeItem } from '@/lib/eventos'
 import { listarLancamentosFinanceiro, resumirFinanceiro } from '@/lib/financeiro'
@@ -96,7 +96,9 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
               <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
                 Administração da unidade
               </p>
-              <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{unidade.nome}</h1>
+              <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
+                {formatNomeTorcida(unidade.nome)}
+              </h1>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2">
               <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />

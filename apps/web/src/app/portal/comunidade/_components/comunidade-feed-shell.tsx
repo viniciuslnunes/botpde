@@ -10,6 +10,7 @@ import { ComunidadeStickySearchChrome } from './comunidade-sticky-search-chrome'
 import { ComunidadeEscopoTabs } from './comunidade-escopo-tabs'
 import { FeedLiveBanner } from './feed-live-banner'
 import { ComunidadeComposerSection } from './comunidade-composer-section'
+import { FeedComposerSkeleton, FeedStoriesSkeleton } from '@/components/portal/feed-skeletons'
 import { ComunidadeNacionalComposerSection } from './comunidade-nacional-composer-section'
 import type { SalaAtivaListItem } from '@/lib/salas'
 import type { AfiliacaoComunidade } from '@/lib/comunidade-contexto'
@@ -49,9 +50,7 @@ interface ComunidadeFeedShellProps {
 }
 
 function ComposerFallback() {
-  return (
-    <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-  )
+  return <FeedComposerSkeleton />
 }
 
 export function ComunidadeFeedShell({
@@ -155,11 +154,7 @@ export function ComunidadeFeedShell({
         </Suspense>
 
         {!modoNacional && currentUser.id && (
-          <Suspense
-            fallback={
-              <div className="h-20 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-            }
-          >
+          <Suspense fallback={<FeedStoriesSkeleton />}>
             <ComunidadeStoriesSection tenantId={tenant.id} currentUser={currentUser} />
           </Suspense>
         )}

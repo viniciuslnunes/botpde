@@ -302,8 +302,10 @@ describe('filterMenuByPermissions com OR', () => {
     expect(soAprovar.map((i) => i.id)).toContain('membros')
     expect(soAprovar.map((i) => i.id)).not.toContain('socios')
 
+    // Moderação virou tab de /admin/comunidade: o menu mostra o módulo, e o
+    // módulo leva o moderador direto para a etapa dele.
     const soMsgMod = filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.MESSAGES_MODERATE])
-    expect(soMsgMod.map((i) => i.id)).toContain('comunidade-moderacao')
+    expect(soMsgMod.map((i) => i.id)).toContain('comunidade')
   })
 
   it('ADMIN_MENU: pacote Financeiro (membro) não abre operação — só Dashboard + Relatórios (leitura)', () => {
@@ -322,7 +324,8 @@ describe('filterMenuByPermissions com OR', () => {
   it('ADMIN_MENU: finance:manage abre Financeiro; events:manage abre Eventos', () => {
     expect(
       filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.FINANCE_MANAGE]).map((i) => i.id),
-    ).toEqual(['dashboard', 'financeiro', 'planos-associacao', 'cobrancas'])
+      // Cobranças e planos são tabs de /admin/financeiro — uma entrada só.
+    ).toEqual(['dashboard', 'financeiro'])
     expect(
       filterMenuByPermissions(ADMIN_MENU, [PERMISSIONS.EVENTS_MANAGE]).map((i) => i.id),
     ).toEqual(['dashboard', 'eventos'])

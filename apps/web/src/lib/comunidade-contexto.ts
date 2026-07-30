@@ -4,7 +4,9 @@ import { getActiveTenant, resolveTenantLogoUrl } from '@/lib/tenant'
 import {
   COR_PRIMARIA_PLATAFORMA,
   designFromPrimary,
+  formatNomeAfiliacao,
   isCorPadraoPlataforma,
+  nomeExibicaoAfiliacao,
   paletaDoClube,
 } from '@torcida/types'
 
@@ -14,6 +16,14 @@ export type AfiliacaoComunidade = {
   apelido: string | null
   slug: string | null
   escudoUrl: string | null
+}
+
+function projetarAfiliacaoComunidade(a: AfiliacaoComunidade): AfiliacaoComunidade {
+  return {
+    ...a,
+    nome: formatNomeAfiliacao(a.nome),
+    apelido: a.apelido ? formatNomeAfiliacao(a.apelido) : null,
+  }
 }
 
 /** Escopo de leitura/publicação escolhido dentro da Comunidade (query `?escopo=`). */
@@ -67,10 +77,11 @@ export const resolverContextoComunidade = cache(
     if (tenant) {
       let afiliacao: AfiliacaoComunidade | null = null
       if (tenant.afiliacaoId) {
-        afiliacao = await db.afiliacao.findUnique({
+        const raw = await db.afiliacao.findUnique({
           where: { id: tenant.afiliacaoId },
           select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
         })
+        afiliacao = raw ? projetarAfiliacaoComunidade(raw) : null
       }
 
       // Subsede/PDE promovida a tenant próprio: sem logo de marca definido,
@@ -107,13 +118,14 @@ export const resolverContextoComunidade = cache(
     })
     if (!perfil?.onboardingConcluidoEm || !perfil.afiliacaoId) return null
 
-    const afiliacao: AfiliacaoComunidade | null = await db.afiliacao.findUnique({
+    const afiliacaoRaw: AfiliacaoComunidade | null = await db.afiliacao.findUnique({
       where: { id: perfil.afiliacaoId },
       select: { id: true, nome: true, apelido: true, slug: true, escudoUrl: true },
     })
-    if (!afiliacao) return null
+    if (!afiliacaoRaw) return null
 
-    const tenantSintetico = await getOrCreateComunidadeNacionalTenant(afiliacao.id)
+    const afiliacao = projetarAfiliacaoComunidade(afiliacaoRaw)
+    const tenantSintetico = await getOrCreateComunidadeNacionalTenant(afiliacaoRaw.id)
 
     return { modo: 'nacional', tenant: null, afiliacao, tenantSintetico, podeEscopoTorcida: false }
   },
@@ -171,7 +183,7 @@ export async function getOrCreateComunidadeNacionalTenant(
   try {
     const criado: TenantSintetico = await db.tenant.create({
       data: {
-        nome: `${afiliacao.apelido ?? afiliacao.nome} — Comunidade Nacional`,
+        nome: `${nomeExibicaoAfiliacao(afiliacao)} — Comunidade Nacional`,
         slug: slugReservado,
         afiliacaoId,
         logoUrl: afiliacao.escudoUrl,

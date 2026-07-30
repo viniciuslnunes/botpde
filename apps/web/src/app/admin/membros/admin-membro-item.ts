@@ -1,3 +1,15 @@
+export interface MembroReprovacaoDetalhe {
+  motivo: string
+  categoriaId: string | null
+  categoriaLabel: string | null
+  /** Ids de `PONTOS_REPROVACAO` apontados como incorretos. */
+  pontos: string[]
+  emLabel: string | null
+  porNome: string | null
+  /** false = reprovação definitiva; o solicitante não pode reenviar. */
+  permiteReenvio: boolean
+}
+
 export interface AdminMembroItem {
   id: string
   nome: string
@@ -61,6 +73,12 @@ export interface AdminMembroItem {
   /** Nº de solicitações (cadastro + recadastros) registradas no AuditLog. */
   tentativas?: number
   ultimoMotivoReprovacao?: string
+  /**
+   * Rastro da reprovação atual (null quando o cadastro não está reprovado).
+   * `pontos` são ids de `PONTOS_REPROVACAO` — o card usa para pintar de
+   * vermelho a etapa recusada.
+   */
+  reprovacao?: MembroReprovacaoDetalhe | null
   /** true = registro espelho na Sede (fila compartilhada Caso B; origem na unidade). */
   espelhado?: boolean
   /** Nome da Subsede/PDE de origem do vínculo (quando espelhado). */

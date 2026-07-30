@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { m } from 'motion/react'
 import { Radio, Users } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import { entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
 import { Avatar } from '@/components/portal/avatar'
 import { springSnappy } from '@/lib/motion-presets'
@@ -66,11 +67,15 @@ export function CanaisSugeridosAside({
         {canais.map((canal) => {
           // Sempre pelo id: oficiais Caso A (SUBSEDE/PDE) compartilham tenantId.
           const href = linkCanalComunidade(canal.id)
+          const tenantNome = formatNomeTorcida(canal.tenantNome)
+          const canalNome = canal.canalOficial
+            ? formatNomeTorcida(canal.nome ?? tenantNome)
+            : (canal.nome ?? 'Canal')
           return (
             <div key={canal.id} className="flex items-center gap-2">
               <Link href={href} className="shrink-0">
                 <Avatar
-                  nome={canal.nome ?? canal.tenantNome}
+                  nome={canalNome}
                   avatarUrl={canal.avatarUrl}
                   size="sm"
                   fit="contain"
@@ -78,7 +83,7 @@ export function CanaisSugeridosAside({
               </Link>
               <Link href={href} className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-[rgb(var(--foreground))] hover:underline">
-                  {canal.nome ?? 'Canal'}
+                  {canalNome}
                 </p>
                 <p className="truncate text-[10px] text-[rgb(var(--foreground-muted))]">
                   <span className="inline-flex items-center gap-0.5">
@@ -87,7 +92,7 @@ export function CanaisSugeridosAside({
                   </span>
                   {' · '}
                   {canal.canalOficial ? 'Oficial' : 'Temático'}
-                  {canal.tenantId !== tenantAtualId ? ` · ${canal.tenantNome}` : null}
+                  {canal.tenantId !== tenantAtualId ? ` · ${tenantNome}` : null}
                 </p>
               </Link>
               {canal.pedidoEnviado ? (

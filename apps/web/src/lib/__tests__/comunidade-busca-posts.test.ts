@@ -55,6 +55,10 @@ vi.mock('@/lib/canais', () => ({
 
 vi.mock('@torcida/types', () => ({
   formatNomeTorcida: (n: string) => n,
+  formatNomeAfiliacao: (n: string) => n,
+  nomeExibicaoAfiliacao: (
+    a: { apelido?: string | null; nome?: string | null } | null | undefined,
+  ) => (a ? String(a.apelido ?? a.nome ?? '') : ''),
 }))
 
 import { buscarComunidade } from '@/lib/comunidade-busca'

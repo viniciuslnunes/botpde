@@ -1,5 +1,6 @@
 import { Prisma } from '@torcida/db'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import type { InboxItemDto } from './mensageria-client'
 import { canFollowUser } from './social'
 import { criarNotificacao } from '@/lib/notificacoes'
@@ -73,6 +74,7 @@ interface MembroAtivoRow {
     tipo: TipoConversa
     tenantId: string
     nome: string | null
+    canalOficial: boolean
     avatarUrl: string | null
     atualizadoEm: Date
   }
@@ -650,6 +652,7 @@ export async function assertMembroConversa(
           tipo: true,
           tenantId: true,
           nome: true,
+          canalOficial: true,
           avatarUrl: true,
           atualizadoEm: true,
         },
@@ -829,7 +832,10 @@ export async function listConversas(userId: string): Promise<ConversaInboxItem[]
     return {
       id: row.conversa.id,
       tipo: row.conversa.tipo,
-      nome: row.conversa.nome,
+      nome:
+        row.conversa.tipo === 'CANAL' && row.conversa.canalOficial && row.conversa.nome
+          ? formatNomeTorcida(row.conversa.nome)
+          : row.conversa.nome,
       avatarUrl:
         row.conversa.avatarUrl ?? avatarCanalPorSede.get(row.conversa.id) ?? null,
       atualizadoEm: row.conversa.atualizadoEm,

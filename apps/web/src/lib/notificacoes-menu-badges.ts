@@ -1,32 +1,39 @@
 import type { TipoNotificacao } from '@torcida/db'
+import { resolverMenuIdDeRota } from '@torcida/types'
 
 /**
- * Mapa tipo → id de ADMIN_MENU para badges no sidebar.
- * Mantido espelhado com `menuId` em POLITICA_POR_TIPO (notificacoes-routing).
+ * Mapa tipo → **rota que resolve a pendência** (a tab/página onde o gestor age).
+ * Mantido espelhado com `rota` em POLITICA_POR_TIPO (notificacoes-routing).
  * Arquivo separado para evitar ciclo notificacoes ↔ notificacoes-routing.
+ *
+ * Por que rota e não id de menu: ao promover uma rota a tab de módulo, a
+ * entrada some de ADMIN_MENU e um id fixo apontaria para o nada — o badge
+ * sumiria em silêncio (aconteceu com estoque/fiado/estorno/pedidos na wave 1).
+ * Resolvendo por rota, o badge sobe sozinho para a entrada do módulo.
  */
-export const MENU_ID_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
-  MEMBRO_SOLICITADO: 'membros',
-  DENUNCIA_NOVA: 'comunidade-moderacao',
-  ALIANCA_PROPOSTA: 'aliancas',
-  ALIANCA_ACEITA: 'aliancas',
-  ALIANCA_REJEITADA: 'aliancas',
-  ALIANCA_ENCERRADA: 'aliancas',
-  ALIANCA_CANCELADA: 'aliancas',
-  COBRANCA_VENCIDA: 'cobrancas',
-  EVENTO_RSVP: 'eventos',
-  EVENTO_DIA_GESTOR: 'eventos',
-  PEDIDO_RECEBIDO: 'loja-pedidos',
-  SOLICITACAO_UNIDADE_CRIADA: 'afiliacoes',
-  BAR_ESTOQUE_BAIXO: 'bar-estoque',
-  BAR_FIADO_VENCIDO: 'bar-fiado',
-  BAR_TURNO_DIVERGENCIA: 'bar-pdv',
-  BAR_ESTORNO_ANOMALO: 'bar-estornos',
+export const ROTA_POR_TIPO: Partial<Record<TipoNotificacao, string>> = {
+  MEMBRO_SOLICITADO: '/admin/membros',
+  DENUNCIA_NOVA: '/admin/comunidade/moderacao',
+  ALIANCA_PROPOSTA: '/admin/aliancas',
+  ALIANCA_ACEITA: '/admin/aliancas',
+  ALIANCA_REJEITADA: '/admin/aliancas',
+  ALIANCA_ENCERRADA: '/admin/aliancas',
+  ALIANCA_CANCELADA: '/admin/aliancas',
+  COBRANCA_VENCIDA: '/admin/financeiro/cobrancas',
+  EVENTO_RSVP: '/admin/eventos',
+  EVENTO_DIA_GESTOR: '/admin/eventos',
+  PEDIDO_RECEBIDO: '/admin/loja/pedidos',
+  SOLICITACAO_UNIDADE_CRIADA: '/admin/afiliacoes',
+  BAR_ESTOQUE_BAIXO: '/admin/bar/estoque',
+  BAR_FIADO_VENCIDO: '/admin/bar/fiado',
+  BAR_TURNO_DIVERGENCIA: '/admin/bar/pdv',
+  BAR_ESTORNO_ANOMALO: '/admin/bar/estornos',
 }
 
 /** Menu do sidebar admin associado ao tipo, se houver badge operacional. */
 export function menuIdParaTipo(tipo: TipoNotificacao): string | null {
-  return MENU_ID_POR_TIPO[tipo] ?? null
+  const rota = ROTA_POR_TIPO[tipo]
+  return rota ? resolverMenuIdDeRota(rota) : null
 }
 
 /**

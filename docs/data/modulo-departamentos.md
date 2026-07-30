@@ -36,6 +36,12 @@ efetivas = ∪ permissionsOfRole(perfil, depto)
 `UserDepartamento` / `DepartamentoGestor` são **projeção** ao salvar os perfis
 (`syncMembershipFromRoles`).
 
+**Elegibilidade obrigatória:** só `SaasMembro` canônico do próprio tenant,
+`SOCIO`, `APROVADO` e sem desligamento pode receber perfil ou projeção de área.
+`TORCEDOR`, pendente/reprovado, desligado e registro espelhado não pertencem a
+departamento. O sincronizador remove projeções inelegíveis; o desligamento
+também remove atomicamente os perfis de área, preservando perfis transversais.
+
 ### Permissões adicionais → novo perfil
 
 Na aba **Permissões adicionais** da pessoa, deltas além do pacote dos perfis podem ser
@@ -108,7 +114,7 @@ o status for `PENDENTE` ou `REPROVADO`.
 | Momento | O que acontece |
 |--------|----------------|
 | `solicitarVinculo` (SOCIO) | Valida depto do tenant → grava `SaasMembro.departamentoId`; status `PENDENTE` |
-| Equipe `/portal/departamentos/[slug]` | Lista só quem **não** é PENDENTE/REPROVADO (filtro de leitura; sem write-on-GET) |
+| Equipe `/portal/departamentos/[slug]` | Lista só sócio canônico, aprovado e ativo (filtro de leitura; sem write-on-GET) |
 | `aprovarMembro(id)` | Role `member` + (default) perfil `Membro · área` + `syncMembershipFromRoles` + `invalidatePermissionsCache` |
 | `aprovarMembro(id, { incluirDepartamento: false })` | Aprova vínculo **sem** entrar na equipe — botão **Sem área** no admin |
 | `reprovarMembro` / `reverterMembro` | `limparMembershipDepartamentos` (roles de área + UD + gestores) |

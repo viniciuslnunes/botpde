@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { Users } from 'lucide-react'
+import { formatNomeAfiliacao, formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { resolverContextoComunidade, resolverEscopoComunidade } from '@/lib/comunidade-contexto'
 import { getGruposDoTenant } from '@/lib/feed'
@@ -25,7 +26,7 @@ export default async function GruposPage({
   const escopo = escopoDesejado === 'nacional' && !ctx.afiliacao ? 'torcida' : escopoDesejado
 
   if (escopo === 'nacional' && ctx.afiliacao && ctx.tenantSintetico) {
-    const nomeClube = ctx.afiliacao.apelido || ctx.afiliacao.nome
+    const nomeClube = formatNomeAfiliacao(ctx.afiliacao.apelido || ctx.afiliacao.nome)
     const grupos = await getGruposDoTenant(ctx.tenantSintetico.id, session.user.id)
 
     return (
@@ -51,7 +52,7 @@ export default async function GruposPage({
       <ComunidadePageHeader
         icon={Users}
         titulo="Grupos"
-        subtitulo={`Comunidades temáticas da ${tenant.nome}`}
+        subtitulo={`Comunidades temáticas da ${formatNomeTorcida(tenant.nome)}`}
       />
 
       <GruposClient gruposIniciais={grupos} />

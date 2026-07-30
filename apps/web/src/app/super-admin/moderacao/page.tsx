@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ShieldAlert } from 'lucide-react'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
@@ -96,7 +97,7 @@ export default async function ModeracaoPlataformaPage() {
             {denunciasPost.map((d) => (
               <tr key={d.id} className="align-top">
                 <td className="px-3 py-2 text-[rgb(var(--foreground))]">
-                  <span className="font-medium">{d.tenant.nome}</span>
+                  <span className="font-medium">{formatNomeTorcida(d.tenant.nome)}</span>
                   <span className="ml-1 font-mono text-xs text-[rgb(var(--foreground-muted))]">{d.tenant.slug}</span>
                 </td>
                 <td className="max-w-xs px-3 py-2 text-[rgb(var(--foreground))]">
@@ -141,7 +142,7 @@ export default async function ModeracaoPlataformaPage() {
             {denunciasMensagem.map((d) => (
               <tr key={d.id} className="align-top">
                 <td className="px-3 py-2 text-[rgb(var(--foreground))]">
-                  <span className="font-medium">{d.tenant.nome}</span>
+                  <span className="font-medium">{formatNomeTorcida(d.tenant.nome)}</span>
                   <span className="ml-1 font-mono text-xs text-[rgb(var(--foreground-muted))]">{d.tenant.slug}</span>
                 </td>
                 <td className="px-3 py-2 text-[rgb(var(--foreground))]">

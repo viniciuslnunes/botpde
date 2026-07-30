@@ -28,8 +28,13 @@ export function AdminMembrosTable({
   dir,
   sortHrefs,
 }: AdminMembrosTableProps) {
-  const [selecionado, setSelecionado] = useState<AdminMembroItem | null>(null)
-  const fecharDetalhe = useCallback(() => setSelecionado(null), [])
+  // Guarda o id, não o objeto: quando a decisão revalida a lista, o card
+  // aberto reflete o novo status/reprovação em vez de mostrar dado velho.
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
+  const selecionado = selecionadoId
+    ? (membros.find((m) => m.id === selecionadoId) ?? null)
+    : null
+  const fecharDetalhe = useCallback(() => setSelecionadoId(null), [])
 
   if (membros.length === 0) {
     return (
@@ -125,11 +130,11 @@ export function AdminMembrosTable({
                   animate="show"
                   exit={{ opacity: 0, x: -8, transition: { duration: 0.18 } }}
                   className="cursor-pointer transition-colors hover:bg-[rgb(var(--background-subtle)_/_0.5)]"
-                  onClick={() => setSelecionado(membro)}
+                  onClick={() => setSelecionadoId(membro.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      setSelecionado(membro)
+                      setSelecionadoId(membro.id)
                     }
                   }}
                   tabIndex={0}
@@ -221,6 +226,8 @@ export function AdminMembrosTable({
                       aprovadoNaUnidadeNome={membro.aprovadoNaUnidadeNome}
                       aprovadoPorNome={membro.aprovadoPorNome}
                       aprovadoEmLabel={membro.aprovadoEmLabel}
+                      nomeMembro={membro.nome}
+                      isSocio={membro.isSocio}
                     />
                   </td>
                 </m.tr>

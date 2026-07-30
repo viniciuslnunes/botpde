@@ -395,6 +395,37 @@ Provider: `ComunidadeQueryProvider` no layout da Comunidade.
 | C5 | **Prefetch on-hover** perfil/hashtag | Alinha navbar | Baixo | ✅ |
 | C6 | Hashtags trending TTL 300s + tag on-write | Escala trending | Baixo | ✅ (MV job ainda futuro) |
 
+**Fix 2026-07-29 — `scrollMargin` no windowing (loop de scroll).** `useFeedWindow`
+usava `useWindowVirtualizer` **sem `scrollMargin`**, ou seja assumindo que a lista
+começa em `y = 0` do documento. Como acima dela há tabs, banners, barra sticky,
+stories e composer (~600–900 px), o range visível e os `item.start` ficavam
+deslocados; as medições (`measureElement`) realimentavam `getTotalSize()`, a altura
+do documento oscilava e a página entrava em **loop de sobe/desce** (sintoma visível:
+o rail sticky da esquerda "pulando"). Só aparecia depois da 2ª página do infinite
+scroll, quando a virtualização liga (> 24 itens). Agora o hook expõe `listRef` +
+`scrollMargin` (medido por `getBoundingClientRect().top + scrollY`, com
+`ResizeObserver` no `body` para mudanças de altura acima da lista) e os consumidores
+posicionam com `translateY(item.start - scrollMargin)`. Regra: **windowing de janela
+só é correto com `scrollMargin`** — nunca usar `item.start` cru.
+
+**Fix 2026-07-29 — a troca de modo em si.** A virtualização liga no meio do scroll
+(quando a 2ª página cruza os 24 itens), e a troca trazia mais três problemas:
+
+| Problema | Efeito | Correção |
+|---|---|---|
+| Lista já renderizada não era medida antes de virtualizar | container passava a valer `count × 420` de uma vez → altura do documento pula | `useLayoutEffect` lê as alturas reais (`[data-index]`) e semeia `initialMeasurementsCache` **no mesmo commit**, antes do paint |
+| `estimateSize` fixo em 420 px | páginas seguintes com estimativa arbitrária | estimativa = **média real medida** na troca |
+| `.feed-post-window` (`content-visibility: auto`) dentro do item medido | fora da viewport o elemento reporta o tamanho intrínseco; o `ResizeObserver` do `measureElement` grava esse valor falso e o total oscila | classe só no modo não-virtualizado (`windowing.postClassName`) — virtualizando, o windowing nativo é redundante |
+
+Detalhes: o modo é **latch** (não desliga se um post for removido e a contagem
+cair); a marcação dos itens é a **mesma nos dois modos** (só muda o
+posicionamento), senão as alturas medidas antes da troca não valeriam depois;
+e o `listRef` é passado **para** o hook, não devolvido por ele (devolver faz o
+lint do React Compiler acusar leitura de ref durante o render em todo acesso ao
+objeto de retorno). Efeito colateral: a lista sempre monta em fluxo normal e só
+então virtualiza — some um risco latente de hydration mismatch quando o cache
+do Query volta quente com muitos posts.
+
 ### Fase D — tempo quase real e consistência multi-instância
 
 **D1 entregue (2026-07-16):** bridge `realtime-bus.ts` com `REDIS_URL` opcional

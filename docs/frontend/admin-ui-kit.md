@@ -24,7 +24,10 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `TableShell` | Card + `<table>` (children = thead/tbody do módulo), slot de filtros, empty via `MotionEmptyState` | **Não** é DataTable declarativa — cada módulo mantém suas linhas |
 | `TablePagination` | ← Anterior / Próxima → (`page`, `totalPages`, `buildHref`) | Server-safe; use com `buildAdminHref` de `apps/web/src/lib/admin-href.ts` |
 | `InsightSection` | Seção de insights (título + grid) com `MotionRevealOnce` | Usada nos hubs e em `/admin/relatorios` |
-| `AdminTabs` | Barra de tabs (`tabs`, `basePath`, `activeId`, `paramKey?`, `extraParams?`); `icon` é `ReactNode` (ex. `<Users className="h-4 w-4" />`), **nunca** o componente Lucide — funções não serializam Server→Client | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
+| `AdminChartPeriodFilter` | Período URL-driven para gráficos (`3m`, `6m`, `9m`, range customizado) | Preserva filtros da página; use 3 meses como default e aplique o intervalo a todas as séries/métricas do bloco |
+| `AdminTabs` | Barra de tabs (`tabs`, `basePath?`, `activeId`, `paramKey?`, `extraParams?`); `icon` é `ReactNode` (ex. `<Users className="h-4 w-4" />`), **nunca** o componente Lucide — funções não serializam Server→Client; `href` por tab dispensa `basePath` (modo rota) | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
+| `AdminModuleTabs` | Tabs em que cada tab é uma **rota** do módulo (`tabs` com `href` e `matchPaths?`, `children` = painel) | Client; tab ativa vem do `usePathname()` por casamento mais específico, então deep links seguem válidos; já embrulha o `role="tabpanel"` |
+| `AdminCreateDisclosure` | Ação de criar recolhida em botão (`label`, `title?`, `children` = form) | Client; para hubs cujo form de criação é componente compartilhado com a edição (cobranças, financeiro) e por isso não pode virar disclosure internamente |
 
 **Quando usar `AdminTabs` vs. filtro simples**: tabs são para **seções de
 conteúdo mutuamente exclusivas** (um form ou bloco por vez — ex.: settings,
@@ -32,19 +35,52 @@ status de uma listagem). Filtros que se **combinam** com paginação/busca (ex.:
 tipo + unidade + ordenação numa tabela) continuam sendo `searchParams` simples
 em um `<form>`, sem essa UI.
 
-### Backlog de tabs (candidatos não migrados)
+## Tabs de rota — o hub como shell do módulo (2026-07-29)
 
-Levantados na auditoria que originou o `AdminTabs` (2026-07-27) — próximos
-candidatos a ganhar tabs, priorizados por quantidade de seções empilhadas:
+Módulos com sub-rotas (Bar, Loja) tinham navegação duplicada: uma seção longa
+no menu lateral **e** uma fileira de botões no hub — que, no caso do Bar, nem
+estava no menu. Agora o `layout.tsx` do segmento monta header + `AdminModuleTabs`,
+as sub-rotas viram painéis irmãos e o menu guarda uma entrada por módulo.
 
-- `admin/bar` — turno + PDV + vendas do dia + margem/CMV + insights 30d +
-  estoque baixo.
-- `admin/eventos` — filtro de tipo + toggle lista/semana/mês + insights +
-  histórico.
-- `admin/cobrancas` — insights + filtro de status + form de criar + tabela.
-- `admin/financeiro` — resumo + insights + filtros + form de lançamento +
-  lista.
-- `admin/loja` — insights + form de criar produto + grid ativos/inativos.
+Receita:
+
+1. `layout.tsx` no segmento resolve permissão, contexto (ex.: unidade do bar) e
+   contagens de badge; monta `AdminPageHeader` + `AdminModuleTabs`. Libs com
+   `React.cache` (ex.: `resolveUnidadeBar`) não pagam a query duas vezes quando
+   a página repete a chamada.
+2. Páginas do módulo perdem o wrapper `app-container … py-8` e o back-link
+   "← Módulo": o shell já provê ambos. Cada página retorna um fragmento.
+3. Rota que **não** entra na barra (detalhe, ou etapa secundária como
+   `bar/fornecedores`) é declarada em `matchPaths` da tab a que pertence, para
+   não deixar a barra sem tab ativa.
+4. Página imersiva de tela cheia fica **fora** do shell via route group — o PDV
+   mora em `admin/bar/pdv`, enquanto o resto vive em `admin/bar/(modulo)/`
+   (route group não altera URL).
+5. Ao encolher o menu (`packages/types/src/menu.js`), remapeie os badges de
+   notificação: `MENU_ID_POR_TIPO` (`lib/notificacoes-menu-badges.ts`) e
+   `menuId` em `POLITICA_POR_TIPO` (`lib/notificacoes-routing.ts`) apontam para
+   ids de `ADMIN_MENU` — id removido = badge some em silêncio. Ajuste também
+   `ICON_BY_ID` no `components/admin/sidebar.tsx`.
+6. Se o gate da rota-raiz do módulo é mais estrito que o do menu, redirecione
+   para a primeira etapa acessível em vez de `/admin` — `admin/loja/page.tsx`
+   manda quem só tem `store:view-orders` para `/admin/loja/pedidos`.
+
+### Estado das tabs por módulo
+
+| Módulo | Tabs | Menu lateral |
+|---|---|---|
+| `admin/bar` | Balcão · Vendas (+ estornos) · Fiado · Produtos · Estoque (+ fornecedores) · Desempenho | 7 → 2 (Bar + PDV) |
+| `admin/loja` | Catálogo · Pedidos · Categorias · Cupons · Desempenho | 2 → 1 |
+| `admin/eventos` | Lista · Semana · Mês · Histórico · Comparecimento (`?vista=`) | 1 |
+| `admin/cobrancas` | Todas · Pendentes · Vencidas · Pagas · Canceladas (`?status=`, com contagem) | 1 |
+| `admin/financeiro` | Lançamentos · Evolução (`?tab=`) | 1 |
+| `admin/membros` | status da fila (`?status=`) | 1 |
+| `admin/configuracoes` | seções de settings (`?tab=`) | 1 |
+
+Os hubs de Bar e Loja deixaram de acumular insights: cada um ganhou a etapa
+**Desempenho** (`bar/desempenho`, `loja/desempenho`), que concentra margem/CMV e
+as séries de 30 dias. O Balcão do bar ficou com turno, caixa do dia e estoque
+baixo; o PDV virou ação primária do header do módulo.
 
 ## Charts — `apps/web/src/components/admin/charts/`
 

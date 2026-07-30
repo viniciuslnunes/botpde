@@ -17,6 +17,7 @@ import {
   calculateEffectivePermissions,
   hasPermission,
   PERMISSIONS,
+  formatNomeTorcida,
 } from '@torcida/types'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -89,7 +90,7 @@ async function resolverNomesUnidade(
     where: { id: { in: ids } },
     select: { id: true, nome: true },
   })
-  return new Map(rows.map((u) => [u.id, u.nome]))
+  return new Map(rows.map((u) => [u.id, formatNomeTorcida(u.nome)]))
 }
 
 export default async function SociosPage({

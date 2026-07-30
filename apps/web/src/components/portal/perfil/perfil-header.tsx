@@ -94,7 +94,7 @@ export function PerfilHeader({
         </div>
 
         {acoes && (
-          <div className="mt-4 flex w-full max-w-xs flex-wrap items-center justify-center gap-2">
+          <div className="mt-4 flex w-full max-w-sm flex-wrap items-center justify-center gap-2">
             {acoes}
           </div>
         )}

@@ -2,24 +2,45 @@ import { Suspense, type ReactNode } from 'react'
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
 import { Users, UserCheck, UserX, Clock } from 'lucide-react'
-import { PERMISSIONS } from '@torcida/types'
+import {
+  PERMISSIONS,
+  formatNomeTorcida,
+  labelCategoriaReprovacao,
+} from '@torcida/types'
 import { assertPermission } from '@/lib/authz'
 import { tenantsAreRivais } from '@/lib/hierarquia'
 import {
   distribuirMembros,
+  resumirFilaPendentes,
   resumirFunilMembros,
+  resumirReprovacoes,
+  serieAprovadosMensal,
+  serieEntradasFilaMensal,
   serieFunilMensal,
+  serieReprovadosMensal,
   type DistribuicaoMembros,
+  type FilaPendentesResumo,
   type FunilMembrosResumo,
   type FunilMensalPonto,
+  type ReprovacoesResumo,
+  type SerieAprovadosPonto,
+  type SerieReprovadosPonto,
+  type StatusMembrosInsight,
 } from '@/lib/membros-insights'
 import {
+  AdminChartPeriodFilter,
+  AdminExpansionPanel,
   AdminTabs,
-  InsightSection,
   StatCard,
   TablePagination,
+  type AdminChartPeriod,
 } from '@/components/admin/ui'
 import { DonutChart, MiniBarChart } from '@/components/admin/charts'
+import {
+  resolverIntervaloCustomizado,
+  resolverIntervaloMeses,
+  type IntervaloAnalise,
+} from '@/lib/admin-insights'
 import {
   nextSortDir,
   parseDirParam,
@@ -33,7 +54,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membros — Admin' }
 
-type StatusFilter = 'PENDENTE' | 'APROVADO' | 'REPROVADO' | 'TODOS'
+type StatusFilter = StatusMembrosInsight
 
 const MEMBROS_SORT_COLS = [
   'nome',
@@ -57,37 +78,126 @@ const MEMBRO_SORT_DEFAULT_DIR: Partial<Record<MembroSortCol, SortDir>> = {
   status: 'asc',
 }
 
-async function MembrosInsights({ tenantId }: { tenantId: string }) {
+const CATEGORIA_CURTA: Record<string, string> = {
+  DADOS_INCORRETOS: 'Dados',
+  DOCUMENTACAO: 'Docs',
+  VINCULO_NAO_COMPROVADO: 'Vínculo',
+  DUPLICIDADE: 'Duplicidade',
+  RESTRICAO: 'Restrição',
+  FORA_DE_PERFIL: 'Perfil',
+  OUTRO: 'Outro',
+}
+
+function parseStatusFiltro(valor: string | undefined): StatusFilter {
+  switch (valor) {
+    case 'PENDENTE':
+    case 'APROVADO':
+    case 'REPROVADO':
+      return valor
+    default:
+      return 'TODOS'
+  }
+}
+
+function parsePeriodoGrafico(valor: string | undefined): AdminChartPeriod {
+  switch (valor) {
+    case '6m':
+    case '9m':
+    case 'custom':
+      return valor
+    default:
+      return '3m'
+  }
+}
+
+const dataIsoSp = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function formatarDataCurta(iso: string): string {
+  const [ano, mes, dia] = iso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
+function descricaoInsights(status: StatusFilter, periodoLabel: string): string {
+  switch (status) {
+    case 'PENDENTE':
+      return `Fila atual · aging do tempo de espera · entradas em ${periodoLabel}.`
+    case 'APROVADO':
+      return `Base aprovada · aprovações e desligamentos em ${periodoLabel} vs período anterior.`
+    case 'REPROVADO':
+      return `Reprovações em ${periodoLabel} vs período anterior · reenvio × definitivo · motivos.`
+    default:
+      return `${periodoLabel} vs período anterior · evolução mensal da base.`
+  }
+}
+
+type InsightsPeriodoProps = {
+  tenantId: string
+  intervalo: IntervaloAnalise
+  periodControl: ChartPeriodControlProps
+}
+
+type ChartPeriodControlProps = {
+  periodo: AdminChartPeriod
+  customStart: string
+  customEnd: string
+  maxDate: string
+  periodExtraParams: Record<string, string | undefined>
+}
+
+function ChartHeader({
+  title,
+  periodControl,
+}: {
+  title: string
+  periodControl: ChartPeriodControlProps
+}) {
+  return (
+    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+        {title}
+      </h3>
+      <AdminChartPeriodFilter
+        basePath="/admin/membros"
+        activePeriod={periodControl.periodo}
+        customStart={periodControl.customStart}
+        customEnd={periodControl.customEnd}
+        maxDate={periodControl.maxDate}
+        extraParams={periodControl.periodExtraParams}
+      />
+    </div>
+  )
+}
+
+async function InsightsTodos({ tenantId, intervalo, periodControl }: InsightsPeriodoProps) {
   const [funil, serie, distribuicao]: [
     FunilMembrosResumo,
     FunilMensalPonto[],
     DistribuicaoMembros,
   ] = await Promise.all([
-    resumirFunilMembros(tenantId, '30d'),
-    serieFunilMensal(tenantId, 12),
-    distribuirMembros(tenantId),
+    resumirFunilMembros(tenantId, intervalo),
+    serieFunilMensal(tenantId, intervalo),
+    distribuirMembros(tenantId, 'APROVADO'),
   ])
 
-  const semBase = distribuicao.socios + distribuicao.torcedores === 0
-  if (semBase && funil.atual.novos === 0 && funil.anterior.novos === 0) return null
-
   return (
-    <InsightSection
-      title="Movimento da base"
-      description="Últimos 30 dias vs período anterior · funil mensal dos últimos 12 meses."
-    >
+    <>
       <StatCard
-        label="Novos cadastros (30d)"
+        label="Novos cadastros no período"
         value={funil.atual.novos}
         delta={{ atual: funil.atual.novos, anterior: funil.anterior.novos }}
       />
       <StatCard
-        label="Aprovações (30d)"
+        label="Aprovações no período"
         value={funil.atual.aprovados}
         delta={{ atual: funil.atual.aprovados, anterior: funil.anterior.aprovados }}
       />
       <StatCard
-        label="Desligamentos (30d)"
+        label="Desligamentos no período"
         value={funil.atual.desligados}
         tone={funil.atual.desligados > 0 ? 'danger' : 'default'}
         delta={{
@@ -98,9 +208,7 @@ async function MembrosInsights({ tenantId }: { tenantId: string }) {
       />
 
       <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-          Novos × desligados por mês
-        </h3>
+        <ChartHeader title="Novos × desligados por mês" periodControl={periodControl} />
         <MiniBarChart
           data={serie.map((p) => ({
             rotulo: p.mes,
@@ -122,7 +230,261 @@ async function MembrosInsights({ tenantId }: { tenantId: string }) {
           centro={String(distribuicao.socios + distribuicao.torcedores)}
         />
       </div>
-    </InsightSection>
+    </>
+  )
+}
+
+async function InsightsPendentes({ tenantId, intervalo, periodControl }: InsightsPeriodoProps) {
+  const [fila, serie]: [FilaPendentesResumo, FunilMensalPonto[]] = await Promise.all([
+    resumirFilaPendentes(tenantId, intervalo),
+    serieEntradasFilaMensal(tenantId, intervalo),
+  ])
+
+  return (
+    <>
+      <StatCard label="Na fila agora" value={fila.estoque} tone="warning" />
+      <StatCard
+        label="Entraram na fila no período"
+        value={fila.novos.atual}
+        delta={{ atual: fila.novos.atual, anterior: fila.novos.anterior }}
+      />
+      <StatCard
+        label="Aguardando 15+ dias"
+        value={fila.aging.find((b) => b.faixa === '15+ dias')?.quantidade ?? 0}
+        tone={
+          (fila.aging.find((b) => b.faixa === '15+ dias')?.quantidade ?? 0) > 0
+            ? 'danger'
+            : 'default'
+        }
+      />
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Aging da fila
+        </h3>
+        <MiniBarChart
+          data={fila.aging.map((b) => ({
+            rotulo: b.faixa,
+            valor: b.quantidade,
+            cor: 'rgb(var(--color-warning) / 0.75)',
+          }))}
+        />
+      </div>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Fila por tipo
+        </h3>
+        <DonutChart
+          data={[
+            { rotulo: 'Sócios', valor: fila.porTipo.socios },
+            { rotulo: 'Torcedores', valor: fila.porTipo.torcedores },
+          ]}
+          centro={String(fila.porTipo.socios + fila.porTipo.torcedores)}
+        />
+      </div>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5 lg:col-span-3">
+        <ChartHeader title="Entradas na fila por mês" periodControl={periodControl} />
+        <MiniBarChart
+          data={serie.map((p) => ({
+            rotulo: p.mes,
+            valor: p.novos,
+            cor: 'rgb(var(--color-warning) / 0.75)',
+          }))}
+        />
+      </div>
+    </>
+  )
+}
+
+async function InsightsAprovados({ tenantId, intervalo, periodControl }: InsightsPeriodoProps) {
+  const [funil, serie, distribuicao]: [
+    FunilMembrosResumo,
+    SerieAprovadosPonto[],
+    DistribuicaoMembros,
+  ] = await Promise.all([
+    resumirFunilMembros(tenantId, intervalo),
+    serieAprovadosMensal(tenantId, intervalo),
+    distribuirMembros(tenantId, 'APROVADO'),
+  ])
+
+  const base = distribuicao.socios + distribuicao.torcedores
+
+  return (
+    <>
+      <StatCard label="Base aprovada" value={base} />
+      <StatCard
+        label="Aprovações no período"
+        value={funil.atual.aprovados}
+        tone="success"
+        delta={{ atual: funil.atual.aprovados, anterior: funil.anterior.aprovados }}
+      />
+      <StatCard
+        label="Desligamentos no período"
+        value={funil.atual.desligados}
+        tone={funil.atual.desligados > 0 ? 'danger' : 'default'}
+        delta={{
+          atual: funil.atual.desligados,
+          anterior: funil.anterior.desligados,
+          invertido: true,
+        }}
+      />
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+        <ChartHeader title="Aprovações × desligamentos por mês" periodControl={periodControl} />
+        <MiniBarChart
+          data={serie.map((p) => ({
+            rotulo: p.mes,
+            valor: p.aprovados,
+            valorSecundario: p.desligados,
+          }))}
+          legenda={{ principal: 'Aprovações', secundaria: 'Desligados' }}
+        />
+      </div>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Base por tipo
+        </h3>
+        <DonutChart
+          data={[
+            { rotulo: 'Sócios', valor: distribuicao.socios },
+            { rotulo: 'Torcedores', valor: distribuicao.torcedores },
+          ]}
+          centro={String(base)}
+        />
+      </div>
+    </>
+  )
+}
+
+async function InsightsReprovados({ tenantId, intervalo, periodControl }: InsightsPeriodoProps) {
+  const [resumo, serie]: [ReprovacoesResumo, SerieReprovadosPonto[]] = await Promise.all([
+    resumirReprovacoes(tenantId, intervalo),
+    serieReprovadosMensal(tenantId, intervalo),
+  ])
+
+  return (
+    <>
+      <StatCard label="Reprovados na fila" value={resumo.estoque} tone="danger" />
+      <StatCard
+        label="Reprovações no período"
+        value={resumo.reprovados.atual}
+        tone={resumo.reprovados.atual > 0 ? 'warning' : 'default'}
+        delta={{
+          atual: resumo.reprovados.atual,
+          anterior: resumo.reprovados.anterior,
+          invertido: true,
+        }}
+      />
+      <StatCard
+        label="Podem reenviar"
+        value={resumo.permiteReenvio}
+        badge={
+          resumo.definitivos > 0 ? `${resumo.definitivos} definitivos` : undefined
+        }
+        badgeTone="danger"
+      />
+
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:col-span-2 sm:p-5">
+        <ChartHeader title="Reprovações por mês" periodControl={periodControl} />
+        <MiniBarChart
+          data={serie.map((p) => ({
+            rotulo: p.mes,
+            valor: p.reprovados,
+            cor: 'rgb(var(--color-danger) / 0.7)',
+          }))}
+        />
+      </div>
+      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:p-5">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
+          Motivos
+        </h3>
+        <DonutChart
+          data={
+            resumo.porCategoria.length > 0
+              ? resumo.porCategoria.map((c) => ({
+                  rotulo: CATEGORIA_CURTA[c.id] ?? labelCategoriaReprovacao(c.id) ?? c.id,
+                  valor: c.quantidade,
+                }))
+              : [{ rotulo: 'Sem dados', valor: 0 }]
+          }
+          centro={String(resumo.estoque)}
+        />
+      </div>
+    </>
+  )
+}
+
+async function MembrosInsights({
+  tenantId,
+  status,
+  intervalo,
+  periodo,
+  periodoLabel,
+  customStart,
+  customEnd,
+  maxDate,
+  periodExtraParams,
+}: {
+  tenantId: string
+  status: StatusFilter
+  intervalo: IntervaloAnalise
+  periodo: AdminChartPeriod
+  periodoLabel: string
+  customStart: string
+  customEnd: string
+  maxDate: string
+  periodExtraParams: Record<string, string | undefined>
+}) {
+  const periodControl: ChartPeriodControlProps = {
+    periodo,
+    customStart,
+    customEnd,
+    maxDate,
+    periodExtraParams,
+  }
+  let body: ReactNode
+  switch (status) {
+    case 'PENDENTE':
+      body = (
+        <InsightsPendentes
+          tenantId={tenantId}
+          intervalo={intervalo}
+          periodControl={periodControl}
+        />
+      )
+      break
+    case 'APROVADO':
+      body = (
+        <InsightsAprovados
+          tenantId={tenantId}
+          intervalo={intervalo}
+          periodControl={periodControl}
+        />
+      )
+      break
+    case 'REPROVADO':
+      body = (
+        <InsightsReprovados
+          tenantId={tenantId}
+          intervalo={intervalo}
+          periodControl={periodControl}
+        />
+      )
+      break
+    default:
+      body = (
+        <InsightsTodos tenantId={tenantId} intervalo={intervalo} periodControl={periodControl} />
+      )
+  }
+
+  return (
+    <AdminExpansionPanel
+      title="Movimento da base"
+      description={descricaoInsights(status, periodoLabel)}
+      defaultOpen
+    >
+      {body}
+    </AdminExpansionPanel>
   )
 }
 
@@ -137,6 +499,9 @@ export default async function MembrosPage({
     tipo?: string
     sort?: string
     dir?: string
+    periodoGrafico?: string
+    de?: string
+    ate?: string
   }>
 }) {
   // Gate de leitura: dados de cadastro (comprovante, telefone) são RESTRITOS —
@@ -149,7 +514,27 @@ export default async function MembrosPage({
   }
 
   const params = await searchParams
-  const statusFiltro = (params.status as StatusFilter) ?? 'TODOS'
+  const statusFiltro = parseStatusFiltro(params.status)
+  const periodoGrafico = parsePeriodoGrafico(params.periodoGrafico)
+  const hoje = new Date()
+  const maxDate = dataIsoSp.format(hoje)
+  const inicioPadrao = resolverIntervaloMeses(3).inicio
+  const customStartPadrao = dataIsoSp.format(inicioPadrao)
+  const customIntervaloInformado =
+    periodoGrafico === 'custom'
+      ? resolverIntervaloCustomizado(params.de, params.ate)
+      : null
+  const customStart = customIntervaloInformado ? params.de! : customStartPadrao
+  const customEnd = customIntervaloInformado ? params.ate! : maxDate
+  const intervalo =
+    periodoGrafico === 'custom'
+      ? (customIntervaloInformado ??
+        resolverIntervaloCustomizado(customStartPadrao, maxDate)!)
+      : resolverIntervaloMeses(periodoGrafico === '9m' ? 9 : periodoGrafico === '6m' ? 6 : 3)
+  const periodoLabel =
+    periodoGrafico === 'custom'
+      ? `de ${formatarDataCurta(customStart)} a ${formatarDataCurta(customEnd)}`
+      : `últimos ${periodoGrafico === '9m' ? 9 : periodoGrafico === '6m' ? 6 : 3} meses`
   const busca = params.q ?? ''
   const sedeFiltro = params.sede ?? ''
   const tipoFiltro =
@@ -337,7 +722,9 @@ export default async function MembrosPage({
           select: { id: true, nome: true },
         })
       : []
-  const nomeUnidadePorId = new Map(unidadesOrigem.map((u) => [u.id, u.nome]))
+  const nomeUnidadePorId = new Map(
+    unidadesOrigem.map((u) => [u.id, formatNomeTorcida(u.nome)]),
+  )
 
   const count: Record<string, number> = { PENDENTE: 0, APROVADO: 0, REPROVADO: 0 }
   for (const c of contagens) count[c.status] = c._count
@@ -385,12 +772,20 @@ export default async function MembrosPage({
       sort,
       dir,
       pagina: String(pagina),
+      periodoGrafico: periodoGrafico === '3m' ? undefined : periodoGrafico,
+      de: periodoGrafico === 'custom' ? customStart : undefined,
+      ate: periodoGrafico === 'custom' ? customEnd : undefined,
       ...overrides,
     }
     if (merged.status && merged.status !== 'TODOS') p.set('status', merged.status)
     if (merged.q) p.set('q', merged.q)
     if (merged.sede) p.set('sede', merged.sede)
     if (merged.tipo) p.set('tipo', merged.tipo)
+    if (merged.periodoGrafico) p.set('periodoGrafico', merged.periodoGrafico)
+    if (merged.periodoGrafico === 'custom' && merged.de && merged.ate) {
+      p.set('de', merged.de)
+      p.set('ate', merged.ate)
+    }
     const sortVal = merged.sort || 'criadoEm'
     const dirVal = merged.dir || 'desc'
     if (!(sortVal === 'criadoEm' && dirVal === 'desc')) {
@@ -412,6 +807,15 @@ export default async function MembrosPage({
   const sortHrefs: Record<string, string> = Object.fromEntries(
     MEMBROS_SORT_COLS.map((col) => [col, sortHref(col)]),
   )
+  const periodExtraParams: Record<string, string | undefined> = {
+    status: statusFiltro !== 'TODOS' ? statusFiltro : undefined,
+    q: busca || undefined,
+    sede: sedeFiltro || undefined,
+    tipo: tipoFiltro || undefined,
+    sort: sort !== 'criadoEm' ? sort : undefined,
+    dir: sort !== 'criadoEm' || dir !== 'desc' ? dir : undefined,
+    pagina: pagina !== 1 ? String(pagina) : undefined,
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -450,6 +854,9 @@ export default async function MembrosPage({
             tipo: tipoFiltro || undefined,
             sort: sort !== 'criadoEm' ? sort : undefined,
             dir: sort !== 'criadoEm' || dir !== 'desc' ? dir : undefined,
+            periodoGrafico: periodoGrafico === '3m' ? undefined : periodoGrafico,
+            de: periodoGrafico === 'custom' ? customStart : undefined,
+            ate: periodoGrafico === 'custom' ? customEnd : undefined,
           }}
         />
 
@@ -461,6 +868,15 @@ export default async function MembrosPage({
           {sort !== 'criadoEm' && <input type="hidden" name="sort" value={sort} />}
           {(sort !== 'criadoEm' || dir !== 'desc') && (
             <input type="hidden" name="dir" value={dir} />
+          )}
+          {periodoGrafico !== '3m' && (
+            <input type="hidden" name="periodoGrafico" value={periodoGrafico} />
+          )}
+          {periodoGrafico === 'custom' && (
+            <>
+              <input type="hidden" name="de" value={customStart} />
+              <input type="hidden" name="ate" value={customEnd} />
+            </>
           )}
           <input
             type="search"
@@ -504,6 +920,34 @@ export default async function MembrosPage({
       {/* Tabela */}
       <div className="flex-1 overflow-auto py-4">
         <div className="app-container">
+        <div className="mb-8">
+          <Suspense
+            key={`${statusFiltro}-${periodoGrafico}-${customStart}-${customEnd}`}
+            fallback={
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 w-full max-w-md rounded-xl bg-[rgb(var(--border)_/_0.45)]" />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <MembrosInsights
+              tenantId={tenant.id}
+              status={statusFiltro}
+              intervalo={intervalo}
+              periodo={periodoGrafico}
+              periodoLabel={periodoLabel}
+              customStart={customStart}
+              customEnd={customEnd}
+              maxDate={maxDate}
+              periodExtraParams={periodExtraParams}
+            />
+          </Suspense>
+        </div>
+
         <AdminMembrosTable
           sort={sort}
           dir={dir}
@@ -549,6 +993,12 @@ export default async function MembrosPage({
                 adimplente: membro.adimplente,
                 aprovadoPorNome: membro.aprovadoPorNome,
                 aprovadoEm: membro.aprovadoEm,
+                reprovadoEm: membro.reprovadoEm,
+                reprovadoPorNome: membro.reprovadoPorNome,
+                reprovadoCategoria: membro.reprovadoCategoria,
+                reprovadoMotivo: membro.reprovadoMotivo,
+                reprovadoPontos: membro.reprovadoPontos,
+                reprovadoPermiteReenvio: membro.reprovadoPermiteReenvio,
                 desligadoEm: membro.desligadoEm,
                 desligadoMotivo: membro.desligadoMotivo,
                 criadoEm: membro.criadoEm,
@@ -586,20 +1036,6 @@ export default async function MembrosPage({
           totalPages={totalPaginas}
           buildHref={(p) => buildHref({ pagina: String(p) })}
         />
-
-        <div className="mt-8">
-          <Suspense
-            fallback={
-              <div className="grid animate-pulse gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-28 rounded-2xl bg-[rgb(var(--border)_/_0.45)]" />
-                ))}
-              </div>
-            }
-          >
-            <MembrosInsights tenantId={tenant.id} />
-          </Suspense>
-        </div>
         </div>
       </div>
     </div>

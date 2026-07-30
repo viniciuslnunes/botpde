@@ -1,5 +1,7 @@
 /** Tipos e rótulos de torcida — seguros para Client Components (sem next/headers). */
 
+import { formatNomeAfiliacao, formatNomeTorcida, nomeExibicaoAfiliacao } from '@torcida/types'
+
 export type TorcidaOpcao = {
   id: string
   slug: string
@@ -41,7 +43,7 @@ const TIPO_UNIDADE_LABEL: Record<string, string> = {
 }
 
 export function labelClubeOpcao(c: Pick<ClubeOpcao, 'nome' | 'apelido' | 'estado'>): string {
-  const nome = c.apelido ?? c.nome
+  const nome = nomeExibicaoAfiliacao(c)
   return c.estado ? `${nome} (${c.estado})` : nome
 }
 
@@ -59,18 +61,20 @@ export type TorcidaTransferencia = TorcidaOpcao & {
   ownerEmail: string | null
 }
 
-/** "Corinthians (SP)" — subtítulo / busca. */
+/** "CORINTHIANS (SP)" — subtítulo / busca. */
 export function labelClubeComUf(
   t: Pick<TorcidaOpcao, 'clubeNome' | 'clubeUf'>,
 ): string | null {
   if (!t.clubeNome) return null
-  return t.clubeUf ? `${t.clubeNome} (${t.clubeUf})` : t.clubeNome
+  const clube = formatNomeAfiliacao(t.clubeNome)
+  return t.clubeUf ? `${clube} (${t.clubeUf})` : clube
 }
 
-/** Rótulo "Torcida — Clube (UF)" para listagens e combobox. */
+/** Rótulo "TORCIDA — CLUBE (UF)" para listagens e combobox. */
 export function labelTorcidaComClube(
   t: Pick<TorcidaOpcao, 'nome' | 'clubeNome' | 'clubeUf'>,
 ): string {
+  const nome = formatNomeTorcida(t.nome)
   const clube = labelClubeComUf(t)
-  return clube ? `${t.nome} — ${clube}` : t.nome
+  return clube ? `${nome} — ${clube}` : nome
 }

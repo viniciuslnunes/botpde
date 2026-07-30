@@ -179,3 +179,34 @@ novas mutações usam `bar:manage` existente. Ver caveat de margem/relatórios (
 "últimos 30 dias" filtra por `estornadoEm` (não por `criadoEm` da venda), alinhado
 à detecção de padrão anômalo em `estornarVendaBar`. Assim, venda antiga estornada
 hoje aparece no relatório do período corrente.
+
+## Layout do PDV — frame por container query (2026-07-30)
+
+O PDV é um **frame imersivo** (fora do shell admin: sem topbar/sidebar) com três
+zonas: trilha de turno, cardápio e comanda. Decisão fechada: **quem dita o layout
+interno é a largura real do frame, não a da viewport**. A raiz é
+`@container/pdv` e todos os cortes internos usam `@[Nrem]/pdv:` — nunca `lg:`/`xl:`.
+Motivo: as duas colunas laterais comem 40–43rem, então a viewport "dizia" que
+cabiam 3 colunas de produto quando cabia 1; e `lg:` (media query, `rem` sobre a
+fonte inicial do browser) divergia de `w-[19rem]` (`rem` sobre a fonte raiz)
+sempre que havia zoom ou fonte padrão custom — a comanda empilhava embaixo do
+cardápio em vez de virar coluna.
+
+Cortes: comanda vira coluna em ≥60rem (21rem → 23rem em 76rem → 25rem em 100rem);
+trilha de turno entra em ≥82rem (16rem, 18rem em 100rem). **A comanda tem
+prioridade sobre a trilha** — abaixo de 82rem o turno vira drawer pelo chip do
+topbar, e o topbar passa a mostrar `turnoResumo` (vendido + nº de vendas) para o
+caixa não ficar invisível. Abaixo de 60rem a comanda vira bottom sheet.
+
+Cardápio: **linha compacta** de ~4rem (thumb 44px + nome + preço·estoque + zona de
+ação de 4.25rem fixa) em `repeat(auto-fill, minmax(min(15.5rem,100%),1fr))` — o
+card alto com foto grande cabia ~3 itens na tela, a linha cabe ~8 por coluna.
+A zona de ação tem largura fixa de propósito: a linha não reflui ao lançar item.
+Toque na linha lança +1; com item na comanda a linha mostra `−` + badge, e o
+stepper completo vive na comanda (fonte única de edição de quantidade). A linha é
+`div` com `role=button` + Enter/Espaço — `<button>` aninhado fecha o externo cedo
+e estilhaça a grade. Faixa de PIX pendente é chip de uma linha (h-9), não card.
+
+Sheet e drawer usam `absolute` dentro da raiz: `container-type: inline-size`
+implica `contain: layout`, então `fixed` passaria a se posicionar pela raiz —
+melhor assumir isso explicitamente do que depender do efeito colateral.

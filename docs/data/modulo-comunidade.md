@@ -107,7 +107,7 @@ cobrir o mesmo conjunto.
 |-------|---------|
 | Contexto | `resolverContextoEngajamento()` — sócio `APROVADO` com `COMMUNITY_POST`, **ou** torcedor global / preview sem vínculo (escopo = `afiliacaoId` do clube). Não usar só `assertPermission` + `tenantId` do viewer. |
 | Gate do post | `podeEngajarPostVisivel` — fast-path: próprio tenant, ou mesmo clube (sintético / `PUBLICO`); fallback: `resolveVisibleTenantIdsForFeed` (exportado de `feed.ts`). |
-| Leitura de comentários | `listarComentariosPost` — gate pela **visibilidade do post**, sem exigir tenant do viewer (torcedor global lê comentários de posts `PUBLICO`). |
+| Leitura de comentários | `listarComentariosPost` aplica primeiro `resolveTenantIdPortalComunidade` + `resolveVisibleTenantIdsForFeed` (mesmo alcance do feed/permalink), depois `PUBLICO`/`TENANT`/`PRIVADO`. Rival/unrelated não lê nem comentário de post público; autor sempre lê; privacidade de perfil não entra. Torcedor global/CN continua suportado pelo tenant sintético. |
 | UI | `PostEngagement` é otimista; o servidor confirma / reverte no catch. |
 | Sintoma clássico de regressão | POST em `/portal/comunidade` com *“An error occurred in the Server Components render”* ao curtir post da CN → lookup com `tenantId: tenant.id` ou authz sem tenant. |
 
@@ -281,9 +281,13 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     `seed:torcidas-tenants` já provisiona o canal na criação. Abrir na
     listagem vai a `/canais/[id]` (não `/unidade/[tenantId]`), para Caso A
     não colidir no mural do portal-mãe.
-  - `pedirEntradaCanal` aceita canal fechado de **qualquer** tenant desde que
-    `podeVerCanal` (antes filtrava só `tenantId` ativo — listagem mostrava Pedir
-    e a action falhava).
+  - `podeVerCanal` permite **descobrir/ler**, não integrar o roster. Em canal
+    real não-comunidade, `PENDENTE` exige `SaasMembro` local no tenant do canal
+    e `ATIVO` exige vínculo `APROVADO`, não desligado e carteirinha válida.
+    Aliado sem vínculo local vê canal `ALIADOS`, mas não pede, entra nem pode
+    ter pedido aprovado. `DIRETA`, comunidade e tenant sintético são exceções.
+    O gate único é `assertElegibilidadeMembroCanal` (`lib/canais.ts`) e cobre
+    entrada explícita, inscrição implícita ao publicar, aprovação e convite.
   - **Grupos** (`tipo: GRUPO`) criados por torcedores **não** entram nesta
     listagem — ficam em `/portal/comunidade/grupos` (superfície distinta).
 - **Comunidades temáticas** — sócios com `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` criam
@@ -334,7 +338,8 @@ publicação) é resolvido pelo **tenant ativo de quem publica**, não por
     tenant. Botão "Pedir para entrar" no cabeçalho do canal
     (`canal-feed-composition.tsx`) e na listagem (`canais-client.tsx`);
     `canal.pedidoPendente` mostra "Pedido enviado" (desabilitado) em vez de
-    duplicar o pedido.
+    duplicar o pedido. A UI não carrega vínculos locais de todos os tenants
+    visíveis; portanto o gate servidor devolve erro claro sem criar linha.
   - **Decidir pedido**: `decidirPedidoCanal(conversaId, userId, aprovar)` —
     autoridade via `podeGerenciarPedidosCanal` (`lib/canais.ts`): admin local
     do canal (temático) OU `CHANNELS_MANAGE`/`COMMUNITY_MANAGE` no tenant;

@@ -8,7 +8,7 @@ import { getAncestorTenantIds } from '@/lib/hierarquia'
 import { reconciliarPropostasAliancaPendentes } from '@/lib/notificacoes'
 import { AliancaForms } from '@/components/admin/alianca-forms'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { PERMISSIONS } from '@torcida/types'
+import { formatNomeAfiliacao, formatNomeTorcida, PERMISSIONS } from '@torcida/types'
 
 export const metadata: Metadata = { title: 'Alianças — Admin' }
 
@@ -94,11 +94,18 @@ export default async function AdminAliancasPage() {
 
   const tenantOptions: TenantOption[] = tenantsRaw.map((t) => ({
     id: t.id,
-    nome: t.nome,
+    nome: formatNomeTorcida(t.nome),
     slug: t.slug,
     logoUrl: t.torcidaConhecida?.logoUrl ?? t.logoUrl,
     afiliacaoId: t.afiliacaoId,
-    afiliacao: t.afiliacao,
+    afiliacao: t.afiliacao
+      ? {
+          nome: formatNomeAfiliacao(t.afiliacao.nome),
+          apelido: t.afiliacao.apelido ? formatNomeAfiliacao(t.afiliacao.apelido) : null,
+          cidade: t.afiliacao.cidade,
+          estado: t.afiliacao.estado,
+        }
+      : null,
   }))
 
   // Client Component: Dates → ISO (Flight aceita Date, mas o restante do admin

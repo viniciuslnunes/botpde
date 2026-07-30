@@ -20,7 +20,9 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { formatNomeTorcida } from '@torcida/types'
 import { criarCanalTematico, entrarCanal, pedirEntradaCanal } from '@/app/portal/comunidade/actions'
+import { LogoImage } from '@/components/media/logo-image'
 import { Avatar } from '@/components/portal/avatar'
 import { MotionEmptyState } from '@/components/motion/motion-empty-state'
 import { useCroppedImageUpload } from '@/components/media/use-cropped-image-upload'
@@ -644,7 +646,7 @@ export function CanaisClient({
           />
         ) : (
           grupos.map((grupo) => (
-            <div key={grupo.secao} className="space-y-2">
+            <div key={grupo.secao} className="space-y-3">
               <h2 className="flex items-center gap-2 px-0.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
                 {grupo.secao === 'perto' ? <MapPin className="h-3.5 w-3.5" /> : null}
                 {SECAO_CANAL_LABEL[grupo.secao]}
@@ -656,11 +658,11 @@ export function CanaisClient({
                 variants={staggerContainer}
                 initial="hidden"
                 animate="show"
-                className="divide-y divide-[rgb(var(--border)_/_0.7)] overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 lg:grid-cols-3"
               >
                 {grupo.canais.map((c) => (
-                  <m.li key={c.id} variants={staggerItem}>
-                    <CanalRow
+                  <m.li key={c.id} variants={staggerItem} className="min-w-0">
+                    <CanalCard
                       canal={c}
                       tenantAtualId={tenantAtualId}
                       distanciaKm={localizacao ? distanciaKm(localizacao, c) : null}
@@ -680,7 +682,7 @@ export function CanaisClient({
   )
 }
 
-function CanalRow({
+function CanalCard({
   canal,
   tenantAtualId,
   distanciaKm: dist,
@@ -703,149 +705,155 @@ function CanalRow({
   const local = localizacaoLabel(canal)
   const tipoLabel = canal.tipoUnidade ? labelTipoUnidade(canal.tipoUnidade) : null
   const distLabel = dist != null ? formatarDistanciaKm(dist) : null
+  const tenantNome = formatNomeTorcida(canal.tenantNome)
+  const canalNome = canal.canalOficial
+    ? formatNomeTorcida(canal.nome ?? tenantNome)
+    : (canal.nome ?? 'Canal')
+  const resumo =
+    canal.descricao?.trim() ||
+    (canal.canalOficial
+      ? 'Canal oficial da unidade.'
+      : labelVisibilidadeCanal(canal.visibilidadeCanal))
 
   return (
-    <div
+    <article
       className={[
-        'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 transition-colors sm:grid-cols-[auto_minmax(0,1fr)_minmax(7rem,9rem)_auto_auto] sm:gap-x-4 sm:px-4',
-        'hover:bg-[rgb(var(--background-subtle)_/_0.55)]',
-        destaqueProximo ? 'bg-[rgb(var(--color-primary)_/_0.06)]' : '',
+        'card-soft flex h-full flex-col overflow-hidden rounded-2xl border bg-[rgb(var(--surface))] transition-[border-color,box-shadow,background-color] duration-150',
+        destaqueProximo
+          ? 'border-[rgb(var(--color-primary)_/_0.45)] bg-[rgb(var(--color-primary)_/_0.05)] shadow-sm'
+          : 'border-[rgb(var(--border))] hover:border-[rgb(var(--primary)_/_0.4)] hover:shadow-sm',
       ].join(' ')}
     >
-      <Link href={href} className="shrink-0 self-start sm:self-center">
-        <Avatar nome={canal.nome ?? canal.tenantNome} avatarUrl={canal.avatarUrl} size="md" fit="contain" />
-      </Link>
-
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-start gap-3">
           <Link
             href={href}
-            className="truncate text-sm font-semibold text-[rgb(var(--foreground))] hover:underline"
+            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))] sm:h-24 sm:w-24"
+            aria-label={`Abrir canal ${canalNome}`}
           >
-            {canal.nome ?? 'Canal'}
+            {canal.avatarUrl ? (
+              <LogoImage
+                src={canal.avatarUrl}
+                alt={canalNome}
+                size={192}
+                quality={95}
+                className="h-20 w-20 object-contain sm:h-24 sm:w-24"
+              />
+            ) : (
+              <Avatar nome={canalNome} avatarUrl={canal.avatarUrl} size="xl" fit="contain" />
+            )}
           </Link>
-          <span
-            className={[
-              'inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-              canal.canalOficial
-                ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
-                : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
-            ].join(' ')}
-          >
-            {canal.canalOficial ? 'Oficial' : 'Temático'}
-          </span>
-          {canal.tenantId === tenantAtualId && (
-            <span className="text-[10px] font-medium text-[rgb(var(--foreground-muted))]">você</span>
-          )}
-          {destaqueProximo && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))]">
-              <MapPin className="h-3 w-3" />
-              Mais perto
-            </span>
-          )}
-        </div>
 
-        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[rgb(var(--foreground-muted))]">
-          {tipoLabel ? <span>{tipoLabel}</span> : null}
-          {tipoLabel ? <span aria-hidden>·</span> : null}
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            {canal.membros}
-          </span>
-          {!canal.publica ? (
-            <>
-              <span aria-hidden>·</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1">
+              <span
+                className={[
+                  'inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                  canal.canalOficial
+                    ? 'bg-[rgb(var(--color-primary)_/_0.14)] text-[rgb(var(--color-primary-fg))]'
+                    : 'bg-[rgb(var(--background-subtle))] text-[rgb(var(--foreground-muted))]',
+                ].join(' ')}
+              >
+                {canal.canalOficial ? 'Oficial' : 'Temático'}
+              </span>
+              {canal.tenantId === tenantAtualId ? (
+                <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[10px] font-medium text-[rgb(var(--foreground-muted))]">
+                  você
+                </span>
+              ) : null}
+              {destaqueProximo ? (
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-[rgb(var(--color-primary)_/_0.14)] px-1.5 py-0.5 text-[10px] font-semibold text-[rgb(var(--color-primary-fg))]">
+                  <MapPin className="h-3 w-3" aria-hidden />
+                  Mais perto
+                </span>
+              ) : null}
+            </div>
+
+            <Link
+              href={href}
+              className="mt-1.5 line-clamp-2 text-sm font-semibold uppercase leading-snug tracking-wide text-[rgb(var(--foreground))] text-balance hover:underline"
+            >
+              {canalNome}
+            </Link>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[rgb(var(--foreground-muted))]">
+              {tipoLabel ? <span>{tipoLabel}</span> : null}
               <span className="inline-flex items-center gap-1">
-                <Lock className="h-3 w-3" />
-                Pedido
+                <Users className="h-3 w-3" aria-hidden />
+                <span className="tabular-nums">
+                  {canal.membros} {canal.membros === 1 ? 'membro' : 'membros'}
+                </span>
               </span>
-            </>
-          ) : null}
-          {canal.descricao ? (
-            <>
-              <span aria-hidden className="hidden sm:inline">
-                ·
+              {!canal.publica ? (
+                <span className="inline-flex items-center gap-1">
+                  <Lock className="h-3 w-3" aria-hidden />
+                  Pedido
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <p className="line-clamp-2 text-xs leading-relaxed text-[rgb(var(--foreground-muted))] text-pretty">
+          {resumo}
+        </p>
+
+        <div className="mt-auto space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            {local ? (
+              <p className="inline-flex min-w-0 items-center gap-1 text-xs font-medium text-[rgb(var(--foreground))]">
+                <MapPin
+                  className="h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]"
+                  aria-hidden
+                />
+                <span className="truncate">{local}</span>
+              </p>
+            ) : (
+              <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{tenantNome}</p>
+            )}
+            {distLabel ? (
+              <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[rgb(var(--foreground-muted))]">
+                {distLabel}
               </span>
-              <span className="hidden max-w-[28ch] truncate sm:inline">{canal.descricao}</span>
-            </>
+            ) : null}
+          </div>
+
+          {canal.souMembro ? (
+            <Link
+              href={href}
+              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--color-primary))]"
+            >
+              Abrir canal
+            </Link>
+          ) : canal.publica ? (
+            <m.button
+              type="button"
+              disabled={pending}
+              onClick={() => onEntrar(canal.id)}
+              whileTap={{ scale: 0.97 }}
+              transition={springSnappy}
+              className="inline-flex w-full items-center justify-center rounded-lg bg-[rgb(var(--color-primary))] px-3 py-2 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
+            >
+              Entrar
+            </m.button>
+          ) : canal.pedidoPendente ? (
+            <span className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium text-[rgb(var(--foreground-muted))]">
+              Pedido enviado
+            </span>
           ) : (
-            <>
-              <span aria-hidden className="hidden md:inline">
-                ·
-              </span>
-              <span className="hidden truncate md:inline">
-                {labelVisibilidadeCanal(canal.visibilidadeCanal)}
-              </span>
-            </>
+            <m.button
+              type="button"
+              disabled={pending}
+              onClick={() => onPedirEntrada(canal.id)}
+              whileTap={{ scale: 0.97 }}
+              transition={springSnappy}
+              className="inline-flex w-full items-center justify-center rounded-lg border border-[rgb(var(--border))] px-3 py-2 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
+            >
+              Solicitar
+            </m.button>
           )}
         </div>
       </div>
-
-      <div className="col-start-2 min-w-0 sm:col-start-auto sm:text-right">
-        {local ? (
-          <p className="truncate text-xs font-medium text-[rgb(var(--foreground))]">
-            <span className="inline-flex max-w-full items-center gap-1">
-              <MapPin className="h-3 w-3 shrink-0 text-[rgb(var(--foreground-muted))]" />
-              <span className="truncate">{local}</span>
-            </span>
-          </p>
-        ) : (
-          <p className="truncate text-xs text-[rgb(var(--foreground-muted))]">{canal.tenantNome}</p>
-        )}
-      </div>
-
-      <div className="hidden w-[4.5rem] shrink-0 text-right sm:block">
-        {distLabel ? (
-          <span className="text-xs font-semibold tabular-nums text-[rgb(var(--foreground))]">
-            {distLabel}
-          </span>
-        ) : (
-          <span className="text-xs text-[rgb(var(--foreground-muted))]">—</span>
-        )}
-      </div>
-
-      <div className="col-start-3 row-start-1 self-center sm:col-start-auto sm:row-start-auto">
-        {canal.souMembro ? (
-          <Link
-            href={href}
-            className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))]"
-          >
-            Abrir
-          </Link>
-        ) : canal.publica ? (
-          <m.button
-            type="button"
-            disabled={pending}
-            onClick={() => onEntrar(canal.id)}
-            whileTap={{ scale: 0.94 }}
-            transition={springSnappy}
-            className="inline-flex shrink-0 rounded-lg bg-[rgb(var(--color-primary))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--color-primary-on))] disabled:opacity-50"
-          >
-            Entrar
-          </m.button>
-        ) : canal.pedidoPendente ? (
-          <span className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium text-[rgb(var(--foreground-muted))]">
-            Pedido enviado
-          </span>
-        ) : (
-          <m.button
-            type="button"
-            disabled={pending}
-            onClick={() => onPedirEntrada(canal.id)}
-            whileTap={{ scale: 0.94 }}
-            transition={springSnappy}
-            className="inline-flex shrink-0 rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgb(var(--background-subtle))] disabled:opacity-50"
-          >
-            Solicitar
-          </m.button>
-        )}
-      </div>
-
-      {distLabel ? (
-        <p className="col-span-2 col-start-2 text-[10px] font-medium text-[rgb(var(--foreground-muted))] sm:hidden">
-          {distLabel} de você
-        </p>
-      ) : null}
-    </div>
+    </article>
   )
 }

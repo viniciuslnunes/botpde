@@ -65,7 +65,7 @@ describe('resolverTituloPerfilSocial', () => {
         afiliacaoApelido: 'Timão',
         afiliacaoNome: 'Corinthians',
       }),
-    ).toBe('Timão')
+    ).toBe('TIMÃO')
   })
 
   it('torcedor sem apelido cai no nome do clube', () => {
@@ -76,7 +76,7 @@ describe('resolverTituloPerfilSocial', () => {
         afiliacaoApelido: null,
         afiliacaoNome: 'Corinthians',
       }),
-    ).toBe('Corinthians')
+    ).toBe('CORINTHIANS')
   })
 
   it('sócio exibe nome da torcida organizada', () => {
@@ -98,7 +98,7 @@ describe('resolverTituloPerfilSocial', () => {
         afiliacaoApelido: 'Timão',
         afiliacaoNome: 'Corinthians',
       }),
-    ).toBe('Timão')
+    ).toBe('TIMÃO')
   })
 })
 

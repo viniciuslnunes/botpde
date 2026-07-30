@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { getAlliedTenantIds } from '@/lib/hierarquia'
 import { avaliarAcessoDm, podeConvidarParaGrupoChat } from '@/lib/mensageria'
 import {
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
             id: r.user.id,
             nome: r.user.nome,
             avatarUrl: r.user.avatarUrl,
-            tenantNome: r.tenant.nome,
+            tenantNome: formatNomeTorcida(r.tenant.nome),
             mesmoTenant: r.tenantId === tenant.id,
           })
         }
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
               id: c.user.id,
               nome: c.user.nome,
               avatarUrl: c.user.avatarUrl,
-              tenantNome: c.tenant.nome,
+              tenantNome: formatNomeTorcida(c.tenant.nome),
               mesmoTenant: c.tenantId === tenant.id,
             })
           }
@@ -291,7 +292,7 @@ export async function GET(request: NextRequest) {
           id: s.user.id,
           nome: s.user.nome,
           avatarUrl: s.user.avatarUrl,
-          tenantNome: s.tenant.nome,
+          tenantNome: formatNomeTorcida(s.tenant.nome),
           mesmoTenant: false,
         })
       }
@@ -326,7 +327,7 @@ export async function GET(request: NextRequest) {
             id: c.user.id,
             nome: c.user.nome,
             avatarUrl: c.user.avatarUrl,
-            tenantNome: c.tenant.nome,
+            tenantNome: formatNomeTorcida(c.tenant.nome),
             mesmoTenant: false,
           })
         }
@@ -370,7 +371,7 @@ export async function GET(request: NextRequest) {
         id: r.user.id,
         nome: r.user.nome,
         avatarUrl: r.user.avatarUrl,
-        tenantNome: r.tenant.nome,
+        tenantNome: formatNomeTorcida(r.tenant.nome),
         mesmoTenant: r.tenantId === tenant.id,
       })
     }
@@ -407,7 +408,7 @@ export async function GET(request: NextRequest) {
           id: c.user.id,
           nome: c.user.nome,
           avatarUrl: c.user.avatarUrl,
-          tenantNome: c.tenant.nome,
+          tenantNome: formatNomeTorcida(c.tenant.nome),
           mesmoTenant: c.tenantId === tenant.id,
         })
       }
@@ -451,7 +452,7 @@ export async function GET(request: NextRequest) {
           id: s.user.id,
           nome: s.user.nome,
           avatarUrl: s.user.avatarUrl,
-          tenantNome: s.tenant.nome,
+          tenantNome: formatNomeTorcida(s.tenant.nome),
           mesmoTenant: false,
         })
       }

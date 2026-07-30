@@ -149,7 +149,7 @@ function CoIrmaBadge() {
 function afiliacaoLabel(tenant: TenantOption): string | null {
   const af = tenant.afiliacao
   if (!af) return null
-  const clube = af.apelido?.trim() || af.nome
+  const clube = (af.apelido?.trim() || af.nome).toLocaleUpperCase('pt-BR')
   const local = [af.cidade, af.estado].filter(Boolean).join('/')
   return local ? `${clube} · ${local}` : clube
 }

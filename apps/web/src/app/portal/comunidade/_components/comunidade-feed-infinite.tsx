@@ -5,9 +5,10 @@ import type { PostSocialItem } from '@/lib/feed'
 import { FeedPostCard } from '@/components/portal/feed-post-card'
 import { MotionRevealOnce } from '@/components/motion/motion-reveal-once'
 import { OptimisticHighlight } from '@/components/motion/optimistic-highlight'
-import { m } from 'motion/react'
 import { ComunidadeFeedEmpty } from './comunidade-feed-empty'
 import { FeedRefreshIndicator } from './feed-refresh-indicator'
+import { FeedLoadMore } from './feed-load-more'
+import { FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
 import { useFeedStream } from '@/lib/use-feed-stream'
 import { useComunidadeInfiniteFeed } from '@/lib/use-comunidade-infinite-feed'
 import { useFeedWindow } from '@/lib/use-feed-window'
@@ -85,6 +86,7 @@ export function ComunidadeFeedInfinite({
     posts,
     pageInfo,
     loadingMore,
+    loadingInicial,
     isRefreshing,
     error,
     loadMore,
@@ -106,7 +108,8 @@ export function ComunidadeFeedInfinite({
     seedFromSsr,
   })
 
-  const windowing = useFeedWindow(posts.length)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const windowing = useFeedWindow(posts.length, { listRef })
   const refreshDebounceRef = useRef<number | null>(null)
   const seenIds = useRef<Set<string>>(new Set())
 
@@ -207,6 +210,19 @@ export function ComunidadeFeedInfinite({
     }
   }, [filtro, prependPost, removePost, replacePost])
 
+  // Mesma marcação nos dois modos (só muda o posicionamento) — as alturas
+  // medidas em fluxo normal continuam válidas quando a virtualização liga.
+  const renderizaveis = useMemo(
+    () =>
+      windowing.enabled && windowing.virtualItems
+        ? windowing.virtualItems.map((item) => ({
+            index: item.index,
+            offset: item.start - windowing.scrollMargin,
+          }))
+        : posts.map((_, index) => ({ index, offset: null })),
+    [posts, windowing.enabled, windowing.virtualItems, windowing.scrollMargin],
+  )
+
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -234,26 +250,39 @@ export function ComunidadeFeedInfinite({
         pullProgress={pullProgress}
       />
 
-      <section id="comunidade-feed-posts" className="space-y-4">
-        {posts.length === 0 && !showRefreshIndicator ? (
+      <section id="comunidade-feed-posts">
+        {posts.length === 0 && loadingInicial ? (
+          <div role="status" aria-live="polite" aria-busy>
+            <span className="sr-only">Carregando publicações…</span>
+            <FeedPostSkeletonList count={3} />
+          </div>
+        ) : posts.length === 0 && !showRefreshIndicator && !error ? (
           <ComunidadeFeedEmpty filtro={filtro} nacional={isNacional} />
-        ) : windowing.enabled && windowing.virtualItems ? (
-          <div className="relative w-full" style={{ height: windowing.totalSize }}>
-            {windowing.virtualItems.map((item) => {
-              const post = posts[item.index]
+        ) : (
+          <div
+            ref={listRef}
+            className="relative w-full"
+            style={windowing.enabled ? { height: windowing.totalSize } : undefined}
+          >
+            {renderizaveis.map(({ index, offset }) => {
+              const post = posts[index]
               if (!post) return null
               const otimista = String(post.id).startsWith('optimistic-')
               return (
                 <div
                   key={post.id}
-                  data-index={item.index}
+                  data-index={index}
                   ref={windowing.measureElement}
-                  className="absolute left-0 top-0 w-full pb-4"
-                  style={{ transform: `translateY(${item.start}px)` }}
+                  className={
+                    offset === null
+                      ? 'w-full pb-4'
+                      : 'absolute left-0 top-0 w-full pb-4'
+                  }
+                  style={offset === null ? undefined : { transform: `translateY(${offset}px)` }}
                 >
-                  <MotionRevealOnce id={post.id} index={item.index} seenIds={seenIds}>
+                  <MotionRevealOnce id={post.id} index={index} seenIds={seenIds}>
                     <OptimisticHighlight active={otimista}>
-                      <div className="feed-post-window">
+                      <div className={windowing.postClassName}>
                         <FeedPostCard
                           post={post}
                           showTenantBadge={deveExibirBadgeTorcidaNoFeed({
@@ -272,49 +301,17 @@ export function ComunidadeFeedInfinite({
               )
             })}
           </div>
-        ) : (
-          posts.map((post, index) => {
-            const otimista = String(post.id).startsWith('optimistic-')
-            return (
-              <MotionRevealOnce key={post.id} id={post.id} index={index} seenIds={seenIds}>
-                <OptimisticHighlight active={otimista}>
-                  <div className="feed-post-window">
-                    <FeedPostCard
-                      post={post}
-                      showTenantBadge={deveExibirBadgeTorcidaNoFeed({
-                        postTenantId: post.tenantId,
-                        viewerTenantId: tenantId,
-                        visibilidade: post.visibilidade,
-                        escopoNacional: isNacional,
-                      })}
-                      currentUser={currentUser}
-                      salvo={salvoSet.has(post.id)}
-                    />
-                  </div>
-                </OptimisticHighlight>
-              </MotionRevealOnce>
-            )
-          })
         )}
       </section>
 
-      {error && (
-        <div className="pt-3 text-center text-sm text-[rgb(var(--foreground-muted))]">
-          {error}
-        </div>
-      )}
-
-      {pageInfo.hasMore ? (
-        <div ref={sentinelRef} className="flex justify-center pt-2">
-          {loadingMore && (
-            <m.div
-              className="h-10 w-40 rounded-full border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
-        </div>
-      ) : null}
+      <FeedLoadMore
+        sentinelRef={sentinelRef}
+        hasMore={pageInfo.hasMore}
+        loading={loadingMore}
+        error={error}
+        onRetry={() => void loadMoreWithDeeplink()}
+        temConteudo={posts.length > 0}
+      />
     </>
   )
 }

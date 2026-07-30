@@ -8,6 +8,7 @@ import {
   podeGerenciarPedidosCanal,
   type CanalItem,
 } from '@/lib/canais'
+import { FeedComposerSkeleton, FeedPostSkeletonList } from '@/components/portal/feed-skeletons'
 import { ComunidadePostsSection } from '../../_components/comunidade-posts-section'
 import { CanalFeedComposition } from './canal-feed-composition'
 import { CanalComposerSection } from './canal-composer-section'
@@ -20,18 +21,15 @@ interface CurrentUser {
 
 function CanalFeedFallback() {
   return (
-    <div className="space-y-4">
-      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-      <div className="h-32 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-      <div className="h-32 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
+    <div role="status" aria-live="polite" aria-busy>
+      <span className="sr-only">Carregando publicações do canal…</span>
+      <FeedPostSkeletonList count={3} />
     </div>
   )
 }
 
 function ComposerFallback() {
-  return (
-    <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-  )
+  return <FeedComposerSkeleton />
 }
 
 /**

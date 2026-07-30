@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Ban, Loader2, MessageCircle } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
+import { Ban, Loader2, MessageCircle, X } from 'lucide-react'
 import { toast } from '@torcida/ui'
+import { lightboxBackdrop, lightboxContent, springGentle } from '@/lib/motion-presets'
 
 interface PerfilMensagemActionsProps {
   userId: string
@@ -22,11 +25,38 @@ export function PerfilMensagemActions({
   bloqueadoPorMim,
 }: PerfilMensagemActionsProps) {
   const router = useRouter()
+  const tituloId = useId()
   const [abrindo, setAbrindo] = useState(false)
   const [bloqueado, setBloqueado] = useState(bloqueadoPorMim)
   const [alternando, setAlternando] = useState(false)
   const [mostrarSolicitacao, setMostrarSolicitacao] = useState(false)
   const [mensagemInicial, setMensagemInicial] = useState('')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  function fecharSolicitacao() {
+    setMostrarSolicitacao(false)
+    setMensagemInicial('')
+  }
+
+  useEffect(() => {
+    if (!mostrarSolicitacao) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      setMostrarSolicitacao(false)
+      setMensagemInicial('')
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [mostrarSolicitacao])
 
   async function abrirConversa(conteudo?: string) {
     setAbrindo(true)
@@ -56,6 +86,7 @@ export function PerfilMensagemActions({
       }
       if (data.solicitacao) {
         toast.success('Solicitação enviada. Aguarde a aprovação do membro.')
+        fecharSolicitacao()
       }
       router.push(`/portal/mensagens?c=${data.conversaId}`)
     } catch (error) {
@@ -82,16 +113,115 @@ export function PerfilMensagemActions({
   }
 
   const podeAcionarMensagem = (podeConversar || podeSolicitarMensagem) && !bloqueado
+  const precisaSolicitacao = podeSolicitarMensagem && !podeConversar
+  const mensagemPronta = mensagemInicial.trim().length > 0
+
+  const dialog =
+    mounted &&
+    createPortal(
+      <AnimatePresence>
+        {mostrarSolicitacao && podeSolicitarMensagem && (
+          <m.div
+            key="solicitacao-backdrop"
+            variants={lightboxBackdrop}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+            role="presentation"
+            onClick={fecharSolicitacao}
+          >
+            <m.div
+              key="solicitacao-panel"
+              variants={lightboxContent}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              transition={springGentle}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={tituloId}
+              className="flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-[rgb(var(--border))] px-4 py-3.5">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.12)] text-[rgb(var(--color-primary-fg))]">
+                    <MessageCircle className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2
+                      id={tituloId}
+                      className="text-base font-semibold text-[rgb(var(--foreground))]"
+                    >
+                      Solicitar conversa
+                    </h2>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[rgb(var(--foreground-muted))]">
+                      Envie uma mensagem inicial. O membro precisa aprovar antes da conversa
+                      continuar.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={fecharSolicitacao}
+                  aria-label="Fechar"
+                  className="shrink-0 rounded-lg p-1.5 text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 px-4 py-4">
+                <textarea
+                  value={mensagemInicial}
+                  onChange={(e) => setMensagemInicial(e.target.value)}
+                  rows={4}
+                  maxLength={2000}
+                  autoFocus
+                  placeholder="Olá! Gostaria de conversar com você…"
+                  className="w-full resize-none rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3.5 py-2.5 text-sm leading-relaxed text-[rgb(var(--foreground))] outline-none placeholder:text-[rgb(var(--foreground-muted))] focus:border-[rgb(var(--primary))]"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={fecharSolicitacao}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-[rgb(var(--foreground-muted))] transition-colors hover:bg-[rgb(var(--background-subtle))] hover:text-[rgb(var(--foreground))]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={abrindo || !mensagemPronta}
+                    onClick={() => void abrirConversa(mensagemInicial.trim())}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {abrindo ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <MessageCircle className="h-4 w-4" />
+                    )}
+                    {abrindo ? 'Enviando…' : 'Enviar solicitação'}
+                  </button>
+                </div>
+              </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>,
+      document.body,
+    )
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {podeAcionarMensagem && !mostrarSolicitacao && (
+    <>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {podeAcionarMensagem && (
           <button
             type="button"
             disabled={abrindo}
             onClick={() => {
-              if (podeSolicitarMensagem && !podeConversar) {
+              if (precisaSolicitacao) {
                 setMostrarSolicitacao(true)
                 return
               }
@@ -99,12 +229,12 @@ export function PerfilMensagemActions({
             }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {abrindo ? (
+            {abrindo && !mostrarSolicitacao ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <MessageCircle className="h-4 w-4" />
             )}
-            {podeSolicitarMensagem && !podeConversar ? 'Solicitar conversa' : 'Mensagem'}
+            {precisaSolicitacao ? 'Solicitar conversa' : 'Mensagem'}
           </button>
         )}
         <button
@@ -122,42 +252,7 @@ export function PerfilMensagemActions({
           {bloqueado ? 'Desbloquear' : 'Bloquear'}
         </button>
       </div>
-
-      {mostrarSolicitacao && podeSolicitarMensagem && (
-        <div className="space-y-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] p-3">
-          <p className="text-xs text-[rgb(var(--foreground-muted))]">
-            Envie uma mensagem inicial. O membro precisa aprovar antes da conversa continuar.
-          </p>
-          <textarea
-            value={mensagemInicial}
-            onChange={(e) => setMensagemInicial(e.target.value)}
-            rows={3}
-            maxLength={2000}
-            placeholder="Olá! Gostaria de conversar com você…"
-            className="w-full resize-none rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none focus:border-[rgb(var(--primary))]"
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={abrindo || mensagemInicial.trim().length === 0}
-              onClick={() => void abrirConversa(mensagemInicial.trim())}
-              className="rounded-lg bg-[rgb(var(--primary))] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {abrindo ? 'Enviando…' : 'Enviar solicitação'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMostrarSolicitacao(false)
-                setMensagemInicial('')
-              }}
-              className="rounded-lg border border-[rgb(var(--border))] px-3 py-1.5 text-sm text-[rgb(var(--foreground-muted))]"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      {dialog}
+    </>
   )
 }

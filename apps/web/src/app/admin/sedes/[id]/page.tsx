@@ -6,6 +6,7 @@ import {
   calculateEffectivePermissions,
   hasPermission,
   PERMISSIONS,
+  formatNomeTorcida,
 } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -154,7 +155,7 @@ export default async function EditarSedePage({
         id: pai.id,
         nome: pai.nome,
         tipo: pai.tipo,
-        tenantNome: pai.tenant.nome,
+        tenantNome: formatNomeTorcida(pai.tenant.nome),
       }
     }
   }

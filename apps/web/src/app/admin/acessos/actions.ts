@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { invalidarBadgesAutorTenant } from '@/lib/comunidade-cache'
 import { notificarSafe } from '@/lib/notificacoes'
 import { db, syncMembershipFromRoles, type Prisma } from '@torcida/db'
@@ -15,6 +16,7 @@ import {
   canManageDepartamento,
   calculateEffectivePermissions,
   hasPermission,
+  isMembroElegivelDepartamento,
   permissionsOfRole,
   podeTerVice,
   PAPEL_DEPARTAMENTO,
@@ -51,6 +53,57 @@ interface UserPermissionLite {
   granted: boolean
 }
 
+const IdSchema = z.string().min(1)
+const SalvarAcessoSchema = z.object({
+  userId: IdSchema,
+  perfilIds: z.array(IdSchema),
+  permissoes: z.array(z.string()),
+})
+const PerfilCompostoSchema = z.object({
+  nome: z.string().trim().min(2),
+  cor: z.string().trim(),
+  userId: z.string().trim(),
+  departamentoId: z.string().trim(),
+  papelNoDepartamento: z.string().trim(),
+  permissionsExtras: z.array(z.string()),
+})
+const VinculoDepartamentoSchema = z.object({
+  departamentoId: IdSchema,
+  targetUserId: IdSchema,
+})
+
+type MembroElegibilidade = {
+  tenantId: string
+  tipo: string
+  status: string
+  desligadoEm: Date | null
+  espelhado: boolean
+  membroOrigemId: string | null
+}
+
+async function assertMembroElegivelParaDepartamento(
+  userId: string,
+  tenantId: string,
+  client: Prisma.TransactionClient | typeof db = db,
+): Promise<void> {
+  const membro: MembroElegibilidade | null = await client.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: {
+      tenantId: true,
+      tipo: true,
+      status: true,
+      desligadoEm: true,
+      espelhado: true,
+      membroOrigemId: true,
+    },
+  })
+  if (!isMembroElegivelDepartamento(membro, tenantId)) {
+    throw new Error(
+      'Somente sócio aprovado, ativo e com vínculo canônico nesta torcida pode atuar em departamento.',
+    )
+  }
+}
+
 /**
  * Salva o acesso do usuário: perfis + overrides de permissões adicionais.
  * Membership de departamento é projeção dos perfis vinculados (sync).
@@ -58,11 +111,18 @@ interface UserPermissionLite {
 export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
-  const perfilIds = new Set(formData.getAll('perfilIds') as string[])
+  const entrada = SalvarAcessoSchema.safeParse({
+    userId,
+    perfilIds: formData.getAll('perfilIds'),
+    permissoes: formData.getAll('permissoes'),
+  })
+  if (!entrada.success) throw new Error('Dados de acesso inválidos')
+
+  const perfilIds = new Set(entrada.data.perfilIds)
   const permissoesEfetivas = new Set<string>(
     applyPermissionCascade(
       [],
-      (formData.getAll('permissoes') as string[]).filter((p) => ALL_PERMISSIONS_SET.includes(p)),
+      entrada.data.permissoes.filter((p) => ALL_PERMISSIONS_SET.includes(p)),
     ),
   )
 
@@ -119,6 +179,9 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 
   const validRoleIds = new Set(rolesTenant.map((r) => r.id))
   const roleIdsAtuais = new Set(userRolesAtuais.map((r) => r.roleId))
+  const atribuiPerfilDepartamento = rolesTenant.some(
+    (role) => role.departamentoId && perfilIds.has(role.id),
+  )
 
   // Liderança (OWNER/ADMIN) recém-atribuída aqui nunca passou pelo auto-vínculo
   // de canais de `aprovarMembro` — sem isso a pessoa vira admin do tenant mas
@@ -142,6 +205,9 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
   const overridesAtuais = new Map(userPermissionsAtuais.map((p) => [p.permission, p.granted]))
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (atribuiPerfilDepartamento) {
+      await assertMembroElegivelParaDepartamento(userId, tenant.id, tx)
+    }
     for (const roleId of perfilIds) {
       if (!validRoleIds.has(roleId) || roleIdsAtuais.has(roleId)) continue
       await tx.userRole.create({ data: { userId, tenantId: tenant.id, roleId } })
@@ -228,19 +294,26 @@ export async function salvarAcessoUsuario(userId: string, formData: FormData) {
 export async function salvarPerfilComposto(formData: FormData) {
   const { session, tenant } = await assertPermission(PERMISSIONS.ROLES_MANAGE)
 
-  const nome = String(formData.get('nome') ?? '').trim()
-  const cor = String(formData.get('cor') ?? '#6b7280').trim()
-  const userId = String(formData.get('userId') ?? '').trim() || null
-  const departamentoIdRaw = String(formData.get('departamentoId') ?? '').trim()
-  const papelRaw = String(formData.get('papelNoDepartamento') ?? '').trim()
+  const entrada = PerfilCompostoSchema.safeParse({
+    nome: formData.get('nome'),
+    cor: formData.get('cor') ?? '#6b7280',
+    userId: formData.get('userId') ?? '',
+    departamentoId: formData.get('departamentoId') ?? '',
+    papelNoDepartamento: formData.get('papelNoDepartamento') ?? '',
+    permissionsExtras: formData.getAll('permissionsExtras'),
+  })
+  if (!entrada.success) throw new Error('Dados do perfil inválidos')
+
+  const { nome, cor } = entrada.data
+  const userId = entrada.data.userId || null
+  const departamentoIdRaw = entrada.data.departamentoId
+  const papelRaw = entrada.data.papelNoDepartamento
   const extras = applyPermissionCascade(
     [],
-    (formData.getAll('permissionsExtras') as string[]).filter((p) =>
+    entrada.data.permissionsExtras.filter((p) =>
       ALL_PERMISSIONS_SET.includes(p),
     ),
   )
-
-  if (nome.length < 2) throw new Error('Nome do perfil é obrigatório')
 
   const departamentoId = departamentoIdRaw || null
   const papelNoDepartamento =
@@ -282,6 +355,9 @@ export async function salvarPerfilComposto(formData: FormData) {
     if (userId) {
       const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true } })
       if (!user) throw new Error('Usuário não encontrado')
+      if (departamentoId) {
+        await assertMembroElegivelParaDepartamento(userId, tenant.id, tx)
+      }
       await tx.userRole.create({
         data: { userId, tenantId: tenant.id, roleId: created.id },
       })
@@ -369,9 +445,18 @@ async function assertPodeGerirDepartamento(departamentoId: string) {
   return { session, tenant }
 }
 
-export async function adicionarMembroDepartamento(departamentoId: string, targetUserId: string) {
-  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
+export async function adicionarMembroDepartamento(
+  rawDepartamentoId: string,
+  rawTargetUserId: string,
+) {
+  const entrada = VinculoDepartamentoSchema.safeParse({
+    departamentoId: rawDepartamentoId,
+    targetUserId: rawTargetUserId,
+  })
+  if (!entrada.success) throw new Error('Dados do vínculo inválidos')
+  const { departamentoId, targetUserId } = entrada.data
 
+  const { session, tenant } = await assertPodeGerirDepartamento(departamentoId)
   const departamento: { id: string; nome: string } | null = await db.departamento.findFirst({
     where: { id: departamentoId, tenantId: tenant.id },
     select: { id: true, nome: true },
@@ -386,28 +471,19 @@ export async function adicionarMembroDepartamento(departamentoId: string, target
     },
     select: { id: true },
   })
+  if (!roleMembro) {
+    throw new Error('Perfil de membro do departamento não encontrado')
+  }
 
   await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    if (roleMembro) {
-      const ja = await tx.userRole.findFirst({
-        where: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
-      })
-      if (!ja) {
-        await tx.userRole.create({
-          data: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
-        })
-      }
-    } else {
-      await tx.userDepartamento.upsert({
-        where: {
-          userId_tenantId_departamentoId: {
-            userId: targetUserId,
-            tenantId: tenant.id,
-            departamentoId,
-          },
-        },
-        create: { userId: targetUserId, tenantId: tenant.id, departamentoId },
-        update: {},
+    await assertMembroElegivelParaDepartamento(targetUserId, tenant.id, tx)
+    const ja: { id: string } | null = await tx.userRole.findFirst({
+      where: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
+      select: { id: true },
+    })
+    if (!ja) {
+      await tx.userRole.create({
+        data: { userId: targetUserId, tenantId: tenant.id, roleId: roleMembro.id },
       })
     }
     await syncMembershipFromRoles(tx, { userId: targetUserId, tenantId: tenant.id })

@@ -49,6 +49,10 @@ vi.mock('@/lib/canais', () => ({
 
 vi.mock('@torcida/types', () => ({
   formatNomeTorcida: (n: string) => n,
+  formatNomeAfiliacao: (n: string) => n,
+  nomeExibicaoAfiliacao: (
+    a: { apelido?: string | null; nome?: string | null } | null | undefined,
+  ) => (a ? String(a.apelido ?? a.nome ?? '') : ''),
 }))
 
 vi.mock('next/cache', () => ({ unstable_cache: (fn: () => unknown) => fn }))

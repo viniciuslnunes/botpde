@@ -330,6 +330,11 @@ export function useComunidadeInfiniteFeed<TPost extends { id: string }>(options:
     pageInfo,
     currentCursor,
     loadingMore: query.isFetchingNextPage,
+    /**
+     * Primeira página ainda em voo (bootstrap com cache frio, sem seed do SSR).
+     * Sem isso a lista vazia cai no empty state enquanto o fetch acontece.
+     */
+    loadingInicial: query.isPending,
     isRefreshing,
     error: query.error instanceof Error ? query.error.message : null,
     loadMore,

@@ -1,7 +1,7 @@
 import { db } from '@torcida/db'
 import { assertPermission, assertPresidenteGlobal } from '@/lib/authz'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { PERMISSIONS, podeCriarUnidadeTerritorial } from '@torcida/types'
+import { PERMISSIONS, podeCriarUnidadeTerritorial, formatNomeTorcida } from '@torcida/types'
 import { isPaiHerdadoDeTorcidaPrincipal } from '@/lib/sede-regras'
 import { redirect } from 'next/navigation'
 import {
@@ -199,7 +199,7 @@ export default async function AdminSedesPage() {
         id: pai.id,
         nome: pai.nome,
         tipo: pai.tipo,
-        tenantNome: pai.tenant.nome,
+        tenantNome: formatNomeTorcida(pai.tenant.nome),
         logoUrl: pai.tenant.logoUrl,
         fotoUrl: pai.fotoUrl,
         lat: pai.lat,

@@ -39,6 +39,7 @@ const criarPendenciaEspelhoFn = vi.hoisted(() =>
   vi.fn(async () => ({ raizTenantId: null, espelhoId: null, ignoradoJaMembroDireto: false })),
 )
 const notificarNovoMembroPendenteFn = vi.hoisted(() => vi.fn(async () => undefined))
+const vincularMembroCanaisFn = vi.hoisted(() => vi.fn(async () => undefined))
 const userFindFirst = vi.hoisted(() => vi.fn(async () => null))
 const userUpdate = vi.hoisted(() => vi.fn(async () => ({})))
 
@@ -83,6 +84,9 @@ const notificarSafeFn = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/notificacoes', () => ({ notificarSafe: notificarSafeFn }))
 vi.mock('@/lib/notificacoes-routing', () => ({
   notificarNovoMembroPendente: notificarNovoMembroPendenteFn,
+}))
+vi.mock('@/lib/canais', () => ({
+  vincularMembroCanaisAposAprovacao: vincularMembroCanaisFn,
 }))
 vi.mock('@/lib/hierarquia', () => ({
   getDescendantTenantIds: getDescendantTenantIdsFn,
@@ -382,6 +386,12 @@ describe('solicitarVinculo — validação', () => {
       expect.objectContaining({ data: expect.objectContaining({ acao: 'CADASTRO_SOLICITADO' }) }),
     )
     expect(perfilUpsert).toHaveBeenCalled()
+    expect(vincularMembroCanaisFn).toHaveBeenCalledWith({
+      tenantId: UUID,
+      userId: 'u1',
+      sedeId: null,
+      fallbackCriadoPorId: 'u1',
+    })
   })
 
   it('sócio com departamento grava preferência sem UserDepartamento', async () => {
@@ -473,9 +483,20 @@ describe('solicitarVinculo — validação', () => {
       exigirDocumentosCadastro: true,
     })
     sedeFindMany.mockResolvedValue([])
-    membroFindUnique.mockResolvedValue({ id: 'm1', status: 'APROVADO' })
+    membroFindUnique.mockResolvedValue({
+      id: 'm1',
+      status: 'APROVADO',
+      reprovadoPermiteReenvio: false,
+      sedeId: UUID2,
+    })
     const r = await solicitarVinculo({ ...vinculoBase, tipo: 'TORCEDOR' })
     expect(r.message).toContain('já é membro aprovado')
+    expect(vincularMembroCanaisFn).toHaveBeenCalledWith({
+      tenantId: UUID,
+      userId: 'u1',
+      sedeId: UUID2,
+      fallbackCriadoPorId: 'u1',
+    })
   })
 })
 

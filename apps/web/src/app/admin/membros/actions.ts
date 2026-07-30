@@ -12,20 +12,27 @@ import {
   lockDecisaoAdmissaoTorcida,
   lockNumeroAssociadoDaTorcida,
   propagarLgeParaEspelho,
+  REPROVACAO_LIMPA,
   sincronizarSocioNaSedeRaiz,
   sincronizarStatusEspelhoDaOrigem,
   validarNumeroAssociadoUnicoNaTorcida,
+  type DadosReprovacaoEspelho,
 } from '@/lib/membros-sede'
 import { notificarSafe, emitNotificacaoPingCnDoSolicitante } from '@/lib/notificacoes'
 import { emitNotificacaoPing } from '@/lib/notificacoes-bus'
 import { privatizarPerfilAoAprovarSocio } from '@/lib/social'
 import { invalidatePermissionsCache } from '@/lib/tenant'
+import { diffCamposMembro } from '@/lib/membro-audit-diff'
 import {
   AtualizarMembroLgeSchema,
   DesligarMembroSchema,
   formatDataCompetenciaInput,
+  formatNomeTorcida,
+  labelCategoriaReprovacao,
+  labelPontoReprovacao,
   PAPEL_DEPARTAMENTO,
   PERMISSIONS,
+  ReprovarMembroSchema,
 } from '@torcida/types'
 
 const ERRO_ESPELHO_MUTACAO =
@@ -262,25 +269,35 @@ async function limparMembershipDepartamentos(
   tenantId: string,
   userId: string,
   client: Prisma.TransactionClient | typeof db = db,
-) {
+): Promise<{ perfisAreaRemovidos: number; membrosRemovidos: number; gestoresRemovidos: number }> {
   const rolesDeArea: { id: string }[] = await client.role.findMany({
     where: { tenantId, departamentoId: { not: null } },
     select: { id: true },
   })
-  if (rolesDeArea.length > 0) {
-    await client.userRole.deleteMany({
-      where: {
-        userId,
-        tenantId,
-        roleId: { in: rolesDeArea.map((r) => r.id) },
-      },
-    })
-  }
+  const perfisAreaRemovidos =
+    rolesDeArea.length > 0
+      ? (
+          await client.userRole.deleteMany({
+            where: {
+              userId,
+              tenantId,
+              roleId: { in: rolesDeArea.map((r) => r.id) },
+            },
+          })
+        ).count
+      : 0
 
-  await client.userDepartamento.deleteMany({ where: { userId, tenantId } })
-  await client.departamentoGestor.deleteMany({
+  const membrosRemovidos = await client.userDepartamento.deleteMany({
+    where: { userId, tenantId },
+  })
+  const gestoresRemovidos = await client.departamentoGestor.deleteMany({
     where: { userId, departamento: { tenantId } },
   })
+  return {
+    perfisAreaRemovidos,
+    membrosRemovidos: membrosRemovidos.count,
+    gestoresRemovidos: gestoresRemovidos.count,
+  }
 }
 
 export type AprovarMembroOpts = {
@@ -370,6 +387,7 @@ export async function aprovarMembro(
             aprovadoPorId,
             aprovadoPorNome,
             aprovadoEm: agora,
+            ...REPROVACAO_LIMPA,
           },
           select: membroDecisaoSelect,
         })
@@ -408,7 +426,7 @@ export async function aprovarMembro(
           espelhoId: existente.id,
           decididoEmTenantId: tenant.id,
           tenantNotificarId: origemFresh.tenantId,
-          tenantNotificarNome: unidadeTenant?.nome ?? tenant.nome,
+          tenantNotificarNome: formatNomeTorcida(unidadeTenant?.nome ?? tenant.nome),
         }
       }
 
@@ -446,6 +464,7 @@ export async function aprovarMembro(
           aprovadoPorId,
           aprovadoPorNome,
           aprovadoEm: new Date(),
+          ...REPROVACAO_LIMPA,
         },
         select: membroDecisaoSelect,
       })
@@ -481,7 +500,7 @@ export async function aprovarMembro(
         espelhoId,
         decididoEmTenantId: tenant.id,
         tenantNotificarId: tenant.id,
-        tenantNotificarNome: tenant.nome,
+        tenantNotificarNome: formatNomeTorcida(tenant.nome),
       }
     },
     TRANSACAO_DECISAO_MEMBRO_OPTS,
@@ -588,14 +607,40 @@ export async function aprovarMembro(
   }
 }
 
+export type ReprovarMembroInput = {
+  /** Id de `CATEGORIAS_REPROVACAO`. */
+  categoria: string
+  /** Justificativa livre do analista (obrigatória). */
+  motivo: string
+  /** Ids de `PONTOS_REPROVACAO` apontados como incorretos. */
+  pontos: string[]
+  /** false = reprovação definitiva; bloqueia o reenvio pelo solicitante. */
+  permiteReenvio: boolean
+}
+
 export async function reprovarMembro(
   membroId: string,
-  motivo?: string,
+  input: ReprovarMembroInput,
 ): Promise<{ error: string } | void> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_REJECT)
+
+  const parsed = ReprovarMembroSchema.safeParse({ membroId, ...input })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Dados da reprovação inválidos.' }
+  }
+  const { categoria, motivo: motivoTrim, pontos, permiteReenvio } = parsed.data
+
   const aprovadoPorNome = session.user.name ?? 'Admin'
   const aprovadoPorId = session.user.id
-  const motivoTrim = motivo?.trim() || null
+  const dadosReprovacao: DadosReprovacaoEspelho = {
+    reprovadoEm: new Date(),
+    reprovadoPorId: aprovadoPorId,
+    reprovadoPorNome: aprovadoPorNome,
+    reprovadoCategoria: categoria,
+    reprovadoMotivo: motivoTrim,
+    reprovadoPontos: pontos,
+    reprovadoPermiteReenvio: permiteReenvio,
+  }
 
   type ResultadoReprovacao = {
     origem: MembroDecisaoSelect
@@ -649,7 +694,7 @@ export async function reprovarMembro(
           )
         }
 
-        const agora = new Date()
+        const agora = dadosReprovacao.reprovadoEm
         const origemAtualizada = await tx.saasMembro.update({
           where: { id: origemFresh.id },
           data: {
@@ -657,6 +702,7 @@ export async function reprovarMembro(
             aprovadoPorId,
             aprovadoPorNome,
             aprovadoEm: agora,
+            ...dadosReprovacao,
           },
           select: membroDecisaoSelect,
         })
@@ -668,7 +714,8 @@ export async function reprovarMembro(
           aprovadoPorId,
           aprovadoPorNome,
           aprovadoEm: agora,
-          desligadoMotivo: motivoTrim || 'Reprovado pela Sede',
+          desligadoMotivo: motivoTrim,
+          reprovacao: dadosReprovacao,
         })
 
         const unidadeTenant: { nome: string } | null = await tx.tenant.findFirst({
@@ -681,7 +728,7 @@ export async function reprovarMembro(
           espelhoId: existente.id,
           decididoEmTenantId: tenant.id,
           tenantNotificarId: origemFresh.tenantId,
-          tenantNotificarNome: unidadeTenant?.nome ?? tenant.nome,
+          tenantNotificarNome: formatNomeTorcida(unidadeTenant?.nome ?? tenant.nome),
         }
       }
 
@@ -696,7 +743,7 @@ export async function reprovarMembro(
         throw erroSolicitacaoJaAnalisada(fresh.aprovadoPorNome, fresh.aprovadoEm)
       }
 
-      const agora = new Date()
+      const agora = dadosReprovacao.reprovadoEm
       const atualizado = await tx.saasMembro.update({
         where: { id: membroId, tenantId: tenant.id },
         data: {
@@ -704,6 +751,7 @@ export async function reprovarMembro(
           aprovadoPorId,
           aprovadoPorNome,
           aprovadoEm: agora,
+          ...dadosReprovacao,
         },
         select: membroDecisaoSelect,
       })
@@ -715,7 +763,8 @@ export async function reprovarMembro(
         aprovadoPorId,
         aprovadoPorNome,
         aprovadoEm: agora,
-        desligadoMotivo: motivoTrim || 'Reprovado na unidade de origem',
+        desligadoMotivo: motivoTrim,
+        reprovacao: dadosReprovacao,
       })
 
       return {
@@ -723,7 +772,7 @@ export async function reprovarMembro(
         espelhoId,
         decididoEmTenantId: tenant.id,
         tenantNotificarId: tenant.id,
-        tenantNotificarNome: tenant.nome,
+        tenantNotificarNome: formatNomeTorcida(tenant.nome),
       }
     },
     TRANSACAO_DECISAO_MEMBRO_OPTS,
@@ -745,7 +794,10 @@ export async function reprovarMembro(
   await marcarSolicitacoesLidas(aprovadoPorId, origem.userId, tenantIdsNotif)
 
   const detalhesAudit = {
+    categoria,
     motivo: motivoTrim,
+    pontos,
+    permiteReenvio,
     membroOrigemId: origem.id,
     espelhoId,
     decididoEmTenantId,
@@ -780,15 +832,23 @@ export async function reprovarMembro(
     }
   }
 
+  const pontosLabel = pontos.map((p) => labelPontoReprovacao(p)).join(', ')
   await notificarSafe({
     userId: origem.userId,
     tenantId: tenantNotificarId,
     tipo: 'MEMBRO_REPROVADO',
-    titulo: 'Sua solicitação foi reprovada',
-    corpo: motivoTrim
-      ? motivoTrim
-      : `Sua solicitação de ingresso em ${tenantNotificarNome} não foi aprovada.`,
-    link: '/portal/comunidade',
+    titulo: `Sua solicitação em ${tenantNotificarNome} foi reprovada`,
+    corpo: [
+      labelCategoriaReprovacao(categoria),
+      motivoTrim,
+      pontosLabel ? `Revise: ${pontosLabel}.` : null,
+      permiteReenvio
+        ? 'Corrija os pontos apontados e reenvie seu cadastro.'
+        : 'Fale com a diretoria antes de tentar de novo.',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    link: permiteReenvio ? '/portal/cadastro' : '/portal/comunidade',
   })
   await emitNotificacaoPingCnDoSolicitante(tenantNotificarId, origem.userId)
 
@@ -798,6 +858,7 @@ export async function reprovarMembro(
   revalidatePath('/admin')
   revalidatePath('/portal/departamentos', 'layout')
   revalidatePath('/portal/carteirinha')
+  revalidatePath('/portal/cadastro')
   } catch (err) {
     const mapped = mapearErroDecisaoMembro(err)
     if (mapped) return mapped
@@ -830,6 +891,7 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
           aprovadoPorId: null,
           aprovadoPorNome: null,
           aprovadoEm: null,
+          ...REPROVACAO_LIMPA,
         },
         select: membroDecisaoSelect,
       })
@@ -891,6 +953,7 @@ export async function reverterMembro(membroId: string): Promise<{ error: string 
   revalidatePath('/portal', 'layout')
   revalidatePath('/portal/comunidade')
   revalidatePath('/portal/carteirinha')
+  revalidatePath('/portal/cadastro')
   revalidatePath('/admin/membros')
   revalidatePath('/portal/departamentos', 'layout')
   } catch (err) {
@@ -934,9 +997,30 @@ export async function atualizarDadosLge(
   }
 
   const data = parsed.data
-  const existente: { id: string; espelhado: boolean } | null = await db.saasMembro.findFirst({
+  type LgeAntes = {
+    id: string
+    espelhado: boolean
+    rg: string | null
+    cpf: string | null
+    filiacao: string | null
+    escolaridade: string | null
+    profissao: string | null
+    dataNascimento: Date | null
+    planoAssociacaoId: string | null
+  }
+  const existente: LgeAntes | null = await db.saasMembro.findFirst({
     where: { id: data.membroId, tenantId: tenant.id },
-    select: { id: true, espelhado: true },
+    select: {
+      id: true,
+      espelhado: true,
+      rg: true,
+      cpf: true,
+      filiacao: true,
+      escolaridade: true,
+      profissao: true,
+      dataNascimento: true,
+      planoAssociacaoId: true,
+    },
   })
   if (!existente) return { error: 'Membro não encontrado' }
   if (existente.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
@@ -981,6 +1065,20 @@ export async function atualizarDadosLge(
       acao: 'MEMBRO_LGE_ATUALIZADO',
       entidade: 'SaasMembro',
       entidadeId: existente.id,
+      detalhes: {
+        alteracoes: diffCamposMembro(
+          {
+            rg: existente.rg,
+            cpf: existente.cpf,
+            filiacao: existente.filiacao,
+            escolaridade: existente.escolaridade,
+            profissao: existente.profissao,
+            dataNascimento: existente.dataNascimento,
+            planoAssociacaoId: existente.planoAssociacaoId,
+          },
+          { ...dadosLge, planoAssociacaoId: data.planoAssociacaoId ?? null },
+        ),
+      },
     },
   })
 
@@ -1003,16 +1101,21 @@ export async function desligarMembro(
     return { errors: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
-  const membro: { id: string; desligadoEm: Date | null; espelhado: boolean } | null =
+  const membro: {
+    id: string
+    userId: string
+    desligadoEm: Date | null
+    espelhado: boolean
+  } | null =
     await db.saasMembro.findFirst({
       where: { id: parsed.data.membroId, tenantId: tenant.id },
-      select: { id: true, desligadoEm: true, espelhado: true },
+      select: { id: true, userId: true, desligadoEm: true, espelhado: true },
     })
   if (!membro) return { error: 'Membro não encontrado' }
   if (membro.espelhado) return { error: ERRO_ESPELHO_MUTACAO }
   if (membro.desligadoEm) return { error: 'Membro já desligado' }
 
-  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+  const { espelhoTenantId } = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.saasMembro.update({
       where: { id: membro.id },
       data: {
@@ -1021,20 +1124,35 @@ export async function desligarMembro(
         desligadoPorId: session.user.id,
       },
     })
+    const limpeza = await limparMembershipDepartamentos(tenant.id, membro.userId, tx)
+    const espelho: { tenantId: string; userId: string } | null =
+      await tx.saasMembro.findUnique({
+        where: { membroOrigemId: membro.id },
+        select: { tenantId: true, userId: true },
+      })
+    const limpezaEspelho = espelho
+      ? await limparMembershipDepartamentos(espelho.tenantId, espelho.userId, tx)
+      : null
     await desligarEspelhoDaOrigem(tx, membro.id, parsed.data.motivo)
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        atorId: session.user.id,
+        acao: 'MEMBRO_DESLIGADO',
+        entidade: 'SaasMembro',
+        entidadeId: membro.id,
+        detalhes: { motivo: parsed.data.motivo, ...limpeza, limpezaEspelho },
+      },
+    })
+    return { espelhoTenantId: espelho?.tenantId ?? null }
   })
 
-  await db.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      atorId: session.user.id,
-      acao: 'MEMBRO_DESLIGADO',
-      entidade: 'SaasMembro',
-      entidadeId: membro.id,
-      detalhes: { motivo: parsed.data.motivo },
-    },
-  })
-
+  invalidatePermissionsCache(membro.userId, tenant.id)
+  if (espelhoTenantId) {
+    invalidatePermissionsCache(membro.userId, espelhoTenantId)
+    invalidarCachesComunidadeFeed(espelhoTenantId)
+  }
+  invalidarCachesComunidadeFeed(tenant.id)
   revalidatePath('/admin/membros')
   revalidatePath(`/admin/membros/${membro.id}`)
   return { ok: true }
@@ -1120,24 +1238,31 @@ export async function reatribuirSedeMembro(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { session, tenant } = await assertPermission(PERMISSIONS.MEMBERS_APPROVE)
 
-  const membro: { id: string; sedeId: string | null; espelhado: boolean } | null =
-    await db.saasMembro.findFirst({
-      where: { id: membroId, tenantId: tenant.id },
-      select: { id: true, sedeId: true, espelhado: true },
-    })
+  type MembroSede = {
+    id: string
+    sedeId: string | null
+    espelhado: boolean
+    sede: { nome: string } | null
+  }
+  const membro: MembroSede | null = await db.saasMembro.findFirst({
+    where: { id: membroId, tenantId: tenant.id },
+    select: { id: true, sedeId: true, espelhado: true, sede: { select: { nome: true } } },
+  })
   if (!membro) return { ok: false, error: 'Membro não encontrado.' }
   if (membro.espelhado) {
     return { ok: false, error: 'Registro espelhado — altere na unidade de origem.' }
   }
 
   let sedeAlvoId: string | null = sedeId?.trim() || null
+  let sedeAlvoNome: string | null = null
   if (sedeAlvoId) {
-    const sede = await db.sede.findFirst({
+    const sede: { id: string; nome: string } | null = await db.sede.findFirst({
       where: { id: sedeAlvoId, tenantId: tenant.id, ativa: true },
-      select: { id: true },
+      select: { id: true, nome: true },
     })
     if (!sede) return { ok: false, error: 'Unidade não encontrada ou inativa.' }
     sedeAlvoId = sede.id
+    sedeAlvoNome = sede.nome
   }
 
   if (membro.sedeId === sedeAlvoId) return { ok: true }
@@ -1157,6 +1282,13 @@ export async function reatribuirSedeMembro(
       detalhes: {
         sedeIdAntes: membro.sedeId,
         sedeIdDepois: sedeAlvoId,
+        alteracoes: [
+          {
+            campo: 'Unidade',
+            de: membro.sede?.nome ?? null,
+            para: sedeAlvoNome,
+          },
+        ],
       },
     },
   })

@@ -920,6 +920,30 @@ model SaasMembro {
 
 
 
+  // Reprovação da solicitação (MEMBERS_REJECT). A justificativa é obrigatória
+  // na Server Action; `reprovadoPontos` guarda ids do catálogo
+  // PONTOS_REPROVACAO (@torcida/types) para o card de detalhes destacar em
+  // vermelho exatamente a etapa/campo recusado. Limpo ao aprovar/reverter.
+
+  reprovadoEm     DateTime? @map("reprovado_em")
+
+  reprovadoPorId   String?  @map("reprovado_por_id")
+
+  reprovadoPorNome String?  @map("reprovado_por_nome")
+
+  reprovadoCategoria String? @map("reprovado_categoria")
+
+  reprovadoMotivo    String? @map("reprovado_motivo")
+
+  reprovadoPontos    String[] @default([]) @map("reprovado_pontos")
+
+  /// false = reprovação definitiva; o solicitante não pode reenviar o cadastro
+  /// (só volta à fila se um admin reverter para PENDENTE).
+
+  reprovadoPermiteReenvio Boolean @default(true) @map("reprovado_permite_reenvio")
+
+
+
   // Desligamento estatutário (MEMBERS_DISMISS) — distinto de bloqueio.
 
   desligadoEm     DateTime? @map("desligado_em")

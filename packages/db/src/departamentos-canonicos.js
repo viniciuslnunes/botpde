@@ -22,6 +22,7 @@ import {
   nomePerfilDepartamento,
 } from '../../types/src/permissions.js'
 import { isDepartamentoLegado } from '../../types/src/departamento-capabilities.js'
+import { isMembroElegivelDepartamento } from '../../types/src/departamento-eligibilidade.js'
 
 /** Slugs legados que não são departamentos (são tipos de membro). */
 export const DEPARTAMENTOS_SLUGS_LEGADOS = ['socio', 'torcedor']
@@ -723,17 +724,35 @@ export async function upsertPerfisDepartamentoCanonicos(client, tenantId, opts =
  * @param {{ userId: string, tenantId: string }} args
  */
 export async function syncMembershipFromRoles(client, { userId, tenantId }) {
-  const userRoles = await client.userRole.findMany({
-    where: { userId, tenantId },
-    include: {
-      role: {
-        select: {
-          departamentoId: true,
-          papelNoDepartamento: true,
-        },
-      },
+  const membro = await client.saasMembro.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: {
+      tenantId: true,
+      tipo: true,
+      status: true,
+      desligadoEm: true,
+      espelhado: true,
+      membroOrigemId: true,
     },
   })
+  const elegivel = isMembroElegivelDepartamento(membro, tenantId)
+
+  // Não removemos UserRole aqui: alguns chamadores fazem bootstrap de perfis
+  // globais vinculados à Diretoria antes de criar o SaasMembro. Sem
+  // elegibilidade, porém, nenhuma projeção departamental pode sobreviver.
+  const userRoles = elegivel
+    ? await client.userRole.findMany({
+        where: { userId, tenantId },
+        include: {
+          role: {
+            select: {
+              departamentoId: true,
+              papelNoDepartamento: true,
+            },
+          },
+        },
+      })
+    : []
 
   /** @type {Map<string, 'MEMBRO' | 'GESTOR'>} */
   const desired = new Map()

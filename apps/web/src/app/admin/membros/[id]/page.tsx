@@ -2,10 +2,14 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, User } from 'lucide-react'
 import { db } from '@torcida/db'
-import { PERMISSIONS } from '@torcida/types'
+import {
+  calculateEffectivePermissions,
+  formatNomeTorcida,
+  hasPermission,
+  PERMISSIONS,
+} from '@torcida/types'
 import { assertAnyPermission } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
-import { calculateEffectivePermissions, hasPermission } from '@torcida/types'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
 import { AdminMembroLgeForm } from '../admin-membro-lge-form'
 import { AdminMembroSedeForm } from '../admin-membro-sede-form'
@@ -116,7 +120,7 @@ export default async function MembroDetalhePage({ params }: Props) {
         select: { nome: true },
       })
     : null
-  const aprovadoNaUnidadeNome = unidadeOrigem?.nome ?? null
+  const aprovadoNaUnidadeNome = unidadeOrigem ? formatNomeTorcida(unidadeOrigem.nome) : null
   const aprovadoEmLabel = membro.aprovadoEm
     ? new Date(membro.aprovadoEm).toLocaleDateString('pt-BR')
     : null

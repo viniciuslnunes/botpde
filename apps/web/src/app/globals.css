@@ -58,6 +58,15 @@
   --color-warning-on: 255 255 255;
   --color-info-on: 255 255 255;
 
+  /* Skeletons de carregamento — contraste reativo ao tema.
+     A trilha é tinta do texto sobre a superfície: escurece no claro,
+     clareia no escuro. O brilho que varre é sempre branco (forte no
+     claro, discreto no escuro) — nunca cor de marca: com marca preta
+     ou branca o brilho desapareceria em um dos temas. */
+  --skeleton-track: rgb(var(--foreground) / 0.1);
+  --skeleton-track-soft: rgb(var(--foreground) / 0.06);
+  --skeleton-sheen: rgb(255 255 255 / 0.62);
+
   /* Grade .app-shell-bg — sobrescrita pelo TenantDesignBridge */
   --grid-enabled: 1;
   --grid-size: 48px;
@@ -78,6 +87,11 @@
   /* Fallback legível no escuro até o bridge do tenant aplicar a marca */
   --color-primary-fg: 196 181 253;
   --color-secondary-fg: 196 181 253;
+  /* Trilha um pouco mais forte (zinc-900 pede mais tinta) e brilho
+     bem discreto — no escuro um branco opaco viraria flash. */
+  --skeleton-track: rgb(var(--foreground) / 0.12);
+  --skeleton-track-soft: rgb(var(--foreground) / 0.07);
+  --skeleton-sheen: rgb(255 255 255 / 0.07);
 }
 
 @theme inline {
@@ -633,7 +647,64 @@ html[data-grid='off'] .app-shell-bg {
   }
 }
 
-/* Comunidade — windowing nativo (Fase C1): pula paint fora da viewport */
+/* ── Skeletons de carregamento ────────────────────────────────────
+   `.skeleton-sweep` no cartão (não em cada barra): uma única camada
+   animada por cartão varre o conjunto, então as barras acendem em
+   sincronia e o custo é um composite por cartão. `--i` escalona a
+   varredura entre cartões vizinhos (cascata de cima para baixo).
+   Trilha e brilho vêm dos tokens `--skeleton-*`, que o tema troca. */
+.skeleton-track {
+  background-color: var(--skeleton-track);
+}
+.skeleton-track-soft {
+  background-color: var(--skeleton-track-soft);
+}
+
+.skeleton-sweep {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.skeleton-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    100deg,
+    transparent 32%,
+    var(--skeleton-sheen) 50%,
+    transparent 68%
+  );
+  transform: translate3d(-105%, 0, 0);
+  animation: skeleton-sweep 1600ms cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  animation-delay: calc(var(--i, 0) * 160ms);
+}
+@keyframes skeleton-sweep {
+  0% {
+    transform: translate3d(-105%, 0, 0);
+  }
+  /* Pausa entre passadas: a varredura respira em vez de piscar. */
+  68%,
+  100% {
+    transform: translate3d(105%, 0, 0);
+  }
+}
+
+/* Sem movimento: a trilha estática + o texto do `role="status"` já
+   comunicam o carregamento — nada pisca. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-sweep::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Comunidade — windowing nativo (Fase C1): pula paint fora da viewport.
+   Só é aplicado ENQUANTO a lista não está virtualizada (`useFeedWindow`
+   devolve `postClassName`): dentro de um item medido por `measureElement`,
+   o tamanho intrínseco reportado fora da viewport falseia a medição e faz
+   o total do virtualizer oscilar. */
 .feed-post-window {
   content-visibility: auto;
   contain-intrinsic-size: auto 420px;

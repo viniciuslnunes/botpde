@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding, UFS_BRASIL } from '@/lib/onboarding'
+import { getAfiliacoesParaOnboarding, getEstadoOnboarding, getRegioesOnboarding } from '@/lib/onboarding'
 import { getTenantFromHost } from '@/lib/tenant'
 import { usuarioPrecisaNickname } from '@/lib/tenant-context'
 import { OnboardingSkeleton } from './onboarding-skeleton'
@@ -67,7 +67,6 @@ async function OnboardingWizardLoader({
     <OnboardingWizard
       afiliacoesIniciais={afiliacoesIniciais}
       regioes={regioes}
-      ufs={UFS_BRASIL}
       nomeInicial={nomeInicial}
       emailInicial={emailInicial}
       userId={userId}

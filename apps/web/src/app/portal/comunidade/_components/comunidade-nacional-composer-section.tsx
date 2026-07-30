@@ -1,13 +1,10 @@
 import dynamic from 'next/dynamic'
 import { getComposerContext } from './composer-context'
+import { FeedComposerSkeleton } from '@/components/portal/feed-skeletons'
 
 const FeedComposer = dynamic(
   () => import('@/components/portal/feed-composer').then((mod) => mod.FeedComposer),
-  {
-    loading: () => (
-      <div className="h-24 animate-pulse rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]" />
-    ),
-  },
+  { loading: () => <FeedComposerSkeleton /> },
 )
 
 /**

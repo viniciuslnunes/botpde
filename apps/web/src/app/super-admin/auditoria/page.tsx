@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ScrollText } from 'lucide-react'
 import { db } from '@torcida/db'
+import { formatNomeTorcida } from '@torcida/types'
 import { auth } from '@/lib/auth'
 import { isSuperAdminEmail, listarTorcidasParaSelecao } from '@/lib/tenant-context'
 import { AdminPageHeader } from '@/components/admin/ui/admin-page-header'
@@ -226,7 +227,7 @@ export default async function AuditoriaPlataformaPage({
                     {formatarDataHora(log.criadoEm)}
                   </td>
                   <td className="px-3 py-2 text-[rgb(var(--foreground))]">
-                    <span className="font-medium">{log.tenant.nome}</span>
+                    <span className="font-medium">{formatNomeTorcida(log.tenant.nome)}</span>
                     <span className="ml-1 font-mono text-xs text-[rgb(var(--foreground-muted))]">
                       {log.tenant.slug}
                     </span>

@@ -301,6 +301,38 @@ Troca visual entre estados de UI (ex.: Seguir → Pendente → Seguindo):
 />
 ```
 
+### 12. Skeletons de carregamento (feed)
+
+Placeholder com forma do conteúdo real, não spinner nem “badge” pulsante.
+Componentes em `apps/web/src/components/portal/feed-skeletons.tsx`
+(`Skeleton`, `FeedPostSkeleton`, `FeedPostSkeletonList`, `FeedComposerSkeleton`,
+`FeedStoriesSkeleton`); contraste vem de tokens em `globals.css`:
+
+| Token | Claro | Escuro |
+|-------|-------|--------|
+| `--skeleton-track` | `--foreground` @ 10% | `--foreground` @ 12% |
+| `--skeleton-track-soft` | `--foreground` @ 6% | `--foreground` @ 7% |
+| `--skeleton-sheen` | branco @ 62% | branco @ 7% |
+
+Regras:
+
+- A trilha é **tinta do texto sobre a superfície** — escurece no claro, clareia
+  no escuro. Nunca uma cor fixa (cinza fixo desaparece em um dos temas).
+- O brilho é **sempre branco**, só muda o alpha. Não usar cor de marca: com
+  marca preta ou branca a varredura sumiria em um dos temas.
+- `.skeleton-sweep` vai **no cartão**, não em cada barra: uma camada animada por
+  cartão, tudo acende em sincronia, um composite por cartão. `--i` (índice)
+  escalona a varredura entre cartões vizinhos.
+- `prefers-reduced-motion`: varredura desligada; a trilha estática + o texto do
+  `role="status"` seguem comunicando o carregamento.
+- Geometria espelha o `FeedPostCard` (avatar 40px, nome + @, corpo, barra de
+  engajamento) para a troca pelo conteúdo real não empurrar a lista.
+
+**Onde está:** `feed-load-more` (rodapé do infinite scroll — também marca fim da
+lista e erro com retry), carga inicial de `comunidade-feed-infinite` /
+`comunidade-rede-infinite`, `loading.tsx` da Comunidade, fallbacks de composer /
+stories / canal.
+
 ---
 
 ## Mapa de cobertura atual (Comunidade)
@@ -308,7 +340,7 @@ Troca visual entre estados de UI (ex.: Seguir → Pendente → Seguindo):
 | Área | Animações aplicadas |
 |------|---------------------|
 | Layout | `MotionShell`, `ComunidadeRouteTransition` |
-| Feed | `MotionReveal`, `ComunidadeFeedEmpty`, tabs com `layoutId` |
+| Feed | `MotionReveal`, `ComunidadeFeedEmpty`, tabs com `layoutId`, skeletons de carga inicial e de página seguinte (`feed-load-more`) |
 | Composer | expand, pickers, menu `+` mobile, prévia de mídia (entrada/saída + barra de progresso real) |
 | Posts | engajamento, enquete, menu, stagger |
 | Stories | rings, viewer, slide, progresso |
