@@ -6,6 +6,8 @@ export interface ConfigSectionCardProps {
   icon: ReactNode
   title: string
   description: string
+  /** Âncora estável para deep links (ex.: `#canal-oficial`). */
+  id?: string
   /** Seção restrita ao owner da torcida (não é permissão do RBAC). */
   ownerOnly?: boolean
   /** True quando a seção é ownerOnly e o usuário atual não é owner. */
@@ -24,6 +26,7 @@ export function ConfigSectionCard({
   icon,
   title,
   description,
+  id,
   ownerOnly = false,
   blocked = false,
   index = 0,
@@ -32,6 +35,7 @@ export function ConfigSectionCard({
   return (
     <MotionReveal index={index}>
       <section
+        id={id}
         className={[
           'overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))]',
           blocked ? 'opacity-60' : '',

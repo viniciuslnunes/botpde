@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { MessageSquare } from 'lucide-react'
 import { DiscordForm } from '@/components/admin/config-forms'
 import { ConfigSectionCard } from '../_components/config-section-card'
@@ -8,9 +7,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Integrações — Configurações' }
 
 export default async function ConfiguracoesIntegracoesPage() {
-  const contexto = await getConfigContexto()
-  if (!contexto) redirect('/')
-  const { tenant, isOwner } = contexto
+  const { tenant, isOwner } = await getConfigContexto()
 
   return (
     <div className="space-y-6">

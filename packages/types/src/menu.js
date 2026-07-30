@@ -31,8 +31,10 @@ export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'dashboard', label: 'Dashboard', href: '/admin', permissao: null, exact: true, secao: 'geral' },
   // Visão da torcida, unidades (sedes), hierarquia e solicitações de afiliação
   // são tabs de `/admin/torcida` (route group `admin/(estrutura)/` — as URLs
-  // não mudaram). Console global e solicitações só existem na Sede principal:
-  // o layout do admin esconde a entrada, e o do módulo esconde a tab.
+  // não mudaram). Quem só tem `roles:manage` ou `affiliation:manage` cai na
+  // própria etapa (ver torcida/page.tsx). Console global e solicitações só
+  // existem na Sede principal: o layout do admin esconde a entrada, e o do
+  // módulo esconde a tab.
   {
     id: 'estrutura',
     label: 'Estrutura',
@@ -142,7 +144,8 @@ export const ADMIN_MENU = /** @type {const} */ ([
   },
   // Configurações, design, controle de acesso e auditoria são tabs de
   // `/admin/configuracoes` (route group `admin/(plataforma)/`).
-  // Auditoria é append-only: sem mutações na UI.
+  // Quem só tem `roles:manage` ou `audit:view` cai na própria etapa
+  // (ver configuracoes/page.tsx). Auditoria é append-only: sem mutações na UI.
   {
     id: 'plataforma',
     label: 'Plataforma',

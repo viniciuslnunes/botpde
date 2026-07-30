@@ -178,6 +178,24 @@ describe('tabsPermitidasDoModulo', () => {
     )
   })
 
+  it('gestor de cargos entra na Estrutura pela Hierarquia', () => {
+    expect(primeiraTabPermitida('estrutura', [PERMISSIONS.ROLES_MANAGE])).toBe('/admin/hierarquia')
+  })
+
+  it('gestor de afiliação entra na Estrutura pelas Solicitações', () => {
+    expect(primeiraTabPermitida('estrutura', [PERMISSIONS.AFFILIATION_MANAGE])).toBe(
+      '/admin/afiliacoes',
+    )
+  })
+
+  it('controle de acesso entra na Plataforma por Acessos', () => {
+    expect(primeiraTabPermitida('plataforma', [PERMISSIONS.ROLES_MANAGE])).toBe('/admin/acessos')
+  })
+
+  it('leitura de auditoria entra na Plataforma pela Auditoria', () => {
+    expect(primeiraTabPermitida('plataforma', [PERMISSIONS.AUDIT_VIEW])).toBe('/admin/auditoria')
+  })
+
   it('sem nenhuma permissão do módulo não sobra etapa', () => {
     expect(tabsPermitidasDoModulo('comunidade', [])).toEqual([])
     expect(primeiraTabPermitida('comunidade', [])).toBeNull()

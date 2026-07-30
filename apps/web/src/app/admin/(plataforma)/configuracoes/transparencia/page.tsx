@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { Network, Scale } from 'lucide-react'
 import { BalancoVisivelForm, HierarquiaVisivelForm } from '@/components/admin/config-forms'
 import { ConfigSectionCard } from '../_components/config-section-card'
@@ -15,9 +14,7 @@ const ICONE = 'h-4 w-4'
  * operação interna fica visível para associados e unidades filhas.
  */
 export default async function ConfiguracoesTransparenciaPage() {
-  const contexto = await getConfigContexto()
-  if (!contexto) redirect('/')
-  const { tenant, isOwner } = contexto
+  const { tenant, isOwner } = await getConfigContexto()
 
   return (
     <div className="space-y-6">

@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation'
 import { db } from '@torcida/db'
-import { formatNomeAfiliacao } from '@torcida/types'
+import { formatNomeAfiliacao, PERMISSIONS, primeiraTabPermitida } from '@torcida/types'
+import { assertPermission } from '@/lib/authz'
 import { isExpectedError } from '@/lib/expected-error'
 import { Flag, IdCard, Radio, Settings } from 'lucide-react'
 import { PerfilTenantForm, AfiliacaoForm, DocumentosCadastroForm, CanalOficialForm } from '@/components/admin/config-forms'
 import { getOrCreateCanalOficial } from '@/lib/canais'
+import { permissoesEfetivasNoAdmin } from '@/lib/admin-modulos'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { ConfigSectionCard } from './_components/config-section-card'
 import { getConfigContexto } from './_lib/contexto'
@@ -66,9 +68,16 @@ export default async function ConfiguracoesGeralPage({
   const destinoLegado = tab ? ROTA_POR_TAB_LEGADA[tab] : undefined
   if (destinoLegado) redirect(destinoLegado)
 
-  const contexto = await getConfigContexto()
-  if (!contexto) redirect('/')
-  const { userId, tenant, isOwner } = contexto
+  // Menu de Plataforma aponta para esta raiz; quem só tem Acessos/Auditoria
+  // cai na própria etapa (mesmo padrão de Loja/Comunidade).
+  try {
+    await assertPermission(PERMISSIONS.SETTINGS_MANAGE)
+  } catch {
+    const permissoes = await permissoesEfetivasNoAdmin()
+    redirect(primeiraTabPermitida('plataforma', permissoes) ?? '/admin')
+  }
+
+  const { userId, tenant, isOwner } = await getConfigContexto()
 
   const afiliacoes: AfiliacaoOption[] = await db.afiliacao
     .findMany({ orderBy: { nome: 'asc' }, select: { id: true, nome: true } })
@@ -147,6 +156,7 @@ export default async function ConfiguracoesGeralPage({
       </ConfigSectionCard>
 
       <ConfigSectionCard
+        id="canal-oficial"
         icon={<Radio className={ICONE} />}
         title="Canal oficial"
         description="Nome, foto, visibilidade e regras do mural desta unidade na Comunidade"
