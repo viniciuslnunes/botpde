@@ -106,6 +106,9 @@
 /* ── Reset e base ─────────────────────────────────────────────── */
 * {
   border-color: rgb(var(--border));
+  /* Substitui o implícito `auto` (I-beam sobre texto) por seta;
+     cursores explícitos (pointer, text, grab etc.) abaixo vencem. */
+  cursor: default;
 }
 
 body {
@@ -118,12 +121,12 @@ body {
 }
 
 /* ── Cursor de ação (pointer) ───────────────────────────────────
-   Tailwind v4 não define pointer em button (fica auto → I-beam no texto).
-   Unlayered + !important para vencer utilitários em @layer e UA.
-   Descendentes também recebem pointer (não inherit) para o I-beam
+   Tailwind v4 não define pointer em button (* já fixa default, não auto).
+   Unlayered + !important para vencer utilitários em @layer e o * acima.
+   Descendentes também recebem pointer (não inherit) para o default
    não aparecer em <p>/<span> dentro de links/botões.
    NÃO usar pointer-events:none nos filhos: em <a> transparente o hit
-   atravessa o link e o cursor volta ao padrão. */
+   atravessa o link e o cursor volta ao default do *. */
 :is(
   a[href],
   area[href],
