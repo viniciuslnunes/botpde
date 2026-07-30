@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { Palette } from 'lucide-react'
 import { db } from '@torcida/db'
 import { resolveTenantDesign } from '@torcida/types'
 import type { TenantDesign } from '@torcida/ui'
@@ -52,21 +51,15 @@ export default async function DesignPage() {
   ].filter((u): u is string => Boolean(u))
 
   return (
-    <div className="flex min-h-0 flex-col xl:h-[calc(100dvh-3.5rem)] xl:overflow-hidden">
-      <div className="shrink-0 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-4 sm:py-5">
-        <div className="flex items-center gap-3">
-          <Palette className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-          <div>
-            <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Design</h1>
-            <p className="text-sm text-[rgb(var(--foreground-muted))]">
-              Estúdio visual · passe o mouse nos controles e veja na prévia ·{' '}
-              {tenant.nome}
-            </p>
-          </div>
-        </div>
-      </div>
+    // Estúdio: as duas colunas rolam por dentro, então o container precisa de
+    // altura limitada. Sob o shell de tabs ela não pode mais ser a viewport
+    // inteira — `70dvh` com piso evita depender da altura do header/tabs.
+    <div className="flex min-h-0 flex-col xl:h-[70dvh] xl:min-h-[34rem] xl:overflow-hidden">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Estúdio visual · passe o mouse nos controles e veja na prévia.
+      </p>
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:py-5 xl:overflow-hidden">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col xl:overflow-hidden">
         <DesignForm
           initialDesign={design}
           corPrimaria={tenant.corPrimaria}

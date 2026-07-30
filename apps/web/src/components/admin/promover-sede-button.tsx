@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { Building2, Loader2 } from 'lucide-react'
-import { promoverSedeAction } from '@/app/admin/sedes/actions'
+import { promoverSedeAction } from '@/app/admin/(estrutura)/sedes/actions'
 import { runPersistAction } from '@/lib/toast-action'
 
 export function PromoverSedeButton({

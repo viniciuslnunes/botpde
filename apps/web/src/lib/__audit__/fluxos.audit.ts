@@ -938,7 +938,7 @@ describe('fluxo: conceder departamento exige sócio elegível', () => {
 
     const departamentoId = perfilArea.departamentoId
     const antes = await contarProjecoesArea(tenant.id, torcedor.userId)
-    const { adicionarMembroDepartamento } = await import('@/app/admin/acessos/actions')
+    const { adicionarMembroDepartamento } = await import('@/app/admin/(plataforma)/acessos/actions')
     const r = await comoUsuario(ator, () =>
       tentativa(() => adicionarMembroDepartamento(departamentoId, torcedor.userId)),
     )
@@ -1045,7 +1045,7 @@ describe('fluxo: conceder departamento exige sócio elegível', () => {
     })
 
     const { adicionarMembroDepartamento, removerMembroDepartamento } = await import(
-      '@/app/admin/acessos/actions'
+      '@/app/admin/(plataforma)/acessos/actions'
     )
     const r = await comoUsuario(ator, () =>
       tentativa(() => adicionarMembroDepartamento(departamentoId, alvo)),

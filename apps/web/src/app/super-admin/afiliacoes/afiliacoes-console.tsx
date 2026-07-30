@@ -10,7 +10,7 @@ import {
   editarSolicitacao,
   recusarSolicitacao,
   type SolicitacaoActionState,
-} from '@/app/admin/afiliacoes/afiliacao-actions'
+} from '@/app/admin/(estrutura)/afiliacoes/afiliacao-actions'
 import { buscarEnderecoPorCep } from '@/lib/viacep'
 import { normalizarInicioEndereco } from '@/lib/endereco'
 import { uploadMediaToCloudinary } from '@/lib/cloudinary-upload'

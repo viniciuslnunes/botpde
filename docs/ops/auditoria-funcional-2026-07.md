@@ -436,6 +436,202 @@ teste e passam a rodar assim que o timeout for corrigido. Também sem exercício
 migração de membros e de unidades filhas na promoção, que só acontece no
 caminho feliz.
 
+## Rodada 5 — notificações (2026-07-30)
+
+`apps/web/src/lib/__audit__/notificacoes.audit.ts`, rodado por
+`pnpm --filter @torcida/web audit:notificacoes`. **11 conformes, 1 alerta,
+3 erros.**
+
+Esta rodada teve dois trabalhos. O primeiro foi **reverificar** a auditoria de
+notificações de 2026-07-22, que foi feita por análise e não por execução — e
+que em 8 dias envelheceu. Repetir uma lista desatualizada como se fosse estado
+atual é pior do que não auditar.
+
+### Alegações de 2026-07-22, reverificadas
+
+| Alegação | Veredito hoje |
+|---|---|
+| "Badge preso: a `Notificacao` nunca é marcada lida ao decidir pela fila" | **parcialmente derrubada** — os 3 arquivos citados passaram a reconciliar. Sobrou o alcance (ver Achado 10) |
+| "`NOVA_MENSAGEM` nunca é criado, tipo morto" | **derrubada** — 26 notificações desse tipo no banco |
+| "Não existe `SEGUIMENTO_REJEITADO`" | **derrubada** — o tipo existe e `rejeitarSeguimento` o cria |
+
+Fora do alcance de auditoria de fluxo, e portanto **não** reverificados:
+`TIPOS_QUE_EXIGEM_REFRESH` (constante de client), a dessincronia entre os dois
+caches singleton, o volume de `revalidatePath` por clique, e se `REDIS_URL`
+está setado no Railway. Esses continuam valendo como pendências de leitura de
+código e de operação.
+
+### Achado 10 (novo) — reconciliação cobre 1 de N destinatários
+
+O "badge preso" foi corrigido **só para quem clica**. O fan-out cria N
+notificações; a reconciliação marca uma. Provado nos dois caminhos:
+
+- **Pedido de grupo**: `pedirEntradaGrupo` notificou os 2 administradores; o
+  pedido foi aprovado; **1 admin ficou com a notificação não lida** apontando
+  para um pedido que já não existe.
+- **Moderação**: denúncia resolvida e **6 moderadores** seguem com
+  `DENUNCIA_NOVA` não lida.
+
+A causa é a mesma nos dois: o `updateMany` de reconciliação é escopado em
+`userId: session.user.id`. Vale igual para `decidirPedidoCanal`, para as 4
+funções de moderação e para `marcarSolicitacoesLidas`
+(`admin/membros/actions.ts`). Quanto mais gente na equipe, pior — numa torcida
+com 6 moderadores, 5 badges ficam presos por denúncia resolvida.
+
+Fix: reconciliar por **critério do evento** (tipo + ator + entidade) em vez de
+por destinatário, isto é, tirar o `userId` do `where` e emitir o ping para cada
+destinatário afetado.
+
+### Achado 11 (novo) — ex-membro continua recebendo comunicado
+
+`desligarMembro` grava `desligadoEm` mas **não muda o `status`**, que segue
+`APROVADO`. `listarUserIdsMembrosAprovados` filtra só por `status`. Resultado:
+quem foi desligado continua no fan-out de `notificarMembrosAprovados` — o
+canal de comunicado urgente da torcida. Verificado desligando um membro e
+consultando a lista de destinatários: o desligado estava lá.
+
+Fix: adicionar `desligadoEm: null` ao filtro (e conferir os outros consumidores
+de "membro aprovado" que possam ter a mesma omissão).
+
+### Conformes
+
+Roteamento por permissão respeita **override negado** (8 pares
+usuário×permissão conferidos) — quem foi explicitamente excluído não entra no
+fan-out administrativo. `excetoUserId` funciona: num comunicado de 127
+destinatários, quem disparou não recebeu a própria notificação. O fan-out fica
+contido no tenant de origem, e a contagem do sino é por tenant — a mesma
+pessoa em duas torcidas não vê a notificação de uma no sino da outra.
+Reconciliação do próprio decisor funciona nos dois caminhos, e o solicitante é
+avisado da aprovação.
+
+## Rodada 6 — mensageria / DM (2026-07-30)
+
+`apps/web/src/lib/__audit__/mensageria.audit.ts`, rodado por
+`pnpm --filter @torcida/web audit:mensageria`. **16 conformes, 0 alertas,
+0 erros** — a primeira rodada sem achado, e vale dizer por quê: é a camada
+onde a regra mais delicada do produto está, e ela segura.
+
+**Método diferente**: DM não é Server Action, é route handler
+(`app/api/conversas/**`, `app/api/usuarios/[id]/bloqueio`). Os handlers são
+chamados como funções, com `Request` sintético e `params` como Promise — o
+mesmo contrato do Next. Como `assertUsuarioMensageria` resolve o tenant pelo
+**host** (não pelo vínculo), foi preciso simular `getTenantFromHost`; sem
+isso todo handler recusa com "Não autenticado." e a auditoria contaria isso
+como recusa de regra.
+
+### Segregação por rivalidade — segura, e o Achado 9 não se propaga
+
+Sócio de `camisa-12-corinthians` e sócio de `mancha-alviverde` (Corinthians ×
+Palmeiras) não abrem DM em nenhum sentido, e `criarDmComSolicitacao` recusa a
+escrita, não só a leitura. A anti-infiltração do `spec-onboarding` §3.2 está
+enforced no servidor.
+
+Isso foi testado **de propósito** nesse par: `isParRivalSocio` depende de
+`getTenantRelation`, que é o Achado 9, e os dois lados têm 4 unidades cada —
+a forma que expõe o bug. A relação saiu `rival/rival` nos dois sentidos, ou
+seja, **o defeito de hierarquia não chegou até aqui**. Não é garantia: como o
+Achado 9 é sensível à ordem que o Postgres devolve, o resultado pode mudar. A
+checagem fica no arquivo justamente para pegar isso se acontecer, e a mensagem
+de erro já distingue "a relação não saiu rival" (propagação do Achado 9) de
+"saiu rival e o gate não bloqueou" (defeito local).
+
+### Bloqueio e recusa
+
+Bloquear em **uma** direção fecha a DM nas **duas** — quem foi bloqueado
+também não alcança quem bloqueou. E não dá para contornar pelo grupo:
+`podeConvidarParaGrupoChat` também recusa. Desbloquear devolve exatamente o
+acesso anterior. Autobloqueio é recusado. Tudo com `AuditLog`.
+
+Regra forte que o nome da função não entrega: **recusar uma solicitação de DM
+grava `BloqueioUsuario`** — `rejeitarSolicitacaoMensagem` faz upsert de
+bloqueio junto com o status `REJEITADO`. Recusar não é "não agora", é
+bloquear. Quem foi recusado não consegue reabrir nem insistir.
+
+Falar com sócio de **outra torcida do mesmo clube** (co-irmã) passa por
+solicitação: a conversa nasce com destinatário `PENDENTE` e remetente `ATIVO`.
+
+### Escopo
+
+Quem não é membro da conversa é barrado tanto na leitura quanto no envio, com
+"Conversa não encontrada" — o escopo está na query, não numa checagem
+posterior.
+
+### Erro meu, que vale como lição de método
+
+A primeira execução **vazou estado no banco**: a reversão localizava a DM por
+`findDmEntreUsuarios`, que filtra por status `ATIVO`/`PENDENTE` — depois da
+recusa os dois lados ficam `REJEITADO`, a busca devolveu `null` e a limpeza
+não apagou nada. Sobrou uma conversa e um `BloqueioUsuario`, que fizeram a
+execução seguinte reportar o par como "bloqueado" e perder o teste inteiro.
+Localizado, limpo à mão, e a reversão passou a localizar por participantes e
+a remover o bloqueio da recusa.
+
+É a **segunda** vez na série que a reversão falha (a primeira foi o turno de
+caixa, rodada 3). O padrão é o mesmo: a reversão assume a forma do estado
+feliz e não a do estado que a própria mutação produz.
+
+## Rodada 7 — loja e rede social (2026-07-30)
+
+`apps/web/src/lib/__audit__/loja.audit.ts`, rodado por
+`pnpm --filter @torcida/web audit:loja`. **14 conformes, 0 alertas, 0 erros**,
+com o resultado **estável em execuções repetidas** (ver "determinismo" abaixo).
+
+A rodada 2 tinha coberto o caminho feliz da compra. Aqui entraram as bordas.
+
+### Concorrência na última unidade — o teste que motivou a rodada
+
+O decremento de estoque é um **read-modify-write sobre coluna JSON**
+(`{ ...estoque, [chave]: disponivel - qtd }`) dentro de uma interactive
+transaction. Sob READ COMMITTED, a leitura clássica seria: duas transações
+leem `1`, ambas gravam `0`, e a torcida vende duas vezes a mesma peça.
+
+Testado com dois sócios disparando `finalizarPedido` em `Promise.all` sobre um
+produto com **1 unidade**: um concluiu, o outro recebeu *"Estoque insuficiente"*,
+1 unidade vendida, estoque final 0. **Sem oversell.**
+
+> A primeira versão deste teste deu o mesmo "1 checkout concluído" **pelo motivo
+> errado**: o comprador A era `TORCEDOR`, e `tenantsPermitidosLoja` só considera
+> vínculo `SOCIO` — ele nem chegava à disputa, falhava com "produto não está mais
+> disponível". O teste agora **captura a mensagem do perdedor** e separa
+> "perdeu a disputa" de "não era elegível"; sem isso a conformidade era sorte.
+
+### Cupom
+
+Vencido é recusado (*"Cupom expirado."*); o de primeira compra é recusado para
+quem já tem pedido; e cupom de outra torcida não vale nesta loja
+(*"Cupom inválido."*) — o desconto não atravessa a fronteira de tenant.
+
+**Não auditado porque não existe**: limite de uso por cupom e valor mínimo de
+pedido **não estão no modelo** (`SaasCupom` só tem `ativo`, `validoAte`,
+`primeiraCompra`). Estavam no plano da rodada 5 como itens a auditar; são
+lacuna de produto, não defeito — se a intenção é ter cupom com tiragem
+limitada, isso é feature nova.
+
+### Estoque e pedido
+
+Checkout com um item sem estoque recusa **o carrinho inteiro** e desfaz o
+decremento do item que tinha estoque — transação íntegra, nenhum pedido
+gravado, e a sacola do comprador é preservada. Gestor não muda status de pedido
+de outra torcida. Cancelar o pedido **devolve as unidades ao estoque** (4 → 2 na
+compra, 2 → 4 no cancelamento).
+
+### Rede social
+
+Sócios de torcidas rivais **não podem se seguir** em nenhum sentido — a
+segregação da rodada 6 (mensageria) vale também aqui, o que importa porque
+seguir dá acesso a conteúdo. Seguir perfil **privado** cria solicitação
+`PENDENTE` em vez de aprovar direto.
+
+### Determinismo
+
+Duas execuções seguidas deram contagens diferentes (14 e 12 conformes) antes de
+uma correção: `contextoLoja` escolhia "o primeiro produto ativo" por `orderBy`,
+e as **fixtures da própria auditoria** — que vivem até o `afterAll` — podiam
+ganhar essa ordenação e trocar o tenant no meio da execução. Corrigido
+excluindo o prefixo `[AUDIT-LOJA]` da seleção; duas execuções seguidas passaram
+a dar 14/0/0. É a terceira manifestação da mesma armadilha: **auditoria que não
+isola as próprias fixtures do dado que audita mede a si mesma.**
+
 ## Próximas camadas a auditar (planejado, não feito)
 
 Ordem por risco × esforço:
@@ -467,22 +663,25 @@ Ordem por risco × esforço:
 Reordenada após a rodada 3 (que cobriu eventos, bar, RBAC e grupos). O que
 sobrou, ainda por risco × esforço:
 
-1. **Notificações** — segue sendo o topo: os gaps conhecidos (badge preso,
+1. ~~**Notificações**~~ — **feito na rodada 5** (Achados 10 e 11, e reverificação das alegações de 2026-07-22).
    `NOVA_MENSAGEM` morto, refresh incompleto) continuam sem exercício. A
    rodada 3 gerou notificação em três pontos (promoção da espera, divergência
    de caixa, entrada em grupo) mas não auditou leitura nem zeragem do badge.
-2. **Mensageria / DM** — solicitação, aceite, bloqueio e denúncia de mensagem;
-   a segregação entre sócios de torcidas rivais continua sem dado.
+2. ~~**Mensageria / DM**~~ — **feito na rodada 6**, sem achados: a segregação
+   entre sócios de torcidas rivais está enforced. Resta a **denúncia de
+   mensagem** (`DenunciaMensagem`) e o envio em si (rate limit,
+   `MAX_CONTEUDO_MENSAGEM`, edição/exclusão de mensagem).
 3. **Associação e cobrança** — `PlanoAssociacao` e `CobrancaAssociacao` estão
    **zerados** no banco de teste (confirmado por contagem). Precisa de seed
    antes de qualquer auditoria; hoje mensalidade é lançamento avulso.
 4. ~~**Sedes e hierarquia**~~ — **feito na rodada 4** (Achados 8 e 9). Resta
    o caminho feliz da promoção, bloqueado pelo Achado 8.
-5. **Loja, o resto** — cupom expirado / no limite de uso, estoque insuficiente
-   na concorrência, `atualizarStatusPedido`. A rodada 2 cobriu só o caminho
-   feliz e o cross-tenant.
-6. **Seguir e perfil privado** — `solicitarSeguir` em perfil privado, aprovar,
-   rejeitar, e o efeito da rivalidade. 56 seguimentos semeados.
+5. ~~**Loja, o resto**~~ — **feito na rodada 7**, sem achados. Limite de uso de
+   cupom não foi auditado porque **não existe no modelo** (feature nova, não
+   defeito).
+6. ~~**Seguir e perfil privado**~~ — **feito na rodada 7** (rivalidade e perfil
+   privado). Resta o par `aprovarSeguimento`/`rejeitarSeguimento` visto do lado
+   de quem decide.
 7. **Timeline / fan-out do feed** — custo e corretude sob volume.
 8. **Busca da Comunidade** — `modo=rapida`, e garantir que o `DISTINCT` +
    `similarity` não voltou.
@@ -524,6 +723,19 @@ Três falsos positivos custaram tempo nesta rodada e vão se repetir:
    `getUserPermissionsInTenant` devolve `{ rolePermissions, overrides }` — o
    conjunto efetivo sai de `calculateEffectivePermissions`. Cada um desses
    gerou um "erro" que era só harness errado.
+4c. **Isole as próprias fixtures do dado que você audita.** Rodada 7: a
+   auditoria escolhia o tenant pelo "primeiro produto ativo", e as fixtures
+   `[AUDIT-LOJA]` — vivas até o `afterAll` — ganhavam essa ordenação e trocavam
+   o contexto no meio da execução; duas rodadas seguidas davam contagens
+   diferentes. Toda seleção de contexto deve excluir o prefixo da auditoria.
+4b. **A reversão precisa localizar o estado que a mutação DEIXA, não o que ela
+   parte.** Rodada 6: a limpeza buscava a DM por `findDmEntreUsuarios`, que só
+   enxerga `ATIVO`/`PENDENTE` — depois da recusa os membros viram `REJEITADO`
+   e a busca devolveu null, vazando conversa e bloqueio para a execução
+   seguinte. Localize por chave estável (participantes, id capturado na
+   criação), nunca por um helper de domínio que filtra por status. E confira
+   os **efeitos colaterais** da action: `rejeitarSolicitacaoMensagem` cria um
+   `BloqueioUsuario` que a reversão ingênua não removeria.
 4. **A reversão também erra.** Na rodada 3 a limpeza do turno de caixa falhou
    e deixou um turno **fechado** no banco: `fechadoPorId: null` é argumento
    desconhecido para o Prisma quando o campo tem relação declarada (é

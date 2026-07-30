@@ -851,6 +851,50 @@ Refactor da área admin em fases — **todas entregues (1–5)**. Guia completo:
     **obrigatório**, porque `Notificacao.link` já gravado no banco aponta para
     a URL antiga (`/admin/cobrancas?status=VENCIDA`). `?tab=evolucao` do
     Financeiro também redireciona para a rota nova.
+- **Módulo em route group, quando as etapas não têm prefixo comum**
+  (2026-07-30): a seção Governança tinha 8 entradas de menu misturando
+  organização interna, rede externa, leitura e configuração. Virou 3 —
+  **Estrutura**, Alianças, Relatórios, **Plataforma**:
+  - **Estrutura** (`admin/(estrutura)/`): `Visão geral · Unidades ·
+    Hierarquia · Solicitações` sobre `/admin/torcida`, `/admin/sedes`,
+    `/admin/hierarquia`, `/admin/afiliacoes`. **Route group, não move de
+    rota**: as quatro URLs são irmãs, mover exigiria quatro redirects (e
+    `SOLICITACAO_UNIDADE_CRIADA` tem link gravado). Regra geral: etapas com
+    prefixo comum → sub-rota; etapas irmãs → route group.
+  - **Plataforma** (`admin/(plataforma)/`): `Geral · Transparência ·
+    Integrações · Identidade · Acessos · Auditoria`. As 7 seções `?tab=` de
+    Configurações se dissolveram nas três primeiras etapas — Transparência
+    junta balanço e hierarquia visível, que respondem à mesma pergunta (o que
+    o portal expõe). Sem barra de tabs empilhada: cada etapa empilha
+    `ConfigSectionCard`. `?tab=discord|balanco|hierarquia` redireciona.
+  - **Consequência no resolvedor**: com route group, a rota da etapa não
+    compartilha prefixo com a raiz do módulo, então `resolverMenuIdDeRota`
+    passou a consultar `ADMIN_MODULOS` **e** `ADMIN_MENU` competindo pelo
+    prefixo mais longo — não por precedência fixa. Precedência fixa em módulo
+    fazia `/admin/bar/pdv` casar com a tab `/admin/bar` e o badge de
+    divergência de turno migrar do PDV para o módulo (pego pelo teste de
+    invariante, não em produção).
+  - **Estúdio de Design sob shell**: `DesignForm` tem duas colunas com scroll
+    próprio e dependia de `h-[calc(100dvh-3.5rem)]`. Sob o shell de tabs a
+    altura não pode mais assumir a viewport inteira — passou a `xl:h-[70dvh]`
+    com piso, sem depender da altura de header/tabs.
+  - **Menu**: 24 entradas antes da wave 1 → **14** agora.
+- **Detalhe sob shell de módulo + seções do menu** (2026-07-30, fecha o
+  refactor):
+  - **`AdminDetailHeader`** no kit: página de detalhe dentro de um módulo
+    (`/admin/sedes/[id]` em Estrutura) empilhava **dois** cabeçalhos
+    full-bleed. A versão de detalhe não tem faixa de superfície — o header do
+    módulo continua sendo o do topo, e a identidade da entidade vive dentro do
+    painel, com back-link explícito.
+  - **Tabs internas onde ganham**: `eventos/[id]` (`Cockpit · Embarque ·
+    Editar`) e `torcida/unidade/[id]` (`Financeiro · Agenda · Bar · Membros` —
+    aqui a aba também corta 5 leituras por render para as da aba visível).
+    `sedes/[id]` e `membros/[id]` **não** ganharam tabs: o form de sede já tem
+    stepper próprio e o de membro tem três blocos. Linha ≠ carga cognitiva.
+  - **`ADMIN_MENU_SECOES` reagrupado** por natureza do trabalho (Pessoas ·
+    Operação · Finanças · Governança): com o módulo virando uma linha, cinco
+    seções tinham um único item repetindo o cabeçalho ("Loja › Loja"). Coberto
+    por invariante para não voltar.
 - **Charts SVG próprios** (zero dependência) em `components/admin/charts/`
   (`Sparkline`, `MiniBarChart` c/ série dupla, `DonutChart`, `TrendDelta`).
   Fronteira RSC→client: props só primitivas (nunca `Decimal`/`Date`); funções
@@ -1041,6 +1085,40 @@ sessão simulada). Lista completa, impacto e método em
     admin, ou (c) diferenciar a resposta quando a entidade existe em outro
     tenant. A opção (a) resolve a classe toda; (b) é o mínimo para o 404
     deixar de ser mudo.
+11. **Reconciliação de leitura cobre 1 de N** (rodada 5, 2026-07-30) — o
+    fan-out cria uma `Notificacao` por destinatário, mas o `updateMany` que
+    marca lida é escopado em `userId: session.user.id`. Medido: pedido de
+    grupo resolvido deixa 1 de 2 admins com badge preso; denúncia resolvida
+    deixa **6 moderadores**. Vale para `decidirPedidoGrupo`,
+    `decidirPedidoCanal`, as 4 funções de moderação e
+    `marcarSolicitacoesLidas`. Quanto maior a equipe, pior. Fix: reconciliar
+    por critério do evento (tipo + ator + entidade), não por destinatário.
+12. **Ex-membro segue recebendo comunicado** (rodada 5) — `desligarMembro`
+    grava `desligadoEm` sem mexer no `status`, e
+    `listarUserIdsMembrosAprovados` filtra só `status: 'APROVADO'`. Quem saiu
+    continua no fan-out de `notificarMembrosAprovados` (comunicado urgente).
+    Fix: incluir `desligadoEm: null` no filtro e conferir os demais
+    consumidores de "membro aprovado".
+
+Rodada 7 (`audit:loja`) fechou **sem achados**, com destaque para a
+**concorrência de estoque**: dois checkouts simultâneos na última unidade
+resolvem sem oversell, apesar de o decremento ser read-modify-write sobre
+coluna JSON. Cupom vencido, de primeira compra e de outra torcida são
+recusados; cancelamento devolve estoque; rivalidade também bloqueia
+seguimento. **Limite de uso de cupom não existe no modelo** — se for
+desejado, é feature nova.
+
+Rodada 6 (`audit:mensageria`) fechou **sem achados**: a segregação
+sócio×sócio de torcidas rivais está enforced no servidor (leitura e escrita),
+o bloqueio é bidirecional e não contornável por grupo, e **recusar uma
+solicitação de DM grava `BloqueioUsuario`** — recusa vale como bloqueio.
+O Achado 9 **não** se propagou até `isParRivalSocio` no par testado, mas a
+checagem ficou no arquivo porque o defeito é sensível à ordem do Postgres.
+
+A auditoria de notificações de 2026-07-22 foi **reverificada em fluxo** na
+rodada 5: "NOVA_MENSAGEM é tipo morto" e "não existe SEGUIMENTO_REJEITADO"
+estão **derrubadas**; "badge preso" está parcialmente corrigida (sobrou o
+item 11). Detalhe em `docs/ops/auditoria-funcional-2026-07.md` §Rodada 5.
 
 Rodada 3 (`audit:fluxos-avancados`) cobriu, todas **conformes**: capacidade /
 lista de espera / promoção automática / check-in de Eventos; estorno, fiado e

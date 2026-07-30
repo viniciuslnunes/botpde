@@ -114,44 +114,39 @@ export default async function AuditoriaPage({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Auditoria</h1>
-              <p className="mt-1 max-w-xl text-sm text-[rgb(var(--foreground-muted))]">
-                Registro imutável das ações administrativas neste tenant — quem fez, o que
-                aconteceu e sobre qual recurso. Ninguém pode editar ou apagar estes eventos.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">
-              <Shield className="h-3.5 w-3.5 shrink-0" />
-              Somente leitura · Diretoria
-            </div>
-          </div>
-
-          <form method="get" className="mt-4">
-            <label htmlFor="q" className="sr-only">
-              Buscar no registro
-            </label>
-            <input
-              id="q"
-              name="q"
-              defaultValue={busca}
-              placeholder="Buscar por ação, entidade, id ou responsável…"
-              className="w-full max-w-md rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none ring-[rgb(var(--primary))] placeholder:text-[rgb(var(--foreground-muted))] focus:ring-2"
-            />
-          </form>
-
-          <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
-            {total} evento{total !== 1 ? 's' : ''}
-            {busca ? ` para “${busca}”` : ''}
+    <div className="space-y-6">
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <p className="max-w-xl text-sm text-[rgb(var(--foreground-muted))]">
+            Registro imutável das ações administrativas neste tenant — quem fez, o que aconteceu e
+            sobre qual recurso. Ninguém pode editar ou apagar estes eventos.
           </p>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background-subtle))] px-3 py-2 text-xs text-[rgb(var(--foreground-muted))]">
+            <Shield className="h-3.5 w-3.5 shrink-0" />
+            Somente leitura · Diretoria
+          </div>
         </div>
+
+        <form method="get" className="mt-4">
+          <label htmlFor="q" className="sr-only">
+            Buscar no registro
+          </label>
+          <input
+            id="q"
+            name="q"
+            defaultValue={busca}
+            placeholder="Buscar por ação, entidade, id ou responsável…"
+            className="w-full max-w-md rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--background))] px-3 py-2 text-sm text-[rgb(var(--foreground))] outline-none ring-[rgb(var(--primary))] placeholder:text-[rgb(var(--foreground-muted))] focus:ring-2"
+          />
+        </form>
+
+        <p className="mt-3 text-xs text-[rgb(var(--foreground-muted))]">
+          {total} evento{total !== 1 ? 's' : ''}
+          {busca ? ` para “${busca}”` : ''}
+        </p>
       </div>
 
-      <div className="app-container flex-1 py-6">
+      <div>
         {logs.length === 0 ? (
           <MotionEmptyState
             icon={<ScrollText className="mb-3 h-8 w-8 text-[rgb(var(--foreground-muted))]" />}

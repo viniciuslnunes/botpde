@@ -1,6 +1,5 @@
 import { db } from '@torcida/db'
 import { redirect } from 'next/navigation'
-import { KeyRound } from 'lucide-react'
 import { AccessManager } from '@/components/admin/access-manager'
 import { AccessControlNav, parseAccessSecao } from '@/components/admin/access-control-nav'
 import { RolesManager, DepartamentosManager } from '@/components/admin/config-forms'
@@ -209,50 +208,33 @@ export default async function AcessosPage({
   }))
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface))] py-5">
-        <div className="app-container">
-          <div className="flex items-center gap-3">
-            <KeyRound className="h-5 w-5 text-[rgb(var(--foreground-muted))]" />
-            <div>
-              <h1 className="text-xl font-bold text-[rgb(var(--foreground))]">Controle de acesso</h1>
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                Pessoas, cargos e departamentos — {tenant.nome}
-              </p>
-            </div>
-          </div>
-          {!(secao === 'pessoas' && initialUserId) && (
-            <AccessControlNav
-              secao={secao}
-              counts={{
-                pessoas: usuariosFormatados.length,
-                cargos: rolesComEfetivas.length,
-                departamentos: departamentos.length,
-              }}
-            />
-          )}
-        </div>
-      </div>
+    <div className="space-y-6">
+      {!(secao === 'pessoas' && initialUserId) && (
+        <AccessControlNav
+          secao={secao}
+          counts={{
+            pessoas: usuariosFormatados.length,
+            cargos: rolesComEfetivas.length,
+            departamentos: departamentos.length,
+          }}
+        />
+      )}
 
-      <div className="py-6">
-        <div className="app-container">
-          <MotionReveal>
-            {secao === 'cargos' && (
-              <RolesManager roles={rolesComEfetivas} departamentos={departamentos} tipoSede={tipoSede} />
-            )}
-            {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
-            {secao === 'pessoas' && (
-              <AccessManager
-                usuarios={usuariosFormatados}
-                roles={rolesComEfetivas}
-                departamentos={departamentos}
-                tipoSede={tipoSede}
-                initialUserId={initialUserId}
-              />
-            )}
-          </MotionReveal>
-        </div>
-      </div>
+      <MotionReveal>
+        {secao === 'cargos' && (
+          <RolesManager roles={rolesComEfetivas} departamentos={departamentos} tipoSede={tipoSede} />
+        )}
+        {secao === 'departamentos' && <DepartamentosManager departamentos={departamentos} />}
+        {secao === 'pessoas' && (
+          <AccessManager
+            usuarios={usuariosFormatados}
+            roles={rolesComEfetivas}
+            departamentos={departamentos}
+            tipoSede={tipoSede}
+            initialUserId={initialUserId}
+          />
+        )}
+      </MotionReveal>
     </div>
   )
 }

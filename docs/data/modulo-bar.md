@@ -3,6 +3,12 @@
 > PDV simples para o bar da torcida: catálogo com estoque, venda rápida com PIX real,
 > Dinheiro/Cartão manual ou Fiado, e integração automática com o livro-caixa (categoria `BAR`).
 
+> **Fiado → Comanda (spec 2026-07-30):** o fluxo de Fiado descrito aqui será
+> substituído por **Comanda** (conta aberta, N lançamentos, fechamento com N
+> pagamentos; sair devendo vira desfecho do fechamento). Regras fechadas em
+> [`modulo-bar-comanda.md`](./modulo-bar-comanda.md) — ainda **não implementado**.
+> Este documento descreve o comportamento em produção hoje.
+
 ## Escopo MVP
 
 | Inclui | Fora (próximas fases) |

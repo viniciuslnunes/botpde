@@ -29,7 +29,7 @@ import {
   criarDepartamento,
   atualizarDepartamento,
   excluirDepartamento,
-} from '@/app/admin/configuracoes/actions'
+} from '@/app/admin/(plataforma)/configuracoes/actions'
 import { toast } from '@torcida/ui'
 import { runPersistAction } from '@/lib/toast-action'
 import { useConfirmAction, useConfirmDialog } from '@/lib/confirm-action'

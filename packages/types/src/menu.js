@@ -1,20 +1,21 @@
 import { PERMISSIONS, hasPermission } from './permissions.js'
 
 /**
- * Seções do menu admin alinhadas aos módulos de departamento
- * (`DEPARTAMENTO_MODULOS`) + governança transversal.
- * `label: null` = sem cabeçalho (ex.: Dashboard).
+ * Seções do menu admin. `label: null` = sem cabeçalho (Dashboard).
+ *
+ * Uma seção só se justifica quando **agrupa** e diz algo que os nomes dos
+ * itens não dizem sozinhos. Enquanto cada módulo ocupava 3–7 linhas, havia uma
+ * seção por módulo; depois que o módulo virou **uma** entrada (tabs de rota,
+ * §5.12), sobravam cinco cabeçalhos repetindo o nome do único item abaixo
+ * (Loja › Loja, Comunidade › Comunidade…). Agora agrupam por natureza do
+ * trabalho, não por módulo.
  */
 export const ADMIN_MENU_SECOES = /** @type {const} */ ([
   { id: 'geral', label: null },
-  { id: 'pessoas', label: 'Pessoas', modulo: 'membros' },
-  { id: 'operacao', label: 'Operação', modulo: 'eventos' },
-  { id: 'loja', label: 'Loja', modulo: 'loja' },
-  { id: 'bar', label: 'Bar', modulo: 'bar' },
-  { id: 'comunidade', label: 'Comunidade', modulo: 'comunidade' },
-  { id: 'financeiro', label: 'Financeiro', modulo: 'financeiro' },
-  { id: 'patrimonio', label: 'Patrimônio', modulo: 'patrimonio' },
-  { id: 'governanca', label: 'Governança', modulo: null },
+  { id: 'pessoas', label: 'Pessoas' },
+  { id: 'operacao', label: 'Operação' },
+  { id: 'financas', label: 'Finanças' },
+  { id: 'governanca', label: 'Governança' },
 ])
 
 /**
@@ -28,13 +29,20 @@ export const ADMIN_MENU_SECOES = /** @type {const} */ ([
  */
 export const ADMIN_MENU = /** @type {const} */ ([
   { id: 'dashboard', label: 'Dashboard', href: '/admin', permissao: null, exact: true, secao: 'geral' },
-  // Console global de leitura do Presidente/Vice — além da permissão, o layout
-  // só exibe o item quando o tenant é a Sede principal (tipo SEDE).
+  // Visão da torcida, unidades (sedes), hierarquia e solicitações de afiliação
+  // são tabs de `/admin/torcida` (route group `admin/(estrutura)/` — as URLs
+  // não mudaram). Console global e solicitações só existem na Sede principal:
+  // o layout do admin esconde a entrada, e o do módulo esconde a tab.
   {
-    id: 'torcida',
-    label: 'Visão da torcida',
+    id: 'estrutura',
+    label: 'Estrutura',
     href: '/admin/torcida',
-    permissao: PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+    permissao: [
+      PERMISSIONS.TORCIDA_GLOBAL_VIEW,
+      PERMISSIONS.SEDES_MANAGE,
+      PERMISSIONS.ROLES_MANAGE,
+      PERMISSIONS.AFFILIATION_MANAGE,
+    ],
     secao: 'governanca',
   },
   // Aprovar sócios/membros sem members:view ainda precisa ver a fila de pendentes.
@@ -54,15 +62,6 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: PERMISSIONS.EVENTS_MANAGE,
     secao: 'operacao',
   },
-  { id: 'sedes', label: 'Sedes', href: '/admin/sedes', permissao: PERMISSIONS.SEDES_MANAGE, secao: 'operacao' },
-  // Mural organizacional — só quem gerencia cargos/acessos (não members:view genérico).
-  {
-    id: 'hierarquia',
-    label: 'Hierarquia',
-    href: '/admin/hierarquia',
-    permissao: PERMISSIONS.ROLES_MANAGE,
-    secao: 'governanca',
-  },
   // Catálogo, pedidos, categorias, cupons e desempenho são tabs de `/admin/loja`.
   // Quem só tem `store:view-orders` cai direto em Pedidos (ver loja/page.tsx).
   {
@@ -70,7 +69,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
     label: 'Loja',
     href: '/admin/loja',
     permissao: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_VIEW_ORDERS],
-    secao: 'loja',
+    secao: 'operacao',
   },
   // Etapas do módulo (vendas, fiado, produtos, estoque, desempenho) vivem nas
   // tabs de `/admin/bar` — o menu guarda só a entrada do módulo e o atalho
@@ -80,14 +79,14 @@ export const ADMIN_MENU = /** @type {const} */ ([
     label: 'Bar',
     href: '/admin/bar',
     permissao: [PERMISSIONS.BAR_OPERATE, PERMISSIONS.BAR_MANAGE],
-    secao: 'bar',
+    secao: 'operacao',
   },
   {
     id: 'bar-pdv',
     label: 'PDV',
     href: '/admin/bar/pdv',
     permissao: [PERMISSIONS.BAR_OPERATE, PERMISSIONS.BAR_MANAGE],
-    secao: 'bar',
+    secao: 'operacao',
   },
   // Comunicados, mural, moderação e notícias são tabs de `/admin/comunidade`.
   // As permissões aqui são a união das etapas — quem tem só `news:curate`
@@ -103,7 +102,7 @@ export const ADMIN_MENU = /** @type {const} */ ([
       PERMISSIONS.MESSAGES_MODERATE,
       PERMISSIONS.NEWS_CURATE,
     ],
-    secao: 'comunidade',
+    secao: 'operacao',
   },
   // Lançamentos, evolução, cobranças e planos são tabs de `/admin/financeiro`.
   // `/admin/cobrancas` e `/admin/planos-associacao` seguem como redirect: há
@@ -114,22 +113,17 @@ export const ADMIN_MENU = /** @type {const} */ ([
     href: '/admin/financeiro',
     // finance:view = portal; admin = operação do gestor.
     permissao: PERMISSIONS.FINANCE_MANAGE,
-    secao: 'financeiro',
+    secao: 'financas',
   },
   {
     id: 'patrimonio',
     label: 'Patrimônio',
     href: '/admin/patrimonio',
     permissao: PERMISSIONS.PATRIMONY_MANAGE,
-    secao: 'patrimonio',
+    secao: 'financas',
   },
-  {
-    id: 'afiliacoes',
-    label: 'Solicitações de afiliação',
-    href: '/admin/afiliacoes',
-    permissao: PERMISSIONS.AFFILIATION_MANAGE,
-    secao: 'governanca',
-  },
+  // Rede externa: domínio próprio, não vira etapa de Estrutura (que é a
+  // organização interna da própria torcida).
   {
     id: 'aliancas',
     label: 'Alianças',
@@ -137,14 +131,8 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: PERMISSIONS.ALLIANCES_MANAGE,
     secao: 'governanca',
   },
-  {
-    id: 'acessos',
-    label: 'Controle de acesso',
-    href: '/admin/acessos',
-    permissao: PERMISSIONS.ROLES_MANAGE,
-    secao: 'governanca',
-  },
   // Leitura de inteligência administrativa (indicadores/insights por módulo).
+  // Cross-módulo por natureza — por isso não é tab de ninguém.
   {
     id: 'relatorios',
     label: 'Relatórios',
@@ -152,26 +140,14 @@ export const ADMIN_MENU = /** @type {const} */ ([
     permissao: PERMISSIONS.REPORTS_VIEW,
     secao: 'governanca',
   },
-  // Append-only: sem mutações na UI. Gate: Diretoria (+ owner/admin/vice via ALL_PERMISSIONS).
+  // Configurações, design, controle de acesso e auditoria são tabs de
+  // `/admin/configuracoes` (route group `admin/(plataforma)/`).
+  // Auditoria é append-only: sem mutações na UI.
   {
-    id: 'auditoria',
-    label: 'Auditoria',
-    href: '/admin/auditoria',
-    permissao: PERMISSIONS.AUDIT_VIEW,
-    secao: 'governanca',
-  },
-  {
-    id: 'design',
-    label: 'Design',
-    href: '/admin/design',
-    permissao: PERMISSIONS.SETTINGS_MANAGE,
-    secao: 'governanca',
-  },
-  {
-    id: 'configuracoes',
-    label: 'Configurações',
+    id: 'plataforma',
+    label: 'Plataforma',
     href: '/admin/configuracoes',
-    permissao: PERMISSIONS.SETTINGS_MANAGE,
+    permissao: [PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.ROLES_MANAGE, PERMISSIONS.AUDIT_VIEW],
     secao: 'governanca',
   },
 ])
@@ -208,13 +184,6 @@ export const ADMIN_MENU = /** @type {const} */ ([
  * `permissao`: string (única), array (OR) ou `null` (herda o gate do módulo).
  * `matchPaths`: rotas irmãs que ativam a tab sem aparecer na barra.
  *
- * @typedef {{
- *   id: string,
- *   label: string,
- *   href: string,
- *   permissao: string | readonly string[] | null,
- *   matchPaths?: readonly string[],
- * }} AdminModuloTab
  * @typedef {{ id: string, menuId: string, href: string, tabs: readonly AdminModuloTab[] }} AdminModulo
  *
  * @type {readonly AdminModulo[]}
@@ -328,6 +297,68 @@ export const ADMIN_MODULOS = ([
       { id: 'planos', label: 'Planos de sócio', href: '/admin/financeiro/planos', permissao: null },
     ],
   },
+  // Estrutura e Plataforma são montados em **route group**
+  // (`admin/(estrutura)/`, `admin/(plataforma)/`): as etapas não compartilham
+  // prefixo com a raiz, então mover as rotas exigiria redirects. O group dá o
+  // layout comum sem tocar em nenhuma URL — e `resolverMenuIdDeRota` acha o
+  // módulo pelas tabs, não pelo prefixo.
+  {
+    id: 'estrutura',
+    menuId: 'estrutura',
+    href: '/admin/torcida',
+    tabs: [
+      {
+        id: 'visao-geral',
+        label: 'Visão geral',
+        href: '/admin/torcida',
+        // Presidente vê o console consolidado; quem gere unidades vê a árvore.
+        permissao: [PERMISSIONS.TORCIDA_GLOBAL_VIEW, PERMISSIONS.SEDES_MANAGE],
+        // Leitura de uma unidade pertence à visão consolidada.
+        matchPaths: ['/admin/torcida/unidade'],
+      },
+      {
+        id: 'unidades',
+        label: 'Unidades',
+        href: '/admin/sedes',
+        permissao: PERMISSIONS.SEDES_MANAGE,
+      },
+      {
+        id: 'hierarquia',
+        label: 'Hierarquia',
+        href: '/admin/hierarquia',
+        permissao: PERMISSIONS.ROLES_MANAGE,
+      },
+      {
+        id: 'solicitacoes',
+        label: 'Solicitações',
+        href: '/admin/afiliacoes',
+        permissao: PERMISSIONS.AFFILIATION_MANAGE,
+      },
+    ],
+  },
+  {
+    id: 'plataforma',
+    menuId: 'plataforma',
+    href: '/admin/configuracoes',
+    tabs: [
+      { id: 'geral', label: 'Geral', href: '/admin/configuracoes', permissao: PERMISSIONS.SETTINGS_MANAGE },
+      {
+        id: 'transparencia',
+        label: 'Transparência',
+        href: '/admin/configuracoes/transparencia',
+        permissao: PERMISSIONS.SETTINGS_MANAGE,
+      },
+      {
+        id: 'integracoes',
+        label: 'Integrações',
+        href: '/admin/configuracoes/integracoes',
+        permissao: PERMISSIONS.SETTINGS_MANAGE,
+      },
+      { id: 'identidade', label: 'Identidade', href: '/admin/design', permissao: PERMISSIONS.SETTINGS_MANAGE },
+      { id: 'acessos', label: 'Acessos', href: '/admin/acessos', permissao: PERMISSIONS.ROLES_MANAGE },
+      { id: 'auditoria', label: 'Auditoria', href: '/admin/auditoria', permissao: PERMISSIONS.AUDIT_VIEW },
+    ],
+  },
 ])
 
 /**
@@ -384,34 +415,78 @@ export function primeiraTabPermitida(moduloId, effectivePermissions) {
 }
 
 /**
- * Item de `ADMIN_MENU` que **hoje** representa uma rota — casamento por prefixo
- * mais longo, ignorando itens `exact` que não sejam a rota inteira.
+ * Módulo dono de uma rota, se ela for etapa de algum — casamento por prefixo
+ * mais longo entre `href` e `matchPaths` das tabs.
+ *
+ * @param {string} rota
+ * @returns {AdminModulo | null}
+ */
+export function resolverModuloDeRota(rota) {
+  const base = rota.split('?')[0] ?? rota
+  /** @type {AdminModulo | null} */
+  let dono = null
+  let maisEspecifico = -1
+
+  for (const modulo of ADMIN_MODULOS) {
+    for (const tab of modulo.tabs) {
+      for (const alvo of [tab.href, ...(tab.matchPaths ?? [])]) {
+        const casa = base === alvo || base.startsWith(`${alvo}/`)
+        if (casa && alvo.length > maisEspecifico) {
+          maisEspecifico = alvo.length
+          dono = modulo
+        }
+      }
+    }
+  }
+
+  return dono
+}
+
+/**
+ * Item de `ADMIN_MENU` que **hoje** representa uma rota — o casamento mais
+ * específico entre as entradas do menu e as tabs dos módulos.
  *
  * É o que impede o bug silencioso dos badges: ao transformar uma rota de menu
  * em tab de módulo, o badge sobe sozinho para a entrada do módulo em vez de
- * sumir apontando para um id que não existe mais.
+ * sumir apontando para um id que não existe mais. Consultar `ADMIN_MODULOS`
+ * é o que faz isso valer também para módulo montado em route group, cujas
+ * etapas não compartilham prefixo com a raiz (`/admin/afiliacoes` é etapa de
+ * `/admin/torcida`).
+ *
+ * As duas fontes competem pelo prefixo mais longo, nunca por precedência fixa:
+ * `/admin/bar/pdv` tem entrada própria no menu e precisa vencer a tab
+ * `/admin/bar` do módulo, senão o badge de divergência de turno migra para o
+ * módulo errado.
  *
  * @param {string} rota
  * @returns {string | null}
  */
 export function resolverMenuIdDeRota(rota) {
   const base = rota.split('?')[0] ?? rota
+
   /** @type {string | null} */
   let menuId = null
   let maisEspecifico = -1
 
   for (const item of ADMIN_MENU) {
-    if (item.exact) {
-      if (base === item.href && item.href.length > maisEspecifico) {
-        maisEspecifico = item.href.length
-        menuId = item.id
-      }
-      continue
-    }
-    const casa = base === item.href || base.startsWith(`${item.href}/`)
+    const casa = item.exact
+      ? base === item.href
+      : base === item.href || base.startsWith(`${item.href}/`)
     if (casa && item.href.length > maisEspecifico) {
       maisEspecifico = item.href.length
       menuId = item.id
+    }
+  }
+
+  for (const modulo of ADMIN_MODULOS) {
+    for (const tab of modulo.tabs) {
+      for (const alvo of [tab.href, ...(tab.matchPaths ?? [])]) {
+        const casa = base === alvo || base.startsWith(`${alvo}/`)
+        if (casa && alvo.length > maisEspecifico) {
+          maisEspecifico = alvo.length
+          menuId = modulo.menuId
+        }
+      }
     }
   }
 

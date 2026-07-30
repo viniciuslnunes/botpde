@@ -19,7 +19,7 @@ import {
   excluirSede,
   salvarFotoSede,
   type SedeState,
-} from '@/app/admin/sedes/actions'
+} from '@/app/admin/(estrutura)/sedes/actions'
 import { resolverCoordsDeLinkMaps } from '@/lib/maps-actions'
 import {
   Check,

@@ -14,7 +14,10 @@
     "audit:dados": "vitest run --config vitest.audit.config.ts src/lib/__audit__/dados-reais.audit.ts",
     "audit:fluxos": "vitest run --config vitest.audit.config.ts src/lib/__audit__/fluxos.audit.ts",
     "audit:fluxos-avancados": "vitest run --config vitest.audit.config.ts src/lib/__audit__/fluxos-avancados.audit.ts",
-    "audit:hierarquia": "vitest run --config vitest.audit.config.ts src/lib/__audit__/hierarquia.audit.ts"
+    "audit:hierarquia": "vitest run --config vitest.audit.config.ts src/lib/__audit__/hierarquia.audit.ts",
+    "audit:notificacoes": "vitest run --config vitest.audit.config.ts src/lib/__audit__/notificacoes.audit.ts",
+    "audit:mensageria": "vitest run --config vitest.audit.config.ts src/lib/__audit__/mensageria.audit.ts",
+    "audit:loja": "vitest run --config vitest.audit.config.ts src/lib/__audit__/loja.audit.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

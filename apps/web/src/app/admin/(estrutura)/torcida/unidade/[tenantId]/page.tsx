@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Beer, CalendarDays, Lock, MapPin, ShieldCheck, Users, Wallet } from 'lucide-react'
+import { Beer, Building2, CalendarDays, Lock, MapPin, ShieldCheck, Users, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import { db } from '@torcida/db'
 import { formatarMoedaBRL, formatDataCompetenciaInput, formatNomeTorcida } from '@torcida/types'
@@ -23,12 +22,22 @@ import {
 } from '@/components/financeiro/financeiro-lancamentos-lista'
 import { FinanceiroResumoCards } from '@/components/financeiro/financeiro-resumo-cards'
 import { MotionReveal } from '@/components/motion/motion-reveal'
+import { AdminDetailHeader, AdminTabs, adminTabIds } from '@/components/admin/ui'
 
 export const metadata: Metadata = { title: 'Administração da unidade — Visão da torcida' }
 
+const ICONE_TAB = 'h-4 w-4 shrink-0'
+
 type Props = {
   params: Promise<{ tenantId: string }>
-  searchParams: Promise<FinanceiroSearchParams>
+  searchParams: Promise<FinanceiroSearchParams & { modulo?: string }>
+}
+
+const MODULOS = ['financeiro', 'agenda', 'bar', 'membros'] as const
+type ModuloUnidade = (typeof MODULOS)[number]
+
+function parseModulo(valor: string | undefined): ModuloUnidade {
+  return MODULOS.includes(valor as ModuloUnidade) ? (valor as ModuloUnidade) : 'financeiro'
 }
 
 /**
@@ -55,21 +64,28 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
   if (!unidade) redirect('/admin/torcida')
 
   const sp = await searchParams
+  const modulo = parseModulo(sp.modulo)
   const { filtro, values } = parseFiltroFinanceiro(sp)
   const filtroResumo = { ...filtro }
   delete filtroResumo.page
 
   const basePath = `/admin/torcida/unidade/${tenantId}`
 
-  const [resumo, lista, eventos, bar, membros] = await Promise.all([
-    resumirFinanceiro(tenantId, filtroResumo),
-    listarLancamentosFinanceiro(tenantId, { filtro }),
-    listarEventosDaUnidade(tenantId),
-    resumoBarDaUnidade(tenantId),
-    listarMembrosDaUnidade(tenantId),
-  ])
+  // Só a aba visível consulta o banco: antes eram 5 leituras por render, mesmo
+  // com o Presidente olhando um módulo só.
+  const [resumo, lista] =
+    modulo === 'financeiro'
+      ? await Promise.all([
+          resumirFinanceiro(tenantId, filtroResumo),
+          listarLancamentosFinanceiro(tenantId, { filtro }),
+        ])
+      : [null, null]
+  const eventos: EventoUnidadeItem[] =
+    modulo === 'agenda' ? await listarEventosDaUnidade(tenantId) : []
+  const bar = modulo === 'bar' ? await resumoBarDaUnidade(tenantId) : null
+  const membros = modulo === 'membros' ? await listarMembrosDaUnidade(tenantId) : null
 
-  const itens: LancamentoRow[] = lista.itens.map((l) => ({
+  const itens: LancamentoRow[] = (lista?.itens ?? []).map((l) => ({
     id: l.id,
     tipo: l.tipo,
     categoria: l.categoria,
@@ -80,45 +96,42 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
     criadoPorNome: l.criadoPor.nome,
   }))
 
+  const { tabId, panelId } = adminTabIds('modulo', modulo)
+
   return (
-    <div className="app-container space-y-7 py-8">
+    <div className="space-y-6">
+      <AdminDetailHeader
+        title={formatNomeTorcida(unidade.nome)}
+        eyebrow="Administração da unidade"
+        backHref="/admin/torcida"
+        backLabel="Visão da torcida"
+        icon={<Building2 className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2">
+            <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+            <span className="text-xs text-[rgb(var(--foreground-muted))]">
+              Somente leitura — a operação é da liderança da unidade
+            </span>
+          </div>
+        }
+      />
+
+      <AdminTabs
+        tabs={[
+          { id: 'financeiro', label: 'Financeiro', icon: <Wallet className={ICONE_TAB} /> },
+          { id: 'agenda', label: 'Agenda', icon: <CalendarDays className={ICONE_TAB} /> },
+          { id: 'bar', label: 'Bar', icon: <Beer className={ICONE_TAB} /> },
+          { id: 'membros', label: 'Membros', icon: <Users className={ICONE_TAB} /> },
+        ]}
+        basePath={basePath}
+        activeId={modulo}
+        paramKey="modulo"
+      />
+
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
+      {modulo === 'financeiro' && resumo && lista && (
       <MotionReveal>
-        <div className="space-y-3">
-          <Link
-            href="/admin/torcida"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[rgb(var(--color-primary-fg))] hover:underline"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Visão da torcida
-          </Link>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-                Administração da unidade
-              </p>
-              <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">
-                {formatNomeTorcida(unidade.nome)}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2">
-              <Lock className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-              <span className="text-xs text-[rgb(var(--foreground-muted))]">
-                Somente leitura — a operação é da liderança da unidade
-              </span>
-            </div>
-          </div>
-        </div>
-      </MotionReveal>
-
-      <MotionReveal index={1}>
-        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Financeiro
-            </h2>
-          </div>
-
+        <section className="space-y-4">
           <FinanceiroResumoCards
             totalReceitas={resumo.totalReceitas}
             totalDespesas={resumo.totalDespesas}
@@ -132,20 +145,15 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
             page={lista.page}
             pageSize={lista.pageSize}
             basePath={basePath}
-            query={values}
+            query={{ ...values, modulo }}
           />
         </section>
       </MotionReveal>
+      )}
 
-      <MotionReveal index={2}>
-        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Agenda
-            </h2>
-          </div>
-
+      {modulo === 'agenda' && (
+      <MotionReveal>
+        <section className="space-y-4">
           {eventos.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-8 text-center text-sm text-[rgb(var(--foreground-muted))]">
               Esta unidade ainda não tem eventos na agenda.
@@ -159,16 +167,11 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
           )}
         </section>
       </MotionReveal>
+      )}
 
-      <MotionReveal index={3}>
-        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
-          <div className="flex items-center gap-2">
-            <Beer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-              Bar
-            </h2>
-          </div>
-
+      {modulo === 'bar' && bar && (
+      <MotionReveal>
+        <section className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
@@ -199,16 +202,15 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
           )}
         </section>
       </MotionReveal>
+      )}
 
-      <MotionReveal index={4}>
-        <section className="space-y-4 border-l-2 border-amber-400/50 pl-4 dark:border-amber-500/40">
+      {modulo === 'membros' && membros && (
+      <MotionReveal>
+        <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-[rgb(var(--color-primary-fg))]" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--foreground-muted))]">
-                Membros ({membros.total})
-              </h2>
-            </div>
+            <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+              {membros.total} membro{membros.total === 1 ? '' : 's'}
+            </p>
             <span className="inline-flex items-center gap-1 text-xs text-[rgb(var(--foreground-muted))]">
               <ShieldCheck className="h-3.5 w-3.5" />
               RG/CPF e endereço ocultos (LGE)
@@ -228,6 +230,8 @@ export default async function UnidadeAdminPage({ params, searchParams }: Props) 
           )}
         </section>
       </MotionReveal>
+      )}
+      </div>
     </div>
   )
 }

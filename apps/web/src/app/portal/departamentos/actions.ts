@@ -18,7 +18,7 @@ import {
 import {
   adicionarMembroDepartamento,
   removerMembroDepartamento,
-} from '@/app/admin/acessos/actions'
+} from '@/app/admin/(plataforma)/acessos/actions'
 
 const IdSchema = z.string().min(1)
 const CorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida')

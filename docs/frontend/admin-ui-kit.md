@@ -28,6 +28,7 @@ Motion por padrão. Vive em `apps/web` (não em `packages/ui`) porque depende de
 | `AdminTabs` | Barra de tabs (`tabs`, `basePath?`, `activeId`, `paramKey?`, `extraParams?`); `icon` é `ReactNode` (ex. `<Users className="h-4 w-4" />`), **nunca** o componente Lucide — funções não serializam Server→Client; `href` por tab dispensa `basePath` (modo rota) | Client (roving tabindex por teclado); navegação via `Link` real + `buildAdminHref` — funciona sem JS; ARIA completo (`role="tablist"`/`"tab"`/`aria-selected`/`aria-controls`); helper `adminTabIds(paramKey, id)` gera os ids para o `role="tabpanel"` do conteúdo |
 | `AdminModuleTabs` | Tabs em que cada tab é uma **rota** do módulo (`tabs` com `href` e `matchPaths?`, `children` = painel) | Client; tab ativa vem do `usePathname()` por casamento mais específico, então deep links seguem válidos; já embrulha o `role="tabpanel"` |
 | `AdminCreateDisclosure` | Ação de criar recolhida em botão (`label`, `title?`, `children` = form) | Client; para hubs cujo form de criação é componente compartilhado com a edição (cobranças, financeiro) e por isso não pode virar disclosure internamente |
+| `AdminDetailHeader` | Header de página de **detalhe** (`title`, `backHref`, `backLabel?`, `eyebrow?`, `icon?`, `badges?`, `actions?`) | Server-safe; versão leve, **sem** faixa de superfície — detalhe sob shell de módulo (`/admin/sedes/[id]` em Estrutura) ganharia dois headers full-bleed empilhados se usasse `AdminPageHeader` |
 
 **Quando usar `AdminTabs` vs. filtro simples**: tabs são para **seções de
 conteúdo mutuamente exclusivas** (um form ou bloco por vez — ex.: settings,
@@ -44,26 +45,60 @@ as sub-rotas viram painéis irmãos e o menu guarda uma entrada por módulo.
 
 Receita:
 
-1. `layout.tsx` no segmento resolve permissão, contexto (ex.: unidade do bar) e
-   contagens de badge; monta `AdminPageHeader` + `AdminModuleTabs`. Libs com
-   `React.cache` (ex.: `resolveUnidadeBar`) não pagam a query duas vezes quando
-   a página repete a chamada.
-2. Páginas do módulo perdem o wrapper `app-container … py-8` e o back-link
+1. **Declare as etapas em `ADMIN_MODULOS`** (`packages/types/src/menu.js`) —
+   fonte única de módulo → tabs (id, label, href, `permissao`, `matchPaths`).
+   Ícone e contagem **não** entram: componente React não atravessa
+   Server→Client.
+2. `layout.tsx` no segmento resolve permissão e contexto e monta
+   `AdminPageHeader` + `AdminModuleTabs`, com a barra vinda de
+   `montarTabsModulo(id, permissoes, enfeites)`
+   (`apps/web/src/lib/admin-modulos.tsx`) — o segundo argumento vem de
+   `permissoesEfetivasNoAdmin()`. Libs com `React.cache` não pagam a query duas
+   vezes quando a página repete a chamada.
+3. Páginas do módulo perdem o wrapper `app-container … py-8` e o back-link
    "← Módulo": o shell já provê ambos. Cada página retorna um fragmento.
-3. Rota que **não** entra na barra (detalhe, ou etapa secundária como
+4. Rota que **não** entra na barra (detalhe, ou etapa secundária como
    `bar/fornecedores`) é declarada em `matchPaths` da tab a que pertence, para
    não deixar a barra sem tab ativa.
-4. Página imersiva de tela cheia fica **fora** do shell via route group — o PDV
+5. Página imersiva de tela cheia fica **fora** do shell via route group — o PDV
    mora em `admin/bar/pdv`, enquanto o resto vive em `admin/bar/(modulo)/`
    (route group não altera URL).
-5. Ao encolher o menu (`packages/types/src/menu.js`), remapeie os badges de
-   notificação: `MENU_ID_POR_TIPO` (`lib/notificacoes-menu-badges.ts`) e
-   `menuId` em `POLITICA_POR_TIPO` (`lib/notificacoes-routing.ts`) apontam para
-   ids de `ADMIN_MENU` — id removido = badge some em silêncio. Ajuste também
-   `ICON_BY_ID` no `components/admin/sidebar.tsx`.
-6. Se o gate da rota-raiz do módulo é mais estrito que o do menu, redirecione
-   para a primeira etapa acessível em vez de `/admin` — `admin/loja/page.tsx`
-   manda quem só tem `store:view-orders` para `/admin/loja/pedidos`.
+6. Etapa com permissão própria é filtrada por `tabsPermitidasDoModulo`; quem
+   não pode ver a raiz entra por `primeiraTabPermitida` em vez de ser expulso
+   para `/admin` (`store:view_orders` → Pedidos; `news:curate` → Notícias).
+   Isso **não** é controle de acesso: cada rota-tab mantém seu
+   `assertPermission`.
+7. Badge de notificação aponta para a **rota** onde a pendência se resolve
+   (`ROTA_POR_TIPO` em `lib/notificacoes-menu-badges.ts` + `rota` em
+   `POLITICA_POR_TIPO`), nunca para id de menu — `resolverMenuIdDeRota` casa o
+   prefixo mais longo entre `ADMIN_MENU` e as tabs dos módulos, então promover
+   uma rota a tab **sobe** o badge para o módulo em vez de apagá-lo. Ajuste
+   também `ICON_BY_ID` no `components/admin/sidebar.tsx`.
+
+### Sub-rota ou route group?
+
+- **Prefixo comum** (`/admin/financeiro/cobrancas`) → sub-rota. Mover uma rota
+  existente para dentro do módulo exige `permanentRedirect` na antiga
+  preservando query: `Notificacao.link` já gravado no banco aponta para ela.
+- **Etapas irmãs** sem prefixo comum (`/admin/torcida`, `/admin/sedes`,
+  `/admin/hierarquia`, `/admin/afiliacoes`) → **route group**
+  (`admin/(estrutura)/`). Dá o layout comum sem tocar em URL nenhuma — zero
+  redirect, zero link quebrado.
+
+### Regra de corte
+
+Tab = etapa do mesmo módulo, sobre a mesma entidade-raiz, deep-linkável, com
+alternância frequente. **Não** viram tab: tela imersiva (PDV), criação
+(disclosure) e leitura cross-módulo (Relatórios). Teto de ~6 etapas — passou
+disso, provavelmente são dois módulos. Página de detalhe (`[id]`) não é tab do
+módulo, mas pode ter tabs **internas** por query param quando tem seções
+pesadas e independentes; se o form já tem stepper próprio (`sedes/[id]`), não
+empilhe uma barra em cima dele.
+
+Os invariantes estão travados em `lib/__tests__/admin-modulos.test.ts` (rota
+existe, uma entrada de menu por módulo, raiz = primeira tab, teto de 6, seção
+não repete o nome do único item) e em `notificacoes-routing.test.ts` (nenhuma
+rota de badge órfã).
 
 ### Estado das tabs por módulo
 
@@ -71,16 +106,31 @@ Receita:
 |---|---|---|
 | `admin/bar` | Balcão · Vendas (+ estornos) · Fiado · Produtos · Estoque (+ fornecedores) · Desempenho | 7 → 2 (Bar + PDV) |
 | `admin/loja` | Catálogo · Pedidos · Categorias · Cupons · Desempenho | 2 → 1 |
+| `admin/comunidade` | Visão geral · Comunicados · Mural · Moderação · Notícias | 5 → 1 |
+| `admin/financeiro` | Lançamentos · Evolução · Cobranças · Planos de sócio | 3 → 1 |
+| `admin/(estrutura)` | Visão geral · Unidades · Hierarquia · Solicitações | 4 → 1 |
+| `admin/(plataforma)` | Geral · Transparência · Integrações · Identidade · Acessos · Auditoria | 4 → 1 |
 | `admin/eventos` | Lista · Semana · Mês · Histórico · Comparecimento (`?vista=`) | 1 |
-| `admin/cobrancas` | Todas · Pendentes · Vencidas · Pagas · Canceladas (`?status=`, com contagem) | 1 |
-| `admin/financeiro` | Lançamentos · Evolução (`?tab=`) | 1 |
 | `admin/membros` | status da fila (`?status=`) | 1 |
-| `admin/configuracoes` | seções de settings (`?tab=`) | 1 |
+| `admin/eventos/[id]` | Cockpit · Embarque/Presença · Editar (`?tab=`) | detalhe |
+| `admin/torcida/unidade/[id]` | Financeiro · Agenda · Bar · Membros (`?modulo=`) | detalhe |
 
 Os hubs de Bar e Loja deixaram de acumular insights: cada um ganhou a etapa
 **Desempenho** (`bar/desempenho`, `loja/desempenho`), que concentra margem/CMV e
 as séries de 30 dias. O Balcão do bar ficou com turno, caixa do dia e estoque
 baixo; o PDV virou ação primária do header do módulo.
+
+O drill-down da unidade só consulta o banco da aba visível — antes eram cinco
+leituras por render, mesmo com o Presidente olhando um módulo só.
+
+### Seções do menu lateral
+
+`ADMIN_MENU_SECOES` agrupa por **natureza do trabalho**, não por módulo:
+Pessoas · Operação · Finanças · Governança (+ Dashboard sem cabeçalho). Uma
+seção só se justifica quando agrupa dois ou mais itens e diz algo que os nomes
+deles não dizem — enquanto cada módulo ocupava várias linhas havia uma seção
+por módulo; virando uma linha, sobravam cabeçalhos repetindo o item
+("Loja › Loja"). O menu saiu de **24 entradas para 14**.
 
 ## Charts — `apps/web/src/components/admin/charts/`
 
@@ -182,6 +232,25 @@ escopo registradas nas ondas 4–5:
   `overflow-hidden` sensível; o form já anima via `StickyPersistBar`.
 - `StatCard` ganhou `badgeTone` (linha auxiliar em danger/warning/default —
   default `success`) e o modo `compact` passou a renderizar `badge`.
+
+## Refactor de navegação por tabs (2026-07-29 → 2026-07-30)
+
+Cinco ondas, todas entregues. Menu de **24 → 14** entradas; seis módulos com
+tabs de rota. Decisões de escopo:
+
+- **Membros e Sócios ficaram separados**: são jornadas distintas (admissão vs.
+  carteirinha/mensalidade) e ambos já têm tabs internas por status — fundir
+  criaria duas barras empilhadas.
+- **`sedes/[id]` e `membros/[id]` não ganharam tabs**: o form de sede já tem
+  stepper próprio (`SEDE_STEPS`, com marcação de erro por etapa), e o detalhe de
+  membro tem só três blocos. Contagem de linhas engana — boa parte desses
+  arquivos é query e tipo, não interface.
+- **Estúdio de Design sob o shell**: dependia de `h-[calc(100dvh-3.5rem)]`
+  (viewport inteira). Passou a `xl:h-[70dvh]` com piso de `34rem`, para as duas
+  colunas com scroll próprio não dependerem da altura de header + tabs.
+- **Formulário de criação em disclosure, não modal**: em Cobranças/Financeiro o
+  form é compartilhado com a edição, e um modal quebraria a integração com
+  `useTrackedForm`/`StickyPersistBar`.
 
 ## Ver também
 

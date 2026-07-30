@@ -864,7 +864,7 @@ describe('fluxo: quem administra cargos pode se dar poder que não tem?', () => 
       })
     })
 
-    const { criarRole } = await import('@/app/admin/configuracoes/actions')
+    const { criarRole } = await import('@/app/admin/(plataforma)/configuracoes/actions')
     const r = await comoUsuario(ator, () => tentativa(() => criarRole(form)))
     if (!r.ok) {
       ok(AREA, `criarRole recusou conceder "${cobicada}" a quem não tem: "${r.erro}"`)
@@ -915,7 +915,7 @@ describe('fluxo: quem administra cargos pode se dar poder que não tem?', () => 
     form.set('cor', '#000000')
     form.append('permissions', PERMISSIONS.MEMBERS_VIEW)
 
-    const { atualizarRole, excluirRole } = await import('@/app/admin/configuracoes/actions')
+    const { atualizarRole, excluirRole } = await import('@/app/admin/(plataforma)/configuracoes/actions')
 
     const rEdit = await comoUsuario(ator, () => tentativa(() => atualizarRole(sistema.id, form)))
     if (rEdit.ok) {

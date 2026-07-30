@@ -3,8 +3,8 @@ import { getTenantFromHost } from '@/lib/tenant'
 import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS } from '@torcida/types'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Inbox } from 'lucide-react'
+import { Inbox, Upload } from 'lucide-react'
+import { AdminDetailHeader } from '@/components/admin/ui'
 import { ImportForm } from '@/components/admin/import-form'
 import { UndoImportButton } from '@/components/admin/undo-import-button'
 import type { Metadata } from 'next'
@@ -75,20 +75,13 @@ export default async function ImportarMembrosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/membros"
-          className="flex w-fit items-center gap-1.5 text-xs text-[rgb(var(--foreground-muted))] transition-colors hover:text-[rgb(var(--foreground))]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Membros
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold text-[rgb(var(--foreground))]">Importar base de associados</h1>
-        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          Traga a base existente da torcida para o sistema. Nesta fase, use dados de
-          demonstração para validar a apresentação.
-        </p>
-      </div>
+      <AdminDetailHeader
+        title="Importar base de associados"
+        backHref="/admin/membros"
+        backLabel="Membros"
+        icon={<Upload className="h-5 w-5" />}
+        description="Traga a base existente da torcida para o sistema. Nesta fase, use dados de demonstração para validar a apresentação."
+      />
 
       <ImportForm />
 

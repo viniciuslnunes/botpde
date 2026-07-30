@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
-import { ClipboardCheck } from 'lucide-react'
 import { db } from '@torcida/db'
 import type { Tenant } from '@torcida/db'
 import type { Session } from 'next-auth'
@@ -9,7 +8,6 @@ import { calculateEffectivePermissions, hasPermission, PERMISSIONS } from '@torc
 import { assertAffiliationManage } from '@/lib/authz'
 import { getUserPermissionsInTenant } from '@/lib/tenant'
 import { isSuperAdminEmail } from '@/lib/tenant-context'
-import { AdminPageHeader } from '@/components/admin/ui'
 import { AfiliacaoPedidos } from './_components/afiliacao-pedidos'
 
 export const metadata: Metadata = { title: 'Solicitações de afiliação — Admin' }
@@ -64,18 +62,14 @@ export default async function AfiliacoesPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
-      <AdminPageHeader
-        icon={<ClipboardCheck className="h-5 w-5" />}
-        title="Solicitações de afiliação"
-        description="Revise foto, mapa, provas e contato de cada pedido — o Presidente aprova e a unidade ganha portal próprio."
-      />
-
-      <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
-        <Suspense fallback={<PedidosSkeleton />}>
-          <AfiliacaoPedidos tenantId={tenant.id} podeDecidir={podeDecidir} />
-        </Suspense>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Revise foto, mapa, provas e contato de cada pedido — o Presidente aprova e a unidade ganha
+        portal próprio.
+      </p>
+      <Suspense fallback={<PedidosSkeleton />}>
+        <AfiliacaoPedidos tenantId={tenant.id} podeDecidir={podeDecidir} />
+      </Suspense>
     </div>
   )
 }

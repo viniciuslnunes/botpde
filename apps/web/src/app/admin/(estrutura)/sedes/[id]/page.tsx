@@ -12,7 +12,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EditarSedeForm } from '@/components/admin/sede-forms'
 import { PromoverSedeButton } from '@/components/admin/promover-sede-button'
-import { AdminPageHeader, KpiGrid, StatCard } from '@/components/admin/ui'
+import { AdminDetailHeader, KpiGrid, StatCard } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { labelTipoUnidade } from '@/lib/canais-shared'
 import { Badge } from '@torcida/ui'
@@ -192,32 +192,27 @@ export default async function EditarSedePage({
   }
 
   return (
-    <div className="pb-10">
-      <AdminPageHeader
+    <div className="space-y-6">
+      <AdminDetailHeader
         title={sede.nome}
         backHref="/admin/sedes"
+        backLabel="Unidades"
         icon={<MapPin className="h-5 w-5" />}
-        description={
-          localResumo
-            ? `${labelTipoUnidade(sede.tipo)} · ${localResumo}`
-            : labelTipoUnidade(sede.tipo)
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="info">
-              {labelTipoUnidade(sede.tipo)}
-            </Badge>
+        description={localResumo || undefined}
+        badges={
+          <>
+            <Badge variant="info">{labelTipoUnidade(sede.tipo)}</Badge>
             <Badge variant={sede.ativa ? 'success' : 'neutral'}>
               {sede.ativa ? 'Ativa' : 'Inativa'}
             </Badge>
             {paiHerdado ? (
               <Badge variant="neutral">PDE de {paiHerdado.tenantNome}</Badge>
             ) : null}
-          </div>
+          </>
         }
       />
 
-      <div className="app-container space-y-6 py-6">
+      <div className="space-y-6">
         {paiHerdado && (
           <MotionReveal index={0}>
             <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 py-3">

@@ -68,19 +68,20 @@ export default async function AdminLayout({
     tenantEhSedePrincipal = await tenantIsAdministracaoSede(tenant.id)
   }
 
-  const exibirConsoleTorcida =
+  // O módulo Estrutura tem etapas que existem em qualquer unidade (Unidades,
+  // Hierarquia) e etapas exclusivas da Sede principal (Visão da torcida,
+  // Solicitações). Só some do menu quem não alcança nenhuma delas.
+  const exibirEstrutura =
     isSuperAdmin ||
+    hasPermission(effectivePermissions, PERMISSIONS.SEDES_MANAGE) ||
+    hasPermission(effectivePermissions, PERMISSIONS.ROLES_MANAGE) ||
     (tenantEhSedePrincipal &&
-      hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW))
-
-  const exibirAfiliacoes =
-    isSuperAdmin ||
-    (tenantEhSedePrincipal && hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE))
+      (hasPermission(effectivePermissions, PERMISSIONS.TORCIDA_GLOBAL_VIEW) ||
+        hasPermission(effectivePermissions, PERMISSIONS.AFFILIATION_MANAGE)))
 
   const menuBase = isSuperAdmin ? ADMIN_MENU : filterMenuByPermissions(ADMIN_MENU, effectivePermissions)
   const menuItems = menuBase
-    .filter((item) => item.id !== 'torcida' || exibirConsoleTorcida)
-    .filter((item) => item.id !== 'afiliacoes' || exibirAfiliacoes)
+    .filter((item) => item.id !== 'estrutura' || exibirEstrutura)
     .map((item) => ({
       id: item.id,
       label: item.label,

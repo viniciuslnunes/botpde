@@ -71,7 +71,6 @@ describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
   it('mapeia tipos operacionais para ids do ADMIN_MENU', () => {
     expect(menuIdParaTipo('MEMBRO_SOLICITADO')).toBe('membros')
     expect(menuIdParaTipo('ALIANCA_PROPOSTA')).toBe('aliancas')
-    expect(menuIdParaTipo('SOLICITACAO_UNIDADE_CRIADA')).toBe('afiliacoes')
     expect(menuIdParaTipo('COMUNICADO_URGENTE')).toBeNull()
     expect(menuIdParaTipo('MEMBRO_APROVADO')).toBeNull()
   })
@@ -84,7 +83,10 @@ describe('menuIdParaTipo / agregarBadgesPorMenu', () => {
     expect(menuIdParaTipo('PEDIDO_RECEBIDO')).toBe('loja')
     expect(menuIdParaTipo('BAR_ESTOQUE_BAIXO')).toBe('bar')
     expect(menuIdParaTipo('BAR_ESTORNO_ANOMALO')).toBe('bar')
-    // PDV segue fora do shell de tabs — tem entrada própria no menu.
+    // Afiliações virou etapa de Estrutura, montada em route group.
+    expect(menuIdParaTipo('SOLICITACAO_UNIDADE_CRIADA')).toBe('estrutura')
+    // PDV segue fora do shell de tabs e tem entrada própria no menu: a entrada
+    // mais específica vence a tab `/admin/bar` do módulo.
     expect(menuIdParaTipo('BAR_TURNO_DIVERGENCIA')).toBe('bar-pdv')
   })
 

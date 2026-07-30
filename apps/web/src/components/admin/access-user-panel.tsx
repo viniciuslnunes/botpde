@@ -18,8 +18,8 @@ import {
   PAPEL_DEPARTAMENTO,
   permissionsOfRole,
 } from '@torcida/types'
-import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/acessos/actions'
-import { atualizarRole, excluirRole } from '@/app/admin/configuracoes/actions'
+import { salvarAcessoUsuario, salvarPerfilComposto } from '@/app/admin/(plataforma)/acessos/actions'
+import { atualizarRole, excluirRole } from '@/app/admin/(plataforma)/configuracoes/actions'
 import { AccessPermissionCompare } from '@/components/admin/access-permission-preview'
 import { AccessPermissionWorktree, type PermissaoOrigem } from '@/components/admin/access-permission-worktree'
 import { runPersistAction } from '@/lib/toast-action'

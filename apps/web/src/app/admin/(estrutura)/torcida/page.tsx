@@ -58,21 +58,12 @@ export default async function TorcidaPage() {
   }
 
   return (
-    <div className="app-container space-y-7 py-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--color-primary-fg))]">
-            Presidência
-          </p>
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">Visão da torcida</h1>
-          <p className="mt-0.5 text-sm text-[rgb(var(--foreground-muted))]">{tenant.nome}</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2">
-          <Eye className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
-          <span className="text-xs text-[rgb(var(--foreground-muted))]">
-            Visão consolidada de leitura — cada unidade é gerida pela sua liderança
-          </span>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-3 py-2">
+        <Eye className="h-4 w-4 shrink-0 text-[rgb(var(--foreground-muted))]" />
+        <span className="text-xs text-[rgb(var(--foreground-muted))]">
+          Presidência · visão consolidada de leitura — cada unidade é gerida pela sua liderança
+        </span>
       </div>
 
       <Suspense fallback={<ConsoleSkeleton />}>

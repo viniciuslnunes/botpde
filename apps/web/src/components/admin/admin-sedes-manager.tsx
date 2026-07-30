@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { CriarSedeForm, SedeAcoesMenu } from '@/components/admin/sede-forms'
 import { LogoImage } from '@/components/media/logo-image'
-import { geocodificarSedesSemCoords } from '@/app/admin/sedes/actions'
+import { geocodificarSedesSemCoords } from '@/app/admin/(estrutura)/sedes/actions'
 import { isGoogleMapsConfigured, resolveSedeLocationImage } from '@/lib/google-maps'
 import { normalizarTexto } from '@/lib/onboarding-unidade'
 import { toast } from 'sonner'

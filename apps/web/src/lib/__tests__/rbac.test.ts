@@ -348,8 +348,8 @@ describe('filterMenuByPermissions com OR', () => {
       PERMISSIONS.MEMBERS_VIEW,
     ]).map((i) => ({ id: i.id, label: i.label, href: i.href, secao: i.secao }))
     const groups = groupAdminMenuBySecao(items)
-    expect(groups.map((g) => g.id)).toEqual(['geral', 'pessoas', 'financeiro'])
-    expect(groups.find((g) => g.id === 'financeiro')?.label).toBe('Financeiro')
+    expect(groups.map((g) => g.id)).toEqual(['geral', 'pessoas', 'financas'])
+    expect(groups.find((g) => g.id === 'financas')?.label).toBe('Finanças')
   })
 
   it('Fase 2: pacote colaborador de área canônica não abre operação admin (no máx. Relatórios)', () => {

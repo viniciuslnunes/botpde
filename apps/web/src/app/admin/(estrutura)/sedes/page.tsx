@@ -9,9 +9,7 @@ import {
   type AdminSedeListItem,
   type PaiHerdadoListItem,
 } from '@/components/admin/admin-sedes-manager'
-import { AdminPageHeader } from '@/components/admin/ui'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { MapPin } from 'lucide-react'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Sedes — Admin' }
@@ -270,24 +268,21 @@ export default async function AdminSedesPage() {
   )
 
   return (
-    <div className="flex min-h-full flex-col">
-      <AdminPageHeader
-        icon={<MapPin className="h-5 w-5" />}
-        title="Sedes"
-        description="Hierarquia Sede → Subsede → PDE — mapa, eventos e cadastro. Unidades com portal próprio continuam na árvore."
-      />
-      <div className="app-container min-w-0 flex-1 py-5 sm:py-8">
-        <MotionReveal>
-          <AdminSedesManager
-            sedes={sedes}
-            sedesOption={sedesOption}
-            candidatos={candidatos}
-            membrosSemUnidade={membrosSemUnidade}
-            torcidaPrincipal={torcidaPrincipal}
-            podeAdicionarLocal={podeAdicionarLocal}
-          />
-        </MotionReveal>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <p className="text-sm text-[rgb(var(--foreground-muted))]">
+        Hierarquia Sede → Subsede → PDE — mapa, eventos e cadastro. Unidades com portal próprio
+        continuam na árvore.
+      </p>
+      <MotionReveal>
+        <AdminSedesManager
+          sedes={sedes}
+          sedesOption={sedesOption}
+          candidatos={candidatos}
+          membrosSemUnidade={membrosSemUnidade}
+          torcidaPrincipal={torcidaPrincipal}
+          podeAdicionarLocal={podeAdicionarLocal}
+        />
+      </MotionReveal>
     </div>
   )
 }

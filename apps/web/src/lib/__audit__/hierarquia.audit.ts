@@ -147,7 +147,7 @@ describe('fluxo: promover unidade a tenant próprio', () => {
       return
     }
 
-    const { promoverSedeAction } = await import('@/app/admin/sedes/actions')
+    const { promoverSedeAction } = await import('@/app/admin/(estrutura)/sedes/actions')
 
     // 1. Sede principal não pode ser promovida — ela já é o tenant.
     const rSede = await comoUsuario(ctx.presidente, () =>
@@ -249,7 +249,7 @@ describe('fluxo: promover unidade a tenant próprio', () => {
       })
     })
 
-    const { promoverSedeAction } = await import('@/app/admin/sedes/actions')
+    const { promoverSedeAction } = await import('@/app/admin/(estrutura)/sedes/actions')
     const r = await comoUsuario(ctx.presidente, () => tentativa(() => promoverSedeAction(unidade.id)))
     if (!r.ok) {
       // Distinguir "regra recusou" de "a action não consegue completar" — são
@@ -495,7 +495,7 @@ describe('fluxo: excluir unidade remaneja quem dependia dela', () => {
     const ctx = await contextoSede()
     if (!ctx) return
 
-    const { excluirSede } = await import('@/app/admin/sedes/actions')
+    const { excluirSede } = await import('@/app/admin/(estrutura)/sedes/actions')
 
     // 1. Origem = destino.
     const rMesma = await comoUsuario(ctx.presidente, () =>
@@ -639,7 +639,7 @@ describe('fluxo: excluir unidade remaneja quem dependia dela', () => {
       await db.evento.deleteMany({ where: { id: evento.id } })
     })
 
-    const { excluirSede } = await import('@/app/admin/sedes/actions')
+    const { excluirSede } = await import('@/app/admin/(estrutura)/sedes/actions')
     const r = await comoUsuario(ctx.presidente, () =>
       tentativa(() => excluirSede(duplicada.id, ctx.sedePrincipalId)),
     )

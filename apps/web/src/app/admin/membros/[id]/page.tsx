@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, User } from 'lucide-react'
+import { User } from 'lucide-react'
 import { db } from '@torcida/db'
 import {
   calculateEffectivePermissions,
@@ -15,7 +14,7 @@ import { AdminMembroLgeForm } from '../admin-membro-lge-form'
 import { AdminMembroSedeForm } from '../admin-membro-sede-form'
 import { MemberActions } from '@/components/admin/member-actions'
 import { MotionReveal } from '@/components/motion/motion-reveal'
-import { StatusBadge } from '@/components/admin/ui'
+import { AdminDetailHeader, StatusBadge } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Membro — Admin' }
@@ -134,59 +133,56 @@ export default async function MembroDetalhePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
-      <Link
-        href="/admin/membros"
-        className="inline-flex items-center gap-1 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-      >
-        <ArrowLeft className="h-4 w-4" /> Voltar à lista
-      </Link>
+      <AdminDetailHeader
+        title={membro.nome}
+        backHref="/admin/membros"
+        backLabel="Membros"
+        icon={<User className="h-5 w-5" />}
+        description={[
+          membro.tipo,
+          membro.departamento?.nome,
+          membro.planoAssociacao?.nome,
+          membro.user.email,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+        badges={
+          <>
+            <StatusBadge dominio="membro" status={membro.status} />
+            <span
+              className={
+                membro.adimplente
+                  ? 'text-xs font-medium text-[rgb(var(--color-success-fg))]'
+                  : 'text-xs font-medium text-[rgb(var(--color-danger-fg))]'
+              }
+            >
+              {membro.adimplente ? 'Adimplente' : 'Inadimplente'}
+            </span>
+          </>
+        }
+      />
 
       <MotionReveal>
         <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--primary)_/_0.1)] text-[rgb(var(--color-primary-fg))]">
-              <User className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold text-[rgb(var(--foreground))]">
-                  {membro.nome}
-                </h1>
-                <StatusBadge dominio="membro" status={membro.status} />
-                {membro.espelhado && (
-                  <span className="rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
-                    {membro.status === 'PENDENTE'
-                      ? aprovadoNaUnidadeNome
-                        ? `Solicitação via ${aprovadoNaUnidadeNome}`
-                        : 'Espelho da Sede'
-                      : membro.aprovadoPorNome
-                        ? `Analisada por ${membro.aprovadoPorNome}${
-                            aprovadoEmLabel ? ` em ${aprovadoEmLabel}` : ''
-                          }`
-                        : aprovadoNaUnidadeNome
-                          ? `Aprovado via ${aprovadoNaUnidadeNome}`
-                          : 'Espelho da Sede'}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                {membro.tipo}
-                {membro.departamento ? ` · ${membro.departamento.nome}` : ''}
-                {membro.planoAssociacao ? ` · ${membro.planoAssociacao.nome}` : ''}
-              </p>
-              <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                {membro.user.email}
-                {membro.telefone ? ` · ${membro.telefone}` : ''}
-                {membro.cidade ? ` · ${membro.cidade}` : ''}
-              </p>
-              <p className="mt-1 text-xs">
-                {membro.adimplente ? (
-                  <span className="text-[rgb(var(--color-success-fg))]">Adimplente</span>
-                ) : (
-                  <span className="text-[rgb(var(--color-danger-fg))]">Inadimplente</span>
-                )}
-              </p>
-            </div>
+          <div className="min-w-0 space-y-1">
+            {membro.espelhado && (
+              <span className="inline-block rounded-md bg-[rgb(var(--background-subtle))] px-1.5 py-0.5 text-[11px] font-medium text-[rgb(var(--foreground-muted))]">
+                {membro.status === 'PENDENTE'
+                  ? aprovadoNaUnidadeNome
+                    ? `Solicitação via ${aprovadoNaUnidadeNome}`
+                    : 'Espelho da Sede'
+                  : membro.aprovadoPorNome
+                    ? `Analisada por ${membro.aprovadoPorNome}${
+                        aprovadoEmLabel ? ` em ${aprovadoEmLabel}` : ''
+                      }`
+                    : aprovadoNaUnidadeNome
+                      ? `Aprovado via ${aprovadoNaUnidadeNome}`
+                      : 'Espelho da Sede'}
+              </span>
+            )}
+            <p className="text-xs text-[rgb(var(--foreground-muted))]">
+              {[membro.telefone, membro.cidade].filter(Boolean).join(' · ') || 'Sem contato extra'}
+            </p>
           </div>
           <MemberActions
             membroId={membro.id}

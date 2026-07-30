@@ -5,8 +5,8 @@ import { assertPermission } from '@/lib/authz'
 import { PERMISSIONS, TIPO_EVENTO_LABEL } from '@torcida/types'
 import { redirect, notFound } from 'next/navigation'
 import { EditarEventoForm } from '@/components/admin/evento-forms'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { Gauge, PencilLine, UserCheck } from 'lucide-react'
+import { AdminDetailHeader, AdminTabs, adminTabIds } from '@/components/admin/ui'
 import type { Metadata } from 'next'
 import { EventoTipoBadge } from '@/components/eventos/evento-tipo-badge'
 import { ListaEmbarque, type EmbarqueRow } from '@/components/eventos/lista-embarque'
@@ -18,12 +18,24 @@ import { getAfiliacaoIdDoTenant, listPartidasParaEvento } from '@/lib/partidas'
 
 export const metadata: Metadata = { title: 'Agenda — Evento' }
 
+const ICONE_TAB = 'h-4 w-4 shrink-0'
+
+const ABAS = ['cockpit', 'presenca', 'editar'] as const
+type AbaEvento = (typeof ABAS)[number]
+
+function parseAba(valor: string | undefined): AbaEvento {
+  return ABAS.includes(valor as AbaEvento) ? (valor as AbaEvento) : 'cockpit'
+}
+
 export default async function AdminEventoDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const aba = parseAba((await searchParams).tab)
 
   try {
     await assertPermission(PERMISSIONS.EVENTS_MANAGE)
@@ -149,36 +161,46 @@ export default async function AdminEventoDetailPage({
     checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
   }))
 
+  const { tabId, panelId } = adminTabIds('tab', aba)
+
   return (
     <div className="app-container space-y-6 py-8">
-      <div>
-        <Link
-          href="/admin/eventos"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-[rgb(var(--foreground-muted))] hover:text-[rgb(var(--foreground))]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Agenda
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <EventoTipoBadge tipo={evento.tipo} />
-          <h1 className="text-2xl font-bold text-[rgb(var(--foreground))]">{evento.titulo}</h1>
-        </div>
-        <p className="mt-1 text-sm text-[rgb(var(--foreground-muted))]">
-          {TIPO_EVENTO_LABEL[evento.tipo]} · cockpit operacional
-        </p>
-        <div className="mt-3">
-          <EventoAcoesRapidas
-            eventoId={evento.id}
-            titulo={evento.titulo}
-            descricao={evento.descricao}
-            local={evento.local}
-            dataIso={evento.data.toISOString()}
-          />
-        </div>
+      <AdminDetailHeader
+        title={evento.titulo}
+        backHref="/admin/eventos"
+        backLabel="Agenda"
+        description={TIPO_EVENTO_LABEL[evento.tipo]}
+        badges={<EventoTipoBadge tipo={evento.tipo} />}
+      />
+
+      <AdminTabs
+        tabs={[
+          { id: 'cockpit', label: 'Cockpit', icon: <Gauge className={ICONE_TAB} /> },
+          {
+            id: 'presenca',
+            label: labelCheckin,
+            icon: <UserCheck className={ICONE_TAB} />,
+            count: evento._count.rsvps,
+          },
+          { id: 'editar', label: 'Editar', icon: <PencilLine className={ICONE_TAB} /> },
+        ]}
+        basePath={`/admin/eventos/${evento.id}`}
+        activeId={aba}
+      />
+
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId} className="space-y-6">
+      {aba === 'cockpit' && (
+      <>
+      <div className="space-y-3">
+        <EventoAcoesRapidas
+          eventoId={evento.id}
+          titulo={evento.titulo}
+          descricao={evento.descricao}
+          local={evento.local}
+          dataIso={evento.data.toISOString()}
+        />
         {(evento.lat != null && evento.lng != null) && (
-          <div className="mt-3">
-            <EventoMapaLinks lat={evento.lat} lng={evento.lng} local={evento.local} />
-          </div>
+          <EventoMapaLinks lat={evento.lat} lng={evento.lng} local={evento.local} />
         )}
       </div>
 
@@ -214,25 +236,31 @@ export default async function AdminEventoDetailPage({
           </div>
         )}
       </div>
+      </>
+      )}
 
-      <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-[rgb(var(--foreground))]">Editar</h2>
-        <EditarEventoForm
-          evento={eventoForm}
-          sedes={sedes}
-          partidas={partidas}
-          temAfiliacao={Boolean(afiliacaoId)}
-          redirectTo={`/admin/eventos/${evento.id}`}
+      {aba === 'presenca' && (
+        <ListaEmbarque
+          eventoId={evento.id}
+          itens={itens}
+          podeGerir
+          labelCheckin={labelCheckin}
+          tituloEvento={evento.titulo}
         />
-      </div>
+      )}
 
-      <ListaEmbarque
-        eventoId={evento.id}
-        itens={itens}
-        podeGerir
-        labelCheckin={labelCheckin}
-        tituloEvento={evento.titulo}
-      />
+      {aba === 'editar' && (
+        <div className="rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-6 shadow-sm">
+          <EditarEventoForm
+            evento={eventoForm}
+            sedes={sedes}
+            partidas={partidas}
+            temAfiliacao={Boolean(afiliacaoId)}
+            redirectTo={`/admin/eventos/${evento.id}?tab=editar`}
+          />
+        </div>
+      )}
+      </div>
     </div>
   )
 }

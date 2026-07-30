@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ADMIN_MENU,
+  ADMIN_MENU_SECOES,
   ADMIN_MODULOS,
   PERMISSIONS,
   primeiraTabPermitida,
@@ -43,12 +44,44 @@ function rotaTemPagina(rota: string): boolean {
   return busca(APP_DIR, segmentos)
 }
 
+/** Diretório da rota existe (mesmo sem `page.tsx` próprio, como pai de `[id]`). */
+function segmentoExiste(rota: string): boolean {
+  const segmentos = rota.replace(/^\//, '').split('/')
+
+  function busca(dir: string, restantes: string[]): boolean {
+    if (!existsSync(dir)) return false
+    if (restantes.length === 0) return true
+
+    const [atual, ...resto] = restantes
+    if (busca(join(dir, atual!), resto)) return true
+
+    return gruposEm(dir).some((grupo) => busca(join(dir, grupo), restantes))
+  }
+
+  return busca(APP_DIR, segmentos)
+}
+
 describe('ADMIN_MODULOS — invariantes de navegação', () => {
   it('toda tab aponta para uma rota que existe', () => {
     for (const modulo of ADMIN_MODULOS) {
       for (const tab of modulo.tabs) {
-        for (const rota of [tab.href, ...(tab.matchPaths ?? [])]) {
-          expect(rotaTemPagina(rota), `${modulo.id}/${tab.id}: rota inexistente ${rota}`).toBe(true)
+        expect(rotaTemPagina(tab.href), `${modulo.id}/${tab.id}: rota inexistente ${tab.href}`).toBe(
+          true,
+        )
+      }
+    }
+  })
+
+  it('todo matchPath corresponde a um segmento real da árvore', () => {
+    // matchPath é prefixo de ativação, não destino: pode apontar para o pai de
+    // uma rota dinâmica (`/admin/torcida/unidade` → `unidade/[tenantId]`).
+    for (const modulo of ADMIN_MODULOS) {
+      for (const tab of modulo.tabs) {
+        for (const rota of tab.matchPaths ?? []) {
+          expect(
+            rotaTemPagina(rota) || segmentoExiste(rota),
+            `${modulo.id}/${tab.id}: matchPath sem segmento ${rota}`,
+          ).toBe(true)
         }
       }
     }
@@ -81,6 +114,31 @@ describe('ADMIN_MODULOS — invariantes de navegação', () => {
       for (const tab of modulo.tabs) {
         expect(resolverMenuIdDeRota(tab.href), `${modulo.id}/${tab.id}`).toBe(modulo.menuId)
       }
+    }
+  })
+
+  it('nenhum cabeçalho de seção repete o nome do seu único item', () => {
+    // Resíduo do menu por módulo: enquanto Loja ocupava 5 linhas, a seção
+    // "Loja" agrupava; virando uma linha, virou "Loja › Loja".
+    const porSecao = new Map<string, string[]>()
+    for (const item of ADMIN_MENU) {
+      const secao = item.secao ?? 'geral'
+      porSecao.set(secao, [...(porSecao.get(secao) ?? []), item.label])
+    }
+
+    for (const secao of ADMIN_MENU_SECOES) {
+      const labels = porSecao.get(secao.id) ?? []
+      if (!secao.label || labels.length !== 1) continue
+      expect(labels[0]!.toLowerCase(), `seção ${secao.id} repete o item`).not.toBe(
+        secao.label.toLowerCase(),
+      )
+    }
+  })
+
+  it('todo item aponta para uma seção declarada', () => {
+    const ids = new Set(ADMIN_MENU_SECOES.map((s) => s.id))
+    for (const item of ADMIN_MENU) {
+      expect(ids.has(item.secao ?? 'geral'), `${item.id}: seção ${item.secao}`).toBe(true)
     }
   })
 

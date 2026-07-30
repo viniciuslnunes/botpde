@@ -53,6 +53,9 @@ pnpm --filter @torcida/web audit:dados       # auditoria funcional (código real
 pnpm --filter @torcida/web audit:fluxos      # fluxos ponta a ponta (Server Actions reais; muta e reverte)
 pnpm --filter @torcida/web audit:fluxos-avancados  # regras ainda não cobertas (eventos, bar, RBAC, grupos)
 pnpm --filter @torcida/web audit:hierarquia  # Sede→Subsede→PDE (promover, excluir, reatribuir)
+pnpm --filter @torcida/web audit:notificacoes # fan-out, reconciliação de leitura, escopo
+pnpm --filter @torcida/web audit:mensageria  # DM: segregação por rivalidade, bloqueio, solicitação
+pnpm --filter @torcida/web audit:loja        # cupom, estoque (inclui concorrência), pedido, seguir
 ```
 
 CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway.
@@ -109,8 +112,11 @@ CI roda `tsc --noEmit` + `eslint` em todo PR. Deploy: push em `main` → Railway
  quem não pode ver a raiz entra por `primeiraTabPermitida` (nunca expulsar para
  `/admin`). Badge de notificação aponta para a **rota** (`ROTA_POR_TIPO` +
  `rota` em `POLITICA_POR_TIPO`), nunca para id de menu — assim ele sobe para o
- módulo em vez de sumir em silêncio. Mover rota de módulo exige
- `permanentRedirect` na antiga: `Notificacao.link` já gravado aponta para ela.
+ módulo em vez de sumir em silêncio. Etapas com prefixo comum viram sub-rota;
+ etapas irmãs (Estrutura, Plataforma) viram **route group**
+ (`admin/(estrutura)/`), que dá o layout comum sem mudar URL. Mover rota de
+ módulo exige `permanentRedirect` na antiga: `Notificacao.link` já gravado
+ aponta para ela.
  Seções de uma única rota usam `AdminTabs` por query param; form de criar não
  fica empilhado (disclosure ou `AdminCreateDisclosure`).
 - **Dependência externa opcional**: quando uma feature depende de um serviço externo não

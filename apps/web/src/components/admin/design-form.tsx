@@ -51,7 +51,7 @@ import { StickyPersistBar } from '@/components/sticky-persist-bar'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { runPersistAction } from '@/lib/toast-action'
 import { extrairPaletaDeImagem } from '@/lib/extrair-paleta'
-import { restaurarDesignPadrao, salvarDesignTenant } from '@/app/admin/design/actions'
+import { restaurarDesignPadrao, salvarDesignTenant } from '@/app/admin/(plataforma)/design/actions'
 import { useTheme } from 'next-themes'
 import {
   DesignStudioPreview,
