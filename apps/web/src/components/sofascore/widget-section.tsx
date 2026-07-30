@@ -1,4 +1,4 @@
-import { getWidgetsForContexto } from '@torcida/types'
+import { getWidgetsForContexto, resolverWidgetsClassificacao } from '@torcida/types'
 import { MotionReveal } from '@/components/motion/motion-reveal'
 import { SofascoreWidgetFrame } from './sofascore-widget-frame'
 import type { SofascoreWidgetContexto, SofascoreWidgetTipo } from '@/lib/sofascore'
@@ -6,6 +6,8 @@ import type { SofascoreWidgetContexto, SofascoreWidgetTipo } from '@/lib/sofasco
 interface WidgetSectionProps {
   contexto: SofascoreWidgetContexto
   afiliacaoSlug: string | null | undefined
+  /** Divisão do clube (`Afiliacao.serie`) — usada no contexto `classificacao`. */
+  serie?: string | null
   competicaoSlug?: string | null
   jogadorId?: string | null
   limit?: number
@@ -18,12 +20,13 @@ interface WidgetSectionProps {
 
 /**
  * Seção de widgets oficiais Sofascore do clube do torcedor.
- * Sem widget cadastrado/ativo para o `afiliacaoSlug` → não renderiza nada
- * (nem placeholder, nem widget genérico).
+ * Sem widget cadastrado/ativo para o `afiliacaoSlug` (nem tabela nacional da
+ * divisão, no contexto classificacao) → não renderiza nada.
  */
 export async function WidgetSection({
   contexto,
   afiliacaoSlug,
+  serie,
   competicaoSlug,
   jogadorId,
   limit,
@@ -31,7 +34,10 @@ export async function WidgetSection({
   loading,
   hideTitulo,
 }: WidgetSectionProps) {
-  const widgets = getWidgetsForContexto({ contexto, afiliacaoSlug, competicaoSlug, jogadorId, limit })
+  const widgets =
+    contexto === 'classificacao'
+      ? resolverWidgetsClassificacao({ afiliacaoSlug, serie })
+      : getWidgetsForContexto({ contexto, afiliacaoSlug, competicaoSlug, jogadorId, limit })
   if (widgets.length === 0) return null
 
   return (

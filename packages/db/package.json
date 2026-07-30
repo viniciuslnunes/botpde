@@ -36,6 +36,8 @@
     "scrape:organizadas": "node --use-system-ca scripts/scrape-organizadas.mjs",
     "test:afiliacoes": "node scripts/test-afiliacoes.js",
     "db:repair-afiliacoes-torcidas": "node scripts/repair-afiliacoes-torcidas.js",
+    "db:repair-series-afiliacoes": "node scripts/repair-series-afiliacoes.js",
+    "test:series-brasileirao": "node scripts/test-series-brasileirao.js",
     "audit:clube-torcidas": "node scripts/audit-clube-torcidas.js",
     "db:promover-subsede-tenant": "node scripts/promover-subsede-para-tenant.js",
     "backfill:perfis-torcedores-publicos": "node scripts/backfill-perfis-torcedores-publicos.js",
